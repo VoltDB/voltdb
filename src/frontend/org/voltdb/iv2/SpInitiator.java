@@ -20,10 +20,10 @@ package org.voltdb.iv2;
 import org.voltcore.messaging.HostMessenger;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
-import org.voltdb.Iv2ExecutionSite;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.iv2.Site;
 
 public class SpInitiator implements Initiator
 {
@@ -33,7 +33,7 @@ public class SpInitiator implements Initiator
 
     // Encapsulated objects
     private InitiatorMailbox m_initiatorMailbox = null;
-    private Iv2ExecutionSite m_executionSite = null;
+    private Site m_executionSite = null;
     private SiteTaskerScheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
 
@@ -53,13 +53,13 @@ public class SpInitiator implements Initiator
                           CatalogContext catalogContext,
                           SiteTracker siteTracker)
     {
-        m_executionSite = new Iv2ExecutionSite(m_scheduler,
-                                               m_initiatorMailbox.getHSId(),
-                                               backend, catalogContext,
-                                               serializedCatalog,
-                                               catalogContext.m_transactionId,
-                                               m_partitionId,
-                                               siteTracker.m_numberOfPartitions);
+        m_executionSite = new Site(m_scheduler,
+                                   m_initiatorMailbox.getHSId(),
+                                   backend, catalogContext,
+                                   serializedCatalog,
+                                   catalogContext.m_transactionId,
+                                   m_partitionId,
+                                   siteTracker.m_numberOfPartitions);
         ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
         prf.configure(m_executionSite, null /* wtfhsql!? */);
         m_procSet = new LoadedProcedureSet(m_executionSite,

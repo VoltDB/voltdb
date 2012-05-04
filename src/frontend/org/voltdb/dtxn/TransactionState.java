@@ -25,7 +25,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
-import org.voltdb.Iv2ExecutionSite;
+import org.voltdb.iv2.Site;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -59,7 +59,7 @@ public abstract class TransactionState extends OrderableTransaction  {
         m_site = null;
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
-        m_beginUndoToken = Iv2ExecutionSite.kInvalidUndoToken;
+        m_beginUndoToken = Site.kInvalidUndoToken;
     }
 
     /**
