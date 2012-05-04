@@ -56,6 +56,12 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
 
+    // hacky partition ids?
+    private final long[] m_primaryPartitions = new long[]{};
+
+    //
+    // Half-backed replication stuff
+    //
     InitiatorRole m_role;
     private LeaderElector m_elector;
     // only primary initiator has the following two set
@@ -185,10 +191,18 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
-        final ProcedureTask task =
-            new ProcedureTask(this, this.m_loadedProcs.procs.get(procedureName),
-                              m_txnId.incrementAndGet(), message);
-        m_scheduler.offer(task);
+        if (message.isSinglePartition()) {
+            final SpProcedureTask task =
+                new SpProcedureTask(this, this.m_loadedProcs.procs.get(procedureName),
+                        m_txnId.incrementAndGet(), message);
+            m_scheduler.offer(task);
+        }
+        else {
+            final MpProcedureTask task =
+                new MpProcedureTask(this, this.m_loadedProcs.procs.get(procedureName),
+                        m_txnId.incrementAndGet(), message, m_primaryPartitions);
+            m_scheduler.offer(task);
+        }
     }
 
     private void handleInitiateResponseMessage(InitiateResponseMessage message)
