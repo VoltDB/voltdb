@@ -25,6 +25,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.iv2.Site;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
@@ -215,7 +216,7 @@ public abstract class TransactionState extends OrderableTransaction  {
      * responses to the waiting transaction state.
      * @return
      */
-    public Map<Integer, List<VoltTable>> recursableRun()
+    public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
     {
         return null;
     }

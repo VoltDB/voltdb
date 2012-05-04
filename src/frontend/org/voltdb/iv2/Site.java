@@ -365,7 +365,7 @@ public class Site implements Runnable, SiteProcedureConnection
     public Map<Integer, List<VoltTable>> recursableRun(
             TransactionState currentTxnState)
     {
-        return currentTxnState.recursableRun();
+        return currentTxnState.recursableRun(this);
     }
 
     @Override
