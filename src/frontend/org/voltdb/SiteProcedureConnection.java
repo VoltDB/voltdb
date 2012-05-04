@@ -108,4 +108,8 @@ public interface SiteProcedureConnection {
         long planFragmentId, int inputDepId, ParameterSet parameterSet,
         long txnId, boolean readOnly) throws EEException;
 
+    /**
+     * IV2: send dependencies to the EE
+     */
+    public void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies);
 }

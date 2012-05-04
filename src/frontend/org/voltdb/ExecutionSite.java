@@ -2076,7 +2076,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         {
             if (dependencies != null)
             {
-                ee.stashWorkUnitDependencies(dependencies);
+                stashWorkUnitDependencies(dependencies);
             }
         }
 
@@ -2315,5 +2315,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                       txnId,
                                       lastCommittedTxnId,
                                       readOnly ? Long.MAX_VALUE : getNextUndoToken());
+    }
+
+    @Override
+    public void stashWorkUnitDependencies(Map<Integer, List<VoltTable>> dependencies)
+    {
+        ee.stashWorkUnitDependencies(dependencies);
     }
 }

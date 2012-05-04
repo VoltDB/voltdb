@@ -379,4 +379,10 @@ public class Site implements Runnable, SiteProcedureConnection
             m_lastCommittedTxnId = txnId;
         }
     }
+
+    @Override
+    public void stashWorkUnitDependencies(Map<Integer, List<VoltTable>> dependencies)
+    {
+        m_ee.stashWorkUnitDependencies(dependencies);
+    }
 }
