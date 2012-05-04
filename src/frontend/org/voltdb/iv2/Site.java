@@ -365,7 +365,7 @@ public class Site implements Runnable, SiteProcedureConnection
     public Map<Integer, List<VoltTable>> recursableRun(
             TransactionState currentTxnState)
     {
-        throw new RuntimeException("Not supported in IV2");
+        return currentTxnState.recursableRun();
     }
 
     @Override

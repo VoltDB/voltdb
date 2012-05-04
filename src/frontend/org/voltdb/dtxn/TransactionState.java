@@ -203,4 +203,20 @@ public abstract class TransactionState extends OrderableTransaction  {
      * @param failedSites list of execution and initiator sites that have failed
      */
     public abstract void handleSiteFaults(HashSet<Long> failedSites);
+
+    /**
+     * IV2 implementation: in iv2, recursable run is a function on the
+     * transaction state; we block in the transaction state recording
+     * until all dependencies / workunits are received.
+     * IV2's SiteProcedureConnection.recursableRun(TransactionState) delegates
+     * to this recursableRun method.
+     *
+     * The IV2 initiator mailbox knows how to offer() incoming fragment
+     * responses to the waiting transaction state.
+     * @return
+     */
+    public Map<Integer, List<VoltTable>> recursableRun()
+    {
+        return null;
+    }
 }
