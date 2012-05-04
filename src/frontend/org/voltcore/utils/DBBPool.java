@@ -18,11 +18,11 @@
 package org.voltcore.utils;
 
 import java.nio.ByteBuffer;
-import java.util.ArrayDeque;
-import java.util.HashMap;
 import java.util.concurrent.atomic.AtomicLong;
+import org.apache.hadoop_voltpatches.hbase.utils.DirectMemoryUtils;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltDB;
 
 /**
  * A pool of {@link java.nio.ByteBuffer ByteBuffers} that are
@@ -126,38 +126,22 @@ public final class DBBPool {
     private final long bytesAllocatedLocally = 0;
     private final long bytesLoanedLocally = 0;
 
-    private static final HashMap<Integer, ArrayDeque<ByteBuffer>> m_availableBufferStock =
-            new HashMap<Integer, ArrayDeque<ByteBuffer>>();
-
     public static BBContainer allocateDirect(final int capacity) {
-        synchronized (m_availableBufferStock) {
-            ArrayDeque<ByteBuffer> buffers = m_availableBufferStock.get(capacity);
-            ByteBuffer retval = null;
-            if (buffers != null) {
-                retval = buffers.poll();
-            }
-            if (retval != null) {
-                retval.clear();
-            } else {
-                bytesAllocatedGlobally.getAndAdd(capacity);
-                retval = ByteBuffer.allocateDirect(capacity);
-            }
-            return new BBContainer(retval, 0) {
+        final ByteBuffer retval = ByteBuffer.allocateDirect(capacity);
+        bytesAllocatedGlobally.getAndAdd(capacity);
 
-                @Override
-                public void discard() {
-                    synchronized (m_availableBufferStock) {
-                        ArrayDeque<ByteBuffer> buffers = m_availableBufferStock.get(b.capacity());
-                        if (buffers == null) {
-                            buffers = new ArrayDeque<ByteBuffer>();
-                            m_availableBufferStock.put(b.capacity(), buffers);
-                        }
-                        buffers.offer(b);
-                    }
+        return new BBContainer(retval, 0) {
+
+            @Override
+            public void discard() {
+                try {
+                    DirectMemoryUtils.destroyDirectByteBuffer(retval);
+                } catch (Throwable e) {
+                    VoltDB.crashLocalVoltDB("Failed to deallocate direct byte buffer", false, e);
                 }
+            }
 
-            };
-        }
+        };
     }
 
     /*

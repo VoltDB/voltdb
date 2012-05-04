@@ -107,5 +107,17 @@ public abstract class RecoverySiteProcessor {
         }
     }
 
+    /*
+     * Make a last ditch attempt to free all the allocated buffers. If recovery
+     * terminates via an error condition it might not reach the block
+     * that discards all the buffers.
+     */
+    @Override
+    public void finalize() {
+        for (BBContainer cont : m_bufferToOriginMap.values()) {
+            cont.discard();
+        }
+    }
+
     abstract public void notifyBlockedOnMultiPartTxn(long currentTxnId);
 }
