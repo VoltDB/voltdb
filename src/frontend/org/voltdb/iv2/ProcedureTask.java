@@ -43,7 +43,7 @@ public class ProcedureTask extends SiteTasker
     private static final VoltLogger execLog = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final Iv2TransactionState m_txn;
+    final SpTransactionState m_txn;
     final ProcedureRunner m_runner;
     final InitiatorMailbox m_initiator;
 
@@ -52,7 +52,7 @@ public class ProcedureTask extends SiteTasker
     {
         m_initiator = initiator;
         m_runner = runner;
-        m_txn = new Iv2TransactionState(txnId, msg);
+        m_txn = new SpTransactionState(txnId, msg);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */

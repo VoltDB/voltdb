@@ -20,64 +20,60 @@ package org.voltdb.iv2;
 import java.util.HashSet;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.StoredProcedureInvocation;
 
-public class Iv2MPTransactionState extends TransactionState
+public class SpTransactionState extends TransactionState
 {
-    final FragmentTaskMessage m_task;
-
-    Iv2MPTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    final Iv2InitiateTaskMessage m_task;
+    protected SpTransactionState(long realTxnId, TransactionInfoBaseMessage notice)
     {
-        super(txnId, notice);
-        m_task = (FragmentTaskMessage)notice;
+        super(realTxnId, notice);
+        m_task = (Iv2InitiateTaskMessage)notice;
     }
 
     @Override
     public boolean isSinglePartition()
     {
-        return false;
+        return true;
     }
 
     @Override
     public boolean isCoordinator()
     {
-        return false;
+        return true;
     }
 
     @Override
     public boolean isBlocked()
     {
-        // TODO Auto-generated method stub
-        return false;
+        return true;
     }
 
+    // Per SinglePartitonTxnState.java
     @Override
     public boolean hasTransactionalWork()
     {
-        // TODO Auto-generated method stub
-        return false;
+        return true;
     }
 
     @Override
     public boolean doWork(boolean recovering)
     {
-        // TODO Auto-generated method stub
-        return false;
+        throw new RuntimeException("Do not expect doWork() in IV2");
     }
 
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        // TODO Auto-generated method stub
-        return null;
+        return m_task.getStoredProcedureInvocation();
     }
 
     @Override
     public void handleSiteFaults(HashSet<Long> failedSites)
     {
-        // TODO Auto-generated method stub
-
+        throw new RuntimeException("Do not expect handleSiteFaults in IV2");
     }
 }
