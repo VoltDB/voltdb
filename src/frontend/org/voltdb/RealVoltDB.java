@@ -44,6 +44,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
@@ -94,6 +95,7 @@ import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
+import org.voltcore.utils.COWMap;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -281,7 +283,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_replicationActive = false;
 
             // set up site structure
-            m_localSites = new HashMap<Long, ExecutionSite>();
+            m_localSites = new COWMap<Long, ExecutionSite>();
             m_siteThreads = new HashMap<Long, Thread>();
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
@@ -535,6 +537,32 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 }
                 assert(runner.m_siteObj != null);
                 m_localSites.put(runner.m_siteId, runner.m_siteObj);
+            }
+
+            /*
+             * At this point all of the execution sites have been published to m_localSites
+             * It is possible that while they were being created the mailbox tracker found additional
+             * sites, but was unable to deliver the notification to some or all of the execution sites.
+             * Since notifying them of new sites is idempotent (version number check), let's do that here so there
+             * are no lost updates for additional sites. But... it must be done from the
+             * mailbox tracker thread or there is a race with failure detection and handling.
+             * Generally speaking it seems like retrieving a reference to a site tracker not via a message
+             * from the mailbox tracker thread that builds the site tracker is bug. If it isn't delivered to you by
+             * a site tracker then you lose sequential consistency.
+             */
+            try {
+                m_mailboxTracker.executeTask(new Runnable() {
+                    @Override
+                    public void run() {
+                        for (ExecutionSite es : m_localSites.values()) {
+                            es.notifySitesAdded(m_siteTracker);
+                        }
+                    }
+                }).get();
+            } catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            } catch (ExecutionException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
             // Create the client interface

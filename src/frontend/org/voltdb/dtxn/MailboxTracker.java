@@ -47,11 +47,16 @@ import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltZK;
 import org.voltdb.VoltZK.MailboxType;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+
 public class MailboxTracker {
     private final ZooKeeper m_zk;
     private final MailboxUpdateHandler m_handler;
-    private final ExecutorService m_es =
-            Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Mailbox tracker", 1024 * 128));
+    private final ListeningExecutorService m_es =
+            MoreExecutors.listeningDecorator(
+                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Mailbox tracker", 1024 * 128)));
 
     private byte m_lastChecksum[] = null;
 
@@ -212,5 +217,13 @@ public class MailboxTracker {
                 mailboxes.add(new MailboxNodeContent(hsId, partitionId));
             }
         }
+    }
+
+    /*
+     * Execute a task in the mailbox tracker thread. It is necessary to deliver a
+     * new version of the site tracker from this thread if you want to avoid lost updates.
+     */
+    public ListenableFuture<?> executeTask(Runnable r) {
+        return m_es.submit(r);
     }
 }
