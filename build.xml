@@ -365,7 +365,9 @@ DISTRIBUTION
     <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="voltdb" defaultexcludes="yes">
             <include name="voltdb-${dist.version}.jar" />
+            <include name="voltdb-${dist.version}-javadoc.jar" />
             <include name="voltdbclient-${dist.version}.jar" />
+            <include name="voltdbclient-${dist.version}-javadoc.jar" />
         </fileset>
     </copy>
     <copy todir="${dist.dir}/voltdb" flatten="true" >
@@ -669,6 +671,41 @@ JAR BUILDING
             </section>
         </manifest>
     </jar>
+    <jar destfile="voltdb/voltdb-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}" defaultexcludes="no" >
+            <include name="javadoc/procedure-api/**"/>
+        </fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB Inc." />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB Database JavaDoc"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar>
+    <jar destfile="voltdb/voltdbclient-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}" defaultexcludes="no" >
+            <include name="javadoc/java-client-api/**"/>
+        </fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB Inc." />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB Client JavaDoc"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar>
+
 </target>
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">
