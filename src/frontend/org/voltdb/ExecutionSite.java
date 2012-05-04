@@ -1515,7 +1515,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                  txnId != null ? txnId : Long.MIN_VALUE,
                                                  lastKnownGloballyCommitedMultiPartTxnId);
 
-                m_mailbox.send(CoreUtils.toLongArray(survivors), srcmsg);
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), srcmsg);
             }
         }
         catch (MessagingException e) {
