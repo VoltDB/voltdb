@@ -31,9 +31,7 @@ import java.net.SocketException;
 import java.net.URL;
 import java.net.UnknownHostException;
 import java.util.Collection;
-import java.util.Collections;
 import java.util.Enumeration;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
@@ -43,6 +41,9 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.ThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
+
+import com.google.common.collect.ImmutableList;
+import com.google.common.collect.ImmutableMap;
 
 public class CoreUtils {
     public static final long[] toLongArray(Set<Long> set) {
@@ -197,12 +198,12 @@ public class CoreUtils {
         return (int)(siteId>>32);
     }
 
-    public static <K,V> Map<K, List<V>> unmodifiableMapCopy(Map<K, List<V>> m) {
-        HashMap<K, List<V>> copy = new HashMap<K, List<V>>();
+    public static <K,V> ImmutableMap<K, List<V>> unmodifiableMapCopy(Map<K, List<V>> m) {
+        ImmutableMap.Builder<K, List<V>> builder = ImmutableMap.builder();
         for (Map.Entry<K, List<V>> e : m.entrySet()) {
-            copy.put(e.getKey(), Collections.unmodifiableList(e.getValue()));
+            builder.put(e.getKey(), ImmutableList.<V>builder().addAll(e.getValue()).build());
         }
-        return Collections.unmodifiableMap(copy);
+        return builder.build();
     }
 
     public static byte[] urlToBytes(String url) {
