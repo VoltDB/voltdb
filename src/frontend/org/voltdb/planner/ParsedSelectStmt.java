@@ -282,7 +282,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 tve.setValueType(orig_col.expression.getValueType());
             }
         }
-        else
+        else if (child.name.equals("function") == false)
         {
             throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
         }

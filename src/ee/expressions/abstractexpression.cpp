@@ -194,6 +194,7 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
     ValueType value_type = VALUE_TYPE_INVALID;
     AbstractExpression *left_child = NULL;
     AbstractExpression *right_child = NULL;
+    std::vector<AbstractExpression*>* argsVector = NULL;
 
     // read the expression type
     json_spirit::Value expressionTypeValue = json_spirit::find_value(obj,
@@ -237,28 +238,38 @@ AbstractExpression::buildExpressionTree_recurse(json_spirit::Object &obj)
         json_spirit::Value leftValue = json_spirit::find_value(obj, "LEFT");
         if (!(leftValue == json_spirit::Value::null)) {
             left_child = AbstractExpression::buildExpressionTree_recurse(leftValue.get_obj());
-        } else {
-            left_child = NULL;
         }
 
         json_spirit::Value rightValue = json_spirit::find_value( obj, "RIGHT");
         if (!(rightValue == json_spirit::Value::null)) {
             right_child = AbstractExpression::buildExpressionTree_recurse(rightValue.get_obj());
-        } else {
-            right_child = NULL;
         }
 
+        // NULL argsVector corresponds to a missing ARGS value
+        // vs. an empty argsVector which corresponds to an empty array ARGS value.
+        // Different expression types could assert either a NULL or non-NULL argsVector initializer.
+        json_spirit::Value argsValue = json_spirit::find_value(obj, "ARGS");
+        if (!(argsValue == json_spirit::Value::null)) {
+            argsVector = new std::vector<AbstractExpression*>();
+
+            json_spirit::Array argsArray = argsValue.get_array();
+            for (int ii = 0; ii < argsArray.size(); ii++) {
+                json_spirit::Value argValue = argsArray[ii];
+                AbstractExpression* argExpr = AbstractExpression::buildExpressionTree_recurse(argValue.get_obj());
+                argsVector->push_back(argExpr);
+            }
+        }
         // invoke the factory. obviously it has to handle null children.
         // pass it the serialization stream in case a subclass has more
         // to read. yes, the per-class data really does follow the
         // child serializations.
-        return expressionFactory(obj,
-                                 peek_type, value_type, valueSize,
-                                 left_child, right_child);
+        return ExpressionUtil::expressionFactory(obj, peek_type, value_type, valueSize,
+                                                 left_child, right_child, argsVector);
     }
     catch (SerializableEEException &ex) {
         delete left_child;
         delete right_child;
+        delete argsVector;
         throw;
     }
 }

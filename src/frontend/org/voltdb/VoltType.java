@@ -260,13 +260,24 @@ public enum VoltType {
     /**
      * Get the number of bytes required to store the type for types
      * with fixed length.
-     * @return An integer value represting a number of bytes.
+     * @return An integer value representing a number of bytes.
      */
     public int getLengthInBytesForFixedTypes() {
         if (m_lengthInBytes == -1) {
             throw new RuntimeException(
                     "Asking for fixed size for non-fixed or unknown type.");
 
+        }
+        return m_lengthInBytes;
+    }
+
+    /**
+     * Get the maximum number of bytes required to store the type
+     * @return An integer value representing a number of bytes.
+     */
+    public int getMaxLengthInBytes() {
+        if (m_lengthInBytes == -1) {
+            return MAX_VALUE_LENGTH;
         }
         return m_lengthInBytes;
     }
@@ -528,4 +539,5 @@ public enum VoltType {
     private static final class NullDecimalSigil{}
     /** Null value for <code>DECIMAL</code>.  */
     public static final NullDecimalSigil NULL_DECIMAL = new NullDecimalSigil();
+
 }

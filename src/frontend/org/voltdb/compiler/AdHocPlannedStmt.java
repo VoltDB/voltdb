@@ -34,4 +34,16 @@ public class AdHocPlannedStmt extends AsyncCompilerResult {
         retval += "\n  sql: " + ((sql != null) ? sql : "null");
         return retval;
     }
+
+    @Override
+    public Object clone() {
+        AdHocPlannedStmt copy = new AdHocPlannedStmt();
+        copy.aggregatorFragment = aggregatorFragment;
+        copy.collectorFragment = collectorFragment;
+        copy.sql = sql;
+        copy.partitionParam = partitionParam;
+        copy.isReplicatedTableDML = isReplicatedTableDML;
+        copy.catalogVersion = catalogVersion;
+        return copy;
+    }
 }
