@@ -28,7 +28,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
-import org.voltdb.Iv2ExecutionSite;
+import org.voltdb.iv2.Site;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.ProcedureRunner;
@@ -154,11 +154,11 @@ public class ProcedureTask extends SiteTasker
     void completeInitiateTask(SiteProcedureConnection siteConnection)
     {
         if (!m_txn.isReadOnly()) {
-            assert(siteConnection.getLatestUndoToken() != Iv2ExecutionSite.kInvalidUndoToken) :
+            assert(siteConnection.getLatestUndoToken() != Site.kInvalidUndoToken) :
                 "[SP][RW] transaction found invalid latest undo token state in Iv2ExecutionSite.";
             assert(siteConnection.getLatestUndoToken() >= m_txn.getBeginUndoToken()) :
                 "[SP][RW] transaction's undo log token farther advanced than latest known value.";
-            assert (m_txn.getBeginUndoToken() != Iv2ExecutionSite.kInvalidUndoToken) :
+            assert (m_txn.getBeginUndoToken() != Site.kInvalidUndoToken) :
                 "[SP][RW] with invalid undo token in completeInitiateTask.";
 
             // the truncation point token SHOULD be part of m_txn. However, the
