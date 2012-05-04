@@ -27,8 +27,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.ClientResponseImpl;
+import org.voltdb.dtxn.TransactionState;
 import org.voltdb.ExpectedProcedureException;
-import org.voltdb.iv2.Site;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.ProcedureRunner;
@@ -38,35 +38,27 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 
-public class ProcedureTask extends SiteTasker
+abstract public class ProcedureTask extends SiteTasker
 {
-    private static final VoltLogger execLog = new VoltLogger("EXEC");
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    static final VoltLogger execLog = new VoltLogger("EXEC");
+    static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final SpTransactionState m_txn;
     final ProcedureRunner m_runner;
     final InitiatorMailbox m_initiator;
+    final TransactionState m_txn;
 
-    ProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner,
-                  long txnId, Iv2InitiateTaskMessage msg)
+    ProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner, TransactionState txn)
     {
         m_initiator = initiator;
         m_runner = runner;
-        m_txn = new SpTransactionState(txnId, msg);
+        m_txn = txn;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
-    @Override
-    public void run(SiteProcedureConnection siteConnection)
-    {
-        if (!m_txn.isReadOnly()) {
-            m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
-        }
-        final InitiateResponseMessage response = processInitiateTask();
-        completeInitiateTask(siteConnection);
-        m_initiator.deliver(response);
-        execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
-    }
+    abstract public void run(SiteProcedureConnection siteConnection);
+
+    /** procedure tasks must complete their txnstates */
+    abstract void completeInitiateTask(SiteProcedureConnection siteConnection);
 
     /** Priority returns this task's priority for scheduling */
     @Override
@@ -76,10 +68,9 @@ public class ProcedureTask extends SiteTasker
     }
 
     /** Mostly copy-paste of old ExecutionSite.processInitiateTask() */
-    InitiateResponseMessage processInitiateTask()
+    protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage task)
     {
-        final Iv2InitiateTaskMessage itask = m_txn.m_task;
-        final InitiateResponseMessage response = new InitiateResponseMessage(itask);
+        final InitiateResponseMessage response = new InitiateResponseMessage(task);
 
         try {
             Object[] callerParams = null;
@@ -88,7 +79,7 @@ public class ProcedureTask extends SiteTasker
              * that the parameter set is corrupt
              */
             try {
-                callerParams = itask.getParameters();
+                callerParams = task.getParameters();
             } catch (RuntimeException e) {
                 Writer result = new StringWriter();
                 PrintWriter pw = new PrintWriter(result);
@@ -118,17 +109,17 @@ public class ProcedureTask extends SiteTasker
                        cr = runner.call(txnId, combinedParams);
                    }
                    else {
-                        cr = runner.call(txnId, itask.getParameters());
+                        cr = runner.call(txnId, task.getParameters());
                     }
                 */
-                cr = m_runner.call(txnId, itask.getParameters());
+                cr = m_runner.call(txnId, task.getParameters());
 
                 response.setResults(cr);
                 // record the results of write transactions to the transaction state
                 // this may be used to verify the DR replica cluster gets the same value
                 // skip for multi-partition txns because only 1 of k+1 partitions will
                 //  have the real results
-                if ((!itask.isReadOnly()) && itask.isSinglePartition()) {
+                if ((!task.isReadOnly()) && task.isSinglePartition()) {
                     m_txn.storeResults(cr);
                 }
             }
@@ -151,26 +142,5 @@ public class ProcedureTask extends SiteTasker
         return response;
     }
 
-    void completeInitiateTask(SiteProcedureConnection siteConnection)
-    {
-        if (!m_txn.isReadOnly()) {
-            assert(siteConnection.getLatestUndoToken() != Site.kInvalidUndoToken) :
-                "[SP][RW] transaction found invalid latest undo token state in Iv2ExecutionSite.";
-            assert(siteConnection.getLatestUndoToken() >= m_txn.getBeginUndoToken()) :
-                "[SP][RW] transaction's undo log token farther advanced than latest known value.";
-            assert (m_txn.getBeginUndoToken() != Site.kInvalidUndoToken) :
-                "[SP][RW] with invalid undo token in completeInitiateTask.";
-
-            // the truncation point token SHOULD be part of m_txn. However, the
-            // legacy interaces don't work this way and IV2 hasn't changed this
-            // ownership yet. But truncateUndoLog is written assuming the right
-            // eventual encapsulation.
-            final long token = m_txn.needsRollback() ?
-                m_txn.getBeginUndoToken() : siteConnection.getLatestUndoToken();
-
-            siteConnection.truncateUndoLog(m_txn.needsRollback(), token, m_txn.txnId);
-        }
-
-    }
 
 }
