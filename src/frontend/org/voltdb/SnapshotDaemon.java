@@ -1404,53 +1404,73 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
         }
 
-        boolean requestExists = false;
+        String path = null;
+        String nonce = null;
+        byte blocking = 0;
+        SnapshotFormat format = SnapshotFormat.NATIVE;
         try {
-            String path;
-            String nonce;
-            byte blocking;
-            String format = "native";
             if (params.length == 1) {
                 JSONObject jsObj = new JSONObject((String)params[0]);
                 path = jsObj.getString("path");
                 nonce = jsObj.getString("nonce");
                 blocking = (byte)(jsObj.optBoolean("block", false) ? 1 : 0);
-                format = jsObj.optString("format", "native");
+                String formatString = jsObj.optString("format",SnapshotFormat.NATIVE.toString());
+
                 /*
                  * Yet another parameter validation
                  */
-                if (!(format.equals("csv") || format.equals("native"))) {
+                try {
+                    format = SnapshotFormat.getEnumIgnoreCase(formatString);
+                } catch (IllegalArgumentException argException) {
                     final ClientResponseImpl errorResponse =
                             new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                                                    new VoltTable[0],
-                                                   "@SnapshotSave format param is a " + format +
-                                                       " and should be one of [\"native\" | \"csv\"]",
+                                                   "@SnapshotSave format param is a " + formatString +
+                                                   " and should be one of [\"native\" | \"csv\"]",
                                                    invocation.clientHandle);
-                        ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                        buf.putInt(buf.capacity() - 4);
-                        errorResponse.flattenToBuffer(buf).flip();
-                        c.writeStream().enqueue(buf);
+                    ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    errorResponse.flattenToBuffer(buf).flip();
+                    c.writeStream().enqueue(buf);
                 }
             } else {
                 path = (String)params[0];
                 nonce = (String)params[1];
                 blocking = ((Number)params[2]).byteValue();
             }
-            final JSONObject jsObj = new JSONObject();
-            jsObj.put("path", path);
-            jsObj.put("nonce", nonce);
-            jsObj.put("block", blocking == 1 ? true: false);
-            jsObj.put("format", format);
-            final String requestId = java.util.UUID.randomUUID().toString();
-            jsObj.put("requestId", requestId);
-            String zkString = jsObj.toString(4);
-            byte zkBytes[] = zkString.getBytes("UTF-8");
-            m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            registerUserSnapshotResponseWatch(requestId, invocation, c);
-        } catch (KeeperException.NodeExistsException e) {
-            requestExists = true;
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
+        }
+
+        createAndWatchRequestNode(invocation.clientHandle, c, path, nonce, blocking, format);
+    }
+
+    /**
+     * Try to create the ZK request node and watch it if created successfully.
+     *
+     * @param clientHandle
+     * @param c
+     * @param path
+     * @param nonce
+     * @param blocking
+     * @param format
+     */
+    public void createAndWatchRequestNode(final long clientHandle,
+                                          final Connection c,
+                                          String path,
+                                          String nonce,
+                                          byte blocking,
+                                          SnapshotFormat format) {
+        boolean requestExists = false;
+        final String requestId = createRequestNode(path, nonce, blocking, format);
+        if (requestId == null) {
+            requestExists = true;
+        } else {
+            try {
+                registerUserSnapshotResponseWatch(requestId, clientHandle, c);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to register ZK watch on snapshot response", true, e);
+            }
         }
 
         if (requestExists) {
@@ -1464,18 +1484,51 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 new ClientResponseImpl(ClientResponseImpl.SUCCESS,
                                        new VoltTable[] { result },
                                        "A request to perform a user snapshot already exists",
-                                       invocation.clientHandle);
+                                       clientHandle);
             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
             buf.putInt(buf.capacity() - 4);
             errorResponse.flattenToBuffer(buf).flip();
             c.writeStream().enqueue(buf);
-            return;
         }
+    }
+
+    /**
+     * Try to create the ZK node to request the snapshot.
+     *
+     * @param path can be null if the target is not a file target
+     * @param nonce
+     * @param blocking
+     * @param format
+     * @return The request ID if succeeded, otherwise null.
+     */
+    private String createRequestNode(String path, String nonce,
+                                     byte blocking, SnapshotFormat format) {
+        String requestId = null;
+
+        try {
+            final JSONObject jsObj = new JSONObject();
+            jsObj.put("path", path);
+            jsObj.put("nonce", nonce);
+            jsObj.put("block", blocking == 1 ? true: false);
+            jsObj.put("format", format);
+            requestId = java.util.UUID.randomUUID().toString();
+            jsObj.put("requestId", requestId);
+            String zkString = jsObj.toString(4);
+            byte zkBytes[] = zkString.getBytes("UTF-8");
+
+            m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            return null;
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
+        }
+
+        return requestId;
     }
 
     private void registerUserSnapshotResponseWatch(
             final String requestId,
-            final StoredProcedureInvocation invocation,
+            final long clientHandle,
             final Connection c
             ) throws Exception {
         final String responseNode = VoltZK.user_snapshot_response + requestId;
@@ -1491,7 +1544,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             try {
                                 processUserSnapshotRequestResponse(
                                             event,
-                                            invocation,
+                                            clientHandle,
                                             c);
                             } catch (Exception e) {
                                 VoltDB.crashLocalVoltDB(
@@ -1513,14 +1566,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         EventType.NodeCreated,
                         KeeperState.SyncConnected,
                         responseNode),
-                        invocation,
+                        clientHandle,
                         c);
         }
     }
 
     void processUserSnapshotRequestResponse(
             final WatchedEvent event,
-            final StoredProcedureInvocation invocation,
+            final long clientHandle,
             final Connection c) throws Exception {
         byte responseBytes[] = m_zk.getData(event.getPath(), false, null);
         try {
@@ -1531,7 +1584,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         ByteBuffer buf = ByteBuffer.wrap(responseBytes);
         ClientResponseImpl response = new ClientResponseImpl();
         response.initFromBuffer(buf);
-        response.setClientHandle(invocation.clientHandle);
+        response.setClientHandle(clientHandle);
         // Not sure if we need to preserve the original byte buffer here, playing it safe
         ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf2.putInt(buf2.capacity() - 4);

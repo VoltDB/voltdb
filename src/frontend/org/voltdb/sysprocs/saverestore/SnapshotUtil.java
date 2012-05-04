@@ -40,15 +40,24 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.zip.CRC32;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.SnapshotDaemon;
+import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
@@ -832,5 +841,141 @@ public class SnapshotUtil {
             }
         }
         return inprogress;
+    }
+
+    /**
+     * Handles response from asynchronous snapshot requests.
+     */
+    public static interface SnapshotResponseHandler {
+        public void handleResponse(ClientResponseImpl resp);
+    }
+
+    /**
+     * Request a new snapshot. It will retry for a couple of times. If it
+     * doesn't succeed in the specified time, an error response will be sent to
+     * the response handler, otherwise a success response will be passed to the
+     * handler.
+     *
+     * The request process runs in a separate thread, this method call will
+     * return immediately.
+     *
+     * @param clientHandle
+     * @param path
+     * @param nonce
+     * @param blocking
+     * @param format
+     * @param handler
+     */
+    public static void requestSnapshot(final long clientHandle,
+                                       final String path,
+                                       final String nonce,
+                                       final byte blocking,
+                                       final SnapshotFormat format,
+                                       final SnapshotResponseHandler handler) {
+        final Connection c = new Connection() {
+            @Override
+            public WriteStream writeStream() {
+                return new WriteStream() {
+
+                    @Override
+                    public void enqueue(DeferredSerialization ds) {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public void enqueue(ByteBuffer b) {
+                        ClientResponseImpl resp = new ClientResponseImpl();
+                        try {
+                            b.position(4);
+                            resp.initFromBuffer(b);
+                            if (handler != null) {
+                                handler.handleResponse(resp);
+                            }
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+
+                    @Override
+                    public void enqueue(ByteBuffer[] b)
+                    {
+                        if (b.length != 1)
+                        {
+                            throw new RuntimeException("Cannot use ByteBuffer chaining in enqueue");
+                        }
+                        enqueue(b[0]);
+                    }
+
+                    @Override
+                    public int calculatePendingWriteDelta(long now) {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public boolean isEmpty() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public int getOutstandingMessageCount() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public boolean hadBackPressure() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                };
+            }
+
+            @Override
+            public NIOReadStream readStream() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void disableReadSelection() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void enableReadSelection() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public String getHostnameOrIP() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public long connectionId() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public Future<?> unregister() {
+                throw new UnsupportedOperationException();
+            }
+
+        };
+
+        final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
+        Runnable work = new Runnable() {
+            @Override
+            public void run() {
+                // abort if unable to succeed in 2 hours
+                final long startTime = System.currentTimeMillis();
+                while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
+                    sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking, format);
+                }
+            }
+        };
+
+        // Use an executor service here to avoid explosion of threads???
+        ThreadFactory factory = CoreUtils.getThreadFactory("Snapshot Request - " + nonce);
+        Thread workThread = factory.newThread(work);
+        workThread.start();
     }
 }
