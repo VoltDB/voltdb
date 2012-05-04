@@ -198,8 +198,8 @@ public class CoreUtils {
         return (int)(siteId>>32);
     }
 
-    public static <K,V> ImmutableMap<K, List<V>> unmodifiableMapCopy(Map<K, List<V>> m) {
-        ImmutableMap.Builder<K, List<V>> builder = ImmutableMap.builder();
+    public static <K,V> ImmutableMap<K, ImmutableList<V>> unmodifiableMapCopy(Map<K, List<V>> m) {
+        ImmutableMap.Builder<K, ImmutableList<V>> builder = ImmutableMap.builder();
         for (Map.Entry<K, List<V>> e : m.entrySet()) {
             builder.put(e.getKey(), ImmutableList.<V>builder().addAll(e.getValue()).build());
         }

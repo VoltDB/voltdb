@@ -105,6 +105,8 @@ import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
+import com.google.common.collect.ImmutableList;
+
 /**
  * RealVoltDB initializes global server components, like the messaging
  * layer, ExecutionSite(s), and ClientInterface. It provides accessors
@@ -638,7 +640,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = true;
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
-                for (Map.Entry<Integer, List<Long>> entry : m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
+                for (Map.Entry<Integer, ImmutableList<Long>> entry :
+                    m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
                     hostLog.info(entry.getKey() + " -- "
                             + CoreUtils.hsIdCollectionToString(entry.getValue()));
                 }
