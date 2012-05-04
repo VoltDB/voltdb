@@ -62,12 +62,12 @@ namespace detail
 {
 struct AbstractExecutorState
 {   
-    AbstractExecutorState(TempTable* table) :
+    AbstractExecutorState(Table* table) :
         m_table(table), m_iterator((table)? table->makeIterator() : NULL),
         m_list() 
     {}
-    TempTable* m_table;
-    TableIterator* m_iterator;
+    Table* m_table;
+    boost::scoped_ptr<TableIterator> m_iterator;
     std::vector<AbstractExecutor*> m_list;
 };
 

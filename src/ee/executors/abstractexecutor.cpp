@@ -145,8 +145,7 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
         m_tmpOutputTable = NULL;
     }
     
-    m_absState.reset(new detail::AbstractExecutorState(m_tmpOutputTable));
-    
+    m_absState.reset(new detail::AbstractExecutorState(tmp_output_table_base));
     return true;
 }
 
@@ -238,18 +237,20 @@ void AbstractExecutor::p_pre_execute_pull(const NValueArray& params)
         }
     }
     
-    //if (cleanUpTable != NULL)
-    //    cleanUpTable->deleteAllTuples(false);
+    // Now the executor's output table is populated
+    // We can initialize the iterator to be ready to the p_next_pull call
+    if (m_absState->m_table)
+        m_absState->m_iterator.reset(m_absState->m_table->makeIterator());
 }
 
 TableTuple AbstractExecutor::p_next_pull()
 {
+    assert(m_absState->m_table);
     TableTuple tuple(m_absState->m_table->schema());
+    
     if (m_absState->m_iterator)
     {
         m_absState->m_iterator->next(tuple);
-        //if (!m_absState->m_iterator->next(tuple))
-        //    tuple.setAllNulls();
     }
     return tuple;
 }
