@@ -73,7 +73,7 @@ def announce(*msgs):
     for msg in msgs:
         print(msg)
     print(announcement_separator)
-    
+
 class Column(object):
     def __init__(self, name, type, modifiers):
         self.name = name
@@ -137,7 +137,7 @@ def generate_project(tables):
                 yield project_partition % ('%s_%d' % (table.name, variation+1),
                                                       table.columns[table.pk].name)
     yield project_end
-    
+
 def generate_comma_separated_list(generator, indent, comment):
     first = True
     for line in generator:
@@ -159,7 +159,7 @@ def generate_table_ddl_lines(table, name):
         yield '%s %s%s' % (column.name, column.type, modifiers)
     if table.pk is not None:
         yield ddl_pk % (name, table.columns[table.pk].name)
-        
+
 def generate_ddl(tables):
     yield ddl_start
     for table in tables:
@@ -173,7 +173,7 @@ def generate_ddl(tables):
             yield table_end
     yield ddl_end
 
-def generate_file(path, generator):        
+def generate_file(path, generator):
     print 'Generating %s...' % path
     try:
         try:

@@ -56,36 +56,31 @@
 #include "json_spirit/json_spirit.h"
 namespace voltdb {
 
+class ExpressionUtil {
+public:
 /** instantiate a typed expression */
-voltdb::AbstractExpression* expressionFactory(json_spirit::Object &obj,
-                  voltdb::ExpressionType et, ValueType vt, int vs,
-                  voltdb::AbstractExpression* lc,
-                  voltdb::AbstractExpression* rc);
+    static AbstractExpression* expressionFactory(json_spirit::Object &obj,
+                                                 ExpressionType et, ValueType vt, int vs,
+                                                 AbstractExpression* lc, AbstractExpression* rc,
+                                                 const std::vector<AbstractExpression*>* arguments);
 
+    static AbstractExpression* comparisonFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
+    static AbstractExpression* conjunctionFactory(ExpressionType et, AbstractExpression *lc, AbstractExpression *rc);
 
-// Several helpers used by expressionFactory() and useful to export to testcases.
-AbstractExpression * comparisonFactory(ExpressionType et, AbstractExpression*, AbstractExpression*);
-AbstractExpression * operatorFactory(ExpressionType et,  AbstractExpression*, AbstractExpression*);
-AbstractExpression * constantValueFactory(const NValue &val);
-AbstractExpression * parameterValueFactory(int idx);
-AbstractExpression * tupleValueFactory(int idx);
-AbstractExpression *conjunctionFactory(ExpressionType, AbstractExpression*, AbstractExpression*);
+    /** If the passed vector contains only TupleValueExpression, it
+     * returns ColumnIds of them, otherwise NULL.*/
+    static boost::shared_array<int>
+    convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions);
 
-// incomparisonFactory() .. would only wrap the ctor and pass the val. vector
+    /** If the passed vector contains only ParameterValueExpression, it
+     * returns ParamIds of them, otherwise NULL.*/
+    static boost::shared_array<int>
+    convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
 
-}
+    // Implemented in functionexpression.cpp because function expression handling is growing into a system unto itself.
+    static AbstractExpression * functionFactory(ExpressionType et, const std::vector<AbstractExpression*>* arguments);
 
-namespace expressionutil {
-
-/** If the passed vector contains only TupleValueExpression, it
- * returns ColumnIds of them, otherwise NULL.*/
-boost::shared_array<int>
-convertIfAllTupleValues(const std::vector<voltdb::AbstractExpression*> &expressions);
-
-/** If the passed vector contains only ParameterValueExpression, it
- * returns ParamIds of them, otherwise NULL.*/
-boost::shared_array<int>
-convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
+};
 
 }
 

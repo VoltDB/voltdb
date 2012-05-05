@@ -33,6 +33,7 @@ import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.CopyOnWriteArrayList;
 
 import org.voltcore.network.Connection;
 import org.voltcore.network.QueueMonitor;
@@ -55,7 +56,8 @@ class Distributer {
     static final long PING_HANDLE = Long.MAX_VALUE;
 
     // collection of connections to the cluster
-    private final ArrayList<NodeConnection> m_connections = new ArrayList<NodeConnection>();
+    private final CopyOnWriteArrayList<NodeConnection> m_connections =
+            new CopyOnWriteArrayList<NodeConnection>();
 
     private final ArrayList<ClientStatusListenerExt> m_listeners = new ArrayList<ClientStatusListenerExt>();
 
@@ -587,15 +589,16 @@ class Distributer {
         Map<Long, Map<String, ClientStats>> retval =
                 new TreeMap<Long, Map<String, ClientStats>>();
 
-        synchronized (this) {
             for (NodeConnection conn : m_connections) {
-                Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
-                for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
-                    connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
+                synchronized (conn) {
+                    Map<String, ClientStats> connMap = new TreeMap<String, ClientStats>();
+                    for (Entry<String, ClientStats> e : conn.m_stats.entrySet()) {
+                        connMap.put(e.getKey(), (ClientStats) e.getValue().clone());
+                    }
+                    retval.put(conn.connectionId(), connMap);
                 }
-                retval.put(conn.connectionId(), connMap);
             }
-        }
+
 
         return retval;
     }
@@ -603,24 +606,22 @@ class Distributer {
     Map<Long, ClientIOStats> getIOStatsSnapshot() {
         Map<Long, ClientIOStats> retval = new TreeMap<Long, ClientIOStats>();
 
-        synchronized (this) {
-            Map<Long, Pair<String, long[]>> ioStats;
-            try {
-                ioStats = m_network.getIOStats(false);
-            } catch (Exception e) {
-                return null;
-            }
+        Map<Long, Pair<String, long[]>> ioStats;
+        try {
+            ioStats = m_network.getIOStats(false);
+        } catch (Exception e) {
+            return null;
+        }
 
-            for (NodeConnection conn : m_connections) {
-                Pair<String, long[]> perConnIOStats = ioStats.get(conn.connectionId());
-                if (perConnIOStats == null) continue;
+        for (NodeConnection conn : m_connections) {
+            Pair<String, long[]> perConnIOStats = ioStats.get(conn.connectionId());
+            if (perConnIOStats == null) continue;
 
-                long read = perConnIOStats.getSecond()[0];
-                long write = perConnIOStats.getSecond()[2];
+            long read = perConnIOStats.getSecond()[0];
+            long write = perConnIOStats.getSecond()[2];
 
-                ClientIOStats cios = new ClientIOStats(conn.connectionId(), read, write);
-                retval.put(conn.connectionId(), cios);
-            }
+            ClientIOStats cios = new ClientIOStats(conn.connectionId(), read, write);
+            retval.put(conn.connectionId(), cios);
         }
 
         return retval;

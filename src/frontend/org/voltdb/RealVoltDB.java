@@ -44,6 +44,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -93,6 +94,7 @@ import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
+import org.voltcore.utils.COWMap;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -104,6 +106,7 @@ import org.voltdb.utils.VoltSampler;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.collect.ImmutableList;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -283,7 +286,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_replicationActive = false;
 
             // set up site structure
-            m_localSites = new HashMap<Long, ExecutionSite>();
+            m_localSites = new COWMap<Long, ExecutionSite>();
             m_siteThreads = new HashMap<Long, Thread>();
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
@@ -532,17 +535,39 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              * the constructed ExecutionSites in the local site map.
              */
             for (ExecutionSiteRunner runner : m_runners) {
-                synchronized (runner) {
-                    if (!runner.m_isSiteCreated) {
-                        try {
-                            runner.wait();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
+                try {
+                    runner.m_siteIsLoaded.await();
+                } catch (InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Unable to wait on starting execution site.", true, e);
+                }
+                assert(runner.m_siteObj != null);
+                m_localSites.put(runner.m_siteId, runner.m_siteObj);
+            }
+
+            /*
+             * At this point all of the execution sites have been published to m_localSites
+             * It is possible that while they were being created the mailbox tracker found additional
+             * sites, but was unable to deliver the notification to some or all of the execution sites.
+             * Since notifying them of new sites is idempotent (version number check), let's do that here so there
+             * are no lost updates for additional sites. But... it must be done from the
+             * mailbox tracker thread or there is a race with failure detection and handling.
+             * Generally speaking it seems like retrieving a reference to a site tracker not via a message
+             * from the mailbox tracker thread that builds the site tracker is bug. If it isn't delivered to you by
+             * a site tracker then you lose sequential consistency.
+             */
+            try {
+                m_mailboxTracker.executeTask(new Runnable() {
+                    @Override
+                    public void run() {
+                        for (ExecutionSite es : m_localSites.values()) {
+                            es.notifySitesAdded(m_siteTracker);
                         }
                     }
-                    assert(runner.m_siteObj != null);
-                    m_localSites.put(runner.m_siteId, runner.m_siteObj);
-                }
+                }).get();
+            } catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            } catch (ExecutionException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
             // Create the client interface
@@ -618,7 +643,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = true;
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
-                for (Map.Entry<Integer, List<Long>> entry : m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
+                for (Map.Entry<Integer, ImmutableList<Long>> entry :
+                    m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
                     hostLog.info(entry.getKey() + " -- "
                             + CoreUtils.hsIdCollectionToString(entry.getValue()));
                 }
@@ -1296,10 +1322,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public void run() {
         // start the separate EE threads
         for (ExecutionSiteRunner r : m_runners) {
-            synchronized (r) {
-                assert(r.m_isSiteCreated) : "Site should already have been created by ExecutionSiteRunner";
-                r.notifyAll();
-            }
+            r.m_shouldStartRunning.countDown();
         }
 
         if (m_restoreAgent != null) {
@@ -1873,6 +1896,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 }
                 for (ExecutionSite es : getLocalSites().values()) {
                     es.notifySitesAdded(m_siteTracker);
+                }
+
+                if (ExportManager.instance() != null) {
+                    //Notify the export manager the cluster topology has changed
+                    ExportManager.instance().notifyOfClusterTopologyChange();
                 }
             }
         }

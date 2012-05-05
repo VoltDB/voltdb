@@ -476,6 +476,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_AGGREGATE_AVG: {
         return "AGGREGATE_AVG";
     }
+    case EXPRESSION_TYPE_FUNCTION_ABS: {
+        return "FUNCTION_ABS";
+    }
     }
     return "INVALID";
 }
@@ -542,6 +545,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_MAX;
     } else if (str == "AGGREGATE_AVG") {
         return EXPRESSION_TYPE_AGGREGATE_AVG;
+    } else if (str == "FUNCTION_ABS") {
+        return EXPRESSION_TYPE_FUNCTION_ABS;
     }
 
     return EXPRESSION_TYPE_INVALID;

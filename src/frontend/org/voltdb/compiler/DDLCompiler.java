@@ -436,7 +436,7 @@ public class DDLCompiler {
         for (Column c : columnMap.values()) {
             VoltType t = VoltType.get((byte)c.getType());
             if ((t == VoltType.STRING) || (t == VoltType.VARBINARY)) {
-                if (c.getSize() > 1024 * 1024) {
+                if (c.getSize() > VoltType.MAX_VALUE_LENGTH) {
                     throw m_compiler.new VoltCompilerException("Table name " + name + " column " + c.getName() +
                             " has a maximum size of " + c.getSize() + " bytes" +
                             " but the maximum supported size is " + VoltType.MAX_VALUE_LENGTH_STR);

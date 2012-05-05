@@ -602,27 +602,8 @@ public class JdbcDatabaseMetaDataGenerator
 
     private int getParamLength(ProcParameter param)
     {
-        int length = 0;
         VoltType type = VoltType.get((byte) param.getType());
-        switch(type)
-        {
-        case TINYINT:
-        case SMALLINT:
-        case INTEGER:
-        case BIGINT:
-        case TIMESTAMP:
-        case FLOAT:
-        case DECIMAL:
-            length = type.getLengthInBytesForFixedTypes();
-            break;
-        case STRING:
-        case VARBINARY:
-            length = VoltType.MAX_VALUE_LENGTH;
-            break;
-        default:
-            // XXX What's the right behavior here?
-        }
-        return length;
+        return type.getMaxLengthInBytes();
     }
 
     private Integer getParamCharOctetLength(ProcParameter param)
@@ -684,6 +665,6 @@ public class JdbcDatabaseMetaDataGenerator
         return results;
     }
 
-    private Catalog m_catalog;
-    private Database m_database;
+    private final Catalog m_catalog;
+    private final Database m_database;
 }

@@ -101,7 +101,7 @@ public class SnapshotSiteProcessor {
 
 
     /** Number of snapshot buffers to keep */
-    static final int m_numSnapshotBuffers = 12;
+    static final int m_numSnapshotBuffers = 5;
 
     /**
      * Pick a buffer length that is big enough to store at least one of the largest size tuple supported

@@ -35,25 +35,6 @@ import org.voltdb.utils.VoltTypeUtil;
 public abstract class ExpressionUtil {
 
     /**
-     * Convenience method for determining whether an Expression object should have a child
-     * Expression on its RIGHT side. The follow types of Expressions do not need a right child:
-     *      OPERATOR_NOT
-     *      COMPARISON_IN
-     *      OPERATOR_IS_NULL
-     *      AggregageExpression
-     *
-     * @param exp
-     * @return Does this expression need a right expression to be valid?
-     */
-    public static Boolean needsRightExpression(AbstractExpression exp) {
-        assert(exp != null);
-        return (exp.getExpressionType() != ExpressionType.OPERATOR_NOT &&
-                exp.getExpressionType() != ExpressionType.COMPARE_IN &&
-                exp.getExpressionType() != ExpressionType.OPERATOR_IS_NULL &&
-                !(exp instanceof AggregateExpression));
-    }
-
-    /**
      * Given an expression, find and convert its NUMERIC literals to
      * acceptable VoltTypes. Inserts may have expressions that are stand-alone
      * constant value expressions. In this case, allow the caller to pass
@@ -109,6 +90,18 @@ public abstract class ExpressionUtil {
         if (exp.m_right != null) {
             normalizeOperandConstantTypes_recurse(exp.m_right);
         }
+        if (exp.m_args != null) {
+            for (AbstractExpression argument : exp.m_args) {
+                normalizeOperandConstantTypes_recurse(argument);
+                if (argument.m_valueType == VoltType.NUMERIC) {
+                    //XXX: We need the preferred numeric type to normalize a function argument.
+                    // For now, assume that it is identical to the function's return type, which may have been recently normalized, itself.
+                    // If there are exceptions for specific functions,
+                    // that may need to be modeled as an optional attribute of SupportedFunction.
+                    assignOperandConstantType(argument, exp.m_valueType);
+                }
+            }
+        }
 
         // XXX: There's no check here that the Numeric operands are actually constants.
         // Can a sub-expression of type Numeric arise in any other case?
@@ -158,6 +151,11 @@ public abstract class ExpressionUtil {
             assignOutputValueTypesRecursively(exp.m_left);
         if (exp.m_right != null)
             assignOutputValueTypesRecursively(exp.m_right);
+        if (exp.m_args != null) {
+            for (AbstractExpression argument : exp.m_args) {
+                assignOutputValueTypesRecursively(argument);
+            }
+        }
 
         VoltType retType = VoltType.INVALID;
         int retSize = 0;
@@ -243,6 +241,15 @@ public abstract class ExpressionUtil {
                 default:
                     throw new RuntimeException("ERROR: Invalid Expression type '" + exp_type + "' for Expression '" + exp + "'");
             } // SWITCH
+        } else if (exp instanceof FunctionExpression) {
+            if (exp.getValueType() != null) {
+                // Nothing special required for this case.
+                return;
+            }
+            // Avoid non-castable types runtime exception by propagating the type of the first argument,
+            // assumed to be driving the unspecified (parameterized) function return type.
+            retType = exp.m_args.get(0).getValueType();
+            retSize = retType.getMaxLengthInBytes();
         // -------------------------------
         // EVERYTHING ELSE
         // We need to look at our children and iterate through their
@@ -256,7 +263,12 @@ public abstract class ExpressionUtil {
             //
             // If there doesn't need to be a a right expression, then the type will always be a integer (for booleans)
             //
-            if (!ExpressionUtil.needsRightExpression(exp)) {
+            if (exp.needsRightExpression()) {
+                //
+                // Use VoltTypeUtil to figure out what to cast the value to
+                //
+                cast_type = VoltTypeUtil.determineImplicitCasting(left_type, right_type);
+            } else {
                 //
                 // Make sure that they can cast the left-side expression with integer
                 // This is just a simple check to make sure that it is a numeric value
@@ -274,11 +286,6 @@ public abstract class ExpressionUtil {
                 } catch (Exception ex) {
                     throw new RuntimeException("ERROR: Invalid type '" + left_type + "' used in a '" + exp_type + "' Expression");
                 }
-            //
-            // Otherwise, use VoltTypeUtil to figure out what to case the value to
-            //
-            } else {
-                cast_type = VoltTypeUtil.determineImplicitCasting(left_type, right_type);
             }
             if (cast_type == VoltType.INVALID) {
                 throw new RuntimeException("ERROR: Invalid output value type for Expression '" + exp + "'");
@@ -391,6 +398,11 @@ public abstract class ExpressionUtil {
         // recursive calls
         tves.addAll(getTupleValueExpressions(input.m_left));
         tves.addAll(getTupleValueExpressions(input.m_right));
+        if (input.m_args != null) {
+            for (AbstractExpression argument : input.m_args) {
+                tves.addAll(getTupleValueExpressions(argument));
+            }
+        }
         return tves;
     }
 
