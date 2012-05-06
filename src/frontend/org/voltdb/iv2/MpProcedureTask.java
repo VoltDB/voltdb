@@ -37,10 +37,10 @@ public class MpProcedureTask extends ProcedureTask
     final int[] m_primaryHsIds;
 
     MpProcedureTask(InitiatorMailbox mailbox, ProcedureRunner runner,
-                  long txnId, Iv2InitiateTaskMessage msg, int[] partitions)
+                  long txnId, Iv2InitiateTaskMessage msg, long[] hsids)
     {
         super(mailbox, runner,
-              new MpTransactionState(mailbox, txnId, msg, partitions));
+              new MpTransactionState(mailbox, txnId, msg, hsids));
 
         m_primaryHsIds = new int[] {};
     }

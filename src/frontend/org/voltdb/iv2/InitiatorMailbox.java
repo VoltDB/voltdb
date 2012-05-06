@@ -57,7 +57,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     AtomicLong m_txnId = new AtomicLong(0);
 
     // hacky partition ids?
-    private final int[] m_primaryPartitions = new int[]{};
+    private final long[] m_primaryPartitions = new long[]{};
 
     //
     // Half-backed replication stuff

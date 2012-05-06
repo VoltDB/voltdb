@@ -42,21 +42,22 @@ public class MpTransactionState extends TransactionState
     final Iv2InitiateTaskMessage m_task;
     final Mailbox m_mailbox;
     LinkedBlockingDeque<FragmentResponseMessage> m_newDeps;
-    Map<Integer, List<Pair<Integer, FragmentResponseMessage>>> m_remoteDeps;
-    Map<Integer, List<Pair<Integer, FragmentResponseMessage>>> m_localDeps;
+    Map<Integer, Set<Long>> m_remoteDeps;
+    Map<Integer, List<VoltTable>> m_remoteDepTables;
+    Map<Integer, Set<Long>> m_localDeps;
     Set<Integer> m_finalDeps;
-    int[] m_usePartitions;
+    long[] m_useHSIds;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
 
     MpTransactionState(Mailbox mailbox, long txnId,
                        TransactionInfoBaseMessage notice,
-                       int[] usePartitions)
+                       long[] useHSIds)
     {
         super(txnId, notice);
         m_mailbox = mailbox;
         m_task = (Iv2InitiateTaskMessage)notice;
-        m_usePartitions = usePartitions;
+        m_useHSIds = useHSIds;
     }
 
     @Override
@@ -123,7 +124,7 @@ public class MpTransactionState extends TransactionState
     {
         m_localWork = task;
         // Create some record of expected dependencies for tracking
-        m_localDeps = createTrackedDependenciesFromTask(task, new int[] {0});
+        m_localDeps = createTrackedDependenciesFromTask(task, new long[] {0});
     }
 
     @Override
@@ -142,19 +143,17 @@ public class MpTransactionState extends TransactionState
 //        }
     }
 
-    private Map<Integer, List<Pair<Integer, FragmentResponseMessage>>>
+    private Map<Integer, Set<Long>>
     createTrackedDependenciesFromTask(FragmentTaskMessage task,
-                                      int[] expectedPartitions)
+                                      long[] expectedHSIds)
     {
-        Map<Integer, List<Pair<Integer, FragmentResponseMessage>>> depMap =
-            new HashMap<Integer, List<Pair<Integer, FragmentResponseMessage>>>();
+        Map<Integer, Set<Long>> depMap = new HashMap<Integer, Set<Long>>();
         for (int i = 0; i < task.getFragmentCount(); i++) {
             int dep = task.getOutputDepId(i);
-            ArrayList<Pair<Integer, FragmentResponseMessage>> scoreboard =
-                new ArrayList<Pair<Integer, FragmentResponseMessage>>();
+            Set<Long> scoreboard = new HashSet<Long>();
             depMap.put(dep, scoreboard);
-            for (int partition : expectedPartitions) {
-                scoreboard.add(new Pair<Integer, FragmentResponseMessage>(partition, null));
+            for (long hsid : expectedHSIds) {
+                scoreboard.add(hsid);
             }
         }
         return depMap;
@@ -168,7 +167,7 @@ public class MpTransactionState extends TransactionState
         {
             // Create some record of expected dependencies for tracking
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
-                                                             m_usePartitions);
+                                                             m_useHSIds);
             boolean doneWithRemoteDeps = false;
             while (!doneWithRemoteDeps)
             {
@@ -192,8 +191,34 @@ public class MpTransactionState extends TransactionState
 
     private boolean handleReceivedFragResponse(FragmentResponseMessage msg)
     {
-        // WRITE ME
-        return false;
+        for (int i = 0; i < msg.getTableCount(); i++)
+        {
+            int this_depId = msg.getTableDependencyIdAtIndex(i);
+            VoltTable this_dep = msg.getTableAtIndex(i);
+            long src_hsid = msg.getExecutorSiteId();
+            // check me for null for sanity
+            Object needed = m_remoteDeps.remove(src_hsid);
+            if (needed != null) {
+                // add table to storage
+                List<VoltTable> tables = m_remoteDepTables.get(this_depId);
+                if (tables == null) {
+                    tables = new ArrayList<VoltTable>();
+                    m_remoteDepTables.put(this_depId, tables);
+                }
+                tables.add(this_dep);
+            }
+            else {
+                // Bad things...deal with latah
+            }
+        }
+
+        boolean done = true;
+        for (Set<Long> depid : m_remoteDeps.values()) {
+            if (depid.size() != 0) {
+                done = false;
+            }
+        }
+        return done;
     }
 
     private Map<Integer, List<VoltTable>> extractDepTablesFromResponses()
