@@ -24,6 +24,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
@@ -156,7 +157,7 @@ public class MpTransactionState extends TransactionState
         }
         try {
             // send to all non-local sites (for now)
-            m_mbox.send(non_local_hsids, task);
+            m_mbox.send(non_local_hsids, m_remoteWork);
         }
         catch (MessagingException e) {
             throw new RuntimeException(e);
@@ -190,6 +191,14 @@ public class MpTransactionState extends TransactionState
                                                              m_useHSIds);
             // Add code to do local remote work.
             // need to modify processLocalFragmentTask() to be useable here too
+            Map<Integer, List<VoltTable>> local_frag =
+                processLocalFragmentTask(m_remoteWork, siteConnection);
+            for (Entry<Integer, List<VoltTable>> dep : local_frag.entrySet()) {
+                // every place that processes the map<int, list<volttable>> assumes
+                // only one returned table.
+                trackDependency(m_localHSId, dep.getKey(), dep.getValue().get(0));
+            }
+
             boolean doneWithRemoteDeps = false;
             while (!doneWithRemoteDeps)
             {
@@ -207,8 +216,26 @@ public class MpTransactionState extends TransactionState
         // kinda, at least for now while we're executing stuff locally.
         // Probably don't need to generate a FragmentResponse
         Map<Integer, List<VoltTable>> results =
-            processLocalFragmentTask(siteConnection);
+            processLocalFragmentTask(m_localWork, siteConnection);
         return results;
+    }
+
+    private void trackDependency(long hsid, int depId, VoltTable table)
+    {
+        // check me for null for sanity
+        Object needed = m_remoteDeps.remove(hsid);
+        if (needed != null) {
+            // add table to storage
+            List<VoltTable> tables = m_remoteDepTables.get(depId);
+            if (tables == null) {
+                tables = new ArrayList<VoltTable>();
+                m_remoteDepTables.put(depId, tables);
+            }
+            tables.add(table);
+        }
+        else {
+            // Bad things...deal with latah
+        }
     }
 
     private boolean handleReceivedFragResponse(FragmentResponseMessage msg)
@@ -218,20 +245,7 @@ public class MpTransactionState extends TransactionState
             int this_depId = msg.getTableDependencyIdAtIndex(i);
             VoltTable this_dep = msg.getTableAtIndex(i);
             long src_hsid = msg.getExecutorSiteId();
-            // check me for null for sanity
-            Object needed = m_remoteDeps.remove(src_hsid);
-            if (needed != null) {
-                // add table to storage
-                List<VoltTable> tables = m_remoteDepTables.get(this_depId);
-                if (tables == null) {
-                    tables = new ArrayList<VoltTable>();
-                    m_remoteDepTables.put(this_depId, tables);
-                }
-                tables.add(this_dep);
-            }
-            else {
-                // Bad things...deal with latah
-            }
+            trackDependency(src_hsid, this_depId, this_dep);
         }
 
         boolean done = true;
@@ -247,20 +261,21 @@ public class MpTransactionState extends TransactionState
     // Very similar to FragmentTask.processFragmentTask()...consider future
     // consolidation.
     private Map<Integer, List<VoltTable>>
-    processLocalFragmentTask(SiteProcedureConnection siteConnection)
+    processLocalFragmentTask(FragmentTaskMessage ftask,
+                             SiteProcedureConnection siteConnection)
     {
         Map<Integer, List<VoltTable>> depResults =
             new HashMap<Integer, List<VoltTable>>();
 
-        for (int frag = 0; frag < m_localWork.getFragmentCount(); frag++)
+        for (int frag = 0; frag < ftask.getFragmentCount(); frag++)
         {
-            final long fragmentId = m_localWork.getFragmentId(frag);
-            final int outputDepId = m_localWork.getOutputDepId(frag);
+            final long fragmentId = ftask.getFragmentId(frag);
+            final int outputDepId = ftask.getOutputDepId(frag);
 
             // this is a horrible performance hack, and can be removed with small changes
             // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
             ParameterSet params = null;
-            final ByteBuffer paramData = m_localWork.getParameterDataForFragment(frag);
+            final ByteBuffer paramData = ftask.getParameterDataForFragment(frag);
             if (paramData != null) {
                 final FastDeserializer fds = new FastDeserializer(paramData);
                 try {
@@ -276,13 +291,13 @@ public class MpTransactionState extends TransactionState
                 params = new ParameterSet();
             }
 
-            if (m_localWork.isSysProcTask()) {
+            if (ftask.isSysProcTask()) {
                 throw new RuntimeException("IV2: Sysprocs not yet supported");
 //                return processSysprocFragmentTask(txnState, dependencies, fragmentId,
 //                                                  currentFragResponse, params);
             }
             else {
-                final int inputDepId = m_localWork.getOnlyInputDepId(frag);
+                final int inputDepId = ftask.getOnlyInputDepId(frag);
 
                 // The try/catch from ExecutionSite goes away here, and
                 // we let the exceptions bubble up to ProcedureRunner.call()
