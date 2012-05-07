@@ -198,7 +198,10 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
             m_scheduler.offer(task);
         }
         else {
+            // HACK: grab the current sitetracker until we write leader notices.
+            m_clerk = VoltDB.instance().getSiteTracker();
             final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
+            System.out.println("partitionInitiators list: " + partitionInitiators.toString());
             final MpProcedureTask task =
                 new MpProcedureTask(this, this.m_loadedProcs.procs.get(procedureName),
                         m_txnId.incrementAndGet(), message, partitionInitiators);

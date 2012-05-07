@@ -50,7 +50,8 @@ public class MpTransactionState extends TransactionState
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final Iv2InitiateTaskMessage m_task;
-    LinkedBlockingDeque<FragmentResponseMessage> m_newDeps;
+    LinkedBlockingDeque<FragmentResponseMessage> m_newDeps =
+        new LinkedBlockingDeque<FragmentResponseMessage>();
     Map<Integer, Set<Long>> m_remoteDeps;
     Map<Integer, List<VoltTable>> m_remoteDepTables;
     Map<Integer, Set<Long>> m_localDeps;
@@ -191,8 +192,15 @@ public class MpTransactionState extends TransactionState
             boolean doneWithRemoteDeps = false;
             while (!doneWithRemoteDeps)
             {
-                FragmentResponseMessage msg = m_newDeps.poll();
-                doneWithRemoteDeps = handleReceivedFragResponse(msg);
+                try {
+                    FragmentResponseMessage msg = m_newDeps.take();
+                    doneWithRemoteDeps = handleReceivedFragResponse(msg);
+                } catch (InterruptedException e) {
+                    // this is a valid shutdown path.
+                    hostLog.warn("Interrupted coordinating a multi-partition transaction. " +
+                            "Terminating the transaction. " + e);
+                    terminateTransaction();
+                }
             }
         }
 
@@ -330,4 +338,16 @@ public class MpTransactionState extends TransactionState
         // push into threadsafe queue
         m_newDeps.offer(message);
     }
+
+    /**
+     * Kill a transaction - maybe shutdown mid-transaction? Or a timeout
+     * collecting fragments? This is a don't-know-what-to-do-yet
+     * stub.
+     * TODO: fix this.
+     */
+    void terminateTransaction()
+    {
+        throw new RuntimeException("terminateTransaction is not yet implemented.");
+    }
+
 }
