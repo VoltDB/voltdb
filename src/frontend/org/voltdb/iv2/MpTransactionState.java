@@ -315,7 +315,7 @@ public class MpTransactionState extends TransactionState
                 List<VoltTable> tables = depResults.get(outputDepId);
                 if (tables == null) {
                     tables = new ArrayList<VoltTable>();
-                    m_remoteDepTables.put(outputDepId, tables);
+                    depResults.put(outputDepId, tables);
                 }
                 tables.add(dependency);
                 // IZZY: Keep the handled exceptions around for now until we
