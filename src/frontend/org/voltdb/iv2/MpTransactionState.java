@@ -53,7 +53,8 @@ public class MpTransactionState extends TransactionState
     LinkedBlockingDeque<FragmentResponseMessage> m_newDeps =
         new LinkedBlockingDeque<FragmentResponseMessage>();
     Map<Integer, Set<Long>> m_remoteDeps;
-    Map<Integer, List<VoltTable>> m_remoteDepTables;
+    Map<Integer, List<VoltTable>> m_remoteDepTables =
+        new HashMap<Integer, List<VoltTable>>();
     Map<Integer, Set<Long>> m_localDeps;
     Set<Integer> m_finalDeps;
     List<Long> m_useHSIds;
@@ -144,14 +145,15 @@ public class MpTransactionState extends TransactionState
             long[] non_local_hsids = new long[m_useHSIds.size() - 1];
             int index = 0;
             for (Long hsid : m_useHSIds) {
-                if (hsid != m_localHSId)
-                {
+                if (hsid != m_localHSId) {
                     non_local_hsids[index] = hsid;
                 }
             }
             try {
                 // send to all non-local sites (for now)
-                m_mbox.send(non_local_hsids, m_remoteWork);
+                if (non_local_hsids.length > 0) {
+                    m_mbox.send(non_local_hsids, m_remoteWork);
+                }
             }
             catch (MessagingException e) {
                 throw new RuntimeException(e);
@@ -182,8 +184,7 @@ public class MpTransactionState extends TransactionState
     public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
     {
         // Do distributed fragments, if any
-        if (m_remoteWork != null)
-        {
+        if (m_remoteWork != null) {
             // Create some record of expected dependencies for tracking
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
                                                              m_useHSIds);
@@ -194,15 +195,17 @@ public class MpTransactionState extends TransactionState
             for (Entry<Integer, List<VoltTable>> dep : local_frag.entrySet()) {
                 // every place that processes the map<int, list<volttable>> assumes
                 // only one returned table.
+                System.out.println("Removing local fragment from tracked dep.");
+                System.out.println("Done?" + checkDoneReceivingFragResponses());
                 trackDependency(m_localHSId, dep.getKey(), dep.getValue().get(0));
+                System.out.println("Done now?" + checkDoneReceivingFragResponses());
             }
 
-            boolean doneWithRemoteDeps = false;
-            while (!doneWithRemoteDeps)
-            {
+            // if there are remote deps, block on them.
+            while (!checkDoneReceivingFragResponses()) {
                 try {
                     FragmentResponseMessage msg = m_newDeps.take();
-                    doneWithRemoteDeps = handleReceivedFragResponse(msg);
+                    handleReceivedFragResponse(msg);
                 } catch (InterruptedException e) {
                     // this is a valid shutdown path.
                     hostLog.warn("Interrupted coordinating a multi-partition transaction. " +
@@ -230,7 +233,10 @@ public class MpTransactionState extends TransactionState
     private void trackDependency(long hsid, int depId, VoltTable table)
     {
         // check me for null for sanity
-        Object needed = m_remoteDeps.remove(hsid);
+        // Remove the distributed fragment for this site from remoteDeps
+        // for the dependency Id depId.
+        Set<Long> localRemotes = m_remoteDeps.get(depId);
+        Object needed = localRemotes.remove(hsid);
         if (needed != null) {
             // add table to storage
             List<VoltTable> tables = m_remoteDepTables.get(depId);
@@ -241,11 +247,11 @@ public class MpTransactionState extends TransactionState
             tables.add(table);
         }
         else {
-            // Bad things...deal with latah
+            System.out.println("No remote dep for local site: " + hsid);
         }
     }
 
-    private boolean handleReceivedFragResponse(FragmentResponseMessage msg)
+    private void handleReceivedFragResponse(FragmentResponseMessage msg)
     {
         for (int i = 0; i < msg.getTableCount(); i++)
         {
@@ -254,7 +260,10 @@ public class MpTransactionState extends TransactionState
             long src_hsid = msg.getExecutorSiteId();
             trackDependency(src_hsid, this_depId, this_dep);
         }
+    }
 
+    private boolean checkDoneReceivingFragResponses()
+    {
         boolean done = true;
         for (Set<Long> depid : m_remoteDeps.values()) {
             if (depid.size() != 0) {
@@ -263,6 +272,7 @@ public class MpTransactionState extends TransactionState
         }
         return done;
     }
+
 
     // Cut-and-pasted from ExecutionSite.processFragmentTask().
     // Very similar to FragmentTask.processFragmentTask()...consider future
