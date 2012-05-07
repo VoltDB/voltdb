@@ -21,7 +21,6 @@ import java.util.HashSet;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.StoredProcedureInvocation;
 
@@ -30,7 +29,7 @@ public class SpTransactionState extends TransactionState
     final Iv2InitiateTaskMessage m_task;
     protected SpTransactionState(long realTxnId, TransactionInfoBaseMessage notice)
     {
-        super(realTxnId, notice);
+        super(realTxnId, null, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
     }
 

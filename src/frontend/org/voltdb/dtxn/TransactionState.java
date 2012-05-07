@@ -53,10 +53,11 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected ClientResponseImpl m_response = null;
 
     /** Iv2 constructor */
-    protected TransactionState(long txnId, TransactionInfoBaseMessage notice)
+    protected TransactionState(long txnId, Mailbox mbox,
+                               TransactionInfoBaseMessage notice)
     {
         super(txnId, notice.getInitiatorHSId());
-        m_mbox = null;
+        m_mbox = mbox;
         m_site = null;
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();

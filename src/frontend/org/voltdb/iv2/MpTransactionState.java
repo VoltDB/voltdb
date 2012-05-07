@@ -50,7 +50,6 @@ public class MpTransactionState extends TransactionState
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final Iv2InitiateTaskMessage m_task;
-    final Mailbox m_mailbox;
     LinkedBlockingDeque<FragmentResponseMessage> m_newDeps;
     Map<Integer, Set<Long>> m_remoteDeps;
     Map<Integer, List<VoltTable>> m_remoteDepTables;
@@ -65,8 +64,7 @@ public class MpTransactionState extends TransactionState
                        TransactionInfoBaseMessage notice,
                        long[] useHSIds, long localHSId)
     {
-        super(txnId, notice);
-        m_mailbox = mailbox;
+        super(txnId, mailbox, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
         m_useHSIds = useHSIds;
         m_localHSId = localHSId;

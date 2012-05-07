@@ -30,7 +30,7 @@ public class FragmentTransactionState extends TransactionState
 
     FragmentTransactionState(long txnId, TransactionInfoBaseMessage notice)
     {
-        super(txnId, notice);
+        super(txnId, null, notice);
         m_task = (FragmentTaskMessage)notice;
     }
 
