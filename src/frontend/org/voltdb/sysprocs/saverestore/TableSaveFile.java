@@ -49,9 +49,8 @@ import org.json_voltpatches.JSONArray;
 public class TableSaveFile
 {
 
-    public static class Container extends BBContainer {
+    public class Container extends BBContainer {
         public final int partitionId;
-        @SuppressWarnings("unused")
         private final BBContainer m_origin;
         Container(ByteBuffer b, long pointer, BBContainer origin, int partitionId) {
             super(b, pointer);
@@ -61,7 +60,11 @@ public class TableSaveFile
 
         @Override
         public void discard() {
-            m_buffers.add(this);
+            if (m_hasMoreChunks == false) {
+                m_origin.discard();
+            } else {
+                m_buffers.add(this);
+            }
         }
     }
 
@@ -359,6 +362,14 @@ public class TableSaveFile
             }
             notifyAll();
         }
+
+        /*
+         * Free buffers used to pull snapshot data in process
+         */
+        BBContainer cont;
+        while ((cont = m_buffers.poll()) != null) {
+            cont.discard();
+        }
     }
 
     public Set<Integer> getCorruptedPartitionIds() {
@@ -412,39 +423,6 @@ public class TableSaveFile
         }
         return m_hasMoreChunks || !m_availableChunks.isEmpty();
     }
-    //
-    //    /**
-    //     * A wrapper for the in memory storage for a table chunk
-    //     * that counts the number of times the chunk is discarded
-    //     * and only returns the memory back to the pool when the
-    //     * chunk has been read by enough times. This is necessary
-    //     * for replicated tables so that they only have to
-    //     *
-    //     */
-    //    private class ChunkCounter {
-    //
-    //        private ChunkCounter(BBContainer c, int chunkIndex) {
-    //            m_container = c;
-    //            m_chunkIndex = chunkIndex;
-    //        }
-    //
-    //        private BBContainer fetch() {
-    //            m_fetches++;
-    //            if (m_fetches == m_fetchCount) {
-    //                return m_container;
-    //            }
-    //        }
-    //
-    //        private final BBContainer m_container;
-    //        private int m_chunkIndex;
-    //        private int m_fetches = 0;
-    //    }
-
-    //    /**
-    //     * Number of times a chunk must be fetched before its buffer can
-    //     * be returned to the pool
-    //     */
-    //    private final int m_fetchCount;
 
     private final FileChannel m_saveFile;
     private final ByteBuffer m_tableHeader;
@@ -461,7 +439,7 @@ public class TableSaveFile
     private final int m_totalPartitions;
     private final long m_txnId;
     private boolean m_hasMoreChunks = true;
-    private static ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
+    private ConcurrentLinkedQueue<Container> m_buffers = new ConcurrentLinkedQueue<Container>();
     private final ArrayDeque<Container> m_availableChunks = new ArrayDeque<Container>();
     private final HashSet<Integer> m_relevantPartitionIds;
 
