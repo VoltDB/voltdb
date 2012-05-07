@@ -800,29 +800,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final long now)
     {
         if (VoltDB.instance().isIV2Enabled()) {
-            if (isSinglePartition) {
-                // MEGAHACK
-                long initiatorHSId = VoltDB.instance().getSiteTracker().m_partitionToInitiatorsImmutable.get(partitions[0]).get(0);
-                long handle = m_sequence.incrementAndGet();
-                m_sequenceToConnection.put(handle,
-                                           new Pair<Long, Connection>(invocation.getClientHandle(),
-                                                                      (Connection)clientData));
+            long handle = m_sequence.incrementAndGet();
+            m_sequenceToConnection.put(handle,
+                    new Pair<Long, Connection>(invocation.getClientHandle(),
+                        (Connection)clientData));
 
-                Iv2InitiateTaskMessage workRequest =
-                    new Iv2InitiateTaskMessage(m_siteId,
-                                            initiatorHSId,
-                                            Long.MIN_VALUE,
-                                            isReadOnly,
-                                            isSinglePartition,
-                                            invocation,
-                                            handle);
-                try {
+            long initiatorHSId = isSinglePartition ?
+                VoltDB.instance().getSiteTracker().m_partitionToInitiatorsImmutable.get(partitions[0]).get(0) :
+                VoltDB.instance().getSiteTracker().m_partitionToInitiatorsImmutable.get(0).get(0);
+
+            Iv2InitiateTaskMessage workRequest =
+                new Iv2InitiateTaskMessage(m_siteId,
+                        initiatorHSId,
+                        Long.MIN_VALUE,
+                        isReadOnly,
+                        isSinglePartition,
+                        invocation,
+                        handle);
+            try {
                     m_mailbox.send(initiatorHSId, workRequest);
-                } catch (MessagingException e) {
-                    throw new RuntimeException(e);
-                }
-            } else {
-                throw new RuntimeException("No multipart with IV2 yet, Chester");
+            } catch (MessagingException e) {
+                throw new RuntimeException(e);
             }
             return true; //YEEHAW
         } else {
