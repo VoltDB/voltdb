@@ -207,7 +207,7 @@ public class MpTransactionState extends TransactionState
             }
         }
 
-        // Next do local fragment stuff
+        // Next do local aggregating (or MP read) fragment stuff
         // Inject input deps for the local frags into the EE
         // use siteConnection.stashWorkUnitDependencies()
         siteConnection.stashWorkUnitDependencies(m_remoteDepTables);
@@ -217,6 +217,8 @@ public class MpTransactionState extends TransactionState
         // Probably don't need to generate a FragmentResponse
         Map<Integer, List<VoltTable>> results =
             processLocalFragmentTask(m_localWork, siteConnection);
+
+        // Need some sanity check that we got all of the expected output dependencies?
         return results;
     }
 
