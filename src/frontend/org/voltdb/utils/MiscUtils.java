@@ -319,7 +319,7 @@ public class MiscUtils {
      * @return String in hostname/ip:port format.
      */
     public static String getHostnameColonPortString(String server, int defaultPort) {
-        return HostAndPort.fromParts(server, defaultPort).toString();
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort).toString();
     }
 
     /**
