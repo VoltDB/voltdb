@@ -79,6 +79,7 @@ protected:
 //@TODO pullexec prototype
 public:
     TableTuple p_next_pull();
+    bool support_pull() const;
 
 protected:
 

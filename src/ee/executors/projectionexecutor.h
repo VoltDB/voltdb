@@ -98,6 +98,7 @@ class ProjectionExecutor : public AbstractExecutor {
     //@TODO pullexec prototype
     public:
         TableTuple p_next_pull();
+        bool support_pull() const;
 
         //@TODO just a hack
         bool needsPostExecuteClear() { return true; }

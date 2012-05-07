@@ -274,4 +274,8 @@ void  ProjectionExecutor::p_pre_execute_pull(const NValueArray &params) {
     }
 }
 
+bool ProjectionExecutor::support_pull() const {
+    return true;
+}
+
 }

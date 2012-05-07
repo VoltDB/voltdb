@@ -359,3 +359,6 @@ void SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
     }
 }
 
+bool SeqScanExecutor::support_pull() const {
+    return true;
+}

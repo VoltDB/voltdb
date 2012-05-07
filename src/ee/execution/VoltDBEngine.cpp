@@ -379,13 +379,13 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             executor->execute_pull(params);
-            executor->depth_first_iterate_pull(fcleanup);
+            executor->depth_first_iterate_pull(fcleanup, false);
         } catch (SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
 
-            executor->depth_first_iterate_pull(fcleanup);
+            executor->depth_first_iterate_pull(fcleanup, false);
 
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());

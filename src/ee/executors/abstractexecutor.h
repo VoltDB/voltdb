@@ -63,8 +63,7 @@ namespace detail
 struct AbstractExecutorState
 {   
     AbstractExecutorState(Table* table) :
-        m_table(table), m_iterator((table)? table->makeIterator() : NULL),
-        m_list() 
+        m_table(table), m_iterator(), m_list() 
     {}
     Table* m_table;
     boost::scoped_ptr<TableIterator> m_iterator;
@@ -137,7 +136,7 @@ class AbstractExecutor {
     // and call the functor on each level 
     // The functor signature is void f(AbstractExcecutor*) 
     template <typename Functor>
-    typename Functor::result_type  depth_first_iterate_pull(Functor& f);
+    typename Functor::result_type  depth_first_iterate_pull(Functor& f, bool stopOnPush);
   
     // Gets next available tuple from input table 
     // and also applies executor specific logic. 
@@ -145,6 +144,9 @@ class AbstractExecutor {
 //@TODO See the suggestion in VoltDBEngine.cpp 
 // for sub-optimal but simplifying default behavior for this function: --paul
     virtual TableTuple p_next_pull();
+    
+    // Temp
+    virtual bool support_pull() const;
     
   protected:
     
@@ -164,7 +166,7 @@ class AbstractExecutor {
     void p_build_list();
     void p_add_to_list(std::vector<AbstractExecutor*>& list);
     
- private:
+ protected:
 
     boost::scoped_ptr<detail::AbstractExecutorState> m_absState;
 };
@@ -186,17 +188,22 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 }
 
 template <typename Functor>
-typename Functor::result_type AbstractExecutor::depth_first_iterate_pull(Functor& functor)
+typename Functor::result_type AbstractExecutor::depth_first_iterate_pull(
+    Functor& functor, bool stopOnPush)
 {
-    assert(m_abstractNode);
-    // Recurs to children and applay functor
-    std::vector<AbstractPlanNode*>& children = m_abstractNode->getChildren();
-    for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
-    {
-        assert(*it);
-        AbstractExecutor* executor = (*it)->getExecutor();
-        assert(executor);
-        executor->depth_first_iterate_pull(functor);
+    // stop traversal if executor doesn't support pull mode. This will switch
+    // it to conventional push mode. In some cases the behaviour can be overriden  
+    if (this->support_pull() || !stopOnPush) { 
+        assert(m_abstractNode);
+        // Recurs to children and applay functor
+        std::vector<AbstractPlanNode*>& children = m_abstractNode->getChildren();
+        for (std::vector<AbstractPlanNode*>::iterator it = children.begin(); it != children.end(); ++it)
+        {
+            assert(*it);
+            AbstractExecutor* executor = (*it)->getExecutor();
+            assert(executor);
+            executor->depth_first_iterate_pull(functor, stopOnPush);
+        }
     }
     // Applay functor to itself
     return functor(this);
@@ -225,6 +232,10 @@ inline void AbstractExecutor::clearOutputTable_pull()
         assert(m_tmpOutputTable);
         m_tmpOutputTable->deleteAllTuples(false);
     }
+}
+
+inline bool AbstractExecutor::support_pull() const {
+    return false;
 }
 
 }

@@ -89,8 +89,8 @@ using namespace voltdb;
 
 DistinctExecutor::DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
     : AbstractExecutor(engine, abstract_node),
-    distinct_column_type(VALUE_TYPE_INVALID), m_state()
-{}
+    distinct_column_type(VALUE_TYPE_INVALID), m_state() {
+}
     
 bool DistinctExecutor::p_init(AbstractPlanNode*,
                               TempTableLimits* limits)
@@ -179,5 +179,9 @@ void DistinctExecutor::p_pre_execute_pull(const NValueArray &params) {
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
     
-    m_state.reset(new detail::DistinctExecutorState(node, input_table));    
+    m_state.reset(new detail::DistinctExecutorState(node, input_table)); 
+}
+
+bool DistinctExecutor::support_pull() const {
+    return true;
 }

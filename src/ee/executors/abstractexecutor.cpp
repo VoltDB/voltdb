@@ -165,18 +165,19 @@ bool AbstractExecutor::execute_pull(const NValueArray& params)
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
                m_abstractNode->getPlanNodeId());
 
-    if (m_tmpOutputTable)
-    {
-        VOLT_TRACE("Clearing output table...");
-        m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
-    }
+    // We clean-up during after the execute_pull is completed
+    //if (m_tmpOutputTable)
+    //{
+    //    VOLT_TRACE("Clearing output table...");
+    //    m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
+    //}
 
     // hook to give executor a chance to perform some initialization if necessary
     // potentially could be used to call children in push mode
     // recurs to children
     boost::function<void(AbstractExecutor*)> fpreexecute =
         boost::bind(&AbstractExecutor::p_pre_execute_pull, _1, boost::cref(params));
-    depth_first_iterate_pull(fpreexecute);
+    depth_first_iterate_pull(fpreexecute, true);
     
     // run the executor
     while (true)
@@ -195,7 +196,7 @@ bool AbstractExecutor::execute_pull(const NValueArray& params)
     // recurs to children
     boost::function<void(AbstractExecutor*)> fpostexecute =
         &AbstractExecutor::p_post_execute_pull;
-    depth_first_iterate_pull(fpostexecute);
+    depth_first_iterate_pull(fpostexecute, true);
 
     return true;
 }
@@ -211,7 +212,7 @@ void AbstractExecutor::p_pre_execute_pull(const NValueArray& params)
     // Build the depth-first children list.
     this->p_build_list();
     
-    Table *cleanUpTable = NULL;
+    //Table *cleanUpTable = NULL;
     // Walk through the queue and execute each plannode.  The query
     // planner guarantees that for a given plannode, all of its
     // children are positioned before it in this list, therefore
@@ -222,15 +223,16 @@ void AbstractExecutor::p_pre_execute_pull(const NValueArray& params)
         AbstractExecutor* executor = m_absState->m_list[ctr];
         assert(executor);
     
-        if (executor->needsPostExecuteClear())
-            cleanUpTable =
-                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
+        // We clean-up during after the execute_pull is completed
+        //if (executor->needsPostExecuteClear())
+        //    cleanUpTable =
+        //        dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
                 
         if (!executor->execute(params)) 
         {
             VOLT_TRACE("The Executor's execution failed");
-            if (cleanUpTable != NULL)
-                cleanUpTable->deleteAllTuples(false);
+            //if (cleanUpTable != NULL)
+            //    cleanUpTable->deleteAllTuples(false);
             // set these back to -1 for error handling
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           "The Executor's execution failed");
@@ -238,7 +240,7 @@ void AbstractExecutor::p_pre_execute_pull(const NValueArray& params)
     }
     
     // Now the executor's output table is populated
-    // We can initialize the iterator to be ready to the p_next_pull call
+    // We can initialize the iterator to be ready for the 
     if (m_absState->m_table)
         m_absState->m_iterator.reset(m_absState->m_table->makeIterator());
 }
@@ -246,8 +248,7 @@ void AbstractExecutor::p_pre_execute_pull(const NValueArray& params)
 TableTuple AbstractExecutor::p_next_pull()
 {
     assert(m_absState->m_table);
-    TableTuple tuple(m_absState->m_table->schema());
-    
+    TableTuple tuple(m_absState->m_table->schema());    
     if (m_absState->m_iterator)
     {
         m_absState->m_iterator->next(tuple);
@@ -267,5 +268,7 @@ void AbstractExecutor::p_build_list()
     // rebuild the df children list
     boost::function<void(AbstractExecutor*)> faddtolist =
         boost::bind(&AbstractExecutor::p_add_to_list, _1, boost::ref(m_absState->m_list));
-    depth_first_iterate_pull(faddtolist);
+    // The second parameter (stop when hit non-pull aware executor) is false here
+    // because we need to build the full list of children 
+    depth_first_iterate_pull(faddtolist, false);
 }

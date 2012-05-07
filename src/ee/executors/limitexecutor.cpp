@@ -196,3 +196,7 @@ void LimitExecutor::p_pre_execute_pull(const NValueArray &params) {
     
     m_state.reset(new detail::LimitExecutorState(node, input_table, params));    
 }
+
+bool LimitExecutor::support_pull() const {
+    return true;
+}

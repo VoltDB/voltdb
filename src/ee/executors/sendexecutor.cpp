@@ -72,10 +72,11 @@ struct SendExecutorState
         std::vector<AbstractPlanNode*>& children = node->getChildren();
         assert(children.size() == 1);
         m_childExecutor = children[0]->getExecutor();
-        // needsOutputTableClear is protected
-        //m_needSaveTuple = m_childExecutor->needsOutputTableClear();
-        // walk-around
-        m_needSaveTuple = (dynamic_cast<TempTable*>(node->getOutputTable()))? true : false;
+        // We only need to save tuple in Send Executor if
+        // 1. It's input table is a temp table
+        // 2. Child supports pull mode (otherwise it will save it itself) 
+        m_needSaveTuple = (dynamic_cast<TempTable*>(node->getOutputTable()) &&
+            m_childExecutor->support_pull())? true : false;
     }
 
     AbstractExecutor* m_childExecutor;
@@ -161,6 +162,10 @@ void SendExecutor::p_insert_output_table_pull(TableTuple& tuple)
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                       message);
     }
+}
+
+bool SendExecutor::support_pull() const {
+    return true;
 }
 
 } // namespace voltdb
