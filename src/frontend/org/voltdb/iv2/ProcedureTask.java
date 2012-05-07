@@ -141,6 +141,4 @@ abstract public class ProcedureTask extends SiteTasker
         }
         return response;
     }
-
-
 }

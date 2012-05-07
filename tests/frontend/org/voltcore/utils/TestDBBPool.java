@@ -25,32 +25,17 @@ package org.voltcore.utils;
 
 import junit.framework.TestCase;
 
-import org.voltcore.utils.DBBPool.BBContainer;
+import org.junit.Test;
 
 public class TestDBBPool extends TestCase {
 
-    final int SIZE1 = 8096;
-    final int SIZE2 = 1337;
-
-    public void testDefaultPoolBehavior() {
-        assertEquals(0, DBBPool.getBytesAllocatedGlobally());
-        BBContainer container1 = DBBPool.allocateDirect(SIZE1);
-        assertEquals(SIZE1, DBBPool.getBytesAllocatedGlobally());
-        container1.discard();
-
-        BBContainer container2 = DBBPool.allocateDirect(SIZE1);
-        // check that we don't allocate a new buffer but reuse the one we
-        // just discarded
-        assertEquals(SIZE1, DBBPool.getBytesAllocatedGlobally());
-        // make sure second size works and is tracked separately
-        container1 = DBBPool.allocateDirect(SIZE2);
-        assertEquals(SIZE1 + SIZE2, DBBPool.getBytesAllocatedGlobally());
-        container1.discard();
-        assertEquals(SIZE1 + SIZE2, DBBPool.getBytesAllocatedGlobally());
-        container1 = DBBPool.allocateDirect(SIZE2);
-        assertEquals(SIZE1 + SIZE2, DBBPool.getBytesAllocatedGlobally());
-        container1.discard();
-        container2.discard();
-        assertEquals(SIZE1 + SIZE2, DBBPool.getBytesAllocatedGlobally());
+    /*
+     * Allocate 4 gigs of memory, should not OOM
+     */
+    @Test
+    public void testBasicBehavior() {
+        for (int ii = 0; ii < (2097152 * 2); ii++) {
+            DBBPool.allocateDirect(1024).discard();
+        }
     }
 }

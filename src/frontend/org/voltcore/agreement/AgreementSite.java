@@ -21,7 +21,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -648,7 +647,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     {
         HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
         survivorSet.removeAll(m_pendingFailedSites);
-        long survivors[] = CoreUtils.toLongArray(survivorSet);
+        long survivors[] = com.google.common.primitives.Longs.toArray(survivorSet);
         m_recoveryLog.info("Agreement, Sending fault data " + CoreUtils.hsIdCollectionToString(m_pendingFailedSites)
                 + " to "
                 + CoreUtils.hsIdCollectionToString(survivorSet) + " survivors");

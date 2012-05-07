@@ -17,7 +17,7 @@
 
 package org.voltdb.compiler;
 
-public class AdHocPlannedStmt extends AsyncCompilerResult {
+public class AdHocPlannedStmt extends AsyncCompilerResult implements Cloneable {
     private static final long serialVersionUID = -8627490621430290801L;
 
     public String aggregatorFragment;
@@ -37,13 +37,10 @@ public class AdHocPlannedStmt extends AsyncCompilerResult {
 
     @Override
     public Object clone() {
-        AdHocPlannedStmt copy = new AdHocPlannedStmt();
-        copy.aggregatorFragment = aggregatorFragment;
-        copy.collectorFragment = collectorFragment;
-        copy.sql = sql;
-        copy.partitionParam = partitionParam;
-        copy.isReplicatedTableDML = isReplicatedTableDML;
-        copy.catalogVersion = catalogVersion;
-        return copy;
+        try {
+            return super.clone();
+        } catch (CloneNotSupportedException e) {
+            throw new RuntimeException(e);
+        }
     }
 }

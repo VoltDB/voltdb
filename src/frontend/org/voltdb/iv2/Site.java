@@ -109,7 +109,7 @@ public class Site implements Runnable, SiteProcedureConnection
         return latestUndoToken;
     }
 
-    // TODO: need this for real?
+    // Advanced in complete transaction.
     long m_lastCommittedTxnId = 0L;
 
     SiteProcedureConnection getSiteProcedureConnection()
