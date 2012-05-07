@@ -819,7 +819,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
-            Initiator initiator = new SpInitiator(m_messenger, partition);
+            Initiator initiator = new SpInitiator(m_messenger, partition, m_siteTracker);
             MailboxNodeContent mnc = new MailboxNodeContent(initiator.getInitiatorHSId(),
                                                             partition);
             m_mailboxPublisher.registerMailbox(MailboxType.Initiator, mnc);

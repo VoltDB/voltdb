@@ -55,14 +55,14 @@ public class MpTransactionState extends TransactionState
     Map<Integer, List<VoltTable>> m_remoteDepTables;
     Map<Integer, Set<Long>> m_localDeps;
     Set<Integer> m_finalDeps;
-    long[] m_useHSIds;
+    List<Long> m_useHSIds;
     long m_localHSId;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
 
     MpTransactionState(Mailbox mailbox, long txnId,
                        TransactionInfoBaseMessage notice,
-                       long[] useHSIds, long localHSId)
+                       List<Long> useHSIds, long localHSId)
     {
         super(txnId, mailbox, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
@@ -85,7 +85,6 @@ public class MpTransactionState extends TransactionState
     @Override
     public boolean isBlocked()
     {
-        // TODO Auto-generated method stub
         // Not clear this method is useful in the new world?
         return false;
     }
@@ -93,29 +92,24 @@ public class MpTransactionState extends TransactionState
     @Override
     public boolean hasTransactionalWork()
     {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public boolean doWork(boolean recovering)
     {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public void handleSiteFaults(HashSet<Long> failedSites)
     {
-        // TODO Auto-generated method stub
-
     }
 
     // Overrides needed by MpProcedureRunner
@@ -134,23 +128,20 @@ public class MpTransactionState extends TransactionState
     {
         m_localWork = task;
         // Create some record of expected dependencies for tracking
-        m_localDeps = createTrackedDependenciesFromTask(task, new long[] {0});
+        m_localDeps = createTrackedDependenciesFromTask(task, new ArrayList<Long>(0));
     }
 
     @Override
     public void createAllParticipatingFragmentWork(FragmentTaskMessage task)
     {
         m_remoteWork = task;
-        // Distribute fragments
-        // Short-term(?) hack.  Pull the local HSId out of the list, we'll
-        // short-cut that fragment task later
-        long[] non_local_hsids = new long[m_useHSIds.length - 1];
+        // Distribute fragments to remote (not-this-site) destinations.
+        long[] non_local_hsids = new long[m_useHSIds.size() - 1];
         int index = 0;
-        for (int i = 0; i < m_useHSIds.length; i++) {
-            if (m_useHSIds[i] != m_localHSId)
+        for (Long hsid : m_useHSIds) {
+            if (hsid != m_localHSId)
             {
-                non_local_hsids[index] = m_useHSIds[i];
-                ++index;
+                non_local_hsids[index] = hsid;
             }
         }
         try {
@@ -164,7 +155,7 @@ public class MpTransactionState extends TransactionState
 
     private Map<Integer, Set<Long>>
     createTrackedDependenciesFromTask(FragmentTaskMessage task,
-                                      long[] expectedHSIds)
+                                      List<Long> expectedHSIds)
     {
         Map<Integer, Set<Long>> depMap = new HashMap<Integer, Set<Long>>();
         for (int i = 0; i < task.getFragmentCount(); i++) {

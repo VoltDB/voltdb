@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.List;
+
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.MessagingException;
 
@@ -37,10 +39,10 @@ public class MpProcedureTask extends ProcedureTask
     final int[] m_primaryHsIds;
 
     MpProcedureTask(InitiatorMailbox mailbox, ProcedureRunner runner,
-                  long txnId, Iv2InitiateTaskMessage msg, long[] hsids)
+                  long txnId, Iv2InitiateTaskMessage msg, List<Long> pInitiators)
     {
         super(mailbox, runner,
-              new MpTransactionState(mailbox, txnId, msg, hsids,
+              new MpTransactionState(mailbox, txnId, msg, pInitiators,
                                      mailbox.getHSId()));
 
         m_primaryHsIds = new int[] {};

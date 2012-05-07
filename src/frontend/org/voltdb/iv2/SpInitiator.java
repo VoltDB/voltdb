@@ -39,12 +39,12 @@ public class SpInitiator implements Initiator
 
     private Thread m_siteThread = null;
 
-    public SpInitiator(HostMessenger messenger, Integer partition)
+    public SpInitiator(HostMessenger messenger, Integer partition, PartitionClerk clerk)
     {
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = new SiteTaskerScheduler();
-        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_partitionId);
+        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_partitionId, clerk);
         m_messenger.createMailbox(null, m_initiatorMailbox);
     }
 

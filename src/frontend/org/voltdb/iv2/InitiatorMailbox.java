@@ -52,12 +52,10 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     private final HostMessenger m_messenger;
     private long m_hsId;
     private LoadedProcedureSet m_loadedProcs;
+    private PartitionClerk m_clerk;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
-
-    // hacky partition ids?
-    private final long[] m_primaryPartitions = new long[]{};
 
     //
     // Half-backed replication stuff
@@ -97,11 +95,13 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     };
 
 
-    public InitiatorMailbox(SiteTaskerScheduler scheduler, HostMessenger messenger, int partitionId)
+    public InitiatorMailbox(SiteTaskerScheduler scheduler, HostMessenger messenger,
+            int partitionId, PartitionClerk partitionClerk)
     {
         m_scheduler = scheduler;
         m_messenger = messenger;
         m_partitionId = partitionId;
+        m_clerk = partitionClerk;
     }
 
     void setProcedureSet(LoadedProcedureSet loadedProcs)
@@ -198,9 +198,10 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
             m_scheduler.offer(task);
         }
         else {
+            final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
             final MpProcedureTask task =
                 new MpProcedureTask(this, this.m_loadedProcs.procs.get(procedureName),
-                        m_txnId.incrementAndGet(), message, m_primaryPartitions);
+                        m_txnId.incrementAndGet(), message, partitionInitiators);
             m_scheduler.offer(task);
         }
     }

@@ -74,7 +74,8 @@ public class Iv2TestInitiatorMailbox extends ZKTestBase {
         zk = getClient(0);
         VoltZK.createPersistentZKNodes(zk);
         doReturn(zk).when(hm).getZK();
-        mb = new InitiatorMailbox(null, hm, 0);
+        // TODO: need to replace null here with PartitionClerk implementation.
+        mb = new InitiatorMailbox(null, hm, 0, null);
         mb.setHSId(100);
     }
 
