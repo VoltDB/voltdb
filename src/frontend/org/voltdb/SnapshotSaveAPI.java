@@ -70,16 +70,19 @@ public class SnapshotSaveAPI
      *
      * @param file_path
      * @param file_nonce
+     * @param format
      * @param block
-     * @param startTime
+     * @param txnId
+     * @param data
      * @param context
      * @param hostname
      * @return VoltTable describing the results of the snapshot attempt
      */
     public VoltTable startSnapshotting(
-            String file_path, String file_nonce, boolean csv, byte block,
-            long txnId, SystemProcedureExecutionContext context, String hostname)
+            String file_path, String file_nonce, SnapshotFormat format, byte block,
+            long txnId, String data, SystemProcedureExecutionContext context, String hostname)
     {
+        // TODO: add stream target here
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
         final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
@@ -110,7 +113,7 @@ public class SnapshotSaveAPI
             }
 
             if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                createSetup(file_path, file_nonce, csv, txnId, context, hostname, result);
+                createSetup(file_path, file_nonce, format, txnId, context, hostname, result);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -294,7 +297,7 @@ public class SnapshotSaveAPI
 
     @SuppressWarnings("unused")
     private void createSetup(
-            String file_path, String file_nonce, boolean csv,
+            String file_path, String file_nonce, SnapshotFormat format,
             long txnId, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
@@ -359,7 +362,7 @@ public class SnapshotSaveAPI
                             context.getExecutionSite().getCorrespondingHostId(),
                             file_path,
                             file_nonce,
-                            csv,
+                            format,
                             tables.toArray(new Table[0]));
                 for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
@@ -367,7 +370,7 @@ public class SnapshotSaveAPI
                      * For a deduped csv snapshot, only produce the replicated tables on the "leader"
                      * host.
                      */
-                    if (csv && table.getIsreplicated() && !tracker.isFirstHost()) {
+                    if (format == SnapshotFormat.CSV && table.getIsreplicated() && !tracker.isFirstHost()) {
                         continue;
                     }
                     String canSnapshot = "SUCCESS";
@@ -377,11 +380,11 @@ public class SnapshotSaveAPI
                                     table,
                                     file_path,
                                     file_nonce,
-                                    csv ? ".csv" : ".vpt",
+                                    format,
                                     context.getHostId());
                     SnapshotDataTarget sdt = null;
                     try {
-                        if (csv) {
+                        if (format == SnapshotFormat.CSV) {
                             sdt = new SimpleFileSnapshotDataTarget(saveFilePath);
                         } else {
                             sdt =
@@ -426,7 +429,7 @@ public class SnapshotSaveAPI
                         sdt.setOnCloseHandler(onClose);
 
                         List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
-                        if (csv) {
+                        if (format == SnapshotFormat.CSV) {
                             filters.add(
                                     new PartitionProjectionSnapshotFilter(
                                             Ints.toArray(partitionsToInclude),

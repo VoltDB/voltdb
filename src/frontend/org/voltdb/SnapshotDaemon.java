@@ -1442,7 +1442,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
         }
 
-        createAndWatchRequestNode(invocation.clientHandle, c, path, nonce, blocking, format);
+        createAndWatchRequestNode(invocation.clientHandle, c, path, nonce, blocking, format, null);
     }
 
     /**
@@ -1454,15 +1454,17 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @param nonce
      * @param blocking
      * @param format
+     * @param data
      */
     public void createAndWatchRequestNode(final long clientHandle,
                                           final Connection c,
                                           String path,
                                           String nonce,
                                           byte blocking,
-                                          SnapshotFormat format) {
+                                          SnapshotFormat format,
+                                          String data) {
         boolean requestExists = false;
-        final String requestId = createRequestNode(path, nonce, blocking, format);
+        final String requestId = createRequestNode(path, nonce, blocking, format, data);
         if (requestId == null) {
             requestExists = true;
         } else {
@@ -1499,10 +1501,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @param nonce
      * @param blocking
      * @param format
+     * @param data Any data to pass to the snapshot target
      * @return The request ID if succeeded, otherwise null.
      */
     private String createRequestNode(String path, String nonce,
-                                     byte blocking, SnapshotFormat format) {
+                                     byte blocking, SnapshotFormat format,
+                                     String data) {
         String requestId = null;
 
         try {
@@ -1510,9 +1514,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("path", path);
             jsObj.put("nonce", nonce);
             jsObj.put("block", blocking == 1 ? true: false);
-            jsObj.put("format", format);
+            jsObj.put("format", format.toString());
             requestId = java.util.UUID.randomUUID().toString();
             jsObj.put("requestId", requestId);
+            jsObj.put("data", data);
             String zkString = jsObj.toString(4);
             byte zkBytes[] = zkString.getBytes("UTF-8");
 

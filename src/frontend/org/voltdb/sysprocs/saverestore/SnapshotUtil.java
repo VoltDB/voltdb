@@ -734,9 +734,14 @@ public class SnapshotUtil {
      */
     public static final String constructFilenameForTable(Table table,
                                                          String fileNonce,
-                                                         String extension,
+                                                         SnapshotFormat format,
                                                          int hostId)
     {
+        String extension = ".vpt";
+        if (format == SnapshotFormat.CSV) {
+            extension = ".csv";
+        }
+
         StringBuilder filename_builder = new StringBuilder(fileNonce);
         filename_builder.append("-");
         filename_builder.append(table.getTypeName());
@@ -752,11 +757,11 @@ public class SnapshotUtil {
     public static final File constructFileForTable(Table table,
             String filePath,
             String fileNonce,
-            String extension,
+            SnapshotFormat format,
             int hostId)
     {
         return new VoltFile(filePath, SnapshotUtil.constructFilenameForTable(
-            table, fileNonce, extension, hostId));
+            table, fileNonce, format, hostId));
     }
 
     /**
@@ -864,6 +869,7 @@ public class SnapshotUtil {
      * @param nonce
      * @param blocking
      * @param format
+     * @param data Any data that needs to be passed to the snapshot target
      * @param handler
      */
     public static void requestSnapshot(final long clientHandle,
@@ -871,6 +877,7 @@ public class SnapshotUtil {
                                        final String nonce,
                                        final byte blocking,
                                        final SnapshotFormat format,
+                                       final String data,
                                        final SnapshotResponseHandler handler) {
         final Connection c = new Connection() {
             @Override
@@ -968,7 +975,7 @@ public class SnapshotUtil {
                 // abort if unable to succeed in 2 hours
                 final long startTime = System.currentTimeMillis();
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
-                    sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking, format);
+                    sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking, format, data);
                 }
             }
         };

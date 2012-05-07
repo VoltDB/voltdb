@@ -1280,9 +1280,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable startSnapshotting = saveAPI.startSnapshotting(snapshotMsg.path,
                                       nonce,
-                                      false,
+                                      SnapshotFormat.NATIVE,
                                       (byte) 0x1,
                                       snapshotMsg.m_roadblockTransactionId,
+                                      null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress());
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
