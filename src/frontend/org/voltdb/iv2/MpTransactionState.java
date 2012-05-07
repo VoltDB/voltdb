@@ -135,22 +135,30 @@ public class MpTransactionState extends TransactionState
     @Override
     public void createAllParticipatingFragmentWork(FragmentTaskMessage task)
     {
-        m_remoteWork = task;
-        // Distribute fragments to remote (not-this-site) destinations.
-        long[] non_local_hsids = new long[m_useHSIds.size() - 1];
-        int index = 0;
-        for (Long hsid : m_useHSIds) {
-            if (hsid != m_localHSId)
-            {
-                non_local_hsids[index] = hsid;
+        // Don't generate remote work or dependency tracking or anything if
+        // there are no fragments to be done in this message
+        // At some point maybe ProcedureRunner.slowPath() can get smarter
+        if (task.getFragmentCount() > 0) {
+            m_remoteWork = task;
+            // Distribute fragments to remote (not-this-site) destinations.
+            long[] non_local_hsids = new long[m_useHSIds.size() - 1];
+            int index = 0;
+            for (Long hsid : m_useHSIds) {
+                if (hsid != m_localHSId)
+                {
+                    non_local_hsids[index] = hsid;
+                }
+            }
+            try {
+                // send to all non-local sites (for now)
+                m_mbox.send(non_local_hsids, m_remoteWork);
+            }
+            catch (MessagingException e) {
+                throw new RuntimeException(e);
             }
         }
-        try {
-            // send to all non-local sites (for now)
-            m_mbox.send(non_local_hsids, m_remoteWork);
-        }
-        catch (MessagingException e) {
-            throw new RuntimeException(e);
+        else {
+            m_remoteWork = null;
         }
     }
 

@@ -341,7 +341,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if ((m_inputDepIds != null) && (m_inputDepIds.length > 0)) {
             sb.append("\n");
             sb.append("  DEPENDENCY_IDS ");
-            for (long id : m_fragmentIds)
+            for (ArrayList<?> id : m_inputDepIds)
                 sb.append(id).append(", ");
             sb.setLength(sb.lastIndexOf(", "));
         }
@@ -351,7 +351,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         if (m_taskType == USER_PROC)
         {
-            sb.append("\n  THIS IS A SYSPROC TASK");
+            sb.append("\n  THIS IS A USER TASK");
         }
         else if (m_taskType == SYS_PROC_PER_PARTITION)
         {
