@@ -40,7 +40,8 @@ public class MpProcedureTask extends ProcedureTask
                   long txnId, Iv2InitiateTaskMessage msg, long[] hsids)
     {
         super(mailbox, runner,
-              new MpTransactionState(mailbox, txnId, msg, hsids));
+              new MpTransactionState(mailbox, txnId, msg, hsids,
+                                     mailbox.getHSId()));
 
         m_primaryHsIds = new int[] {};
     }

@@ -17,28 +17,37 @@
 
 package org.voltdb.iv2;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltcore.utils.Pair;
+import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.utils.LogKeys;
 
 public class MpTransactionState extends TransactionState
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     final Iv2InitiateTaskMessage m_task;
     final Mailbox m_mailbox;
     LinkedBlockingDeque<FragmentResponseMessage> m_newDeps;
@@ -47,17 +56,19 @@ public class MpTransactionState extends TransactionState
     Map<Integer, Set<Long>> m_localDeps;
     Set<Integer> m_finalDeps;
     long[] m_useHSIds;
+    long m_localHSId;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
 
     MpTransactionState(Mailbox mailbox, long txnId,
                        TransactionInfoBaseMessage notice,
-                       long[] useHSIds)
+                       long[] useHSIds, long localHSId)
     {
         super(txnId, notice);
         m_mailbox = mailbox;
         m_task = (Iv2InitiateTaskMessage)notice;
         m_useHSIds = useHSIds;
+        m_localHSId = localHSId;
     }
 
     @Override
@@ -131,16 +142,25 @@ public class MpTransactionState extends TransactionState
     public void createAllParticipatingFragmentWork(FragmentTaskMessage task)
     {
         m_remoteWork = task;
-//        // Distribute fragments
-//        try {
-//            // send to all non-coordinating sites
-//            m_mbox.send(m_nonCoordinatingSites, task);
-//            // send to this site
-//            // IZZY: DO THE RIGHT THING HERE
-//        }
-//        catch (MessagingException e) {
-//            throw new RuntimeException(e);
-//        }
+        // Distribute fragments
+        // Short-term(?) hack.  Pull the local HSId out of the list, we'll
+        // short-cut that fragment task later
+        long[] non_local_hsids = new long[m_useHSIds.length - 1];
+        int index = 0;
+        for (int i = 0; i < m_useHSIds.length; i++) {
+            if (m_useHSIds[i] != m_localHSId)
+            {
+                non_local_hsids[index] = m_useHSIds[i];
+                ++index;
+            }
+        }
+        try {
+            // send to all non-local sites (for now)
+            m_mbox.send(non_local_hsids, task);
+        }
+        catch (MessagingException e) {
+            throw new RuntimeException(e);
+        }
     }
 
     private Map<Integer, Set<Long>>
@@ -168,6 +188,8 @@ public class MpTransactionState extends TransactionState
             // Create some record of expected dependencies for tracking
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
                                                              m_useHSIds);
+            // Add code to do local remote work.
+            // need to modify processLocalFragmentTask() to be useable here too
             boolean doneWithRemoteDeps = false;
             while (!doneWithRemoteDeps)
             {
@@ -179,13 +201,13 @@ public class MpTransactionState extends TransactionState
         // Next do local fragment stuff
         // Inject input deps for the local frags into the EE
         // use siteConnection.stashWorkUnitDependencies()
-        Map<Integer, List<VoltTable>> deps = extractDepTablesFromResponses();
-        siteConnection.stashWorkUnitDependencies(deps);
+        siteConnection.stashWorkUnitDependencies(m_remoteDepTables);
 
         // Then execute the fragment task.  Looks like ExecutionSite.processFragmentTask(),
         // kinda, at least for now while we're executing stuff locally.
         // Probably don't need to generate a FragmentResponse
-        Map<Integer, List<VoltTable>> results = processLocalFragmentTask();
+        Map<Integer, List<VoltTable>> results =
+            processLocalFragmentTask(siteConnection);
         return results;
     }
 
@@ -221,24 +243,77 @@ public class MpTransactionState extends TransactionState
         return done;
     }
 
-    private Map<Integer, List<VoltTable>> extractDepTablesFromResponses()
-    {
-        Map<Integer, List<VoltTable>> depTables =
-            new HashMap<Integer, List<VoltTable>>();
-
-        // WRITE ME
-
-
-        return depTables;
-    }
-
-    private Map<Integer, List<VoltTable>> processLocalFragmentTask()
+    // Cut-and-pasted from ExecutionSite.processFragmentTask().
+    // Very similar to FragmentTask.processFragmentTask()...consider future
+    // consolidation.
+    private Map<Integer, List<VoltTable>>
+    processLocalFragmentTask(SiteProcedureConnection siteConnection)
     {
         Map<Integer, List<VoltTable>> depResults =
             new HashMap<Integer, List<VoltTable>>();
 
-        // WRITE ME
+        for (int frag = 0; frag < m_localWork.getFragmentCount(); frag++)
+        {
+            final long fragmentId = m_localWork.getFragmentId(frag);
+            final int outputDepId = m_localWork.getOutputDepId(frag);
 
+            // this is a horrible performance hack, and can be removed with small changes
+            // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
+            ParameterSet params = null;
+            final ByteBuffer paramData = m_localWork.getParameterDataForFragment(frag);
+            if (paramData != null) {
+                final FastDeserializer fds = new FastDeserializer(paramData);
+                try {
+                    params = fds.readObject(ParameterSet.class);
+                }
+                catch (final IOException e) {
+                    hostLog.l7dlog(Level.FATAL,
+                                   LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                }
+            }
+            else {
+                params = new ParameterSet();
+            }
+
+            if (m_localWork.isSysProcTask()) {
+                throw new RuntimeException("IV2: Sysprocs not yet supported");
+//                return processSysprocFragmentTask(txnState, dependencies, fragmentId,
+//                                                  currentFragResponse, params);
+            }
+            else {
+                final int inputDepId = m_localWork.getOnlyInputDepId(frag);
+
+                // The try/catch from ExecutionSite goes away here, and
+                // we let the exceptions bubble up to ProcedureRunner.call()
+                // for handling?
+                // IZZY: skeptical, need to test exception on final
+                // fragment rollback
+                final VoltTable dependency =
+                    siteConnection.executePlanFragment(fragmentId,
+                                                       inputDepId,
+                                                       params,
+                                                       txnId,
+                                                       isReadOnly());
+                List<VoltTable> tables = depResults.get(outputDepId);
+                if (tables == null) {
+                    tables = new ArrayList<VoltTable>();
+                    m_remoteDepTables.put(outputDepId, tables);
+                }
+                tables.add(dependency);
+                // IZZY: Keep the handled exceptions around for now until we
+                // verify functionality
+                //} catch (final EEException e) {
+                //    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                //    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                //    break;
+                //} catch (final SQLException e) {
+                //    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
+                //    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+                //    break;
+                //}
+            }
+        }
 
         return depResults;
     }
