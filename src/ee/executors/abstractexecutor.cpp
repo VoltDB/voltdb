@@ -42,16 +42,13 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-#include <vector>
-#include <boost/function.hpp>
-#include <boost/ref.hpp>
-#include <boost/bind.hpp>
 
 #include "abstractexecutor.h"
 
 #include "execution/VoltDBEngine.h"
 #include "plannodes/abstractoperationnode.h"
 #include "plannodes/abstractscannode.h"
+#include <vector>
 
 using namespace std;
 using namespace voltdb;
@@ -144,41 +141,48 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
                    " answered so");
         m_tmpOutputTable = NULL;
     }
-    
-    m_absState.reset(new detail::AbstractExecutorState(tmp_output_table_base));
     return true;
 }
 
-AbstractExecutor::AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode): 
+AbstractExecutor::~AbstractExecutor() {}
+
+namespace voltdb {
+namespace detail {
+struct AbstractExecutorState
+{
+    AbstractExecutorState(Table* table) :
+        m_iterator(table->makeIterator()),
+        m_nextTuple(table->schema()),
+        m_nullTuple(table->schema())
+    {}
+    boost::scoped_ptr<TableIterator> m_iterator;
+    TableTuple m_nextTuple;
+    TableTuple m_nullTuple;
+};
+
+} // namespace detail
+} // namespace voltdb
+
+using namespace voltdb::detail;
+
+AbstractExecutor::AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode):
     m_abstractNode(abstractNode), m_tmpOutputTable(NULL), m_absState()
 {}
 
-AbstractExecutor::~AbstractExecutor() {}
-
-
-
-//@TODO pullexec prototype
-
+// Top-level entry point for executor pull protocol
 bool AbstractExecutor::execute_pull(const NValueArray& params)
-{    
+{
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
                m_abstractNode->getPlanNodeId());
-
-    // We clean-up during after the execute_pull is completed
-    //if (m_tmpOutputTable)
-    //{
-    //    VOLT_TRACE("Clearing output table...");
-    //    m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
-    //}
 
     // hook to give executor a chance to perform some initialization if necessary
     // potentially could be used to call children in push mode
     // recurs to children
     boost::function<void(AbstractExecutor*)> fpreexecute =
-        boost::bind(&AbstractExecutor::p_pre_execute_pull, _1, boost::cref(params));
+        boost::bind(&AbstractExecutor::pre_execute_pull, _1, boost::cref(params));
     depth_first_iterate_pull(fpreexecute, true);
-    
+
     // run the executor
     while (true)
     {
@@ -190,7 +194,7 @@ bool AbstractExecutor::execute_pull(const NValueArray& params)
         // Insert processed tuple into the output table
         p_insert_output_table_pull(tuple);
     }
-    
+
     // some executors need to do some work after the iteration
     // send executor, for example
     // recurs to children
@@ -201,74 +205,60 @@ bool AbstractExecutor::execute_pull(const NValueArray& params)
     return true;
 }
 
-//@TODO One suggestion for streamlining this code is to ASSUME pull support.
-// Any node that does not actually implement an optimized execute_pull instead inherits a sub-optimal default behavior from AbstractExecutor that:
+static void add_to_list(AbstractExecutor* exec, std::vector<AbstractExecutor*>& list)
+{
+    list.push_back(exec);
+}
+
+//@TODO To accomodate executors that have not been updated to implement the pull protocol,
+// this implementation provides an adaptor to the older push protocol.
+// This allows VoltDBEngine to switch over immediately to using the pull protocol.
+// Any node that does not actually implement a custom p_pre_execute_pull/p_next_pull
+// instead inherits this sub-optimal default behavior AbstractExecutor that:
 // Implements p_pre_execute_pull to do the following:
 // - Recursively constructs a (depth-first) list of its child(ren).
 // - Calls execute on each of them, and finally itself.
 // Implements p_next_pull to retrieve each row from its output table (previously populated by its execute method).
-void AbstractExecutor::p_pre_execute_pull(const NValueArray& params) 
+void AbstractExecutor::p_pre_execute_pull(const NValueArray& params)
 {
     // Build the depth-first children list.
-    this->p_build_list();
-    
-    //Table *cleanUpTable = NULL;
+    std::vector<AbstractExecutor*> execs;
+    boost::function<void(AbstractExecutor*)> faddtolist =
+        boost::bind(&add_to_list, _1, boost::ref(execs));
+    // The second parameter (stop when hit non-pull aware executor) is false here
+    // because we want to call the push executor on the full list of children.
+    depth_first_iterate_pull(faddtolist, false);
+
     // Walk through the queue and execute each plannode.  The query
     // planner guarantees that for a given plannode, all of its
     // children are positioned before it in this list, therefore
     // dependency tracking is not needed here.
-    size_t ttl = m_absState->m_list.size();
+    size_t ttl = execs.size();
     for (size_t ctr = 0; ctr < ttl; ++ctr)
     {
-        AbstractExecutor* executor = m_absState->m_list[ctr];
+        AbstractExecutor* executor = execs[ctr];
         assert(executor);
-    
-        // We clean-up during after the execute_pull is completed
-        //if (executor->needsPostExecuteClear())
-        //    cleanUpTable =
-        //        dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
-                
-        if (!executor->execute(params)) 
+
+        if (!executor->execute(params))
         {
             VOLT_TRACE("The Executor's execution failed");
-            //if (cleanUpTable != NULL)
-            //    cleanUpTable->deleteAllTuples(false);
             // set these back to -1 for error handling
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           "The Executor's execution failed");
         }
     }
-    
-    // Now the executor's output table is populated
-    // We can initialize the iterator to be ready for the 
-    if (m_absState->m_table)
-        m_absState->m_iterator.reset(m_absState->m_table->makeIterator());
+
+    // Now the executor's output table is populated.
+    // Initialize the iterator to be ready for p_next_pull.
+    Table* output_table = m_abstractNode->getOutputTable();
+    assert(output_table);
+    m_absState.reset(new detail::AbstractExecutorState(output_table));
 }
 
 TableTuple AbstractExecutor::p_next_pull()
 {
-    assert(m_absState->m_table);
-    TableTuple tuple(m_absState->m_table->schema());    
-    if (m_absState->m_iterator)
-    {
-        m_absState->m_iterator->next(tuple);
+    if (m_absState->m_iterator->next(m_absState->m_nextTuple)) {
+        return m_absState->m_nextTuple;
     }
-    return tuple;
-}
-
-void AbstractExecutor::p_add_to_list(std::vector<AbstractExecutor*>& list)
-{
-    list.push_back(this);
-}
-
-void AbstractExecutor::p_build_list()
-{
-    // clear the children
-    m_absState->m_list.clear();
-    // rebuild the df children list
-    boost::function<void(AbstractExecutor*)> faddtolist =
-        boost::bind(&AbstractExecutor::p_add_to_list, _1, boost::ref(m_absState->m_list));
-    // The second parameter (stop when hit non-pull aware executor) is false here
-    // because we need to build the full list of children 
-    depth_first_iterate_pull(faddtolist, false);
+    return m_absState->m_nullTuple;
 }

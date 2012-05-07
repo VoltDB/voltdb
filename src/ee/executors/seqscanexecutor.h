@@ -54,12 +54,12 @@
 
 namespace voltdb
 {
-    // Aggregate Struct to keep Executor state in between iteration 
+    // Aggregate Struct to keep Executor state in between iteration
     namespace detail
     {
         struct SeqScanExecutorState;
     } //namespace detail
-     
+
     class UndoLog;
     class ReadWriteSet;
 
@@ -67,29 +67,18 @@ namespace voltdb
     public:
         SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
-    protected:
+    private:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
-        
-        
-        
-    //@TODO pullexec prototype
-    public:
+
         TableTuple p_next_pull();
-        bool support_pull() const;
-        
-    protected:
-    
         void p_pre_execute_pull(const NValueArray& params);
-        
-    private:
-     
+
         boost::scoped_ptr<detail::SeqScanExecutorState> m_state;
-       
     };
-    
+
 }
 
 #endif

@@ -86,7 +86,7 @@ bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
 
 bool ReceiveExecutor::p_execute(const NValueArray &params) {
     int loadedDeps = 0;
-    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(m_abstractNode);
+    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(getPlanNode());
     Table* output_table = dynamic_cast<Table*>(node->getOutputTable());
 
     // iterate dependencies stored in the frontend and union them

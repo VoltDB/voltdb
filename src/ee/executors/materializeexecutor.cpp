@@ -107,7 +107,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
 }
 
 bool MaterializeExecutor::p_execute(const NValueArray &params) {
-    assert (node == dynamic_cast<MaterializePlanNode*>(m_abstractNode));
+    assert (node == dynamic_cast<MaterializePlanNode*>(getPlanNode()));
     assert(node);
     assert (!node->isInline()); // inline projection's execute() should not be called
     assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));

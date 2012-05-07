@@ -43,12 +43,10 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-#include <boost/shared_array.hpp>
-#include <boost/scoped_array.hpp>
-#include <boost/foreach.hpp>
-#include <boost/scoped_ptr.hpp>
-#include <boost/function.hpp>
-
+#include "boost/shared_array.hpp"
+#include "boost/scoped_array.hpp"
+#include "boost/foreach.hpp"
+#include "boost/scoped_ptr.hpp"
 #include "VoltDBEngine.h"
 #include "common/common.h"
 #include "common/debuglog.h"
@@ -354,39 +352,33 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     assert (iter != m_executorMap.end());
     boost::shared_ptr<ExecutorVector> execsForFrag = iter->second;
 
-//@TODO One suggestion for streamlining this code is to ASSUME pull support.
-// Any node that does not actually implement an optimized execute_pull instead inherits a sub-optimal default behavior from AbstractExecutor that:
-// Implements p_pre_execute_pull to do the following:
-// - Recursively constructs a (depth-first) list of its child(ren).
-// - Calls execute on each of them, and finally itself.
-// Implements p_next_pull to retrieve each row from its output table (previously populated by its execute method).
+    // This code assumes executor pull support.
+    // Any node that does not actually implement a custom execute_pull
+    // instead inherits a sub-optimal default behavior from AbstractExecutor
+    // that adapts the specific executor's support for the older push protocol for
+    // use by the pull protocol.
 
-    // Walk through the queue and execute each plannode.  The query
-    // planner guarantees that for a given plannode, all of its
-    // children are positioned before it in this list, therefore
-    // dependency tracking is not needed here.
+    // Execute each plannode.
+    // The planner guarantees that for a given plannode, all of its
+    // children are positioned before it in this list. The executor pull
+    // protocol operates "leaf-first" on the executor tree structure,
+    // therefore dependency tracking is not needed here, just a single
+    // executor invocation on the final "parent" executor.
     size_t ttl = execsForFrag->list.size();
     if (ttl > 0) {
 
-    //@TODO pullexec prototype
         AbstractExecutor *executor = execsForFrag->list[ttl - 1];
         assert (executor);
 
-        // clean-up hook
-        boost::function<void(AbstractExecutor*)> fcleanup =
-            &AbstractExecutor::clearOutputTable_pull;
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
             executor->execute_pull(params);
-            executor->depth_first_iterate_pull(fcleanup, false);
         } catch (SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-
-            executor->depth_first_iterate_pull(fcleanup, false);
-
+            executor->clearOutputTables();
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
@@ -395,9 +387,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
-    
+        executor->clearOutputTables();
     }
-    
+
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {
         // put the number of tuples modified into our simple table

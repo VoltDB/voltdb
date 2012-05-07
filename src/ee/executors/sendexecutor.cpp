@@ -62,34 +62,6 @@
 
 namespace voltdb {
 
-namespace detail {
-
-struct SendExecutorState
-{   
-    SendExecutorState(SendPlanNode* node) :
-        m_childExecutor(NULL), m_needSaveTuple(false) 
-    {
-        std::vector<AbstractPlanNode*>& children = node->getChildren();
-        assert(children.size() == 1);
-        m_childExecutor = children[0]->getExecutor();
-        // We only need to save tuple in Send Executor if
-        // 1. It's input table is a temp table
-        // 2. Child supports pull mode (otherwise it will save it itself) 
-        m_needSaveTuple = (dynamic_cast<TempTable*>(node->getOutputTable()) &&
-            m_childExecutor->support_pull())? true : false;
-    }
-
-    AbstractExecutor* m_childExecutor;
-    bool m_needSaveTuple;
-};
-
-} // namespace detail
-
-SendExecutor::SendExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
-    : AbstractExecutor(engine, abstractNode), 
-      m_inputTable(NULL), m_engine(engine), m_state()
-{}
-
 bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
                           TempTableLimits* limits)
 {
@@ -105,10 +77,6 @@ bool SendExecutor::p_init(AbstractPlanNode* abstractNode,
     // Just pass our input table on through...
     //
     node->setOutputTable(node->getInputTables()[0]);
-    
-    //
-    //@TODO pullexec prototype
-    m_state.reset(new detail::SendExecutorState(node));
 
     return true;
 }
@@ -129,15 +97,42 @@ bool SendExecutor::p_execute(const NValueArray &params) {
 }
 
 
-//@TODO pullexec prototype
-TableTuple SendExecutor::p_next_pull() 
+TableTuple SendExecutor::p_next_pull()
 {
-    // Simply get the next tuple from the child executor
-    return m_state->m_childExecutor->p_next_pull();
-}
+    VOLT_DEBUG("started SEND");
+    assert(m_inputTable);
 
-void SendExecutor::p_post_execute_pull() 
-{
+    std::vector<AbstractPlanNode*>& children = getPlanNode()->getChildren();
+    assert(children.size() == 1);
+    AbstractExecutor* childExec = children[0]->getExecutor();
+
+    // We only need to save tuple in Send Executor if
+    // 1. It's input table is a temp table
+    // 2. Child supports pull mode (otherwise it will save it itself)
+    bool needSave = (dynamic_cast<TempTable*>(getPlanNode()->getOutputTable()) != NULL) && childExec->support_pull();
+    TableTuple tuple;
+    // Simply get each tuple from the child executor
+    // SendExecutor is always at the top of a plan fragment (executor tree),
+    // so it never needs to produce its tuples.
+    while (true) {
+        tuple = childExec->p_next_pull();
+        if (tuple.isNullTuple()) {
+            break;
+        }
+        // NOTE: I (Paul) migrated this code from its separate packaging (not needed?) in p_insert_output_table_pull.
+        // @XXX: I (Paul) don't completely understand this -- when, practically speaking, is needSave false?
+        // Do we even have to call p_next_pull in the case of needSave == false
+        // or is that just a CPU-intensive formality?
+        if (needSave && !m_inputTable->insertTuple(tuple))
+        {
+            char message[128];
+            snprintf(message, 128, "Failed to insert tuple into output table '%s'",
+                     m_inputTable->name().c_str());
+            VOLT_ERROR("%s", message);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          message);
+        }
+    }
     // Just blast the input table on through VoltDBEngine!
     if (!m_engine->send(m_inputTable)) {
         char message[128];
@@ -148,20 +143,8 @@ void SendExecutor::p_post_execute_pull()
                                       message);
     }
     VOLT_DEBUG("SEND TABLE: %s", m_inputTable->debug().c_str());
-}
-
-void SendExecutor::p_insert_output_table_pull(TableTuple& tuple)
-{
-    // we only need to save a tuple if child executor has a temp table
-    if (m_state->m_needSaveTuple && !m_inputTable->insertTuple(tuple))
-    {
-        char message[128];
-        snprintf(message, 128, "Failed to insert tuple into output table '%s'",
-                   m_inputTable->name().c_str());
-        VOLT_ERROR("%s", message);
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      message);
-    }
+    // return a null tuple to trivially satisfy execute_pull.
+    return tuple;
 }
 
 bool SendExecutor::support_pull() const {

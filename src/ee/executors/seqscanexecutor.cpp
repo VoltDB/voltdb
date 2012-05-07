@@ -64,25 +64,25 @@ namespace voltdb {
 namespace detail {
 
     struct SeqScanExecutorState
-    {   
-        SeqScanExecutorState(SeqScanPlanNode* node, Table* targetTable,
+    {
+        SeqScanExecutorState(AbstractExpression* predicate, Table* targetTable,
             Table* outputTable) :
             m_iterator(targetTable->iterator()),
-            m_predicate(node->getPredicate()),
+            m_predicate(predicate),
             m_tupleCtr(0),
             m_targetTableTupleCount((int)targetTable->activeTupleCount()),
             m_targetTableSchema(targetTable->schema()),
             m_targetTableName(targetTable->name().c_str()),
             m_outputTableName(outputTable->name().c_str())
         {
-        
+
         }
-            
+
         TableIterator m_iterator;
         AbstractExpression* m_predicate;
         int m_tupleCtr;
         int m_targetTableTupleCount;
-        const TupleSchema* m_targetTableSchema; 
+        const TupleSchema* m_targetTableSchema;
         const char* m_targetTableName;
         const char* m_outputTableName;
     };
@@ -144,13 +144,13 @@ bool SeqScanExecutor::needsOutputTableClear() {
     // clear the temporary output table only when it has a predicate.
     // if it doesn't have a predicate, it's the original persistent table
     // and we don't have to (and must not) clear it.
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
+    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(getPlanNode());
     assert(node);
     return node->needsOutputTableClear();
 }
 
 bool SeqScanExecutor::p_execute(const NValueArray &params) {
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
+    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -295,49 +295,34 @@ bool SeqScanExecutor::p_execute(const NValueArray &params) {
 TableTuple SeqScanExecutor::p_next_pull() {
 
     TableTuple tuple(m_state->m_targetTableSchema);
-    bool result = false;
     //
     // if there is a predicate find the next tuple which satisfies it
     //
-    if (m_state->m_predicate != NULL)
-    {
-        while (m_state->m_iterator.next(tuple) == true)
-        {
-            VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
-                       tuple.debug(m_state->m_targetTableName, m_state->m_tupleCtr,
-                       m_state->m_targetTableTupleCount));
-            if ((result = m_state->m_predicate->eval(&tuple, NULL).isTrue()) == true)
-                break;
+    while (m_state->m_iterator.next(tuple)) {
+        VOLT_TRACE("INPUT TUPLE: %s, %d/%d\n",
+                   tuple.debug(m_state->m_targetTableName, m_state->m_tupleCtr,
+                   m_state->m_targetTableTupleCount));
+        if (m_state->m_predicate == NULL ||
+            m_state->m_predicate->eval(&tuple, NULL).isTrue()) {
+            ++m_state->m_tupleCtr;
+            return tuple;
         }
     }
-    else
-    {
-        result = m_state->m_iterator.next(tuple);
-    }
-    
-    if (result == true)
-    {
-        ++m_state->m_tupleCtr;
-        return tuple;
-    }
-    else
-    {
-        // return an empty one
-        return TableTuple(m_state->m_targetTableSchema);
-    }
+    TableTuple nullTuple(m_state->m_targetTableSchema);
+    return nullTuple;
 }
 
 void SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
     //
     // Initialize itself
     //
-    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(m_abstractNode);
+    SeqScanPlanNode* node = dynamic_cast<SeqScanPlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
     Table* target_table = dynamic_cast<Table*>(node->getTargetTable());
     assert(target_table);
-        
+
     VOLT_TRACE("Sequential Scanning table :\n %s",
                target_table->debug().c_str());
     VOLT_DEBUG("Sequential Scanning table : %s which has %d active, %d"
@@ -346,19 +331,13 @@ void SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
                (int)target_table->activeTupleCount(),
                (int)target_table->allocatedTupleCount(),
                (int)target_table->usedTupleCount());
-               
-    m_state.reset(new detail::SeqScanExecutorState(node, target_table, output_table));
-               
-    VOLT_TRACE("SCAN PREDICATE A:\n%s\n", m_state->m_predicate->debug(true).c_str());
-    if (m_state->m_predicate)
-    {
-        m_state->m_predicate->substitute(params);
-        assert(m_state->m_predicate != NULL);
-        VOLT_DEBUG("SCAN PREDICATE B:\n%s\n",
-                   m_state->m_predicate->debug(true).c_str());
-    }
-}
 
-bool SeqScanExecutor::support_pull() const {
-    return true;
+    AbstractExpression* predicate = node->getPredicate();
+    if (predicate) {
+        VOLT_TRACE("SCAN PREDICATE A:\n%s\n", predicate->debug(true).c_str());
+        predicate->substitute(params);
+        VOLT_DEBUG("SCAN PREDICATE B:\n%s\n", predicate->debug(true).c_str());
+    }
+
+    m_state.reset(new detail::SeqScanExecutorState(predicate, target_table, output_table));
 }

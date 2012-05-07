@@ -58,7 +58,7 @@ namespace voltdb {
 class UndoLog;
 class ReadWriteSet;
 
-// Aggregate Struct to keep Executor state in between iteration 
+// Aggregate Struct to keep Executor state in between iteration
 namespace detail
 {
     struct DistinctExecutorState;
@@ -68,6 +68,7 @@ class DistinctExecutor : public AbstractExecutor
 {
 public:
     DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+    ~DistinctExecutor();
 
 protected:
     bool p_init(AbstractPlanNode*,
@@ -75,7 +76,7 @@ protected:
     bool p_execute(const NValueArray &params);
 
     ValueType distinct_column_type;
-    
+
 //@TODO pullexec prototype
 public:
     TableTuple p_next_pull();

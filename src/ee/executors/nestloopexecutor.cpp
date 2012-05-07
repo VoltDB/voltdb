@@ -200,7 +200,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
 bool NestLoopExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("executing NestLoop...");
 
-    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
+    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(getPlanNode());
     assert(node);
     assert(node->getInputTables().size() == 2);
 

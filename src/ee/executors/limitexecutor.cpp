@@ -57,31 +57,22 @@ namespace voltdb {
 namespace detail {
 
     struct LimitExecutorState
-    {   
-        LimitExecutorState(LimitPlanNode* node, Table* targetTable, const NValueArray &params):
-            m_limit(0), m_offset(0), m_tupleCtr(0), m_tupleSkipped(0), 
-            m_targetTableSchema(targetTable->schema()),
-            m_childExecutor(NULL),
-            m_iterator(targetTable->iterator())
-        {
-            node->getLimitAndOffsetByReference(params, m_limit, m_offset);
-            assert(m_limit >= 0);
-            assert(m_offset >= 0);
-            std::vector<AbstractPlanNode*>& children = node->getChildren();
-            assert(children.size() == 1);
-            m_childExecutor = children[0]->getExecutor();
-            assert(m_childExecutor);
-        }
-            
+    {
+        LimitExecutorState(int limit, int offset, AbstractExecutor* childExec, Table* input_table) :
+            m_limit(limit),
+            m_offset(offset),
+            m_nullTuple(input_table->schema()),
+            m_childExecutor(childExec),
+            m_iterator(input_table->iterator())
+        {}
+
         int m_limit;
         int m_offset;
-        int m_tupleCtr;
-        int m_tupleSkipped;
-        const TupleSchema* m_targetTableSchema; 
+        TableTuple m_nullTuple;
         AbstractExecutor* m_childExecutor;
         TableIterator m_iterator;
     };
-    
+
 } // namespace detail
 } // namespace voltdb
 
@@ -123,7 +114,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
 bool
 LimitExecutor::p_execute(const NValueArray &params)
 {
-    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
+    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -165,36 +156,43 @@ LimitExecutor::p_execute(const NValueArray &params)
 }
 
 
-//@TODO pullexec prototype
 TableTuple LimitExecutor::p_next_pull() {
-
-    TableTuple tuple(m_state->m_targetTableSchema);
-    
+    AbstractExecutor* childExec = m_state->m_childExecutor;
     // Skip first offset tuples
-    do {
-        tuple = m_state->m_childExecutor->p_next_pull();
-    } while (m_state->m_tupleSkipped++ < m_state->m_offset && tuple.isNullTuple() == false);
-     
-    // Check if we hit the limit
-    if (tuple.isNullTuple() == true || m_state->m_tupleCtr >= m_state->m_limit) {
-        // We either exhausted the input table or reached the limit 
-        tuple = TableTuple(m_state->m_targetTableSchema);
-    } else {
-        ++m_state->m_tupleCtr;
+    while (m_state->m_offset) {
+        TableTuple tuple = childExec->p_next_pull();
+        if (tuple.isNullTuple()) {
+            return tuple;
+        }
+        --(m_state->m_offset);
     }
-    return tuple;
+
+    // Check if limit has run out
+    if (m_state->m_limit) {
+        --(m_state->m_limit);
+        return childExec->p_next_pull();
+    }
+    return m_state->m_nullTuple;
 }
 
 void LimitExecutor::p_pre_execute_pull(const NValueArray &params) {
     //
     // Initialize itself
     //
-    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
+    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(getPlanNode());
     assert(node);
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
-    
-    m_state.reset(new detail::LimitExecutorState(node, input_table, params));    
+    int limit;
+    int offset;
+    node->getLimitAndOffsetByReference(params, limit, offset);
+    assert(limit >= 0);
+    assert(offset >= 0);
+    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    assert(children.size() == 1);
+    AbstractExecutor* childExec = children[0]->getExecutor();
+    assert(childExec);
+    m_state.reset(new detail::LimitExecutorState(limit, offset, childExec, input_table));
 }
 
 bool LimitExecutor::support_pull() const {

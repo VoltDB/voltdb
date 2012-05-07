@@ -56,7 +56,7 @@
 
 namespace voltdb {
 
-// Aggregate Struct to keep Executor state in between iteration 
+// Aggregate Struct to keep Executor state in between iteration
 namespace detail
 {
     struct InsertExecutorState;
@@ -99,17 +99,17 @@ public:
     public:
         TableTuple p_next_pull();
         bool support_pull() const;
-        
+
     protected:
-    
+
         void p_pre_execute_pull(const NValueArray& params);
         void p_post_execute_pull();
         void p_insert_output_table_pull(TableTuple& tuple);
-        
+
     private:
-     
+
         boost::scoped_ptr<detail::InsertExecutorState> m_state;
-       
+
 };
 
 }

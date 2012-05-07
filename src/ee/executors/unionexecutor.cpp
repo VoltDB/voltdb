@@ -123,7 +123,7 @@ bool UnionExecutor::p_init(AbstractPlanNode* abstract_node,
 }
 
 bool UnionExecutor::p_execute(const NValueArray &params) {
-    UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(m_abstractNode);
+    UnionPlanNode* node = dynamic_cast<UnionPlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);

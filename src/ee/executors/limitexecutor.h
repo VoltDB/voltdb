@@ -57,12 +57,12 @@ namespace voltdb
     class UndoLog;
     class ReadWriteSet;
 
-    // Aggregate Struct to keep Executor state in between iteration 
+    // Aggregate Struct to keep Executor state in between iteration
     namespace detail
     {
         struct LimitExecutorState;
     } //namespace detail
-    
+
     /**
      *
      */

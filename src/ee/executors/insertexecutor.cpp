@@ -66,7 +66,7 @@ namespace voltdb {
 namespace detail {
 
     struct InsertExecutorState
-    {   
+    {
         InsertExecutorState(Table* inputTable, Table* outputTable, Table* targetTable) :
             m_outputTable(outputTable),
             m_countTuple(outputTable->tempTuple()),
@@ -77,10 +77,10 @@ namespace detail {
             m_iterator(inputTable->iterator()),
             m_modifiedTuples(0)
         {}
-            
+
         Table* m_outputTable;
         TableTuple m_countTuple;
-        const TupleSchema* m_inputTableSchema; 
+        const TupleSchema* m_inputTableSchema;
         const char* m_inputTableName;
         const char* m_outputTableName;
         const char* m_targetTableName;
@@ -99,7 +99,7 @@ InsertExecutor::InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_
     : AbstractExecutor(engine, abstract_node), m_node(NULL), m_inputTable(NULL),
     m_targetTable(NULL), m_tuple(), m_partitionColumn(-1),
     m_multiPartition(false), m_engine(engine), m_state()
-    
+
 {}
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
@@ -155,7 +155,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
-    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
+    assert(m_node == dynamic_cast<InsertPlanNode*>(getPlanNode()));
     assert(m_node);
     assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
     assert(m_inputTable);
@@ -252,7 +252,7 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
 
 //@TODO pullexec prototype
 void InsertExecutor::p_pre_execute_pull(const NValueArray &params) {
-    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
+    assert(m_node == dynamic_cast<InsertPlanNode*>(getPlanNode()));
     assert(m_node);
     assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
     assert(m_inputTable);
@@ -283,7 +283,7 @@ TableTuple InsertExecutor::p_next_pull() {
 
     //
     // An insert is quite simple really. We just loop through our m_inputTable
-    // and insert any tuple that we find into our m_targetTable. 
+    // and insert any tuple that we find into our m_targetTable.
     // It doesn't get any easier than that!
     //
     bool result = false;
@@ -334,20 +334,20 @@ TableTuple InsertExecutor::p_next_pull() {
         m_state->m_countTuple.setNValue(
             0, ValueFactory::getBigIntValue(++m_state->m_modifiedTuples));
         break;
-    } 
-    if (!result) { 
+    }
+    if (!result) {
         m_state->m_countTuple = TableTuple(m_state->m_countTuple.getSchema());
     }
     return m_state->m_countTuple;
 }
 
-void InsertExecutor::p_post_execute_pull() { 
+void InsertExecutor::p_post_execute_pull() {
     // add to the planfragments count of modified tuples
     m_engine->m_tuplesModified += m_state->m_modifiedTuples;
     VOLT_INFO("Finished inserting tuple");
 }
 
-void InsertExecutor::p_insert_output_table_pull(TableTuple& tuple) { 
+void InsertExecutor::p_insert_output_table_pull(TableTuple& tuple) {
     // try to put the tuple into the output table
     if (!m_state->m_outputTable->insertTuple(m_state->m_countTuple)) {
         char message[128];
@@ -356,7 +356,7 @@ void InsertExecutor::p_insert_output_table_pull(TableTuple& tuple) {
                 m_state->m_modifiedTuples, m_state->m_outputTableName);
         VOLT_ERROR("%s", message);
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-    }                                  
+    }
 }
 
 bool InsertExecutor::support_pull() const {

@@ -274,7 +274,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
-    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
+    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(getPlanNode()));
     assert(node);
     assert (inline_node == dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
     assert(inline_node);
