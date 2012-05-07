@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="auction"
-VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar`
+VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | head -1`
 CLASSPATH="$VOLTJAR:../../../lib"
 VOLTDB="../../../bin/voltdb"
 EXPORTTOFILE="../../../bin/exporttofile"
