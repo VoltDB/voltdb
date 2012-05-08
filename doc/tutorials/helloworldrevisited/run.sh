@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="helloworld"
-VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar`
+VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
 CLASSPATH="$VOLTJAR:../../../lib"
 VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"
