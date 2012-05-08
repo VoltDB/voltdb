@@ -144,8 +144,6 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     return true;
 }
 
-AbstractExecutor::~AbstractExecutor() {}
-
 namespace voltdb {
 namespace detail {
 struct AbstractExecutorState
@@ -168,6 +166,9 @@ using namespace voltdb::detail;
 AbstractExecutor::AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode):
     m_abstractNode(abstractNode), m_tmpOutputTable(NULL), m_absState()
 {}
+
+AbstractExecutor::~AbstractExecutor() {}
+
 
 // Top-level entry point for executor pull protocol
 bool AbstractExecutor::execute_pull(const NValueArray& params)
