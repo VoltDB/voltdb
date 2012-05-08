@@ -152,6 +152,8 @@ public class MpTransactionState extends TransactionState
             }
             try {
                 // send to all non-local sites (for now)
+                // IZZY: This needs to go through mailbox.deliver()
+                // so that fragments could get replicated for k>0
                 if (non_local_hsids.length > 0) {
                     m_mbox.send(non_local_hsids, m_remoteWork);
                 }
