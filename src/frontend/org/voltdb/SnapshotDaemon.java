@@ -1517,7 +1517,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("format", format.toString());
             requestId = java.util.UUID.randomUUID().toString();
             jsObj.put("requestId", requestId);
-            jsObj.put("data", data);
+            jsObj.putOpt("data", data);
             String zkString = jsObj.toString(4);
             byte zkBytes[] = zkString.getBytes("UTF-8");
 
