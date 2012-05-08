@@ -41,6 +41,9 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+
+import com.google.common.collect.ImmutableMap;
+
 import jline.*;
 
 public class SQLCommand
@@ -237,17 +240,19 @@ public class SQLCommand
                                 else
                                     System.out.println("\n--- System Procedures --------------------------------------");
                             }
-                            System.out.printf(format, procedure);
-                            System.out.print("\t");
-                            int pidx = 0;
-                            for(String paramType : Procedures.get(procedure))
-                            {
-                                if (pidx > 0)
-                                    System.out.print(", ");
-                                System.out.print(paramType);
-                                pidx++;
+                            for (List<String> parameterSet : Procedures.get(procedure).values()) {
+                                System.out.printf(format, procedure);
+                                System.out.print("\t");
+                                int pidx = 0;
+                                for(String paramType : parameterSet)
+                                {
+                                    if (pidx > 0)
+                                        System.out.print(", ");
+                                    System.out.print(paramType);
+                                    pidx++;
+                                }
+                                System.out.print("\n");
                             }
-                            System.out.print("\n");
                             j++;
                         }
                     }
@@ -396,9 +401,14 @@ public class SQLCommand
             if (!Procedures.containsKey(procedure))
                 throw new Exception("Undefined procedure: " + procedure);
 
-            List<String> paramTypes = Procedures.get(procedure);
-            if (params.size() != paramTypes.size())
-                throw new Exception("Invalid parameter count for procedure: " + procedure + "(expected: " + paramTypes.size() + ", received: " + params.size() + ")");
+            List<String> paramTypes = Procedures.get(procedure).get(params.size());
+            if (paramTypes == null || params.size() != paramTypes.size()) {
+                String expectedSizes = "";
+                for (Integer expectedSize : Procedures.get(procedure).keySet()) {
+                    expectedSizes += expectedSize + ", ";
+                }
+                throw new Exception("Invalid parameter count for procedure: " + procedure + "(expected: " + expectedSizes + " received: " + params.size() + ")");
+            }
             Object[] objectParams = new Object[params.size()];
             if (procedure.equals("@SnapshotDelete"))
             {
@@ -696,26 +706,49 @@ public class SQLCommand
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
                       "PROCEDURES", "PROCEDURECOLUMNS");
-    private static Map<String,List<String>> Procedures = Collections.synchronizedMap(new HashMap<String,List<String>>());
+    private static Map<String,Map<Integer, List<String>>> Procedures =
+            Collections.synchronizedMap(new HashMap<String,Map<Integer, List<String>>>());
     private static void loadSystemProcedures()
     {
-        Procedures.put("@Pause", new ArrayList<String>());
-        Procedures.put("@Quiesce", new ArrayList<String>());
-        Procedures.put("@Resume", new ArrayList<String>());
-        Procedures.put("@Shutdown", new ArrayList<String>());
-        Procedures.put("@SnapshotDelete", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@SnapshotRestore", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@SnapshotSave", Arrays.asList("varchar", "varchar", "bit"));
-        Procedures.put("@SnapshotScan", Arrays.asList("varchar"));
-        Procedures.put("@Statistics", Arrays.asList("statisticscomponent", "bit"));
-        Procedures.put("@SystemCatalog", Arrays.asList("metadataselector"));
-        Procedures.put("@SystemInformation", Arrays.asList("sysinfoselector"));
-        Procedures.put("@UpdateApplicationCatalog", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@UpdateLogging", Arrays.asList("varchar"));
-        Procedures.put("@Promote", new ArrayList<String>());
-        Procedures.put("@SnapshotStatus", new ArrayList<String>());
-        Procedures.put("@AdHoc", new ArrayList<String>(Arrays.asList("varchar")));
-        Procedures.put("@AdHocSP", new ArrayList<String>(Arrays.asList("varchar", "bigint")));
+        Procedures.put("@Pause",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@Quiesce",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@Resume",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@Shutdown",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@SnapshotDelete",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build()
+                );
+        Procedures.put("@SnapshotRestore",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build()
+                );
+        Procedures.put("@SnapshotSave",
+                ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("varchar", "varchar", "bit")).
+                put( 1, Arrays.asList("varchar")).build()
+                );
+        Procedures.put("@SnapshotScan",
+                ImmutableMap.<Integer, List<String>>builder().put( 1,
+                Arrays.asList("varchar")).build());
+        Procedures.put("@Statistics",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("statisticscomponent", "bit")).build());
+        Procedures.put("@SystemCatalog",
+                ImmutableMap.<Integer, List<String>>builder().put( 1,Arrays.asList("metadataselector")).build());
+        Procedures.put("@SystemInformation",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("sysinfoselector")).build());
+        Procedures.put("@UpdateApplicationCatalog",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@UpdateLogging",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@Promote",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@SnapshotStatus",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@AdHoc",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@AdHocSP",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
     }
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
@@ -817,7 +850,7 @@ public class SQLCommand
         return new Object[] {tables, views, exports};
     }
 
-    private static void loadStoredProcedures(Map<String,List<String>> procedures)
+    private static void loadStoredProcedures(Map<String,Map<Integer, List<String>>> procedures)
     {
         VoltTable procs = null;
         VoltTable params = null;
@@ -868,11 +901,15 @@ public class SQLCommand
                     this_params.add(null);
                 }
             }
-            procedures.put(procs.getString("PROCEDURE_NAME"), this_params);
+            HashMap<Integer, List<String>> argLists = new HashMap<Integer, List<String>>();
+            argLists.put(proc_param_counts.get(proc_name), this_params);
+            procedures.put(procs.getString("PROCEDURE_NAME"), argLists);
         }
         while (params.advanceRow())
         {
-            List<String> this_params = procedures.get(params.getString("PROCEDURE_NAME"));
+            Map<Integer, List<String>> argLists = procedures.get(params.getString("PROCEDURE_NAME"));
+            assert(argLists.size() == 1);
+            List<String> this_params = argLists.values().iterator().next();
             this_params.set((int)params.getLong("ORDINAL_POSITION") - 1,
                             params.getString("TYPE_NAME").toLowerCase());
         }
