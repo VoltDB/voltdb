@@ -41,9 +41,14 @@ public class TestMPBasecaseSuite extends RegressionSuite {
 
     void loadData(Client client) throws IOException, ProcCallException
     {
+        loadData("P1.insert", client);
+    }
+
+    void loadData(String procname, Client client) throws IOException, ProcCallException
+    {
         // inserts
         for (int i=0; i < 10; i++) {
-            ClientResponse resp = client.callProcedure("P1.insert", i, i, Integer.toHexString(i));
+            ClientResponse resp = client.callProcedure(procname, i, i, i, Integer.toHexString(i));
             assertTrue(resp.getStatus() == ClientResponse.SUCCESS);
             assertTrue(resp.getResults()[0].asScalarLong() == 1);
         }
@@ -75,6 +80,79 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         assertEquals("Updated sum=20", 20L, resp.getResults()[0].asScalarLong());
     }
 
+    public void testOneShotConstraintViolationAllSites() throws Exception
+    {
+        final Client client = this.getClient();
+        loadData(client);
+        try {
+            client.callProcedure("ConstraintViolationUpdate");
+            assertFalse("Failed to produce constraint violation", true);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is rollback.",
+                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+        }
+
+        // verify initial result is unchanged (transactions!)
+        ClientResponse resp = client.callProcedure("SumB1");
+        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testOneshotPartitionViolationAllSites() throws Exception
+    {
+        // Restrict to clustered tests (configured with > 1 partition)
+        if (!this.isLocalCluster()) {
+            return;
+        }
+
+        final Client client = this.getClient();
+        loadData(client);
+        try {
+            client.callProcedure("PartitionViolationUpdate");
+            assertFalse("Failed to produce violation", true);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is error.",
+                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
+        }
+        // verify initial result is unchanged (transactions!)
+        ClientResponse resp = client.callProcedure("SumKey");
+        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
+        // see ENG-2941
+        assertTrue(resp.getStatusString() == null);
+    }
+
+    public void testOneshotReplicatedWriteAndRead() throws Exception
+    {
+        final Client client = this.getClient();
+        loadData("R1.insert", client);
+
+        ClientResponse resp =  client.callProcedure("SumR1");
+        assertTrue("OK response", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expected sum=45", 45L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testOneshotReplicatedConstraintViolation() throws Exception
+    {
+        final Client client = this.getClient();
+        loadData("R1.insert", client);
+        try {
+            client.callProcedure("ConstraintViolationUpdate_R");
+            assertTrue("Failed to produce constraint violation", false);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is rollback.",
+                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+        }
+
+        // verify initial result is unchanged (transactions!)
+        ClientResponse resp = client.callProcedure("SumB1_R");
+        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
+    }
+
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
@@ -82,20 +160,36 @@ public class TestMPBasecaseSuite extends RegressionSuite {
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
         project.addStmtProcedure("CountP1", "select count(*) from p1;");
-        project.addStmtProcedure("SumP1", "select sum(b2) from p1;");
+
+        // update non-unique, non-partitioning attribute
         project.addStmtProcedure("UpdateP1", "update p1 set b2 = 2");
+        project.addStmtProcedure("SumP1", "select sum(b2) from p1;");
+
+        project.addStmtProcedure("UpdateR1", "update r1 set b2 = 2");
+        project.addStmtProcedure("SumR1", "select sum(b2) from r1;");
+
+        // update all pkeys to the same value.
+        project.addStmtProcedure("ConstraintViolationUpdate", "update p1 set b1 = 1");
+        project.addStmtProcedure("SumB1", "select sum(b1) from p1;");
+
+        project.addStmtProcedure("ConstraintViolationUpdate_R", "update r1 set b1 = 1");
+        project.addStmtProcedure("SumB1_R", "select sum(b1) from r1;");
+
+        // update all partitioning keys to the same value.
+        project.addStmtProcedure("PartitionViolationUpdate", "update p1 set key = 1");
+        project.addStmtProcedure("SumKey", "select sum(key) from p1;");
 
         try {
-            // a table that should generate procedures
-            // use column names such that lexical order != column order.
             project.addLiteralSchema(
-                    "CREATE TABLE p1(b1 INTEGER NOT NULL, b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
+                    "CREATE TABLE p1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
+                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
             );
-            project.addPartitionInfo("p1", "b1");
+            project.addPartitionInfo("p1", "key");
 
             // a replicated table (should not generate procedures).
             project.addLiteralSchema(
-                    "CREATE TABLE r1(a1 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (a1));"
+                    "CREATE TABLE r1(key INTEGER NOT NULL, b1 INTEGER NOT NULL, " +
+                    "b2 INTEGER NOT NULL, a2 VARCHAR(10) NOT NULL, PRIMARY KEY (b1));"
             );
 
         } catch (IOException error) {
@@ -106,6 +200,11 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
+        builder.addServerConfig(config);
+
+        config = new LocalSingleProcessServer("sqltypes-onesite.jar", 3, BackendTarget.NATIVE_EE_JNI);
+        boolean t3 = config.compile(project);
+        assertTrue(t3);
         builder.addServerConfig(config);
 
         // CLUSTER
