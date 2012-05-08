@@ -17,8 +17,8 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-	local srcfiles=`find src -name '*.java'`
-    javac -classpath $CLASSPATH -d obj "$srcfiles"
+    local srcfiles=`find src -name '*.java'`
+    javac -classpath $CLASSPATH -d obj $srcfiles
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
@@ -53,17 +53,33 @@ function benchmark-help() {
     java -classpath obj:$CLASSPATH:obj ${APPNAME}.Benchmark --help
 }
 
-function benchmark() {
+function _benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         ${APPNAME}.Benchmark \
         --displayinterval=5 \
         --servers=localhost \
-        --queriespertest=10000
+        --configfile=config.xml \
+        --warmup=5 \
+        --duration=60 \
+        --test=$1
+}
+
+function benchmark-joins() {
+    _benchmark join
+}
+
+function benchmark-projections() {
+    _benchmark projection
+}
+
+function benchmark() {
+    benchmark-joins
+    benchmark-projections
 }
 
 function help() {
-    echo "Usage: ./run.sh {clean|catalog|server|benchmark|benchmark-help}"
+    echo "Usage: ./run.sh {clean|catalog|server|benchmark|benchmark-joins|benchmark-projections|benchmark-help}"
 }
 
 # Run the target passed as the first arg on the command line

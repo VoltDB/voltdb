@@ -23,22 +23,16 @@
 
 package adhocbenchmark;
 
-import java.io.File;
 import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
+import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
-import java.util.Map;
 import java.util.NoSuchElementException;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
-
-import javax.xml.parsers.DocumentBuilder;
-import javax.xml.parsers.DocumentBuilderFactory;
-import javax.xml.parsers.ParserConfigurationException;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
@@ -49,10 +43,6 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
-import org.w3c.dom.Document;
-import org.w3c.dom.Element;
-import org.w3c.dom.NodeList;
-import org.xml.sax.SAXException;
 
 /**
  * Class providing the entire benchmark implementation and command line main().
@@ -97,36 +87,40 @@ public class Benchmark {
         @Option(desc = "Output file path for raw summary statistics.")
         String statsfile = "";
 
-        @Option(desc = "Number of queries generated per test.")
-        int queriespertest = 10000;
+        @Option(desc = "Benchmark duration in seconds (0=infinite).")
+        int duration = 60;
 
-        @Option(desc = "Comma-separated tests to run (joins|projections). Runs all tests by default")
-        String teststorun = "joins,projections";
+        @Option(desc = "Warmup duration in seconds.")
+        int warmup = 5;
 
-        // Set by validate()
-        boolean runJoins = false;
-        boolean runProjections = false;
+        @Option(desc = "Test to run.")
+        String test = BenchmarkConfiguration.getDefaultTestName();
 
         @Override
         public void validate() {
             if (this.displayinterval <= 0)
                 exitWithMessageAndUsage("displayinterval must be > 0");
-            if (this.queriespertest <= 0)
-                exitWithMessageAndUsage("queriespertest must be > 0");
-            if (!this.teststorun.isEmpty()) {
-                String[] tests = this.teststorun.split(",");
+            if (this.duration < 0)
+                exitWithMessageAndUsage("duration must be 0 or a positive integer");
+            if (this.warmup <= 0)
+                exitWithMessageAndUsage("warmup must be a positive integer");
+            // We don't know the test names here. Ask for them and use them to validate.
+            List<String> tests = Arrays.asList(BenchmarkConfiguration.getTestNames());
+            this.test = this.test.toLowerCase();
+            if (!tests.contains(this.test)) {
+                StringBuilder validTests = new StringBuilder()
+                    .append("test '").append(this.test).append("' is unknown");
+                boolean first = true;
                 for (String test : tests) {
-                    if (test.equalsIgnoreCase("joins")) {
-                        this.runJoins = true;
-                    } else if (test.equalsIgnoreCase("projections")) {
-                        this.runProjections = true;
+                    if (first) {
+                        validTests.append(", use one of: ");
+                        first = false;
                     } else {
-                        System.err.printf("WARNING: Ignoring unknown test '%s'\n", test);
+                        validTests.append(" ");
                     }
+                    validTests.append(test);
                 }
-            }
-            if (!this.runJoins && !this.runProjections) {
-                exitWithMessageAndUsage("No valid tests are specified in teststorun");
+                exitWithMessageAndUsage(validTests.toString());
             }
         }
     }
@@ -285,220 +279,88 @@ public class Benchmark {
     }
 
     /**
-     * Configuration that determines what the generated join queries look like.
+     * Implements an iterator that returns generated query strings.
      */
-    private static class JoinTest {
-        // Table prefix
-        public final String tablePrefix;
-        // Table count
-        public final int nTables;
-        // Column prefix
-        public final String columnPrefix;
-        // Column count
-        public final int nColumns;
-        // Number of join levels
-        public final int nLevels;
-        // Number of queries to generate
-        public final int nQueries;
+    private static class QueryIterator implements Iterator<String>, QueryTestHelper {
 
-        public JoinTest(final String tablePrefix, int nTables,
-                                  final String columnPrefix, int nColumns,
-                                  int nLevels, int nQueries) {
-            this.tablePrefix = tablePrefix;
-            this.nTables = nTables;
-            this.columnPrefix = columnPrefix;
-            this.nColumns = nColumns;
-            this.nLevels = nLevels;
-            this.nQueries = nQueries;
-        }
-    }
-
-    /**
-     * Implements an iterator that returns generated join query strings.
-     */
-    private static class JoinIterator implements Iterator<String> {
-        private final List<JoinTest> tests;
+        private final List<QueryTestBase> tests;
+        private Iterator<QueryTestBase> testIterator;
+        private QueryTestBase currentTest = null;
         private int iGeneratedQueries = 0;
-        private final Iterator<JoinTest> testIterator;
-        private JoinTest currentTest = null;
-        private List<Integer> shuffledNumbers = null;
+        private final long startTimeMS;
+        private final int duration;
+        private List<Integer> shuffledNumbers;
         private final Random rnd = new Random(99);
 
-        public JoinIterator(List<JoinTest> testParameters) {
-            this.tests = testParameters;
+        public QueryIterator(final List<QueryTestBase> tests, final int duration) {
+            this.tests = tests;
+            this.duration = duration;
+            this.startTimeMS = System.currentTimeMillis();
             this.testIterator = this.tests.listIterator();
             // Prepare to run the first test
             this.nextTest();
         }
 
+        /**
+         * Prepare for the next test.
+         */
         public void nextTest() {
             this.currentTest = this.testIterator.next();
-            this.shuffledNumbers = new ArrayList<Integer>(this.currentTest.nLevels);
-            for (int i = 0; i < this.currentTest.nTables; i++) {
-                this.shuffledNumbers.add(i);
+            if (this.currentTest != null) {
+                // Prepare the random numbers.
+                this.shuffledNumbers = new ArrayList<Integer>(this.currentTest.nRandomNumbers);
+                for (int i = 0; i < this.currentTest.nRandomNumbers; i++) {
+                    this.shuffledNumbers.add(i);
+                }
             }
-            java.util.Collections.shuffle(this.shuffledNumbers, rnd);
         }
 
-        // Move the needle, either to the next set of tables within a test or to the next test.
+        /**
+         *  Advance to the next test.
+         */
         private void advance() {
             if (this.currentTest == null) {
                 throw new NoSuchElementException();
             }
-            this.iGeneratedQueries++;
-            if (this.iGeneratedQueries == this.currentTest.nQueries) {
-                this.iGeneratedQueries = 0;
+            if (this.duration > 0 && System.currentTimeMillis() > this.startTimeMS + (duration * 1000)) {
+                // Time expired.
+                this.currentTest = null;
+            } else {
+                this.iGeneratedQueries++;
                 if (this.testIterator.hasNext()) {
+                    // Keep going as long as tests remain.
                     this.nextTest();
                 } else {
-                    this.currentTest = null;
+                    // Wrap around until time expires.
+                    this.testIterator = this.tests.listIterator();
+                    this.currentTest = this.testIterator.next();
                 }
             }
         }
 
         // Generate table name from prefix and zero-based table index.
-        private String tableName(int iTable) {
-            // Use shuffled numbers to randomize the distribution.
-            int nTable = this.shuffledNumbers.get(iTable % this.currentTest.nTables) + 1;
-            return String.format("%s_%d", this.currentTest.tablePrefix, nTable);
+        @Override
+        public String tableName(int iTable) {
+            return String.format("%s_%d", this.currentTest.tablePrefix, iTable + 1);
         }
 
         // Generate column name from prefix and zero-based table index.
-        private String columnName(int iColumn) {
+        @Override
+        public String columnName(int iColumn) {
             return String.format("%s_%d", this.currentTest.columnPrefix,
                                           (iColumn % this.currentTest.nColumns) + 1);
         }
 
         // Generate table.column name from prefix and zero-based table index.
-        private String tableColumnName(int iTable, int iColumn) {
+        @Override
+        public String tableColumnName(int iTable, int iColumn) {
             return String.format("%s.%s", this.tableName(iTable), this.columnName(iColumn));
         }
 
-        // Check if a next query is available. Pre-determined by previous next()/advance() call.
+        // Get an indexed shuffled number.
         @Override
-        public boolean hasNext() {
-            // As soon as tests are exhausted currentTest is set to null in advance().
-            return (this.currentTest != null);
-        }
-
-        // Get the next query string.
-        @Override
-        public String next() {
-            // Exhausted all tests?
-            if (this.currentTest == null) {
-                throw new NoSuchElementException();
-            }
-            // Generate table lists by grabbing n sequential numbers at a time (wrap around).
-            int iStart = this.iGeneratedQueries * this.currentTest.nLevels;
-            StringBuilder query = new StringBuilder("SELECT * FROM ");
-            for (int i = 0; i < this.currentTest.nLevels; i++) {
-                if (i > 0) {
-                    query.append(", ");
-                }
-                query.append(this.tableName(iStart + i));
-            }
-            // The where clause uses a foreign key/primary key pair.
-            query.append(" WHERE ");
-            for (int i = 0; i < this.currentTest.nLevels - 1; i++) {
-                if (i > 0) {
-                    query.append(" AND ");
-                }
-                query.append(this.tableColumnName(iStart + i + 1, 1))
-                     .append(" = ")
-                     .append(this.tableColumnName(iStart + i, 0));
-            }
-            this.advance();
-            return query.toString();
-        }
-
-        @Override
-        public void remove() {
-            throw new UnsupportedOperationException();
-        }
-    }
-
-    /**
-     *  Iterable Join generator.
-     */
-    private static class JoinGenerator implements Iterable<String>
-    {
-        private final List<JoinTest> tests;
-
-        public JoinGenerator(List<JoinTest> tests) {
-            this.tests = tests;
-        }
-
-        @Override
-        public Iterator<String> iterator() {
-            return new JoinIterator(this.tests);
-        }
-    }
-
-    /**
-     * Configuration that determines what the projection queries look like.
-     */
-    private static class ProjectionTest {
-        // Full table name
-        public final String tableName;
-        // Column prefix
-        public final String columnPrefix;
-        // Column count
-        public final int nColumns;
-        // Total number of joins to generate
-        public int nQueries;
-
-        public ProjectionTest(final String tableName,
-                                        final String columnPrefix, int nColumns,
-                                        int nQueries) {
-            this.tableName = tableName;
-            this.columnPrefix = columnPrefix;
-            this.nColumns = nColumns;
-            this.nQueries = nQueries;
-        }
-    }
-
-    /**
-     * Implements an iterator that returns query strings.
-     */
-    private static class ProjectionIterator implements Iterator<String> {
-        private final List<ProjectionTest> testParameters;
-        private int iGeneratedQueries = 0;
-        private final Iterator<ProjectionTest> testIterator;
-        private ProjectionTest currentTest = null;
-        public List<Integer> shuffledNumbers;
-        private final Random rnd = new Random(99);
-
-        public ProjectionIterator(List<ProjectionTest> tests) {
-            this.testParameters = tests;
-            this.testIterator = this.testParameters.listIterator();
-            // This column number list gets shuffled each time next() is called.
-            this.currentTest = testIterator.next();
-            this.shuffledNumbers = new ArrayList<Integer>(this.currentTest.nColumns);
-            for (int i = 0; i < this.currentTest.nColumns; i++) {
-                this.shuffledNumbers.add(i);
-            }
-        }
-
-        // Move the needle, either to the next set of tables within a test or to the next test.
-        private void advance() {
-            if (this.currentTest == null) {
-                throw new NoSuchElementException();
-            }
-            this.iGeneratedQueries++;
-            if (this.iGeneratedQueries == this.currentTest.nQueries) {
-                this.iGeneratedQueries = 0;
-                if (this.testIterator.hasNext()) {
-                    this.currentTest = this.testIterator.next();
-                } else {
-                    this.currentTest = null;
-                }
-            }
-        }
-
-        // Generate column name from prefix and zero-based table index.
-        private String columnName(int iColumn) {
-            return String.format("%s_%d", this.currentTest.columnPrefix,
-                                          (iColumn % this.currentTest.nColumns) + 1);
+        public int getShuffledNumber(final int i) {
+            return this.shuffledNumbers.get(i % this.shuffledNumbers.size());
         }
 
         // Check if a next query is available. Pre-determined by previous next()/advance() call.
@@ -515,23 +377,13 @@ public class Benchmark {
             if (this.currentTest == null) {
                 throw new NoSuchElementException();
             }
-            // Shuffle the column number mappings to (deterministically) randomize the ordering.
+            // Shuffle the numbers used by the query generator.
             java.util.Collections.shuffle(this.shuffledNumbers, rnd);
-            // Build the query
-            StringBuilder query = new StringBuilder("SELECT ");
-            for (Integer iColumn : this.shuffledNumbers) {
-                if (iColumn > 0) {
-                    query.append(", ");
-                }
-                query.append(this.columnName(iColumn));
-            }
-            query.append(" FROM ")
-                 .append(this.currentTest.tableName)
-                 .append(" WHERE ")
-                 .append(this.columnName(this.shuffledNumbers.get(0)))
-                 .append(" = 'abc'");
+            // Ask the derived class to generate the query. Subtract 1 for zero-based query counter.
+            String query = this.currentTest.getQuery(this.iGeneratedQueries, this);
+            // Get ready for the next one (sets currentTest to null when testing is complete).
             this.advance();
-            return query.toString();
+            return query;
         }
 
         @Override
@@ -541,171 +393,22 @@ public class Benchmark {
     }
 
     /**
-     * Iterable projection query generator.
+     *  Iterable query generator.
      */
-    private static class ProjectionGenerator implements Iterable<String>
+    private static class QueryGenerator implements Iterable<String>
     {
-        private final List<ProjectionTest> tests;
+        protected final List<QueryTestBase> tests;
+        protected final int duration;
 
-        public ProjectionGenerator(List<ProjectionTest> tests) {
+        public QueryGenerator(final List<QueryTestBase> tests, final int duration) {
             this.tests = tests;
+            this.duration = duration;
         }
 
         @Override
         public Iterator<String> iterator() {
-            return new ProjectionIterator(this.tests);
+            return new QueryIterator(this.tests, this.duration);
         }
-    }
-
-    /**
-     * Provides the lists of join and projection tests to run
-     */
-    private static class TestConfiguration {
-        public List<JoinTest> joinTests;
-        public List<ProjectionTest> projectionTests;
-
-        public TestConfiguration(List<JoinTest> joinTests,
-                                 List<ProjectionTest> projectionTests) {
-            this.joinTests = joinTests;
-            this.projectionTests = projectionTests;
-        }
-    }
-
-    /**
-     * Configuration parsing or data exception
-     */
-    private static class ConfigurationException extends Exception {
-        private static final long serialVersionUID = 5634572284073087115L;
-
-        public ConfigurationException(String message) {
-            super(message);
-        }
-
-        public ConfigurationException(String message, Throwable cause) {
-            super(message, cause);
-        }
-    }
-
-    /**
-     * Table configuration data from config.xml
-     */
-    private static class ConfigurationTable {
-        public final String name;
-        public final String columnPrefix;
-        public final int nColumns;
-        public final int nVariations;
-
-        public ConfigurationTable(final String name, final String columnPrefix, int nColumns, int nVariations) {
-            this.name = name;
-            this.columnPrefix = columnPrefix;
-            this.nColumns = nColumns;
-            this.nVariations = nVariations;
-        }
-
-        public static ConfigurationTable fromElement(Element elem) throws ConfigurationException {
-            if (!elem.hasAttribute("name")) {
-                throw new ConfigurationException("<table> element is missing the 'name' attribute");
-            }
-            if (!elem.hasAttribute("prefix")) {
-                throw new ConfigurationException("<table> element is missing the 'prefix' attribute");
-            }
-            if (!elem.hasAttribute("columns")) {
-                throw new ConfigurationException("<table> element is missing the 'columns' attribute");
-            }
-            String name = elem.getAttribute("name");
-            String columnPrefix = elem.getAttribute("prefix");
-            int nColumns = Integer.parseInt(elem.getAttribute("columns"));
-            int nVariations = (elem.hasAttribute("variations")
-                                    ? Integer.parseInt(elem.getAttribute("variations"))
-                                    : 1);
-            return new ConfigurationTable(name, columnPrefix, nColumns, nVariations);
-        }
-    }
-
-    /**
-     * Test configuration data from config.xml
-     */
-    private static class ConfigurationTest {
-        public final String type;
-        public final String table;
-        public final int nLevels;
-
-        public ConfigurationTest(final String type, final String table, int nLevels) {
-            this.type = type;
-            this.table = table;
-            this.nLevels = nLevels;
-        }
-
-        public static ConfigurationTest fromElement(Element elem) throws ConfigurationException {
-            if (!elem.hasAttribute("type")) {
-                throw new ConfigurationException("<test> element is missing the 'type' attribute");
-            }
-            if (!elem.hasAttribute("table")) {
-                throw new ConfigurationException("<test> element is missing the 'table' attribute");
-            }
-            String type = elem.getAttribute("type");
-            String table = elem.getAttribute("table");
-            int nLevels = (elem.hasAttribute("levels") ? Integer.parseInt(elem.getAttribute("levels")) : 0);
-            return new ConfigurationTest(type, table, nLevels);
-        }
-    }
-
-    /**
-     * Parse config.xml and produce test configuration.
-     *
-     * @param path path to configuration file
-     * @param nQueries number of queries to generate per test
-     * @return test configuration
-     * @throws ConfigurationException
-     */
-    public TestConfiguration configureTests(final String path, int nQueries) throws ConfigurationException {
-        List<JoinTest> joinTests = new ArrayList<JoinTest>();
-        List<ProjectionTest> projectionTests = new ArrayList<ProjectionTest>();
-
-        try {
-            DocumentBuilderFactory docBuilderFactory = DocumentBuilderFactory.newInstance();
-            DocumentBuilder docBuilder = docBuilderFactory.newDocumentBuilder();
-            Document doc = docBuilder.parse(new File(path));
-            doc.getDocumentElement().normalize();
-
-            // Read schema tables (provides variation count for tests, etc.)
-            Map<String, ConfigurationTable> tables = new HashMap<String, ConfigurationTable>();
-            Element schemaElement = (Element)doc.getElementsByTagName("schema").item(0);
-            NodeList tableNodes = schemaElement.getElementsByTagName("table");
-            for (int iTable = 0; iTable < tableNodes.getLength(); iTable++) {
-                ConfigurationTable table = ConfigurationTable.fromElement((Element)tableNodes.item(iTable));
-                tables.put(table.name, table);
-            }
-
-            // Read tests and build test lists mixing in data from schema read above.
-            Element testElement = (Element)doc.getElementsByTagName("tests").item(0);
-            NodeList testNodes = testElement.getElementsByTagName("test");
-            for (int iTest = 0; iTest < testNodes.getLength(); iTest++) {
-                ConfigurationTest test = ConfigurationTest.fromElement((Element)testNodes.item(iTest));
-                if (tables.containsKey(test.table)) {
-                    ConfigurationTable table = tables.get(test.table);
-                    if (test.type.equalsIgnoreCase("join")) {
-                        joinTests.add(new JoinTest(test.table, table.nVariations, table.columnPrefix,
-                                                   table.nColumns, test.nLevels, nQueries));
-                    }
-                    else if (test.type.equalsIgnoreCase("projection")) {
-                        projectionTests.add(new ProjectionTest(test.table, table.columnPrefix,
-                                                               table.nColumns, nQueries));
-                    }
-                } else {
-                    throw new ConfigurationException(
-                            String.format("Configuration includes test for unknown table '%s'", test.table));
-                }
-            }
-        } catch (SAXException e) {
-            throw new ConfigurationException("XML parser SAX exception", e);
-        } catch (ParserConfigurationException e) {
-            throw new ConfigurationException("XML parser configuration exception", e);
-        } catch (IOException e) {
-            throw new ConfigurationException("XML parser I/O exception", e);
-        }
-
-        return new TestConfiguration(joinTests, projectionTests);
     }
 
     /**
@@ -713,22 +416,21 @@ public class Benchmark {
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
      *
      * @param configPath  path to configuration file
-     * @param nQueriesPerTest  number of queries to generate per test
      *
      * @throws ConfigurationException
      * @throws InterruptedException
      * @throws IOException
      * @throws NoConnectionsException
      */
-    public void runBenchmark(String configPath, int nQueriesPerTest)
+    public void runBenchmark(String configPath)
             throws ConfigurationException, InterruptedException, NoConnectionsException, IOException {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
 
-        // Hard-code the tests to run for now.
+        // Parse the XML test configuration.
         System.out.printf("Reading configuration file '%s'...\n", configPath);
-        TestConfiguration testConfig = configureTests(configPath, nQueriesPerTest);
+        List<QueryTestBase> tests = BenchmarkConfiguration.configureTests(configPath, this.cliConfig.test);
 
         // connect to one or more servers, loop until success
         connect(this.cliConfig.servers);
@@ -737,31 +439,31 @@ public class Benchmark {
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
+        // Run the benchmark loop for the requested warmup time
+        // The throughput may be throttled depending on client configuration
+        System.out.println("Warming up...");
+        for (String query : new QueryGenerator(tests, this.cliConfig.warmup)) {
+            this.client.callProcedure(new NullCallback(), "@AdHoc", query);
+        }
+
+        // reset the stats after warmup
+        fullStatsContext.fetchAndResetBaseline();
+        periodicStatsContext.fetchAndResetBaseline();
+
         // print periodic statistics to the console
         this.benchmarkStartTS = System.currentTimeMillis();
         long queryElapsedMS = 0;
         schedulePeriodicStats();
 
-        // Run the benchmark loop for the requested number of generated queries.
-        // Show intermediate results if more than one test is enabled.
-        if (this.cliConfig.runJoins) {
-            System.out.println("\nRunning join benchmark...");
-            for (String joinQuery : new JoinGenerator(testConfig.joinTests)) {
-                long startTS = System.currentTimeMillis();
-                this.client.callProcedure(new NullCallback(), "@AdHoc", joinQuery);
-                queryElapsedMS += (System.currentTimeMillis() - startTS);
-                this.queriesProcessed++;
-            }
+        // Run the benchmark for the requested duration.
+        System.out.printf("\nRunning '%s' benchmark...\n", this.cliConfig.test);
+        for (String query : new QueryGenerator(tests, this.cliConfig.duration)) {
+            long startTS = System.currentTimeMillis();
+            this.client.callProcedure(new NullCallback(), "@AdHoc", query);
+            queryElapsedMS += (System.currentTimeMillis() - startTS);
+            this.queriesProcessed++;
         }
-        if (this.cliConfig.runProjections) {
-            System.out.println("\nRunning projection benchmark...");
-            for (String projectionQuery : new ProjectionGenerator(testConfig.projectionTests)) {
-                long startTS = System.currentTimeMillis();
-                this.client.callProcedure(new NullCallback(), "@AdHoc", projectionQuery);
-                queryElapsedMS += (System.currentTimeMillis() - startTS);
-                this.queriesProcessed++;
-            }
-        }
+
         printStatistics();
         System.out.println("");
 
@@ -793,6 +495,6 @@ public class Benchmark {
 
         Benchmark benchmark = new Benchmark(cliConfig);
 
-        benchmark.runBenchmark(cliConfig.configfile, cliConfig.queriespertest);
+        benchmark.runBenchmark(cliConfig.configfile);
     }
 }
