@@ -24,7 +24,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.PriorityBlockingQueue;
 
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
-public class SiteTaskerScheduler
+public class SiteTaskerQueue
 {
     /** TaskComparator orders SiteTaskers by priority */
     static class TaskComparator implements Comparator<SiteTasker>
@@ -51,7 +51,7 @@ public class SiteTaskerScheduler
     final int m_initialCap = 100;
     final AtomicLong m_sequence = new AtomicLong(0);
 
-    SiteTaskerScheduler()
+    SiteTaskerQueue()
     {
         m_tasks = new PriorityBlockingQueue<SiteTasker>(m_initialCap, m_comparator);
     }

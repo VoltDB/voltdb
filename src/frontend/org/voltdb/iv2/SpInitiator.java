@@ -34,7 +34,7 @@ public class SpInitiator implements Initiator
     // Encapsulated objects
     private InitiatorMailbox m_initiatorMailbox = null;
     private Site m_executionSite = null;
-    private SiteTaskerScheduler m_scheduler = null;
+    private SiteTaskerQueue m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
 
     private Thread m_siteThread = null;
@@ -43,7 +43,7 @@ public class SpInitiator implements Initiator
     {
         m_messenger = messenger;
         m_partitionId = partition;
-        m_scheduler = new SiteTaskerScheduler();
+        m_scheduler = new SiteTaskerQueue();
         m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_partitionId, clerk);
         m_messenger.createMailbox(null, m_initiatorMailbox);
     }

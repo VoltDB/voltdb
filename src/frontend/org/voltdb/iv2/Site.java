@@ -28,7 +28,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.iv2.SiteTasker;
-import org.voltdb.iv2.SiteTaskerScheduler;
+import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
@@ -66,7 +66,7 @@ public class Site implements Runnable, SiteProcedureConnection
     private final int m_siteIndex = siteIndexCounter.getAndIncrement();
 
     // Manages pending tasks.
-    final SiteTaskerScheduler m_scheduler;
+    final SiteTaskerQueue m_scheduler;
 
     // Almighty execution engine and its HSQL sidekick
     ExecutionEngine m_ee;
@@ -119,7 +119,7 @@ public class Site implements Runnable, SiteProcedureConnection
 
     /** Create a new execution site and the corresponding EE */
     public Site(
-            SiteTaskerScheduler scheduler,
+            SiteTaskerQueue scheduler,
             long siteId,
             BackendTarget backend,
             CatalogContext context,

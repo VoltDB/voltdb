@@ -48,7 +48,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
 {
     VoltLogger hostLog = new VoltLogger("HOST");
     private final int m_partitionId;
-    private final SiteTaskerScheduler m_scheduler;
+    private final SiteTaskerQueue m_scheduler;
     private final HostMessenger m_messenger;
     private long m_hsId;
     private LoadedProcedureSet m_loadedProcs;
@@ -95,7 +95,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     };
 
 
-    public InitiatorMailbox(SiteTaskerScheduler scheduler, HostMessenger messenger,
+    public InitiatorMailbox(SiteTaskerQueue scheduler, HostMessenger messenger,
             int partitionId, PartitionClerk partitionClerk)
     {
         m_scheduler = scheduler;

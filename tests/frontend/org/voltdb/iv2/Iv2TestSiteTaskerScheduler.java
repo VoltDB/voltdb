@@ -27,7 +27,7 @@ import org.junit.Test;
 
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.iv2.SiteTasker;
-import org.voltdb.iv2.SiteTaskerScheduler;
+import org.voltdb.iv2.SiteTaskerQueue;
 
 import junit.framework.TestCase;
 
@@ -60,7 +60,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     @Test
     public void testSimpleRoundTrip() throws Exception
     {
-        SiteTaskerScheduler sts = new SiteTaskerScheduler();
+        SiteTaskerQueue sts = new SiteTaskerQueue();
         Task t1 = new Task(0);
         sts.offer(t1);
         SiteTasker r = sts.poll();
@@ -70,8 +70,8 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     @Test
     public void testComparator()
     {
-        SiteTaskerScheduler.TaskComparator cmp =
-            new SiteTaskerScheduler.TaskComparator();
+        SiteTaskerQueue.TaskComparator cmp =
+            new SiteTaskerQueue.TaskComparator();
 
         Task p1 = new Task(1);
         p1.setSeq(0);
@@ -93,7 +93,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     @Test
     public void testBaseCase() throws Exception
     {
-        SiteTaskerScheduler sts = new SiteTaskerScheduler();
+        SiteTaskerQueue sts = new SiteTaskerQueue();
         Task p1 = new Task(1);
         Task p2 = new Task(2);
 
@@ -111,7 +111,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     @Test
     public void testPrioritization() throws Exception
     {
-        SiteTaskerScheduler sts = new SiteTaskerScheduler();
+        SiteTaskerQueue sts = new SiteTaskerQueue();
         Task p1 = new Task(1);
         Task p2 = new Task(2);
         Task p3 = new Task(3);
@@ -131,7 +131,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     @Test
     public void testEqualPriorities() throws Exception
     {
-        SiteTaskerScheduler sts = new SiteTaskerScheduler();
+        SiteTaskerQueue sts = new SiteTaskerQueue();
         Task t1 = new Task(0);
         Task t2 = new Task(0);
         Task t3 = new Task(0);
