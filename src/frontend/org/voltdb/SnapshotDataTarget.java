@@ -56,4 +56,9 @@ public interface SnapshotDataTarget {
      * Get last cached exception that occurred during writes
      */
     public Throwable getLastWriteException();
+
+    /**
+     * Get the snapshot format this target uses
+     */
+    public SnapshotFormat getFormat();
 }

@@ -204,10 +204,10 @@ public class SnapshotSiteProcessor {
      */
     public static class SnapshotTableTask {
         public final int m_tableId;
-        public final SnapshotDataTarget m_target;
-        public final SnapshotDataFilter m_filters[];
         public final boolean m_isReplicated;
         public final String m_name;
+        private final SnapshotDataTarget m_target;
+        private final SnapshotDataFilter m_filters[];
 
         public SnapshotTableTask(
                 final int tableId,

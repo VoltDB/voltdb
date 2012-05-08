@@ -115,7 +115,8 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[2] != null);
             String file_path = (String) params.toArray()[0];
             String file_nonce = (String) params.toArray()[1];
-            SnapshotFormat format = (SnapshotFormat)params.toArray()[2];
+            SnapshotFormat format =
+                    SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[2]);
             String data = (String) params.toArray()[3];
             return saveTest(file_path, file_nonce, format, data, context, hostname);
         }
@@ -134,7 +135,8 @@ public class SnapshotSave extends VoltSystemProcedure
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
             byte block = (Byte)params.toArray()[3];
-            SnapshotFormat format = (SnapshotFormat) params.toArray()[4];
+            SnapshotFormat format =
+                    SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[4]);
             String data = (String) params.toArray()[5];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
@@ -200,7 +202,6 @@ public class SnapshotSave extends VoltSystemProcedure
                                     SystemProcedureExecutionContext context,
                                     String hostname) {
         {
-            // TODO: for stream target, do other tests
             VoltTable result = constructNodeResultsTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
@@ -225,49 +226,52 @@ public class SnapshotSave extends VoltSystemProcedure
 
                 for (Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
-                    File saveFilePath =
-                        SnapshotUtil.constructFileForTable(
-                                table,
-                                file_path,
-                                file_nonce,
-                                format,
-                                context.getHostId());
-                    TRACE_LOG.trace("Host ID " + context.getHostId() +
-                                    " table: " + table.getTypeName() +
-                                    " to path: " + saveFilePath);
                     String file_valid = "SUCCESS";
                     String err_msg = "";
-                    if (saveFilePath.exists())
-                    {
-                        file_valid = "FAILURE";
-                        err_msg = "SAVE FILE ALREADY EXISTS: " + saveFilePath;
-                    }
-                    else if (!saveFilePath.getParentFile().canWrite())
-                    {
-                        file_valid = "FAILURE";
-                        err_msg = "FILE LOCATION UNWRITABLE: " + saveFilePath;
-                    }
-                    else
-                    {
-                        try
-                        {
-                            /*
-                             * Sanity check that the file can be created
-                             * and then delete it so empty files aren't
-                             * orphaned if another part of the snapshot
-                             * test fails.
-                             */
-                            if (saveFilePath.createNewFile()) {
-                                saveFilePath.delete();
-                            }
-                        }
-                        catch (IOException ex)
+                    if (format.isFileBased()) {
+                        File saveFilePath =
+                                SnapshotUtil.constructFileForTable(
+                                                                   table,
+                                                                   file_path,
+                                                                   file_nonce,
+                                                                   format,
+                                                                   context.getHostId());
+                        TRACE_LOG.trace("Host ID " + context.getHostId() +
+                                        " table: " + table.getTypeName() +
+                                        " to path: " + saveFilePath);
+                        if (saveFilePath.exists())
                         {
                             file_valid = "FAILURE";
-                            err_msg = "FILE CREATION OF " + saveFilePath +
-                            "RESULTED IN IOException: " + ex.getMessage();
+                            err_msg = "SAVE FILE ALREADY EXISTS: " + saveFilePath;
+                        }
+                        else if (!saveFilePath.getParentFile().canWrite())
+                        {
+                            file_valid = "FAILURE";
+                            err_msg = "FILE LOCATION UNWRITABLE: " + saveFilePath;
+                        }
+                        else
+                        {
+                            try
+                            {
+                                /*
+                                 * Sanity check that the file can be created
+                                 * and then delete it so empty files aren't
+                                 * orphaned if another part of the snapshot
+                                 * test fails.
+                                 */
+                                if (saveFilePath.createNewFile()) {
+                                    saveFilePath.delete();
+                                }
+                            }
+                            catch (IOException ex)
+                            {
+                                file_valid = "FAILURE";
+                                err_msg = "FILE CREATION OF " + saveFilePath +
+                                        "RESULTED IN IOException: " + ex.getMessage();
+                            }
                         }
                     }
+
                     result.addRow(context.getHostId(),
                                   hostname,
                                   table.getTypeName(),
@@ -390,7 +394,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, format, data);
+        params.setParameters(filePath, fileNonce, format.name(), data);
         pfs[0].parameters = params;
 
         // This fragment aggregates the save-to-disk sanity check results
@@ -423,7 +427,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, block, format, data);
+        params.setParameters(filePath, fileNonce, txnId, block, format.name(), data);
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files

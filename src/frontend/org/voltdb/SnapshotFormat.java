@@ -21,7 +21,37 @@ package org.voltdb;
  * Supported snapshot formats
  */
 public enum SnapshotFormat {
-    NATIVE, CSV;
+    NATIVE (true,  true),
+    CSV    (true,  true),
+    STREAM (false, false);
+
+    private final boolean m_isFileBased;
+    private final boolean m_isTableBased;
+    private SnapshotFormat(boolean isFileBased, boolean isTableBased) {
+        m_isFileBased = isFileBased;
+        m_isTableBased = isTableBased;
+    }
+
+    /**
+     * Whether or not this snapshot format writes to file. The snapshot
+     * subsystem will do file creation if the format is file based.
+     *
+     * @return true if file based, otherwise false.
+     */
+    public boolean isFileBased() {
+        return m_isFileBased;
+    }
+
+    /**
+     * Whether or not a per-table snapshot target should be created. If false, a
+     * single snapshot target instance will be used for all tables on a single
+     * partition replica.
+     *
+     * @return
+     */
+    public boolean isTableBased() {
+        return m_isTableBased;
+    }
 
     /**
      * Get the snapshot format enum from the string. Letter case of the string

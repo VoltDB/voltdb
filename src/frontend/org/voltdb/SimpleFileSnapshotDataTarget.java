@@ -144,4 +144,8 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         return m_writeException;
     }
 
+    @Override
+    public SnapshotFormat getFormat() {
+        return SnapshotFormat.CSV;
+    }
 }

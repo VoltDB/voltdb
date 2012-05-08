@@ -21,6 +21,8 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.lang.reflect.Constructor;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
@@ -35,6 +37,7 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
@@ -48,6 +51,7 @@ import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 import com.google.common.primitives.Ints;
 
@@ -113,7 +117,7 @@ public class SnapshotSaveAPI
             }
 
             if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                createSetup(file_path, file_nonce, format, txnId, context, hostname, result);
+                createSetup(file_path, file_nonce, format, txnId, data, context, hostname, result);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -294,11 +298,9 @@ public class SnapshotSaveAPI
         }
     }
 
-
-    @SuppressWarnings("unused")
     private void createSetup(
             String file_path, String file_nonce, SnapshotFormat format,
-            long txnId, SystemProcedureExecutionContext context,
+            long txnId, String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
@@ -364,6 +366,29 @@ public class SnapshotSaveAPI
                             file_nonce,
                             format,
                             tables.toArray(new Table[0]));
+
+                SnapshotDataTarget sdt = null;
+                if (!format.isTableBased()) {
+                    if (format == SnapshotFormat.STREAM && data != null) {
+                        JSONObject jsObj = new JSONObject(data);
+                        int port = jsObj.getInt("port");
+                        JSONArray jsAddresses = jsObj.getJSONArray("addresses");
+                        ArrayList<byte[]> addresses = new ArrayList<byte[]>();
+                        for (int i = 0; i < jsAddresses.length(); i++) {
+                            InetAddress addr = InetAddress.getByName(jsAddresses.getString(i));
+                            addresses.add(addr.getAddress());
+                        }
+
+                        Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotDataTarget",
+                                                                "Rejoin", false);
+                        if (klass != null) {
+                            Constructor<?> constructor =
+                                    klass.getConstructor(List.class, int.class, long.class);
+                            sdt = (SnapshotDataTarget) constructor.newInstance(addresses, port);
+                        }
+                    }
+                }
+
                 for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
                     /*
@@ -375,18 +400,21 @@ public class SnapshotSaveAPI
                     }
                     String canSnapshot = "SUCCESS";
                     String err_msg = "";
-                    final File saveFilePath =
-                            SnapshotUtil.constructFileForTable(
+
+                    File saveFilePath = null;
+                    if (format.isFileBased()) {
+                        saveFilePath = SnapshotUtil.constructFileForTable(
                                     table,
                                     file_path,
                                     file_nonce,
                                     format,
                                     context.getHostId());
-                    SnapshotDataTarget sdt = null;
+                    }
+
                     try {
                         if (format == SnapshotFormat.CSV) {
                             sdt = new SimpleFileSnapshotDataTarget(saveFilePath);
-                        } else {
+                        } else if (format == SnapshotFormat.NATIVE) {
                             sdt =
                                 constructSnapshotDataTargetForTable(
                                         context,
@@ -396,6 +424,11 @@ public class SnapshotSaveAPI
                                         context.getSiteTracker().m_numberOfPartitions,
                                         txnId);
                         }
+
+                        if (sdt == null) {
+                            throw new IOException("Unable to create snapshot target");
+                        }
+
                         targets.add(sdt);
                         final SnapshotDataTarget sdtFinal = sdt;
                         final Runnable onClose = new Runnable() {
@@ -469,7 +502,7 @@ public class SnapshotSaveAPI
                         ex.printStackTrace(pw);
                         pw.flush();
                         canSnapshot = "FAILURE";
-                        err_msg = "SNAPSHOT INITIATION OF " + saveFilePath +
+                        err_msg = "SNAPSHOT INITIATION OF " + file_nonce +
                         "RESULTED IN IOException: \n" + sw.toString();
                     }
 

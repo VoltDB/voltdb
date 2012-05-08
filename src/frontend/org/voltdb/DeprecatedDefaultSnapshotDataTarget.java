@@ -355,4 +355,9 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     public IOException getLastWriteException() {
         return m_writeException;
     }
+
+    @Override
+    public SnapshotFormat getFormat() {
+        return SnapshotFormat.NATIVE;
+    }
 }
