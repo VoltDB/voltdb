@@ -43,9 +43,9 @@ public class SpInitiator implements Initiator
     {
         m_messenger = messenger;
         m_partitionId = partition;
+
         m_scheduler = new SiteTaskerQueue();
         m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_partitionId, clerk);
-        m_messenger.createMailbox(null, m_initiatorMailbox);
     }
 
     @Override

@@ -102,6 +102,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
         m_messenger = messenger;
         m_partitionId = partitionId;
         m_clerk = partitionClerk;
+        m_messenger.createMailbox(null, this);
     }
 
     void setProcedureSet(LoadedProcedureSet loadedProcs)
