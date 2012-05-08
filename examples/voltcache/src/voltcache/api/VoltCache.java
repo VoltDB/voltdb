@@ -42,8 +42,6 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ProcCallException;
 
 public class VoltCache implements IVoltCache
 {
@@ -52,7 +50,7 @@ public class VoltCache implements IVoltCache
     // items from the cache for a given cluster connection.
     private static final HashMap<String,CleanupTask> CleanupTaskPool = new HashMap<String,CleanupTask>();
 
-    
+
     /*
      * Timer task wrapper to scrub out expired items from the cache
      */
@@ -66,7 +64,7 @@ public class VoltCache implements IVoltCache
             this.client = getClient(servers, port);
             this.timer = new Timer();
             this.timer.scheduleAtFixedRate(new TimerTask()
-            {   
+            {
                 @Override
                 public void run()
                 {
@@ -109,7 +107,7 @@ public class VoltCache implements IVoltCache
     {
         this.servers = servers;
         this.port = port;
-        
+
         this.client = getClient(servers, port);
         // Make sure there is at least one cleanup task for this cluster
         lock.lock();
@@ -126,14 +124,14 @@ public class VoltCache implements IVoltCache
             lock.unlock();
         }
     }
-    
+
     protected Client getClient(String servers, int port) throws InterruptedException {
-    	ClientConfig clientConfig = new ClientConfig("","");
-    	Client client = connect(clientConfig, servers, port);
-		return client;
+        ClientConfig clientConfig = new ClientConfig("","");
+        Client client = connect(clientConfig, servers, port);
+                return client;
     }
-    
-    
+
+
     /**
      * Connect to a set of servers in parallel. Each will retry until
      * connection. This call will block until all have connected.
@@ -143,7 +141,7 @@ public class VoltCache implements IVoltCache
      * @throws InterruptedException if anything bad happens with the threads.
      */
     Client connect(ClientConfig clientConfig, final String servers, final int port) throws InterruptedException {
-        
+
         final Client client = ClientFactory.createClient(clientConfig);
         String[] serverArray = servers.split(",");
         final CountDownLatch connections = new CountDownLatch(serverArray.length);
@@ -162,7 +160,7 @@ public class VoltCache implements IVoltCache
         connections.await();
         return client;
     }
-    
+
     /**
      * Connect to a single server with retry. Limited exponential backoff.
      * No timeout. This will run until the process is killed if it's not
@@ -174,11 +172,11 @@ public class VoltCache implements IVoltCache
         int sleep = 1000;
         while (true) {
             try {
-            	if ( server.indexOf(':') > -1) {
-            		client.createConnection(server);
-            	} else {
-            		client.createConnection(server, port);
-            	}
+                if ( server.indexOf(':') > -1) {
+                        client.createConnection(server);
+                } else {
+                        client.createConnection(server, port);
+                }
                 break;
             }
             catch (Exception e) {
@@ -188,23 +186,23 @@ public class VoltCache implements IVoltCache
             }
         }
     }
-    
-    
-   
+
+
+
     /**
      * Closes the VoltCache connection.
      */
     public void close()
     {
-    	try {
-    		this.client.drain();
-    		this.client.close();
-		} catch (NoConnectionsException e) {
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			e.printStackTrace();
-		}
-       
+        try {
+                this.client.drain();
+                this.client.close();
+                } catch (NoConnectionsException e) {
+                        e.printStackTrace();
+                } catch (InterruptedException e) {
+                        e.printStackTrace();
+                }
+
         // Deal with cleanup task
         lock.lock();
         try
@@ -214,8 +212,8 @@ public class VoltCache implements IVoltCache
             if (CleanupTaskPool.get(key).Users <= 0)
                 CleanupTaskPool.remove(key);
         } catch (InterruptedException e) {
-			e.printStackTrace();
-		}
+                        e.printStackTrace();
+                }
         finally
         {
             lock.unlock();
@@ -232,7 +230,7 @@ public class VoltCache implements IVoltCache
      */
     private VoltCacheResult execute(VoltCacheResult.Type type, boolean noreply, String procedure, Object... parameters)
     {
-    	VoltCacheResult results = null;
+        VoltCacheResult results = null;
         try
         {
             if (noreply) {
@@ -255,7 +253,7 @@ public class VoltCache implements IVoltCache
         {
             results= VoltCacheResult.ERROR();
         }
-		return results;
+                return results;
     }
 
     /**
@@ -269,24 +267,24 @@ public class VoltCache implements IVoltCache
     {
         try
         {
-        	Callable<ClientResponse> callable = new Callable<ClientResponse>() {
-        		public ClientResponse call() {
-        			ClientResponse response = null;
-					try {
-						response = client.callProcedure (
-								procedure, 
-								parameters);
-					} catch (Exception e) {
-						e.printStackTrace();
-					}
-					return response;
-				}
-        	};
-        	
-        	FutureTask<ClientResponse> future = new FutureTask<ClientResponse>(
-    				callable
-    		);
-        	
+                Callable<ClientResponse> callable = new Callable<ClientResponse>() {
+                        public ClientResponse call() {
+                                ClientResponse response = null;
+                                        try {
+                                                response = client.callProcedure (
+                                                                procedure,
+                                                                parameters);
+                                        } catch (Exception e) {
+                                                e.printStackTrace();
+                                        }
+                                        return response;
+                                }
+                };
+
+                FutureTask<ClientResponse> future = new FutureTask<ClientResponse>(
+                                callable
+                );
+
             return VoltCacheFuture.cast(type,future);
         }
         catch(Exception x)
@@ -612,17 +610,17 @@ public class VoltCache implements IVoltCache
      */
     public Map<String, ClientStats> getStatistics(String... procedures)
     {
-    	Map<String, ClientStats> results = new HashMap<String, ClientStats>();
-    	Map<String, ClientStats> allProcs = getStatistics().getStatsByProc();
-    	
-    	for( String procedure : procedures) {
-    		ClientStats procStats = allProcs.get(procedure);
-    		if ( procStats != null ) {
-    			results.put(procedure, procStats);
-    		}
-    	}
-    	
-    	return results;
+        Map<String, ClientStats> results = new HashMap<String, ClientStats>();
+        Map<String, ClientStats> allProcs = getStatistics().getStatsByProc();
+
+        for( String procedure : procedures) {
+                ClientStats procStats = allProcs.get(procedure);
+                if ( procStats != null ) {
+                        results.put(procedure, procStats);
+                }
+        }
+
+        return results;
     }
 
     /**
