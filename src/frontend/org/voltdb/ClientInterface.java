@@ -85,6 +85,7 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -266,52 +267,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (m_thread != null) {
                 throw new IllegalStateException("A thread for this ClientAcceptor is already running");
             }
-
-            // Hard-code retry parameters for now.
-            int iRetry = 0;
-            int maxRetries = 6;
-            long sleepDuration = 20000;
-            boolean failed = false;
-            String ioExceptionMessage = null;
-            while (!m_serverSocket.socket().isBound() && iRetry <= maxRetries && !failed) {
+            if (!m_serverSocket.socket().isBound()) {
                 try {
                     m_serverSocket.socket().bind(new InetSocketAddress(m_port));
-                } catch (IOException e) {
-                    ioExceptionMessage = e.getMessage();
-                    if (iRetry++ < maxRetries) {
-                        // Give it another shot.
-                        hostLog.warn(String.format("Client interface failed to bind to port %d, retry %d of %d...",
-                                                   m_port, iRetry, maxRetries));
-                        try {
-                            Thread.sleep(sleepDuration);
-                        } catch (InterruptedException e1) {
-                            hostLog.warn("Port binding retry loop was interrupted - giving up.");
-                            failed = true;
-                        }
-                    } else {
-                        failed = true;
-                    }
+                }
+                catch (IOException e) {
+                    hostLog.fatal("Client interface failed to bind to port " + m_port);
+                    hostLog.fatal("IOException message: \"" + e.getMessage() + "\"");
+                    MiscUtils.printPortsInUse(hostLog);
+                    VoltDB.crashLocalVoltDB("Client interface failed to bind to port " + m_port, false, e);
                 }
             }
-
-            if (failed) {
-                // Ran out of luck.
-                hostLog.fatal("Client interface failed to bind to port " + m_port);
-                if (ioExceptionMessage != null) {
-                    hostLog.fatal("IOException message: \"" + ioExceptionMessage + "\"");
-                }
-                Process p = Runtime.getRuntime().exec("lsof -i");
-                java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
-                java.io.BufferedReader br = new java.io.BufferedReader(reader);
-                String str = null;
-                while ((str = br.readLine()) != null) {
-                    if (str.contains("LISTEN")) {
-                        hostLog.fatal(str);
-                    }
-                }
-                System.exit(-1);
-            }
-
             m_running = true;
             String threadName = m_isAdmin ? "AdminPort connection acceptor" : "ClientPort connection acceptor";
             m_thread = new Thread( null, this, threadName, 262144);
