@@ -189,9 +189,8 @@ public class Benchmark {
         @Option(desc = "Whether value blobs should be compressed (GZip) for storage in the database (true|false).")
         boolean usecompression = false;
 
-        @Option(desc = "Interval for performance feedback, in seconds.")
-        final String csv = "statsfile"; // It doesn't appear that we
-                                        // intentionally expose
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "";
 
         // this command line option.
 
@@ -328,7 +327,7 @@ public class Benchmark {
 
         // Dump statistics to a CSV file
         try {
-            this.cache.saveStatistics(config.csv);
+            this.cache.saveStatistics(config.statsfile);
         } catch (IOException e) {
             e.printStackTrace();
         }
