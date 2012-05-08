@@ -1038,13 +1038,17 @@ TEST CASES
     <property name="emma.dir" location="${build.dir}/emma" />
     <mkdir dir="${emma.dir}" />
     <emma>
-        <!-- don't instrument build.test.dir or any non-voltdb code -->
-        <instr
-            instrpath="${build.prod.dir}/org/voltdb"
-            destdir="${build.instr.dir}/org/voltdb"
-            metadatafile="${emma.dir}/metadata.emma"
-            merge="true"
-        />
+        <instr destdir="${build.instr.dir}/org/"
+               metadatafile="${emma.dir}/metadata.emma"
+               merge="true">
+          <instrpath path="${build.prod.dir}/org"/>
+
+          <filter includes="*voltdb.*"/>
+          <filter includes="*voltcore.*"/>
+          <!--pmsg is the protobuf-generated code for dragent-->
+          <filter excludes="*pmsg.*"/>
+          <filter excludes="*exampleutils.*"/>
+        </instr>
     </emma>
 </target>
 
