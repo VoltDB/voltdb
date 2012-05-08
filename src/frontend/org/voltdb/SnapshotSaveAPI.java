@@ -28,8 +28,10 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -86,7 +88,6 @@ public class SnapshotSaveAPI
             String file_path, String file_nonce, SnapshotFormat format, byte block,
             long txnId, String data, SystemProcedureExecutionContext context, String hostname)
     {
-        // TODO: add stream target here
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
         final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
@@ -342,21 +343,24 @@ public class SnapshotSaveAPI
 
                 final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
 
-                Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
-                        txnId,
-                        context.getExecutionSite().m_context.getCatalogCRC(),
-                        file_path,
-                        file_nonce,
-                        tables,
-                        context.getExecutionSite().getCorrespondingHostId(),
-                        SnapshotSiteProcessor.getExportSequenceNumbers());
-                if (completionTask != null) {
-                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+                if (format.isFileBased()) {
+                    Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
+                                                  txnId,
+                                                  context.getExecutionSite().m_context.getCatalogCRC(),
+                                                  file_path,
+                                                  file_nonce,
+                                                  tables,
+                                                  context.getExecutionSite().getCorrespondingHostId(),
+                                                  SnapshotSiteProcessor.getExportSequenceNumbers());
+                    if (completionTask != null) {
+                        SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+                    }
+                    completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
+                    if (completionTask != null) {
+                        SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+                    }
                 }
-                completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
-                if (completionTask != null) {
-                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
-                }
+
                 final AtomicInteger numTables = new AtomicInteger(tables.size());
                 final SnapshotRegistry.Snapshot snapshotRecord =
                     SnapshotRegistry.startSnapshot(
@@ -369,6 +373,13 @@ public class SnapshotSaveAPI
 
                 SnapshotDataTarget sdt = null;
                 if (!format.isTableBased()) {
+                    // table schemas for all the tables we'll snapshot on this partition
+                    Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
+                    for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase())) {
+                        VoltTable schemaTable = CatalogUtil.getVoltTable(table);
+                        schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
+                    }
+
                     if (format == SnapshotFormat.STREAM && data != null) {
                         JSONObject jsObj = new JSONObject(data);
                         int port = jsObj.getInt("port");
@@ -383,8 +394,10 @@ public class SnapshotSaveAPI
                                                                 "Rejoin", false);
                         if (klass != null) {
                             Constructor<?> constructor =
-                                    klass.getConstructor(List.class, int.class, long.class);
-                            sdt = (SnapshotDataTarget) constructor.newInstance(addresses, port);
+                                    klass.getConstructor(List.class, int.class,
+                                                         Map.class);
+                            sdt = (SnapshotDataTarget) constructor.newInstance(addresses, port,
+                                                                               schemas);
                         }
                     }
                 }

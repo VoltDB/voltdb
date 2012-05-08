@@ -324,7 +324,7 @@ public class SnapshotSave extends VoltSystemProcedure
         int ii = 0;
         error_result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
         error_result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-        if (path == null || path.equals("")) {
+        if (format.isFileBased() && (path == null || path.equals(""))) {
             VoltTable results[] = new VoltTable[] { new VoltTable(error_result_columns) };
             results[0].addRow("FAILURE", "Provided path was null or the empty string");
             return results;

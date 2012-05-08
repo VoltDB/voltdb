@@ -330,7 +330,7 @@ public class SnapshotSiteProcessor {
                  * is responsible for closing the data target. Done in a separate
                  * thread so the EE can continue working.
                  */
-                if (t.m_isReplicated) {
+                if (t.m_isReplicated && t.m_target.getFormat().isTableBased()) {
                     final Thread terminatorThread =
                         new Thread("Replicated SnapshotDataTarget terminator ") {
                         @Override

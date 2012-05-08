@@ -22,7 +22,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.lang.reflect.Constructor;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -34,6 +37,9 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.FailureSiteUpdateMessage;
@@ -88,8 +94,14 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
+import org.voltdb.messaging.RejoinResponseMessage;
+import org.voltdb.rejoin.RejoinCoordinator;
+import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -175,6 +187,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private final SnapshotSiteProcessor m_snapshotter;
 
     private RecoverySiteProcessor m_recoveryProcessor = null;
+    private RejoinSiteProcessor m_rejoinProcessor = null;
+    private volatile Pair<Long, RejoinResponseMessage> m_rejoinInitResponse = null;
+    private long m_rejoinSnapshotTxnId = -1;
+    private RejoinCoordinator m_rejoinCoordinator = null;
 
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
@@ -445,11 +461,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         @Override
         public void run() {
             final long now = System.currentTimeMillis();
-            final long transferred = m_recoveryProcessor.bytesTransferred();
+            final boolean newRejoin = m_rejoinProcessor != null;
+            long transferred = 0;
+            if (m_recoveryProcessor != null) {
+                transferred = m_recoveryProcessor.bytesTransferred();
+            }
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
             final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
             m_recoveryProcessor = null;
+            m_rejoinProcessor = null;
+            m_rejoinInitResponse = null;
+            m_rejoinSnapshotTxnId = -1;
+            m_rejoinCoordinator = null;
             m_recovering = false;
             if (m_haveRecoveryPermit) {
                 m_haveRecoveryPermit = false;
@@ -463,7 +487,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 int remaining = recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
                     ee.toggleProfiler(0);
-                    VoltDB.instance().onExecutionSiteRecoveryCompletion(bytesTransferredTotal);
+
+                    /*
+                     * If it's the new rejoin code, the rejoin coordinator
+                     * handles this.
+                     */
+                    if (!newRejoin) {
+                        VoltDB.instance().onExecutionSiteRecoveryCompletion(bytesTransferredTotal);
+                    }
                 }
             } else {
                 m_recoveryLog.info("Source recovery complete for site " + m_siteId +
@@ -899,16 +930,32 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     if (safeTxnId != null && m_recoveryPermit.tryAcquire()) {
                         m_haveRecoveryPermit = true;
                         m_recoveryStartTime = System.currentTimeMillis();
-                        m_recoveryProcessor =
-                            RecoverySiteProcessorDestination.createProcessor(
-                                    m_context.database,
-                                    m_tracker,
-                                    ee,
-                                    m_mailbox,
-                                    m_siteId,
-                                    m_onRecoveryCompletion,
-                                    m_recoveryMessageHandler);
+
+                        if (!VoltDB.instance().getConfig().m_newRejoin) {
+                            m_recoveryProcessor =
+                                    RecoverySiteProcessorDestination.createProcessor(
+                                        m_context.database,
+                                        m_tracker,
+                                        ee,
+                                        m_mailbox,
+                                        m_siteId,
+                                        m_onRecoveryCompletion,
+                                        m_recoveryMessageHandler);
+                        }
                     }
+                }
+
+                // check if there is a rejoin initiation response to send
+                if (m_rejoinInitResponse != null) {
+                    m_recoveryLog.info("Sending rejoin initiation response to " +
+                            CoreUtils.hsIdToString(m_rejoinInitResponse.getFirst()));
+                    try {
+                        m_mailbox.send(m_rejoinInitResponse.getFirst(),
+                                       m_rejoinInitResponse.getSecond());
+                    } catch (MessagingException e) {
+                        throw new RuntimeException(e);
+                    }
+                    m_rejoinInitResponse = null;
                 }
 
                 TransactionState currentTxnState = (TransactionState)m_transactionQueue.poll();
@@ -940,6 +987,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     } else {
                         //idle, do snapshot work
                         m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+
+                        doRejoinWork();
                     }
                 }
                 if (currentTxnState != null) {
@@ -971,6 +1020,91 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             throw e;
         }
         shutdown();
+    }
+
+    /**
+     * Do rejoin work, including streaming snapshot blocks and replaying logged
+     * transactions.
+     */
+    private void doRejoinWork() {
+        // do rejoin work
+        if (m_rejoinProcessor != null && m_rejoinSnapshotTxnId != -1) {
+            Pair<Integer, ByteBuffer> rejoinWork = m_rejoinProcessor.poll();
+            if (rejoinWork != null) {
+                int tableId = rejoinWork.getFirst();
+                ByteBuffer buffer = rejoinWork.getSecond();
+                m_recoveryLog.info("Got a snapshot block for table " + tableId + " " +
+                        buffer.remaining());
+                VoltTable table =
+                        PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
+                                                                          true);
+                //m_recoveryLog.info("table " + tableId + ": " + table.toString());
+                loadTable(m_rejoinSnapshotTxnId, tableId, table);
+            } else if (m_rejoinProcessor.isEOF()) {
+                m_recoveryLog.info("New rejoin snapshot transfer is finished");
+                m_rejoinProcessor.close();
+                // Notify the rejoin coordinator so that it can start the next site
+                if (m_rejoinCoordinator != null) {
+                    m_rejoinCoordinator.onRejoinFinished(getSiteId());
+                }
+
+                // TODO: done streaming snapshot, start replaying logged transactions
+                m_onRecoveryCompletion.run();
+            }
+        }
+    }
+
+    /**
+     * Construct a stream snapshot receiver and initiate rejoin.
+     */
+    public void initiateRejoin(RejoinCoordinator coordinator) {
+        m_rejoinCoordinator = coordinator;
+        if (m_rejoinCoordinator == null) {
+            VoltDB.crashLocalVoltDB("No rejoin coordinator specified", false, null);
+        }
+
+        // new rejoin code
+        Class<?> klass =
+                MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotSink",
+                                       "Rejoin", false);
+        Constructor<?> constructor;
+        try {
+            constructor = klass.getConstructor(long.class);
+            m_rejoinProcessor = (RejoinSiteProcessor) constructor.newInstance(getSiteId());
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to construct stream snapshot receiver",
+                                    true, e);
+        }
+
+        Pair<List<byte[]>, Integer> endPoints = m_rejoinProcessor.initialize();
+        List<byte[]> addresses = endPoints.getFirst();
+        int port = endPoints.getSecond();
+
+        int partition = m_tracker.getPartitionForSite(getSiteId());
+        long sourceSite = 0;
+        List<Long> sourceSites = new ArrayList<Long>(m_tracker.getSitesForPartition(partition));
+        sourceSites.remove(getSiteId());
+        try {
+            sourceSite = sourceSites.get(0);
+        } catch (ArrayIndexOutOfBoundsException e) {
+            VoltDB.crashLocalVoltDB("No source for partition " + partition,
+                                    false, null);
+        }
+
+        // TODO: start logging transactions here
+
+        m_recoveryLog.info("Initiating new rejoin from " +
+                CoreUtils.hsIdToString(getSiteId()));
+
+        RecoveryMessage message = new RecoveryMessage(getSiteId(), 0l,
+                                                      addresses, port);
+        message.setNewRejoin();
+        try {
+            m_mailbox.send(sourceSite, message);
+        } catch (MessagingException e) {
+            VoltDB.crashLocalVoltDB("Unable to send recovery message to " +
+                    CoreUtils.hsIdToString(sourceSite), true, e);
+        }
     }
 
     /**
@@ -1167,7 +1301,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
             }
         } else if (message instanceof RecoveryMessage) {
-            RecoveryMessage rm = (RecoveryMessage)message;
+            final RecoveryMessage rm = (RecoveryMessage)message;
             if (rm.recoveryMessagesAvailable()) {
                 return;
             }
@@ -1178,7 +1312,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
              * rejoin. New rejoin request cannot be processed now. Telling the
              * rejoining site to retry later.
              */
-            if (m_recoveryProcessor != null) {
+            if (m_recoveryProcessor != null || m_rejoinProcessor != null) {
                 m_recoveryLog.error("ExecutionSite is not ready to handle " +
                         "recovery request from site " +
                         CoreUtils.hsIdToString(rm.sourceSite()));
@@ -1197,16 +1331,84 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     "Recovery initiate received at site " + CoreUtils.hsIdToString(m_siteId) +
                     " from site " + CoreUtils.hsIdToString(rm.sourceSite()) + " requesting recovery start before txnid " +
                     recoveringPartitionTxnId);
-            m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
-                    this,
-                    rm,
-                    m_context.database,
-                    m_tracker,
-                    ee,
-                    m_mailbox,
-                    m_siteId,
-                    m_onRecoveryCompletion,
-                    m_recoveryMessageHandler);
+            if (rm.newRejoin()) {
+                m_recoveryLog.info(CoreUtils.hsIdToString(rm.sourceSite()) +
+                                   " requested new rejoin");
+
+                // Initiate a snapshot with stream snapshot target
+                String data = null;
+                try {
+                    JSONStringer jsStringer = new JSONStringer();
+                    jsStringer.object();
+                    jsStringer.key("addresses").array();
+                    for (byte[] addr : rm.addresses()) {
+                        InetAddress inetAddress = InetAddress.getByAddress(addr);
+                        jsStringer.value(inetAddress.getHostAddress());
+                    }
+                    jsStringer.endArray();
+                    jsStringer.key("port").value(rm.port());
+                    jsStringer.endObject();
+                    data = jsStringer.toString();
+                } catch (Exception e) {
+                    // TODO: error, send error response
+                    m_recoveryLog.error("Failed to serialize to JSON: " +
+                            e.getMessage());
+                }
+
+                SnapshotResponseHandler handler = new SnapshotResponseHandler() {
+                    @Override
+                    public void handleResponse(ClientResponse resp) {
+                        if (resp == null || resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                            // TODO: error
+                            return;
+                        }
+
+                        VoltTable[] results = resp.getResults();
+                        if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                            long txnId = -1;
+                            String appStatus = resp.getAppStatusString();
+                            try {
+                                JSONObject jsObj = new JSONObject(appStatus);
+                                txnId = jsObj.getLong("txnId");
+                            } catch (JSONException e) {
+                                // TODO Failed to get txnId, respond with error
+                                m_recoveryLog.error("Failed to serialize to JSON: " +
+                                        e.getMessage());
+                            }
+
+                            m_recoveryLog.info("Rejoin snapshot requested " + txnId);
+                            m_rejoinInitResponse =
+                                    Pair.of(rm.sourceSite(),
+                                            new RejoinResponseMessage(getSiteId(), txnId));
+                        } else {
+                            // TODO: failed
+                            m_recoveryLog.error("Snapshot request didn't succeed");
+                        }
+                    }
+                };
+
+                SnapshotUtil.requestSnapshot(0l, "", "Rejoin snapshot", (byte) 0,
+                                             SnapshotFormat.STREAM, data, handler);
+            } else {
+                m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
+                        this,
+                        rm,
+                        m_context.database,
+                        m_tracker,
+                        ee,
+                        m_mailbox,
+                        m_siteId,
+                        m_onRecoveryCompletion,
+                        m_recoveryMessageHandler);
+            }
+        }
+        else if (message instanceof RejoinResponseMessage) {
+            // Get the snapshot txnId
+            RejoinResponseMessage rm = (RejoinResponseMessage) message;
+            m_rejoinSnapshotTxnId = rm.txnId();
+            m_recoveryLog.info("Heard rejoin initiation response from " +
+                    CoreUtils.hsIdToString(message.m_sourceHSId) +
+                    ", snapshot txnId is" + m_rejoinSnapshotTxnId);
         }
         else if (message instanceof FragmentResponseMessage) {
             FragmentResponseMessage response = (FragmentResponseMessage)message;
@@ -1896,8 +2098,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
+        loadTable(txnId, table.getRelativeIndex(), data);
+    }
+
+    /**
+     * @param txnId
+     * @param data
+     * @param table
+     */
+    private void loadTable(long txnId, int tableId, VoltTable data) {
         long undo_token = getNextUndoToken();
-        ee.loadTable(table.getRelativeIndex(), data,
+        ee.loadTable(tableId, data,
                      txnId,
                      lastCommittedTxnId,
                      undo_token);

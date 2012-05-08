@@ -40,6 +40,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Exchanger;
 import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.zip.CRC32;
@@ -63,6 +64,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -852,7 +854,11 @@ public class SnapshotUtil {
      * Handles response from asynchronous snapshot requests.
      */
     public static interface SnapshotResponseHandler {
-        public void handleResponse(ClientResponseImpl resp);
+        /**
+         *
+         * @param resp could be null
+         */
+        public void handleResponse(ClientResponse resp);
     }
 
     /**
@@ -879,6 +885,7 @@ public class SnapshotUtil {
                                        final SnapshotFormat format,
                                        final String data,
                                        final SnapshotResponseHandler handler) {
+        final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
         final Connection c = new Connection() {
             @Override
             public WriteStream writeStream() {
@@ -895,9 +902,7 @@ public class SnapshotUtil {
                         try {
                             b.position(4);
                             resp.initFromBuffer(b);
-                            if (handler != null) {
-                                handler.handleResponse(resp);
-                            }
+                            responseExchanger.exchange(resp);
                         } catch (Exception e) {
                             throw new RuntimeException(e);
                         }
@@ -972,11 +977,28 @@ public class SnapshotUtil {
         Runnable work = new Runnable() {
             @Override
             public void run() {
+                ClientResponse response = null;
                 // abort if unable to succeed in 2 hours
                 final long startTime = System.currentTimeMillis();
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
                     sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking, format, data);
+                    try {
+                        response = responseExchanger.exchange(null);
+                        VoltTable[] results = response.getResults();
+                        if (response.getStatus() != ClientResponse.SUCCESS) {
+                            break;
+                        } else if (isSnapshotInProgress(results)) {
+                            // retry after a second
+                            Thread.sleep(1000);
+                            continue;
+                        } else {
+                            // other errors are not recoverable
+                            break;
+                        }
+                    } catch (InterruptedException ignore) {}
                 }
+
+                handler.handleResponse(response);
             }
         };
 

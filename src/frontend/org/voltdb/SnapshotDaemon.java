@@ -631,6 +631,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 CreateMode.PERSISTENT);
                         //Reset the watch
                         userSnapshotRequestExistenceCheck();
+                        hostLog.info("Snapshot request response handled " +
+                                clientResponse.getStatusString());
+                        return;
                     }
 
                     /*
@@ -642,6 +645,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     if (isSnapshotInProgressResponse(clientResponse)) {
                         scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
                     } else {
+                        hostLog.info("Snapshot response weird " + clientResponse.getStatusString()
+                                     + clientResponse.getResults()[0].toString());
                         ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
                         ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
                         m_zk.create(

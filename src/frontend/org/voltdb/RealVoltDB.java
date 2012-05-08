@@ -27,6 +27,7 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
+import java.lang.reflect.Constructor;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -93,6 +94,7 @@ import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
+import org.voltdb.rejoin.RejoinCoordinator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -178,6 +180,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     static Semaphore m_testBlockRecoveryCompletion = new Semaphore(Integer.MAX_VALUE);
     private long m_executionSiteRecoveryFinish;
     private long m_executionSiteRecoveryTransferred;
+
+    // Rejoin coordinator
+    private RejoinCoordinator m_rejoinCoordinator = null;
 
     // id of the leader, or the host restore planner says has the catalog
     int m_hostIdWithStartupCatalog;
@@ -542,6 +547,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
                     assert(runner.m_siteObj != null);
                     m_localSites.put(runner.m_siteId, runner.m_siteObj);
+                }
+            }
+
+            // Construct rejoin coordinator
+            if (m_config.m_newRejoin) {
+                Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
+                                                        "Rejoin", false);
+                Constructor<?> constructor;
+                try {
+                    constructor = klass.getConstructor(Map.class);
+                    m_rejoinCoordinator = (RejoinCoordinator) constructor.newInstance(m_localSites);
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
+                                            true, e);
                 }
             }
 
@@ -1310,6 +1329,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             onRestoreCompletion(Long.MIN_VALUE);
         }
 
+        // Start the rejoin coordinator
+        if (m_rejoinCoordinator != null) {
+            m_rejoinCoordinator.startRejoin();
+        }
+
         // start one site in the current thread
         Thread.currentThread().setName("ExecutionSiteAndVoltDB");
         m_isRunning = true;
@@ -1630,6 +1654,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     private void onRecoveryCompletion() {
+        // null out the rejoin coordinator
+        m_rejoinCoordinator = null;
+
         try {
             m_testBlockRecoveryCompletion.acquire();
         } catch (InterruptedException e) {}
