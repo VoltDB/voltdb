@@ -98,12 +98,14 @@ public class LocalCluster implements VoltServerConfig {
     private final ArrayList<ArrayList<EEProcess>> m_eeProcs = new ArrayList<ArrayList<EEProcess>>();
 
     // Produce a (presumably) available IP port number.
-    PortGenerator portGenerator = new PortGenerator();
+    public final PortGenerator portGenerator = new PortGenerator();
     public static class PortGenerator {
         private int nextPort = 12000;
-        private int nextCport = VoltDB.DEFAULT_PORT;
-        private int nextAport = VoltDB.DEFAULT_ADMIN_PORT;
+        private static int portOffset = 100;    // Shift ports away from defaults for testing
+        private int nextCport = VoltDB.DEFAULT_PORT+portOffset;
+        private int nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
 
+        final int MIN_STATIC_PORT = 10000;
         final int MAX_STATIC_PORT = 49151;
 
         /** Return the next bindable port */
@@ -114,17 +116,29 @@ public class LocalCluster implements VoltServerConfig {
                     return port;
                 }
             }
-            return -1;
+            throw new RuntimeException("Exhausted all possible ports");
         }
         public synchronized int nextClient() {
-            return nextCport++;
+            while(nextCport <= MAX_STATIC_PORT) {
+                int port = nextCport++;
+                if (MiscUtils.isBindable(port)) {
+                    return port;
+                }
+            }
+            throw new RuntimeException("Exhausted all possible client ports");
         }
         public synchronized int nextAdmin() {
-            return nextAport--;
+            while(nextAport >= MIN_STATIC_PORT) {
+                int port = nextAport--;
+                if (MiscUtils.isBindable(port)) {
+                    return port;
+                }
+            }
+            throw new RuntimeException("Exhausted all possible admin ports");
         }
         public synchronized void reset() {
-            nextCport = 21212;
-            nextAport = 21211;
+            nextCport = VoltDB.DEFAULT_PORT+portOffset;
+            nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
         }
     }
 
@@ -1016,6 +1030,22 @@ public class LocalCluster implements VoltServerConfig {
 
     public int internalPort(int hostId) {
         return m_cmdLines.get(hostId).internalPort();
+    }
+
+    public int port(int hostId) {
+        return m_cmdLines.get(hostId).port();
+    }
+
+    public int adminPort(int hostId) {
+        return m_cmdLines.get(hostId).adminPort();
+    }
+
+    public int setPort(int hostId, int port) {
+        return m_cmdLines.get(hostId).m_port = port;
+    }
+
+    public int setAdminPort(int hostId, int port) {
+        return m_cmdLines.get(hostId).m_adminPort = port;
     }
 
     @Override

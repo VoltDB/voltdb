@@ -226,7 +226,7 @@ public class TestSecuritySuite extends RegressionSuite {
 
     public void testAllowedExportConnectorPermissions() throws ExportClientException {
         // user1 can connect (in groups list)
-        ExportTestClient eclient = new ExportTestClient(1);
+        ExportTestClient eclient = new ExportTestClient(1, port(0));
         eclient.addCredentials("user1", "password");
         eclient.connect();
         eclient.disconnect();
@@ -237,7 +237,7 @@ public class TestSecuritySuite extends RegressionSuite {
 
     public void testRejectedExportConnectorPermissions() {
         boolean caught = false;
-        ExportTestClient eclient = new ExportTestClient(1);
+        ExportTestClient eclient = new ExportTestClient(1, port(0));
         try {
             // bad group
             eclient.addCredentials("user2", "password");
