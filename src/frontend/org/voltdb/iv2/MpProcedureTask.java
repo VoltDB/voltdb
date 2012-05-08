@@ -37,7 +37,7 @@ import org.voltdb.utils.LogKeys;
  */
 public class MpProcedureTask extends ProcedureTask
 {
-    final int[] m_primaryHsIds;
+    final long[] m_initiatorHSIds;
 
     MpProcedureTask(Mailbox mailbox, ProcedureRunner runner,
                   long txnId, Iv2InitiateTaskMessage msg, List<Long> pInitiators)
@@ -45,8 +45,7 @@ public class MpProcedureTask extends ProcedureTask
         super(mailbox, runner,
               new MpTransactionState(mailbox, txnId, msg, pInitiators,
                                      mailbox.getHSId()));
-
-        m_primaryHsIds = new int[] {};
+        m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -56,6 +55,10 @@ public class MpProcedureTask extends ProcedureTask
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txn;
         final InitiateResponseMessage response = processInitiateTask(txn.m_task);
+        if (!response.shouldCommit()) {
+            // IZZY: this is a bit of a hack, too
+            txn.m_needsRollback = true;
+        }
         completeInitiateTask(siteConnection);
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
@@ -73,7 +76,7 @@ public class MpProcedureTask extends ProcedureTask
                 false);  // really don't want to have ack the ack.
 
         try {
-            for (long hsid : m_primaryHsIds) {
+            for (long hsid : m_initiatorHSIds) {
                 m_initiator.send(hsid, complete);
             }
         } catch (MessagingException fatal) {

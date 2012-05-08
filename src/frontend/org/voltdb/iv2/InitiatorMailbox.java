@@ -34,6 +34,7 @@ import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -180,6 +181,9 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
         else if (message instanceof FragmentResponseMessage) {
             handleFragmentResponseMessage((FragmentResponseMessage)message);
         }
+        else if (message instanceof CompleteTransactionMessage) {
+            handleCompleteTransactionMessage((CompleteTransactionMessage)message);
+        }
     }
 
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
@@ -229,6 +233,11 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
                 hostLog.error("Failed to deliver response from execution site.", e);
             }
         }
+    }
+
+    private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
+    {
+        m_scheduler.handleCompleteTransactionMessage(message);
     }
 
     /**

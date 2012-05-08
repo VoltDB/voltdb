@@ -262,6 +262,9 @@ public class MpTransactionState extends TransactionState
             long src_hsid = msg.getExecutorSiteId();
             trackDependency(src_hsid, this_depId, this_dep);
         }
+        if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
+            m_needsRollback = true;
+        }
     }
 
     private boolean checkDoneReceivingFragResponses()

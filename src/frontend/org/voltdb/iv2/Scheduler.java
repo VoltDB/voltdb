@@ -26,6 +26,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -81,6 +82,7 @@ public class Scheduler
                 new MpProcedureTask(m_mailbox, m_loadedProcs.procs.get(procedureName),
                         m_txnId.incrementAndGet(), message, partitionInitiators);
             m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
+            System.out.println("CREATED INIT map for TXNID: " + task.m_txn.txnId);
             m_tasks.offer(task);
         }
     }
@@ -97,13 +99,29 @@ public class Scheduler
         long localTxnId = m_txnId.incrementAndGet();
         final FragmentTask task =
             new FragmentTask(m_mailbox, localTxnId, message);
-        m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
+        m_outstandingTxns.put(message.getTxnId(), task.m_txn);
+        System.out.println("CREATED FRAG map for TXNID: " + message.getTxnId());
         m_tasks.offer(task);
     }
 
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
+        System.out.println("LOOKING UP RESP map for TXNID: " + message.getTxnId());
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
+    }
+
+    public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
+    {
+        System.out.println("LOOKING UP COMPLETE map for TXNID: " + message.getTxnId());
+        TransactionState txn = m_outstandingTxns.remove(message.getTxnId());
+        // XXX IZZY This feels like papering over something...come back and
+        // be smarter later
+        if (txn != null)
+        {
+            final CompleteTransactionTask task =
+                new CompleteTransactionTask(txn, message);
+            m_tasks.offer(task);
+        }
     }
 }

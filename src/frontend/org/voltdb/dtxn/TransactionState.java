@@ -49,7 +49,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected final SiteTransactionConnection m_site;
     protected boolean m_done = false;
     protected long m_beginUndoToken;
-    protected boolean m_needsRollback = false;
+    public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
 
     /** Iv2 constructor */
