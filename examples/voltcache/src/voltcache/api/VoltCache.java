@@ -626,13 +626,12 @@ public class VoltCache implements IVoltCache
     }
 
     /**
-     * @deprecated
      * Saves performance statistics to a file
      * @param file The path to the file where statistics will be saved
      */
     public void saveStatistics(String file) throws IOException
     {
-        //this.connection.saveStatistics(file);
+        this.client.writeSummaryCSV(getStatistics().getStats(), file);
     }
 
 }

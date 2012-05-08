@@ -38,6 +38,7 @@
  */
 package voltcache;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Timer;
@@ -191,6 +192,10 @@ public class Benchmark
 
 		@Option(desc = "Whether value blobs should be compressed (GZip) for storage in the database (true|false).")
 		boolean usecompression = false;
+
+		@Option(desc = "Interval for performance feedback, in seconds.")
+		final String csv = "statsfile"; // It doesn't appear that we intentionally expose
+		// this command line option.
     	
     	
         @Override
@@ -310,6 +315,13 @@ public class Benchmark
         System.out.println(" System Server Statistics");
         System.out.println(HORIZONTAL_RULE);
         System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
+        
+        // Dump statistics to a CSV file
+        try {
+            this.cache.saveStatistics(config.csv);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
 	}
 
 
