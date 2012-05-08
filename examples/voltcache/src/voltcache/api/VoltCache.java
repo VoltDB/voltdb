@@ -24,17 +24,24 @@ package voltcache.api;
 
 import java.io.IOException;
 import java.util.HashMap;
+import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
+import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
-import org.voltdb.client.exampleutils.ClientConnection;
-import org.voltdb.client.exampleutils.ClientConnectionPool;
-import org.voltdb.client.exampleutils.PerfCounter;
-import org.voltdb.client.exampleutils.PerfCounterMap;
+import org.voltdb.client.Client;
 
 public class VoltCache implements IVoltCache
 {
@@ -43,28 +50,25 @@ public class VoltCache implements IVoltCache
     // items from the cache for a given cluster connection.
     private static final HashMap<String,CleanupTask> CleanupTaskPool = new HashMap<String,CleanupTask>();
 
+
     /*
      * Timer task wrapper to scrub out expired items from the cache
      */
-    private static class CleanupTask
+    private class CleanupTask
     {
-        private final ClientConnection connection;
+        private final Client client;
         private final Timer timer;
         protected long Users = 1;
         private CleanupTask(String servers, int port) throws Exception
         {
-            this.connection = ClientConnectionPool.get(servers, port);
+            this.client = getClient(servers, port);
             this.timer = new Timer();
             this.timer.scheduleAtFixedRate(new TimerTask()
             {
-                private final ClientConnection con;
-                {
-                    con = connection;
-                }
                 @Override
                 public void run()
                 {
-                    try {con.execute("Cleanup");} catch(Exception x) {}
+                    try {client.callProcedure("Cleanup");} catch(Exception x) {}
                 }
             }
             , 10000
@@ -75,21 +79,21 @@ public class VoltCache implements IVoltCache
         {
             this.Users++;
         }
-        protected void dispose()
+        protected void dispose() throws InterruptedException
         {
             this.Users--;
             if (this.Users <= 0)
             {
                 this.timer.cancel();
-                this.connection.close();
+                this.client.close();
             }
         }
     }
 
     // Client connection to the underlying VoltDB cluster
-    private final ClientConnection Connection;
-    private final String Servers;
-    private final int Port;
+    private final Client client;
+    private final String servers;
+    private final int port;
 
     // For internal use: NullCallback for "noreply" operations
     private static final NullCallback NullCallback = new NullCallback();
@@ -101,16 +105,17 @@ public class VoltCache implements IVoltCache
      */
     public VoltCache(String servers, int port) throws Exception
     {
-        this.Servers = servers;
-        this.Port = port;
-        this.Connection = ClientConnectionPool.get(servers, port);
+        this.servers = servers;
+        this.port = port;
+
+        this.client = getClient(servers, port);
         // Make sure there is at least one cleanup task for this cluster
         lock.lock();
         try
         {
-            String key = this.Servers + ":" + this.Port;
+            String key = this.servers + ":" + this.port;
             if (!CleanupTaskPool.containsKey(key))
-                CleanupTaskPool.put(key, new CleanupTask(this.Servers, this.Port));
+                CleanupTaskPool.put(key, new CleanupTask(this.servers, this.port));
             else
                 CleanupTaskPool.get(key).use();
         }
@@ -120,21 +125,95 @@ public class VoltCache implements IVoltCache
         }
     }
 
+    protected Client getClient(String servers, int port) throws InterruptedException {
+        ClientConfig clientConfig = new ClientConfig("","");
+        Client client = connect(clientConfig, servers, port);
+                return client;
+    }
+
+
+    /**
+     * Connect to a set of servers in parallel. Each will retry until
+     * connection. This call will block until all have connected.
+     *
+     * @param servers A comma separated list of servers using the hostname:port
+     * syntax (where :port is optional).
+     * @throws InterruptedException if anything bad happens with the threads.
+     */
+    Client connect(ClientConfig clientConfig, final String servers, final int port) throws InterruptedException {
+
+        final Client client = ClientFactory.createClient(clientConfig);
+        String[] serverArray = servers.split(",");
+        final CountDownLatch connections = new CountDownLatch(serverArray.length);
+
+        // use a new thread to connect to each server
+        for (final String server : serverArray) {
+            new Thread(new Runnable() {
+                @Override
+                public void run() {
+                    connectToOneServerWithRetry(client, server, port);
+                    connections.countDown();
+                }
+            }).start();
+        }
+        // block until all have connected
+        connections.await();
+        return client;
+    }
+
+    /**
+     * Connect to a single server with retry. Limited exponential backoff.
+     * No timeout. This will run until the process is killed if it's not
+     * able to connect.
+     *
+     * @param server hostname:port or just hostname (hostname can be ip).
+     */
+    void connectToOneServerWithRetry(Client client, String server, int port) {
+        int sleep = 1000;
+        while (true) {
+            try {
+                if ( server.indexOf(':') > -1) {
+                        client.createConnection(server);
+                } else {
+                        client.createConnection(server, port);
+                }
+                break;
+            }
+            catch (Exception e) {
+                System.err.printf("Connection failed - retrying in %d second(s).\n", sleep / 1000);
+                try { Thread.sleep(sleep); } catch (Exception interruted) {}
+                if (sleep < 8000) sleep += sleep;
+            }
+        }
+    }
+
+
+
     /**
      * Closes the VoltCache connection.
      */
     public void close()
     {
-        ClientConnectionPool.dispose(this.Connection);
+        try {
+                this.client.drain();
+                this.client.close();
+                } catch (NoConnectionsException e) {
+                        e.printStackTrace();
+                } catch (InterruptedException e) {
+                        e.printStackTrace();
+                }
+
         // Deal with cleanup task
         lock.lock();
         try
         {
-            String key = this.Servers + ":" + this.Port;
+            String key = this.servers + ":" + this.port;
             CleanupTaskPool.get(key).dispose();
             if (CleanupTaskPool.get(key).Users <= 0)
                 CleanupTaskPool.remove(key);
-        }
+        } catch (InterruptedException e) {
+                        e.printStackTrace();
+                }
         finally
         {
             lock.unlock();
@@ -151,27 +230,30 @@ public class VoltCache implements IVoltCache
      */
     private VoltCacheResult execute(VoltCacheResult.Type type, boolean noreply, String procedure, Object... parameters)
     {
+        VoltCacheResult results = null;
         try
         {
-            if (noreply)
-                return this.Connection.executeAsync(
+            if (noreply) {
+                results = this.client.callProcedure(
                                                      VoltCache.NullCallback
                                                    , procedure
                                                    , parameters
                                                    ) ? VoltCacheResult.SUBMITTED() : VoltCacheResult.ERROR();
-            else
-                return VoltCacheResult.get(
+            } else {
+                results = VoltCacheResult.get(
                                             type
-                                          , this.Connection.execute(
+                                          , this.client.callProcedure(
                                                                      procedure
                                                                    , parameters
                                                                    )
                                           );
+            }
         }
         catch(Exception x)
         {
-            return VoltCacheResult.ERROR();
+            results= VoltCacheResult.ERROR();
         }
+                return results;
     }
 
     /**
@@ -181,17 +263,29 @@ public class VoltCache implements IVoltCache
      * @param parameters Ordered list of procedure parameters
      * @returns Future result of the operation
      */
-    private Future<VoltCacheResult> asyncExecute(VoltCacheResult.Type type, String procedure, Object... parameters)
+    private Future<VoltCacheResult> asyncExecute(VoltCacheResult.Type type, final String procedure, final Object... parameters)
     {
         try
         {
-            return VoltCacheFuture.cast(
-                                         type
-                                       , this.Connection.executeAsync(
-                                                                       procedure
-                                                                     , parameters
-                                                                     )
-                                       );
+                Callable<ClientResponse> callable = new Callable<ClientResponse>() {
+                        public ClientResponse call() {
+                                ClientResponse response = null;
+                                        try {
+                                                response = client.callProcedure (
+                                                                procedure,
+                                                                parameters);
+                                        } catch (Exception e) {
+                                                e.printStackTrace();
+                                        }
+                                        return response;
+                                }
+                };
+
+                FutureTask<ClientResponse> future = new FutureTask<ClientResponse>(
+                                callable
+                );
+
+            return VoltCacheFuture.cast(type,future);
         }
         catch(Exception x)
         {
@@ -494,9 +588,9 @@ public class VoltCache implements IVoltCache
      * Returns underlying performance statistics
      * @returns Full map of performance counters for the underlying VoltDB connection
      */
-    public PerfCounterMap getStatistics()
+    public ClientStatsContext getStatistics()
     {
-        return this.Connection.getStatistics();
+        return this.client.createStatsContext();
     }
 
     /**
@@ -504,9 +598,9 @@ public class VoltCache implements IVoltCache
      * @param procedure Name of the specific procedure for which to retrieve the performance counter.
      * @returns The performance counter for the given procedure
      */
-    public PerfCounter getStatistics(String procedure)
+    public ClientStats getStatistics(String procedure)
     {
-        return this.Connection.getStatistics(procedure);
+        return getStatistics().getStatsForProcedure(procedure);
     }
 
     /**
@@ -514,9 +608,19 @@ public class VoltCache implements IVoltCache
      * @param procedures Names of the specific procedures for which to retrieve an aggregated performance counter.
      * @returns The performance counter for the given list of procedures
      */
-    public PerfCounter getStatistics(String... procedures)
+    public Map<String, ClientStats> getStatistics(String... procedures)
     {
-        return this.Connection.getStatistics(procedures);
+        Map<String, ClientStats> results = new HashMap<String, ClientStats>();
+        Map<String, ClientStats> allProcs = getStatistics().getStatsByProc();
+
+        for( String procedure : procedures) {
+                ClientStats procStats = allProcs.get(procedure);
+                if ( procStats != null ) {
+                        results.put(procedure, procStats);
+                }
+        }
+
+        return results;
     }
 
     /**
@@ -525,7 +629,7 @@ public class VoltCache implements IVoltCache
      */
     public void saveStatistics(String file) throws IOException
     {
-        this.Connection.saveStatistics(file);
+        this.client.writeSummaryCSV(getStatistics().getStats(), file);
     }
 
 }

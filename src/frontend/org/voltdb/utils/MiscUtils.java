@@ -17,8 +17,6 @@
 package org.voltdb.utils;
 
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
 import java.io.IOException;
 import java.net.BindException;
 import java.net.ServerSocket;
@@ -36,6 +34,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google.common.net.HostAndPort;
+
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
@@ -47,16 +47,7 @@ public class MiscUtils {
     public static void copyFile(String fromPath, String toPath) throws Exception {
         File inputFile = new File(fromPath);
         File outputFile = new File(toPath);
-
-        FileReader in = new FileReader(inputFile);
-        FileWriter out = new FileWriter(outputFile);
-        int c;
-
-        while ((c = in.read()) != -1)
-          out.write(c);
-
-        in.close();
-        out.close();
+        com.google.common.io.Files.copy(inputFile, outputFile);
     }
 
     /**
@@ -310,15 +301,7 @@ public class MiscUtils {
      * @return hostname or textual ip representation.
      */
     public static String getHostnameFromHostnameColonPort(String server) {
-        server = server.trim();
-        String[] parts = server.split(":");
-        if (parts.length == 1) {
-            return server;
-        }
-        else {
-            assert(parts.length == 2);
-            return parts[0].trim();
-        }
+        return HostAndPort.fromString(server).getHostText();
     }
 
     /**
@@ -327,14 +310,7 @@ public class MiscUtils {
      * @return port number.
      */
     public static int getPortFromHostnameColonPort(String server, int defaultPort) {
-        String[] parts = server.split(":");
-        if (parts.length == 1) {
-            return defaultPort;
-        }
-        else {
-            assert(parts.length == 2);
-            return Integer.parseInt(parts[1]);
-        }
+        return HostAndPort.fromString(server).getPortOrDefault(defaultPort);
     }
 
     /**
@@ -343,19 +319,7 @@ public class MiscUtils {
      * @return String in hostname/ip:port format.
      */
     public static String getHostnameColonPortString(String server, int defaultPort) {
-        server = server.trim();
-        String[] parts = server.trim().split(":");
-        if (parts.length == 1) {
-            // handle empty port string
-            if (server.endsWith(":"))
-                return server + String.valueOf(0);
-            // handle no port string given
-            return server + ":" + String.valueOf(defaultPort);
-        }
-        else {
-            assert(parts.length == 2);
-            return server;
-        }
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort).toString();
     }
 
     /**

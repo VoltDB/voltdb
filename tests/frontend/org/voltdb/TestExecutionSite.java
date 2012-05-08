@@ -1087,10 +1087,10 @@ public class TestExecutionSite extends TestCase {
         // peek at some internals
         long[] nonCoordinatingSites = ts.getNonCoordinatingSites();
         assertEquals(4, nonCoordinatingSites.length);
-        assertEquals(getHSIdForES(4), nonCoordinatingSites[3]);
-        assertEquals(getHSIdForES(6), nonCoordinatingSites[2]);
-        assertEquals(getHSIdForES(7), nonCoordinatingSites[1]);
-        assertEquals(getHSIdForES(8), nonCoordinatingSites[0]);
+        assertEquals(getHSIdForES(8), nonCoordinatingSites[3]);
+        assertEquals(getHSIdForES(7), nonCoordinatingSites[2]);
+        assertEquals(getHSIdForES(6), nonCoordinatingSites[1]);
+        assertEquals(getHSIdForES(4), nonCoordinatingSites[0]);
 
         // fail first site
         ts = new MultiPartitionParticipantTxnState(m0, es0, mn);
@@ -1100,12 +1100,12 @@ public class TestExecutionSite extends TestCase {
 
         nonCoordinatingSites = ts.getNonCoordinatingSites();
         assertEquals(7, nonCoordinatingSites.length);
-        assertEquals(getHSIdForES(2), nonCoordinatingSites[6]);
-        assertEquals(getHSIdForES(3), nonCoordinatingSites[5]);
-        assertEquals(getHSIdForES(4), nonCoordinatingSites[4]);
-        assertEquals(getHSIdForES(6), nonCoordinatingSites[2]);
-        assertEquals(getHSIdForES(7), nonCoordinatingSites[1]);
-        assertEquals(getHSIdForES(8), nonCoordinatingSites[0]);
+        assertEquals(getHSIdForES(8), nonCoordinatingSites[6]);
+        assertEquals(getHSIdForES(7), nonCoordinatingSites[5]);
+        assertEquals(getHSIdForES(6), nonCoordinatingSites[4]);
+        assertEquals(getHSIdForES(4), nonCoordinatingSites[2]);
+        assertEquals(getHSIdForES(3), nonCoordinatingSites[1]);
+        assertEquals(getHSIdForES(2), nonCoordinatingSites[0]);
 
         // fail site that isn't a non-coordinator site
         ts = new MultiPartitionParticipantTxnState(m0, es0, mn);
@@ -1116,13 +1116,13 @@ public class TestExecutionSite extends TestCase {
 
         nonCoordinatingSites = ts.getNonCoordinatingSites();
         assertEquals(8, nonCoordinatingSites.length);
-        assertEquals(getHSIdForES(1), nonCoordinatingSites[7]);
-        assertEquals(getHSIdForES(2), nonCoordinatingSites[6]);
-        assertEquals(getHSIdForES(3), nonCoordinatingSites[5]);
-        assertEquals(getHSIdForES(4), nonCoordinatingSites[4]);
-        assertEquals(getHSIdForES(6), nonCoordinatingSites[2]);
-        assertEquals(getHSIdForES(7), nonCoordinatingSites[1]);
-        assertEquals(getHSIdForES(8), nonCoordinatingSites[0]);
+        assertEquals(getHSIdForES(8), nonCoordinatingSites[7]);
+        assertEquals(getHSIdForES(7), nonCoordinatingSites[6]);
+        assertEquals(getHSIdForES(6), nonCoordinatingSites[5]);
+        assertEquals(getHSIdForES(5), nonCoordinatingSites[4]);
+        assertEquals(getHSIdForES(3), nonCoordinatingSites[2]);
+        assertEquals(getHSIdForES(2), nonCoordinatingSites[1]);
+        assertEquals(getHSIdForES(1), nonCoordinatingSites[0]);
     }
 
     /*

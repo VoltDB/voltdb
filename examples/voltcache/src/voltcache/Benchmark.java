@@ -38,306 +38,390 @@
  */
 package voltcache;
 
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 
-import org.voltdb.client.exampleutils.AppHelper;
+import org.voltdb.CLIConfig;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 
 import voltcache.api.VoltCache;
 import voltcache.api.VoltCacheResult;
 
-public class Benchmark
-{
+public class Benchmark {
+
+    // handy, rather than typing this out several times
+    static final String HORIZONTAL_RULE = "----------" + "----------"
+            + "----------" + "----------" + "----------" + "----------"
+            + "----------" + "----------" + "\n";
+
     // Initialize some common constants and variables
-    private static final AtomicLongArray GetStoreResults = new AtomicLongArray(2);
-    private static final AtomicLongArray GetCompressionResults = new AtomicLongArray(2);
-    private static final AtomicLongArray PutStoreResults = new AtomicLongArray(2);
-    private static final AtomicLongArray PutCompressionResults = new AtomicLongArray(2);
+    private static final AtomicLongArray GetStoreResults = new AtomicLongArray(
+            2);
+    private static final AtomicLongArray GetCompressionResults = new AtomicLongArray(
+            2);
+    private static final AtomicLongArray PutStoreResults = new AtomicLongArray(
+            2);
+    private static final AtomicLongArray PutCompressionResults = new AtomicLongArray(
+            2);
 
     // Reference to the database connection we will use in them main thread
-    private static VoltCache Con;
+    private VoltCache cache;
 
-    // Class for each thread that will be run in parallel, performing requests against the VoltDB server
-    private static class ClientThread implements Runnable
-    {
-        private final String servers;
-        private final int port;
+    // Configuration for benchmark
+    private VoltCacheConfig config;
+    private ClientStatsContext fullStatsContext;
+
+    // Class for each thread that will be run in parallel, performing requests
+    // against the VoltDB server
+    private class ClientThread implements Runnable {
         private final long duration;
         private final PayloadProcessor processor;
         private final double getPutRatio;
-        public ClientThread(String servers, int port, PayloadProcessor processor, long duration, double getPutRatio) throws Exception
-        {
-            this.servers = servers;
-            this.port = port;
+
+        public ClientThread(PayloadProcessor processor, long duration,
+                double getPutRatio) throws Exception {
+
             this.duration = duration;
             this.processor = processor;
             this.getPutRatio = getPutRatio;
         }
 
         @Override
-        public void run()
-        {
-            // Each thread gets its dedicated cache connection, and posts operations against it.
-            VoltCache con = null;
-            try
-            {
-                con = new VoltCache(servers, port);
-                long endTime = System.currentTimeMillis() + (1000l * this.duration);
+        public void run() {
+
+            try {
+
+                long endTime = System.currentTimeMillis()
+                        + (1000l * this.duration);
                 Random rand = new Random();
-                while (endTime > System.currentTimeMillis())
-                {
+                while (endTime > System.currentTimeMillis()) {
                     // Decide whether to perform a GET or PUT operation
-                    if (rand.nextDouble() < getPutRatio)
-                    {
-                        try
-                        {
-                            String key = processor.generateRandomKeyForRetrieval();
-                            VoltCacheResult result = con.get(key);
+                    if (rand.nextDouble() < getPutRatio) {
+                        try {
+                            String key = processor
+                                    .generateRandomKeyForRetrieval();
+                            VoltCacheResult result = cache.get(key);
                             // Cache miss (Key does not exist)
                             if (result.Data.size() == 0)
                                 GetStoreResults.incrementAndGet(1);
-                            else
-                            {
-                                final PayloadProcessor.Pair pair = processor.retrieveFromStore(key, result.Data.get(key).Value);
+                            else {
+                                final PayloadProcessor.Pair pair = processor
+                                        .retrieveFromStore(key,
+                                                result.Data.get(key).Value);
                                 GetStoreResults.incrementAndGet(0);
-                                GetCompressionResults.addAndGet(0, pair.getStoreValueLength());
-                                GetCompressionResults.addAndGet(1, pair.getRawValueLength());
+                                GetCompressionResults.addAndGet(0,
+                                        pair.getStoreValueLength());
+                                GetCompressionResults.addAndGet(1,
+                                        pair.getRawValueLength());
                             }
-                        }
-                        catch(Exception x)
-                        {
+                        } catch (Exception x) {
                             GetStoreResults.incrementAndGet(1);
                         }
-                    }
-                    else
-                    {
-                        final PayloadProcessor.Pair pair = processor.generateForStore();
-                        try
-                        {
+                    } else {
+                        final PayloadProcessor.Pair pair = processor
+                                .generateForStore();
+                        try {
                             // Put a key/value pair, asynchronously
-                            con.set(pair.Key, 0, 0, pair.getStoreValue(), false);
+                            cache.set(pair.Key, 0, 0, pair.getStoreValue(),
+                                    false);
                             PutStoreResults.incrementAndGet(0);
-                        }
-                        catch(Exception x)
-                        {
+                        } catch (Exception x) {
                             PutStoreResults.incrementAndGet(1);
-                        }
-                        finally
-                        {
-                            PutCompressionResults.addAndGet(0, pair.getStoreValueLength());
-                            PutCompressionResults.addAndGet(1, pair.getRawValueLength());
+                        } finally {
+                            PutCompressionResults.addAndGet(0,
+                                    pair.getStoreValueLength());
+                            PutCompressionResults.addAndGet(1,
+                                    pair.getRawValueLength());
                         }
                     }
                 }
-            }
-            catch(Exception x)
-            {
+            } catch (Exception x) {
                 System.err.println("Exception: " + x);
                 x.printStackTrace();
-            }
-            finally
-            {
-                try { con.close(); } catch (Exception x) {}
             }
         }
     }
 
-    // Application entry point
-    public static void main(String[] args)
-    {
-        try
-        {
+    /**
+     * Uses included {@link CLIConfig} class to declaratively state command line
+     * options with defaults and validation.
+     */
+    static class VoltCacheConfig extends CLIConfig {
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+        @Option(desc = "Number of concurrent threads attacking the database.")
+        int threads = 1;
 
-            // Use the AppHelper utility class to retrieve command line application parameters
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        long displayinterval = 10;
 
-            // Define parameters and pull from command line
-            AppHelper apph = new AppHelper(Benchmark.class.getCanonicalName())
-                .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
-                .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
-                .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
-                .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("poolsize", "pool_size", "Size of the pool of keys to work with (10,00, 10,000, 100,000 items, etc.).", 100000)
-                .add("preload", "preload", "Whether the data store should be initialized with default values before the benchmark is run (true|false).", true)
-                .add("getputratio", "get_put_ratio", "Ratio of GET versus PUT operations: 1.0 => 100% GETs; 0.0 => 0% GETs; 0.95 => 95% GETs, 5% PUTs. Value between 0 and 1", 0.95)
-                .add("keysize", "key_size", "Size of the keys in number of characters. Max: 250", 50)
-                .add("minvaluesize", "min_value_size", "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576", 1000)
-                .add("maxvaluesize", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
-                .add("usecompression", "use_compression", "Whether value blobs should be compressed (GZip) for storage in the database (true|false).", false)
-                .setArguments(args)
-            ;
+        @Option(desc = "Benchmark duration, in seconds.")
+        long duration = 120;
 
-            // Retrieve parameters
-            int threadCount        = apph.intValue("threads");
-            long displayInterval   = apph.longValue("displayinterval");
-            long duration          = apph.longValue("duration");
-            String servers         = apph.stringValue("servers");
-            int port               = apph.intValue("port");
-            double getPutRatio     = apph.doubleValue("getputratio");
-            int poolSize           = apph.intValue("poolsize");
-            boolean preload        = apph.booleanValue("preload");
-            int keySize            = apph.intValue("keysize");
-            int minValueSize       = apph.intValue("minvaluesize");
-            int maxValueSize       = apph.intValue("maxvaluesize");
-            boolean useCompression = apph.booleanValue("usecompression");
-            final String csv       = apph.stringValue("statsfile");
+        @Option(desc = "List of VoltDB servers to connect to.")
+        String servers = "localhost";
 
+        @Option(desc = "Client port to connect to on cluster nodes.")
+        int port = 21212;
 
-            // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("displayinterval", (displayInterval > 0))
-                .validate("threads", (threadCount > 0))
-                .validate("poolsize", (poolSize > 0))
-                .validate("getputratio", (getPutRatio >= 0) && (getPutRatio <= 1))
-                .validate("keysize", (keySize > 0) && (keySize < 251))
-                .validate("minvaluesize", (minValueSize > 0) && (minValueSize < 1048576))
-                .validate("maxvaluesize", (maxValueSize > 0) && (maxValueSize < 1048576) && (maxValueSize >= minValueSize))
-            ;
+        @Option(desc = "Ratio of GET versus PUT operations: 1.0 => 100% GETs; 0.0 => 0% GETs; 0.95 => 95% GETs, 5% PUTs. Value between 0 and 1")
+        double getputratio = 0.95;
 
-            // Display actual parameters, for reference
-            apph.printActualUsage();
+        @Option(desc = "Size of the pool of keys to work with (10,00, 10,000, 100,000 items, etc.).")
+        int poolsize = 100000;
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+        @Option(desc = "Whether the data store should be initialized with default values before the benchmark is run (true|false).")
+        boolean preload = true;
 
-            // Get a client connection - we retry for a while in case the server hasn't started yet
-            System.out.printf("Connecting to servers: %s at port: %d\n", servers, port);
-            int sleep = 1000;
-            while(true)
-            {
-                try
-                {
-                    Con = new VoltCache(servers, port);
-                    break;
-                }
-                catch (Exception e)
-                {
-                    System.err.printf("Connection failed - retrying in %d second(s).\n", sleep/1000);
-                    try {Thread.sleep(sleep);} catch(Exception tie){}
-                    if (sleep < 8000)
-                        sleep += sleep;
-                }
-            }
-            System.out.println("Connected.  Starting benchmark.");
+        @Option(desc = "Size of the keys in number of characters. Max: 250")
+        int keysize = 50;
 
-            // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
-            final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, poolSize, useCompression);
+        @Option(desc = "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576")
+        int minvaluesize = 1000;
 
-            // Initialize the store
-            if (preload)
-            {
-                System.out.print("Initializing data store... ");
-                for(int i=0;i<poolSize;i++)
-                {
-                    final PayloadProcessor.Pair pair = processor.generateForStore(i);
-                    Con.set(pair.Key, 0, 0, pair.getStoreValue(), true);
-                }
-                System.out.println(" Done.");
-            }
+        @Option(desc = "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576")
+        int maxvaluesize = 1000;
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+        @Option(desc = "Whether value blobs should be compressed (GZip) for storage in the database (true|false).")
+        boolean usecompression = false;
 
-            // Create a Timer task to display performance data on the operating procedures
-            Timer timer = new Timer();
-            timer.scheduleAtFixedRate(new TimerTask()
-            {
-                @Override
-                public void run()
-                {
-                    System.out.print(Con.getStatistics("Get", "Set"));
-                }
-            }
-            , displayInterval*1000l
-            , displayInterval*1000l
-            );
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        final String csv = "statsfile"; // It doesn't appear that we
+                                        // intentionally expose
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
+        // this command line option.
 
-            // Create multiple processing threads
-            ArrayList<Thread> threads = new ArrayList<Thread>();
-            for (int i = 0; i < threadCount; i++)
-                threads.add(new Thread(new ClientThread(servers, port, processor, duration, getPutRatio)));
-
-            // Start threads
-            for (Thread thread : threads)
-                thread.start();
-
-            // Wait for threads to complete
-            for (Thread thread : threads)
-                thread.join();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // We're done - stop the performance statistics display task
-            timer.cancel();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Now print application results:
-
-            // 1. Store statistics as tracked by the application (ops counts, payload traffic)
-            System.out.printf(
-              "\n-------------------------------------------------------------------------------------\n"
-            + " Store Results\n"
-            + "-------------------------------------------------------------------------------------\n\n"
-            + "A total of %,d operations was posted...\n"
-            + " - GETs: %,9d Operations (%,9d Misses/Failures)\n"
-            + "         %,9d MB in compressed store data\n"
-            + "         %,9d MB in uncompressed application data\n"
-            + "         Network Throughput: %6.3f Gbps*\n\n"
-            + " - PUTs: %,9d Operations (%,9d Failures)\n"
-            + "         %,9d MB in compressed store data\n"
-            + "         %,9d MB in uncompressed application data\n"
-            + "         Network Throughput: %6.3f Gbps*\n\n"
-            + " - Total Network Throughput: %6.3f Gbps*\n\n"
-            + "* Figure includes key & value traffic but not database protocol overhead.\n"
-            + "\n"
-            + "-------------------------------------------------------------------------------------\n"
-            , GetStoreResults.get(0)+GetStoreResults.get(1)+PutStoreResults.get(0)+PutStoreResults.get(1)
-            , GetStoreResults.get(0)
-            , GetStoreResults.get(1)
-            , GetCompressionResults.get(0)/1048576l
-            , GetCompressionResults.get(1)/1048576l
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
-            , PutStoreResults.get(0)
-            , PutStoreResults.get(1)
-            , PutCompressionResults.get(0)/1048576l
-            , PutCompressionResults.get(1)/1048576l
-            , ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
-            + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
-            );
-
-            // 2. Overall performance statistics for GET/PUT operations
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " System Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics("Get", "Set").toString(false));
-
-            // 3. Per-procedure detailed performance statistics
-            System.out.println(
-              "\n\n-------------------------------------------------------------------------------------\n"
-            + " Detailed Statistics\n"
-            + "-------------------------------------------------------------------------------------\n\n");
-            System.out.print(Con.getStatistics().toString(false));
-
-            // Dump statistics to a CSV file
-            Con.saveStatistics(csv);
-
-            Con.close();
-
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
+        @Override
+        public void validate() {
+            if (threads < 1)
+                exitWithMessageAndUsage("threadcount must be greater than 0");
+            if (displayinterval < 1)
+                exitWithMessageAndUsage("displayInterval must be greater than 0");
+            if (duration < 1)
+                exitWithMessageAndUsage("durations must be greater than 0");
+            if (servers != null && servers.trim().length() == 0)
+                exitWithMessageAndUsage("Must specify servers");
+            if (port <= 0)
+                exitWithMessageAndUsage("port must be greater than 0");
+            if (getputratio < 0 || getputratio > 1)
+                exitWithMessageAndUsage("getputration must be between 0.0 and 1 exclusive.");
+            if (minvaluesize < 0 && minvaluesize > 1048576)
+                exitWithMessageAndUsage("minvaluesize must be greater than 0 and less than 1048576");
+            if (maxvaluesize < 0 && maxvaluesize > 1048576
+                    || maxvaluesize < minvaluesize)
+                exitWithMessageAndUsage("maxvaluesize must be greater than 0,less than 1048576 and greater than minvaluesize.");
         }
-        catch(Exception x)
-        {
-            System.out.println("Exception: " + x);
-            x.printStackTrace();
+    }
+
+    public Benchmark(VoltCacheConfig config) {
+        this.config = config;
+
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Command Line Configuration");
+        System.out.println(HORIZONTAL_RULE);
+        System.out.println(config.getConfigDumpString());
+    }
+
+    // Application entry point
+    public static void main(String[] args) {
+
+        VoltCacheConfig config = new VoltCacheConfig();
+        config.parse(Benchmark.class.getName(), args);
+        Benchmark benchmark = new Benchmark(config);
+        benchmark.runBenchmark();
+    }
+
+    public void runBenchmark() {
+        connect();
+
+        final PayloadProcessor processor = initPayload();
+        Timer timer = startStatsTimer();
+
+        try {
+            executePayload(processor);
+        } catch (Exception e) {
+            // Threads failed to execute to completion
+            e.printStackTrace();
+        }
+
+        timer.cancel();
+
+        // Now print application results:
+        displayStatistics();
+
+        // initialized on connect();
+        this.cache.close();
+    }
+
+    protected void displayStatistics() {
+        ClientStats stats = fullStatsContext.fetch().getStats();
+
+        // 1. Store statistics as tracked by the application (ops counts,
+        // payload traffic)
+        System.out
+                .printf(HORIZONTAL_RULE
+                        + " Store Results\n"
+                        + HORIZONTAL_RULE
+                        + "A total of %,d operations was posted...\n"
+                        + " - GETs: %,9d Operations (%,9d Misses/Failures)\n"
+                        + "         %,9d MB in compressed store data\n"
+                        + "         %,9d MB in uncompressed application data\n"
+                        + "         Network Throughput: %6.3f Gbps*\n\n"
+                        + " - PUTs: %,9d Operations (%,9d Failures)\n"
+                        + "         %,9d MB in compressed store data\n"
+                        + "         %,9d MB in uncompressed application data\n"
+                        + "         Network Throughput: %6.3f Gbps*\n\n"
+                        + " - Total Network Throughput: %6.3f Gbps*\n\n"
+                        + "* Figure includes key & value traffic but not database protocol overhead.\n"
+                        + "\n",
+                        GetStoreResults.get(0) + GetStoreResults.get(1)
+                                + PutStoreResults.get(0)
+                                + PutStoreResults.get(1),
+                        GetStoreResults.get(0),
+                        GetStoreResults.get(1),
+                        GetCompressionResults.get(0) / 1048576l,
+                        GetCompressionResults.get(1) / 1048576l,
+                        ((double) GetCompressionResults.get(0) + (GetStoreResults
+                                .get(0) + GetStoreResults.get(1))
+                                * this.config.keysize)
+                                / (134217728d * this.config.duration),
+                        PutStoreResults.get(0),
+                        PutStoreResults.get(1),
+                        PutCompressionResults.get(0) / 1048576l,
+                        PutCompressionResults.get(1) / 1048576l,
+                        ((double) PutCompressionResults.get(0) + (PutStoreResults
+                                .get(0) + PutStoreResults.get(1))
+                                * this.config.keysize)
+                                / (134217728d * this.config.duration),
+                        ((double) GetCompressionResults.get(0) + (GetStoreResults
+                                .get(0) + GetStoreResults.get(1))
+                                * this.config.keysize)
+                                / (134217728d * this.config.duration)
+                                + ((double) PutCompressionResults.get(0) + (PutStoreResults
+                                        .get(0) + PutStoreResults.get(1))
+                                        * this.config.keysize)
+                                / (134217728d * this.config.duration));
+
+        // 2. Performance statistics
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Client Workload Statistics");
+        System.out.println(HORIZONTAL_RULE);
+
+        System.out.printf("Average throughput:            %,9d txns/sec\n",
+                stats.getTxnThroughput());
+        System.out.printf("Average latency:               %,9d ms\n",
+                stats.getAverageLatency());
+        System.out.printf("95th percentile latency:       %,9d ms\n",
+                stats.kPercentileLatency(.95));
+        System.out.printf("99th percentile latency:       %,9d ms\n",
+                stats.kPercentileLatency(.99));
+
+        System.out.print("\n" + HORIZONTAL_RULE);
+        System.out.println(" System Server Statistics");
+        System.out.println(HORIZONTAL_RULE);
+        System.out.printf("Reported Internal Avg Latency: %,9d ms\n",
+                stats.getAverageInternalLatency());
+
+        // Dump statistics to a CSV file
+        try {
+            this.cache.saveStatistics(config.csv);
+        } catch (IOException e) {
+            e.printStackTrace();
+        }
+    }
+
+    protected void executePayload(final PayloadProcessor processor)
+            throws Exception {
+        ArrayList<Thread> threads = new ArrayList<Thread>();
+        for (int i = 0; i < this.config.threads; i++)
+            threads.add(new Thread(new ClientThread(processor,
+                    this.config.duration, this.config.getputratio)));
+
+        // Start threads
+        for (Thread thread : threads)
+            thread.start();
+
+        // Wait for threads to complete
+        for (Thread thread : threads)
+            thread.join();
+    }
+
+    protected Timer startStatsTimer() {
+        // Create a Timer task to display performance data on the operating
+        // procedures
+        long interval = config.displayinterval * 1000l;
+        Timer timer = new Timer();
+        timer.scheduleAtFixedRate(new TimerTask() {
+            final ClientStatsContext periodicStatsContext = cache
+                    .getStatistics();
+            final long startTime = periodicStatsContext.getStats()
+                    .getStartTimestamp();
+
+            @Override
+            public void run() {
+                printStatistics(periodicStatsContext.fetchAndResetBaseline()
+                        .getStats(), startTime);
+            }
+        }, interval, interval);
+        return timer;
+    }
+
+    /**
+     * Prints a one line update on performance that can be printed periodically
+     * during a benchmark.
+     */
+    public synchronized void printStatistics(ClientStats stats, long startTime) {
+        long time = Math.round((stats.getEndTimestamp() - startTime) / 1000.0);
+
+        System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60,
+                time % 60);
+        System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
+        System.out.printf("Avg/95%% Latency %d/%dms\n",
+                stats.getAverageLatency(), stats.kPercentileLatency(0.95));
+    }
+
+    protected PayloadProcessor initPayload() {
+        // Get a payload generator to create random Key-Value pairs to store in
+        // the database and process (uncompress) pairs retrieved from the
+        // database.
+        final PayloadProcessor processor = new PayloadProcessor(
+                this.config.keysize, this.config.minvaluesize,
+                this.config.maxvaluesize, this.config.poolsize,
+                this.config.usecompression);
+
+        // Initialize the store
+        if (this.config.preload) {
+            System.out.print("Initializing data store... ");
+            for (int i = 0; i < this.config.poolsize; i++) {
+                final PayloadProcessor.Pair pair = processor
+                        .generateForStore(i);
+                cache.set(pair.Key, 0, 0, pair.getStoreValue(), true);
+            }
+            System.out.println(" Done.");
+        }
+        return processor;
+    }
+
+    protected void connect() {
+        System.out.print(HORIZONTAL_RULE);
+        System.out.println(" Setup & Initialization");
+        System.out.println(HORIZONTAL_RULE);
+
+        // Get a client connection - we retry for a while in case the server
+        // hasn't started yet
+        System.out.printf("Connecting to servers: %s at port: %d\n",
+                this.config.servers, this.config.port);
+        try {
+            cache = new VoltCache(this.config.servers, this.config.port);
+            this.fullStatsContext = cache.getStatistics();
+        } catch (Exception e) {
+            e.printStackTrace();
         }
     }
 }
