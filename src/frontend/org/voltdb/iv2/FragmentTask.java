@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
@@ -39,13 +40,13 @@ public class FragmentTask extends SiteTasker
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final FragmentTransactionState m_txn;
-    final InitiatorMailbox m_initiator;
+    final Mailbox m_initiator;
     final FragmentTaskMessage m_task;
 
-    FragmentTask(InitiatorMailbox initiator, long localTxnId,
+    FragmentTask(Mailbox mailbox, long localTxnId,
                  FragmentTaskMessage message)
     {
-        m_initiator = initiator;
+        m_initiator = mailbox;
         m_txn = new FragmentTransactionState(localTxnId, message);
         m_task = message;
     }

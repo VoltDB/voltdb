@@ -34,7 +34,7 @@ public class SpInitiator implements Initiator
     // Encapsulated objects
     private InitiatorMailbox m_initiatorMailbox = null;
     private Site m_executionSite = null;
-    private SiteTaskerQueue m_scheduler = null;
+    private Scheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
 
     private Thread m_siteThread = null;
@@ -43,8 +43,7 @@ public class SpInitiator implements Initiator
     {
         m_messenger = messenger;
         m_partitionId = partition;
-
-        m_scheduler = new SiteTaskerQueue();
+        m_scheduler = new Scheduler(clerk);
         m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_partitionId, clerk);
     }
 
@@ -53,7 +52,7 @@ public class SpInitiator implements Initiator
                           CatalogContext catalogContext,
                           SiteTracker siteTracker)
     {
-        m_executionSite = new Site(m_scheduler,
+        m_executionSite = new Site(m_scheduler.getQueue(),
                                    m_initiatorMailbox.getHSId(),
                                    backend, catalogContext,
                                    serializedCatalog,
@@ -68,7 +67,7 @@ public class SpInitiator implements Initiator
                                            0, // this has no meaning
                                            siteTracker.m_numberOfPartitions);
         m_procSet.loadProcedures(catalogContext, backend);
-        m_initiatorMailbox.setProcedureSet(m_procSet);
+        m_scheduler.setProcedureSet(m_procSet);
 
 
         m_siteThread = new Thread(m_executionSite);

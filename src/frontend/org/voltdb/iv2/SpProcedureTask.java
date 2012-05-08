@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 
 import org.voltcore.logging.Level;
+import org.voltcore.messaging.Mailbox;
 
 import org.voltdb.iv2.Site;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -33,7 +34,7 @@ import org.voltdb.utils.LogKeys;
  */
 public class SpProcedureTask extends ProcedureTask
 {
-    SpProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner,
+    SpProcedureTask(Mailbox initiator, ProcedureRunner runner,
                   long txnId, Iv2InitiateTaskMessage msg)
     {
        super(initiator, runner, new SpTransactionState(txnId, msg));

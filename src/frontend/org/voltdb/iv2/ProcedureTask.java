@@ -23,6 +23,7 @@ import java.io.Writer;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
@@ -44,10 +45,10 @@ abstract public class ProcedureTask extends SiteTasker
     static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final ProcedureRunner m_runner;
-    final InitiatorMailbox m_initiator;
+    final Mailbox m_initiator;
     final TransactionState m_txn;
 
-    ProcedureTask(InitiatorMailbox initiator, ProcedureRunner runner, TransactionState txn)
+    ProcedureTask(Mailbox initiator, ProcedureRunner runner, TransactionState txn)
     {
         m_initiator = initiator;
         m_runner = runner;

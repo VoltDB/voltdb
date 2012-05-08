@@ -48,11 +48,9 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
 {
     VoltLogger hostLog = new VoltLogger("HOST");
     private final int m_partitionId;
-    private final SiteTaskerQueue m_scheduler;
+    private final Scheduler m_scheduler;
     private final HostMessenger m_messenger;
     private long m_hsId;
-    private LoadedProcedureSet m_loadedProcs;
-    private PartitionClerk m_clerk;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
@@ -95,19 +93,14 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     };
 
 
-    public InitiatorMailbox(SiteTaskerQueue scheduler, HostMessenger messenger,
+    public InitiatorMailbox(Scheduler scheduler, HostMessenger messenger,
             int partitionId, PartitionClerk partitionClerk)
     {
         m_scheduler = scheduler;
         m_messenger = messenger;
         m_partitionId = partitionId;
-        m_clerk = partitionClerk;
         m_messenger.createMailbox(null, this);
-    }
-
-    void setProcedureSet(LoadedProcedureSet loadedProcs)
-    {
-        m_loadedProcs = loadedProcs;
+        m_scheduler.setMailbox(this);
     }
 
     /**
@@ -191,27 +184,17 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
 
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
-        final String procedureName = message.getStoredProcedureName();
-        if (message.isSinglePartition()) {
-            final SpProcedureTask task =
-                new SpProcedureTask(this, this.m_loadedProcs.procs.get(procedureName),
-                        m_txnId.incrementAndGet(), message);
-            m_scheduler.offer(task);
-        }
-        else {
-            // HACK: grab the current sitetracker until we write leader notices.
-            m_clerk = VoltDB.instance().getSiteTracker();
-            final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
-            System.out.println("partitionInitiators list: " + partitionInitiators.toString());
-            final MpProcedureTask task =
-                new MpProcedureTask(this, this.m_loadedProcs.procs.get(procedureName),
-                        m_txnId.incrementAndGet(), message, partitionInitiators);
-            m_scheduler.offer(task);
-        }
+        // If MPI and multipart, just schedule (for now)
+        // If MPI or Partition master and singlepart, replicate and schedule
+        // if partition replica, just schedule
+        m_scheduler.handleIv2InitiateTaskMessage(message);
     }
 
     private void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
+        // If MPI and multipart, deliver to client interface
+        // if MPI or partition master and singlepart, dedupe and deliver to client interface
+        // if partition replica, deliver to partition master
         try {
             // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
             send(message.getInitiatorHSId(), message);
@@ -223,26 +206,28 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
 
     private void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        // IZZY: going to need to keep this around or extract the
-        // transaction state from the task for scheduler blocking
-        // Actually, we're going to need to create the transaction state
-        // here if one does not exist so that we can hand it to future
-        // FragmentTasks
-        //
-        // For now (one-shot reads), just create everything from scratch
-        long localTxnId = m_txnId.incrementAndGet();
-        final FragmentTask task =
-            new FragmentTask(this, localTxnId, message);
-        m_scheduler.offer(task);
+        // if MPI just replicate (as partition master)
+        // if partition master, replicate and schedule
+        // if partition replica, just schedule
+        m_scheduler.handleFragmentTaskMessage(message);
     }
 
     private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
-        try {
-            send(message.getDestinationSiteId(), message);
+        // if MPI, schedule
+        if (m_partitionId == 0)
+        {
+            m_scheduler.handleFragmentResponseMessage(message);
         }
-        catch (MessagingException e) {
-            hostLog.error("Failed to deliver response from execution site.", e);
+        else {
+            // if partition master, dedupe and deliver to MPI
+            // if partition replica, deliver to partition master
+            try {
+                send(message.getDestinationSiteId(), message);
+            }
+            catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
         }
     }
 
