@@ -22,7 +22,10 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
@@ -83,12 +86,19 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public ListenableFuture<?> write(final Callable<BBContainer> tupleData) {
         final SettableFuture<Object> retval = SettableFuture.create();
-        final ListenableFuture<BBContainer> computedData = VoltDB.instance().getComputationService().submit(tupleData);
+        ListenableFuture<BBContainer> computedData = VoltDB.instance().getComputationService().submit(tupleData);
+        //Need to be able to null this out to prevent pack rat on the future
+        //that wraps up the result of the write.
+        final AtomicReference<Future<BBContainer>> computedDataFinal =
+            new AtomicReference<Future<BBContainer>>(computedData);
+
         computedData.addListener(new Runnable() {
             @Override
             public void run() {
                 try {
-                    final BBContainer data = computedData.get();
+                    final Future<BBContainer> fut = computedDataFinal.get();
+                    computedDataFinal.set(null);
+                    final BBContainer data = fut.get();
                     if (m_writeFailed) {
                         retval.set(null);
                         data.discard();
@@ -120,6 +130,8 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public void close() throws IOException, InterruptedException {
         try {
+            m_es.shutdown();
+            m_es.awaitTermination(356, TimeUnit.DAYS);
             m_fc.force(false);
             m_fc.close();
             m_tempFile.renameTo(m_file);
