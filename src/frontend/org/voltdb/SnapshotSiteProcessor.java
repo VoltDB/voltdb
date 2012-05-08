@@ -203,11 +203,11 @@ public class SnapshotSiteProcessor {
      * for the resulting tuple blocks
      */
     public static class SnapshotTableTask {
-        private final int m_tableId;
-        private final SnapshotDataTarget m_target;
-        private final SnapshotDataFilter m_filters[];
-        private final boolean m_isReplicated;
-        private final String m_name;
+        public final int m_tableId;
+        public final SnapshotDataTarget m_target;
+        public final SnapshotDataFilter m_filters[];
+        public final boolean m_isReplicated;
+        public final String m_name;
 
         public SnapshotTableTask(
                 final int tableId,
@@ -361,7 +361,7 @@ public class SnapshotSiteProcessor {
             for (SnapshotDataFilter filter : currentTask.m_filters) {
                 valueForTarget = filter.filter(valueForTarget);
             }
-            retval = currentTask.m_target.write(valueForTarget);
+            retval = currentTask.m_target.write(valueForTarget, currentTask);
             if (retval != null) {
                 m_writeFutures.add(retval);
             }

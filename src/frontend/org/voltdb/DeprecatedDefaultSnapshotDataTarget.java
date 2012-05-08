@@ -37,6 +37,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.util.concurrent.Callables;
@@ -336,7 +337,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public ListenableFuture<?> write(final Callable<BBContainer> tupleData) {
+    public ListenableFuture<?> write(final Callable<BBContainer> tupleData, SnapshotTableTask context) {
         return write(tupleData, true);
     }
 
