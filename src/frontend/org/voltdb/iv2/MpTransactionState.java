@@ -147,6 +147,7 @@ public class MpTransactionState extends TransactionState
             for (Long hsid : m_useHSIds) {
                 if (hsid != m_localHSId) {
                     non_local_hsids[index] = hsid;
+                    ++index;
                 }
             }
             try {
@@ -189,7 +190,6 @@ public class MpTransactionState extends TransactionState
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
                                                              m_useHSIds);
             // Add code to do local remote work.
-            // need to modify processLocalFragmentTask() to be useable here too
             Map<Integer, List<VoltTable>> local_frag =
                 processLocalFragmentTask(m_remoteWork, siteConnection);
             for (Entry<Integer, List<VoltTable>> dep : local_frag.entrySet()) {
