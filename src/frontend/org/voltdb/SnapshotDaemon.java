@@ -53,6 +53,8 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.sysprocs.SnapshotSave;
 
+import com.google.common.base.Throwables;
+
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
  * The new functionality for handling truncation snapshots operates separately from
@@ -1411,7 +1413,22 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             byte blocking;
             String format = "native";
             if (params.length == 1) {
-                JSONObject jsObj = new JSONObject((String)params[0]);
+                JSONObject jsObj;
+                try {
+                    jsObj = new JSONObject((String)params[0]);
+                } catch (Exception e) {
+
+                    final ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                               new VoltTable[0],
+                                               Throwables.getStackTraceAsString(e),
+                                               invocation.clientHandle);
+                    ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    errorResponse.flattenToBuffer(buf).flip();
+                    c.writeStream().enqueue(buf);
+                    return;
+                }
                 path = jsObj.getString("path");
                 nonce = jsObj.getString("nonce");
                 blocking = (byte)(jsObj.optBoolean("block", false) ? 1 : 0);
