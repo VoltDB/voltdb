@@ -427,10 +427,15 @@ public class SnapshotSaveAPI
 
                         List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
                         if (csv) {
-                            filters.add(
-                                    new PartitionProjectionSnapshotFilter(
-                                            Ints.toArray(partitionsToInclude),
-                                            0));
+                            /*
+                             * Don't need to do filtering on a replicated table.
+                             */
+                            if (!table.getIsreplicated()) {
+                                filters.add(
+                                        new PartitionProjectionSnapshotFilter(
+                                                Ints.toArray(partitionsToInclude),
+                                                0));
+                            }
                             filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
                         }
                         final SnapshotTableTask task =
