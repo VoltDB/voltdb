@@ -1410,7 +1410,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             String path;
             String nonce;
-            byte blocking;
+            boolean blocking;
             String format = "native";
             if (params.length == 1) {
                 JSONObject jsObj;
@@ -1431,7 +1431,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 }
                 path = jsObj.getString("path");
                 nonce = jsObj.getString("nonce");
-                blocking = (byte)(jsObj.optBoolean("block", false) ? 1 : 0);
+                blocking = jsObj.optBoolean("block", false);
                 format = jsObj.optString("format", "native");
                 /*
                  * Yet another parameter validation
@@ -1451,12 +1451,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             } else {
                 path = (String)params[0];
                 nonce = (String)params[1];
-                blocking = ((Number)params[2]).byteValue();
+                blocking = ((Number)params[2]).byteValue() == 1 ? true : false;
             }
             final JSONObject jsObj = new JSONObject();
             jsObj.put("path", path);
             jsObj.put("nonce", nonce);
-            jsObj.put("block", blocking == 1 ? true: false);
+            jsObj.put("block", blocking);
             jsObj.put("format", format);
             final String requestId = java.util.UUID.randomUUID().toString();
             jsObj.put("requestId", requestId);
