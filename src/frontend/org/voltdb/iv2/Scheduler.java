@@ -106,14 +106,14 @@ public class Scheduler
 
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
-        System.out.println("LOOKING UP RESP map for TXNID: " + message.getTxnId());
+        System.out.println(this.m_mailbox.getHSId() + " LOOKING UP RESP map for TXNID: " + message.getTxnId());
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
     }
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        System.out.println("LOOKING UP COMPLETE map for TXNID: " + message.getTxnId());
+        System.out.println(this.m_mailbox.getHSId() + "LOOKING UP COMPLETE map for TXNID: " + message.getTxnId());
         TransactionState txn = m_outstandingTxns.remove(message.getTxnId());
         // XXX IZZY This feels like papering over something...come back and
         // be smarter later

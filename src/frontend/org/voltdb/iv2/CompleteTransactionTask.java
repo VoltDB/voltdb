@@ -39,6 +39,9 @@ public class CompleteTransactionTask extends SiteTasker
         System.out.println("CompleteTransactionTask.run():");
         System.out.println(" msg: " + m_msg);
         System.out.println(" txnstate: " + m_txn);
+        System.out.println(" rollback: " + m_msg.isRollback());
+        System.out.println(" token: " + m_txn.getBeginUndoToken());
+        System.out.println(" txnid: " + m_msg.getTxnId());
         siteConnection.truncateUndoLog(m_msg.isRollback(),
                                        m_txn.getBeginUndoToken(),
                                        m_msg.getTxnId());

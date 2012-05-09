@@ -54,6 +54,7 @@ public class MpProcedureTask extends ProcedureTask
     {
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txn;
+        m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         final InitiateResponseMessage response = processInitiateTask(txn.m_task);
         if (!response.shouldCommit()) {
             // IZZY: this is a bit of a hack, too

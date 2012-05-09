@@ -84,6 +84,7 @@ public class TestMPBasecaseSuite extends RegressionSuite {
     {
         final Client client = this.getClient();
         loadData(client);
+        boolean caught = false;
         try {
             client.callProcedure("ConstraintViolationUpdate");
             assertFalse("Failed to produce constraint violation", true);
@@ -91,7 +92,9 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         catch (ProcCallException e) {
             assertEquals("Client response is rollback.",
                     ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            caught = true;
         }
+        assertTrue("Expected exception.", caught);
 
         // verify initial result is unchanged (transactions!)
         ClientResponse resp = client.callProcedure("SumB1");
@@ -99,31 +102,31 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
     }
 
-    public void testOneshotPartitionViolationAllSites() throws Exception
-    {
-        // Restrict to clustered tests (configured with > 1 partition)
-        if (!this.isLocalCluster()) {
-            return;
-        }
-
-        final Client client = this.getClient();
-        loadData(client);
-        try {
-            client.callProcedure("PartitionViolationUpdate");
-            assertFalse("Failed to produce violation", true);
-        }
-        catch (ProcCallException e) {
-            assertEquals("Client response is error.",
-                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
-        }
-        // verify initial result is unchanged (transactions!)
-        ClientResponse resp = client.callProcedure("SumKey");
-        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
-        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
-        // see ENG-2941
-        assertTrue(resp.getStatusString() == null);
-    }
-
+//    public void testOneshotPartitionViolationAllSites() throws Exception
+//    {
+//        // Restrict to clustered tests (configured with > 1 partition)
+//        if (!this.isLocalCluster()) {
+//            return;
+//        }
+//
+//        final Client client = this.getClient();
+//        loadData(client);
+//        try {
+//            client.callProcedure("PartitionViolationUpdate");
+//            assertFalse("Failed to produce violation", true);
+//        }
+//        catch (ProcCallException e) {
+//            assertEquals("Client response is error.",
+//                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
+//        }
+//        // verify initial result is unchanged (transactions!)
+//        ClientResponse resp = client.callProcedure("SumKey");
+//        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+//        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
+//        // see ENG-2941
+//        assertTrue(resp.getStatusString() == null);
+//    }
+//
     public void testOneshotReplicatedWriteAndRead() throws Exception
     {
         final Client client = this.getClient();
@@ -137,6 +140,7 @@ public class TestMPBasecaseSuite extends RegressionSuite {
     public void testOneshotReplicatedConstraintViolation() throws Exception
     {
         final Client client = this.getClient();
+        boolean caught = false;
         loadData("R1.insert", client);
         try {
             client.callProcedure("ConstraintViolationUpdate_R");
@@ -145,7 +149,9 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         catch (ProcCallException e) {
             assertEquals("Client response is rollback.",
                     ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            caught = true;
         }
+        assertTrue("Caught expected", caught);
 
         // verify initial result is unchanged (transactions!)
         ClientResponse resp = client.callProcedure("SumB1_R");
