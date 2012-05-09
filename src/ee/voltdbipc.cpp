@@ -240,8 +240,16 @@ static void writeOrDie(int fd, unsigned char *data, ssize_t sz) {
  */
 static VoltDBIPC *currentVolt = NULL;
 
-// defined in voltdbjni.cpp
-extern void deserializeParameterSetCommon(int, voltdb::ReferenceSerializeInput&, voltdb::GenericValueArray<voltdb::NValue>&, Pool *stringPool);
+/**
+ * Utility used for deserializing ParameterSet passed from Java.
+ */
+void deserializeParameterSetCommon(int cnt, ReferenceSerializeInput &serialize_in,
+                                   NValueArray &params, Pool *stringPool)
+{
+    for (int i = 0; i < cnt; ++i) {
+        params[i] = NValue::deserializeFromAllocateForStorage(serialize_in, stringPool);
+    }
+}
 
 VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
     currentVolt = this;
@@ -425,8 +433,18 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
         int32_t totalPartitions;
         int16_t hostnameLength;
         char hostname[0];
-    };
+    }__attribute__((packed));
     struct initialize * cs = (struct initialize*) cmd;
+
+    printf("sizeof(ipc_command) = %d\n", (int)sizeof(ipc_command));
+    printf("sizeof(long) = %d\n", (int)sizeof(long));
+    printf("sizeof(int) = %d\n", (int)sizeof(int));
+    printf("sizeof(initialize) = %d\n", (int)sizeof(initialize));
+    printf("position(hostId) = %d\n", (int)((char*)&cs->hostId - (char*)cs));
+    printf("position(tempTableMemory) = %d\n", (int)((char*)&cs->tempTableMemory - (char*)cs));
+    printf("position(totalPartitions) = %d\n", (int)((char*)&cs->totalPartitions - (char*)cs));
+    printf("position(hostnameLength) = %d\n", (int)((char*)&cs->hostnameLength - (char*)cs));
+    printf("position(hostname) = %d\n", (int)((char*)&cs->hostname - (char*)cs));
 
     printf("initialize: cluster=%d, site=%jd\n",
            ntohl(cs->clusterId), (intmax_t)ntohll(cs->siteId));
@@ -1184,7 +1202,7 @@ int main(int argc, char **argv) {
     /* max message size that can be read from java */
     int max_ipc_message_size = (1024 * 1024 * 2);
 
-    int port = 0;
+    int port = 10001;
 
     if (argc == 2) {
         printf("Binding to a specific socket is no longer supported\n");
@@ -1292,6 +1310,7 @@ int main(int argc, char **argv) {
 
         // dispatch the request
         struct ipc_command *cmd = (struct ipc_command*) data;
+
         // size at least length + command
         if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
             printf("bytesread=%zx cmd=%d msgsize=%d\n",

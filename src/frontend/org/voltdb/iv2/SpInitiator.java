@@ -60,7 +60,7 @@ public class SpInitiator implements Initiator
                                    m_partitionId,
                                    siteTracker.m_numberOfPartitions);
         ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
-        prf.configure(m_executionSite, null /* wtfhsql!? */);
+        prf.configure(m_executionSite, null /* context */, null /* hsql */);
         m_procSet = new LoadedProcedureSet(m_executionSite,
                                            prf,
                                            m_initiatorMailbox.getHSId(),
