@@ -101,7 +101,7 @@ public class LocalCluster implements VoltServerConfig {
     public final PortGenerator portGenerator = new PortGenerator();
     public static class PortGenerator {
         private int nextPort = 12000;
-        private static int portOffset = 100;    // Shift ports away from defaults for testing
+        private static int portOffset = 0;    // Shift ports away from defaults for testing
         private int nextCport = VoltDB.DEFAULT_PORT+portOffset;
         private int nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
 
