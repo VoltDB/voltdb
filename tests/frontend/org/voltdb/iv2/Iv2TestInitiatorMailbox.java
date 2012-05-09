@@ -23,41 +23,16 @@
 
 package org.voltdb.iv2;
 
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
+import static org.junit.Assert.assertFalse;
+import static org.mockito.Mockito.mock;
 
-import java.util.List;
-import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.atomic.AtomicLong;
+public class Iv2TestInitiatorMailbox {
 
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.junit.After;
-import org.junit.Before;
-import org.junit.BeforeClass;
-import org.junit.Test;
-import org.mockito.ArgumentCaptor;
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.zk.ZKTestBase;
-import org.voltcore.zk.ZKUtil;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltDBInterface;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.VoltType;
-import org.voltdb.VoltZK;
-import org.voltdb.client.ClientResponse;
-import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.InitiateTaskMessage;
-
-public class Iv2TestInitiatorMailbox extends ZKTestBase {
-    private static VoltDBInterface mockVolt;
-    private ZooKeeper zk;
-    private HostMessenger hm = mock(HostMessenger.class);
-    private InitiatorMailbox mb;
+    public void testWhereAreMyPants()
+    {
+        boolean pants = false;
+        assertFalse(pants);
+    }
 
 //    @BeforeClass
 //    public static void setUpBeforeClass() {
