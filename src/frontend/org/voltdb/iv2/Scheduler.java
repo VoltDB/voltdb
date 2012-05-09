@@ -93,11 +93,11 @@ public class Scheduler
         // something in progress already
         if (txn == null) {
             long localTxnId = m_txnId.incrementAndGet();
-            txn = new FragmentTransactionState(localTxnId, message);
+            txn = new ParticipantTransactionState(localTxnId, message);
             m_outstandingTxns.put(message.getTxnId(), txn);
         }
         final FragmentTask task =
-            new FragmentTask(m_mailbox, (FragmentTransactionState)txn, message);
+            new FragmentTask(m_mailbox, (ParticipantTransactionState)txn, message);
         m_tasks.offer(task);
     }
 

@@ -39,12 +39,12 @@ public class FragmentTask extends SiteTasker
     private static final VoltLogger execLog = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final FragmentTransactionState m_txn;
+    final ParticipantTransactionState m_txn;
     final Mailbox m_initiator;
     final FragmentTaskMessage m_task;
 
     FragmentTask(Mailbox mailbox,
-                 FragmentTransactionState txn,
+                 ParticipantTransactionState txn,
                  FragmentTaskMessage message)
     {
         m_initiator = mailbox;

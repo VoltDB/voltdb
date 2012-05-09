@@ -24,11 +24,11 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.FragmentTaskMessage;
 
-public class FragmentTransactionState extends TransactionState
+public class ParticipantTransactionState extends TransactionState
 {
     final FragmentTaskMessage m_task;
 
-    FragmentTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice)
     {
         super(txnId, null, notice);
         m_task = (FragmentTaskMessage)notice;
