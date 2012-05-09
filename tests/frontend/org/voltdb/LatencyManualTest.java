@@ -60,7 +60,7 @@ public class LatencyManualTest {
 
             final String listener = cluster.getListenerAddresses().get(0);
             final Client client = ClientFactory.createClient();
-            client.createConnection(listener);
+            client.createConnection(listener, cluster.port(0));
 
             long iterations = 10000;
             long start = System.nanoTime();

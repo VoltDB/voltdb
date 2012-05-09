@@ -42,8 +42,6 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientConfig;
-import org.voltdb.client.ProcCallException;
 
 public class VoltCache implements IVoltCache
 {
@@ -626,13 +624,12 @@ public class VoltCache implements IVoltCache
     }
 
     /**
-     * @deprecated
      * Saves performance statistics to a file
      * @param file The path to the file where statistics will be saved
      */
     public void saveStatistics(String file) throws IOException
     {
-        //this.connection.saveStatistics(file);
+        this.client.writeSummaryCSV(getStatistics().getStats(), file);
     }
 
 }

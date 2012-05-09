@@ -132,7 +132,7 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
         super.setUp();
 
         callbackSucceded = true;
-        m_tester = new ExportTestClient(getServerConfig().getNodeCount());
+        m_tester = new ExportTestClient(getServerConfig().getNodeCount(), port(0));
         m_tester.addCredentials("export", "export");
         try {
             m_tester.connect();

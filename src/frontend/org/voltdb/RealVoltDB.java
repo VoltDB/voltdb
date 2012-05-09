@@ -969,6 +969,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (m_deployment.getUsers() != null) {
                 for (UsersType.User user : m_deployment.getUsers().getUser()) {
                     String groupsCSV = user.getGroups();
+                    if (groupsCSV == null || groupsCSV.isEmpty()) {
+                        continue;
+                    }
                     String[] groups = groupsCSV.split(",");
                     for (String group : groups) {
                         if (db.getGroups().get(group) == null) {
