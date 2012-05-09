@@ -148,8 +148,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
       boost::shared_array<AbstractExpression*>
         (new AbstractExpression*[m_numOfSearchkeys]);
     m_searchKeyBeforeSubstituteArray = m_searchKeyBeforeSubstituteArrayPtr.get();
-    m_searchKeyAllParamArrayPtr = ExpressionUtil::convertIfAllParameterValues(m_node->getSearchKeyExpressions());
-    m_searchKeyAllParamArray = m_searchKeyAllParamArrayPtr.get();
     m_needsSubstituteSearchKeyPtr =
         boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
     m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
@@ -276,28 +274,22 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // assert (m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
     //         m_lookupType == INDEX_LOOKUP_TYPE_GT);
+    bool searchKeyRangeIsValid = true;
     m_searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
-    if (m_searchKeyAllParamArray != NULL)
-    {
-        VOLT_TRACE("sweet, all params");
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
-        {
-            m_searchKey.setNValue( ctr, params[m_searchKeyAllParamArray[ctr]]);
+    for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
+        if (m_needsSubstituteSearchKey[ctr]) {
+            m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
+        }
+        NValue candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
+        try {
+            m_searchKey.setNValue(ctr, candidateValue);
+        }
+        catch (SQLException e) {
+            searchKeyRangeIsValid = false;
         }
     }
-    else
-    {
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
-            if (m_needsSubstituteSearchKey[ctr]) {
-                m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
-            }
-            m_searchKey.
-              setNValue(ctr,
-                        m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL));
-        }
-    }
-    assert(m_searchKey.getSchema()->columnCount() > 0);
+    assert((!searchKeyRangeIsValid) || (m_searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
 
@@ -342,7 +334,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // Use our search key to prime the index iterator
     // Now loop through each tuple given to us by the iterator
     //
-    if (m_numOfSearchkeys > 0)
+    if ((m_numOfSearchkeys > 0) && (searchKeyRangeIsValid))
     {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                    m_lookupType, m_numOfSearchkeys, m_searchKey.debugNoHeader().c_str());
