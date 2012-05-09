@@ -666,7 +666,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         deleteTestFiles();
 
         client.callProcedure("@SnapshotSave",
-                "{ path:\"" + TMPDIR +
+                "{ path:\"file://" + TMPDIR +
                 "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }");
 
         FileInputStream fis = new FileInputStream(
@@ -868,7 +868,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             results = client.callProcedure(
                     "@SnapshotSave",
-                    "{ path:\"" + TMPDIR +
+                    "{ path:\"file://" + TMPDIR +
                     "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }").getResults();
         }
         catch (Exception ex)

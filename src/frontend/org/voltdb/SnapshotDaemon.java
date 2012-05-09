@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -1412,47 +1413,43 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             String nonce;
             boolean blocking;
             String format = "native";
-            if (params.length == 1) {
-                JSONObject jsObj;
-                try {
-                    jsObj = new JSONObject((String)params[0]);
-                } catch (Exception e) {
 
-                    final ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                               new VoltTable[0],
-                                               Throwables.getStackTraceAsString(e),
-                                               invocation.clientHandle);
-                    ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                    buf.putInt(buf.capacity() - 4);
-                    errorResponse.flattenToBuffer(buf).flip();
-                    c.writeStream().enqueue(buf);
-                    return;
-                }
+            /*
+             * Parse the request as a JSON object, or parse it
+             * out of the parameter array.
+             */
+            if (params.length == 1) {
+                final JSONObject jsObj = new JSONObject((String)params[0]);
+
                 path = jsObj.getString("path");
+                URI pathURI = new URI(path);
+                String pathURIScheme = pathURI.getScheme();
+                if (pathURIScheme == null) {
+                    throw new Exception("URI scheme cannot be null");
+                }
+                if (!pathURIScheme.equals("file")) {
+                    throw new Exception("Unsupported URI scheme " + pathURIScheme +
+                            " if this is a file path then you must prepend file://");
+                }
+                path = pathURI.getPath();
+
                 nonce = jsObj.getString("nonce");
                 blocking = jsObj.optBoolean("block", false);
                 format = jsObj.optString("format", "native");
-                /*
-                 * Yet another parameter validation
-                 */
+
                 if (!(format.equals("csv") || format.equals("native"))) {
-                    final ClientResponseImpl errorResponse =
-                            new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                                   new VoltTable[0],
-                                                   "@SnapshotSave format param is a " + format +
-                                                       " and should be one of [\"native\" | \"csv\"]",
-                                                   invocation.clientHandle);
-                        ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                        buf.putInt(buf.capacity() - 4);
-                        errorResponse.flattenToBuffer(buf).flip();
-                        c.writeStream().enqueue(buf);
+                    throw new Exception("@SnapshotSave format param is a " + format +
+                            " and should be one of [\"native\" | \"csv\"]");
                 }
             } else {
                 path = (String)params[0];
                 nonce = (String)params[1];
                 blocking = ((Number)params[2]).byteValue() == 1 ? true : false;
             }
+
+            /*
+             * Forward the request as a JSON object now that things are validated
+             */
             final JSONObject jsObj = new JSONObject();
             jsObj.put("path", path);
             jsObj.put("nonce", nonce);
@@ -1462,12 +1459,25 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("requestId", requestId);
             String zkString = jsObj.toString(4);
             byte zkBytes[] = zkString.getBytes("UTF-8");
-            m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            registerUserSnapshotResponseWatch(requestId, invocation, c);
-        } catch (KeeperException.NodeExistsException e) {
-            requestExists = true;
+            try {
+                m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                registerUserSnapshotResponseWatch(requestId, invocation, c);
+            } catch (KeeperException.NodeExistsException e) {
+                requestExists = true;
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
+            }
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
+            final ClientResponseImpl errorResponse =
+                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                                       new VoltTable[0],
+                                       Throwables.getStackTraceAsString(e),
+                                       invocation.clientHandle);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
+            return;
         }
 
         if (requestExists) {
