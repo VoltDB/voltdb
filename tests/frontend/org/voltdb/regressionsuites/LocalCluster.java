@@ -219,7 +219,9 @@ public class LocalCluster implements VoltServerConfig {
             jzmq_dir = System.getProperty("user.dir") + "/third_party/cpp/jnilib";
         }
 
+        // set the java lib path to the one for this process - default to obj/release/nativelibs
         String java_library_path = buildDir + "/nativelibs" + ":" + jzmq_dir;
+        java_library_path = System.getProperty("java.library.path", java_library_path);
 
         String classPath = System.getProperty("java.class.path") + ":" + buildDir
             + File.separator + jarFileName + ":" + buildDir + File.separator + "prod";
