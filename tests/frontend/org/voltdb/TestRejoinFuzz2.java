@@ -77,7 +77,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
 
         Client client = ClientFactory.createClient(m_cconfig);
 
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         Random r = new Random();
         StringBuilder sb = new StringBuilder(512);

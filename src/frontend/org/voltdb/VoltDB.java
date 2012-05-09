@@ -477,8 +477,9 @@ public class VoltDB {
         try
         {
             TimestampType ts = new TimestampType(new java.util.Date());
-            String root = VoltDB.instance().getCatalogContext().cluster.getVoltroot();
-            PrintWriter writer = new PrintWriter(root + File.separator + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
+            CatalogContext catalogContext = VoltDB.instance().getCatalogContext();
+            String root = catalogContext != null ? catalogContext.cluster.getVoltroot() + File.separator : "";
+            PrintWriter writer = new PrintWriter(root + "voltdb_crash" + ts.toString().replace(' ', '-') + ".txt");
             writer.println("Time: " + ts);
             writer.println("Message: " + errMsg);
 

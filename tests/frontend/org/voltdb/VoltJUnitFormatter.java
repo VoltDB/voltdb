@@ -36,6 +36,7 @@ import junit.framework.Test;
 import org.apache.tools.ant.BuildException;
 import org.apache.tools.ant.taskdefs.optional.junit.JUnitResultFormatter;
 import org.apache.tools.ant.taskdefs.optional.junit.JUnitTest;
+import org.voltdb.utils.MiscUtils;
 
 public class VoltJUnitFormatter implements JUnitResultFormatter {
 
@@ -108,8 +109,10 @@ public class VoltJUnitFormatter implements JUnitResultFormatter {
             out.flush();
         }
 
+        String ts = MiscUtils.getCompactStringTimestamp(System.currentTimeMillis());
         File logFile = new File("obj/release/testoutput/volt-junit-fulllog.txt");
-        File newFile = new File("obj/release/testoutput/junit-log." + suite.getName() + ".txt");
+        File newFile = new File(String.format("obj/release/testoutput/junit-log.%s.%s.txt",
+                                              ts, suite.getName()));
         logFile.renameTo(newFile);
     }
 

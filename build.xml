@@ -645,13 +645,12 @@ JAR BUILDING
             <include name="org/voltdb/**"/>
             <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
+            <include name="org/apache/**" />
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
-            <include name="org/apache/jute_voltpatches/**" />
-            <include name="org/apache/zookeeper_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
@@ -717,6 +716,7 @@ JAR BUILDING
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/apache/hadoop_voltpatches/**" />
         </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
@@ -1042,13 +1042,17 @@ TEST CASES
     <property name="emma.dir" location="${build.dir}/emma" />
     <mkdir dir="${emma.dir}" />
     <emma>
-        <!-- don't instrument build.test.dir or any non-voltdb code -->
-        <instr
-            instrpath="${build.prod.dir}/org/voltdb"
-            destdir="${build.instr.dir}/org/voltdb"
-            metadatafile="${emma.dir}/metadata.emma"
-            merge="true"
-        />
+        <instr destdir="${build.instr.dir}/org/"
+               metadatafile="${emma.dir}/metadata.emma"
+               merge="true">
+          <instrpath path="${build.prod.dir}/org"/>
+
+          <filter includes="*voltdb.*"/>
+          <filter includes="*voltcore.*"/>
+          <!--pmsg is the protobuf-generated code for dragent-->
+          <filter excludes="*pmsg.*"/>
+          <filter excludes="*exampleutils.*"/>
+        </instr>
     </emma>
 </target>
 

@@ -119,4 +119,16 @@ public class VoltDBFickleCluster extends LocalCluster {
         m_cluster.shutDown();
     }
 
+    public static int getInternalPort(int hostId) {
+        return m_cluster.internalPort(hostId);
+    }
+
+    public static int getPort(int hostId) {
+        return m_cluster.port(hostId);
+    }
+
+    public static int getAdminPort(int hostId) {
+        return m_cluster.adminPort(hostId);
+    }
+
 }
