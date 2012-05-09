@@ -43,19 +43,25 @@ public class FragmentTask extends SiteTasker
     final Mailbox m_initiator;
     final FragmentTaskMessage m_task;
 
-    FragmentTask(Mailbox mailbox, long localTxnId,
+    FragmentTask(Mailbox mailbox,
+                 FragmentTransactionState txn,
                  FragmentTaskMessage message)
     {
         m_initiator = mailbox;
-        m_txn = new FragmentTransactionState(localTxnId, message);
+        m_txn = txn;
         m_task = message;
     }
 
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        // Set the begin undo token if we haven't already
+        // In the future we could record a token per batch
+        // and do partial rollback
         if (!m_txn.isReadOnly()) {
-            m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+            if (m_txn.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+            }
         }
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         // completion?

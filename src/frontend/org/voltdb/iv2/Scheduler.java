@@ -87,17 +87,17 @@ public class Scheduler
 
     public void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        // IZZY: going to need to keep this around or extract the
-        // transaction state from the task for scheduler blocking
-        // Actually, we're going to need to create the transaction state
-        // here if one does not exist so that we can hand it to future
-        // FragmentTasks
-        //
-        // For now (one-shot reads), just create everything from scratch
-        long localTxnId = m_txnId.incrementAndGet();
+        TransactionState txn = m_outstandingTxns.get(message.getTxnId());
+        // bit of a hack...we will probably not want to create and
+        // offer FragmentTasks for txn ids that don't match if we have
+        // something in progress already
+        if (txn == null) {
+            long localTxnId = m_txnId.incrementAndGet();
+            txn = new FragmentTransactionState(localTxnId, message);
+            m_outstandingTxns.put(message.getTxnId(), txn);
+        }
         final FragmentTask task =
-            new FragmentTask(m_mailbox, localTxnId, message);
-        m_outstandingTxns.put(message.getTxnId(), task.m_txn);
+            new FragmentTask(m_mailbox, (FragmentTransactionState)txn, message);
         m_tasks.offer(task);
     }
 
