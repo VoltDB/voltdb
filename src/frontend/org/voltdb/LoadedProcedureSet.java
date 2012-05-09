@@ -149,4 +149,8 @@ public class LoadedProcedureSet {
         }
     }
 
+    public ProcedureRunner getProcByName(String procName)
+    {
+        return procs.get(procName);
+    }
 }

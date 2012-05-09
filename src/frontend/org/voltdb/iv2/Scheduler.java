@@ -69,7 +69,7 @@ public class Scheduler
         final String procedureName = message.getStoredProcedureName();
         if (message.isSinglePartition()) {
             final SpProcedureTask task =
-                new SpProcedureTask(m_mailbox, m_loadedProcs.procs.get(procedureName),
+                new SpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
                         m_txnId.incrementAndGet(), message);
             m_tasks.offer(task);
         }
@@ -78,7 +78,7 @@ public class Scheduler
             m_clerk = VoltDB.instance().getSiteTracker();
             final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
             final MpProcedureTask task =
-                new MpProcedureTask(m_mailbox, m_loadedProcs.procs.get(procedureName),
+                new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
                         m_txnId.incrementAndGet(), message, partitionInitiators);
             m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
             m_tasks.offer(task);
