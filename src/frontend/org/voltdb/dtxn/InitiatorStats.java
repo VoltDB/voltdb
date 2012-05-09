@@ -50,7 +50,7 @@ public class InitiatorStats extends SiteStatsSource {
      * @param name
      * @param siteId
      */
-    public InitiatorStats(int siteId) {
+    public InitiatorStats(long siteId) {
         super(siteId, false);
         VoltDB.instance().getStatsAgent().registerStatsSource(SysProcSelector.INITIATOR, 0, this);
     }

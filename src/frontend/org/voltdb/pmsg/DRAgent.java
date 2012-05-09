@@ -4730,7 +4730,9 @@ public final class DRAgent {
       QUERY(3, 4),
       RESPONSE(4, 5),
       SNAPSHOT_REQ(5, 6),
-      STOP_SYNC(6, 7),
+      SNAPSHOT_TERM(6, 7),
+      STOP_SYNC(7, 8),
+      CONNECT(8, 9),
       ;
       
       public static final int ACK_VALUE = 1;
@@ -4739,7 +4741,9 @@ public final class DRAgent {
       public static final int QUERY_VALUE = 4;
       public static final int RESPONSE_VALUE = 5;
       public static final int SNAPSHOT_REQ_VALUE = 6;
-      public static final int STOP_SYNC_VALUE = 7;
+      public static final int SNAPSHOT_TERM_VALUE = 7;
+      public static final int STOP_SYNC_VALUE = 8;
+      public static final int CONNECT_VALUE = 9;
       
       
       public final int getNumber() { return value; }
@@ -4752,7 +4756,9 @@ public final class DRAgent {
           case 4: return QUERY;
           case 5: return RESPONSE;
           case 6: return SNAPSHOT_REQ;
-          case 7: return STOP_SYNC;
+          case 7: return SNAPSHOT_TERM;
+          case 8: return STOP_SYNC;
+          case 9: return CONNECT;
           default: return null;
         }
       }
@@ -4783,7 +4789,7 @@ public final class DRAgent {
       }
       
       private static final Type[] VALUES = {
-        ACK, RESET, PAUSE, QUERY, RESPONSE, SNAPSHOT_REQ, STOP_SYNC, 
+        ACK, RESET, PAUSE, QUERY, RESPONSE, SNAPSHOT_REQ, SNAPSHOT_TERM, STOP_SYNC, CONNECT, 
       };
       
       public static Type valueOf(
@@ -6058,16 +6064,17 @@ public final class DRAgent {
       "\003\022\032\n\022lastSentTupleIndex\030\004 \001(\003\022\027\n\017totalTu",
       "pleCount\030\005 \001(\003\022\036\n\026outstandingBufferCount" +
       "\030\006 \001(\003\022\034\n\024outstandingByteCount\030\007 \001(\003\022\020\n\010" +
-      "isPaused\030\010 \001(\010\022\020\n\010isSynced\030\t \001(\010\"\310\002\n\014Ctr" +
+      "isPaused\030\010 \001(\010\022\020\n\010isSynced\030\t \001(\010\"\350\002\n\014Ctr" +
       "lEnvelope\022%\n\004type\030\001 \002(\0162\027.pmsg.CtrlEnvel" +
       "ope.Type\022\026\n\002id\030\002 \002(\0132\n.pmsg.UUID\022\026\n\003ack\030" +
       "\003 \001(\0132\t.pmsg.Ack\022\032\n\005reset\030\004 \001(\0132\013.pmsg.R" +
       "eset\022\032\n\005pause\030\005 \001(\0132\013.pmsg.Pause\022 \n\010resp" +
       "onse\030\006 \001(\0132\016.pmsg.Response\022&\n\013snapshotRe" +
-      "q\030\007 \001(\0132\021.pmsg.SnapshotReq\"_\n\004Type\022\007\n\003AC" +
+      "q\030\007 \001(\0132\021.pmsg.SnapshotReq\"\177\n\004Type\022\007\n\003AC" +
       "K\020\001\022\t\n\005RESET\020\002\022\t\n\005PAUSE\020\003\022\t\n\005QUERY\020\004\022\014\n\010",
-      "RESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\r\n\tSTOP_SYN" +
-      "C\020\007B\032\n\017org.voltdb.pmsgB\007DRAgent"
+      "RESPONSE\020\005\022\020\n\014SNAPSHOT_REQ\020\006\022\021\n\rSNAPSHOT" +
+      "_TERM\020\007\022\r\n\tSTOP_SYNC\020\010\022\013\n\007CONNECT\020\tB\032\n\017o" +
+      "rg.voltdb.pmsgB\007DRAgent"
     };
     com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner assigner =
       new com.google.protobuf.Descriptors.FileDescriptor.InternalDescriptorAssigner() {

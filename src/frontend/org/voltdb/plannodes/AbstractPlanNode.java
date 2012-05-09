@@ -98,6 +98,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     protected boolean m_isInline = false;
 
     /**
+     * The textual explanation of why the plan may fail to have a deterministic result or effect when replayed.
+     */
+    protected String  m_nondeterminismDetail = "the query result does not guarantee a consistent ordering";
+
+    /**
      * Instantiates a new plan node.
      */
     protected AbstractPlanNode() {
@@ -201,6 +206,47 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 node.validate();
             }
         }
+    }
+
+    /**
+     * Does the (sub)plan guarantee an identical result/effect when "replayed"
+     * against the same database state, such as during replication or CL recovery.
+     * @return
+     */
+    public boolean isOrderDeterministic() {
+        // Leaf nodes need to re-implement this test.
+        assert(m_children != null);
+        for (AbstractPlanNode child : m_children) {
+            if (! child.isOrderDeterministic()) {
+                m_nondeterminismDetail = child.m_nondeterminismDetail;
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Does the (sub)plan guarantee an identical result/effect (except possibly for ordering)
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return
+     */
+    public boolean isContentDeterministic() {
+        // Leaf nodes need to re-implement this test.
+        assert(m_children != null);
+        for (AbstractPlanNode child : m_children) {
+            if (! child.isContentDeterministic()) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /**
+     * Accessor for description of plan non-determinism.
+     * @return the field
+     */
+    public String nondeterminismDetail() {
+        return m_nondeterminismDetail;
     }
 
     @Override
@@ -434,7 +480,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return collected;
     }
 
-    public void findAllNodesOfType_recurse(PlanNodeType type,ArrayList<AbstractPlanNode> collected,
+    private void findAllNodesOfType_recurse(PlanNodeType type,ArrayList<AbstractPlanNode> collected,
         HashSet<AbstractPlanNode> visited)
     {
         if (visited.contains(this)) {
@@ -447,6 +493,28 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         for (AbstractPlanNode n : m_children)
             n.findAllNodesOfType_recurse(type, collected, visited);
+
+        // NOTE: ignores inline nodes.
+
+}
+
+    /**
+     * @param type plan node type to search for
+     * @return whether a node of that type is contained in the plan tree
+     */
+    public boolean hasAnyNodeOfType(PlanNodeType type) {
+        if (getPlanNodeType() == type)
+            return true;
+
+        for (AbstractPlanNode n : m_children) {
+            if (n.hasAnyNodeOfType(type)) {
+                return true;
+            }
+        }
+
+        // NOTE: ignores inline nodes.
+
+        return false;
     }
 
     @Override

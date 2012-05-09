@@ -71,8 +71,11 @@ SchemaColumn::SchemaColumn(Object& colObject) : m_colObject(colObject)
 
     Object columnExpressionObject = columnExpressionValue.get_obj();
     m_expression = AbstractExpression::buildExpressionTree(columnExpressionObject);
-    assert(contains_table_name && contains_column_name &&
-           contains_column_alias && contains_type && contains_size);
+
+    if(!(contains_table_name && contains_column_name &&
+         contains_column_alias && contains_type && contains_size)) {
+        throw runtime_error("SchemaColumn::constructor missing configuration data.");
+    }
 }
 
 SchemaColumn::~SchemaColumn()

@@ -1021,7 +1021,7 @@ public final class Constraint implements SchemaObject {
             case FOREIGN_KEY: return "FOREIGN_KEY";
             case MAIN: return "MAIN";
             case UNIQUE: return "UNIQUE";
-            case CHECK: return "CHECK";
+            case CHECK: return isNotNull ? "NOT_NULL" : "CHECK";
             case PRIMARY_KEY: return "PRIMARY_KEY";
         }
         return "UNKNOWN";
@@ -1064,6 +1064,7 @@ public final class Constraint implements SchemaObject {
 
                     VoltXMLElement ref = new VoltXMLElement("constraint");
                     constraint.children.add(ref);
+                    assert(ref != null);
                     ref.attributes.put("from", our_colname);
                     ref.attributes.put("to", fkey_colname);
                 }

@@ -153,6 +153,10 @@ OrderByPlanNode::loadFromJSONObject(json_spirit::Object& obj)
                     push_back(AbstractExpression::buildExpressionTree(sortColumn[zz].value_.get_obj()));
             }
         }
-        assert (hasExpression && hasDirection);
+        if (!(hasExpression && hasDirection)) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "OrderByPlanNode::loadFromJSONObject:"
+                                          " Does not have expression and direction.");
+        }
     }
 }

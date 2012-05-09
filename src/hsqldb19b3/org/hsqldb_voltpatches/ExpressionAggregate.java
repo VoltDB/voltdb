@@ -332,7 +332,9 @@ public class ExpressionAggregate extends Expression {
             exp.attributes.put("distinct", "true");
         }
         for (Expression expr : nodes) {
-            exp.children.add(expr.voltGetXML(session));
+            VoltXMLElement vxmle = expr.voltGetXML(session);
+            exp.children.add(vxmle);
+            assert(vxmle != null);
         }
 
         return exp;

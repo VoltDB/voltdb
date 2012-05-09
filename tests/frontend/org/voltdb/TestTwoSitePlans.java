@@ -96,10 +96,10 @@ public class TestTwoSitePlans extends TestCase {
 
         // create two EEs
         site1 = new ExecutionSite(0); // site 0
-        ee1 = new ExecutionEngineJNI(site1, cluster.getRelativeIndex(), 1, 0, 0, "", 100);
+        ee1 = new ExecutionEngineJNI(cluster.getRelativeIndex(), 1, 0, 0, "", 100, 2);
         ee1.loadCatalog( 0, catalog.serialize());
         site2 = new ExecutionSite(1); // site 1
-        ee2 = new ExecutionEngineJNI(site2, cluster.getRelativeIndex(), 2, 0, 0, "", 100);
+        ee2 = new ExecutionEngineJNI(cluster.getRelativeIndex(), 2, 1, 0, "", 100, 2);
         ee2.loadCatalog( 0, catalog.serialize());
 
         // cache some plan fragments
@@ -129,7 +129,7 @@ public class TestTwoSitePlans extends TestCase {
         for (PlanFragment f : insertStmt.getFragments())
             insertFrag = f;
         ParameterSet params = new ParameterSet();
-        params.m_params = new Object[] { 1L, 1L, 1L };
+        params.setParameters(1L, 1L, 1L);
 
         VoltTable[] results = ee2.executeQueryPlanFragmentsAndGetResults(
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) }, 1,
@@ -140,7 +140,8 @@ public class TestTwoSitePlans extends TestCase {
         assert(results.length == 1);
         assert(results[0].asScalarLong() == 1L);
 
-        params.m_params = new Object[] { 2L, 2L, 2L };
+        params = new ParameterSet();
+        params.setParameters(2L, 2L, 2L);
 
         results = ee1.executeQueryPlanFragmentsAndGetResults(
                 new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) }, 1,
@@ -154,14 +155,12 @@ public class TestTwoSitePlans extends TestCase {
 
     public void testMultiSiteSelectAll() {
         ParameterSet params = new ParameterSet();
-        params.m_params = new Object[] { };
+        params.setParameters();
 
-        DependencyPair dependencies = ee1.executePlanFragment(
+        int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+        VoltTable dependency1 = ee1.executePlanFragment(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                1 | DtxnConstants.MULTIPARTITION_DEPENDENCY, -1,
-                params, 3, 2, Long.MAX_VALUE);
-        VoltTable dependency1 = dependencies.dependency;
-        int depId1 = dependencies.depId;
+                -1, params, 3, 2, Long.MAX_VALUE);
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
@@ -170,12 +169,9 @@ public class TestTwoSitePlans extends TestCase {
         }
         assertTrue(dependency1 != null);
 
-        dependencies = ee2.executePlanFragment(
+        VoltTable dependency2 = ee2.executePlanFragment(
                 CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                1 | DtxnConstants.MULTIPARTITION_DEPENDENCY, -1,
-                params, 3, 2, Long.MAX_VALUE);
-        VoltTable dependency2 = dependencies.dependency;
-        int depId2 = dependencies.depId;
+                -1, params, 3, 2, Long.MAX_VALUE);
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
@@ -184,16 +180,15 @@ public class TestTwoSitePlans extends TestCase {
         }
         assertTrue(dependency2 != null);
 
-        ee1.stashDependency(depId1, dependency1);
-        ee1.stashDependency(depId2, dependency2);
+        ee1.stashDependency(outDepId, dependency1);
+        ee1.stashDependency(outDepId, dependency2);
 
-        dependencies = ee1.executePlanFragment(
+        dependency1 = ee1.executePlanFragment(
                 CatalogUtil.getUniqueIdForFragment(selectTopFrag),
-                2, 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY,
-                params, 3, 2, Long.MAX_VALUE);
+                outDepId, params, 3, 2, Long.MAX_VALUE);
         try {
             System.out.println("Final Result");
-            System.out.println(dependencies.dependency.toString());
+            System.out.println(dependency1.toString());
         } catch (Exception e) {
             // TODO Auto-generated catch block
             e.printStackTrace();

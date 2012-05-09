@@ -61,8 +61,6 @@
 #include "catalog/catalogmap.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
-#include "catalog/site.h"
-#include "catalog/partition.h"
 #include "catalog/database.h"
 #include "catalog/table.h"
 #include "catalog/index.h"
@@ -157,11 +155,12 @@ VoltDBEngine::VoltDBEngine(Topend *topend, LogProxy *logProxy)
 
 bool
 VoltDBEngine::initialize(int32_t clusterIndex,
-                         int32_t siteId,
+                         int64_t siteId,
                          int32_t partitionId,
                          int32_t hostId,
                          string hostname,
-                         int64_t tempTableMemoryLimit)
+                         int64_t tempTableMemoryLimit,
+                         int32_t totalPartitions)
 {
     // Be explicit about running in the standard C locale for now.
     locale::global(locale("C"));
@@ -169,6 +168,7 @@ VoltDBEngine::initialize(int32_t clusterIndex,
     m_siteId = siteId;
     m_partitionId = partitionId;
     m_tempTableMemoryLimit = tempTableMemoryLimit;
+    m_totalPartitions = totalPartitions;
 
     // Instantiate our catalog - it will be populated later on by load()
     m_catalog = boost::shared_ptr<catalog::Catalog>(new catalog::Catalog());
@@ -763,7 +763,6 @@ bool VoltDBEngine::rebuildTableCollections() {
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_TABLE);
     getStatsManager().unregisterStatsSource(STATISTICS_SELECTOR_TYPE_INDEX);
 
-    map<string, catalog::Table*>::const_iterator it = m_database->tables().begin();
     map<string, CatalogDelegate*>::iterator cdIt = m_catalogDelegates.begin();
 
     // walk the table delegates and update local table collections
@@ -1004,28 +1003,6 @@ bool VoltDBEngine::initCluster() {
 
     catalog::Cluster* catalogCluster =
       m_catalog->clusters().get("cluster");
-
-    // Find the partition id for this execution site.
-    map<string, catalog::Site*>::const_iterator site_it;
-    for (site_it = catalogCluster->sites().begin();
-         site_it != catalogCluster->sites().end();
-         site_it++)
-    {
-        catalog::Site *site = site_it->second;
-        assert (site);
-        string sname = site->name();
-        if (atoi(sname.c_str()) == m_siteId) {
-            assert(site->partition());
-            string pname = site->partition()->name();
-            m_partitionId = atoi(pname.c_str());
-            break;
-        }
-    }
-
-    // need to update executor context as partitionId wasn't
-    // available when the structure was initially created.
-    m_executorContext->m_partitionId = m_partitionId;
-    m_totalPartitions = catalogCluster->partitions().size();
 
     // deal with the epoch
     int64_t epoch = catalogCluster->localepoch() * (int64_t)1000;

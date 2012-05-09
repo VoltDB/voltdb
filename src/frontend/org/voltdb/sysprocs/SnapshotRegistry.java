@@ -62,9 +62,7 @@ public class SnapshotRegistry {
             synchronized (this.tables) {
                 for (org.voltdb.catalog.Table table : tables) {
                     String filename =
-                        SnapshotUtil.constructFilenameForTable(table,
-                                                               nonce,
-                                                               Integer.toString(hostId));
+                        SnapshotUtil.constructFilenameForTable(table, nonce, hostId);
                     this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename));
                 }
             }

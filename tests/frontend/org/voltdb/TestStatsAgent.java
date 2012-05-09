@@ -22,26 +22,25 @@
  */
 package org.voltdb;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.junit.After;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
+
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.*;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MockMailbox;
-import org.voltdb.network.Connection;
-import org.voltdb.network.MockConnection;
-import org.voltdb.network.MockWriteStream;
-import org.voltdb.network.WriteStream;
 
 public class TestStatsAgent {
 
@@ -56,9 +55,16 @@ public class TestStatsAgent {
         public WriteStream writeStream() {
             return new MockWriteStream() {
                 @Override
-                public boolean enqueue(FastSerializable f) {
-                    responses.offer((ClientResponseImpl)f);
-                    return true;
+                public void enqueue(ByteBuffer buf) {
+                    ClientResponseImpl cri = new ClientResponseImpl();
+                    buf.clear();
+                    buf.position(4);
+                    try {
+                        cri.initFromBuffer(buf);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    responses.offer(cri);
                 }
             };
         }
@@ -67,14 +73,15 @@ public class TestStatsAgent {
     @Before
     public void setUp() throws Exception {
         m_mvoltdb = new MockVoltDB();
-        m_mvoltdb.addHost(0);
-        m_mvoltdb.addHost(1);
-        m_mvoltdb.addSite( 1, 0, 0, false);
-        m_mvoltdb.addSite( 2, 1, 0, false);
+        m_mvoltdb.addSite( CoreUtils.getHSIdFromHostAndSite( 0, 1), MailboxType.Initiator);
+        m_mvoltdb.addSite( CoreUtils.getHSIdFromHostAndSite( 1, 2), MailboxType.Initiator);
         VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);
         m_secondAgent = new StatsAgent();
-        Mailbox mailbox = m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(), 2);
-        MockMailbox.postoffice.get(VoltDB.STATS_MAILBOX_ID).put(2, mailbox);
+        long secondAgentHSId = VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42);
+        VoltDB.instance().getHostMessenger().generateMailboxId(
+                VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42));
+        m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(), secondAgentHSId);
+        m_mvoltdb.addSite(secondAgentHSId, MailboxType.StatsAgent);
     }
 
     @After
@@ -96,7 +103,7 @@ public class TestStatsAgent {
                 { 42, "42" },
                 { 43, "43" }
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.WANPARTITION, 0, partitionSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRPARTITION, 0, partitionSource);
 
         List<VoltTable.ColumnInfo> nodeColumns = Arrays.asList(new VoltTable.ColumnInfo[] {
                 new VoltTable.ColumnInfo( "c1", VoltType.STRING),
@@ -107,27 +114,27 @@ public class TestStatsAgent {
                 { "43", 43 },
                 { "42", 43 }
         });
-        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.WANNODE, 0, nodeSource);
+        m_mvoltdb.getStatsAgent().registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
 
         MockStatsSource.columns = partitionColumns;
         partitionSource = new MockStatsSource(new Object[][] {
                 { 44, "44" },
                 { 45, "45" }
         });
-        m_secondAgent.registerStatsSource(SysProcSelector.WANPARTITION, 0, partitionSource);
+        m_secondAgent.registerStatsSource(SysProcSelector.DRPARTITION, 0, partitionSource);
 
         MockStatsSource.columns = nodeColumns;
         nodeSource = new MockStatsSource(new Object[][] {
                 { "45", 44 },
                 { "44", 44 }
         });
-        m_secondAgent.registerStatsSource(SysProcSelector.WANNODE, 0, nodeSource);
+        m_secondAgent.registerStatsSource(SysProcSelector.DRNODE, 0, nodeSource);
     }
 
     @Test
-    public void testCollectWANStats() throws Exception {
+    public void testCollectDRStats() throws Exception {
         createAndRegisterStats();
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -139,14 +146,14 @@ public class TestStatsAgent {
 
     @Test
     public void testCollectUnsupportedStats() throws Exception {
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
         VoltTable results[] = response.getResults();
         assertEquals(0, results.length);
         assertTrue(
-                "Requested statistic \"WAN\" is not supported in the current configuration".equals(
+                "Requested statistic \"DR\" is not supported in the current configuration".equals(
                 response.getStatusString()));
     }
 
@@ -155,7 +162,7 @@ public class TestStatsAgent {
         createAndRegisterStats();
         StatsAgent.STATS_COLLECTION_TIMEOUT = 300;
         MockStatsSource.delay = 200;
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         ClientResponseImpl response = responses.take();
 
         assertEquals(ClientResponse.GRACEFUL_FAILURE, response.getStatus());
@@ -176,7 +183,7 @@ public class TestStatsAgent {
          * Generate a bunch of requests, should get backpressure on some of them
          */
         for (int ii = 0; ii < 12; ii++) {
-            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+            m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         }
 
         boolean hadBackpressure = false;
@@ -195,7 +202,7 @@ public class TestStatsAgent {
         /*
          * Now having recieved all responses, it should be possible to collect the stats
          */
-        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "WAN");
+        m_mvoltdb.getStatsAgent().collectStats( m_mockConnection, 32, "DR");
         ClientResponseImpl response = responses.take();
         verifyResults(response);
     }

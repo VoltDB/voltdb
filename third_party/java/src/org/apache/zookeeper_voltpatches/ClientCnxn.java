@@ -71,6 +71,7 @@ import org.apache.zookeeper_voltpatches.proto.SetWatches;
 import org.apache.zookeeper_voltpatches.proto.WatcherEvent;
 import org.apache.zookeeper_voltpatches.server.ByteBufferInputStream;
 import org.apache.zookeeper_voltpatches.server.ZooTrace;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class manages the socket i/o for the client. ClientCnxn maintains a list
@@ -79,7 +80,7 @@ import org.apache.zookeeper_voltpatches.server.ZooTrace;
  *
  */
 public class ClientCnxn {
-    private static final Logger LOG = Logger.getLogger("ZK-CLIENT");
+    private static final VoltLogger LOG = new VoltLogger("ZK-CLIENT");
 
     /**
      * This controls whether automatic watch resetting is enabled. Clients

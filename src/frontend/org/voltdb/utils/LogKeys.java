@@ -47,7 +47,6 @@ public enum LogKeys {
     host_VoltDB_StartingNetwork,
     host_VoltDB_InternalProfilingDisabledOnMultipartitionHosts,
     host_VoltDB_ProfileLevelIs,
-    host_VoltDB_CreatingVoltDB,
     host_VoltDB_InvalidHostCount,
     host_VoltDB_CouldNotRetrieveLeaderAddress,
     host_VoltDB_ExportInitFailure,

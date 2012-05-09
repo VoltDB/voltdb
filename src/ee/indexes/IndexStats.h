@@ -71,7 +71,7 @@ public:
             std::string tableName,
             voltdb::CatalogId hostId,
             std::string hostname,
-            voltdb::CatalogId siteId,
+            int64_t siteId,
             voltdb::CatalogId partitionId,
             voltdb::CatalogId databaseId);
 

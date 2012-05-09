@@ -24,7 +24,7 @@ import org.voltdb.licensetool.LicenseApi;
 
 /**
  * Stub class that provides a gateway to the InvocationBufferServer when
- * WAN-based DR is enabled. If no DR, then it acts as a noop stub.
+ * DR is enabled. If no DR, then it acts as a noop stub.
  *
  */
 public class PartitionDRGateway {
@@ -37,43 +37,60 @@ public class PartitionDRGateway {
      * @return Instance of PartitionDRGateway
      */
     public static PartitionDRGateway getInstance(int partitionId,
-                                                 boolean rejoiningAtStartup,
                                                  boolean replicationActive,
                                                  File overflowDir)
     {
         final VoltDBInterface vdb = VoltDB.instance();
         LicenseApi api = vdb.getLicenseApi();
-        final boolean licensedToWAN = api.isWanReplicationAllowed();
+        final boolean licensedToDR = api.isDrReplicationAllowed();
 
         // if this is a primary cluster in a DR-enabled scenario
-        //  try to load the real version of this class
+        // try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToWAN) {
-            try {
-                Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
-                Object obj = pdrgiClass.newInstance();
-                pdrg = (PartitionDRGateway) obj;
-            } catch (Exception e) {
-            }
+        if (licensedToDR) {
+            pdrg = tryToLoadProVersion();
         }
-
-        // create a stub instance
         if (pdrg == null) {
             pdrg = new PartitionDRGateway();
         }
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, rejoiningAtStartup, replicationActive, overflowDir);
+            pdrg.init(partitionId, replicationActive, overflowDir);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
         return pdrg;
     }
 
+    /**
+     * shutdown is a global method to gracefully terminate the underlying
+     * gateway infrastructure. It stops anything started by getInstance().
+     */
+    public static void shutdown()
+    {
+        // intentionally avoid a license check to shutdown.
+        PartitionDRGateway pdrg = null;
+        pdrg = tryToLoadProVersion();
+        if (pdrg == null) {
+            pdrg = new PartitionDRGateway();
+        }
+        pdrg.shutdownInternal();
+    }
+
+    private static PartitionDRGateway tryToLoadProVersion()
+    {
+        try {
+            Class<?> pdrgiClass = Class.forName("org.voltdb.dr.PartitionDRGatewayImpl");
+            Object obj = pdrgiClass.newInstance();
+            return (PartitionDRGateway) obj;
+        } catch (Exception e) {
+        }
+        return null;
+    }
+
     // empty methods for community edition
     protected void init(int partitionId,
-                        boolean rejoiningAtStartup,
                         boolean replicationActive,
                         File overflowDir) throws IOException {}
     public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
@@ -81,6 +98,6 @@ public class PartitionDRGateway {
     public void start() {}
     public void setActive(boolean active) {}
     public boolean isActive() { return false; }
-    public void shutdown() {}
+    protected void shutdownInternal() {}
 
 }

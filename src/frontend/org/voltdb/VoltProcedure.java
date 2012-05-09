@@ -76,7 +76,7 @@ public abstract class VoltProcedure {
         return new Expectation(Type.EXPECT_SCALAR_MATCH, scalar);
     }
 
-    protected ProcedureRunner m_runner;
+    private ProcedureRunner m_runner;
     private boolean m_initialized;
 
     /**

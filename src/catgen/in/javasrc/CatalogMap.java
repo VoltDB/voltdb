@@ -188,4 +188,23 @@ public final class CatalogMap<T extends CatalogType> implements Iterable<T> {
 
         return true;
     }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = size();
+
+        for (Entry<String, T> e : m_items.entrySet()) {
+            String key = e.getKey();
+            if (key != null) {
+                result += key.hashCode();
+            }
+            T value = e.getValue();
+            if (value != null) {
+                result += value.hashCode();
+            }
+        }
+        return result;
+    }
+
 }

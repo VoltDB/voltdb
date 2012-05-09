@@ -20,7 +20,7 @@ package org.voltdb.expressions;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 public class AggregateExpression extends AbstractExpression {
 
@@ -29,10 +29,6 @@ public class AggregateExpression extends AbstractExpression {
 
     public AggregateExpression(ExpressionType type) {
         super(type);
-    }
-
-    public AggregateExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
-        super(type, left, right);
     }
 
     public AggregateExpression() {

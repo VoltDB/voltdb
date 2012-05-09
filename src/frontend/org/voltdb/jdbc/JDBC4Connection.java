@@ -36,18 +36,13 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 
-import org.voltdb.client.exampleutils.ClientConnection;
-import org.voltdb.client.exampleutils.ClientConnectionPool;
-import org.voltdb.client.exampleutils.PerfCounter;
-import org.voltdb.client.exampleutils.PerfCounterMap;
-
 public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
-    protected final ClientConnection NativeConnection;
+    protected final JDBC4ClientConnection NativeConnection;
     protected final String User;
     private boolean isClosed = false;
 
-    public JDBC4Connection(ClientConnection connection, String user)
+    public JDBC4Connection(JDBC4ClientConnection connection, String user)
     {
         this.NativeConnection = connection;
         this.User = user;
@@ -74,7 +69,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         try
         {
             isClosed = true;
-            ClientConnectionPool.dispose(NativeConnection);
+            JDBC4ClientConnectionPool.dispose(NativeConnection);
         }
         catch(Exception x)
         {
@@ -378,7 +373,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setAutoCommit(boolean autoCommit) throws SQLException
     {
         checkClosed();
-    if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
+        if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
             throw SQLError.noSupport();
     }
 
@@ -478,21 +473,21 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     // IVoltDBConnection extended method
     // Return global performance statistics for the underlying connection (pooled information)
     @Override
-    public PerfCounterMap getStatistics()
+    public JDBC4PerfCounterMap getStatistics()
     {
         return this.NativeConnection.getStatistics();
     }
 
     // Return performance statistics for a specific procedure, for the underlying connection (pooled information)
     @Override
-    public PerfCounter getStatistics(String procedure)
+    public JDBC4PerfCounter getStatistics(String procedure)
     {
         return this.NativeConnection.getStatistics(procedure);
     }
 
     // Return performance statistics for a list of procedures, for the underlying connection (pooled information)
     @Override
-    public PerfCounter getStatistics(String... procedures)
+    public JDBC4PerfCounter getStatistics(String... procedures)
     {
         return this.NativeConnection.getStatistics(procedures);
     }

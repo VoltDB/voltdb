@@ -20,7 +20,7 @@ package org.voltdb.jni;
 import java.util.ArrayList;
 import java.util.Random;
 
-import org.voltdb.DependencyPair;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
 import org.voltdb.TableStreamType;
@@ -29,16 +29,15 @@ import org.voltdb.VoltType;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 public class MockExecutionEngine extends ExecutionEngine {
 
     public MockExecutionEngine() {
-        super(null);
+        super();
     }
 
     @Override
-    public DependencyPair executePlanFragment(final long planFragmentId, int outputDepId,
+    public VoltTable executePlanFragment(final long planFragmentId,
             int inputDepIdfinal, ParameterSet parameterSet, final long txnId,
             final long lastCommittedTxnId, final long undoToken) throws EEException
     {
@@ -90,7 +89,7 @@ public class MockExecutionEngine extends ExecutionEngine {
                   new VoltTable.ColumnInfo("foo", VoltType.INTEGER)
         });
         vt.addRow(Integer.valueOf(1));
-        return new DependencyPair(outputDepId, vt);
+        return vt;
     }
 
     @Override
@@ -101,34 +100,29 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable executeCustomPlanFragment(final String plan, int outputDepId,
+    public VoltTable executeCustomPlanFragment(final String plan,
             int inputDepId, final long txnId, final long lastCommittedTxnId, final long undoQuantumToken)
             throws EEException {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public VoltTable[] executeQueryPlanFragmentsAndGetResults(final long[] planFragmentIds, final int numFragmentIds, final ParameterSet[] parameterSets,
             final int numParameterSets, final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public VoltTable[] getStats(final SysProcSelector selector, final int[] locators, boolean interval, Long now) {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public void loadCatalog(final long txnId, final String serializedCatalog) throws EEException {
-        // TODO Auto-generated method stub
     }
 
     @Override
     public void updateCatalog(final long txnId, final String catalogDiffs) throws EEException {
-        // TODO Auto-generated method stub
     }
 
     @Override
@@ -136,84 +130,69 @@ public class MockExecutionEngine extends ExecutionEngine {
         final long lastCommittedTxnId, final long undoToken)
     throws EEException
     {
-        // TODO Auto-generated method stub
     }
 
     @Override
     public void release() throws EEException {
-        // TODO Auto-generated method stub
     }
 
     @Override
     public boolean releaseUndoToken(final long undoToken) {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public VoltTable serializeTable(final int tableId) throws EEException {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public void tick(final long time, final long lastCommittedTxnId) {
-        // TODO Auto-generated method stub
     }
 
     @Override
     public void toggleProfiler(final int toggle) {
-        // TODO Auto-generated method stub
         return;
     }
 
     @Override
     public boolean undoUndoToken(final long undoToken) {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public boolean setLogLevels(final long logLevels) throws EEException {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public void quiesce(long lastCommittedTxnId) {
-        // TODO Auto-generated method stub
 
     }
 
     @Override
     public boolean activateTableStream(int tableId, TableStreamType type) {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public int tableStreamSerializeMore(BBContainer c, int tableId, TableStreamType type) {
-        // TODO Auto-generated method stub
         return 0;
     }
 
     @Override
     public ExportProtoMessage exportAction(boolean syncAction,
             long ackOffset, long seqNo, int partitionId, String mTableSignature) {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public long[] getUSOForExportTable(String tableSignature) {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public void processRecoveryMessage( java.nio.ByteBuffer buffer, long pointer) {
-        // TODO Auto-generated method stub
-
     }
 
     @Override
@@ -223,13 +202,11 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public int hashinate(Object value, int partitionCount) {
-        // TODO Auto-generated method stub
         return 0;
     }
 
     @Override
     public long getThreadLocalPoolAllocations() {
-        // TODO Auto-generated method stub
         return 0L;
     }
 }

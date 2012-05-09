@@ -53,7 +53,7 @@ public class VoltDBFickleCluster extends LocalCluster {
     }
 
     public static void rejoinNode() throws Exception {
-        m_cluster.recoverOne(1, 0, "localhost");
+        m_cluster.recoverOne(1, 0, "");
     }
 
     public void mutateCatalog() throws Exception {
@@ -117,6 +117,18 @@ public class VoltDBFickleCluster extends LocalCluster {
 
     public static void stop() throws Exception {
         m_cluster.shutDown();
+    }
+
+    public static int getInternalPort(int hostId) {
+        return m_cluster.internalPort(hostId);
+    }
+
+    public static int getPort(int hostId) {
+        return m_cluster.port(hostId);
+    }
+
+    public static int getAdminPort(int hostId) {
+        return m_cluster.adminPort(hostId);
     }
 
 }

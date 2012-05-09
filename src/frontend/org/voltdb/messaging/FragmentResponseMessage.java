@@ -21,9 +21,11 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.SerializableException;
-import org.voltdb.utils.DBBPool;
 
 /**
  * Message from an execution site which is participating in a transaction
@@ -38,14 +40,17 @@ public class FragmentResponseMessage extends VoltMessage {
     public static final byte USER_ERROR       = 2;
     public static final byte UNEXPECTED_ERROR = 3;
 
-    int m_executorSiteId;
-    int m_destinationSiteId;
+    long m_executorHSId;
+    long m_destinationHSId;
     long m_txnId;
     byte m_status;
     // default dirty to true until proven otherwise
     // Not currently used; leaving it in for now
     boolean m_dirty = true;
     boolean m_recovering = false;
+    // WHA?  Why do we have a separate dependency count when
+    // the array lists will tell you their lengths?  Doesn't look like
+    // we do anything else with this value other than track the length
     short m_dependencyCount = 0;
     ArrayList<Integer> m_dependencyIds = new ArrayList<Integer>();
     ArrayList<VoltTable> m_dependencies = new ArrayList<VoltTable>();
@@ -56,10 +61,10 @@ public class FragmentResponseMessage extends VoltMessage {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public FragmentResponseMessage(FragmentTaskMessage task, int siteId) {
-        m_executorSiteId = siteId;
-        m_txnId = task.m_txnId;
-        m_destinationSiteId = task.m_coordinatorSiteId;
+    public FragmentResponseMessage(FragmentTaskMessage task, long HSId) {
+        m_executorHSId = HSId;
+        m_txnId = task.getTxnId();
+        m_destinationHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
     }
 
@@ -87,12 +92,12 @@ public class FragmentResponseMessage extends VoltMessage {
         m_dependencyCount++;
     }
 
-    public int getExecutorSiteId() {
-        return m_executorSiteId;
+    public long getExecutorSiteId() {
+        return m_executorHSId;
     }
 
-    public int getDestinationSiteId() {
-        return m_destinationSiteId;
+    public long getDestinationSiteId() {
+        return m_destinationHSId;
     }
 
     public long getTxnId() {
@@ -120,77 +125,80 @@ public class FragmentResponseMessage extends VoltMessage {
     }
 
     @Override
-    protected void flattenToBuffer(final DBBPool pool) throws IOException {
-        int msgsize = 4 + 4 + 8 + 1 + 1 + 1 + 2;
-        assert(m_exception == null || m_status != SUCCESS);
+    public int getSerializedSize()
+    {
+        int msgsize = super.getSerializedSize();
+
+        msgsize += 8 // executorHSId
+            + 8 // destinationHSId
+            + 8 // txnId
+            + 1 // status byte
+            + 1 // dirty flag
+            + 1 // node recovering flag
+            + 2; // dependency count
+
+        // one int per dependency ID
+        msgsize += 4 * m_dependencyCount;
+
+        // Add the actual result lengths
+        for (VoltTable dep : m_dependencies)
+        {
+            msgsize += dep.getSerializedSize();
+        }
 
         if (m_exception != null) {
             msgsize += m_exception.getSerializedSize();
         } else {
-            msgsize += 4;//Still serialize exception length 0
+            msgsize += 4; //Still serialize exception length 0
         }
 
-        // stupid lame flattening of the tables
-        ByteBuffer tableBytes = null;
-        if (m_dependencyCount > 0) {
-
-            FastSerializer fs = new FastSerializer();
-            try {
-                for (int i = 0; i < m_dependencyCount; i++)
-                    fs.writeObject(m_dependencies.get(i));
-            } catch (IOException e) {
-                e.printStackTrace();
-                assert(false);
-            }
-            tableBytes = fs.getBuffer();
-            msgsize += tableBytes.remaining();
-            msgsize += 4 * m_dependencyCount;
-        }
-
-        if (m_buffer == null) {
-            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
-            m_buffer = m_container.b;
-        }
-        setBufferSize(msgsize + 1, pool);
-
-        m_buffer.position(HEADER_SIZE);
-        m_buffer.put(FRAGMENT_RESPONSE_ID);
-
-        m_buffer.putInt(m_executorSiteId);
-        m_buffer.putInt(m_destinationSiteId);
-        m_buffer.putLong(m_txnId);
-        m_buffer.put(m_status);
-        m_buffer.put((byte) (m_dirty ? 1 : 0));
-        m_buffer.put((byte) (m_recovering ? 1 : 0));
-        m_buffer.putShort(m_dependencyCount);
-        for (int i = 0; i < m_dependencyCount; i++)
-            m_buffer.putInt(m_dependencyIds.get(i));
-        if (tableBytes != null)
-            m_buffer.put(tableBytes);
-        if (m_exception != null) {
-            m_exception.serializeToBuffer(m_buffer);
-        } else {
-            m_buffer.putInt(0);
-        }
-
-        m_buffer.limit(m_buffer.position());
+        return msgsize;
     }
 
     @Override
-    protected void initFromBuffer() {
-        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        m_executorSiteId = m_buffer.getInt();
-        m_destinationSiteId = m_buffer.getInt();
-        m_txnId = m_buffer.getLong();
-        m_status = m_buffer.get();
-        m_dirty = m_buffer.get() == 0 ? false : true;
-        m_recovering = m_buffer.get() == 0 ? false : true;
-        m_dependencyCount = m_buffer.getShort();
-        //assert(m_dependencyCount <= 50);
+    public void flattenToBuffer(ByteBuffer buf)
+    {
+        assert(m_exception == null || m_status != SUCCESS);
+        buf.put(VoltDbMessageFactory.FRAGMENT_RESPONSE_ID);
+
+        buf.putLong(m_executorHSId);
+        buf.putLong(m_destinationHSId);
+        buf.putLong(m_txnId);
+        buf.put(m_status);
+        buf.put((byte) (m_dirty ? 1 : 0));
+        buf.put((byte) (m_recovering ? 1 : 0));
+        buf.putShort(m_dependencyCount);
         for (int i = 0; i < m_dependencyCount; i++)
-            m_dependencyIds.add(m_buffer.getInt());
+            buf.putInt(m_dependencyIds.get(i));
+
+        for (int i = 0; i < m_dependencyCount; i++)
+        {
+            m_dependencies.get(i).flattenToBuffer(buf);
+        }
+
+        if (m_exception != null) {
+            m_exception.serializeToBuffer(buf);
+        } else {
+            buf.putInt(0);
+        }
+
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
+    }
+
+    @Override
+    public void initFromBuffer(ByteBuffer buf) {
+        m_executorHSId = buf.getLong();
+        m_destinationHSId = buf.getLong();
+        m_txnId = buf.getLong();
+        m_status = buf.get();
+        m_dirty = buf.get() == 0 ? false : true;
+        m_recovering = buf.get() == 0 ? false : true;
+        m_dependencyCount = buf.getShort();
+        for (int i = 0; i < m_dependencyCount; i++)
+            m_dependencyIds.add(buf.getInt());
         for (int i = 0; i < m_dependencyCount; i++) {
-            FastDeserializer fds = new FastDeserializer(m_buffer);
+            FastDeserializer fds = new FastDeserializer(buf);
             try {
                 m_dependencies.add(fds.readObject(VoltTable.class));
             } catch (IOException e) {
@@ -198,7 +206,8 @@ public class FragmentResponseMessage extends VoltMessage {
                 assert(false);
             }
         }
-        m_exception = SerializableException.deserializeFromBuffer(m_buffer);
+        m_exception = SerializableException.deserializeFromBuffer(buf);
+        assert(buf.capacity() == buf.position());
     }
 
     @Override
@@ -206,9 +215,9 @@ public class FragmentResponseMessage extends VoltMessage {
         StringBuilder sb = new StringBuilder();
 
         sb.append("FRAGMENT_RESPONSE (FROM ");
-        sb.append(m_executorSiteId);
+        sb.append(CoreUtils.hsIdToString(m_executorHSId));
         sb.append(" TO ");
-        sb.append(m_destinationSiteId);
+        sb.append(CoreUtils.hsIdToString(m_destinationHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
 

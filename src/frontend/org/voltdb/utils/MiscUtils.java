@@ -16,32 +16,29 @@
  */
 package org.voltdb.utils;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.InputStream;
+import java.io.IOException;
+import java.net.BindException;
+import java.net.ServerSocket;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.logging.VoltLogger;
+
+import com.google.common.net.HostAndPort;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     /**
      * Simple code to copy a file from one place to another...
@@ -50,25 +47,7 @@ public class MiscUtils {
     public static void copyFile(String fromPath, String toPath) throws Exception {
         File inputFile = new File(fromPath);
         File outputFile = new File(toPath);
-
-        FileReader in = new FileReader(inputFile);
-        FileWriter out = new FileWriter(outputFile);
-        int c;
-
-        while ((c = in.read()) != -1)
-          out.write(c);
-
-        in.close();
-        out.close();
-    }
-
-    public static final int[] toArray(Set<Integer> set) {
-        int retval[] = new int[set.size()];
-        int ii = 0;
-        for (Integer i : set) {
-            retval[ii++] = i;
-        }
-        return retval;
+        com.google.common.io.Files.copy(inputFile, outputFile);
     }
 
     /**
@@ -129,7 +108,7 @@ public class MiscUtils {
                 }
 
                 @Override
-                public boolean isWanReplicationAllowed() {
+                public boolean isDrReplicationAllowed() {
                     return false;
                 }
 
@@ -214,17 +193,17 @@ public class MiscUtils {
             }
         }
 
-        // enforce wan replication constraint
+        // enforce DR replication constraint
         if (replicationRole == ReplicationRole.REPLICA) {
-            if (licenseApi.isWanReplicationAllowed() == false) {
-                hostLog.fatal("Warning, VoltDB license does not allow use of WAN Replication.");
+            if (licenseApi.isDrReplicationAllowed() == false) {
+                hostLog.fatal("Warning, VoltDB license does not allow use of DR replication.");
                 return false;
             }
         }
 
         // print out trial success message
         if (licenseApi.isTrial()) {
-            hostLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
+            consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
             return true;
         }
 
@@ -251,7 +230,7 @@ public class MiscUtils {
                                    (valid ? "" : "invalid "),
                                    licenseApi.maxHostcount(),
                                    expiresStr);
-        hostLog.info(msg);
+        consoleLog.info(msg);
 
         return true;
     }
@@ -288,107 +267,6 @@ public class MiscUtils {
 
     }
 
-    /*
-     * Have shutdown actually means shutdown. Tasks that need to complete should use
-     * futures.
-     */
-    public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize, int stackSize) {
-        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
-        ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
-        ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-        return ses;
-    }
-
-    /**
-     * Create a bounded single threaded executor that rejects requests if more than capacity
-     * requests are outstanding.
-     */
-    public static ExecutorService getBoundedSingleThreadExecutor(String name, int capacity) {
-        LinkedBlockingQueue<Runnable> lbq = new LinkedBlockingQueue<Runnable>(capacity);
-        ThreadPoolExecutor tpe = new ThreadPoolExecutor(1, 1, Long.MAX_VALUE, TimeUnit.DAYS, lbq, getThreadFactory(name));
-        return tpe;
-    }
-
-    public static ThreadFactory getThreadFactory(String name) {
-        return getThreadFactory(name, 1024 * 1024);
-    }
-
-    public static ThreadFactory getThreadFactory(final String name, final int stackSize) {
-        return new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(null, r, name, stackSize);
-                t.setDaemon(true);
-                return t;
-            }
-        };
-    }
-
-    private static String checkForJavaHomeInEnvironment() throws Exception {
-        String javahome = System.getenv("JAVA_HOME");
-        if (javahome != null) {
-            File f = new File(new File(javahome, "bin"), "java");
-            if (f.exists() && f.canExecute()) {
-                return f.getAbsolutePath();
-            } else {
-                hostLog.warn("JAVA_HOME environment variable (" + javahome +
-                        ") was set, but could not find an executable java binary at " + f.getAbsolutePath());
-            }
-        } else {
-            hostLog.warn("JAVA_HOME environment variable was not set, couldn't be used to find a java binary");
-        }
-        return null;
-    }
-
-    private static String checkForJavaInPath() throws Exception {
-        Process p = Runtime.getRuntime().exec("which java");
-        p.waitFor();
-        InputStream is = p.getInputStream();
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        int read = 0;
-        while ((read = is.read()) != -1) {
-            baos.write(read);
-        }
-        String java = new String(baos.toByteArray(), "UTF-8").trim();
-        if (java != null) {
-            File f = new File(java);
-            if (f.exists() && f.canExecute()) {
-                return f.getAbsolutePath();
-            } else {
-                hostLog.warn("Attempted to discover java binary from PATH using 'which java' (" +
-                        java + ") but an executable binary was not found at " + f.getAbsolutePath());
-            }
-        }
-        return null;
-    }
-
-    public static String getJavaPath() throws Exception {
-        String javahome = System.getProperties().getProperty("java.home");
-        if (javahome != null) {
-            File f = new File(javahome + "/bin/java");
-            if (f.exists() && f.canExecute()) {
-                return f.getAbsolutePath();
-            } else {
-                hostLog.warn("Couldn't find java binary in java home (" + javahome + ") defined by " +
-                        "the java.home system property. Path checked was " + f.getAbsolutePath());
-            }
-        } else {
-            hostLog.warn("java.home system property not defined");
-        }
-        String javaPath = checkForJavaHomeInEnvironment();
-        if (javaPath == null) {
-          javaPath = checkForJavaInPath();
-        }
-        if (javaPath == null) {
-            hostLog.error(
-                    "Could not find executable java binary in the java.home property specified by " +
-                    "the JVM, or in the Java home specified  by the JAVA_HOME environment variable, " +
-                    " or in the PATH");
-            throw new Exception("Could not find java binary");
-        }
-        return javaPath;
-    }
-
     public static String formatHostMetadataFromJSON(String json) {
         try {
             JSONObject obj = new JSONObject(json);
@@ -423,15 +301,7 @@ public class MiscUtils {
      * @return hostname or textual ip representation.
      */
     public static String getHostnameFromHostnameColonPort(String server) {
-        server = server.trim();
-        String[] parts = server.split(":");
-        if (parts.length == 1) {
-            return server;
-        }
-        else {
-            assert(parts.length == 2);
-            return parts[0].trim();
-        }
+        return HostAndPort.fromString(server).getHostText();
     }
 
     /**
@@ -440,14 +310,7 @@ public class MiscUtils {
      * @return port number.
      */
     public static int getPortFromHostnameColonPort(String server, int defaultPort) {
-        String[] parts = server.split(":");
-        if (parts.length == 1) {
-            return defaultPort;
-        }
-        else {
-            assert(parts.length == 2);
-            return Integer.parseInt(parts[1]);
-        }
+        return HostAndPort.fromString(server).getPortOrDefault(defaultPort);
     }
 
     /**
@@ -456,18 +319,75 @@ public class MiscUtils {
      * @return String in hostname/ip:port format.
      */
     public static String getHostnameColonPortString(String server, int defaultPort) {
-        server = server.trim();
-        String[] parts = server.trim().split(":");
-        if (parts.length == 1) {
-            // handle empty port string
-            if (server.endsWith(":"))
-                return server + String.valueOf(0);
-            // handle no port string given
-            return server + ":" + String.valueOf(defaultPort);
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort).toString();
+    }
+
+    /**
+     * I heart commutativity
+     * @param buffer ByteBuffer assumed position is at end of data
+     * @return the cheesy checksum of this VoltTable
+     */
+    public static final long cheesyBufferCheckSum(ByteBuffer buffer) {
+        final int mypos = buffer.position();
+        buffer.position(0);
+        long checksum = 0;
+        if (buffer.hasArray()) {
+            final byte bytes[] = buffer.array();
+            final int end = buffer.arrayOffset() + mypos;
+            for (int ii = buffer.arrayOffset(); ii < end; ii++) {
+                checksum += bytes[ii];
+            }
+        } else {
+            for (int ii = 0; ii < mypos; ii++) {
+                checksum += buffer.get();
+            }
         }
-        else {
-            assert(parts.length == 2);
-            return server;
+        buffer.position(mypos);
+        return checksum;
+    }
+
+    public static String getCompactStringTimestamp(long timestamp) {
+        SimpleDateFormat sdf =
+                new SimpleDateFormat("MMddHHmmss");
+        Date tsDate = new Date(timestamp);
+        return sdf.format(tsDate);
+    }
+
+    public static synchronized boolean isBindable(int port) {
+        try {
+            ServerSocket ss = new ServerSocket(port);
+            ss.close();
+            ss = null;
+            return true;
+        }
+        catch (BindException be) {
+            return false;
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Log (to the fatal logger) the list of ports in use.
+     * Uses "lsof -i" internally.
+     *
+     * @param log VoltLogger used to print output or warnings.
+     */
+    public static synchronized void printPortsInUse(VoltLogger log) {
+        try {
+            Process p = Runtime.getRuntime().exec("lsof -i");
+            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+            java.io.BufferedReader br = new java.io.BufferedReader(reader);
+            String str = null;
+            while((str = br.readLine()) != null) {
+                if (str.contains("LISTEN")) {
+                    log.fatal(str);
+                }
+            }
+        }
+        catch (Exception e) {
+            log.fatal("Unable to list ports in use at this time.");
         }
     }
 }

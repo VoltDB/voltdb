@@ -31,7 +31,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public class SnapshotCompletionMonitor {
     @SuppressWarnings("unused")
@@ -71,12 +71,12 @@ public class SnapshotCompletionMonitor {
     private void processSnapshotChildrenChanged(final WatchedEvent event) {
         try {
             TreeSet<String> children = new TreeSet<String>(m_zk.getChildren(
-                    "/completed_snapshots", m_newSnapshotWatcher));
+                    VoltZK.completed_snapshots, m_newSnapshotWatcher));
             TreeSet<String> newChildren = new TreeSet<String>(children);
             newChildren.removeAll(m_lastKnownSnapshots);
             m_lastKnownSnapshots = children;
             for (String newSnapshot : newChildren) {
-                String path = "/completed_snapshots/" + newSnapshot;
+                String path = VoltZK.completed_snapshots + "/" + newSnapshot;
                 try {
                     byte data[] = m_zk.getData(path, new Watcher() {
                         @Override
@@ -179,11 +179,11 @@ public class SnapshotCompletionMonitor {
             public void run() {
                 m_zk = zk;
                 try {
-                    m_zk.create("/completed_snapshots", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    m_zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 } catch (Exception e){}
                 try {
                     m_lastKnownSnapshots =
-                        new TreeSet<String>(m_zk.getChildren("/completed_snapshots", m_newSnapshotWatcher));
+                        new TreeSet<String>(m_zk.getChildren(VoltZK.completed_snapshots, m_newSnapshotWatcher));
                 } catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Error initializing snapshot completion monitor", true, e);
                 }

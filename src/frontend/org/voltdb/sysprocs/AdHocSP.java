@@ -55,7 +55,7 @@ public class AdHocSP extends VoltSystemProcedure {
         ExecutionEngine ee = ctx.getExecutionEngine();
         VoltTable t;
 
-        t = ee.executeCustomPlanFragment(aggregatorFragment, 1, -1, getTransactionId(),
+        t = ee.executeCustomPlanFragment(aggregatorFragment, -1, getTransactionId(),
                                          ctx.getLastCommittedTxnId(),
                                          ctx.getNextUndo());
 

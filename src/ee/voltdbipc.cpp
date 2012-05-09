@@ -417,24 +417,26 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     struct initialize {
         struct ipc_command cmd;
         int clusterId;
-        int siteId;
+        long siteId;
         int partitionId;
         int hostId;
         int64_t logLevels;
+        int64_t tempTableMemory;
+        int32_t totalPartitions;
         int16_t hostnameLength;
         char hostname[0];
-        int64_t tempTableMemory;
     };
     struct initialize * cs = (struct initialize*) cmd;
 
-    printf("initialize: cluster=%d, site=%d\n",
-           ntohl(cs->clusterId), ntohl(cs->siteId));
+    printf("initialize: cluster=%d, site=%jd\n",
+           ntohl(cs->clusterId), (intmax_t)ntohll(cs->siteId));
     cs->clusterId = ntohl(cs->clusterId);
-    cs->siteId = ntohl(cs->siteId);
+    cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
     cs->hostnameLength = ntohs(cs->hostnameLength);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
+    cs->totalPartitions = ntohl(cs->totalPartitions);
     std::string hostname(cs->hostname, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
@@ -447,7 +449,8 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
-                                 cs->tempTableMemory) == true) {
+                                 cs->tempTableMemory,
+                                 cs->totalPartitions) == true) {
             return kErrorCode_Success;
         }
     } catch (FatalException e) {

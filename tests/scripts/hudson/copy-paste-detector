@@ -1,3 +1,0 @@
-cd trunk
-svn info
-ant clean default cpd

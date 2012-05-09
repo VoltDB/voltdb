@@ -77,7 +77,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
 
         Client client = ClientFactory.createClient(m_cconfig);
 
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         Random r = new Random();
         StringBuilder sb = new StringBuilder(512);
@@ -149,7 +149,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                                 haveFailed.set(true);
                                 break;
                             }
-                            if (cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                            if (cluster.recoverOne( dead, toConnectTo, "")) {
                                 break;
                             }
                             attempts++;
@@ -192,7 +192,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                         haveFailed.set(true);
                         break;
                     }
-                    if (cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                    if (cluster.recoverOne( recoverNow, toConnectTo, "")) {
                         break;
                     }
                     attempts++;

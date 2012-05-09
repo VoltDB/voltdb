@@ -32,10 +32,12 @@ import junit.framework.TestCase;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 
 
 public class TestPartitionedTableSaveFileState extends TestCase
@@ -216,8 +218,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
         }
 
         // Add some non-exec sites for more test coverage
-        m_voltDB.addSite(number_of_partitions, 0, 0, false);
-        m_voltDB.addSite(number_of_partitions + 1, 1, 0, false);
+        m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite( 0,number_of_partitions), MailboxType.Initiator);
+        m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite( 1, number_of_partitions + 1), MailboxType.Initiator);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -240,7 +242,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
         checkPlanFragments(test_plan, partitionsToDistribute);
         for (int i = 0; i < number_of_partitions; i++)
         {
-            assertEquals(i, test_plan[i].siteId);
+            assertEquals(CoreUtils.getHSIdFromHostAndSite(i,i), test_plan[i].siteId);
         }
     }
 
@@ -256,8 +258,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
         }
 
         // Add some non-exec sites for more test coverage
-        m_voltDB.addSite(original_partitions, 0, 0, false);
-        m_voltDB.addSite(original_partitions + 1, 1, 0, false);
+        m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite( 0, original_partitions), MailboxType.Initiator);
+        m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite( 1, original_partitions + 1), MailboxType.Initiator);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -302,8 +304,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
                              original_partitions + 1,
                              true);
         // Add some non-exec sites for more test coverage
-        m_voltDB.addSite(original_partitions + 2, 0, 0, false);
-        m_voltDB.addSite(original_partitions + 3, 1, 0, false);
+        m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite( 0, original_partitions + 2), MailboxType.Initiator);
+        m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite( 1, original_partitions + 3), MailboxType.Initiator);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -339,8 +341,8 @@ public class TestPartitionedTableSaveFileState extends TestCase
             addSiteInfoToCatalog(i, i, i, true);
         }
         // Add some non-exec sites for more test coverage
-        m_voltDB.addSite(number_of_partitions, 0, 0, false);
-        m_voltDB.addSite(number_of_partitions + 1, 1, 0, false);
+        m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite( 0,number_of_partitions), MailboxType.Initiator);
+        m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite( 1, number_of_partitions + 1), MailboxType.Initiator);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -379,9 +381,11 @@ public class TestPartitionedTableSaveFileState extends TestCase
     private void addSiteInfoToCatalog(int siteId, int hostId, int partitionId,
                                       boolean isExec)
     {
-        m_voltDB.addPartition(partitionId);
-        m_voltDB.addHost(hostId);
-        m_voltDB.addSite(siteId, hostId, partitionId, isExec);
+        if (isExec) {
+            m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite(hostId, siteId), partitionId);
+        } else {
+            m_voltDB.addSite(CoreUtils.getHSIdFromHostAndSite(hostId, siteId), MailboxType.Initiator);
+        }
     }
 
     /*
@@ -399,7 +403,7 @@ public class TestPartitionedTableSaveFileState extends TestCase
             assertEquals(SysProcFragmentId.
                          PF_restoreDistributePartitionedTable,
                          plan[i].fragmentId);
-            assertTrue(plan[i].siteId == 0 || plan[i].siteId == i);
+            assertTrue(plan[i].siteId == 0 || plan[i].siteId == CoreUtils.getHSIdFromHostAndSite(i,i));
             assertFalse(plan[i].multipartition);
             assertEquals(TABLE_NAME, plan[i].parameters.toArray()[0]);
             for (Integer partition : ((int[])plan[i].parameters.toArray()[2])) {

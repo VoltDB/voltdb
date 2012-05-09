@@ -18,8 +18,6 @@
 package org.voltdb;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.security.MessageDigest;
-import java.security.NoSuchAlgorithmException;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
@@ -27,23 +25,21 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.ByteArrayUtils;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Packages up the data to be sent back to the client as a stored
  * procedure response in one FastSerialziable object.
  *
  */
-public class ClientResponseImpl implements FastSerializable, ClientResponse, JSONString {
-    private static final int MAX_HASH_BYTES = 1024 * 10; // hash the first 10k
-
+public class ClientResponseImpl implements ClientResponse, JSONString {
     private boolean setProperly = false;
     private byte status = 0;
     private String statusString = null;
+    private byte encodedStatusString[];
     private byte appStatus = Byte.MIN_VALUE;
     private String appStatusString = null;
+    private byte encodedAppStatusString[];
     private VoltTable[] results = new VoltTable[0];
 
     private int clusterRoundTripTime = 0;
@@ -59,7 +55,7 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
     static final String JSON_TYPE_KEY = "type";
     static final String JSON_EXCEPTION_KEY = "exception";
 
-    // Error string returned on duplicate replicated transaction from WAN agent
+    // Error string returned on duplicate replicated transaction from DR agent
     public static final String DUPE_TRANSACTION = "Rejected duplicate replicated transaction";
 
     /** opaque data optionally provided by and returned to the client */
@@ -163,8 +159,8 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         return m_exception;
     }
 
-    @Override
-    public void readExternal(FastDeserializer in) throws IOException {
+    public void initFromBuffer(ByteBuffer buf) throws IOException {
+        FastDeserializer in = new FastDeserializer(buf);
         in.readByte();//Skip version byte
         clientHandle = in.readLong();
         byte presentFields = in.readByte();
@@ -190,11 +186,42 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         setProperly = true;
     }
 
-    @Override
-    public void writeExternal(FastSerializer out) throws IOException {
+    public int getSerializedSize() {
+        int msgsize = 1 // version
+            + 8 // clientHandle
+            + 1 // present fields
+            + 1 // status
+            + 1 // app status
+            + 4 // cluster roundtrip time
+            + 2; // number of result tables
+        try {
+            if (appStatusString != null) {
+                encodedAppStatusString = appStatusString.getBytes("UTF-8");
+                msgsize += encodedAppStatusString.length + 4;
+            }
+            if (statusString != null) {
+                encodedStatusString = statusString.getBytes("UTF-8");
+                msgsize += encodedStatusString.length + 4;
+            }
+            if (m_exception != null) {
+                msgsize += m_exception.getSerializedSize();
+            }
+            for (VoltTable vt : results) {
+                msgsize += vt.getSerializedSize();
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error serializing client response", false, e);
+        }
+        return msgsize;
+    }
+
+    /**
+     * @return buf to allow call chaining.
+     */
+    public ByteBuffer flattenToBuffer(ByteBuffer buf) {
         assert setProperly;
-        out.writeByte(0);//version
-        out.writeLong(clientHandle);
+        buf.put((byte)0); //version
+        buf.putLong(clientHandle);
         byte presentFields = 0;
         if (appStatusString != null) {
             presentFields |= 1 << 7;
@@ -205,22 +232,29 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
         if (statusString != null) {
             presentFields |= 1 << 5;
         }
-        out.writeByte(presentFields);
-        out.write(status);
+        buf.put(presentFields);
+        buf.put(status);
         if (statusString != null) {
-            out.writeString(statusString);
+            buf.putInt(encodedStatusString.length);
+            buf.put(encodedStatusString);
         }
-        out.write(appStatus);
+        buf.put(appStatus);
         if (appStatusString != null) {
-            out.writeString(appStatusString);
+            buf.putInt(encodedAppStatusString.length);
+            buf.put(encodedAppStatusString);
         }
-        out.writeInt(clusterRoundTripTime);
+        buf.putInt(clusterRoundTripTime);
         if (m_exception != null) {
             final ByteBuffer b = ByteBuffer.allocate(m_exception.getSerializedSize());
             m_exception.serializeToBuffer(b);
-            out.write(b.array());
+            buf.put(b.array());
         }
-        out.writeArray(results);
+        buf.putShort((short)results.length);
+        for (VoltTable vt : results)
+        {
+            vt.flattenToBuffer(buf);
+        }
+        return buf;
     }
 
     @Override
@@ -293,22 +327,12 @@ public class ClientResponseImpl implements FastSerializable, ClientResponse, JSO
      */
     public int getHashOfTableResults() {
         try {
-            MessageDigest md = MessageDigest.getInstance("MD5");
+            long cheesyChecksum = 0;
             for (int i = 0; i < results.length; ++i) {
-                final ByteBuffer buf = results[i].m_buffer.duplicate();
-                buf.position(0);
-                int len = buf.limit();
-                assert(len > 0);
-                if (len > MAX_HASH_BYTES) {
-                    len = MAX_HASH_BYTES;
-                    buf.limit(MAX_HASH_BYTES);
-                }
-                md.update(buf);
+                cheesyChecksum += MiscUtils.cheesyBufferCheckSum(results[i].m_buffer);
             }
-            byte[] digest = md.digest();
-            return ByteArrayUtils.bytesToInt(digest, 0);
-        } catch (NoSuchAlgorithmException e) {
-            // TODO Auto-generated catch block
+            return (int)cheesyChecksum;
+        } catch (Exception e) {
             e.printStackTrace();
             return 0;
         }

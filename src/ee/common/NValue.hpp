@@ -22,6 +22,7 @@
 #include <cfloat>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <exception>
 #include <limits>
 #include <stdint.h>
@@ -237,13 +238,22 @@ class NValue {
     /* Return a copy of MIN(this, rhs) */
     NValue op_min(const NValue rhs) const;
 
-    /* For number NValues, compute new NValues for arthimetic operators */
+    /* For number NValues, compute new NValues for arithmetic operators */
     NValue op_increment() const;
     NValue op_decrement() const;
     NValue op_subtract(const NValue rhs) const;
     NValue op_add(const NValue rhs) const;
     NValue op_multiply(const NValue rhs) const;
     NValue op_divide(const NValue rhs) const;
+
+    template <ExpressionType E> // template for SQL functions returning constants (like pi)
+    static NValue callConstant();
+
+    template <ExpressionType E> // template for SQL functions of one NValue
+    NValue callUnary() const;
+
+    template <ExpressionType E> // template for SQL functions of multiple NValues
+    static NValue call(const std::vector<NValue>& arguments);
 
     /* For boost hashing */
     void hashCombine(std::size_t &seed) const;
@@ -2688,6 +2698,29 @@ inline NValue NValue::op_divide(const NValue rhs) const {
                getTypeName(rhs.getValueType()).c_str());
 }
 
+
+template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const {
+    const ValueType type = getValueType();
+    NValue retval(type);
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+        retval.getTinyInt() = static_cast<int8_t>(std::abs(getTinyInt())); break;
+    case VALUE_TYPE_SMALLINT:
+        retval.getSmallInt() = static_cast<int16_t>(std::abs(getSmallInt())); break;
+    case VALUE_TYPE_INTEGER:
+        retval.getInteger() = std::abs(getInteger()); break;
+    case VALUE_TYPE_BIGINT:
+        retval.getBigInt() = std::abs(getBigInt()); break;
+    case VALUE_TYPE_DOUBLE:
+        retval.getDouble() = std::abs(getDouble()); break;
+    case VALUE_TYPE_TIMESTAMP:
+    default:
+        throwFatalException ("type %d is not numeric", (int) type);
+        break;
+    }
+    return retval;
 }
+
+} // namespace voltdb
 
 #endif /* NVALUE_HPP_ */

@@ -148,5 +148,82 @@ public class TestDDLCompiler extends TestCase {
         hsql.close();
     }
 
+    /**
+     * ENG-2643: Ensure VoltDB can compile DDL with check and fk constrants,
+     * but warn the user, rather than silently ignoring the stuff VoltDB
+     * doesn't support.
+     */
+    public void testFKsAndChecksGiveWarnings() throws HSQLParseException {
+        // ensure the test cleans up
+        File jarOut = new File("checkCompilerWarnings.jar");
+        jarOut.deleteOnExit();
 
+        // schema with a foreign key constraint and a check constraint
+        String schema1 =  "create table t0 (id bigint not null, primary key (id));\n";
+               schema1 += "create table t1 (name varchar(32), user varchar(32), " +
+                          "id bigint references t0, primary key (name, user), CHECK (id>0));";
+
+        // similar schema with not null and unique constraints (should have no warnings)
+        String schema2 =  "create table t0 (id bigint not null, primary key (id));\n";
+               //schema2 += "create table t1 (name varchar(32), user varchar(32), " +
+               //                  "id bigint, primary key (name, user);";
+
+        // boilerplate for making a project
+        final String simpleProject =
+                "<?xml version=\"1.0\"?>\n" +
+                "<project><database><schemas>" +
+                "<schema path='%s' />" +
+                "</schemas></database></project>";
+
+        // RUN EXPECTING WARNINGS
+        File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema1);
+        String schemaPath = schemaFile.getPath();
+
+        File projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        String projectPath = projectFile.getPath();
+
+        // compile successfully (but with two warnings hopefully)
+        VoltCompiler compiler = new VoltCompiler();
+        boolean success = compiler.compile(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        // verify the warnings exist
+        int foundCheckWarnings = 0;
+        int foundFKWarnings = 0;
+        for (VoltCompiler.Feedback f : compiler.m_warnings) {
+            if (f.message.toLowerCase().contains("check")) {
+                foundCheckWarnings++;
+            }
+            if (f.message.toLowerCase().contains("foreign")) {
+                foundFKWarnings++;
+            }
+        }
+        assertEquals(1, foundCheckWarnings);
+        assertEquals(1, foundFKWarnings);
+
+        // cleanup after the test
+        jarOut.delete();
+
+        // RUN EXPECTING NO WARNINGS
+        schemaFile = VoltProjectBuilder.writeStringToTempFile(schema2);
+        schemaPath = schemaFile.getPath();
+
+        projectFile = VoltProjectBuilder.writeStringToTempFile(
+                String.format(simpleProject, schemaPath));
+        projectPath = projectFile.getPath();
+
+        // don't reinitialize the compiler to test that it can be re-called
+        //compiler = new VoltCompiler();
+
+        // compile successfully with no warnings
+        success = compiler.compile(projectPath, jarOut.getPath());
+        assertTrue(success);
+
+        // verify no warnings
+        assertEquals(0, compiler.m_warnings.size());
+
+        // cleanup after the test
+        jarOut.delete();
+    }
 }

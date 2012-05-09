@@ -102,7 +102,7 @@ public class TestExportToFileClient extends TestCase {
 
         final String listener = cluster.getListenerAddresses().get(0);
         final Client client = ClientFactory.createClient();
-        client.createConnection(listener);
+        client.createConnection(listener, cluster.port(0));
         client.callProcedure("Insert", 5);
         client.close();
 
@@ -135,8 +135,8 @@ public class TestExportToFileClient extends TestCase {
                     0,
                     false);
 
-        InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT);
-        InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT + 1);
+        InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", cluster.port(0));
+        InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", cluster.port(1));
 
         exportClient1.addServerInfo(inetaddr1);
         exportClient2.addServerInfo(inetaddr2);

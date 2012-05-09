@@ -86,10 +86,8 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
         dynamic_cast<AbstractScanPlanNode*>(m_abstractNode);
     AbstractOperationPlanNode* oper_node =
         dynamic_cast<AbstractOperationPlanNode*>(m_abstractNode);
-    bool requires_target_table = false;
     if (scan_node || oper_node)
     {
-        requires_target_table = true;
         Table* target_table = NULL;
 
         string targetTableName;

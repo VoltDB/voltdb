@@ -32,8 +32,8 @@ public abstract class VoltTypeUtil {
     private static final Logger LOG = Logger.getLogger(VoltTypeUtil.class.getName());
 
     protected final static Random rand = new Random();
-    protected static final Integer DATE_STOP = Math.round(System.currentTimeMillis() / 1000);
-    protected static final Integer DATE_START = VoltTypeUtil.DATE_STOP - 153792000;
+    protected static final Long DATE_STOP = System.currentTimeMillis() / 1000;
+    protected static final Long DATE_START = VoltTypeUtil.DATE_STOP - 153792000;
 
     public static Object getRandomValue(VoltType type) {
         Object ret = null;
@@ -82,7 +82,7 @@ public abstract class VoltTypeUtil {
             // TIMESTAMP
             // --------------------------------
             case TIMESTAMP: {
-                int timestamp = VoltTypeUtil.rand.nextInt(VoltTypeUtil.DATE_STOP - VoltTypeUtil.DATE_START) + VoltTypeUtil.DATE_START;
+                long timestamp = VoltTypeUtil.rand.nextInt((int)(VoltTypeUtil.DATE_STOP - VoltTypeUtil.DATE_START)) + VoltTypeUtil.DATE_START;
                 ret = new TimestampType(Long.valueOf(timestamp * 1000));
                 break;
             }
@@ -97,7 +97,7 @@ public abstract class VoltTypeUtil {
 
     /*
      * Determine if a cast is allowable w/o loss of precision
-     * for index key comparison. This is probably overly strict.
+     * for index key comparison.
      */
     public static boolean isAllowableCastForKeyComparator(VoltType from, VoltType to) {
         // self to self cast is obviously fine.
@@ -118,21 +118,8 @@ public abstract class VoltTypeUtil {
         }
 
         // disallow integers getting smaller
-        if (from == VoltType.BIGINT) {
-            if (to == VoltType.SMALLINT ||
-                to == VoltType.TINYINT  ||
-                to == VoltType.INTEGER)
-                return false;
-        }
-        else if (from == VoltType.INTEGER) {
-            if (to == VoltType.SMALLINT ||
-                to == VoltType.TINYINT)
-                return false;
-        }
-        else if (from == VoltType.SMALLINT) {
-            if (to == VoltType.TINYINT)
-                return false;
-        }
+        if (to.isInteger())
+            return from.isInteger();
 
         return true;
     }

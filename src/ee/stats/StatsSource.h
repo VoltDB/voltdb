@@ -76,7 +76,7 @@ public:
             std::string name,
             voltdb::CatalogId hostId,
             std::string hostname,
-            voltdb::CatalogId siteId,
+            int64_t siteId,
             voltdb::CatalogId partitionId,
             voltdb::CatalogId databaseId);
 
@@ -164,7 +164,7 @@ private:
      */
     voltdb::CatalogId m_partitionId;
 
-    voltdb::CatalogId m_siteId;
+    int64_t m_siteId;
     voltdb::CatalogId m_hostId;
 
     voltdb::NValue m_hostname;

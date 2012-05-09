@@ -45,13 +45,12 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.network.Connection;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.network.Connection;
 import org.voltdb.sysprocs.SnapshotSave;
 
 /**
@@ -202,10 +201,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         m_zk = zk;
 
         try {
-            zk.create("/nodes_currently_snapshotting", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zk.create(VoltZK.nodes_currently_snapshotting, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
         try {
-            zk.create("/completed_snapshots", null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
 
         // Really shouldn't leak this from a constructor, and twice to boot
@@ -226,7 +225,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private void scanTruncationSnapshots() {
         if (m_truncationSnapshotPath == null) {
             try {
-                m_truncationSnapshotPath = new String(m_zk.getData("/test_scan_path", false, null), "UTF-8");
+                m_truncationSnapshotPath = new String(m_zk.getData(VoltZK.test_scan_path, false, null), "UTF-8");
             } catch (Exception e) {
                 return;
             }
@@ -353,7 +352,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         loggingLog.info("Starting leader election for snapshot truncation daemon");
         try {
             while (true) {
-                Stat stat = m_zk.exists("/snapshot_truncation_master", new Watcher() {
+                Stat stat = m_zk.exists(VoltZK.snapshot_truncation_master, new Watcher() {
                     @Override
                     public void process(WatchedEvent event) {
                         switch(event.getType()) {
@@ -373,7 +372,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 });
                 if (stat == null) {
                     try {
-                        m_zk.create("/snapshot_truncation_master", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+                        m_zk.create(VoltZK.snapshot_truncation_master, null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
                         loggingLog.info("This node was selected as the leader for snapshot truncation");
                         m_truncationSnapshotScanTask = m_es.scheduleWithFixedDelay(new Runnable() {
                             @Override
@@ -429,7 +428,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         loggingLog.info("Snapshot truncation leader received snapshot truncation request");
         String snapshotPathTemp;
         try {
-            snapshotPathTemp = new String(m_zk.getData("/truncation_snapshot_path", false, null), "UTF-8");
+            snapshotPathTemp = new String(m_zk.getData(VoltZK.truncation_snapshot_path, false, null), "UTF-8");
         } catch (Exception e) {
             loggingLog.error("Unable to retrieve truncation snapshot path from ZK, log can't be truncated");
             return;
@@ -444,7 +443,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             ByteBuffer payload = ByteBuffer.allocate(8);
             payload.putLong(0, now);
-            m_zk.setData("/request_truncation_snapshot", payload.array(), -1);
+            m_zk.setData(VoltZK.request_truncation_snapshot, payload.array(), -1);
         } catch (Exception e) {
             //Cause a cascading failure?
             VoltDB.crashLocalVoltDB("Setting data on the truncation snapshot request in ZK should never fail", true, e);
@@ -509,10 +508,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                      */
                     JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
                     final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
-                    int hosts = VoltDB.instance().getCatalogContext().siteTracker
-                                      .getAllLiveHosts().size();
+                    int hosts = VoltDB.instance().getSiteTracker()
+                                      .getAllHosts().size();
                     try {
-                        m_zk.delete("/request_truncation_snapshot", -1);
+                        m_zk.delete(VoltZK.request_truncation_snapshot, -1);
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB(
                                 "Unexpected error deleting truncation snapshot request", true, e);
@@ -621,11 +620,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                      * If there is an error then we are done.
                      */
                     if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                        hostLog.error(clientResponse.getStatusString());
-                        FastSerializer fs = new FastSerializer();
-                        fs.writeObject((ClientResponseImpl)clientResponse);
+                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
                         m_zk.create(
-                                "/user_snapshot_response_" + requestId, fs.getBytes(),
+                                VoltZK.user_snapshot_response + requestId,
+                                rimpl.flattenToBuffer(buf).array(),
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                         //Reset the watch
@@ -641,10 +640,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     if (isSnapshotInProgressResponse(clientResponse)) {
                         scheduleSnapshotForLater( path, nonce, blocking, requestId, true);
                     } else {
-                        FastSerializer fs = new FastSerializer();
-                        fs.writeObject((ClientResponseImpl)clientResponse);
+                        ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                        ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
                         m_zk.create(
-                                "/user_snapshot_response_" + requestId, fs.getBytes(),
+                                VoltZK.user_snapshot_response + requestId,
+                                rimpl.flattenToBuffer(buf).array(),
                                 Ids.OPEN_ACL_UNSAFE,
                                 CreateMode.PERSISTENT);
                         //Reset the watch
@@ -685,7 +685,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
              */
             VoltTable result = SnapshotSave.constructNodeResultsTable();
             result.addRow(-1,
-                    org.voltdb.client.ConnectionUtil.getHostnameOrAddress(),
+                    CoreUtils.getHostnameOrAddress(),
                     "",
                     "SUCCESS",
                     "SNAPSHOT REQUEST QUEUED");
@@ -695,11 +695,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "Snapshot request could not be fulfilled because a snapshot " +
                                          "is in progress. It was queued for execution",
                                        0);
-            FastSerializer fs = new FastSerializer();
-            fs.writeObject(queuedResponse);
-            m_zk.create("/user_snapshot_response_" + requestId, fs.getBytes(),
-                                    Ids.OPEN_ACL_UNSAFE,
-                                    CreateMode.PERSISTENT);
+            ByteBuffer buf = ByteBuffer.allocate(queuedResponse.getSerializedSize());
+            m_zk.create(VoltZK.user_snapshot_response + requestId,
+                        queuedResponse.flattenToBuffer(buf).array(),
+                        Ids.OPEN_ACL_UNSAFE,
+                        CreateMode.PERSISTENT);
         }
 
         /*
@@ -827,11 +827,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * for a truncation snapshot
      */
     void truncationRequestExistenceCheck() throws KeeperException, InterruptedException {
-        if (m_zk.exists("/request_truncation_snapshot", m_truncationRequestExistenceWatcher) != null) {
+        if (m_zk.exists(VoltZK.request_truncation_snapshot, m_truncationRequestExistenceWatcher) != null) {
             processTruncationRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
-                    "/snapshot_truncation_master"));
+                    VoltZK.snapshot_truncation_master));
         }
     }
 
@@ -840,12 +840,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * request for a snapshot
      */
     void userSnapshotRequestExistenceCheck() throws Exception {
-        m_zk.delete("/user_snapshot_request", -1, null, null);
-        if (m_zk.exists("/user_snapshot_request", m_userSnapshotRequestExistenceWatcher) != null) {
+        m_zk.delete(VoltZK.user_snapshot_request, -1, null, null);
+        if (m_zk.exists(VoltZK.user_snapshot_request, m_userSnapshotRequestExistenceWatcher) != null) {
             processUserSnapshotRequestEvent(new WatchedEvent(
                     EventType.NodeCreated,
                     KeeperState.SyncConnected,
-                    "/user_snapshot_request"));
+                    VoltZK.user_snapshot_request));
         }
     }
 
@@ -1306,7 +1306,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[0],
                                        "@SnapshotSave requires 3 parameters. Path, nonce, and blocking",
                                        invocation.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1316,7 +1319,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[0],
                                        "@SnapshotSave path is null",
                                        invocation.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1326,7 +1332,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[0],
                                        "@SnapshotSave nonce is null",
                                        invocation.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1336,7 +1345,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[0],
                                        "@SnapshotSave blocking is null",
                                        invocation.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1347,7 +1359,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave path param is a " + params[0].getClass().getSimpleName() +
                                            " and should be a java.lang.String",
                                        invocation.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1358,7 +1373,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave nonce param is a " + params[0].getClass().getSimpleName() +
                                            " and should be a java.lang.String",
                                        invocation.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1372,7 +1390,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        "@SnapshotSave blocking param is a " + params[0].getClass().getSimpleName() +
                                            " and should be a java.lang.[Byte|Short|Integer|Long]",
                                        invocation.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
 
@@ -1387,7 +1408,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("requestId", requestId);
             String zkString = jsObj.toString(4);
             byte zkBytes[] = zkString.getBytes("UTF-8");
-            m_zk.create("/user_snapshot_request", zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
             registerUserSnapshotResponseWatch(requestId, invocation, c);
         } catch (KeeperException.NodeExistsException e) {
             requestExists = true;
@@ -1398,7 +1419,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (requestExists) {
             VoltTable result = org.voltdb.sysprocs.SnapshotSave.constructNodeResultsTable();
             result.addRow(-1,
-                    org.voltdb.client.ConnectionUtil.getHostnameOrAddress(),
+                    CoreUtils.getHostnameOrAddress(),
                     "",
                     "FAILURE",
                     "SNAPSHOT IN PROGRESS");
@@ -1407,7 +1428,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                        new VoltTable[] { result },
                                        "A request to perform a user snapshot already exists",
                                        invocation.clientHandle);
-            c.writeStream().enqueue(errorResponse);
+            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            errorResponse.flattenToBuffer(buf).flip();
+            c.writeStream().enqueue(buf);
             return;
         }
     }
@@ -1417,7 +1441,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final StoredProcedureInvocation invocation,
             final Connection c
             ) throws Exception {
-        final String responseNode = "/user_snapshot_response_" + requestId;
+        final String responseNode = VoltZK.user_snapshot_response + requestId;
         Stat exists = m_zk.exists(responseNode, new Watcher() {
             @Override
             public void process(final WatchedEvent event) {
@@ -1467,11 +1491,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         } catch (Exception e) {
             hostLog.error("Error cleaning up user snapshot request response in ZK", e);
         }
-        FastDeserializer fds = new FastDeserializer(responseBytes);
-        ClientResponseImpl response = fds.readObject(org.voltdb.ClientResponseImpl.class);
-
+        ByteBuffer buf = ByteBuffer.wrap(responseBytes);
+        ClientResponseImpl response = new ClientResponseImpl();
+        response.initFromBuffer(buf);
         response.setClientHandle(invocation.clientHandle);
-        c.writeStream().enqueue(response);
+        // Not sure if we need to preserve the original byte buffer here, playing it safe
+        ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf2.putInt(buf2.capacity() - 4);
+        response.flattenToBuffer(buf2).flip();
+        c.writeStream().enqueue(buf2);
     }
 
     @Override

@@ -179,6 +179,27 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         }
     }
 
+    /**
+     * Does the (sub)plan guarantee an identical result/effect when "replayed"
+     * against the same database state, such as during replication or CL recovery.
+     * @return
+     */
+    @Override
+    public boolean isOrderDeterministic() {
+        if ( ! super.isOrderDeterministic()) {
+            return false;
+        }
+        IndexScanPlanNode index_scan =
+            (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+        assert(index_scan != null);
+        if ( ! index_scan.isOrderDeterministic()) {
+            m_nondeterminismDetail = index_scan.m_nondeterminismDetail;
+            return false;
+        }
+        return true;
+    }
+
+
     @Override
     protected String explainPlanForNode(String indent) {
         return "NESTLOOP INDEX JOIN";

@@ -44,7 +44,8 @@ public class TestTheHashinator extends TestCase {
     }
 
     public void testExpectNonZeroHash() {
-        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, 3);
+
         int partitionCount = 3;
         long valueToHash = 2;
         TheHashinator.initialize(partitionCount);
@@ -63,7 +64,8 @@ public class TestTheHashinator extends TestCase {
     }
 
     public void testSameLongHash1() {
-        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, 2);
+
         int partitionCount = 2;
         TheHashinator.initialize(partitionCount);
 
@@ -111,7 +113,7 @@ public class TestTheHashinator extends TestCase {
     }
 
     public void testEdgeCases() {
-        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, 1);
 
         /**
          *  Run with 100k of random values and make sure C++ and Java hash to
@@ -139,7 +141,7 @@ public class TestTheHashinator extends TestCase {
     }
 
     public void testSameLongHash() {
-        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, 1);
 
         /**
          *  Run with 100k of random values and make sure C++ and Java hash to
@@ -164,7 +166,7 @@ public class TestTheHashinator extends TestCase {
     }
 
     public void testSameStringHash() {
-        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, 1);
 
         for (int i = 0; i < 100000; i++) {
             int partitionCount = r.nextInt(1000) + 1;
@@ -185,7 +187,7 @@ public class TestTheHashinator extends TestCase {
     }
 
     public void testNulls() {
-        ExecutionEngine ee = new ExecutionEngineJNI(null, 1, 1, 0, 0, "", 100);
+        ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, 1);
 
         TheHashinator.initialize(2);
         int jHash = TheHashinator.hashToPartition(new Byte(VoltType.NULL_TINYINT));

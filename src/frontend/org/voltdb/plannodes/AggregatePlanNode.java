@@ -112,11 +112,14 @@ public class AggregatePlanNode extends AbstractPlanNode {
         assert(m_children.size() == 1);
         m_children.get(0).resolveColumnIndexes();
         NodeSchema input_schema = m_children.get(0).getOutputSchema();
-        for (SchemaColumn col : m_outputSchema.getColumns())
+
+        // get all the TVEs in the output columns
+        List<TupleValueExpression> output_tves = new ArrayList<TupleValueExpression>();
+        for (SchemaColumn col : m_outputSchema.getColumns()) {
+            output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
+        }
+        for (TupleValueExpression tve : output_tves)
         {
-            // At this point, they'd better all be TVEs.
-            assert(col.getExpression() instanceof TupleValueExpression);
-            TupleValueExpression tve = (TupleValueExpression)col.getExpression();
             int index = input_schema.getIndexOfTve(tve);
             if (index == -1)
             {
@@ -125,7 +128,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
                 if (!tve.getTableName().equals("VOLT_TEMP_TABLE"))
                 {
                     throw new RuntimeException("Unable to find index for column: " +
-                                               col.toString());
+                                               tve.getColumnName());
                 }
             }
             else

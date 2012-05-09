@@ -58,7 +58,7 @@ def buildPro():
         run("pwd")
         run("git status")
         run("git describe --dirty")
-        run("VOLTCORE=../voltdb ant -f mmt.xml clean dist.pro")
+        run("VOLTCORE=../voltdb ant -f mmt.xml -Dallowreplication=true clean dist.pro")
 
 ################################################
 # COPY FILES

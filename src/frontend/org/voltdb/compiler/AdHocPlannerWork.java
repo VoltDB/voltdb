@@ -23,20 +23,18 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     final String sql;
     final Object partitionParam;
 
-    public AdHocPlannerWork(int replySiteId, int replyMailboxId,
-            boolean shouldShutdown, long clientHandle,
+    public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection,
             Object clientData, String sql, Object partitionParam)
     {
-        super(replySiteId, replyMailboxId,
-              shouldShutdown, clientHandle, connectionId, hostname,
+        super(replySiteId, shouldShutdown, clientHandle, connectionId, hostname,
               adminConnection, clientData);
         this.sql = sql;
         this.partitionParam = partitionParam;
     }
 
-    public static AdHocPlannerWork forShutdown(int replySiteId, int replyMailboxId) {
-        return new AdHocPlannerWork(replySiteId, replyMailboxId,
+    public static AdHocPlannerWork forShutdown(int replySiteId) {
+        return new AdHocPlannerWork(replySiteId,
                 true, -1L, -1L, "", false, null, "", null);
     }
 

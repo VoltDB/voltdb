@@ -20,8 +20,8 @@ package org.voltdb;
 import org.voltdb.AuthSystem.AuthUser;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -39,7 +39,7 @@ public class InvocationPermissionPolicy extends InvocationAcceptancePolicy {
      *
      * @see org.voltdb.InvocationAcceptancePolicy#shouldAccept(org.voltdb.AuthSystem.AuthUser,
      *      org.voltdb.StoredProcedureInvocation, org.voltdb.catalog.Procedure,
-     *      org.voltdb.network.WriteStream)
+     *      org.voltcore.network.WriteStream)
      */
     @Override
     public ClientResponseImpl shouldAccept(AuthUser user,
@@ -64,7 +64,7 @@ public class InvocationPermissionPolicy extends InvocationAcceptancePolicy {
      * @see org.voltdb.InvocationAcceptancePolicy#shouldAccept(org.voltdb.AuthSystem.AuthUser,
      *      org.voltdb.StoredProcedureInvocation,
      *      org.voltdb.SystemProcedureCatalog.Config,
-     *      org.voltdb.network.WriteStream)
+     *      org.voltcore.network.WriteStream)
      */
     @Override
     public ClientResponseImpl shouldAccept(AuthUser user,

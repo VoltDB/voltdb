@@ -23,8 +23,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeMap;
 
+import org.voltcore.utils.EstTime;
+
 import org.voltdb.VoltDB;
-import org.voltdb.utils.EstTime;
 
 /**
  * Maintain a set of the last N recently used credentials and
@@ -119,7 +120,7 @@ public class AuthenticatedConnectionCache {
             try
             {
                 adminClient = (ClientImpl) ClientFactory.createClient();
-                if ((userName == null) || (userName == "")) {
+                if ((userName == null) || (userName.equals(""))) {
                     if ((hashedPassword != null) && (hashedPassword.length > 0)) {
                         throw new IOException("Username was null but password was not.");
                     }

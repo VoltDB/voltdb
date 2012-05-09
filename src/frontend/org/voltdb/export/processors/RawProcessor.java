@@ -20,31 +20,38 @@ package org.voltdb.export.processors;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
+import java.util.HashSet;
+import java.util.List;
+import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltdb.CatalogContext;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltdb.OperationMode;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.export.ExportDataProcessor;
 import org.voltdb.export.ExportDataSource;
 import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.network.Connection;
-import org.voltdb.network.InputHandler;
-import org.voltdb.network.QueueMonitor;
-import org.voltdb.network.VoltProtocolHandler;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.DeferredSerialization;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.Connection;
+import org.voltcore.network.InputHandler;
+import org.voltcore.network.QueueMonitor;
+import org.voltcore.network.VoltProtocolHandler;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.utils.NotImplementedException;
 
 /**
@@ -74,6 +81,10 @@ public class RawProcessor implements ExportDataProcessor {
 
     ArrayList<ExportDataSource> m_sourcesArray =
         new ArrayList<ExportDataSource>();
+
+    private final Map<Integer, String> m_clusterMetadata = new HashMap<Integer, String>();
+
+
 
     /**
      * As long as m_shouldContinue is true, the service will listen for new
@@ -165,11 +176,8 @@ public class RawProcessor implements ExportDataProcessor {
             m_c.writeStream().enqueue(
                 new DeferredSerialization() {
                     @Override
-                    public BBContainer serialize(DBBPool p) throws IOException {
-                        // Must account for length prefix - thus "+4",
-                        FastSerializer fs = new FastSerializer(p, r.serializableBytes() + 4);
-                        r.writeToFastSerializer(fs);
-                        return fs.getBBContainer();
+                    public ByteBuffer[] serialize() throws IOException {
+                        return new ByteBuffer[] { r.toBuffer() };
                     }
                     @Override
                     public void cancel() {
@@ -178,6 +186,7 @@ public class RawProcessor implements ExportDataProcessor {
             closeConnection();
         }
 
+        @Override
         public void event(final ExportProtoMessage m)
         {
             if (m.isError()) {
@@ -213,6 +222,12 @@ public class RawProcessor implements ExportDataProcessor {
                 }
                 m_state = RawProcessor.CONNECTED;
 
+                try {
+                    VoltZK.updateClusterMetadata(m_clusterMetadata);
+                } catch (Exception e) {
+                    protocolError(m, org.voltcore.utils.CoreUtils.throwableToString(e));
+                }
+
                 // Respond by advertising the full data source set and
                 //  the set of up nodes that are up
                 FastSerializer fs = new FastSerializer();
@@ -227,21 +242,14 @@ public class RawProcessor implements ExportDataProcessor {
                     // serialize the makup of the cluster
                     //  - the catalog context knows which hosts are up
                     //  - the hostmessenger knows the hostnames of hosts
-                    CatalogContext cx = VoltDB.instance().getCatalogContext();
-                    if (cx != null) {
-                        Set<Integer> liveHosts = cx.siteTracker.getAllLiveHosts();
-                        fs.writeInt(liveHosts.size());
-                        for (int hostId : liveHosts) {
-                            String metadata = VoltDB.instance().getClusterMetadataMap().get(hostId);
-                            //System.out.printf("hostid %d, metadata: %s\n", hostId, metadata);
-                            assert(metadata.contains(":"));
-                            fs.writeString(metadata);
-                        }
+                    fs.writeInt(m_clusterMetadata.size());
+                    for (String metadata : m_clusterMetadata.values()) {
+                        fs.writeString(metadata);
                     }
-                    else {
-                        // for test code
-                        fs.writeInt(0);
-                    }
+//                    else {
+//                        // for test code
+//                        fs.writeInt(0);
+//                    }
                 }
                 catch (IOException e) {
                     protocolError(m, "Error producing open response advertisement.");
@@ -253,11 +261,8 @@ public class RawProcessor implements ExportDataProcessor {
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override
-                        public BBContainer serialize(DBBPool p) throws IOException {
-                            // Must account for length prefix - thus "+4",
-                            FastSerializer fs = new FastSerializer(p, r.serializableBytes() + 4);
-                            r.writeToFastSerializer(fs);
-                            return fs.getBBContainer();
+                        public ByteBuffer[] serialize() throws IOException {
+                            return new ByteBuffer[] { r.toBuffer() };
                         }
                         @Override
                         public void cancel() {
@@ -300,11 +305,8 @@ public class RawProcessor implements ExportDataProcessor {
                 m_c.writeStream().enqueue(
                     new DeferredSerialization() {
                         @Override
-                        public BBContainer serialize(DBBPool p) throws IOException {
-                            // remember +4 longsword of length prefixing.
-                            FastSerializer fs = new FastSerializer(p, m.serializableBytes() + 4);
-                            m.writeToFastSerializer(fs);
-                            return fs.getBBContainer();
+                        public ByteBuffer[] serialize() throws IOException {
+                            return new ByteBuffer[] { m.toBuffer() };
                         }
                         @Override
                         public void cancel() {
@@ -334,12 +336,12 @@ public class RawProcessor implements ExportDataProcessor {
         }
 
         @Override
-        protected void flattenToBuffer(DBBPool pool) {
+        public void flattenToBuffer(ByteBuffer buf) {
             throw new NotImplementedException("Invalid serialization request.");
         }
 
         @Override
-        protected void initFromBuffer() {
+        protected void initFromBuffer(ByteBuffer buf) {
             throw new NotImplementedException("Invalid serialization request.");
         }
     }
@@ -353,7 +355,7 @@ public class RawProcessor implements ExportDataProcessor {
      */
     private class ExportInputHandler extends VoltProtocolHandler
     {
-        private boolean m_isAdminPort;
+        private final boolean m_isAdminPort;
 
         public ExportInputHandler(boolean isAdminPort)
         {
@@ -388,12 +390,6 @@ public class RawProcessor implements ExportDataProcessor {
                     m_sb.closeConnection();
                 }
             });
-        }
-
-        @Override
-        public int getExpectedOutgoingMessageSize() {
-            // roughly 2MB plus the message metadata
-            return (1024 * 1024 * 2) + 128;
         }
 
         @Override

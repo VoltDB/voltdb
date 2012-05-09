@@ -17,8 +17,6 @@
 package org.voltdb.utils;
 
 import java.io.FileWriter;
-import java.io.UnsupportedEncodingException;
-import java.net.URLEncoder;
 import java.util.ArrayList;
 import java.util.List;
 
@@ -36,7 +34,6 @@ public class CommandLine extends VoltDB.Configuration
         CommandLine cl = new CommandLine();
         // first copy the base class fields
         cl.m_ipcPorts.addAll(m_ipcPorts);
-        cl.m_useWatchdogs = m_useWatchdogs;
         cl.m_backend = m_backend;
         cl.m_leader = m_leader;
         cl.m_pathToCatalog = m_pathToCatalog;
@@ -62,6 +59,7 @@ public class CommandLine extends VoltDB.Configuration
         // final in baseclass: cl.m_commitLogDir = new File("/tmp");
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
+        cl.m_leaderPort = m_leaderPort;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -78,8 +76,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.javaExecutable = javaExecutable;
         cl.jmxPort = jmxPort;
         cl.jmxHost = jmxHost;
-        cl.rejoinUser = rejoinUser;
-        cl.rejoinPassword = rejoinPassword;
 
         return cl;
     }
@@ -104,6 +100,22 @@ public class CommandLine extends VoltDB.Configuration
     }
     public int port() {
         return m_port;
+    }
+
+    public int leaderPort() {
+        return m_leaderPort;
+    }
+
+    public void leaderPort(int leaderPort) {
+        m_leaderPort = leaderPort;
+    }
+
+    public int internalPort() {
+        return m_internalPort;
+    }
+
+    public int adminPort() {
+        return m_adminPort;
     }
 
     public CommandLine internalPort(int internalPort) {
@@ -306,18 +318,6 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    String rejoinUser = null;
-    public CommandLine rejoinUser(String rejoinUser) {
-        this.rejoinUser = rejoinUser;
-        return this;
-    }
-
-    String rejoinPassword = null;
-    public CommandLine rejoinPassword(String rejoinPassword) {
-        this.rejoinPassword = rejoinPassword;
-        return this;
-    }
-
     public CommandLine internalInterface(String internalInterface)
     {
         m_internalInterface = internalInterface;
@@ -345,6 +345,7 @@ public class CommandLine extends VoltDB.Configuration
         }
     }
 
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
@@ -411,34 +412,14 @@ public class CommandLine extends VoltDB.Configuration
                 cmdline.add(m_startAction.toString().toLowerCase());
             }
             cmdline.add("leader"); cmdline.add(m_leader);
+            cmdline.add("leaderport"); cmdline.add(Integer.toString(m_leaderPort));
 
             if (m_replicationRole == ReplicationRole.REPLICA) {
                 cmdline.add("replica");
             }
         }
         else {
-            StringBuilder rejoinArg = new StringBuilder();
-            if (rejoinUser != null)
-            {
-                rejoinArg.append(rejoinUser);
-                String password = null;
-                if (rejoinPassword != null)
-                {
-                    try {
-                        password = URLEncoder.encode(rejoinPassword, "UTF-8");
-                    } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
-                    }
-                }
-                if (password != null) {
-                    rejoinArg.append(":").append(password);
-                }
-            }
-            if (rejoinArg.length() > 0) {
-                rejoinArg.append("@");
-            }
-            rejoinArg.append(m_rejoinToHostAndPort);
-            cmdline.add("rejoinhost"); cmdline.add(rejoinArg.toString());
+            cmdline.add("rejoinhost"); cmdline.add(m_rejoinToHostAndPort);
         }
 
         if (includeTestOpts)

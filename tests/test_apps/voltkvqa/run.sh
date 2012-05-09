@@ -56,21 +56,20 @@ function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.AsyncBenchmark \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=60 \
         --servers=localhost \
         --port=21212 \
-        --pool-size=10 \
+        --poolsize=100000 \
         --preload=true \
-        --get-put-ratio=0.5 \
-        --key-size=32 \
-        --min-value-size=1024 \
-        --max-value-size=1024 \
+        --getputratio=0.9 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
         --entropy=127 \
-        --use-compression=true \
-        --rate-limit=100000 \
-        --auto-tune=false \
-        --latency-target=10.0
+        --usecompression=false \
+        --ratelimit=100000 \
+        --latencytarget=10
 }
 
 

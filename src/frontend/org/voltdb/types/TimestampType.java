@@ -57,6 +57,13 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
         return (timeInMicros + fractionalSeconds/1000);
     }
 
+    /**
+     * Construct from a timestamp string in YYYY-MM-DD-SS.sss format.
+     * This is typically used for reading CSV data or data output
+     * from {@link java.sql.Timestamp}'s string format.
+     *
+     * @param param A string in YYYY-MM-DD-SS.sss format.
+     */
     public TimestampType(String param) {
         this(defeatJava(param));
     }

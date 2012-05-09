@@ -17,7 +17,7 @@
 
 package org.voltdb;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public class EELibraryLoader {
 

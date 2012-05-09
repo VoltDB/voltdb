@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<config>
+	<schema>
+	    <table name="join" prefix="col" columns="5" variations="100" />
+	    <table name="projection" prefix="col" columns="20" />
+	</schema>
+	<tests>
+		<test type="join" table="join" levels="3" />
+		<test type="join" table="join" levels="4" />
+		<test type="join" table="join" levels="5" />
+		<test type="join" table="join" levels="6" />
+		<test type="projection" table="projection" />
+	</tests>
+</config>

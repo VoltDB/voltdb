@@ -26,6 +26,7 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.File;
 import java.io.FileInputStream;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.zip.CRC32;
 
 import junit.framework.TestCase;
@@ -37,9 +38,9 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.Pair;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * This test also provides pretty good coverage of DefaultSnapshotTarget
@@ -60,7 +61,8 @@ public class TestTableSaveFile extends TestCase {
     }
 
     private void serializeChunk(VoltTable chunk,
-            DefaultSnapshotDataTarget target) throws Exception {
+            DefaultSnapshotDataTarget target,
+            int partitionId) throws Exception {
         FastSerializer fs = new FastSerializer();
 
         chunk.writeExternal(fs);
@@ -75,7 +77,7 @@ public class TestTableSaveFile extends TestCase {
         chunkBuffer.position(target.getHeaderSize());
         chunkBuffer.mark();
         final CRC32 partitionIdCRC = new CRC32();
-        chunkBuffer.putInt(2);
+        chunkBuffer.putInt(partitionId);
         chunkBuffer.reset();
         byte partitionIdBytes[] = new byte[4];
         chunkBuffer.get(partitionIdBytes);
@@ -111,23 +113,30 @@ public class TestTableSaveFile extends TestCase {
         VoltTable table = new VoltTable(columnInfo, columnInfo.length);
         final File f = File.createTempFile("foo", "bar");
         f.deleteOnExit();
+        ArrayList<Integer> partIds = new ArrayList<Integer>();
+        partIds.add(0);
+        partIds.add(1);
+        partIds.add(2);
+        partIds.add(3);
+        partIds.add(4);
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
-                TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, table,
+                TOTAL_PARTITIONS, false, partIds, table,
                 TXN_ID, VERSION1);
 
         VoltTable currentChunkTable = new VoltTable(columnInfo,
                 columnInfo.length);
+        int partitionId = 0;
         for (int i = 0; i < numberOfItems; i++) {
             if (i % 1000 == 0 && i > 0) {
-                serializeChunk(currentChunkTable, dsdt);
+                serializeChunk(currentChunkTable, dsdt, partitionId++);
                 currentChunkTable = new VoltTable(columnInfo, columnInfo.length);
             }
             Object[] row = new Object[] { i, "name_" + i, i, new Double(i) };
             currentChunkTable.addRow(row);
             table.addRow(row);
         }
-        serializeChunk(currentChunkTable, dsdt);
+        serializeChunk(currentChunkTable, dsdt, partitionId++);
         dsdt.close();
 
         return new Pair<VoltTable, File>(table, f, false);
@@ -139,9 +148,15 @@ public class TestTableSaveFile extends TestCase {
         VoltTable.ColumnInfo columns[] = new VoltTable.ColumnInfo[] { new VoltTable.ColumnInfo(
                 "Foo", VoltType.STRING) };
         VoltTable vt = new VoltTable(columns, 1);
+        ArrayList<Integer> partIds = new ArrayList<Integer>();
+        partIds.add(0);
+        partIds.add(1);
+        partIds.add(2);
+        partIds.add(3);
+        partIds.add(4);
         DefaultSnapshotDataTarget dsdt = new DefaultSnapshotDataTarget(f,
                 HOST_ID, CLUSTER_NAME, DATABASE_NAME, TABLE_NAME,
-                TOTAL_PARTITIONS, false, new int[] { 0, 1, 2, 3, 4 }, vt,
+                TOTAL_PARTITIONS, false, partIds, vt,
                 TXN_ID, VERSION1);
         dsdt.close();
 
@@ -259,10 +274,14 @@ public class TestTableSaveFile extends TestCase {
         FileInputStream fis = new FileInputStream(f);
         TableSaveFile savefile = new TableSaveFile(fis.getChannel(), 3, null);
 
+        int expectedPartitionId = 0;
         VoltTable test_table = null;
         VoltTable reaggregate_table = null;
         while (savefile.hasMoreChunks()) {
-            BBContainer c = savefile.getNextChunk();
+            final BBContainer c = savefile.getNextChunk();
+            TableSaveFile.Container cont = (TableSaveFile.Container)c;
+            assertEquals(expectedPartitionId, cont.partitionId);
+            expectedPartitionId++;
             try {
                 test_table = PrivateVoltTableFactory.createVoltTableFromBuffer(c.b, false);
                 if (reaggregate_table == null) {

@@ -42,9 +42,11 @@ public class TestVoltTable extends TestCase {
     private VoltTable LONG_FIVE;
     private VoltTable t;
     private VoltTable t2;
+
     @Override
     public void setUp() {
-        LONG_FIVE = new VoltTable(new VoltTable.ColumnInfo("Test", VoltType.BIGINT));
+        LONG_FIVE = new VoltTable(new VoltTable.ColumnInfo("Test",
+                VoltType.BIGINT));
         LONG_FIVE.addRow(5L);
         t = new VoltTable();
         t2 = new VoltTable();
@@ -52,26 +54,27 @@ public class TestVoltTable extends TestCase {
 
     void addAllPrimitives(Class<?>[] permittedTypes) {
         Object[] primitives = {
-            null,
-            (byte) 0,
-            (short) 1,
-            (short) 2,
-            3,
-            4L,
-            5.01f,
-            6.02,
-            "string",
-            new byte[] { 'b', 'y', 't', 'e', 's' },
-            new TimestampType(99),
-            new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale),
-            new Object(),
-        };
+                null,
+                (byte) 0,
+                (short) 1,
+                (short) 2,
+                3,
+                4L,
+                5.01f,
+                6.02,
+                "string",
+                new byte[] { 'b', 'y', 't', 'e', 's' },
+                new TimestampType(99),
+                new BigDecimal(7654321)
+                        .setScale(VoltDecimalHelper.kDefaultScale),
+                new Object(), };
 
         for (Object o : primitives) {
             try {
                 t.addRow(o);
                 if (o != null && !contains(permittedTypes, o.getClass())) {
-                    fail(o.getClass() + " is not permitted but addRow succeeded");
+                    fail(o.getClass()
+                            + " is not permitted but addRow succeeded");
                 }
             } catch (VoltTypeException e) {
                 if (contains(permittedTypes, o.getClass())) {
@@ -81,7 +84,8 @@ public class TestVoltTable extends TestCase {
         }
     }
 
-    // VoltTable initially sizes itself to fit exactly, so 2 longs should be sufficient to get
+    // VoltTable initially sizes itself to fit exactly, so 2 longs should be
+    // sufficient to get
     // resizing. Use 16 to be on the safe side.
     private static final int LONGS_TO_RESIZE = 16;
 
@@ -96,7 +100,8 @@ public class TestVoltTable extends TestCase {
 
     private static boolean contains(Class<?>[] types, Class<?> type) {
         for (Class<?> c : types) {
-            if (type == c) return true;
+            if (type == c)
+                return true;
         }
         return false;
     }
@@ -104,42 +109,51 @@ public class TestVoltTable extends TestCase {
     private boolean comparisonHelper(Object lhs, Object rhs, VoltType vt) {
         switch (vt) {
         case TINYINT:
-            Byte b1 = (Byte)lhs;
-            Byte b2 = (Byte)rhs;
+            Byte b1 = (Byte) lhs;
+            Byte b2 = (Byte) rhs;
             return b1.byteValue() == b2.byteValue();
         case SMALLINT:
-            Short s1 = (Short)lhs;
-            Short s2 = (Short)rhs;
+            Short s1 = (Short) lhs;
+            Short s2 = (Short) rhs;
             return s1.shortValue() == s2.shortValue();
         case INTEGER:
-            Integer i1 = (Integer)lhs;
-            Integer i2 = (Integer)rhs;
+            Integer i1 = (Integer) lhs;
+            Integer i2 = (Integer) rhs;
             return i1.intValue() == i2.intValue();
         case BIGINT:
-            Long l1 = (Long)lhs;
-            Long l2 = (Long)rhs;
+            Long l1 = (Long) lhs;
+            Long l2 = (Long) rhs;
             return l1.longValue() == l2.longValue();
         case FLOAT:
-            Double d1 = (Double)lhs;
-            Double d2 = (Double)rhs;
+            Double d1 = (Double) lhs;
+            Double d2 = (Double) rhs;
             return (d1.compareTo(d2) == 0);
         case STRING:
-            if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null) return true;
-            return ((String)lhs).equals(rhs);
+            if (lhs == null && rhs == null)
+                return true;
+            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null)
+                return true;
+            return ((String) lhs).equals(rhs);
         case VARBINARY:
-            if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null) return true;
-            return Arrays.equals((byte[])lhs, (byte[])rhs);
+            if (lhs == null && rhs == null)
+                return true;
+            if (lhs == VoltType.NULL_STRING_OR_VARBINARY && rhs == null)
+                return true;
+            return Arrays.equals((byte[]) lhs, (byte[]) rhs);
         case TIMESTAMP:
-            if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_TIMESTAMP && rhs == null) return true;
-            return ((TimestampType)lhs).equals(rhs);
+            if (lhs == null && rhs == null)
+                return true;
+            if (lhs == VoltType.NULL_TIMESTAMP && rhs == null)
+                return true;
+            return ((TimestampType) lhs).equals(rhs);
         case DECIMAL:
-            if (lhs == null && rhs == null) return true;
-            if (lhs == VoltType.NULL_DECIMAL && rhs == null) return true;
-            if (lhs == null || rhs == null) return false;
-            return ((BigDecimal)lhs).equals(rhs);
+            if (lhs == null && rhs == null)
+                return true;
+            if (lhs == VoltType.NULL_DECIMAL && rhs == null)
+                return true;
+            if (lhs == null || rhs == null)
+                return false;
+            return ((BigDecimal) lhs).equals(rhs);
         }
 
         return false;
@@ -159,7 +173,8 @@ public class TestVoltTable extends TestCase {
         try {
             t = new VoltTable(new ColumnInfo(null, VoltType.BIGINT));
             fail("expected exception");
-        } catch (IllegalArgumentException e) {}
+        } catch (IllegalArgumentException e) {
+        }
     }
 
     public void testLongSchemaOver1K() {
@@ -168,7 +183,8 @@ public class TestVoltTable extends TestCase {
         while (columnname.length() < 8192) {
             columnname.append("ryanlikestheyankees");
         }
-        t = new VoltTable(new ColumnInfo(columnname.toString(), VoltType.BIGINT));
+        t = new VoltTable(
+                new ColumnInfo(columnname.toString(), VoltType.BIGINT));
         assertTrue(t.getColumnName(0).compareTo(columnname.toString()) == 0);
     }
 
@@ -176,23 +192,27 @@ public class TestVoltTable extends TestCase {
         try {
             LONG_FIVE.fetchRow(0).getLong(-1);
             fail("expected exception");
-        } catch (IndexOutOfBoundsException e) {}
+        } catch (IndexOutOfBoundsException e) {
+        }
 
         try {
             LONG_FIVE.fetchRow(0).getLong(1);
             fail("expected exception");
-        } catch (IndexOutOfBoundsException e) {}
+        } catch (IndexOutOfBoundsException e) {
+        }
     }
 
     public void testColumnTypeMismatch() {
         try {
             LONG_FIVE.fetchRow(0).getString(0);
             fail("expected exception");
-        } catch (IllegalArgumentException e) {}
+        } catch (IllegalArgumentException e) {
+        }
     }
 
     public void testColumnByName() {
-        t = new VoltTable(new ColumnInfo("foo", VoltType.STRING), new ColumnInfo("twofoo", VoltType.INTEGER));
+        t = new VoltTable(new ColumnInfo("foo", VoltType.STRING),
+                new ColumnInfo("twofoo", VoltType.INTEGER));
         t.addRow("bar", 5);
 
         assertEquals(0, t.getColumnIndex("foo"));
@@ -208,12 +228,14 @@ public class TestVoltTable extends TestCase {
         try {
             t.getColumnIndex("bar");
             fail("expected exception");
-        } catch (IllegalArgumentException e) {}
+        } catch (IllegalArgumentException e) {
+        }
 
         try {
             r.getString("bar");
             fail("expected exception");
-        } catch (IllegalArgumentException e) {}
+        } catch (IllegalArgumentException e) {
+        }
     }
 
     public void testAddRow() {
@@ -221,12 +243,14 @@ public class TestVoltTable extends TestCase {
         try {
             t.addRow(42L, 47L);
             fail("expected exception (1)");
-        } catch (IllegalArgumentException e) {}
+        } catch (IllegalArgumentException e) {
+        }
         try {
-            Object[] objs = new Object[] {new Long(50), new Long(51) };
+            Object[] objs = new Object[] { new Long(50), new Long(51) };
             t.addRow(objs);
             fail("expected exception (2)");
-        } catch (IllegalArgumentException e) {}
+        } catch (IllegalArgumentException e) {
+        }
     }
 
     public void testResizedTable() {
@@ -251,13 +275,16 @@ public class TestVoltTable extends TestCase {
         compressedBytes = t.getCompressedBytesAsync().get();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
-        byte decompressedBytes[] = CompressionService.decompressBytes(compressedBytes);
-        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(decompressedBytes), true);
+        byte decompressedBytes[] = CompressionService
+                .decompressBytes(compressedBytes);
+        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
+                ByteBuffer.wrap(decompressedBytes), true);
 
         fs = new FastSerializer();
         fs.writeObject(vt);
         byte bytesForComparison[] = fs.getBytes();
-        assertTrue(java.util.Arrays.equals(bytesForComparison, uncompressedBytes));
+        assertTrue(java.util.Arrays.equals(bytesForComparison,
+                uncompressedBytes));
     }
 
     public void testCompressionDirect() throws Exception {
@@ -268,7 +295,8 @@ public class TestVoltTable extends TestCase {
         ByteBuffer copy = ByteBuffer.allocateDirect(view.limit());
         copy.put(view);
         copy.position(position);
-        VoltTable tDirect = PrivateVoltTableFactory.createVoltTableFromBuffer(copy, true);
+        VoltTable tDirect = PrivateVoltTableFactory.createVoltTableFromBuffer(
+                copy, true);
 
         byte compressedBytes[] = tDirect.getCompressedBytes();
         FastSerializer fs = new FastSerializer();
@@ -280,13 +308,16 @@ public class TestVoltTable extends TestCase {
         compressedBytes = tDirect.getCompressedBytesAsync().get();
         assertTrue(uncompressedBytes.length > compressedBytes.length);
 
-        byte decompressedBytes[] = CompressionService.decompressBytes(compressedBytes);
-        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(ByteBuffer.wrap(decompressedBytes), true);
+        byte decompressedBytes[] = CompressionService
+                .decompressBytes(compressedBytes);
+        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
+                ByteBuffer.wrap(decompressedBytes), true);
 
         fs = new FastSerializer();
         fs.writeObject(vt);
         byte bytesForComparison[] = fs.getBytes();
-        assertTrue(java.util.Arrays.equals(bytesForComparison, uncompressedBytes));
+        assertTrue(java.util.Arrays.equals(bytesForComparison,
+                uncompressedBytes));
     }
 
     @SuppressWarnings("deprecation")
@@ -300,25 +331,22 @@ public class TestVoltTable extends TestCase {
         assertFalse(LONG_FIVE.equals(t));
 
         // Different number of columns
-        t = new VoltTable(
-                new ColumnInfo("Test", VoltType.BIGINT),
-                new ColumnInfo("Test2", VoltType.BIGINT)
-        );
+        t = new VoltTable(new ColumnInfo("Test", VoltType.BIGINT),
+                new ColumnInfo("Test2", VoltType.BIGINT));
         assertFalse(LONG_FIVE.equals(t));
         t.addRow(5L, 10L);
         assertFalse(LONG_FIVE.equals(t));
 
         // These are the same table
-        t = new VoltTable(
-                new ColumnInfo("Test", VoltType.BIGINT)
-        );
+        t = new VoltTable(new ColumnInfo("Test", VoltType.BIGINT));
         t.addRow(5L);
         assertEquals(LONG_FIVE, t);
 
         // Test two tables with strings
         t = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.STRING));
         t.addRow("Bar");
-        VoltTable t2 = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.STRING));
+        VoltTable t2 = new VoltTable(new VoltTable.ColumnInfo("Foo",
+                VoltType.STRING));
         t2.addRow("Baz");
         assertFalse(t.equals(t2));
         t2 = new VoltTable(new VoltTable.ColumnInfo("Foo", VoltType.STRING));
@@ -336,7 +364,7 @@ public class TestVoltTable extends TestCase {
 
     public void testStrings() {
         t = new VoltTable(new ColumnInfo("", VoltType.STRING));
-        addAllPrimitives(new Class[]{ String.class, byte[].class });
+        addAllPrimitives(new Class[] { String.class, byte[].class });
         t.addRow("");
         assertEquals("string", t.fetchRow(1).getString(0));
 
@@ -358,7 +386,7 @@ public class TestVoltTable extends TestCase {
     public void testStringsAsBytes() {
         t = new VoltTable(new ColumnInfo("", VoltType.STRING));
         t.addRow(new byte[0]);
-        final byte[] FOO = new byte[]{'f', 'o', 'o'};
+        final byte[] FOO = new byte[] { 'f', 'o', 'o' };
         t.addRow(FOO);
 
         t2 = FastSerializableTestUtil.roundTrip(t);
@@ -376,7 +404,7 @@ public class TestVoltTable extends TestCase {
         t = new VoltTable(new ColumnInfo("", VoltType.VARBINARY));
         final byte[] empty = new byte[0];
         t.addRow(empty);
-        final byte[] FOO = new byte[]{'f', 'o', 'o'};
+        final byte[] FOO = new byte[] { 'f', 'o', 'o' };
         t.addRow(FOO);
 
         t2 = FastSerializableTestUtil.roundTrip(t);
@@ -391,7 +419,8 @@ public class TestVoltTable extends TestCase {
 
     public void testIntegers() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT));
-        addAllPrimitives(new Class[] { Long.class, Integer.class, Short.class, Byte.class, Double.class, Float.class } );
+        addAllPrimitives(new Class[] { Long.class, Integer.class, Short.class,
+                Byte.class, Double.class, Float.class });
 
         t2 = FastSerializableTestUtil.roundTrip(t);
         assertEquals(8, t2.getRowCount());
@@ -406,11 +435,15 @@ public class TestVoltTable extends TestCase {
     }
 
     public void testExactTypes() {
-        VoltTable basecase = new VoltTable(new ColumnInfo("foo", VoltType.DECIMAL));
-        basecase.addRow(new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale));
+        VoltTable basecase = new VoltTable(new ColumnInfo("foo",
+                VoltType.DECIMAL));
+        basecase.addRow(new BigDecimal(7654321)
+                .setScale(VoltDecimalHelper.kDefaultScale));
         VoltTableRow basecaserow = basecase.fetchRow(0);
         BigDecimal bd = basecaserow.getDecimalAsBigDecimal(0);
-        assertEquals(bd, new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale));
+        assertEquals(bd,
+                new BigDecimal(7654321)
+                        .setScale(VoltDecimalHelper.kDefaultScale));
 
         t = new VoltTable(new ColumnInfo("foo", VoltType.DECIMAL));
         addAllPrimitives(new Class[] { BigDecimal.class });
@@ -425,8 +458,9 @@ public class TestVoltTable extends TestCase {
 
         // row 1 contains a known value
         r = t2.fetchRow(1);
-        assertTrue(new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale).
-                   equals(r.getDecimalAsBigDecimal(0)));
+        assertTrue(new BigDecimal(7654321).setScale(
+                VoltDecimalHelper.kDefaultScale).equals(
+                r.getDecimalAsBigDecimal(0)));
 
         t2.clearRowData();
         assertTrue(t2.getRowCount() == 0);
@@ -434,8 +468,8 @@ public class TestVoltTable extends TestCase {
 
     public void testFloats() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.FLOAT));
-        addAllPrimitives(new Class[]{ Long.class, Integer.class, Short.class,
-                                      Byte.class, Double.class, Float.class });
+        addAllPrimitives(new Class[] { Long.class, Integer.class, Short.class,
+                Byte.class, Double.class, Float.class });
 
         t2 = FastSerializableTestUtil.roundTrip(t);
         assertEquals(8, t2.getRowCount());
@@ -457,19 +491,15 @@ public class TestVoltTable extends TestCase {
 
     // At least check that NULL_VALUEs of one type get interpreted as NULL
     // if we attempt to put them into a column of a different type
-    public void testNulls()
-    {
-        VoltType[] types =
-        {VoltType.TINYINT, VoltType.SMALLINT, VoltType.INTEGER,
-         VoltType.BIGINT, VoltType.FLOAT, VoltType.DECIMAL,
-         VoltType.TIMESTAMP, VoltType.STRING};
+    public void testNulls() {
+        VoltType[] types = { VoltType.TINYINT, VoltType.SMALLINT,
+                VoltType.INTEGER, VoltType.BIGINT, VoltType.FLOAT,
+                VoltType.DECIMAL, VoltType.TIMESTAMP, VoltType.STRING };
 
-        for (int i = 0; i < types.length; ++i)
-        {
-            for (int j = 0; j < types.length; ++j)
-            {
-                VoltTable table =
-                    new VoltTable(new ColumnInfo("test_table", types[i]));
+        for (int i = 0; i < types.length; ++i) {
+            for (int j = 0; j < types.length; ++j) {
+                VoltTable table = new VoltTable(new ColumnInfo("test_table",
+                        types[i]));
                 table.addRow(types[j].getNullValue());
                 VoltTableRow row = table.fetchRow(0);
                 row.get(0, types[i]);
@@ -478,41 +508,33 @@ public class TestVoltTable extends TestCase {
         }
     }
 
-    public void testTruncatingCasts()
-    {
-        VoltType[] test_types =
-        {VoltType.TINYINT, VoltType.SMALLINT, VoltType.INTEGER};
+    public void testTruncatingCasts() {
+        VoltType[] test_types = { VoltType.TINYINT, VoltType.SMALLINT,
+                VoltType.INTEGER };
 
-        Object[][] test_vals =
-        {{(long) Byte.MAX_VALUE, ((long) Byte.MAX_VALUE) + 1,
-            ((long) Byte.MIN_VALUE) - 1},
-         {(long) Short.MAX_VALUE, ((long) Short.MAX_VALUE) + 1,
-                ((long) Short.MIN_VALUE) - 1},
-         {(long) Integer.MAX_VALUE, ((long) Integer.MAX_VALUE) + 1,
-                    ((long) Integer.MIN_VALUE) - 1}};
+        Object[][] test_vals = {
+                { (long) Byte.MAX_VALUE, ((long) Byte.MAX_VALUE) + 1,
+                        ((long) Byte.MIN_VALUE) - 1 },
+                { (long) Short.MAX_VALUE, ((long) Short.MAX_VALUE) + 1,
+                        ((long) Short.MIN_VALUE) - 1 },
+                { (long) Integer.MAX_VALUE, ((long) Integer.MAX_VALUE) + 1,
+                        ((long) Integer.MIN_VALUE) - 1 } };
 
-        for (int i = 0; i < test_types.length; ++i)
-        {
+        for (int i = 0; i < test_types.length; ++i) {
             t = new VoltTable(new ColumnInfo("test_table", test_types[i]));
             t.addRow(test_vals[i][0]);
             boolean caught = false;
-            try
-            {
+            try {
                 t.addRow(test_vals[i][1]);
-            }
-            catch (VoltTypeException e)
-            {
+            } catch (VoltTypeException e) {
                 caught = true;
             }
             assertTrue("Failed on: " + test_types[i].toString(), caught);
 
             caught = false;
-            try
-            {
+            try {
                 t.addRow(test_vals[i][2]);
-            }
-            catch (VoltTypeException e)
-            {
+            } catch (VoltTypeException e) {
                 caught = true;
             }
             assertTrue("Failed on: " + test_types[i].toString(), caught);
@@ -521,7 +543,8 @@ public class TestVoltTable extends TestCase {
 
     public void testTimestamps() {
         t = new VoltTable(new ColumnInfo("foo", VoltType.TIMESTAMP));
-        addAllPrimitives(new Class[]{Byte.class, Short.class, Integer.class, Long.class, Float.class, Double.class, TimestampType.class});
+        addAllPrimitives(new Class[] { Byte.class, Short.class, Integer.class,
+                Long.class, Float.class, Double.class, TimestampType.class });
 
         t2 = FastSerializableTestUtil.roundTrip(t);
         assertEquals(9, t2.getRowCount());
@@ -543,17 +566,16 @@ public class TestVoltTable extends TestCase {
     }
 
     public void testAddRowExceptionSafe() {
-        t = new VoltTable(
-                new ColumnInfo("foo", VoltType.BIGINT),
-                new ColumnInfo("bar", VoltType.STRING),
-                new ColumnInfo("baz", VoltType.BIGINT)
-        );
+        t = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT),
+                new ColumnInfo("bar", VoltType.STRING), new ColumnInfo("baz",
+                        VoltType.BIGINT));
 
         t.addRow(0L, "a", 1L);
         try {
-            t.addRow(42L,"", "bad");
+            t.addRow(42L, "", "bad");
             fail("expected exception");
-        } catch (VoltTypeException e) {}
+        } catch (VoltTypeException e) {
+        }
         t.addRow(2L, "b", 3L);
 
         // the contents of the table should not be corrupted
@@ -567,13 +589,12 @@ public class TestVoltTable extends TestCase {
     }
 
     public void testClone() {
-        VoltTable item_data_template = new VoltTable(
-                new ColumnInfo("i_name", VoltType.STRING),
-                new ColumnInfo("s_quantity", VoltType.BIGINT),
-                new ColumnInfo("brand_generic", VoltType.STRING),
-                new ColumnInfo("i_price", VoltType.FLOAT),
-                new ColumnInfo("ol_amount", VoltType.FLOAT)
-        );
+        VoltTable item_data_template = new VoltTable(new ColumnInfo("i_name",
+                VoltType.STRING),
+                new ColumnInfo("s_quantity", VoltType.BIGINT), new ColumnInfo(
+                        "brand_generic", VoltType.STRING), new ColumnInfo(
+                        "i_price", VoltType.FLOAT), new ColumnInfo("ol_amount",
+                        VoltType.FLOAT));
         VoltTable item_data = item_data_template.clone(1024);
         assertEquals(5, item_data.getColumnCount());
         assertEquals("i_name", item_data.getColumnName(0));
@@ -598,15 +619,17 @@ public class TestVoltTable extends TestCase {
         try {
             empty.getLong(1);
             fail();
+        } catch (Exception e) {
         }
-        catch(Exception e) {};
+        ;
 
         assertEquals(-1, empty.getActiveRowIndex());
         assertFalse(empty.advanceRow());
 
         // Make a table with info to iterate
 
-        t = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT), new ColumnInfo("bar", VoltType.STRING));
+        t = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT),
+                new ColumnInfo("bar", VoltType.STRING));
         for (int i = 0; i < 10; i++) {
             t.addRow(i, String.valueOf(i));
         }
@@ -616,7 +639,8 @@ public class TestVoltTable extends TestCase {
         while (t.advanceRow()) {
             assertEquals(rowcount, t.getLong(0));
             assertTrue(String.valueOf(rowcount).equals(t.getString(1)));
-            if (rowcount == 4) copy = t.cloneRow();
+            if (rowcount == 4)
+                copy = t.cloneRow();
             rowcount++;
         }
         assertEquals(10, rowcount);
@@ -637,51 +661,110 @@ public class TestVoltTable extends TestCase {
         try {
             table.getLong(0);
             fail();
-        }
-        catch (RuntimeException e) {
+        } catch (RuntimeException e) {
             assertTrue(e.getMessage().startsWith("VoltTableRow.advanceRow"));
         }
     }
 
+    public void testAdvanceToRow() {
+        // Test iteration of empty table
+        VoltTable empty = new VoltTable();
+
+        // make sure it craps out on an empty table. Don't reset row position in
+        // between.
+        assertFalse(empty.advanceToRow(1));
+        assertFalse(empty.advanceToRow(0));
+        assertFalse(empty.advanceToRow(-1));
+
+        // make sure it craps out on an empty table. Reset row position in
+        // between.
+        empty.resetRowPosition();
+        assertFalse(empty.advanceToRow(1));
+        empty.resetRowPosition();
+        assertFalse(empty.advanceToRow(0));
+        empty.resetRowPosition();
+        assertFalse(empty.advanceToRow(-1));
+        empty.resetRowPosition();
+
+        // Make a table with rows to navigate
+        t = new VoltTable(new ColumnInfo("foo", VoltType.BIGINT),
+                new ColumnInfo("bar", VoltType.STRING));
+        for (int i = 0; i < 10; i++) {
+            t.addRow(i, String.valueOf(i));
+        }
+
+        // Advance to each row one at a time
+        t.resetRowPosition();
+        for (int i = 0; i < 10; i++) {
+            t.advanceToRow(i);
+            assertTrue(String.valueOf(i).equals(t.getString(1)));
+        }
+
+        // Now jump around randomly.
+        t.resetRowPosition();
+        t.advanceRow();
+        assertTrue(t.advanceToRow(3));
+        assertTrue("3".equals(t.getString(1)));
+        assertTrue(t.advanceToRow(9));
+        assertTrue("9".equals(t.getString(1)));
+
+        // Jump off the end of the list
+        assertFalse(t.advanceToRow(99));
+
+        t.resetRowPosition();
+        t.advanceRow();
+        assertFalse(t.advanceToRow(-99));
+
+        // End on a happy note
+        t.resetRowPosition();
+        t.advanceRow();
+        assertTrue(t.advanceToRow(5));
+        assertTrue("5".equals(t.getString(1)));
+    }
+
     public void testRowGet() {
 
-        byte       b1 = (byte)1;
-        short      s1 = (short)2;
-        int        i1 = 3;
-        long       l1 = Long.MIN_VALUE + 1;
-        double     f1 = 3.5;
-        String     S1 = "A";
-        TimestampType d1  = new TimestampType(0);
-        BigDecimal B1 = new BigDecimal(7654321).setScale(VoltDecimalHelper.kDefaultScale);
+        byte b1 = (byte) 1;
+        short s1 = (short) 2;
+        int i1 = 3;
+        long l1 = Long.MIN_VALUE + 1;
+        double f1 = 3.5;
+        String S1 = "A";
+        TimestampType d1 = new TimestampType(0);
+        BigDecimal B1 = new BigDecimal(7654321)
+                .setScale(VoltDecimalHelper.kDefaultScale);
 
-        // create a table with one column per supported type with NULLS on the left to right diagonal.
-        // tinyint is intentionally first AND last to test that wasNull is correctly cleared by the
+        // create a table with one column per supported type with NULLS on the
+        // left to right diagonal.
+        // tinyint is intentionally first AND last to test that wasNull is
+        // correctly cleared by the
         // the next-to-last instance and re-initialized by tinyint.
 
         Object content[] = { b1, S1, i1, l1, f1, s1, d1, B1, b1 };
 
-        Object nulls[] = { VoltType.NULL_TINYINT, VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_INTEGER,
-                           VoltType.NULL_BIGINT, VoltType.NULL_FLOAT, VoltType.NULL_SMALLINT,
-                           VoltType.NULL_TIMESTAMP, VoltType.NULL_DECIMAL, VoltType.NULL_TINYINT };
+        Object nulls[] = { VoltType.NULL_TINYINT,
+                VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_INTEGER,
+                VoltType.NULL_BIGINT, VoltType.NULL_FLOAT,
+                VoltType.NULL_SMALLINT, VoltType.NULL_TIMESTAMP,
+                VoltType.NULL_DECIMAL, VoltType.NULL_TINYINT };
 
-        VoltType types[] = { VoltType.TINYINT, VoltType.STRING, VoltType.INTEGER,
-                           VoltType.BIGINT, VoltType.FLOAT, VoltType.SMALLINT, VoltType.TIMESTAMP,
-                           VoltType.DECIMAL, VoltType.TINYINT };
+        VoltType types[] = { VoltType.TINYINT, VoltType.STRING,
+                VoltType.INTEGER, VoltType.BIGINT, VoltType.FLOAT,
+                VoltType.SMALLINT, VoltType.TIMESTAMP, VoltType.DECIMAL,
+                VoltType.TINYINT };
 
-        VoltTable tt = new VoltTable(
-            new ColumnInfo("tinyint",   types[0]),
-            new ColumnInfo("string",    types[1]),
-            new ColumnInfo("integer",   types[2]),
-            new ColumnInfo("bigint",    types[3]),
-            new ColumnInfo("float",     types[4]),
-            new ColumnInfo("smallint",  types[5]),
-            new ColumnInfo("timestamp", types[6]),
-            new ColumnInfo("decimal",   types[7]),
-            new ColumnInfo("tinyint",   types[0]));
+        VoltTable tt = new VoltTable(new ColumnInfo("tinyint", types[0]),
+                new ColumnInfo("string", types[1]), new ColumnInfo("integer",
+                        types[2]), new ColumnInfo("bigint", types[3]),
+                new ColumnInfo("float", types[4]), new ColumnInfo("smallint",
+                        types[5]), new ColumnInfo("timestamp", types[6]),
+                new ColumnInfo("decimal", types[7]), new ColumnInfo("tinyint",
+                        types[0]));
 
-        for (int i=0; i < content.length; ++i) {
-            Object[] vals = new Object[content.length];;
-            for (int k=0; k < content.length; k++) {
+        for (int i = 0; i < content.length; ++i) {
+            Object[] vals = new Object[content.length];
+            ;
+            for (int k = 0; k < content.length; k++) {
                 if (i == k)
                     vals[k] = nulls[k];
                 else
@@ -691,21 +774,22 @@ public class TestVoltTable extends TestCase {
             tt.addRow(vals);
         }
 
-        // now iterate all the fields in the table and verify that row.get(idx, type)
+        // now iterate all the fields in the table and verify that row.get(idx,
+        // type)
         // works and that the wasNull state is correctly set and cleared.
         System.out.println(tt);
         int rowcounter = 0;
         while (tt.advanceRow()) {
-            for (int k =0; k < content.length; k++) {
+            for (int k = 0; k < content.length; k++) {
                 System.out.println("verifying row:" + rowcounter + " col:" + k);
 
                 if (rowcounter == k) {
-                    boolean result = comparisonHelper(nulls[k], tt.get(k, types[k]), types[k]);
+                    boolean result = comparisonHelper(nulls[k],
+                            tt.get(k, types[k]), types[k]);
                     assertTrue(result);
                     assertTrue(tt.wasNull());
-                }
-                else {
-                    Object got =  tt.get(k, types[k]);
+                } else {
+                    Object got = tt.get(k, types[k]);
                     System.out.println("Type: " + types[k]);
                     System.out.println("Expecting: " + content[k]);
                     System.out.println("Got: " + got);
@@ -721,54 +805,62 @@ public class TestVoltTable extends TestCase {
     @SuppressWarnings("deprecation")
     public void testJSONRoundTrip() throws JSONException, IOException {
         VoltTable t1 = new VoltTable(
-                new ColumnInfo("tinyint", VoltType.TINYINT),
-                new ColumnInfo("smallint", VoltType.SMALLINT),
-                new ColumnInfo("integer", VoltType.INTEGER),
-                new ColumnInfo("bigint", VoltType.BIGINT),
-                new ColumnInfo("float", VoltType.FLOAT),
-                new ColumnInfo("string", VoltType.STRING),
-                new ColumnInfo("varbinary", VoltType.VARBINARY),
-                new ColumnInfo("timestamp", VoltType.TIMESTAMP),
-                new ColumnInfo("decimal", VoltType.DECIMAL));
+                new ColumnInfo("tinyint", VoltType.TINYINT), new ColumnInfo(
+                        "smallint", VoltType.SMALLINT), new ColumnInfo(
+                        "integer", VoltType.INTEGER), new ColumnInfo("bigint",
+                        VoltType.BIGINT), new ColumnInfo("float",
+                        VoltType.FLOAT), new ColumnInfo("string",
+                        VoltType.STRING), new ColumnInfo("varbinary",
+                        VoltType.VARBINARY), new ColumnInfo("timestamp",
+                        VoltType.TIMESTAMP), new ColumnInfo("decimal",
+                        VoltType.DECIMAL));
 
         // add a row of nulls the hard way
-        t1.addRow(VoltType.NULL_TINYINT,
-                  VoltType.NULL_SMALLINT,
-                  VoltType.NULL_INTEGER,
-                  VoltType.NULL_BIGINT,
-                  VoltType.NULL_FLOAT,
-                  VoltType.NULL_STRING_OR_VARBINARY,
-                  VoltType.NULL_STRING_OR_VARBINARY,
-                  VoltType.NULL_TIMESTAMP,
-                  VoltType.NULL_DECIMAL);
+        t1.addRow(VoltType.NULL_TINYINT, VoltType.NULL_SMALLINT,
+                VoltType.NULL_INTEGER, VoltType.NULL_BIGINT,
+                VoltType.NULL_FLOAT, VoltType.NULL_STRING_OR_VARBINARY,
+                VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_TIMESTAMP,
+                VoltType.NULL_DECIMAL);
 
         // add a row of nulls the easy way
-        t1.addRow(null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null,
-                  null);
+        t1.addRow(null, null, null, null, null, null, null, null, null);
 
         // add a row of actual data
-        t1.addRow(123,
-                  12345,
-                  1234567,
-                  12345678901L,
-                  1.234567,
-                  "aabbcc",
-                  new byte[] { 10, 26, 10 },
-                  new TimestampType(System.currentTimeMillis()),
-                  new BigDecimal("123.45"));
+        t1.addRow(123, 12345, 1234567, 12345678901L, 1.234567, "aabbcc",
+                new byte[] { 10, 26, 10 },
+                new TimestampType(System.currentTimeMillis()), new BigDecimal(
+                        "123.45"));
 
         String json = t1.toJSONString();
 
         VoltTable t2 = VoltTable.fromJSONString(json);
 
         assertTrue(t1.equals(t2));
+    }
+
+    /**
+     * Java won't let you pass >255 args to a method. Verify it's possible to
+     * make a big table using vararg methods and arrays.
+     */
+    public void test300Columns() {
+        VoltTable.ColumnInfo[] schema = new VoltTable.ColumnInfo[300];
+        for (int i = 0; i < schema.length; ++i) {
+            schema[i] = new VoltTable.ColumnInfo(String.valueOf(i),
+                    VoltType.BIGINT);
+        }
+        VoltTable t = new VoltTable(schema);
+        assertNotNull(t);
+        assertEquals(300, t.getColumnCount());
+
+        Object[] row = new Object[schema.length];
+        for (int i = 0; i < schema.length; ++i) {
+            row[i] = new Long(i);
+        }
+
+        t.addRow(row);
+        assertEquals(1, t.getRowCount());
+        assertEquals(schema.length - 1, t.fetchRow(0)
+                .getLong(schema.length - 1));
     }
 
 }

@@ -29,6 +29,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -37,6 +38,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -76,8 +78,13 @@ public class TestJDBCDriver {
 
     @AfterClass
     public static void tearDown() throws Exception {
-        conn.close();
-        server.shutdown();
+        // May have been closed by a connection test.
+        if (conn != null) {
+            conn.close();
+        }
+        if (server != null) {
+            server.shutdown();
+        }
         File f = new File(testjar);
         f.delete();
     }
@@ -324,5 +331,58 @@ public class TestJDBCDriver {
         assertEquals(0, meta.getScale(1));
         assertTrue(meta.isCaseSensitive(1));
         assertFalse(meta.isSigned(1));
+    }
+
+    @Test
+    public void testBadProcedureName() throws SQLException {
+        CallableStatement cs = conn.prepareCall("{call Oopsy(?)}");
+        cs.setLong(1, 99);
+        try {
+            cs.execute();
+        } catch (SQLException e) {
+            // Since it's a GENERAL_ERROR we need to look for a string by pattern.
+            assertEquals(e.getSQLState(), SQLError.GENERAL_ERROR);
+            assertTrue(Pattern.matches(".*Procedure .* not found.*", e.getMessage()));
+        }
+    }
+
+    @Test
+    public void testDoubleInsert() throws SQLException {
+        // long i_id, long i_im_id, String i_name, double i_price, String i_data
+        CallableStatement cs = conn.prepareCall("{call InsertNewOrder(?, ?, ?)}");
+        cs.setInt(1, 55);
+        cs.setInt(2, 66);
+        cs.setInt(3, 77);
+        cs.execute();
+        try {
+            cs.execute();
+        } catch (SQLException e) {
+            // Since it's a GENERAL_ERROR we need to look for a string by pattern.
+            assertEquals(e.getSQLState(), SQLError.GENERAL_ERROR);
+            assertTrue(e.getMessage().contains("violation of constraint"));
+        }
+    }
+
+    public void testVersionMetadata() throws SQLException {
+        int major = conn.getMetaData().getDatabaseMajorVersion();
+        int minor = conn.getMetaData().getDatabaseMinorVersion();
+        assertTrue(major >= 2);
+        assertTrue(minor >= 0);
+    }
+
+    // IMPORTANT: This must be the last test because it destroys the connection.
+    @Test
+    public void testLostConnection() throws SQLException {
+        CallableStatement cs = conn.prepareCall("{call Oopsy(?)}");
+        conn.close();
+        conn = null;
+        try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
+        server = null;
+        cs.setLong(1, 99);
+        try {
+            cs.execute();
+        } catch (SQLException e) {
+            assertEquals(e.getSQLState(), SQLError.CONNECTION_FAILURE);
+        }
     }
 }

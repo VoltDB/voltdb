@@ -168,6 +168,10 @@ public class SchemaColumn
                     retval = true;
                 }
             }
+            else if (tableName.equals("VOLT_TEMP_TABLE"))
+            {
+                retval = true;
+            }
             else
             {
                 throw new RuntimeException("Attempted to match a SchemaColumn " +

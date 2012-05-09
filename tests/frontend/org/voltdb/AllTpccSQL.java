@@ -35,9 +35,6 @@ public class AllTpccSQL {
     public HashMap<String, HashMap<String, String>> stmts = new HashMap<String, HashMap<String, String>>();
 
     Class<?>[] procs = new Class<?>[] {
-        // milestone 1
-        //org.voltdb.compiler.procedures.MilestoneOneCombined.class,
-
         // tpcc
         org.voltdb.benchmark.tpcc.procedures.delivery.class,
         org.voltdb.benchmark.tpcc.procedures.paymentByCustomerId.class,

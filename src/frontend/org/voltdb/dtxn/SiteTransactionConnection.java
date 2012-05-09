@@ -20,10 +20,10 @@ package org.voltdb.dtxn;
 import java.util.HashMap;
 import java.util.List;
 
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.VoltMessage;
 
 /**
  *  TransactionState invokes SiteTransactionConnection methods to manipulate

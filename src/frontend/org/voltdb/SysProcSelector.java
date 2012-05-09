@@ -32,10 +32,10 @@ public enum SysProcSelector {
     SNAPSHOTSTATUS,
 
     /*
-     * WANPARTITION and WANNODE are internal names
-     * Externally the selector is just "WAN"
+     * DRPARTITION and DRNODE are internal names
+     * Externally the selector is just "DR"
      */
-    WANPARTITION,
-    WANNODE;
+    DRPARTITION,
+    DRNODE;
 
 }

@@ -49,18 +49,19 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.messaging.HeartbeatMessage;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
-import org.voltdb.messaging.HeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Messenger;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 /** Supports correct execution of multiple partition transactions by executing them one at a time. */
@@ -69,6 +70,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     private final ExecutorTxnIdSafetyState m_safetyState;
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     private ClientInterface m_clientInterface;
     public void setClientInterface(ClientInterface ci) {
@@ -78,7 +80,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     /**
      * Indicates if backpressure has been seen and reported
      */
-    private AtomicBoolean m_hadBackPressure = new AtomicBoolean(false);
+    private final AtomicBoolean m_hadBackPressure = new AtomicBoolean(false);
 
     /*
      * Whether or not to send heartbeats. It's set to false by default, this
@@ -96,31 +98,29 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private long m_pendingTxnBytes = 0;
     private int m_pendingTxnCount = 0;
     private final DtxnInitiatorMailbox m_mailbox;
-    private final int m_siteId;
+    private final long m_siteId;
     private final int m_hostId;
     private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
-    public SimpleDtxnInitiator(CatalogContext context,
-                               Messenger messenger, int hostId, int siteId,
-                               int initiatorId,
+    public SimpleDtxnInitiator(DtxnInitiatorMailbox mailbox,
+                               CatalogContext context,
+                               HostMessenger messenger, int hostId,
+                               long initiatorId,
                                long timestampTestingSalt)
     {
         assert(messenger != null);
-        hostLog.info("Initializing initiator ID: " + initiatorId  + ", SiteID: " + siteId);
+
+        m_mailbox = mailbox;
+        m_safetyState = m_mailbox.getSafetyState();
+        m_siteId = m_mailbox.getHSId();
+        m_safetyState.setHSId(m_siteId);
+        consoleLog.info("Initializing initiator ID: " + initiatorId  +
+                ", SiteID: " + CoreUtils.hsIdToString(m_siteId));
 
         m_idManager = new TransactionIdManager(initiatorId, timestampTestingSalt);
         m_hostId = hostId;
-        m_siteId = siteId;
-        m_safetyState = new ExecutorTxnIdSafetyState(siteId, context.siteTracker);
-        m_mailbox =
-            new DtxnInitiatorMailbox(
-                    siteId,
-                    m_safetyState,
-                    (org.voltdb.messaging.HostMessenger)messenger);
-        messenger.createMailbox(siteId, VoltDB.DTXN_MAILBOX_ID, m_mailbox);
         m_mailbox.setInitiator(this);
     }
-
 
     @Override
     public synchronized boolean createTransaction(
@@ -194,24 +194,22 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         }
         else
         {
-            SiteTracker tracker = VoltDB.instance().getCatalogContext().siteTracker;
-            ArrayList<Integer> sitesOnThisHost =
-                tracker.getLiveExecutionSitesForHost(m_hostId);
-            int coordinatorId = sitesOnThisHost.get(0);
-            ArrayList<Integer> replicaIds = new ArrayList<Integer>();
-            for (Integer replica : tracker.getAllSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
-                if (replica != coordinatorId && tracker.getAllLiveSites().contains(replica)) {
+            SiteTracker tracker = VoltDB.instance().getSiteTracker();
+            List<Long> sitesOnThisHost = tracker.getSitesForHost(m_hostId);
+            long coordinatorId = sitesOnThisHost.get(0);
+            ArrayList<Long> replicaIds = new ArrayList<Long>();
+            for (Long replica : tracker.getSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
+                if (replica != coordinatorId) {
                     replicaIds.add(replica);
                 }
             }
 
-            ArrayList<Integer> otherSiteIds = new ArrayList<Integer>();
+            ArrayList<Long> otherSiteIds = new ArrayList<Long>();
 
             // store only partitions that are NOT the coordinator or coordinator replica
             // this is a bit too slow
-            int[] allSiteIds =
-                VoltDB.instance().getCatalogContext().
-                siteTracker.getLiveSitesForEachPartition(partitions);
+            long[] allSiteIds =
+                tracker.getSitesForPartitionsAsArray(partitions);
 
             for (int i = 0; i < allSiteIds.length; i++)
             {
@@ -222,9 +220,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 }
             }
 
-            int otherSiteIdsArr[] = new int[otherSiteIds.size()];
+            long otherSiteIdsArr[] = new long[otherSiteIds.size()];
             int ii = 0;
-            for (Integer otherSiteId : otherSiteIds) {
+            for (Long otherSiteId : otherSiteIds) {
                 otherSiteIdsArr[ii++] = otherSiteId;
             }
 
@@ -263,9 +261,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
     @Override
     public void sendHeartbeat(final long txnId) {
-        final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
-        int remoteHeartbeatTargets[][] = st.getRemoteHeartbeatTargets();
-        int localHeartbeatTargets[] = st.getLocalHeartbeatTargets();
+        final SiteTracker st = VoltDB.instance().getSiteTracker();
+        long remoteHeartbeatTargets[][] = st.getRemoteSites();
+        long localHeartbeatTargets[] = st.getLocalSites();
 
         try {
             /*
@@ -273,9 +271,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
              * site. Then coalesce them into a single heartbeat message to send to the
              * initiator on that host who will then demux the heartbeats
              */
-            for (int hostTargets[] : remoteHeartbeatTargets) {
-                final int initiatorSiteId = st.getFirstNonExecSiteForHost(st.getHostForSite(hostTargets[0]));
-                assert(initiatorSiteId != 1);//uninitialized value
+            for (long hostTargets[] : remoteHeartbeatTargets) {
+                final long initiatorSiteId = st.getInitiatorsForHost(SiteTracker.getHostForSite(hostTargets[0])).get(0);
+                assert(initiatorSiteId != 1L);//uninitialized value
                 long safeTxnIds[] = new long[hostTargets.length];
                 for (int ii = 0; ii < safeTxnIds.length; ii++) {
                     safeTxnIds[ii] = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(hostTargets[ii]);
@@ -283,16 +281,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
                 CoalescedHeartbeatMessage heartbeat =
                     new CoalescedHeartbeatMessage(m_siteId, txnId, hostTargets,safeTxnIds);
-                m_mailbox.send(initiatorSiteId, VoltDB.DTXN_MAILBOX_ID, heartbeat);
+                m_mailbox.send(initiatorSiteId, heartbeat);
             }
 
             // loop over all the local sites that need a heartbeat and send each a message
             // no coalescing here
-            for (int siteId : localHeartbeatTargets) {
+            for (long siteId : localHeartbeatTargets) {
                 // tack on the last confirmed seen txn id for all sites with a particular partition
                 long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(siteId);
                 HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, newestSafeTxnId);
-                m_mailbox.send(siteId, VoltDB.DTXN_MAILBOX_ID, tickNotice);
+                m_mailbox.send(siteId, tickNotice);
             }
         } catch (MessagingException e) {
             throw new RuntimeException(e);
@@ -316,17 +314,16 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                              int messageSize,
                              long now)
     {
-        ArrayList<Integer> siteIds;
+        List<Long> siteIds;
+        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
 
         // Special case the common 1 partition case -- cheap via SiteTracker
         if (partitions.length == 1) {
-            siteIds = VoltDB.instance().getCatalogContext().
-            siteTracker.getLiveSitesForPartition(partitions[0]);
+            siteIds = siteTracker.getSitesForPartition(partitions[0]);
         }
         // need all sites for a set of partitions -- a little more expensive
         else {
-            siteIds = VoltDB.instance().getCatalogContext().
-            siteTracker.getLiveSitesForEachPartitionAsList(partitions);
+            siteIds = siteTracker.getSitesForPartitions(partitions);
         }
 
         increaseBackpressure(messageSize);
@@ -351,12 +348,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                  connectionHostname,
                                  adminConnection);
 
-        for (int siteId : siteIds) {
+        for (long siteId : siteIds) {
             state.addCoordinator(siteId);
         }
         m_mailbox.addPendingTxn(state);
 
-        for (int coordId : state.outstandingCoordinators) {
+        for (long coordId : state.outstandingCoordinators) {
             sendTransactionToCoordinator(state, coordId);
         }
     }
@@ -377,7 +374,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
                 m_siteId, txn.firstCoordinatorId, txn.txnId, txn.isReadOnly);
         try {
-            m_mailbox.send(txn.otherSiteIds, 0, notice);
+            m_mailbox.send(txn.otherSiteIds, notice);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
@@ -403,8 +400,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
          * a participant notice
          */
         try {
-            m_mailbox.send(txn.firstCoordinatorId, 0, workRequest);
-            for (Integer replica : txn.coordinatorReplicas) {
+            m_mailbox.send(txn.firstCoordinatorId, workRequest);
+            for (Long replica : txn.coordinatorReplicas) {
                 newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(replica);
                 workRequest = new InitiateTaskMessage(
                         m_siteId,
@@ -414,7 +411,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                         txn.isSinglePartition,
                         txn.invocation,
                         newestSafeTxnId); // this will allow all transactions to run for now
-                m_mailbox.send(replica, 0, workRequest);
+                m_mailbox.send(replica, workRequest);
             }
         } catch (MessagingException e) {
             throw new RuntimeException(e);
@@ -429,7 +426,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      *
      * @param txn Information about the transaction to send.
      */
-    private void sendTransactionToCoordinator(InFlightTxnState txn, int coordinatorId)
+    private void sendTransactionToCoordinator(InFlightTxnState txn, long coordinatorId)
     {
         // figure out what the newest txnid seen by ALL partitions for this execution
         //  site id is and tack it on to this message
@@ -445,7 +442,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 newestSafeTxnId); // this will allow all transactions to run for now
 
         try {
-            m_mailbox.send(coordinatorId, 0, workRequest);
+            m_mailbox.send(coordinatorId, workRequest);
         } catch (MessagingException e) {
             throw new RuntimeException(e);
         }
@@ -481,9 +478,10 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     }
 
     @Override
-    public synchronized void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds) {
-        for (int executorSiteId : executorSiteIds) {
-            m_safetyState.addRejoinedState(executorSiteId);
+    public synchronized void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
+        SiteTracker st = VoltDB.instance().getSiteTracker();
+        for (Long executorSiteId : executorSiteIds) {
+            m_safetyState.addState(executorSiteId, st.m_sitesToPartitionsImmutable.get(executorSiteId));
         }
     }
 

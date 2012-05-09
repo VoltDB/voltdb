@@ -25,7 +25,6 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.ConstraintType;
 
 /**
@@ -146,14 +145,20 @@ public class ConstraintFailureException extends SQLException {
     @Override
     protected int p_getSerializedSize() {
         // ... + 8 + string prefix + string length + ...
-        return super.p_getSerializedSize() + 8 + 4 + tableName.length() + buffer.capacity();
+        return super.p_getSerializedSize()
+            + 4 // constraint type
+            + 4 // table name string length
+            + tableName.length()
+            + 4 // buffer length
+            + buffer.capacity();
     }
 
     @Override
-    protected void p_serializeToBuffer(ByteBuffer b) throws IOException {
+    protected void p_serializeToBuffer(ByteBuffer b) {
         super.p_serializeToBuffer(b);
         b.putInt(type.getValue());
-        FastSerializer.writeString(tableName, b);
+        b.putInt(tableName.length());
+        b.put(tableName.getBytes());
         b.putInt(buffer.capacity());
         buffer.rewind();
         b.put(buffer);

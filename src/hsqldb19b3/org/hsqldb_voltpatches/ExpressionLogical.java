@@ -208,6 +208,7 @@ public class ExpressionLogical extends Expression {
         return new ExpressionLogical(OpTypes.AND, e1, e2);
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer(64);
@@ -365,6 +366,7 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -470,6 +472,7 @@ public class ExpressionLogical extends Expression {
         return sb.toString();
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -817,6 +820,7 @@ public class ExpressionLogical extends Expression {
         resolveTypesForAllAny(session);
     }
 
+    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -1464,6 +1468,7 @@ public class ExpressionLogical extends Expression {
         ((ExpressionLogical) nodes[RIGHT]).distributeOr();
     }
 
+    @Override
     Expression getIndexableExpression(RangeVariable rangeVar) {
 
         switch (opType) {
@@ -1696,6 +1701,7 @@ public class ExpressionLogical extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
@@ -1722,8 +1728,11 @@ public class ExpressionLogical extends Expression {
         case OpTypes.SQL_FUNCTION:      element = "function"; break;
         case OpTypes.IS_NULL:           element = "is_null"; break;
         case OpTypes.NOT:               element = "not"; break;
+        case OpTypes.LIKE:
+            throw new HSQLParseException("Unsupported LIKE clause argument");
+        // Handle some of the unsupported OpTypes with slightly more informative messages.
         default:
-            throw new HSQLParseException("Unsupported Logical Operation: " +
+            throw new HSQLParseException("Unsupported Logical Operation: #" +
                                          String.valueOf(opType));
         }
 
@@ -1736,7 +1745,9 @@ public class ExpressionLogical extends Expression {
             exp.attributes.put("alias", getAlias());
         }
         for (Expression expr : nodes) {
-            exp.children.add(expr.voltGetXML(session));
+            VoltXMLElement vxmle = expr.voltGetXML(session);
+            exp.children.add(vxmle);
+            assert(vxmle != null);
         }
 
         return exp;

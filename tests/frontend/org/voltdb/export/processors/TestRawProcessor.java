@@ -39,15 +39,16 @@ import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.network.WriteStream;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DeferredSerialization;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.utils.VoltFile;
+import org.voltcore.utils.DeferredSerialization;
 
 public class TestRawProcessor extends TestCase {
 
-    static class MockWriteStream extends org.voltdb.network.MockWriteStream {
+    static class MockWriteStream extends org.voltcore.network.MockWriteStream {
         DBBPool pool = new DBBPool();
 
         LinkedBlockingDeque<ExportProtoMessage> writequeue =
@@ -55,9 +56,9 @@ public class TestRawProcessor extends TestCase {
 
 
         @Override
-        public boolean enqueue(DeferredSerialization ds) {
+        public void enqueue(DeferredSerialization ds) {
             try {
-                ByteBuffer b = ds.serialize(pool).b;
+                ByteBuffer b = ds.serialize()[0];
                 b.getInt(); // eat the length prefix
                 FastDeserializer fds = new FastDeserializer(b);
                 ExportProtoMessage m = ExportProtoMessage.readExternal(fds);
@@ -66,11 +67,10 @@ public class TestRawProcessor extends TestCase {
             catch (IOException e) {
                 throw new RuntimeException(e);
             }
-            return true;
         }
     }
 
-    static class MockConnection extends org.voltdb.network.MockConnection {
+    static class MockConnection extends org.voltcore.network.MockConnection {
         MockWriteStream m_writeStream = new MockWriteStream();
 
         @Override
@@ -96,9 +96,8 @@ public class TestRawProcessor extends TestCase {
         public static int m_part = 2;
 
         static {
-            m_mockVoltDB.addHost(m_host);
-            m_mockVoltDB.addPartition(m_part);
-            m_mockVoltDB.addSite(m_site, m_host, m_part, true);
+
+            m_mockVoltDB.addSite(CoreUtils.getHSIdFromHostAndSite( m_host, m_site), m_part);
             m_mockVoltDB.addTable("TableName", false);
             m_mockVoltDB.addColumnToTable("TableName", "COL1", VoltType.INTEGER, false, null, VoltType.INTEGER);
             m_mockVoltDB.addColumnToTable("TableName", "COL2", VoltType.STRING, false, null, VoltType.STRING);

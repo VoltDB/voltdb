@@ -142,6 +142,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public String abortMessage;
     public long lastOrigTxnId = Long.MIN_VALUE;
     public boolean origTxnIdOrderCorrect = true;
+    private long m_startTime;
 
     @Override
     public boolean callProcedure(ProcedureCallback callback, String procName,
@@ -187,33 +188,11 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public VoltTable getIOStats() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getIOStatsInterval() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
     public Object[] getInstanceId() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getProcedureStats() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getProcedureStatsInterval() {
-        // TODO Auto-generated method stub
-        return null;
+        Object[] dumb = new Object[2];
+        dumb[0] = m_startTime;
+        dumb[1] = 0;
+        return dumb;
     }
 
     @Override
@@ -247,18 +226,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public VoltTable getClientRTTLatencies() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getClusterRTTLatencies() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath) throws IOException,
                                                                                          NoConnectionsException,
                                                                                          ProcCallException {
@@ -280,7 +247,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
                                  String procName,
                                  Object... parameters) throws IOException,
                                                       NoConnectionsException {
-        System.out.println("Received procedure call for " + procName + " with original TXN ID: " + originalTxnId);
         numCalls += 1;
         calledName = procName;
         calledParameters = parameters;
@@ -306,5 +272,45 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     public void setNextReturn(boolean retval)
     {
         m_nextReturn = retval;
+    }
+
+    public void setInstanceStartTime(long time)
+    {
+        m_startTime = time;
+    }
+
+    @Override
+    public ClientResponse callProcedure(long originalTxnId, String procName,
+                                        Object... parameters)
+    throws IOException, NoConnectionsException, ProcCallException
+    {
+        numCalls += 1;
+        calledName = procName;
+        calledParameters = parameters;
+        if (originalTxnId <= lastOrigTxnId)
+        {
+            origTxnIdOrderCorrect = false;
+        }
+        else
+        {
+            lastOrigTxnId = originalTxnId;
+        }
+        return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
+    }
+
+    @Override
+    public ClientStatsContext createStatsContext() {
+        return null;
+    }
+
+    @Override
+    public int[] getThroughputAndOutstandingTxnLimits() {
+        return null;
+    }
+
+    @Override
+    public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        // TODO Auto-generated method stub
+
     }
 }

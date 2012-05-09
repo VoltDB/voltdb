@@ -28,6 +28,7 @@ import java.io.IOException;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -93,6 +94,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         for (VoltTable result : results) {
             assertEquals( 0, result.asScalarLong());
         }
+    }
+
+    public void testPromoteMaster() throws Exception {
+        Client client = getClient();
+        boolean threw = false;
+        try
+        {
+            client.callProcedure("@Promote");
+        }
+        catch (ProcCallException pce)
+        {
+            assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
+            threw = true;
+        }
+        assertTrue(threw);
     }
 
     public void testStatistics_Table() throws Exception {

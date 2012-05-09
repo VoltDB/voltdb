@@ -31,8 +31,8 @@ import java.util.NoSuchElementException;
 import java.util.TreeMap;
 import java.util.Iterator;
 
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * A deque that specializes in providing persistence of binary objects to disk. Any object placed
@@ -416,7 +416,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
             throw new IOException("Closed");
         }
         if (!m_finishedSegments.isEmpty()) {
-            assert(m_finishedSegments.firstKey() == m_currentPollSegmentIndex);
+            assert(m_finishedSegments.firstKey().equals(m_currentPollSegmentIndex));
         }
         ArrayDeque<ArrayDeque<BBContainer[]>> segments = new ArrayDeque<ArrayDeque<BBContainer[]>>();
         ArrayDeque<BBContainer[]> currentSegment = new ArrayDeque<BBContainer[]>();

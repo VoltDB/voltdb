@@ -197,8 +197,11 @@ AggregatePlanNode::loadFromJSONObject(Object &obj)
                     push_back(AbstractExpression::buildExpressionTree(aggregateColumn[zz].value_.get_obj()));
             }
         }
-        assert(containsType && containsDistinct &&
-               containsOutputColumn && containsExpression);
+        if(!(containsType && containsDistinct && containsOutputColumn && containsExpression)) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "AggregatePlanNode::loadFromJSONObject:"
+                                      " Missing type,distinct, outputcolumn or expression.");
+        }
     }
 
     Value groupByExpressionsValue = find_value(obj, "GROUPBY_EXPRESSIONS");

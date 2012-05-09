@@ -23,6 +23,10 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
+# add the path to the volt python client, just based on knowing
+# where we are now
+sys.path.append('../../src/py_client')
+
 import random
 import time
 import subprocess
@@ -216,9 +220,13 @@ The following place holders are supported,
 \t_cmp\t\tWill be replaced with a comparison operator
 \t_math\t\tWill be replaced with a arithmatic operator
 \t_agg\t\tWill be replaced with an aggregation operator
-\t_singleton\t\tWill be replaced with an operator like NOT
+\t_maybe\t\tWill be replaced with NOT or simply removed
+\t_distinct\t\tWill be replaced with DISTINCT or simply removed
+\t_like\t\tWill be replaced with LIKE or NOT LIKE
 \t_set\t\tWill be replaced with a set operator
-\t_logic\t\tWill be replaced with a logic operator"""
+\t_logic\t\tWill be replaced with a logic operator
+\t_sortordert\tWill be replaced with ASC, DESC, or 'blank' (implicitly ascending)
+"""
 
 if __name__ == "__main__":
     parser = OptionParser()

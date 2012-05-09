@@ -64,5 +64,12 @@ public class SQLError
     {
         return new SQLFeatureNotSupportedException();
     }
+
+    public static boolean isConnectionError(String status)
+    {
+        return (status.equals(CONNECTION_UNSUCCESSFUL) ||
+                status.equals(CONNECTION_CLOSED) ||
+                status.equals(CONNECTION_FAILURE));
+    }
 }
 

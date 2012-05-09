@@ -169,15 +169,12 @@ CTX.INPUT['catalog'] = """
  deployment.cpp
  group.cpp
  groupref.cpp
- host.cpp
  index.cpp
  materializedviewinfo.cpp
- partition.cpp
  planfragment.cpp
  procedure.cpp
  procparameter.cpp
  program.cpp
- site.cpp
  statement.cpp
  stmtparameter.cpp
  systemsettings.cpp
@@ -241,6 +238,7 @@ CTX.INPUT['executors'] = """
 CTX.INPUT['expressions'] = """
  abstractexpression.cpp
  expressionutil.cpp
+ functionexpression.cpp
  tupleaddressexpression.cpp
 """
 

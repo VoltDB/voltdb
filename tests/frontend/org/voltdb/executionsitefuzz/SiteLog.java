@@ -29,15 +29,15 @@ import java.util.HashMap;
 
 public class SiteLog
 {
-    private Integer m_siteId;
-    private Integer m_partitionId;
-    private StringWriter m_logBuffer;
+    private final Long m_siteId;
+    private final Integer m_partitionId;
+    private final StringWriter m_logBuffer;
     private int m_logIndex;
-    private HashMap<Long, TransactionRecord> m_txns;
-    private ArrayList<TransactionRecord> m_txnInitOrder;
-    private ArrayList<TransactionRecord> m_txnCloseOrder;
+    private final HashMap<Long, TransactionRecord> m_txns;
+    private final ArrayList<TransactionRecord> m_txnInitOrder;
+    private final ArrayList<TransactionRecord> m_txnCloseOrder;
 
-    SiteLog(Integer siteId, Integer partitionId, StringWriter logBuffer)
+    SiteLog(Long siteId, Integer partitionId, StringWriter logBuffer)
     {
         m_siteId = siteId;
         m_partitionId = partitionId;
@@ -53,7 +53,7 @@ public class SiteLog
         m_logIndex = 0;
     }
 
-    Integer getSiteId()
+    Long getSiteId()
     {
         return m_siteId;
     }

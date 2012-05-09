@@ -9,9 +9,11 @@
 	<classpathentry kind="src" path="examples/voltcache/src"/>
 	<classpathentry kind="src" path="examples/voltkv/src"/>
 	<classpathentry kind="src" path="examples/voter/src"/>
+	<classpathentry kind="src" path="tests/test_apps/adhocbenchmark/src"/>
 	<classpathentry kind="src" path="src/hsqldb19b3"/>
 	<classpathentry kind="src" path="third_party/java/src"/>
 	<classpathentry kind="lib" path="lib/commons-lang3-3.0.jar"/>
+	<classpathentry kind="lib" path="lib/commons-cli-1.2.jar"/>
 	<classpathentry kind="lib" path="lib/jline-1.0.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant_doxygen.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/ant-junit.jar"/>
@@ -26,23 +28,24 @@
 	<classpathentry kind="lib" path="third_party/java/jars/pmd-4.2.5.jar"/>
 	<classpathentry kind="lib" path="third_party/java/jars/testability-explorer.jar"/>
 	<classpathentry kind="lib" path="lib/log4j-1.2.16.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-http-7.5.1.v20110908.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-server-7.5.1.v20110908.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-http-7.6.1.v20120215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-server-7.6.1.v20120215.jar"/>
 	<classpathentry kind="lib" path="lib/servlet-api-2.5.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-util-7.5.1.v20110908.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-continuation-7.5.1.v20110908.jar"/>
-	<classpathentry kind="lib" path="lib/jetty-io-7.5.1.v20110908.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-util-7.6.1.v20120215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-continuation-7.6.1.v20120215.jar"/>
+	<classpathentry kind="lib" path="lib/jetty-io-7.6.1.v20120215.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-api-1.6.2.jar"/>
 	<classpathentry kind="lib" path="lib/slf4j-nop-1.6.2.jar"/>
+	<classpathentry kind="lib" path="lib/jna.jar"/>
+	<classpathentry kind="lib" path="lib/protobuf-java-2.4.1.jar"/>
+	<classpathentry kind="lib" path="lib/snappy-java-1.0.4.1.jar"/>
+	<classpathentry kind="lib" path="lib/zmq-2.1.11.jar"/>
+	<classpathentry kind="lib" path="lib/guava-12.0.jar"/>
+	<classpathentry kind="lib" path="third_party/java/jars/mockito-all-1.9.0.jar"/>
 	<classpathentry kind="con" path="org.eclipse.jdt.launching.JRE_CONTAINER">
 		<attributes>
 			<attribute name="org.eclipse.jdt.launching.CLASSPATH_ATTR_LIBRARY_PATH_ENTRY" value="voltdb/voltdb"/>
 		</attributes>
 	</classpathentry>
-	<classpathentry kind="lib" path="lib/jna.jar"/>
-	<classpathentry kind="lib" path="lib/protobuf-java-2.4.1.jar"/>
-	<classpathentry kind="lib" path="lib/snappy-java-1.0.4.1.jar"/>
-	<classpathentry kind="lib" path="lib/zmq-2.1.11.jar"/>
-	<classpathentry kind="lib" path="third_party/java/jars/mockito-all-1.9.0.jar"/>
 	<classpathentry kind="output" path="obj/eclipse"/>
 </classpath>

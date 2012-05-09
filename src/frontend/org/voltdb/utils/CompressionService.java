@@ -28,6 +28,7 @@ import java.util.concurrent.ThreadFactory;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.utils.Base64;
 import org.xerial.snappy.Snappy;
 
 public final class CompressionService {
@@ -155,18 +156,17 @@ public final class CompressionService {
     public static byte[] decompressBuffer(final ByteBuffer compressed) throws IOException {
         assert(compressed.isDirect());
         IOBuffers buffers = m_buffers.get();
-        ByteBuffer input = buffers.input;
         ByteBuffer output = buffers.output;
 
-        final int uncompressedLength = Snappy.uncompressedLength(input);
+        final int uncompressedLength = Snappy.uncompressedLength(compressed);
         if (output.capacity() < uncompressedLength) {
             output = ByteBuffer.allocateDirect(Math.max(output.capacity() * 2, uncompressedLength));
-            buffers = new IOBuffers(input, output);
+            buffers = new IOBuffers(compressed, output);
             m_buffers.set(buffers);
         }
         output.clear();
 
-        final int actualUncompressedLength = Snappy.uncompress(input, output);
+        final int actualUncompressedLength = Snappy.uncompress(compressed, output);
         assert(uncompressedLength == actualUncompressedLength);
 
         byte result[] = new byte[actualUncompressedLength];

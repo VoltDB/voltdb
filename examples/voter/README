@@ -16,9 +16,8 @@ These attributes can be adjusted by modifying the arguments to the "client" targ
 
 Additional arguments allow the client to automatically tune itself for optimal performance
 
+  - Whether auto-tuning should be turned on, allowing the benchmark to determine an optimal TPS for a given target latency
   - Target average stored procedure call (SPC) latency (in ms)
-  - Adjustment rate: the tuning process will decrease requested SPC/s to FACTOR*observed-SPC/s until the target latency is reached
-  - auto-tuning interval (in seconds)
 
 Measuring Performance
 ---------------------
@@ -40,7 +39,7 @@ Interpreting the Results
 ------------------------
 The default client configuration will allow the system to automatically tune itself for optimal performance, regardless of your underlying hardware and cluster deployment.
 
-The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion SP Calls per second - 1B SPC/s).  Within 5 second, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency of approximately 10 ms.
+The client starts "fire-hosing" the VoltDB server by attempting to submit transactions faster than the server can possibly process them (1 billion SP Calls per second - 1B SPC/s).  Within 5 second, the automated tuning should be able to figure out an optimized throughput (TPS) that maintains transaction latency of approximately 6 ms.
 
 You can also turn Auto-Tuning off to experiment with different loads and better understand why proper tuning is key to getting the most of your specific VoltDB deployment.
 

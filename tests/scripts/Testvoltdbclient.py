@@ -23,6 +23,11 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+import sys
+# add the path to the volt python client, just based on knowing
+# where we are now
+sys.path.append('../../src/py_client')
+
 import signal
 import unittest
 import datetime
@@ -30,7 +35,6 @@ import decimal
 import socket
 import threading
 import struct
-import sys
 import subprocess
 import time
 import array

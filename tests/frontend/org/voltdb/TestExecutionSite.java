@@ -28,6 +28,7 @@ import java.io.StringWriter;
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,6 +39,17 @@ import java.util.concurrent.atomic.AtomicInteger;
 
 import junit.framework.TestCase;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HeartbeatMessage;
+import org.voltcore.messaging.HeartbeatResponseMessage;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.DtxnConstants;
@@ -47,21 +59,11 @@ import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.executionsitefuzz.ExecutionSiteFuzzChecker;
 import org.voltdb.fault.FaultDistributor;
-import org.voltdb.fault.NodeFailureFault;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.FailureSiteUpdateMessage;
+import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.HeartbeatMessage;
-import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
 
 public class TestExecutionSite extends TestCase {
 
@@ -69,11 +71,11 @@ public class TestExecutionSite extends TestCase {
 
     private static final int FAIL_RANGE = 80000;
 
-    private static HashMap<Integer, RussianRouletteMailbox> postoffice =
-        new HashMap<Integer, RussianRouletteMailbox>();
+    private static HashMap<Long, RussianRouletteMailbox> postoffice =
+        new HashMap<Long, RussianRouletteMailbox>();
 
 
-    private void registerMailbox(int siteId, RussianRouletteMailbox mbox)
+    private void registerMailbox(long siteId, RussianRouletteMailbox mbox)
     {
         postoffice.put(siteId, mbox);
     }
@@ -89,11 +91,11 @@ public class TestExecutionSite extends TestCase {
     {
         int m_totalSends;
         int m_heartBeatSends;
-        private final Integer m_siteId;
+        private final Long m_siteId;
         final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();
         private int m_failureProb;
 
-        public RussianRouletteMailbox(Integer siteId)
+        public RussianRouletteMailbox(Long siteId)
         {
             for (Subject s : Subject.values()) {
                 m_messages.add( s.getId(), new ArrayDeque<VoltMessage>());
@@ -101,6 +103,16 @@ public class TestExecutionSite extends TestCase {
             m_failureProb = 0;
             m_siteId = siteId;
             m_totalSends = 0;
+        }
+
+        @Override
+        public long getHSId() {
+            return m_siteId;
+        }
+
+        @Override
+        public void setHSId(long hsId) {
+            throw new UnsupportedOperationException();
         }
 
         void setFailureLikelihood(int failChance)
@@ -138,7 +150,8 @@ public class TestExecutionSite extends TestCase {
         }
 
         @Override
-        public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
+        public void send(long siteId, VoltMessage message) throws MessagingException {
+            message.m_sourceHSId = m_siteId;
             m_totalSends++;
             if (message instanceof HeartbeatResponseMessage) {
                 m_heartBeatSends++;
@@ -156,7 +169,8 @@ public class TestExecutionSite extends TestCase {
         }
 
         @Override
-        public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
+        public void send(long[] siteIds, VoltMessage message) throws MessagingException {
+            message.m_sourceHSId = m_siteId;
             if (message instanceof HeartbeatResponseMessage) {
                 m_heartBeatSends += siteIds.length;
             }
@@ -288,26 +302,24 @@ public class TestExecutionSite extends TestCase {
         void killSite()
         {
             // Log breadcrumbs for validator
-            m_siteLogger[m_siteId].trace("FUZZTEST selfNodeFailure " + getHostIdForSiteId(m_siteId));
+            m_siteLogger.get(m_siteId).trace("FUZZTEST selfNodeFailure " + CoreUtils.getHostIdFromHSId(m_siteId));
             // mark the site as down in the catalog
             //System.out.println("KILLING SITE: " + m_siteId);
-            m_sites[m_siteId].shutdown();
+            m_sites.get(m_siteId).shutdown();
             m_voltdb.killSite(m_siteId);
+            long initiatorId = getInitiatorIds()[CoreUtils.getSiteIdFromHSId(m_siteId)];
+            m_voltdb.killSite(initiatorId);
+
+            /*
+             * Fail the site, and its initiator
+             */
             m_voltdb.getFaultDistributor().reportFault(
-                    new NodeFailureFault(
-                            getHostIdForSiteId(m_siteId),
-                            m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(m_siteId)),
-                            String.valueOf(getHostIdForSiteId(m_siteId))));
+                    new SiteFailureFault(Arrays.asList(new Long[] {
+                            m_siteId, initiatorId})));
             // remove this site from the postoffice
             postoffice.remove(m_siteId);
             // stop/join this site's thread
             throw new Error();
-        }
-
-        @Override
-        public int getSiteId() {
-            // TODO Auto-generated method stub
-            return 0;
         }
     }
 
@@ -325,15 +337,15 @@ public class TestExecutionSite extends TestCase {
 
     MockVoltDB m_voltdb;
     ExecutionSiteFuzzChecker m_checker;
-    RestrictedPriorityQueue m_rpqs[] = new RestrictedPriorityQueue[SITE_COUNT];
-    ExecutionSite m_sites[] = new ExecutionSite[SITE_COUNT];
-    RussianRouletteMailbox m_mboxes[] = new RussianRouletteMailbox[SITE_COUNT];
-    Thread m_siteThreads[] = new Thread[SITE_COUNT];
-    VoltLogger[] m_siteLogger = new VoltLogger[SITE_COUNT];
-    StringWriter[] m_siteResults = new StringWriter[SITE_COUNT];
+    Map<Long, RestrictedPriorityQueue> m_rpqs = new HashMap<Long, RestrictedPriorityQueue>();
+    Map<Long, ExecutionSite> m_sites = new HashMap<Long, ExecutionSite>();
+    Map<Long, RussianRouletteMailbox> m_mboxes = new HashMap<Long, RussianRouletteMailbox>();
+    Map<Long, Thread> m_siteThreads = new HashMap<Long, Thread>();
+    Map<Long, VoltLogger> m_siteLogger = new HashMap<Long, VoltLogger>();
+    Map<Long, StringWriter> m_siteResults = new HashMap<Long, StringWriter>();
     Random m_rand;
 
-    private void start(int siteCount, int partitionCount, int kFactor) {
+    private void start(int siteCount, int partitionCount, int kFactor) throws Exception {
         long seed = System.currentTimeMillis();
         m_rand = new Random(seed);
         m_checker = new ExecutionSiteFuzzChecker();
@@ -343,31 +355,31 @@ public class TestExecutionSite extends TestCase {
 
         // one host and one initiator per site
         for (int ss=0; ss < siteCount; ss++) {
-            m_voltdb.addHost(getHostIdForSiteId(ss));
-            m_voltdb.addSite(getInitiatorIdForSiteId(ss),
-                             getHostIdForSiteId(ss),
-                             getPartitionIdForSiteId(ss),
-                             false);
+            final long siteId = CoreUtils.getHSIdFromHostAndSite(getHostIdForSiteId(ss), getInitiatorIdForSiteId(ss));
+            m_voltdb.addSite( siteId, MailboxType.Initiator);
             // Configure log4j so that ExecutionSite generates FUZZTEST output
             String logname = ExecutionSite.class.getName() + "." + ss;
-            m_siteLogger[ss] = new VoltLogger(logname);
-            m_siteResults[ss] = new StringWriter();
-            m_siteLogger[ss].addSimpleWriterAppender(m_siteResults[ss]);
-            m_siteLogger[ss].setLevel(Level.TRACE);
+
+            final VoltLogger siteLogger = new VoltLogger(logname);
+            m_siteLogger.put(siteId, siteLogger);
+            final StringWriter siteResults = new StringWriter();
+            m_siteResults.put(siteId, siteResults);
+            siteLogger.addSimpleWriterAppender(siteResults);
+            siteLogger.setLevel(Level.TRACE);
         }
 
         // create k+1 sites per partition
-        int siteid = 0;
+        int siteIndex = 0;
         for (int pp=0; pp < partitionCount; pp++) {
-            m_voltdb.addPartition(pp);
             for (int kk=0; kk < (kFactor + 1); kk++) {
-                m_voltdb.addSite(siteid, getHostIdForSiteId(siteid), pp, true);
-                m_checker.addSite(siteid, pp, m_siteResults[siteid]);
-                ++siteid;
+                final long siteId = CoreUtils.getHSIdFromHostAndSite(getHostIdForSiteId(siteIndex), siteIndex);
+                m_voltdb.addSite(siteId, pp);
+                m_checker.addSite(siteId, pp, m_siteResults.get(CoreUtils.getHSIdFromHostAndSite( siteIndex, getInitiatorIdForSiteId(siteIndex))));
+                ++siteIndex;
             }
         }
 
-        if (siteid != siteCount) {
+        if (siteIndex != siteCount) {
             throw new RuntimeException("Invalid setup logic.");
         }
 
@@ -393,38 +405,39 @@ public class TestExecutionSite extends TestCase {
 
         // Create the real objects
         for (int ss=0; ss < siteCount; ++ss) {
-            m_mboxes[ss] = new RussianRouletteMailbox( ss );
-            m_rpqs[ss] = new RestrictedPriorityARRR(getInitiatorIds(), ss, m_mboxes[ss]);
-            m_sites[ss] =
+            long siteId = CoreUtils.getHSIdFromHostAndSite( ss, ss);
+            m_mboxes.put(siteId, new RussianRouletteMailbox( siteId ));
+            m_siteLogger.put(
+                    siteId,
+                    m_siteLogger.get(CoreUtils.getHSIdFromHostAndSite( ss, getInitiatorIdForSiteId(ss))));
+            m_rpqs.put( siteId, new RestrictedPriorityARRR(getInitiatorIds(), ss, m_mboxes.get(siteId)));
+            m_sites.put(siteId,
                 new ExecutionSite(
                         m_voltdb,
-                        m_mboxes[ss],
-                        ss,
+                        m_mboxes.get(siteId),
                         null,
-                        m_rpqs[ss],
+                        m_rpqs.get(siteId),
                         new MockProcedureRunnerFactory(),
                         false,
                         false,
-                        new HashSet<Integer>(),
-                        0);
-            registerMailbox(ss, m_mboxes[ss]);
+                        0,
+                        partitionCount));
+            registerMailbox(siteId, m_mboxes.get(siteId));
         }
     }
 
     @Override
     protected void tearDown() throws Exception
     {
-        for (int i=0; i < m_sites.length; ++i) {
-            m_sites[i] = null;
-            m_mboxes[i] = null;
-        }
+        System.out.println("Doing shutdown");
+        super.tearDown();
+        m_sites.clear();
+        m_mboxes.clear();
         if (m_voltdb != null) {
-            m_voltdb.getFaultDistributor().shutDown();
-            m_voltdb.m_snapshotCompletionMonitor.shutdown();
-            m_voltdb.getZK().close();
-            m_voltdb.m_agreementSite.shutdown();
+            m_voltdb.shutdown(null);
+            m_voltdb = null;
         }
-        m_voltdb = null;
+        System.out.println("Shutdown ZK");
         m_checker = null;
     }
 
@@ -439,41 +452,45 @@ public class TestExecutionSite extends TestCase {
     }
 
     /* Get a site on the same "host" as the initiator */
-    int getSiteIdForInitiatorId(int initiatorId) {
-        int siteId = initiatorId - 1000;
-        assert(getInitiatorIdForSiteId(siteId) == initiatorId);
-        return siteId;
+    long getSiteIdForInitiatorId(long initiatorId) {
+        int siteId = CoreUtils.getSiteIdFromHSId(initiatorId) - 1000;
+        assert(CoreUtils.getHSIdFromHostAndSite( siteId, getInitiatorIdForSiteId(siteId)) == initiatorId);
+        return CoreUtils.getHSIdFromHostAndSite( siteId, siteId);
+    }
+
+    long getHSIdForES(int siteId) {
+        return CoreUtils.getHSIdFromHostAndSite(getHostIdForSiteId(siteId), siteId);
     }
 
     /* return a new array of initiator ids */
-    int[] getInitiatorIds() {
-        int[] ids = new int[SITE_COUNT];
+    long[] getInitiatorIds() {
+        long[] ids = new long[SITE_COUNT];
         for (int ss=0; ss < SITE_COUNT; ss++) {
-            ids[ss] = getInitiatorIdForSiteId(ss);
+            ids[ss] = CoreUtils.getHSIdFromHostAndSite( getHostIdForSiteId(ss), getInitiatorIdForSiteId(ss));
         }
         return ids;
     }
 
     /* Random initiator */
-    private int selectRandomInitiator(Random rand) {
+    private long selectRandomInitiator(Random rand) {
         int site =  rand.nextInt(SITE_COUNT);
-        return getInitiatorIdForSiteId(site);
+        return CoreUtils.getHSIdFromHostAndSite(getHostIdForSiteId(site), getInitiatorIdForSiteId(site));
     }
 
     /* Given a partition, return a coordinator by value
        and the participants by out-param. */
-    private int selectCoordinatorAndParticipants(Random rand, int partition,
-                                                 int initiator,
-                                                 List<Integer> participants)
+    private long selectCoordinatorAndParticipants(Random rand, int partition,
+                                                 long initiator,
+                                                 List<Long> participants)
     {
         // Failure detection relies on the assumption that coordinator and
         // initiator are co-located
-        int coordinator = getSiteIdForInitiatorId(initiator);
+        long coordinator = getSiteIdForInitiatorId(initiator);
         for (int i=0; i < SITE_COUNT; i++) {
             if (i == coordinator)
                 continue;
             else
-                participants.add(i);
+                participants.add(getHSIdForES(i));
         }
         return coordinator;
     }
@@ -483,11 +500,11 @@ public class TestExecutionSite extends TestCase {
         return siteId;
     }
 
-    List<Integer> getSiteIdsForPartitionId(int partitionId) {
-        ArrayList<Integer> result = new ArrayList<Integer>();
+    List<Long> getSiteIdsForPartitionId(int partitionId) {
+        ArrayList<Long> result = new ArrayList<Long>();
         for (int ss=0; ss < SITE_COUNT; ++ss) {
             if (getPartitionIdForSiteId(ss) == partitionId) {
-                result.add(ss);
+                result.add(getHSIdForES(ss));
             }
         }
         return result;
@@ -504,32 +521,28 @@ public class TestExecutionSite extends TestCase {
          * the corresponding execution site's mailbox. Ugh.
          */
         public
-        RestrictedPriorityARRR(int[] initiatorSiteIds, int siteId, Mailbox mbox)
+        RestrictedPriorityARRR(long[] initiatorSiteIds, long siteId, Mailbox mbox)
         {
-            super(initiatorSiteIds, siteId, mbox, VoltDB.DTXN_MAILBOX_ID, true);
+            super(initiatorSiteIds, siteId, mbox, true);
         }
     }
 
     public static class MockProcedureRunnerFactory extends ProcedureRunnerFactory {
 
         @Override
-        public ProcedureRunner create(VoltProcedure procedure,
-                int numberOfPartitions, SiteProcedureConnection site,
-                Procedure catProc, HsqlBackend hsql) {
-
+        public ProcedureRunner create(VoltProcedure procedure, Procedure catProc) {
             if (procedure instanceof MockROSPVoltProcedure)
-                return new MockSPProcedureRunner((MockSPVoltProcedure) procedure, (ExecutionSite) site);
+                return new MockSPProcedureRunner((MockSPVoltProcedure) procedure, (ExecutionSite) super.m_site);
             else if (procedure instanceof MockSPVoltProcedure)
-                return new MockSPProcedureRunner((MockSPVoltProcedure) procedure, (ExecutionSite) site);
+                return new MockSPProcedureRunner((MockSPVoltProcedure) procedure, (ExecutionSite) super.m_site);
             else if (procedure instanceof MockMPVoltProcedure)
-                return new MockMPProcedureRunner((MockMPVoltProcedure) procedure, (ExecutionSite) site);
+                return new MockMPProcedureRunner((MockMPVoltProcedure) procedure, (ExecutionSite) super.m_site);
             else if (procedure instanceof VoltSystemProcedure)
-                return super.create(procedure, numberOfPartitions, site, catProc, hsql);
+                return super.create(procedure, catProc);
             else
                 assert(false);
             return null;
         }
-
     }
 
     public static class MockSPProcedureRunner extends ProcedureRunner {
@@ -539,7 +552,7 @@ public class TestExecutionSite extends TestCase {
         final ExecutionSite m_site;
 
         MockSPProcedureRunner(MockSPVoltProcedure procedure, ExecutionSite site) {
-            super(procedure, 1, site, null, null);
+            super(procedure, site, null, null);
             m_procedure = procedure;
             m_site = site;
         }
@@ -613,7 +626,7 @@ public class TestExecutionSite extends TestCase {
         */
 
         public MockMPProcedureRunner(MockMPVoltProcedure procedure, ExecutionSite site) {
-            super(procedure, 1, site, null, null);
+            super(procedure, site, null, null);
             m_procedure = procedure;
             m_site = site;
         }
@@ -672,7 +685,7 @@ public class TestExecutionSite extends TestCase {
                     int localTask_outputDep = m_txnState.getNextDependencyId();
 
                     FragmentTaskMessage localTask =
-                        new FragmentTaskMessage(m_txnState.initiatorSiteId,
+                        new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
                                                 m_txnState.isReadOnly(),
@@ -684,7 +697,7 @@ public class TestExecutionSite extends TestCase {
                     localTask.addInputDepId(0, localTask_startDep);
 
                     FragmentTaskMessage distributedTask =
-                        new FragmentTaskMessage(m_txnState.initiatorSiteId,
+                        new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
                                                 m_txnState.isReadOnly(),
@@ -729,7 +742,7 @@ public class TestExecutionSite extends TestCase {
         }
     }
 
-    /*public void testFuzzedTransactions() throws Exception
+    public void testFuzzedTransactions() throws Exception
     {
         for (int ii = 0; ii < 1; ii++) {
             tearDown();
@@ -739,7 +752,7 @@ public class TestExecutionSite extends TestCase {
             final int totalTransactions = 20000;
             final long firstTxnId = 10000;
             for (int i=0; i < SITE_COUNT; ++i) {
-                m_mboxes[i].setFailureLikelihood(1);
+                m_mboxes.get(getHSIdForES(i)).setFailureLikelihood(1);
             }
             queueTransactions(firstTxnId, totalTransactions, m_rand);
             createAndRunSiteThreads();
@@ -749,11 +762,11 @@ public class TestExecutionSite extends TestCase {
                 boolean stopped = false;
                 do {
                     try {
-                        m_siteThreads[i].join();
+                        m_siteThreads.get(getHSIdForES(i)).join();
                     }
                     catch (InterruptedException e) {
                     }
-                    if (m_siteThreads[i].isAlive() == false) {
+                    if (m_siteThreads.get(getHSIdForES(i)).isAlive() == false) {
                         System.out.println("Joined site " + i);
                         stopped = true;
                     }
@@ -762,19 +775,19 @@ public class TestExecutionSite extends TestCase {
 
             for (int i = 0; i < SITE_COUNT; ++i)
             {
-                System.out.println("sends for mailbox: " + i + ": " + m_mboxes[i].m_totalSends);
+                System.out.println("sends for mailbox: " + i + ": " + m_mboxes.get(getHSIdForES(i)).m_totalSends);
             }
 
             m_checker.dumpLogs();
             assertTrue(m_checker.validateLogs());
         }
-    }*/
+    }
 
     /*
      * SinglePartition basecase. Show that recursableRun completes a
      * single partition transaction.
      */
-    public void testSinglePartitionTxn()
+    public void testSinglePartitionTxn() throws Exception
     {
         start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         final boolean readOnly = false;
@@ -791,28 +804,29 @@ public class TestExecutionSite extends TestCase {
             new InitiateTaskMessage(getInitiatorIdForSiteId(0),
                                     0, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
+        final long siteId0 = getHSIdForES(0);
         final SinglePartitionTxnState tx1 =
-            new SinglePartitionTxnState(m_mboxes[0], m_sites[0], tx1_mn);
+            new SinglePartitionTxnState(m_mboxes.get(siteId0), m_sites.get(siteId0), tx1_mn);
 
         int callcheck = MockSPProcedureRunner.m_called;
 
         assertFalse(tx1.isDone());
-        assertEquals(0, m_sites[0].lastCommittedTxnId);
-        assertEquals(0, m_sites[0].lastKnownGloballyCommitedMultiPartTxnId);
-        m_sites[0].m_transactionsById.put(tx1.txnId, tx1);
-        m_sites[0].recursableRun(tx1);
+        assertEquals(0, m_sites.get(siteId0).lastCommittedTxnId);
+        assertEquals(0, m_sites.get(siteId0).lastKnownGloballyCommitedMultiPartTxnId);
+        m_sites.get(siteId0).m_transactionsById.put(tx1.txnId, tx1);
+        m_sites.get(siteId0).recursableRun(tx1);
 
         assertTrue(tx1.isDone());
-        assertEquals(null, m_sites[0].m_transactionsById.get(tx1.txnId));
+        assertEquals(null, m_sites.get(siteId0).m_transactionsById.get(tx1.txnId));
         assertEquals((++callcheck), MockSPProcedureRunner.m_called);
-        assertEquals(1000, m_sites[0].lastCommittedTxnId);
-        assertEquals(0, m_sites[0].lastKnownGloballyCommitedMultiPartTxnId);
+        assertEquals(1000, m_sites.get(siteId0).lastCommittedTxnId);
+        assertEquals(0, m_sites.get(siteId0).lastKnownGloballyCommitedMultiPartTxnId);
     }
 
     /*
      * Single partition read-only
      */
-    public void testROSinglePartitionTxn()
+    public void testROSinglePartitionTxn() throws Exception
     {
         start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         final boolean readOnly = true;
@@ -825,16 +839,17 @@ public class TestExecutionSite extends TestCase {
         final InitiateTaskMessage tx1_mn =
             new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
+        final long siteId0 = getHSIdForES(0);
         final SinglePartitionTxnState tx1 =
-            new SinglePartitionTxnState(m_mboxes[0], m_sites[0], tx1_mn);
+            new SinglePartitionTxnState(m_mboxes.get(siteId0), m_sites.get(siteId0), tx1_mn);
 
         int callcheck = MockSPProcedureRunner.m_called;
 
         assertFalse(tx1.isDone());
-        m_sites[0].m_transactionsById.put(tx1.txnId, tx1);
-        m_sites[0].recursableRun(tx1);
+        m_sites.get(siteId0).m_transactionsById.put(tx1.txnId, tx1);
+        m_sites.get(siteId0).recursableRun(tx1);
         assertTrue(tx1.isDone());
-        assertEquals(null, m_sites[0].m_transactionsById.get(tx1.txnId));
+        assertEquals(null, m_sites.get(siteId0).m_transactionsById.get(tx1.txnId));
         assertEquals((++callcheck), MockSPProcedureRunner.m_called);
     }
 
@@ -852,42 +867,45 @@ public class TestExecutionSite extends TestCase {
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
         tx1_spi.setParams("commit", new Integer(0));
 
+        final long siteId0 = getHSIdForES(0);
+        final long siteId1 = getHSIdForES(1);
+
         // site 1 is the coordinator
         final InitiateTaskMessage tx1_mn_1 =
             new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, 1000, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final MultiPartitionParticipantTxnState tx1_1 =
-            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1);
+            new MultiPartitionParticipantTxnState(m_mboxes.get(siteId0), m_sites.get(siteId0), tx1_mn_1);
 
         // site 2 is a participant
         final MultiPartitionParticipantMessage tx1_mn_2 =
             new MultiPartitionParticipantMessage(getInitiatorIdForSiteId(0), 0, 1000, readOnly);
 
         final MultiPartitionParticipantTxnState tx1_2 =
-            new MultiPartitionParticipantTxnState(m_mboxes[1], m_sites[1], tx1_mn_2);
+            new MultiPartitionParticipantTxnState(m_mboxes.get(siteId1), m_sites.get(siteId1), tx1_mn_2);
 
         // pre-conditions
         int callcheck = MockMPProcedureRunner.m_called;
         assertFalse(tx1_1.isDone());
         assertFalse(tx1_2.isDone());
 
-        assertEquals(0, m_sites[0].lastCommittedTxnId);
-        assertEquals(0, m_sites[0].lastKnownGloballyCommitedMultiPartTxnId);
-        assertEquals(0, m_sites[1].lastCommittedTxnId);
-        assertEquals(0, m_sites[1].lastKnownGloballyCommitedMultiPartTxnId);
+        assertEquals(0, m_sites.get(siteId0).lastCommittedTxnId);
+        assertEquals(0, m_sites.get(siteId0).lastKnownGloballyCommitedMultiPartTxnId);
+        assertEquals(0, m_sites.get(siteId1).lastCommittedTxnId);
+        assertEquals(0, m_sites.get(siteId1).lastKnownGloballyCommitedMultiPartTxnId);
 
-        m_sites[0].m_transactionsById.put(tx1_1.txnId, tx1_1);
-        m_sites[1].m_transactionsById.put(tx1_2.txnId, tx1_2);
+        m_sites.get(siteId0).m_transactionsById.put(tx1_1.txnId, tx1_1);
+        m_sites.get(siteId1).m_transactionsById.put(tx1_2.txnId, tx1_2);
 
         // execute transaction
         es1 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites[0].recursableRun(tx1_1);}});
+            public void run() {m_sites.get(siteId0).recursableRun(tx1_1);}});
         es1.start();
 
         es2 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites[1].recursableRun(tx1_2);}});
+            public void run() {m_sites.get(siteId1).recursableRun(tx1_2);}});
         es2.start();
 
         es1.join();
@@ -897,12 +915,12 @@ public class TestExecutionSite extends TestCase {
         assertTrue(tx1_1.isDone());
         assertTrue(tx1_2.isDone());
 
-        assertEquals(null, m_sites[0].m_transactionsById.get(tx1_1.txnId));
-        assertEquals(null, m_sites[1].m_transactionsById.get(tx1_2.txnId));
-        assertEquals(1000, m_sites[0].lastCommittedTxnId);
-        assertEquals(1000, m_sites[0].lastKnownGloballyCommitedMultiPartTxnId);
-        assertEquals(1000, m_sites[1].lastCommittedTxnId);
-        assertEquals(1000, m_sites[1].lastKnownGloballyCommitedMultiPartTxnId);
+        assertEquals(null, m_sites.get(siteId0).m_transactionsById.get(tx1_1.txnId));
+        assertEquals(null, m_sites.get(siteId1).m_transactionsById.get(tx1_2.txnId));
+        assertEquals(1000, m_sites.get(siteId1).lastCommittedTxnId);
+        assertEquals(1000, m_sites.get(siteId0).lastKnownGloballyCommitedMultiPartTxnId);
+        assertEquals(1000, m_sites.get(siteId1).lastCommittedTxnId);
+        assertEquals(1000, m_sites.get(siteId1).lastKnownGloballyCommitedMultiPartTxnId);
 
         assertEquals((++callcheck), MockMPProcedureRunner.m_called);
     }
@@ -923,11 +941,13 @@ public class TestExecutionSite extends TestCase {
         // TxnIds in this testcase are chosen to make -1 a valid
         // global commit point. (Where -1 is DUMMY_LAST_SEEN...)
 
+        final long siteId0 = getHSIdForES(0);
+        final long siteId1 = getHSIdForES(1);
         // Want to commit this participant. Global commit pt must
         // be GT than the running txnid.
-        m_sites[0].lastKnownGloballyCommitedMultiPartTxnId =
+        m_sites.get(siteId0).lastKnownGloballyCommitedMultiPartTxnId =
             DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
-        m_sites[1].lastKnownGloballyCommitedMultiPartTxnId =
+        m_sites.get(siteId1).lastKnownGloballyCommitedMultiPartTxnId =
             DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
 
         boolean test_rollback = false;
@@ -949,10 +969,13 @@ public class TestExecutionSite extends TestCase {
         // TxnIds in this testcase are chosen to make -1 a valid
         // global commit point. (Where -1 is DUMMY_LAST_SEEN...)
 
+        final long siteId0 = getHSIdForES(0);
+        final long siteId1 = getHSIdForES(1);
+
         // Want to NOT commit this participant. Global commit pt must
         // be LT than the running txnid.
-        m_sites[0].lastKnownGloballyCommitedMultiPartTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
-        m_sites[1].lastKnownGloballyCommitedMultiPartTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
+        m_sites.get(siteId0).lastKnownGloballyCommitedMultiPartTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
+        m_sites.get(siteId1).lastKnownGloballyCommitedMultiPartTxnId =  DtxnConstants.DUMMY_LAST_SEEN_TXN_ID - 1;
 
         boolean test_rollback = true;
         multipartitionNodeFailure(test_rollback, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
@@ -974,36 +997,39 @@ public class TestExecutionSite extends TestCase {
         tx1_spi.setProcName("org.voltdb.TestExecutionSite$MockMPVoltProcedure");
         tx1_spi.setParams("commit", new Integer(0));
 
+        final long siteId0 = getHSIdForES(0);
+        final long siteId1 = getHSIdForES(1);
+
         // site 1 is the coordinator
         final InitiateTaskMessage tx1_mn_1 =
             new InitiateTaskMessage(getInitiatorIdForSiteId(0), 0, txnid, readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
         final MultiPartitionParticipantTxnState tx1_1 =
-            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1);
+            new MultiPartitionParticipantTxnState(m_mboxes.get(siteId0), m_sites.get(siteId0), tx1_mn_1);
 
         // site 2 is a participant
         final MultiPartitionParticipantMessage tx1_mn_2 =
             new MultiPartitionParticipantMessage(getInitiatorIdForSiteId(0), 0, txnid, readOnly);
 
         final MultiPartitionParticipantTxnState tx1_2 =
-            new MultiPartitionParticipantTxnState(m_mboxes[1], m_sites[1], tx1_mn_2);
+            new MultiPartitionParticipantTxnState(m_mboxes.get(siteId1), m_sites.get(siteId1), tx1_mn_2);
 
         // pre-conditions
         int callcheck = MockMPProcedureRunner.m_called;
         assertFalse(tx1_1.isDone());
         assertFalse(tx1_2.isDone());
-        m_sites[0].m_transactionsById.put(tx1_1.txnId, tx1_1);
-        m_sites[1].m_transactionsById.put(tx1_2.txnId, tx1_2);
+        m_sites.get(siteId0).m_transactionsById.put(tx1_1.txnId, tx1_1);
+        m_sites.get(siteId1).m_transactionsById.put(tx1_2.txnId, tx1_2);
 
         // execute transaction
         es1 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites[0].recursableRun(tx1_1);}});
+            public void run() {m_sites.get(siteId0).recursableRun(tx1_1);}});
         es1.start();
 
         es2 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites[1].recursableRun(tx1_2);}});
+            public void run() {m_sites.get(siteId1).recursableRun(tx1_2);}});
         es2.start();
 
         es1.join();
@@ -1012,11 +1038,13 @@ public class TestExecutionSite extends TestCase {
         // push a fault notice to the participant. Must supply the host id
         // corresponding to the coordinator site id.
         m_voltdb.killSite(0);
+        m_voltdb.killSite(CoreUtils.getHSIdFromHostAndSite( 0, getInitiatorIdForSiteId(0)));
         m_voltdb.getFaultDistributor().reportFault(
-                new NodeFailureFault(
-                        getHostIdForSiteId(0),
-                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(0)),
-                        String.valueOf(getHostIdForSiteId(0))));
+                new SiteFailureFault(
+                        Arrays.asList(
+                                new Long[] {
+                                        CoreUtils.getHSIdFromHostAndSite(
+                                                0, getInitiatorIdForSiteId(0)), getHSIdForES(0)})));
 
         es2.join();
 
@@ -1024,7 +1052,7 @@ public class TestExecutionSite extends TestCase {
         assertFalse(tx1_1.isDone());      // did not run to completion because of simulated fault
         assertTrue(tx1_2.isDone());       // did run to completion because of globalCommitPt.
         assertEquals(should_rollback, tx1_2.needsRollback()); // did not rollback because of globalCommitPt.
-        assertEquals(null, m_sites[1].m_transactionsById.get(tx1_2.txnId));
+        assertEquals(null, m_sites.get(siteId1).m_transactionsById.get(tx1_2.txnId));
         assertEquals((++callcheck), MockMPProcedureRunner.m_called);
     }
 
@@ -1034,7 +1062,7 @@ public class TestExecutionSite extends TestCase {
      * ExecutionSite and Mailbox are necessary to construct a MP txn state.
      */
     @SuppressWarnings("deprecation")
-    public void testMultiPartitionParticipantTxnState_handleSiteFaults() {
+    public void testMultiPartitionParticipantTxnState_handleSiteFaults() throws Exception {
         start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);
@@ -1042,51 +1070,59 @@ public class TestExecutionSite extends TestCase {
         spi.setParams("commit", 57, "gooniestoo");
         InitiateTaskMessage mn = new InitiateTaskMessage(-1, 0, -1, false, false, spi, Long.MIN_VALUE);
 
+        final long siteId0 = getHSIdForES(0);
+        Mailbox m0 = m_mboxes.get(siteId0);
+        ExecutionSite es0 = m_sites.get(siteId0);
         MultiPartitionParticipantTxnState ts =
-            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);
+            new MultiPartitionParticipantTxnState(m0, es0, mn);
 
         // fail middle and last site
-        HashSet<Integer> failedSites = new HashSet<Integer>();
-        failedSites.add(1);
-        failedSites.add(2);
-        failedSites.add(3);
-        failedSites.add(5);
+        HashSet<Long> failedSites = new HashSet<Long>();
+        failedSites.add(getHSIdForES(1));
+        failedSites.add(getHSIdForES(2));
+        failedSites.add(getHSIdForES(3));
+        failedSites.add(getHSIdForES(5));
         ts.handleSiteFaults(failedSites);
 
         // peek at some internals
-        int[] nonCoordinatingSites = ts.getNonCoordinatingSites();
+        long[] nonCoordinatingSites = ts.getNonCoordinatingSites();
         assertEquals(4, nonCoordinatingSites.length);
-        assertEquals(4, nonCoordinatingSites[0]);
+        assertEquals(getHSIdForES(8), nonCoordinatingSites[3]);
+        assertEquals(getHSIdForES(7), nonCoordinatingSites[2]);
+        assertEquals(getHSIdForES(6), nonCoordinatingSites[1]);
+        assertEquals(getHSIdForES(4), nonCoordinatingSites[0]);
 
         // fail first site
-        ts = new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);
+        ts = new MultiPartitionParticipantTxnState(m0, es0, mn);
         failedSites.clear();
-        failedSites.add(1);
+        failedSites.add(getHSIdForES(1));
         ts.handleSiteFaults(failedSites);
 
         nonCoordinatingSites = ts.getNonCoordinatingSites();
         assertEquals(7, nonCoordinatingSites.length);
-        assertEquals(2, nonCoordinatingSites[0]);
-        assertEquals(3, nonCoordinatingSites[1]);
-        assertEquals(4, nonCoordinatingSites[2]);
-        assertEquals(5, nonCoordinatingSites[3]);
-        assertEquals(6, nonCoordinatingSites[4]);
-        assertEquals(7, nonCoordinatingSites[5]);
-        assertEquals(8, nonCoordinatingSites[6]);
+        assertEquals(getHSIdForES(8), nonCoordinatingSites[6]);
+        assertEquals(getHSIdForES(7), nonCoordinatingSites[5]);
+        assertEquals(getHSIdForES(6), nonCoordinatingSites[4]);
+        assertEquals(getHSIdForES(4), nonCoordinatingSites[2]);
+        assertEquals(getHSIdForES(3), nonCoordinatingSites[1]);
+        assertEquals(getHSIdForES(2), nonCoordinatingSites[0]);
 
         // fail site that isn't a non-coordinator site
-        ts = new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], mn);
+        ts = new MultiPartitionParticipantTxnState(m0, es0, mn);
         failedSites.clear();
-        failedSites.add(9);
-        failedSites.add(10);
+        failedSites.add(getHSIdForES(9));
+        failedSites.add(getHSIdForES(10));
         ts.handleSiteFaults(failedSites);
 
         nonCoordinatingSites = ts.getNonCoordinatingSites();
         assertEquals(8, nonCoordinatingSites.length);
-        for (int i=0; i < 8; i++) {
-            assertEquals(i+1, nonCoordinatingSites[i]);
-        }
-
+        assertEquals(getHSIdForES(8), nonCoordinatingSites[7]);
+        assertEquals(getHSIdForES(7), nonCoordinatingSites[6]);
+        assertEquals(getHSIdForES(6), nonCoordinatingSites[5]);
+        assertEquals(getHSIdForES(5), nonCoordinatingSites[4]);
+        assertEquals(getHSIdForES(3), nonCoordinatingSites[2]);
+        assertEquals(getHSIdForES(2), nonCoordinatingSites[1]);
+        assertEquals(getHSIdForES(1), nonCoordinatingSites[0]);
     }
 
     /*
@@ -1111,46 +1147,37 @@ public class TestExecutionSite extends TestCase {
                                     DtxnConstants.DUMMY_LAST_SEEN_TXN_ID,
                                     readOnly, singlePartition, tx1_spi, Long.MAX_VALUE);
 
+        final long siteId0 = getHSIdForES(0);
+        final Mailbox m0 = m_mboxes.get(siteId0);
+        final ExecutionSite es0 = m_sites.get(siteId0);
+        es0.lastKnownGloballyCommitedMultiPartTxnId = DtxnConstants.DUMMY_LAST_SEEN_TXN_ID + 1;
         final MultiPartitionParticipantTxnState tx1_1 =
-            new MultiPartitionParticipantTxnState(m_mboxes[0], m_sites[0], tx1_mn_1);
+            new MultiPartitionParticipantTxnState(m0, es0, tx1_mn_1);
 
         // Site 2 won't exist; we'll claim it fails.
 
         // pre-conditions
         int callcheck = MockMPProcedureRunner.m_called;
         assertFalse(tx1_1.isDone());
-        m_sites[0].m_transactionsById.put(tx1_1.txnId, tx1_1);
+        es0.m_transactionsById.put(tx1_1.txnId, tx1_1);
 
         // execute transaction
         es1 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites[0].recursableRun(tx1_1);}});
+            public void run() {es0.recursableRun(tx1_1);}});
         es1.start();
 
-        m_voltdb.killSite(1);
+        m_voltdb.killSite(getHSIdForES(1));
+        m_voltdb.killSite(getInitiatorIds()[1]);
         m_voltdb.getFaultDistributor().reportFault(
-                new NodeFailureFault(
-                        getHostIdForSiteId(1),
-                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(1)),
-                        String.valueOf(getHostIdForSiteId(1))));
-
-        // the fault data message from the "other surviving" sites
-        // (all but the site actually running and the site that failed).
-        for (int ss=0; ss < SITE_COUNT; ++ss) {
-            if ((ss != 1) || (ss != 0)) {
-                HashSet<Integer> failedHosts = new HashSet<Integer>();
-                failedHosts.add(getHostIdForSiteId(1));
-                m_mboxes[0].deliver(new FailureSiteUpdateMessage
-                                    (ss, failedHosts, tx1_1.initiatorSiteId,
-                                     tx1_1.txnId, tx1_1.txnId));
-            }
-        }
+                new SiteFailureFault(
+                        Arrays.asList(new Long[] { getInitiatorIds()[1], getHSIdForES(1) })));
         es1.join();
 
         // post-conditions
         assertTrue(tx1_1.isDone());
         assertFalse(tx1_1.needsRollback());
-        assertEquals(null, m_sites[0].m_transactionsById.get(tx1_1.txnId));
+        assertEquals(null, es0.m_transactionsById.get(tx1_1.txnId));
         assertEquals((++callcheck), MockMPProcedureRunner.m_called);
     }
 
@@ -1169,15 +1196,15 @@ public class TestExecutionSite extends TestCase {
             boolean readOnly,
             long txn_id,
             long safe_txn_id,
-            int initiator_id,
+            long initiator_id,
             int partition_id)
     {
         final StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
         spi.setParams("commit", new Integer(partition_id));
 
-        List<Integer> sitesForPartition = getSiteIdsForPartitionId(partition_id);
-        for (int i : sitesForPartition) {
+        List<Long> sitesForPartition = getSiteIdsForPartitionId(partition_id);
+        for (long i : sitesForPartition) {
             final InitiateTaskMessage itm =
                 new InitiateTaskMessage(initiator_id,
                                         i,             // each site is its own coordinator
@@ -1186,7 +1213,8 @@ public class TestExecutionSite extends TestCase {
                                         true,          // single partition
                                         spi,
                                         safe_txn_id);  // last safe txnid
-            m_mboxes[i].deliver(itm);
+            itm.m_sourceHSId = initiator_id;
+            m_mboxes.get(i).deliver(itm);
         }
     }
 
@@ -1200,10 +1228,10 @@ public class TestExecutionSite extends TestCase {
             int numberOfBatches,
             long txn_id,
             long safe_txn_id,
-            int initiator_id,
+            long initiator_id,
             int partition_id,
-            int coordinator_id,
-            List<Integer> participants)
+            long coordinator_id,
+            List<Long> participants)
     {
         ArrayList<Object> params = new ArrayList<Object>();
         params.add("number_of_batches");
@@ -1245,14 +1273,15 @@ public class TestExecutionSite extends TestCase {
                                     false,         // multi-partition
                                     spi,
                                     safe_txn_id);  // last safe txnid
+        itm.m_sourceHSId = initiator_id;
+        m_mboxes.get(coordinator_id).deliver(itm);
 
-        m_mboxes[coordinator_id].deliver(itm);
-
-        for (int participant : participants) {
+        for (long participant : participants) {
             final MultiPartitionParticipantMessage mppm =
                 new MultiPartitionParticipantMessage
                 (initiator_id, coordinator_id, txn_id, readOnly);
-            m_mboxes[participant].deliver(mppm);
+            mppm.m_sourceHSId = initiator_id;
+            m_mboxes.get(participant).deliver(mppm);
         }
     }
 
@@ -1266,15 +1295,13 @@ public class TestExecutionSite extends TestCase {
     private void createHeartBeat(
             long txn_id,
             long safe_txn_id,
-            int initiator_id)
+            long initiator_id)
     {
         HeartbeatMessage hbm =
             new HeartbeatMessage(initiator_id, txn_id, safe_txn_id);
-        int[] upExecutionSites =
-            m_voltdb.getCatalogContext().siteTracker.getUpExecutionSites();
-
-        for (int i : upExecutionSites) {
-            m_mboxes[i].deliver(hbm);
+        hbm.m_sourceHSId = initiator_id;
+        for (Mailbox m : m_mboxes.values()) {
+            m.deliver(hbm);
         }
     }
 
@@ -1292,14 +1319,14 @@ public class TestExecutionSite extends TestCase {
             boolean readOnly = rand.nextBoolean();
             long txnid = i + firstTxnId;
             long safe_txnid = txnid;
-            int initiator = selectRandomInitiator(rand);
+            long initiator = selectRandomInitiator(rand);
             int partition = i % PARTITION_COUNT;
 
             int wheelOfDestiny = rand.nextInt(100);
             if (i == totalTransactions) {
                 testLog.info("Queueing final heartbeat.");
                 int offset = 0;
-                for (int inid : getInitiatorIds()) {
+                for (long inid : getInitiatorIds()) {
                     createHeartBeat(txnid + offset, txnid + offset, inid);
                     ++offset;
                 }
@@ -1309,8 +1336,8 @@ public class TestExecutionSite extends TestCase {
             }
             else if (wheelOfDestiny < 70) {
                 int numberOfBatches = rand.nextInt(4) + 1;
-                List<Integer> participants = new ArrayList<Integer>();
-                int coordinator = selectCoordinatorAndParticipants(rand, partition, initiator, participants);
+                List<Long> participants = new ArrayList<Long>();
+                long coordinator = selectCoordinatorAndParticipants(rand, partition, initiator, participants);
                 createMPInitiation(rollback, rollback_all, readOnly, numberOfBatches,
                                    txnid, safe_txnid, initiator, partition,
                                    coordinator, participants);
@@ -1333,17 +1360,17 @@ public class TestExecutionSite extends TestCase {
     private void createAndRunSiteThreads(final boolean loopUntilPoison)
     {
         for (int i=0; i < SITE_COUNT; ++i) {
-            final int site_id = i;
-            m_siteThreads[i] = new Thread(new Runnable() {
+            final long site_id = getHSIdForES(i);
+            m_siteThreads.put(site_id, new Thread(new Runnable() {
                @Override
                public void run() {
-                   m_sites[site_id].runLoop(loopUntilPoison);
+                   m_sites.get(site_id).runLoop(loopUntilPoison);
                }
-            }, "Site: " + site_id);
+            }, "Site: " + CoreUtils.hsIdToString(site_id)));
         }
 
         for (int i=0; i < SITE_COUNT; ++i) {
-            m_siteThreads[i].start();
+            m_siteThreads.get(getHSIdForES(i)).start();
         }
     }
 
@@ -1359,40 +1386,42 @@ public class TestExecutionSite extends TestCase {
     public void testENG1617() throws Exception {
         System.out.println("Starting testENG1617");
         start(SITE_COUNT, PARTITION_COUNT, K_FACTOR);
-        for (int i=0; i < SITE_COUNT; ++i) {
-          m_mboxes[i].setFailureLikelihood(0);
+
+        for (RussianRouletteMailbox m : m_mboxes.values()) {
+             m.setFailureLikelihood(0);
         }
         createAndRunSiteThreads(true);
 
         /*
          * These are the sites that will receive the txns from the two concurrently dieing initiators
          */
-        List<Integer> involvedSites1 = getSiteIdsForPartitionId(0);
+        List<Long> involvedSites1 = getSiteIdsForPartitionId(0);
 
         /*
          * Will use these sites to find initiators to kill
          */
-        List<Integer> involvedSites2 = getSiteIdsForPartitionId(1);
+        List<Long> involvedSites2 = getSiteIdsForPartitionId(1);
 
         //This initiator will initiate the txn with the lower id that is partially replicated to just one site
-        int initiatorToDie1 = getInitiatorIdForSiteId(involvedSites2.get(0));
+        int initiatorToDie1 = getInitiatorIdForSiteId(CoreUtils.getSiteIdFromHSId(involvedSites2.get(0)));
 
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setProcName("org.voltdb.TestExecutionSite$MockSPVoltProcedure");
         spi.setParams("commit", new Integer(0));
 
         InitiateTaskMessage itm =
-                new InitiateTaskMessage(initiatorToDie1,
+                new InitiateTaskMessage(getInitiatorIds()[initiatorToDie1 / 1000],
                                         involvedSites1.get(2),             // each site is its own coordinator
-                                        1,
+                                        getHSIdForES(1),
                                         false,
                                         true,          // single partition
                                         spi,
                                         0);  // last safe txnid
-        m_mboxes[involvedSites1.get(2)].deliver(itm);
+        itm.m_sourceHSId = getInitiatorIds()[initiatorToDie1 / 1000];
+        m_mboxes.get(involvedSites1.get(2)).deliver(itm);
 
         //This initiator will initiate the txn with the higher txn id that is fully replicated
-        int initiatorToDie2 = getInitiatorIdForSiteId(involvedSites2.get(1));
+        int initiatorToDie2 = getInitiatorIdForSiteId(CoreUtils.getSiteIdFromHSId(involvedSites2.get(1)));
 
         for (int ii = 0; ii < 3; ii++) {
             spi = new StoredProcedureInvocation();
@@ -1400,51 +1429,61 @@ public class TestExecutionSite extends TestCase {
             spi.setParams("commit", new Integer(0));
 
             itm =
-                    new InitiateTaskMessage(initiatorToDie2,
+                    new InitiateTaskMessage(getInitiatorIds()[initiatorToDie2 / 1000],
                                             involvedSites1.get(ii),             // each site is its own coordinator
-                                            3,
+                                            getHSIdForES(3),
                                             false,
                                             true,          // single partition
                                             spi,
                                             2);  // last safe txnid
-            m_mboxes[involvedSites1.get(ii)].deliver(itm);
+            itm.m_sourceHSId = getInitiatorIds()[initiatorToDie2 / 1000];
+            m_mboxes.get(involvedSites1.get(ii)).deliver(itm);
         }
 
+        LocalObjectMessage lom = new LocalObjectMessage(new Runnable() {
+            @Override
+            public void run() {
+                throw new Error();
+            }
+        });
+        lom.m_sourceHSId = involvedSites2.get(0);
         /*
          * Kill the two initiators
          */
-        m_mboxes[involvedSites2.get(0)].deliver(new LocalObjectMessage(new Runnable() {
+        m_mboxes.get(involvedSites2.get(0)).deliver(lom);
+        lom = new LocalObjectMessage(new Runnable() {
             @Override
             public void run() {
                 throw new Error();
             }
-        }));
-        m_mboxes[involvedSites2.get(1)].deliver(new LocalObjectMessage(new Runnable() {
-            @Override
-            public void run() {
-                throw new Error();
-            }
-        }));
-        m_siteThreads[involvedSites2.get(0)].join();
-        m_siteThreads[involvedSites2.get(1)].join();
+        });
+        lom.m_sourceHSId = involvedSites2.get(1);
+        m_mboxes.get(involvedSites2.get(1)).deliver(lom);
 
-        m_sites[involvedSites2.get(0)].shutdown();
+        m_siteThreads.get(involvedSites2.get(0)).join();
+        m_siteThreads.get(involvedSites2.get(1)).join();
+
+        m_sites.get(involvedSites2.get(0)).shutdown();
         m_voltdb.killSite(involvedSites2.get(0));
         m_voltdb.getFaultDistributor().reportFault(
-                new NodeFailureFault(
-                        getHostIdForSiteId(involvedSites2.get(0)),
-                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(involvedSites2.get(0))),
-                        String.valueOf(getHostIdForSiteId(involvedSites2.get(0)))));
+                new SiteFailureFault(
+                        Arrays.asList( new Long[] {
+                                CoreUtils.getHSIdFromHostAndSite(
+                                        involvedSites2.get(0).intValue(),
+                                        (int)(involvedSites2.get(0).longValue() >> 32) + 1000),
+                                        involvedSites2.get(0)})));
         // remove this site from the postoffice
         postoffice.remove(involvedSites2.get(0));
 
-        m_sites[involvedSites2.get(1)].shutdown();
+        m_sites.get(involvedSites2.get(1)).shutdown();
         m_voltdb.killSite(involvedSites2.get(1));
         m_voltdb.getFaultDistributor().reportFault(
-                new NodeFailureFault(
-                        getHostIdForSiteId(involvedSites2.get(1)),
-                        m_voltdb.getCatalogContext().siteTracker.getNonExecSitesForHost(getHostIdForSiteId(involvedSites2.get(1))),
-                        String.valueOf(getHostIdForSiteId(involvedSites2.get(1)))));
+                new SiteFailureFault(
+                        Arrays.asList(new Long[]{
+                                CoreUtils.getHSIdFromHostAndSite(
+                                        involvedSites2.get(1).intValue(),
+                                        (int)(involvedSites2.get(1).longValue() >> 32) + 1000),
+                                        involvedSites2.get(1)})));
         // remove this site from the postoffice
         postoffice.remove(involvedSites2.get(1));
 
@@ -1455,10 +1494,10 @@ public class TestExecutionSite extends TestCase {
         long start = System.currentTimeMillis();
         while (System.currentTimeMillis() - start > 15000) {
             boolean containsBadValue = false;
-            for (int ii = 0; ii < m_sites.length; ii++) {
-                if (m_sites[ii] != null) {
-                    if (m_sites[ii].m_transactionsById.containsKey(1L) ||
-                            m_sites[ii].m_transactionsById.containsKey(3L)) {
+            for (ExecutionSite site : m_sites.values()) {
+                if (site != null) {
+                    if (site.m_transactionsById.containsKey(1L) ||
+                            site.m_transactionsById.containsKey(3L)) {
                         containsBadValue = true;
                     }
                 }
@@ -1470,18 +1509,20 @@ public class TestExecutionSite extends TestCase {
             }
         }
 
-        for (RussianRouletteMailbox mailbox : m_mboxes) {
+        for (RussianRouletteMailbox mailbox : m_mboxes.values()) {
             if (mailbox != null) {
-                mailbox.deliver(new LocalObjectMessage(new Runnable() {
+                lom = new LocalObjectMessage(new Runnable() {
                     @Override
                     public void run() {
                         throw new Error();
                     }
-                }));
+                });
+                lom.m_sourceHSId = mailbox.getHSId();
+                mailbox.deliver(lom);
             }
         }
 
-        for (Thread t : m_siteThreads) {
+        for (Thread t : m_siteThreads.values()) {
             t.join();
         }
 
@@ -1490,17 +1531,18 @@ public class TestExecutionSite extends TestCase {
          * In the old code it would have been marked as safely replicated due to txn 2 from the other initiator
          * that failed concurrently.
          */
-        for (int ii = 0; ii < m_sites.length; ii++) {
-            if (m_sites[ii] != null) {
-                if (m_sites[ii].m_transactionsById.containsKey(1L)) {
-                    System.out.println("Site " + ii + " contains txn 1");
+        for (ExecutionSite es : m_sites.values()) {
+            if (es != null) {
+                if (es.m_transactionsById.containsKey(1L)) {
+                    System.out.println("Site " + es.getCorrespondingSiteId() + " contains txn 1");
                 }
-                assertFalse(m_sites[ii].m_transactionsById.containsKey(1L));
-                if (m_sites[ii].m_transactionsById.containsKey(3L)) {
-                    System.out.println("Site " + ii + " contains txn 3");
+                assertFalse(es.m_transactionsById.containsKey(1L));
+                if (es.m_transactionsById.containsKey(3L)) {
+                    System.out.println("Site " + es.getCorrespondingSiteId() + " contains txn 3");
                 }
-                assertFalse(m_sites[ii].m_transactionsById.containsKey(3L));
+                assertFalse(es.m_transactionsById.containsKey(3L));
             }
         }
     }
+
 }

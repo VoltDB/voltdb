@@ -26,7 +26,7 @@ import java.util.Queue;
 
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Represents the export connection to a single export table in the database for
@@ -200,7 +200,7 @@ public class ExportDataSink {
                 ExportProtoMessage m = rx_conn.getValue().poll();
                 if (m != null && m.isPollResponse()) {
                     // john thinks this should never require assignment
-                    assert(m_activeConnection == rx_conn.getKey());
+                    assert(m_activeConnection.equals(rx_conn.getKey()));
                     //m_activeConnection = rx_conn.getKey();
                     handlePollResponse(m);
                 }

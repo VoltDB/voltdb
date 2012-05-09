@@ -28,7 +28,7 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.processtools.ShellTools;
 
 /**
@@ -144,6 +144,11 @@ public class SystemStatsCollector {
                 return null;
             results = lines[1];
             results = results.trim();
+
+            // For systems where LANG != en_US.UTF-8.
+            // see: http://community.voltdb.com/node/422
+            results = results.replace(",", ".");
+
             String[] values = results.split("\\s+");
 
             // tease out all the stats

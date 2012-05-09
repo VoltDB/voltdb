@@ -1253,6 +1253,7 @@ public class StatementDML extends StatementDMQL {
     {
         VoltXMLElement columns = new VoltXMLElement("columns");
         xml.children.add(columns);
+        assert(columns != null);
 
         for (int i = 0; i < insertColumnMap.length; i++)
         {
@@ -1269,6 +1270,7 @@ public class StatementDML extends StatementDMQL {
     {
         VoltXMLElement columns = new VoltXMLElement("columns");
         xml.children.add(columns);
+        assert(columns != null);
 
         for (int i = 0; i < updateColumnMap.length; i++)
         {
@@ -1284,6 +1286,7 @@ public class StatementDML extends StatementDMQL {
 
         VoltXMLElement parameterXML = new VoltXMLElement("parameters");
         xml.children.add(parameterXML);
+        assert(parameterXML != null);
 
         for (int i = 0; i < parameters.length; i++) {
             VoltXMLElement parameter = new VoltXMLElement("parameter");
@@ -1303,6 +1306,7 @@ public class StatementDML extends StatementDMQL {
 
         VoltXMLElement condition = new VoltXMLElement("condition");
         xml.children.add(condition);
+        assert(condition != null);
 
         // AND together all of the WHERE conditions that HSQL spits out
         // The parser will currently redo all of the index start/end
@@ -1354,6 +1358,7 @@ public class StatementDML extends StatementDMQL {
      {
         VoltXMLElement xml = new VoltXMLElement("unknown");
         xml.attributes.put("table", targetTable.getName().name);
+        VoltXMLElement child;
 
         switch (type) {
 
@@ -1368,7 +1373,9 @@ public class StatementDML extends StatementDMQL {
                 xml.name = "update";
                 voltAppendUpdateColumns(session, xml);
                 voltAppendParameters(session, xml);
-                xml.children.add(targetRangeVariables[0].voltGetXML(session));
+                child = targetRangeVariables[0].voltGetXML(session);
+                xml.children.add(child);
+                assert(child != null);
                 voltAppendUpdateCondition(session, xml);
                 break;
 
@@ -1376,7 +1383,9 @@ public class StatementDML extends StatementDMQL {
             case StatementTypes.DELETE_WHERE :
                 xml.name = "delete";
                 voltAppendParameters(session, xml);
-                xml.children.add(targetRangeVariables[0].voltGetXML(session));
+                child = targetRangeVariables[0].voltGetXML(session);
+                xml.children.add(child);
+                assert(child != null);
                 voltAppendUpdateCondition(session, xml);
                 break;
         }

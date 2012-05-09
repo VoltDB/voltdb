@@ -21,7 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 /**
  *
@@ -37,9 +37,6 @@ public class ParameterValueExpression extends AbstractValueExpression {
     public ParameterValueExpression() {
         super(ExpressionType.VALUE_PARAMETER);
     }
-    public ParameterValueExpression(AbstractExpression left, AbstractExpression right) {
-        super(ExpressionType.VALUE_PARAMETER, right, left);
-    }
 
     @Override
     public Object clone() throws CloneNotSupportedException {
@@ -51,14 +48,14 @@ public class ParameterValueExpression extends AbstractValueExpression {
     /**
      * @return the param
      */
-    public Integer getParameterId() {
+    public Integer getParameterIndex() {
         return m_paramIndex;
     }
 
     /**
      * @param paramIndex The index of the parameter to set
      */
-    public void setParameterId(Integer paramIndex) {
+    public void setParameterIndex(Integer paramIndex) {
         m_paramIndex = paramIndex;
     }
 
@@ -72,6 +69,13 @@ public class ParameterValueExpression extends AbstractValueExpression {
 
         // if all seems well, defer to the superclass, which checks kids
         return super.equals(obj);
+    }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = m_paramIndex;
+        return result += super.hashCode();
     }
 
     @Override

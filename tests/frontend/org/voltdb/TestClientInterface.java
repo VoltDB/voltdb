@@ -29,6 +29,7 @@ import java.nio.ByteBuffer;
 import java.util.Arrays;
 import java.util.List;
 
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
@@ -36,21 +37,21 @@ import org.mockito.ArgumentCaptor;
 import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.agreement.AgreementSite;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.AdHocPlannedStmt;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.network.Connection;
-import org.voltdb.network.VoltNetwork;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.network.Connection;
+import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -58,8 +59,6 @@ import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
 
 public class TestClientInterface {
-    private static final int AGREEMENT_SITE_ID = 3; // random number
-
     // mocked objects that CI requires
     private static final VoltDBInterface m_volt = mock(VoltDBInterface.class);
     private static final StatsAgent m_statsAgent = mock(StatsAgent.class);
@@ -78,7 +77,7 @@ public class TestClientInterface {
     private static int[] m_allPartitions = new int[] {0, 1, 2};
 
     @BeforeClass
-    public static void setUpOnce() throws IOException {
+    public static void setUpOnce() throws Exception {
         buildCatalog();
 
         /*
@@ -89,22 +88,17 @@ public class TestClientInterface {
         doReturn(m_statsAgent).when(m_volt).getStatsAgent();
         doReturn(mock(SnapshotCompletionMonitor.class)).when(m_volt).getSnapshotCompletionMonitor();
         doReturn(m_messenger).when(m_volt).getHostMessenger();
+        doReturn(mock(VoltNetworkPool.class)).when(m_messenger).getNetwork();
+        doReturn(mock(ZooKeeper.class)).when(m_messenger).getZK();
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
-
-        AgreementSite agreementSite = mock(AgreementSite.class);
-        doReturn(AGREEMENT_SITE_ID).when(agreementSite).siteId();
-        doReturn(agreementSite).when(m_volt).getAgreementSite();
+        doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
+        doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
 
         // Set up CI with the mock objects.
-        VoltNetwork network = mock(VoltNetwork.class);
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
-                                       m_context, network, ReplicationRole.NONE,
-                                       100, m_initiator, m_allPartitions));
-        ArgumentCaptor<Mailbox> captor = ArgumentCaptor.forClass(Mailbox.class);
-        verify(m_messenger).createMailbox(eq(100), eq(VoltDB.CLIENT_INTERFACE_MAILBOX_ID),
-                                          captor.capture());
-        assertNotNull(captor.getValue());
-        m_mb = captor.getValue();
+                                       m_context, m_messenger, ReplicationRole.NONE, m_initiator, m_allPartitions));
+
+        m_mb = m_ci.m_mailbox;
     }
 
     private static void buildCatalog() throws IOException {
@@ -226,7 +220,7 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(AGREEMENT_SITE_ID), eq(VoltDB.ASYNC_COMPILER_MAILBOX_ID),
+        verify(m_messenger).send(eq(32L),
                                  captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
@@ -236,7 +230,7 @@ public class TestClientInterface {
         msg = createMsg("@AdHoc", "select * from a where i = 3", 3);
         resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
-        verify(m_messenger).send(eq(AGREEMENT_SITE_ID), eq(VoltDB.ASYNC_COMPILER_MAILBOX_ID),
+        verify(m_messenger).send(eq(32L),
                                  captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         assertTrue(captor.getValue().payload.toString().contains("partition param: 3"));
@@ -293,10 +287,20 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(AGREEMENT_SITE_ID), eq(VoltDB.ASYNC_COMPILER_MAILBOX_ID),
+        verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
                                  captor.capture());
         assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
     }
+
+    @Test
+    public void testNegativeUpdateCatalog() throws IOException, MessagingException {
+        ByteBuffer msg = createMsg("@UpdateApplicationCatalog", new Integer(1), new Long(0));
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        // expect an error response from handleRead.
+        assertNotNull(resp);
+        assertTrue(resp.getStatus() != 0);
+    }
+
 
     /**
      * Fake a catalog diff compiler result and send it back to the CI, see if CI
@@ -359,21 +363,21 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@SystemInformation");
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "@SystemInformation", 1, false, true, false, false);
-        assertEquals("OVERVIEW", invocation.getParams().m_params[0]);
+        assertEquals("OVERVIEW", invocation.getParams().toArray()[0]);
     }
 
     /**
-     * WAN stats is not a txn, it goes to the stats agent directly.
+     * DR stats is not a txn, it goes to the stats agent directly.
      * @throws Exception
      */
     @Test
-    public void testWANStats() throws Exception {
-        ByteBuffer msg = createMsg("@Statistics", "WAN", 0);
+    public void testDRStats() throws Exception {
+        ByteBuffer msg = createMsg("@Statistics", "DR", 0);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
         ArgumentCaptor<String> captor = ArgumentCaptor.forClass(String.class);
         verify(m_statsAgent).collectStats(any(Connection.class), anyInt(), captor.capture());
-        assertEquals("WAN", captor.getValue());
+        assertEquals("DR", captor.getValue());
     }
 
     @Test

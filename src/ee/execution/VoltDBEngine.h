@@ -132,15 +132,16 @@ class __attribute__((visibility("default"))) VoltDBEngine {
 
         VoltDBEngine(Topend *topend, LogProxy *logProxy);
         bool initialize(int32_t clusterIndex,
-                        int32_t siteId,
+                        int64_t siteId,
                         int32_t partitionId,
                         int32_t hostId,
                         std::string hostname,
-                        int64_t tempTableMemoryLimit);
+                        int64_t tempTableMemoryLimit,
+                        int32_t totalPartitions);
         virtual ~VoltDBEngine();
 
         inline int32_t getClusterIndex() const { return m_clusterIndex; }
-        inline int32_t getSiteId() const { return m_siteId; }
+        inline int64_t getSiteId() const { return m_siteId; }
 
         // ------------------------------------------------------------------
         // OBJECT ACCESS FUNCTIONS
@@ -424,7 +425,7 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         // Data Members
         // -------------------------------------------------
-        int32_t m_siteId;
+        int64_t m_siteId;
         int32_t m_partitionId;
         int32_t m_clusterIndex;
         int m_totalPartitions;

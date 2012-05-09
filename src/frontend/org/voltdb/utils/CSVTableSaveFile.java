@@ -36,7 +36,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
 

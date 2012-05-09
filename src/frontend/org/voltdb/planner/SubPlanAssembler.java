@@ -58,8 +58,7 @@ public abstract class SubPlanAssembler {
     /** Do the plan need to scan all partitions or just one? */
     final boolean m_singlePartition;
 
-    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition,
-                     int partitionCount)
+    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition)
     {
         m_db = db;
         m_parsedStmt = parsedStmt;
@@ -227,7 +226,8 @@ public abstract class SubPlanAssembler {
                     }
 
                     ColumnRef colRef = colRefIter.next();
-                    if (colInfo.tableName.equals(table.getTypeName()) &&
+                    if (colInfo.expression instanceof TupleValueExpression &&
+                        colInfo.tableName.equals(table.getTypeName()) &&
                         colInfo.columnName.equals(colRef.getColumn().getTypeName()) &&
                         colInfo.ascending == ascending) {
 
@@ -502,9 +502,10 @@ public abstract class SubPlanAssembler {
      *
      * @param table The table to get data from.
      * @param path The access path to access the data in the table (index/scan/etc).
+     * @param needDistributedScan indicator whether distribute scan is required
      * @return The root of a plan graph to get the data.
      */
-    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path) {
+    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path, boolean needDistributedScan) {
         assert(table != null);
         assert(path != null);
 
@@ -529,13 +530,25 @@ public abstract class SubPlanAssembler {
         AbstractPlanNode rootNode = scanNode;
 
         // if we need to scan everywhere...
-        if (tableRequiresDistributedScan(table)) {
+        if (tableRequiresDistributedScan(table) && needDistributedScan) {
             // all sites to a scan -> send
             // root site has many recvs feeding into a union
             rootNode = addSendReceivePair(scanNode);
         }
 
         return rootNode;
+    }
+
+    /**
+     * Given an access path, build the single-site or distributed plan that will
+     * assess the data from the table according to the path.
+     *
+     * @param table The table to get data from.
+     * @param path The access path to access the data in the table (index/scan/etc).
+     * @return The root of a plan graph to get the data.
+     */
+    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path) {
+        return getAccessPlanForTable(table, path, true);
     }
 
     /**

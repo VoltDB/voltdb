@@ -23,21 +23,20 @@ import java.util.List;
 import java.util.Map;
 
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
 import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 @ProcInfo(singlePartition = false)
@@ -106,7 +105,7 @@ public class SnapshotSave extends VoltSystemProcedure
                         ParameterSet params,
                         SystemProcedureExecutionContext context)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_saveTest)
         {
             assert(params.toArray()[0] != null);
@@ -139,8 +138,8 @@ public class SnapshotSave extends VoltSystemProcedure
         } else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesce) {
             // tell each site to quiesce
             context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
-            VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.INTEGER));
-            results.addRow(Integer.parseInt(context.getSite().getTypeName()));
+            VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
+            results.addRow(context.getSiteId());
             return new DependencyPair(DEP_snapshotSaveQuiesce, results);
         }
         else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesceResults) {
@@ -192,9 +191,9 @@ public class SnapshotSave extends VoltSystemProcedure
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
             int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
+            Long lowest_site_id =
+                context.getSiteTracker().
+                getLowestSiteForHost(host_id);
             if (context.getExecutionSite().getSiteId() == lowest_site_id)
             {
                 TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
@@ -202,7 +201,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
                 if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
                     result.addRow(
-                                  Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                  context.getHostId(),
                                   hostname,
                                   "",
                                   "FAILURE",
@@ -213,9 +212,8 @@ public class SnapshotSave extends VoltSystemProcedure
                 for (Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
                     File saveFilePath =
-                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce,
-                                              context.getSite().getHost().getTypeName());
-                    TRACE_LOG.trace("Host ID " + context.getSite().getHost().getTypeName() +
+                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce, context.getHostId());
+                    TRACE_LOG.trace("Host ID " + context.getHostId() +
                                     " table: " + table.getTypeName() +
                                     " to path: " + saveFilePath);
                     String file_valid = "SUCCESS";
@@ -251,7 +249,7 @@ public class SnapshotSave extends VoltSystemProcedure
                             "RESULTED IN IOException: " + ex.getMessage();
                         }
                     }
-                    result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                    result.addRow(context.getHostId(),
                                   hostname,
                                   table.getTypeName(),
                                   file_valid,
