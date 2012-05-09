@@ -102,31 +102,31 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
     }
 
-//    public void testOneshotPartitionViolationAllSites() throws Exception
-//    {
-//        // Restrict to clustered tests (configured with > 1 partition)
-//        if (!this.isLocalCluster()) {
-//            return;
-//        }
-//
-//        final Client client = this.getClient();
-//        loadData(client);
-//        try {
-//            client.callProcedure("PartitionViolationUpdate");
-//            assertFalse("Failed to produce violation", true);
-//        }
-//        catch (ProcCallException e) {
-//            assertEquals("Client response is error.",
-//                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
-//        }
-//        // verify initial result is unchanged (transactions!)
-//        ClientResponse resp = client.callProcedure("SumKey");
-//        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
-//        // see ENG-2941
-//        assertTrue(resp.getStatusString() == null);
-//    }
-//
+    public void testOneshotPartitionViolationAllSites() throws Exception
+    {
+        // Restrict to clustered tests (configured with > 1 partition)
+        if (!this.isLocalCluster()) {
+            return;
+        }
+
+        final Client client = this.getClient();
+        loadData(client);
+        try {
+            client.callProcedure("PartitionViolationUpdate");
+            assertFalse("Failed to produce violation", true);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is error.",
+                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
+        }
+        // verify initial result is unchanged (transactions!)
+        ClientResponse resp = client.callProcedure("SumKey");
+        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
+        // see ENG-2941
+        assertTrue(resp.getStatusString() == null);
+    }
+
     public void testOneshotReplicatedWriteAndRead() throws Exception
     {
         final Client client = this.getClient();

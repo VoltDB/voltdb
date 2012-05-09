@@ -77,12 +77,10 @@ public class Scheduler
             // HACK: grab the current sitetracker until we write leader notices.
             m_clerk = VoltDB.instance().getSiteTracker();
             final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
-            System.out.println("partitionInitiators list: " + partitionInitiators.toString());
             final MpProcedureTask task =
                 new MpProcedureTask(m_mailbox, m_loadedProcs.procs.get(procedureName),
                         m_txnId.incrementAndGet(), message, partitionInitiators);
             m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
-            System.out.println("CREATED INIT map for TXNID: " + task.m_txn.txnId);
             m_tasks.offer(task);
         }
     }
@@ -100,20 +98,25 @@ public class Scheduler
         final FragmentTask task =
             new FragmentTask(m_mailbox, localTxnId, message);
         m_outstandingTxns.put(message.getTxnId(), task.m_txn);
-        System.out.println("CREATED FRAG map for TXNID: " + message.getTxnId());
         m_tasks.offer(task);
     }
 
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
-        System.out.println(this.m_mailbox.getHSId() + " LOOKING UP RESP map for TXNID: " + message.getTxnId());
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
-        ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
+        // XXX IZZY This feels like papering over something...come back and
+        // be smarter later
+        // We could already have received the CompleteTransactionMessage from
+        // the local site and the transaction is dead, despite FragmentResponses
+        // in flight from remote sites.  Drop those on the floor.
+        if (txn != null)
+        {
+            ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
+        }
     }
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        System.out.println(this.m_mailbox.getHSId() + "LOOKING UP COMPLETE map for TXNID: " + message.getTxnId());
         TransactionState txn = m_outstandingTxns.remove(message.getTxnId());
         // XXX IZZY This feels like papering over something...come back and
         // be smarter later

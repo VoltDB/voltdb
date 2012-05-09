@@ -197,10 +197,7 @@ public class MpTransactionState extends TransactionState
             for (Entry<Integer, List<VoltTable>> dep : local_frag.entrySet()) {
                 // every place that processes the map<int, list<volttable>> assumes
                 // only one returned table.
-                System.out.println("Removing local fragment from tracked dep.");
-                System.out.println("Done?" + checkDoneReceivingFragResponses());
                 trackDependency(m_localHSId, dep.getKey(), dep.getValue().get(0));
-                System.out.println("Done now?" + checkDoneReceivingFragResponses());
             }
 
             // if there are remote deps, block on them.

@@ -68,6 +68,10 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     void completeInitiateTask(SiteProcedureConnection siteConnection)
     {
+        // we need to handle the undo log for the local site
+        siteConnection.truncateUndoLog(m_txn.needsRollback(),
+                                       m_txn.getBeginUndoToken(),
+                                       m_txn.txnId);
         CompleteTransactionMessage complete = new CompleteTransactionMessage(
                 m_initiator.getHSId(), // who is the "initiator" now??
                 m_initiator.getHSId(),
@@ -77,8 +81,12 @@ public class MpProcedureTask extends ProcedureTask
                 false);  // really don't want to have ack the ack.
 
         try {
+            // XXX IZZY hack don't send the complete transaction msg to ourselves
+            // in the current MPI hack
             for (long hsid : m_initiatorHSIds) {
-                m_initiator.send(hsid, complete);
+                if (hsid != m_initiator.getHSId()) {
+                    m_initiator.send(hsid, complete);
+                }
             }
         } catch (MessagingException fatal) {
             org.voltdb.VoltDB.crashLocalVoltDB("Messaging exception", true, fatal);
