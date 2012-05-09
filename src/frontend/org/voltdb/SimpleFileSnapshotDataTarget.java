@@ -22,22 +22,18 @@ import java.io.RandomAccessFile;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.SettableFuture;
 
 public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     private final File m_tempFile;
     private final File m_file;
     private final FileChannel m_fc;
@@ -85,24 +81,16 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
 
     @Override
     public ListenableFuture<?> write(final Callable<BBContainer> tupleData) {
-        final SettableFuture<Object> retval = SettableFuture.create();
-        ListenableFuture<BBContainer> computedData = VoltDB.instance().getComputationService().submit(tupleData);
-        //Need to be able to null this out to prevent pack rat on the future
-        //that wraps up the result of the write.
-        final AtomicReference<Future<BBContainer>> computedDataFinal =
-            new AtomicReference<Future<BBContainer>>(computedData);
+        final ListenableFuture<BBContainer> computedData = VoltDB.instance().getComputationService().submit(tupleData);
 
-        computedData.addListener(new Runnable() {
+        return m_es.submit(new Callable<Object>() {
             @Override
-            public void run() {
+            public Object call() throws Exception {
                 try {
-                    final Future<BBContainer> fut = computedDataFinal.get();
-                    computedDataFinal.set(null);
-                    final BBContainer data = fut.get();
+                    final BBContainer data = computedData.get();
                     if (m_writeFailed) {
-                        retval.set(null);
                         data.discard();
-                        return;
+                        return null;
                     }
                     try {
                         while (data.b.hasRemaining()) {
@@ -116,15 +104,12 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                     }
                 } catch (Throwable t) {
                     m_writeException = t;
-                    hostLog.error("Error while attempting to write snapshot data to file " + m_file, t);
                     m_writeFailed = true;
-                    retval.setException(t);
-                    return;
+                    throw Throwables.propagate(t);
                 }
-                retval.set(null);
+                return null;
             }
-        }, m_es);
-        return retval;
+        });
     }
 
     @Override
@@ -155,4 +140,8 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
         return m_writeException;
     }
 
+    @Override
+    public String toString() {
+        return m_file.toString();
+    }
 }

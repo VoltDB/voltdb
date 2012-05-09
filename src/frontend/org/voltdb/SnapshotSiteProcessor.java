@@ -51,6 +51,8 @@ import org.voltdb.utils.CatalogUtil;
 
 
 import com.google.common.util.concurrent.Callables;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -125,14 +127,6 @@ public class SnapshotSiteProcessor {
      * to close each target.
      */
     private ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
-
-    /*
-     * Store the results of write attempts here
-     * so that the terminator thread can review them and
-     * decide whether the snapshot actually succeded.
-     */
-    private static List<Future<?>> m_writeFutures =
-        Collections.synchronizedList(new ArrayList<Future<?>>());
 
     /**
      * Queue of tasks for tables that still need to be snapshotted.
@@ -284,7 +278,7 @@ public class SnapshotSiteProcessor {
     }
 
     public Future<?> doSnapshotWork(ExecutionEngine ee, boolean ignoreQuietPeriod) {
-        Future<?> retval = null;
+        ListenableFuture<?> retval = null;
 
         /*
          * This thread will null out the reference to m_snapshotTableTasks when
@@ -363,7 +357,21 @@ public class SnapshotSiteProcessor {
             }
             retval = currentTask.m_target.write(valueForTarget);
             if (retval != null) {
-                m_writeFutures.add(retval);
+                final ListenableFuture<?> retvalFinal = retval;
+                retvalFinal.addListener(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            retvalFinal.get();
+                        } catch (Throwable t) {
+                            if (m_lastSnapshotSucceded) {
+                                hostLog.error("Error while attempting to write snapshot data to file " +
+                                        currentTask.m_target, t);
+                                m_lastSnapshotSucceded = false;
+                            }
+                        }
+                    }
+                }, MoreExecutors.sameThreadExecutor());
             }
             if (!ignoreQuietPeriod && m_snapshotPriority > 0) {
                 m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(Math.random() * 15));
@@ -428,16 +436,7 @@ public class SnapshotSiteProcessor {
                                     hostLog.error("Error running snapshot completion task", e);
                                 }
                             }
-
-                            for (Future<?> retval : m_writeFutures) {
-                                try {
-                                    retval.get();
-                                } catch (Exception e) {
-                                    m_lastSnapshotSucceded = false;
-                                }
-                            }
                         } finally {
-                            m_writeFutures = Collections.synchronizedList(new ArrayList<Future<?>>());
                             try {
                                 logSnapshotCompleteToZK(txnId, numHosts, m_lastSnapshotSucceded);
                             } finally {

@@ -33,7 +33,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.CRC32;
 
 import org.json_voltpatches.JSONObject;
@@ -329,11 +328,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             tupleData.b.position(tupleData.b.position() + 12);
             compressionTask = CompressionService.compressBufferAsync(tupleData.b);
         }
-
-        //Need to be able to null this out to prevent pack rat on the future
-        //that wraps up the result of the write.
-        final AtomicReference<Future<byte[]>> compressionTaskFinal =
-            new AtomicReference<Future<byte[]>>(compressionTask);
+        final Future<byte[]> compressionTaskFinal = compressionTask;
 
         ListenableFuture<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
@@ -352,12 +347,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
                     int totalWritten = 0;
                     if (prependLength) {
-                        ByteBuffer payloadBuffer = null;
-                        try {
-                            payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get().get());
-                        } finally {
-                            compressionTaskFinal.set(null);
-                        }
+                        final ByteBuffer payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get());
+
                         ByteBuffer lengthPrefix = ByteBuffer.allocate(16);
                         m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining() + 16);
                         lengthPrefix.putInt(payloadBuffer.remaining());
@@ -415,5 +406,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public IOException getLastWriteException() {
         return m_writeException;
+    }
+
+    @Override
+    public String toString() {
+        return m_file.toString();
     }
 }
