@@ -22,37 +22,31 @@ import java.io.StringWriter;
 import java.io.Writer;
 
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
-
-import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.dtxn.TransactionState;
 import org.voltdb.ExpectedProcedureException;
-import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.utils.LogKeys;
 
-abstract public class ProcedureTask extends SiteTasker
+abstract public class ProcedureTask extends TransactionTask
 {
-    static final VoltLogger execLog = new VoltLogger("EXEC");
-    static final VoltLogger hostLog = new VoltLogger("HOST");
-
     final ProcedureRunner m_runner;
     final Mailbox m_initiator;
-    final TransactionState m_txn;
 
     ProcedureTask(Mailbox initiator, ProcedureRunner runner, TransactionState txn)
     {
+        super(txn);
         m_initiator = initiator;
         m_runner = runner;
-        m_txn = txn;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -60,13 +54,6 @@ abstract public class ProcedureTask extends SiteTasker
 
     /** procedure tasks must complete their txnstates */
     abstract void completeInitiateTask(SiteProcedureConnection siteConnection);
-
-    /** Priority returns this task's priority for scheduling */
-    @Override
-    public int priority()
-    {
-        return 0;
-    }
 
     /** Mostly copy-paste of old ExecutionSite.processInitiateTask() */
     protected InitiateResponseMessage processInitiateTask(Iv2InitiateTaskMessage task)

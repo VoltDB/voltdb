@@ -77,4 +77,10 @@ public class SpProcedureTask extends ProcedureTask
             siteConnection.truncateUndoLog(m_txn.needsRollback(), token, m_txn.txnId);
         }
     }
+
+    @Override
+    public long getMpTxnId()
+    {
+        return Long.MAX_VALUE;
+    }
 }

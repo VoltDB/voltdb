@@ -21,7 +21,6 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
@@ -34,12 +33,8 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.utils.LogKeys;
 
-public class FragmentTask extends SiteTasker
+public class FragmentTask extends TransactionTask
 {
-    private static final VoltLogger execLog = new VoltLogger("EXEC");
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
-    final ParticipantTransactionState m_txn;
     final Mailbox m_initiator;
     final FragmentTaskMessage m_task;
 
@@ -47,8 +42,8 @@ public class FragmentTask extends SiteTasker
                  ParticipantTransactionState txn,
                  FragmentTaskMessage message)
     {
+        super(txn);
         m_initiator = mailbox;
-        m_txn = txn;
         m_task = message;
     }
 
@@ -66,12 +61,6 @@ public class FragmentTask extends SiteTasker
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         // completion?
         m_initiator.deliver(response);
-    }
-
-    @Override
-    public int priority()
-    {
-        return 0;
     }
 
     // Cut and pasted from ExecutionSite processFragmentTask(), then
@@ -148,5 +137,11 @@ public class FragmentTask extends SiteTasker
             }
         }
         return currentFragResponse;
+    }
+
+    @Override
+    public long getMpTxnId()
+    {
+        return m_task.getTxnId();
     }
 }

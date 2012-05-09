@@ -38,6 +38,7 @@ import org.voltdb.utils.LogKeys;
 public class MpProcedureTask extends ProcedureTask
 {
     final long[] m_initiatorHSIds;
+    final Iv2InitiateTaskMessage m_msg;
 
     MpProcedureTask(Mailbox mailbox, ProcedureRunner runner,
                   long txnId, Iv2InitiateTaskMessage msg, List<Long> pInitiators)
@@ -45,6 +46,7 @@ public class MpProcedureTask extends ProcedureTask
         super(mailbox, runner,
               new MpTransactionState(mailbox, txnId, msg, pInitiators,
                                      mailbox.getHSId()));
+        m_msg = msg;
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
     }
 
@@ -93,4 +95,9 @@ public class MpProcedureTask extends ProcedureTask
         }
     }
 
+    @Override
+    public long getMpTxnId()
+    {
+        return m_msg.getTxnId();
+    }
 }

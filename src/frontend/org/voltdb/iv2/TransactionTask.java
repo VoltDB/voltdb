@@ -17,32 +17,40 @@
 
 package org.voltdb.iv2;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 
-public class CompleteTransactionTask extends TransactionTask
+public abstract class TransactionTask extends SiteTasker
 {
-    final private CompleteTransactionMessage m_msg;
+    protected static final VoltLogger execLog = new VoltLogger("EXEC");
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    public CompleteTransactionTask(TransactionState txn,
-                                   CompleteTransactionMessage msg)
+    final protected TransactionState m_txn;
+
+    public TransactionTask(TransactionState txn)
     {
-        super(txn);
-        m_msg = msg;
+        m_txn = txn;
     }
 
-    @Override
-    public void run(SiteProcedureConnection siteConnection)
-    {
-        siteConnection.truncateUndoLog(m_msg.isRollback(),
-                                       m_txn.getBeginUndoToken(),
-                                       m_msg.getTxnId());
-    }
+    abstract public void run(SiteProcedureConnection siteConnection);
 
     @Override
-    public long getMpTxnId()
+    final public int priority()
     {
-        return m_msg.getTxnId();
+        return 0;
     }
+
+    public TransactionState getTransactionState()
+    {
+        return m_txn;
+    }
+
+    public long getLocalTxnId()
+    {
+        return m_txn.txnId;
+    }
+
+    abstract public long getMpTxnId();
 }
