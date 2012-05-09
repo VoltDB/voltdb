@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -277,6 +276,11 @@ public class SnapshotSiteProcessor {
         }
     }
 
+    private void quietPeriodSet(boolean ignoreQuietPeriod) {
+        if (!ignoreQuietPeriod && m_snapshotPriority > 0) {
+            m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(Math.random() * 15));
+        }
+    }
     public Future<?> doSnapshotWork(ExecutionEngine ee, boolean ignoreQuietPeriod) {
         ListenableFuture<?> retval = null;
 
@@ -354,7 +358,22 @@ public class SnapshotSiteProcessor {
             Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
             for (SnapshotDataFilter filter : currentTask.m_filters) {
                 valueForTarget = filter.filter(valueForTarget);
+                if (valueForTarget == null) {
+                    break;
+                }
             }
+
+            /*
+             * break because a filter decided not to process a buffer.
+             * We don't go back and serialize another because that is guaranteed
+             * to be dropped as well since it is filtered by partition.
+             * This gives the quiet period a chance to kick in
+             */
+            if (valueForTarget == null) {
+                quietPeriodSet(ignoreQuietPeriod);
+                break;
+            }
+
             retval = currentTask.m_target.write(valueForTarget);
             if (retval != null) {
                 final ListenableFuture<?> retvalFinal = retval;
@@ -373,9 +392,7 @@ public class SnapshotSiteProcessor {
                     }
                 }, MoreExecutors.sameThreadExecutor());
             }
-            if (!ignoreQuietPeriod && m_snapshotPriority > 0) {
-                m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(Math.random() * 15));
-            }
+            quietPeriodSet(ignoreQuietPeriod);
             break;
         }
 
