@@ -732,7 +732,7 @@ public class SQLCommand
                 ImmutableMap.<Integer, List<String>>builder().put( 1,
                 Arrays.asList("varchar")).build());
         Procedures.put("@Statistics",
-                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("statisticscomponent", "bit")).build());
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("statisticscomponent", "bit")).build());
         Procedures.put("@SystemCatalog",
                 ImmutableMap.<Integer, List<String>>builder().put( 1,Arrays.asList("metadataselector")).build());
         Procedures.put("@SystemInformation",
