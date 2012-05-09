@@ -25,7 +25,6 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 import com.google.common.base.Throwables;
@@ -88,6 +87,10 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
             public Object call() throws Exception {
                 try {
                     final BBContainer data = computedData.get();
+                    /*
+                     * If a filter nulled out the buffer do nothing.
+                     */
+                    if (data == null) return null;
                     if (m_writeFailed) {
                         data.discard();
                         return null;

@@ -358,20 +358,6 @@ public class SnapshotSiteProcessor {
             Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
             for (SnapshotDataFilter filter : currentTask.m_filters) {
                 valueForTarget = filter.filter(valueForTarget);
-                if (valueForTarget == null) {
-                    break;
-                }
-            }
-
-            /*
-             * break because a filter decided not to process a buffer.
-             * We don't go back and serialize another because that is guaranteed
-             * to be dropped as well since it is filtered by partition.
-             * This gives the quiet period a chance to kick in
-             */
-            if (valueForTarget == null) {
-                quietPeriodSet(ignoreQuietPeriod);
-                break;
             }
 
             retval = currentTask.m_target.write(valueForTarget);

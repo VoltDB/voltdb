@@ -311,6 +311,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         BBContainer tupleDataTemp;
         try {
             tupleDataTemp = tupleDataC.call();
+            /*
+             * Can be null if the dedupe filter nulled out the buffer
+             */
+            if (tupleDataTemp == null) {
+                return Futures.immediateFuture(null);
+            }
         } catch (Throwable t) {
             return Futures.immediateFailedFuture(t);
         }

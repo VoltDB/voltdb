@@ -54,6 +54,9 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
             @Override
             public BBContainer call() throws Exception {
                 final BBContainer cont = input.call();
+                if (cont == null) {
+                    return null;
+                }
                 try {
                     ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b.remaining());
                     buf.put(m_schemaBytes);
