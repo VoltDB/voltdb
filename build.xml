@@ -1198,21 +1198,21 @@ TEST CASES
                 <exclude name="**/TestRejoinFuzz2.class" />
                 <exclude name="**/TestReplicatedInvocation.class" />
                 <exclude name="**/TestRestoreAgent.class" />
-                <exclude name="**/TestSimpleCJK.class" />
+<!--                <exclude name="**/TestSimpleCJK.class" /> -->
                 <exclude name="**/TestClientTimeouts.class" />
                 <exclude name="**/TestExportToFileClient.class" />
                 <exclude name="**/TestNonDetermisticSeppuku.class" />
                 <exclude name="**/TestJDBCDriver.class" />
                 <exclude name="**/TestAdminMode.class" />
                 <exclude name="**/TestCatalogUpdateSuite.class" />
-                <exclude name="**/TestCRUDSuite.class" />
+<!--                <exclude name="**/TestCRUDSuite.class" /> -->
                 <exclude name="**/TestExecutionSiteDeath.class" />
                 <exclude name="**/TestFailureDetectSuite.class" />
                 <exclude name="**/TestFailuresSuite.class" />
                 <exclude name="**/TestFixedSQLSuite.class" />
                 <exclude name="**/TestFunctionsSuite.class" />
                 <exclude name="**/TestGiantDeleteSuite.class" />
-                <exclude name="**/TestIndexMemoryOwnershipSuite.class" />
+<!--                <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
                 <exclude name="**/TestIndexesSuite.class" />
                 <exclude name="**/TestLimitOffsetSuite.class" />
                 <exclude name="**/TestLoadingSuite.class" />
@@ -1235,7 +1235,7 @@ TEST CASES
                 <exclude name="**/TestSystemCatalogSuite.class" />
                 <exclude name="**/TestSystemInformationSuite.class" />
                 <exclude name="**/TestSystemProcedureSuite.class" />
-                <exclude name="**/TestTPCCSuite.class" />
+<!--                <exclude name="**/TestTPCCSuite.class" /> -->
                 <exclude name="**/TestBlobType.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
             </fileset>
