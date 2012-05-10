@@ -403,7 +403,7 @@ public class TestVoltProcedure extends TestCase {
     public void testProcedureStatsCollector() {
         NullProcedureWrapper wrapper = new LongProcedure();
         ProcedureRunner runner = new ProcedureRunner(
-                wrapper, site,
+                wrapper, site, null,
                 site.m_context.database.getProcedures().get(LongProcedure.class.getName()),
                 null);
 
@@ -442,7 +442,7 @@ public class TestVoltProcedure extends TestCase {
             e.printStackTrace();
         }
         ProcedureRunner runner = new ProcedureRunner(
-                wrapper, site,
+                wrapper, site, null,
                 site.m_context.database.getProcedures().get(procedure.getName()),
                 null);
 

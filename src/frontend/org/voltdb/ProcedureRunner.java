@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.ExecutionSite;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -92,6 +93,7 @@ public class ProcedureRunner {
     // hooks into other parts of voltdb
     //
     protected final SiteProcedureConnection m_site;
+    protected final SystemProcedureExecutionContext m_systemProcedureContext;
     protected final HsqlBackend m_hsql;
     protected final boolean m_isNative;
 
@@ -110,6 +112,7 @@ public class ProcedureRunner {
 
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
+                    SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     HsqlBackend hsql) {
         m_procedureName = procedure.getClass().getSimpleName();
@@ -119,6 +122,7 @@ public class ProcedureRunner {
         m_hsql = hsql;
         m_isNative = hsql == null;
         m_site = site;
+        m_systemProcedureContext = sysprocContext;
 
         m_procedure.init(this);
 
@@ -174,6 +178,15 @@ public class ProcedureRunner {
 
             byte status = ClientResponseImpl.SUCCESS;
             VoltTable[] results = null;
+
+            // inject sysproc execution context as the first parameter.
+            if (isSystemProcedure()) {
+                final Object[] combinedParams = new Object[paramList.length + 1];
+                combinedParams[0] = m_systemProcedureContext;
+                for (int i=0; i < paramList.length; ++i) combinedParams[i+1] = paramList[i];
+                // swap the lists.
+                paramList = combinedParams;
+            }
 
             if (paramList.length != m_paramTypes.length) {
                 m_statsCollector.endProcedure( false, true);
@@ -421,7 +434,7 @@ public class ProcedureRunner {
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params,
-            ExecutionSite.SystemProcedureExecutionContext context) {
+            SystemProcedureExecutionContext context) {
         setupTransaction(txnState);
         assert (m_procedure instanceof VoltSystemProcedure);
         VoltSystemProcedure sysproc = (VoltSystemProcedure) m_procedure;
@@ -599,7 +612,7 @@ public class ProcedureRunner {
             return null;
         }
 
-        if (param instanceof ExecutionSite.SystemProcedureExecutionContext) {
+        if (param instanceof SystemProcedureExecutionContext) {
             return param;
         }
 

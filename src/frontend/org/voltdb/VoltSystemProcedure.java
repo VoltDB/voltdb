@@ -131,7 +131,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     abstract public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params,
-            ExecutionSite.SystemProcedureExecutionContext context);
+            SystemProcedureExecutionContext context);
 
     /**
      * Produce work units, possibly on all sites, for a list of plan fragments.

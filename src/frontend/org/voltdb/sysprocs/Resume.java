@@ -20,9 +20,8 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;

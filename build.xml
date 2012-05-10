@@ -33,6 +33,8 @@
 
 <!-- PATHS AND PROPERTIES -->
 
+<tstamp/>
+
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
 
@@ -597,7 +599,7 @@ CLEANING
     <arg line="-c 'rm -rf voltdb/*.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf voltdb/*.so'"/>
+    <arg line="-c 'rm -rf voltdb/*.so voltdb/*.jnilib'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/ee/catalog/*'"/>
@@ -670,9 +672,9 @@ JAR BUILDING
             </section>
         </manifest>
     </jar>
-    <jar destfile="voltdb/voltdb-${dist.version}-javadoc.jar">
-        <fileset dir="${doc.dir}" defaultexcludes="no" >
-            <include name="javadoc/procedure-api/**"/>
+    <!--jar destfile="voltdb/voltdb-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}/javadoc/procedure-api" defaultexcludes="no" >
+            <include name="**"/>
         </fileset>
         <manifest>
             <section name="Credits">
@@ -688,8 +690,8 @@ JAR BUILDING
         </manifest>
     </jar>
     <jar destfile="voltdb/voltdbclient-${dist.version}-javadoc.jar">
-        <fileset dir="${doc.dir}" defaultexcludes="no" >
-            <include name="javadoc/java-client-api/**"/>
+        <fileset dir="${doc.dir}/javadoc/java-client-api" defaultexcludes="no" >
+            <include name="**"/>
         </fileset>
         <manifest>
             <section name="Credits">
@@ -703,7 +705,7 @@ JAR BUILDING
                 <attribute name="Date" value="${TODAY}" />
             </section>
         </manifest>
-    </jar>
+    </jar-->
 
 </target>
 

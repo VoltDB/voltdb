@@ -589,21 +589,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * SystemProcedures are "friends" with ExecutionSites and granted
      * access to internal state via m_systemProcedureContext.
      */
-    public interface SystemProcedureExecutionContext {
-        public Database getDatabase();
-        public Cluster getCluster();
-        public ExecutionEngine getExecutionEngine();
-        public long getLastCommittedTxnId();
-        public long getCurrentTxnId();
-        public long getNextUndo();
-        public ExecutionSite getExecutionSite();
-        public HashMap<String, ProcedureRunner> getProcedures();
-        public long getSiteId();
-        public int getHostId();
-        public int getPartitionId();
-        public SiteTracker getSiteTracker();
-    }
-
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
         @Override
         public Database getDatabase()                         { return m_context.database; }
@@ -725,7 +710,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // setup the procedure runner wrappers.
         if (runnerFactory != null) {
-            runnerFactory.configure(this, hsql);
+            runnerFactory.configure(this, m_systemProcedureContext, hsql);
         }
         m_registeredSysProcPlanFragments.clear();
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
@@ -2186,16 +2171,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
                     // call the proc
                     runner.setupTransaction(txnState);
-                    if (runner.isSystemProcedure()) {
-                        final Object[] combinedParams = new Object[callerParams.length + 1];
-                        combinedParams[0] = m_systemProcedureContext;
-                        for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                        cr = runner.call(txnId, combinedParams);
-                    }
-                    else {
-                        cr = runner.call(txnId, itask.getParameters());
-                    }
+                    cr = runner.call(txnId, itask.getParameters());
                     response.setResults(cr, itask);
+
                     // record the results of write transactions to the transaction state
                     // this may be used to verify the DR replica cluster gets the same value
                     // skip for multi-partition txns because only 1 of k+1 partitions will

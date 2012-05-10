@@ -24,8 +24,7 @@ import java.util.Map;
 
 import org.voltdb.ClientInterface;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.LiveClientStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -120,7 +119,7 @@ public class Statistics extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                                                   long fragmentId,
                                                   ParameterSet params,
-                                                  ExecutionSite.SystemProcedureExecutionContext context)
+                                                  SystemProcedureExecutionContext context)
     {
         //  TABLE statistics
         if (fragmentId == SysProcFragmentId.PF_tableData) {
