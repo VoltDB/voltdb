@@ -59,8 +59,7 @@ public class MpProcedureTask extends ProcedureTask
         m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         final InitiateResponseMessage response = processInitiateTask(txn.m_task);
         if (!response.shouldCommit()) {
-            // IZZY: this is a bit of a hack, too
-            txn.m_needsRollback = true;
+            txn.setNeedsRollback();
         }
         completeInitiateTask(siteConnection);
         m_initiator.deliver(response);
@@ -100,5 +99,15 @@ public class MpProcedureTask extends ProcedureTask
     public long getMpTxnId()
     {
         return m_msg.getTxnId();
+    }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("MpProcedureTask:");
+        sb.append("\n\tMP TXN ID: ").append(getMpTxnId());
+        sb.append("\n\tLOCAL TXN ID: ").append(getLocalTxnId());
+        return sb.toString();
     }
 }

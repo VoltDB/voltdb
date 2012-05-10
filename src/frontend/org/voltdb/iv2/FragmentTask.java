@@ -144,4 +144,14 @@ public class FragmentTask extends TransactionTask
     {
         return m_task.getTxnId();
     }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("FragmentTask:");
+        sb.append("\n\tMP TXN ID: ").append(getMpTxnId());
+        sb.append("\n\tLOCAL TXN ID: ").append(getLocalTxnId());
+        return sb.toString();
+    }
 }

@@ -84,4 +84,14 @@ public class SpProcedureTask extends ProcedureTask
     {
         return Long.MAX_VALUE;
     }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("SpProcedureTask:");
+        sb.append("\n\tMP TXN ID: ").append(getMpTxnId());
+        sb.append("\n\tLOCAL TXN ID: ").append(getLocalTxnId());
+        return sb.toString();
+    }
 }

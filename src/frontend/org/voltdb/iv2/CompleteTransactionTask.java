@@ -46,4 +46,14 @@ public class CompleteTransactionTask extends TransactionTask
     {
         return m_msg.getTxnId();
     }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("CompleteTransactionTask:");
+        sb.append("\n\tMP TXN ID: ").append(getMpTxnId());
+        sb.append("\n\tLOCAL TXN ID: ").append(getLocalTxnId());
+        return sb.toString();
+    }
 }
