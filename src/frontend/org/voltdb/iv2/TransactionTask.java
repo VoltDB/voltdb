@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.CompleteTransactionMessage;
 
 public abstract class TransactionTask extends SiteTasker
 {
