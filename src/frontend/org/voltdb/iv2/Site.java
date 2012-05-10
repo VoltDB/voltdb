@@ -30,7 +30,6 @@ import org.voltdb.HsqlBackend;
 import org.voltdb.iv2.SiteTasker;
 import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -289,12 +288,6 @@ public class Site implements Runnable, SiteProcedureConnection
     //
     // Legacy SiteProcedureConnection needed by ProcedureRunner
     //
-    @Override
-    public void registerPlanFragment(long pfId, ProcedureRunner proc)
-    {
-        // hostLog.warn("Sysprocs not supported in Iv2. Not loading " + proc.m_procedureName);
-    }
-
     @Override
     public long getCorrespondingSiteId()
     {

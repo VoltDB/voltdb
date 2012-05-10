@@ -68,7 +68,7 @@ public class LoadedProcedureSet {
         }
     }
 
-    void loadProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
+    public void loadProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
         procs.clear();
         m_registeredSysProcPlanFragments.clear();
         loadProceduresFromCatalog(catalogContext, backendTarget);
