@@ -39,6 +39,7 @@ public class Scheduler
     private Mailbox m_mailbox;
     private Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
+    final private TransactionTaskQueue m_pendingTasks;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
@@ -46,6 +47,7 @@ public class Scheduler
     Scheduler(PartitionClerk clerk)
     {
         m_tasks = new SiteTaskerQueue();
+        m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_clerk = clerk;
     }
 
@@ -71,7 +73,7 @@ public class Scheduler
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
                         m_txnId.incrementAndGet(), message);
-            m_tasks.offer(task);
+            m_pendingTasks.offer(task);
         }
         else {
             // HACK: grab the current sitetracker until we write leader notices.
@@ -81,7 +83,7 @@ public class Scheduler
                 new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
                         m_txnId.incrementAndGet(), message, partitionInitiators);
             m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
-            m_tasks.offer(task);
+            m_pendingTasks.offer(task);
         }
     }
 
@@ -98,7 +100,7 @@ public class Scheduler
         }
         final FragmentTask task =
             new FragmentTask(m_mailbox, (ParticipantTransactionState)txn, message);
-        m_tasks.offer(task);
+        m_pendingTasks.offer(task);
     }
 
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
@@ -124,7 +126,7 @@ public class Scheduler
         {
             final CompleteTransactionTask task =
                 new CompleteTransactionTask(txn, message);
-            m_tasks.offer(task);
+            m_pendingTasks.offer(task);
         }
     }
 }

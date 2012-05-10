@@ -47,6 +47,8 @@ public class TransactionTaskQueue
             }
             m_taskQueue.offer(task);
         }
+        // IZZY: this is hacky?
+        flush();
         return retval;
     }
 

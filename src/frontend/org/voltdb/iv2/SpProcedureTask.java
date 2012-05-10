@@ -76,6 +76,7 @@ public class SpProcedureTask extends ProcedureTask
 
             siteConnection.truncateUndoLog(m_txn.needsRollback(), token, m_txn.txnId);
         }
+        m_txn.setDone();
     }
 
     @Override

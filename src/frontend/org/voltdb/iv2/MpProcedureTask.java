@@ -93,6 +93,7 @@ public class MpProcedureTask extends ProcedureTask
         } catch (MessagingException fatal) {
             org.voltdb.VoltDB.crashLocalVoltDB("Messaging exception", true, fatal);
         }
+        m_txn.setDone();
     }
 
     @Override

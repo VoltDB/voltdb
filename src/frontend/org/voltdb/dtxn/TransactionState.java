@@ -47,9 +47,9 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
     protected final SiteTransactionConnection m_site;
-    protected boolean m_done = false;
+    volatile protected boolean m_done = false;
     protected long m_beginUndoToken;
-    public boolean m_needsRollback = false;
+    volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
 
     /** Iv2 constructor */
