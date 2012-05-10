@@ -324,10 +324,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
     }
 
-    private final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
-        new HashMap<Long, ProcedureRunner>();
-
-
     /**
      * Log settings changed. Signal EE to update log level.
      */
@@ -712,7 +708,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         if (runnerFactory != null) {
             runnerFactory.configure(this, m_systemProcedureContext, hsql);
         }
-        m_registeredSysProcPlanFragments.clear();
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
         m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType());
 
@@ -848,7 +843,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
         m_context = context;
-        m_registeredSysProcPlanFragments.clear();
         m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType());
 
         //Necessary to quiesce before updating the catalog
@@ -1763,14 +1757,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     {
         // assume success. errors correct this assumption as they occur
         currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
-
-        ProcedureRunner runner = null;
-        synchronized (m_registeredSysProcPlanFragments) {
-            runner = m_registeredSysProcPlanFragments.get(fragmentId);
-        }
-        if (runner == null) {
-            assert(false);
-        }
+        ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
 
         try {
             final DependencyPair dep
@@ -1831,15 +1818,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     /*
      *  SiteConnection Interface (VoltProcedure -> ExecutionSite)
      */
-
-    @Override
-    public void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
-        synchronized (m_registeredSysProcPlanFragments) {
-            assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
-            m_registeredSysProcPlanFragments.put(pfId, proc);
-        }
-    }
-
     @Override
     public long getCorrespondingSiteId() {
         return m_siteId;
