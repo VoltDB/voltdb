@@ -1777,8 +1777,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 = runner.executePlanFragment(txnState,
                                              dependencies,
                                              fragmentId,
-                                             params,
-                                             m_systemProcedureContext);
+                                             params);
 
             sendDependency(currentFragResponse, dep.depId, dep.dependency);
         }

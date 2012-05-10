@@ -433,12 +433,11 @@ public class ProcedureRunner {
     DependencyPair executePlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
-            ParameterSet params,
-            SystemProcedureExecutionContext context) {
+            ParameterSet params) {
         setupTransaction(txnState);
         assert (m_procedure instanceof VoltSystemProcedure);
         VoltSystemProcedure sysproc = (VoltSystemProcedure) m_procedure;
-        return sysproc.executePlanFragment(dependencies, fragmentId, params, context);
+        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
     protected ParameterSet getCleanParams(SQLStmt stmt, Object[] args) {
