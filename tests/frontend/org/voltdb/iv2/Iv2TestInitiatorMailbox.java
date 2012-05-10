@@ -25,8 +25,9 @@ package org.voltdb.iv2;
 
 import static org.junit.Assert.assertFalse;
 import static org.mockito.Mockito.mock;
+import junit.framework.TestCase;
 
-public class Iv2TestInitiatorMailbox {
+public class Iv2TestInitiatorMailbox extends TestCase {
 
     public void testWhereAreMyPants()
     {
