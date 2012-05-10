@@ -1299,116 +1299,69 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         });
     }
 
+    private static final class ForwardClientException extends Exception {
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+        private final VoltTable m_table;
+        public ForwardClientException(String msg, VoltTable table) {
+            super(msg);
+            m_table = table;
+        }
+
+    }
+
     private void submitUserSnapshotRequest(final StoredProcedureInvocation invocation, final Connection c) {
         Object params[] = invocation.getParams().toArray();
 
-        /*
-         * Dang it, have to parse the params here to validate
-         */
-        if (params.length != 3 && params.length != 1) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave requires 3 parameters or alternatively a single JSON blob. " +
-                                       "Path, nonce, and blocking",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (params[0] == null) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave path is null",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (params.length == 3) {
-            if (params[1] == null) {
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                           new VoltTable[0],
-                                           "@SnapshotSave nonce is null",
-                                           invocation.clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
-                return;
-            }
-
-            if (params[2] == null) {
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                           new VoltTable[0],
-                                           "@SnapshotSave blocking is null",
-                                           invocation.clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
-                return;
-            }
-        }
-
-        if (!(params[0] instanceof String)) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave path param is a " + params[0].getClass().getSimpleName() +
-                                           " and should be a java.lang.String",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (params.length == 3) {
-            if (!(params[1] instanceof String)) {
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                           new VoltTable[0],
-                                           "@SnapshotSave nonce param is a " + params[0].getClass().getSimpleName() +
-                                               " and should be a java.lang.String",
-                                           invocation.clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
-                return;
-            }
-
-            if (!(params[2] instanceof Byte ||
-                    params[2] instanceof Short ||
-                    params[2] instanceof Integer ||
-                    params[2] instanceof Long)) {
-                final ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                           new VoltTable[0],
-                                           "@SnapshotSave blocking param is a " + params[0].getClass().getSimpleName() +
-                                               " and should be a java.lang.[Byte|Short|Integer|Long]",
-                                           invocation.clientHandle);
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf).flip();
-                c.writeStream().enqueue(buf);
-                return;
-            }
-        }
-
-        boolean requestExists = false;
         try {
+            /*
+             * Dang it, have to parse the params here to validate
+             */
+            if (params.length != 3 && params.length != 1) {
+                throw new Exception("@SnapshotSave requires 3 parameters or alternatively a single JSON blob. " +
+                        "Path, nonce, and blocking");
+            }
+
+            if (params[0] == null) {
+                throw new Exception("@SnapshotSave path is null");
+            }
+
+            if (params.length == 3) {
+                if (params[1] == null) {
+                    throw new Exception("@SnapshotSave nonce is null");
+                }
+
+                if (params[2] == null) {
+                    throw new Exception("@SnapshotSave blocking is null");
+                }
+            }
+
+            if (!(params[0] instanceof String)) {
+                throw new Exception("@SnapshotSave path param is a " +
+                        params[0].getClass().getSimpleName() +
+                        " and should be a java.lang.String");
+            }
+
+            if (params.length == 3) {
+                if (!(params[1] instanceof String)) {
+                    throw new Exception("@SnapshotSave nonce param is a " +
+                            params[0].getClass().getSimpleName() +
+                            " and should be a java.lang.String");
+                }
+
+                if (!(params[2] instanceof Byte ||
+                        params[2] instanceof Short ||
+                        params[2] instanceof Integer ||
+                        params[2] instanceof Long)) {
+                    throw new Exception("@SnapshotSave blocking param is a " +
+                            params[0].getClass().getSimpleName() +
+                            " and should be a java.lang.[Byte|Short|Integer|Long]");
+                }
+            }
+
+            boolean requestExists = false;
             String path;
             String nonce;
             boolean blocking;
@@ -1421,7 +1374,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             if (params.length == 1) {
                 final JSONObject jsObj = new JSONObject((String)params[0]);
 
-                path = jsObj.getString("path");
+                path = jsObj.getString("uripath");
                 URI pathURI = new URI(path);
                 String pathURIScheme = pathURI.getScheme();
                 if (pathURIScheme == null) {
@@ -1447,6 +1400,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 blocking = ((Number)params[2]).byteValue() == 1 ? true : false;
             }
 
+            if (nonce.contains("-") || nonce.contains(",")) {
+                throw new Exception("Provided nonce " + nonce + " contains a prohibited character (- or ,)");
+            }
+
             /*
              * Forward the request as a JSON object now that things are validated
              */
@@ -1467,36 +1424,33 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
             }
-        } catch (Exception e) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       Throwables.getStackTraceAsString(e),
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
 
-        if (requestExists) {
-            VoltTable result = org.voltdb.sysprocs.SnapshotSave.constructNodeResultsTable();
-            result.addRow(-1,
-                    CoreUtils.getHostnameOrAddress(),
-                    "",
-                    "FAILURE",
-                    "SNAPSHOT IN PROGRESS");
+            if (requestExists) {
+                VoltTable result = org.voltdb.sysprocs.SnapshotSave.constructNodeResultsTable();
+                result.addRow(-1,
+                        CoreUtils.getHostnameOrAddress(),
+                        "",
+                        "FAILURE",
+                        "SNAPSHOT IN PROGRESS");
+                throw new ForwardClientException("A request to perform a user snapshot already exists", result);
+           }
+        } catch (Exception e) {
+            VoltTable tables[] = new VoltTable[0];
+            byte status = ClientResponseImpl.GRACEFUL_FAILURE;
+            if (e instanceof ForwardClientException && ((ForwardClientException)e).m_table != null) {
+                tables = new VoltTable[] { ((ForwardClientException)e).m_table };
+                status = ClientResponseImpl.SUCCESS;
+            }
             final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.SUCCESS,
-                                       new VoltTable[] { result },
-                                       "A request to perform a user snapshot already exists",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
+                    new ClientResponseImpl(status,
+                                           tables,
+                                           Throwables.getStackTraceAsString(e),
+                                           invocation.clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                errorResponse.flattenToBuffer(buf).flip();
+                c.writeStream().enqueue(buf);
+                return;
         }
     }
 
