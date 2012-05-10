@@ -360,14 +360,15 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
 
     // Execute each plannode.
     // The planner guarantees that for a given plannode, all of its
-    // children are positioned before it in this list. The executor pull
-    // protocol operates "leaf-first" on the executor tree structure,
+    // children are positioned before it in this list. It also guarantees that
+    // the last executor in chain is always the SendExecutor.
+    // The executor pull protocol operates "leaf-first" on the executor tree structure,
     // therefore dependency tracking is not needed here, just a single
     // executor invocation on the final "parent" executor.
     size_t ttl = execsForFrag->list.size();
     if (ttl > 0) {
 
-        AbstractExecutor *executor = execsForFrag->list[ttl - 1];
+        SendExecutor* executor = dynamic_cast<SendExecutor*>(execsForFrag->list[ttl - 1]);
         assert (executor);
 
         try {
@@ -387,6 +388,9 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
+        // @TODO currently we do clean-up twice.
+        // First time during the execute_pull call as part of the pre_execute_pull call for each executor
+        // Second time here
         executor->clearOutputTables();
     }
 

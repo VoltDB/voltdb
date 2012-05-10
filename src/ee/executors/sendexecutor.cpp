@@ -96,6 +96,31 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
+// Top-level entry point for executor pull protocol
+bool SendExecutor::execute_pull(const NValueArray& params)
+{
+    assert(getPlanNode());
+    VOLT_TRACE("Starting execution of plannode(id=%d)...",
+               getPlanNode()->getPlanNodeId());
+
+    // hook to give executor a chance to perform some initialization if necessary
+    // potentially could be used to call children in push mode
+    // recurs to children
+    boost::function<void(AbstractExecutor*)> fpreexecute =
+        boost::bind(&AbstractExecutor::pre_execute_pull, _1, boost::cref(params));
+    depth_first_iterate_pull(fpreexecute, true);
+
+    TableTuple tuple = p_next_pull();
+    assert(tuple.isNullTuple());
+
+    // some executors need to do some work after the iteration
+    boost::function<void(AbstractExecutor*)> fpostexecute =
+        &AbstractExecutor::post_execute_pull;
+    depth_first_iterate_pull(fpostexecute, true);
+
+    return true;
+}
+
 
 TableTuple SendExecutor::p_next_pull()
 {
@@ -109,30 +134,36 @@ TableTuple SendExecutor::p_next_pull()
     // We only need to save tuple in Send Executor if
     // 1. It's input table is a temp table
     // 2. Child supports pull mode (otherwise it will save it itself)
-    bool needSave = (dynamic_cast<TempTable*>(getPlanNode()->getOutputTable()) != NULL) && childExec->support_pull();
+    bool needSave = (dynamic_cast<TempTable*>(getPlanNode()->getOutputTable()) != NULL)
+        && childExec->support_pull();
+
     TableTuple tuple;
-    // Simply get each tuple from the child executor
-    // SendExecutor is always at the top of a plan fragment (executor tree),
-    // so it never needs to produce its tuples.
-    while (true) {
-        tuple = childExec->p_next_pull();
-        if (tuple.isNullTuple()) {
-            break;
-        }
-        // NOTE: I (Paul) migrated this code from its separate packaging (not needed?) in p_insert_output_table_pull.
-        // @XXX: I (Paul) don't completely understand this -- when, practically speaking, is needSave false?
-        // Do we even have to call p_next_pull in the case of needSave == false
-        // or is that just a CPU-intensive formality?
-        if (needSave && !m_inputTable->insertTuple(tuple))
-        {
-            char message[128];
-            snprintf(message, 128, "Failed to insert tuple into output table '%s'",
-                     m_inputTable->name().c_str());
-            VOLT_ERROR("%s", message);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+    if (needSave) {
+        // Simply get each tuple from the child executor
+        // SendExecutor is always at the top of a plan fragment (executor tree),
+        // so it never needs to produce its tuples.
+        // iteration stops when an empty tuple is returned
+        while (true) {
+            tuple = childExec->p_next_pull();
+            if (tuple.isNullTuple()) {
+                break;
+            }
+            // NOTE: I (Paul) migrated this code from its separate packaging (not needed?) in p_insert_output_table_pull.
+            // @XXX: I (Paul) don't completely understand this -- when, practically speaking, is needSave false?
+            // Do we even have to call p_next_pull in the case of needSave == false
+            // or is that just a CPU-intensive formality?
+            if (!m_inputTable->insertTuple(tuple))
+            {
+                char message[128];
+                snprintf(message, 128, "Failed to insert tuple into output table '%s'",
+                         m_inputTable->name().c_str());
+                VOLT_ERROR("%s", message);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              message);
+            }
         }
     }
+
     // Just blast the input table on through VoltDBEngine!
     if (!m_engine->send(m_inputTable)) {
         char message[128];

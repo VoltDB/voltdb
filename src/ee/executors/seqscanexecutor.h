@@ -66,6 +66,7 @@ namespace voltdb
     class SeqScanExecutor : public AbstractExecutor {
     public:
         SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        bool support_pull() const;
 
     private:
         bool p_init(AbstractPlanNode* abstract_node,

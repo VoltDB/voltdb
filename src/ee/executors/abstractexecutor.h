@@ -80,9 +80,6 @@ class AbstractExecutor {
     // Temp
     virtual bool support_pull() const;
 
-    /** Invoke a plannode's associated executor using the pull protocol */
-    bool execute_pull(const NValueArray& params);
-
     // @TODO: Eventually, every executor class will have its own p_next_pull implementation
     // that operates within the pull protocol as best it can.
     // Then this function will be made abstract (pure virtual).
@@ -93,7 +90,16 @@ class AbstractExecutor {
      * and applies executor specific logic to produce its next tuple. */
     virtual TableTuple p_next_pull();
 
-    /** Clean up the output table of the executor tree as needed */
+    /** Generic behavior wrapping the custom p_pre_execute_pull. */
+    // @TODO: Does the need to prep m_tmpOutputTable really cut across executor classes?
+    // Or should we consider moving this into custom p_pre_execute_pull implementations only as it may apply?
+    void pre_execute_pull(const NValueArray& params);
+
+    /** Cleans up after the p_next_pull iteration. */
+    void post_execute_pull();
+
+    // Clean up the output table of the executor tree as needed
+    // Generic behavior wrapping the custom p_pre_execute_pull.
     void clearOutputTables();
 
     /**
@@ -112,6 +118,15 @@ class AbstractExecutor {
   protected:
     AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode);
 
+    // Generic method to depth first iterate over the children and call the functor on each level
+    // The functor signature is void f(AbstractExecutor*)
+    // The second parameter controls whether the iteration should stop
+    // if child doesn't support the pull mode yet or keep going. For example, if we are simply building
+    // the list of all children for a given node, this parameter should be set to false.
+    // It will become obsolete after all executors will be converted to the pull mode.
+    template <typename Functor>
+    typename Functor::result_type  depth_first_iterate_pull(Functor& f, bool stopOnPush);
+
   private:
     /** Concrete executor classes implement initialization in p_init() */
     virtual bool p_init(AbstractPlanNode*,
@@ -129,12 +144,6 @@ class AbstractExecutor {
      */
     virtual bool needsOutputTableClear() { return true; };
 
-    // Generic method to depth first iterate over the children
-    // and call the functor on each level
-    // The functor signature is void f(AbstractExecutor*)
-    template <typename Functor>
-    typename Functor::result_type  depth_first_iterate_pull(Functor& f, bool stopOnPush);
-
     // @TODO: Eventually, when every executor class has its own p_next_pull implementation,
     // p_pre_execute_pull will become abstract (pure virtual).
     // Each executor will be required to implement this function to do its own parameter processing.
@@ -144,11 +153,6 @@ class AbstractExecutor {
     // results in an output table for the defaulted implementation of p_next_pull to find.
     /** Last minute init before the p_next_pull iteration */
     virtual void p_pre_execute_pull(const NValueArray& params);
-
-    /** Generic behavior wrapping the custom p_pre_execute_pull. */
-    // @TODO: Does the need to prep m_tmpOutputTable really cut across executor classes?
-    // Or should we consider moving this into custom p_pre_execute_pull implementations only as it may apply?
-    void pre_execute_pull(const NValueArray& params);
 
     /** Cleans up after the p_next_pull iteration. */
     virtual void p_post_execute_pull();
@@ -193,12 +197,19 @@ inline void AbstractExecutor::pre_execute_pull(const NValueArray& params) {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
                m_abstractNode->getPlanNodeId());
+    // @TODO clean-up is done twice.
+    // First time here
+    // Second time in VoltDBEngine::executeQuery after execute_pull is completed
     if (m_tmpOutputTable)
     {
         VOLT_TRACE("Clearing output table...");
         m_tmpOutputTable->deleteAllTuplesNonVirtual(false);
     }
     p_pre_execute_pull(params);
+}
+
+inline void AbstractExecutor::post_execute_pull() {
+    p_post_execute_pull();
 }
 
 template <typename Functor>
@@ -219,7 +230,7 @@ typename Functor::result_type AbstractExecutor::depth_first_iterate_pull(
             executor->depth_first_iterate_pull(functor, stopOnPush);
         }
     }
-    // Applay functor to itself
+    // Applay functor to self
     return functor(this);
 }
 

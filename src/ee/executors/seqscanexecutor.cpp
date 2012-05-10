@@ -341,3 +341,7 @@ void SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
 
     m_state.reset(new detail::SeqScanExecutorState(predicate, target_table, output_table));
 }
+
+bool SeqScanExecutor::support_pull() const {
+    return true;
+}

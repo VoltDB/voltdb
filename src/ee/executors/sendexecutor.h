@@ -65,6 +65,9 @@ public:
         m_engine = engine;
     }
 
+    /** Invoke a plannode's associated executor using the pull protocol */
+    bool execute_pull(const NValueArray& params);
+
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
