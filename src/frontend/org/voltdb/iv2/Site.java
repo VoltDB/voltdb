@@ -17,32 +17,38 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+
 import org.voltdb.BackendTarget;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
-import org.voltdb.HsqlBackend;
 import org.voltdb.iv2.SiteTasker;
-import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
+import org.voltdb.ExecutionSite;
+import org.voltdb.HsqlBackend;
+import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
+import org.voltdb.ProcedureRunner;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 
 public class Site implements Runnable, SiteProcedureConnection
@@ -116,6 +122,75 @@ public class Site implements Runnable, SiteProcedureConnection
     {
         return this;
     }
+
+
+    /**
+     * SystemProcedures are "friends" with ExecutionSites and granted
+     * access to internal state via m_systemProcedureContext.
+     */
+    SystemProcedureExecutionContext m_sysprocContext = new SystemProcedureExecutionContext() {
+        @Override
+        public Database getDatabase() {
+            return m_context.database;
+        }
+
+        @Override
+        public Cluster getCluster() {
+            return m_context.cluster;
+        }
+
+        @Override
+        public ExecutionEngine getExecutionEngine() {
+            return m_ee;
+        }
+
+        @Override
+        public long getLastCommittedTxnId() {
+            return m_lastCommittedTxnId;
+        }
+
+        @Override
+        public long getCurrentTxnId() {
+            throw new RuntimeException("Not implemented in iv2");
+        }
+
+        @Override
+        public long getNextUndo() {
+            return getNextUndoToken();
+        }
+
+        @Override
+        public ExecutionSite getExecutionSite() {
+            throw new RuntimeException("Not implemented in iv2");
+        }
+
+        @Override
+        public HashMap<String, ProcedureRunner> getProcedures() {
+            throw new RuntimeException("Not implemented in iv2");
+            // return m_loadedProcedures.procs;
+        }
+
+        @Override
+        public long getSiteId() {
+            return m_siteId;
+        }
+
+        @Override
+        public int getHostId() {
+            return SiteTracker.getHostForSite(m_siteId);
+        }
+
+        @Override
+        public int getPartitionId() {
+            return m_partitionId;
+        }
+
+        @Override
+        public SiteTracker getSiteTracker() {
+            throw new RuntimeException("Not implemented in iv2");
+            // return m_tracker;
+        }
+    };
 
     /** Create a new execution site and the corresponding EE */
     public Site(
