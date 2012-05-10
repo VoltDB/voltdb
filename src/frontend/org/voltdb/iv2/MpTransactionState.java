@@ -33,7 +33,9 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
@@ -50,6 +52,8 @@ public class MpTransactionState extends TransactionState
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final Iv2InitiateTaskMessage m_task;
+    final ProcedureRunner m_runner;
+
     LinkedBlockingDeque<FragmentResponseMessage> m_newDeps =
         new LinkedBlockingDeque<FragmentResponseMessage>();
     Map<Integer, Set<Long>> m_remoteDeps;
@@ -63,6 +67,7 @@ public class MpTransactionState extends TransactionState
     FragmentTaskMessage m_localWork = null;
 
     MpTransactionState(Mailbox mailbox, long txnId,
+                       ProcedureRunner runner,
                        TransactionInfoBaseMessage notice,
                        List<Long> useHSIds, long localHSId)
     {
@@ -70,6 +75,7 @@ public class MpTransactionState extends TransactionState
         m_task = (Iv2InitiateTaskMessage)notice;
         m_useHSIds = useHSIds;
         m_localHSId = localHSId;
+        m_runner = runner;
     }
 
     @Override
@@ -219,9 +225,17 @@ public class MpTransactionState extends TransactionState
         // use siteConnection.stashWorkUnitDependencies()
         siteConnection.stashWorkUnitDependencies(m_remoteDepTables);
 
+        System.out.printf("MPTXNSTATE AGG m_remoteDepTables.size(%d)\n", m_remoteDepTables.size());
+        for (Entry<Integer, List<VoltTable>> key : m_remoteDepTables.entrySet()) {
+            System.out.printf("\tDEP list size: %d\n", key.getValue().size());
+            System.out.printf("\tDEP key:%d table:%s\n", key.getKey(), key.getValue().get(0));
+            System.out.printf("\tDEP key:%d table:%s\n", key.getKey(), key.getValue().get(1));
+        }
+
         // Then execute the fragment task.  Looks like ExecutionSite.processFragmentTask(),
         // kinda, at least for now while we're executing stuff locally.
         // Probably don't need to generate a FragmentResponse
+        System.out.println("MPTSXNSTATE LOCALFRAGMENT AGG: " + m_localWork);
         Map<Integer, List<VoltTable>> results =
             processLocalFragmentTask(m_localWork, siteConnection);
 
@@ -311,9 +325,22 @@ public class MpTransactionState extends TransactionState
             }
 
             if (ftask.isSysProcTask()) {
-                throw new RuntimeException("IV2: Sysprocs not yet supported");
-//                return processSysprocFragmentTask(txnState, dependencies, fragmentId,
-//                                                  currentFragResponse, params);
+                final DependencyPair dep
+                    = m_runner.executePlanFragment(this,
+                            m_remoteDepTables,
+                            fragmentId,
+                            params);
+
+                List<VoltTable> tables = depResults.get(outputDepId);
+                if (tables == null) {
+                    tables = new ArrayList<VoltTable>();
+                    depResults.put(outputDepId, tables);
+                }
+                tables.add(dep.dependency);
+                System.out.printf("SYSPROCFRAG LOCAL: outputDepId(%d) depId(%d) table(%s)\n",
+                        outputDepId, dep.depId, dep.dependency);
+
+                return depResults;
             }
             else {
                 final int inputDepId = ftask.getOnlyInputDepId(frag);

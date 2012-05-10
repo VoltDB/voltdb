@@ -160,10 +160,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             // will not retain any references to VoltTables (which is the goal).
             final ArrayDeque<VoltTable> vtstack = m_depsById.get(dependencyId);
             if (vtstack != null && vtstack.size() > 0) {
+                System.out.println("DID FIND IT: " + dependencyId);
                 // java doc. says this amortized constant time.
                 return vtstack.pop();
             }
             else if (vtstack == null) {
+                System.out.println("CAN'T FIND IT: " + dependencyId);
                 assert(false) : "receive without associated tracked dependency.";
                 return null;
             }

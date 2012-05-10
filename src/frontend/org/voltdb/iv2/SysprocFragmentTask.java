@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+
 import java.nio.ByteBuffer;
 
 import java.util.HashMap;
@@ -25,38 +26,43 @@ import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
+
 import org.voltdb.DependencyPair;
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcedureRunner;
-import org.voltdb.SiteProcedureConnection;
-import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
+import org.voltdb.LoadedProcedureSet;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcedureRunner;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 
 public class SysprocFragmentTask extends TransactionTask
 {
     final Mailbox m_initiator;
     final FragmentTaskMessage m_task;
+    final LoadedProcedureSet m_loadedProcSet;
 
     SysprocFragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
-                 FragmentTaskMessage message)
+                 FragmentTaskMessage message,
+                 LoadedProcedureSet procs)
     {
         super(txn);
         m_initiator = mailbox;
         m_task = message;
+        m_loadedProcSet = procs;
         assert(m_task.isSysProcTask());
     }
 
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        // sysprocs are not transactional w.r.t. the EE.
+        // TODO: need a token
         assert(m_txn.getBeginUndoToken() == Site.kInvalidUndoToken);
 
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
@@ -102,16 +108,19 @@ public class SysprocFragmentTask extends TransactionTask
 
             try {
                 // Find the sysproc to invoke.
+                ProcedureRunner runner = m_loadedProcSet.getSysproc(fragmentId);
 
                 // run the overloaded sysproc planfragment. pass an empty dependency
                 // set since remote (non-aggregator) fragments don't receive dependencies.
-                /* final DependencyPair dep
-                    = runner.executePlanFragment(txnState,
+                final DependencyPair dep
+                    = runner.executePlanFragment(m_txn,
                             new HashMap<Integer, List<VoltTable>>(),
                             fragmentId,
-                            params); */
+                            params);
 
-                // currentFragResponse.addDependency(dep.depId, dep.dependency);
+                System.out.printf("SYSPROCFRAG: outputDepId(%d) depId(%d) table(%s)\n",
+                        outputDepId, dep.depId, dep.dependency);
+                currentFragResponse.addDependency(dep.depId, dep.dependency);
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
                 currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);

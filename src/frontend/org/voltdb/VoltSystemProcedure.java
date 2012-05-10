@@ -160,7 +160,6 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         // the stack frame drop terminates the recursion and resumes
         // execution of the current stored procedure.
         assert (txnState != null);
-        assert (txnState instanceof MultiPartitionParticipantTxnState);
         txnState.setupProcedureResume(false, new int[] { aggregatorOutputDependencyId });
 
         // execute the tasks that just got queued.

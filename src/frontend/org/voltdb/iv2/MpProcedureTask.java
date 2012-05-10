@@ -44,7 +44,7 @@ public class MpProcedureTask extends ProcedureTask
                   long txnId, Iv2InitiateTaskMessage msg, List<Long> pInitiators)
     {
         super(mailbox, runner,
-              new MpTransactionState(mailbox, txnId, msg, pInitiators,
+              new MpTransactionState(mailbox, txnId, runner, msg, pInitiators,
                                      mailbox.getHSId()));
         m_msg = msg;
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);

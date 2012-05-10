@@ -430,7 +430,7 @@ public class ProcedureRunner {
         }
     }
 
-    DependencyPair executePlanFragment(
+    public DependencyPair executePlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params) {
