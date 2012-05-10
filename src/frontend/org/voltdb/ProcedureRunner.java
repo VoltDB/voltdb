@@ -93,7 +93,7 @@ public class ProcedureRunner {
     // hooks into other parts of voltdb
     //
     protected final SiteProcedureConnection m_site;
-    protected final ExecutionSite.SystemProcedureExecutionContext m_systemProcedureContext;
+    protected final SystemProcedureExecutionContext m_systemProcedureContext;
     protected final HsqlBackend m_hsql;
     protected final boolean m_isNative;
 
@@ -112,7 +112,7 @@ public class ProcedureRunner {
 
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
-                    ExecutionSite.SystemProcedureExecutionContext sysprocContext,
+                    SystemProcedureExecutionContext sysprocContext,
                     Procedure catProc,
                     HsqlBackend hsql) {
         m_procedureName = procedure.getClass().getSimpleName();
@@ -434,7 +434,7 @@ public class ProcedureRunner {
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params,
-            ExecutionSite.SystemProcedureExecutionContext context) {
+            SystemProcedureExecutionContext context) {
         setupTransaction(txnState);
         assert (m_procedure instanceof VoltSystemProcedure);
         VoltSystemProcedure sysproc = (VoltSystemProcedure) m_procedure;
@@ -612,7 +612,7 @@ public class ProcedureRunner {
             return null;
         }
 
-        if (param instanceof ExecutionSite.SystemProcedureExecutionContext) {
+        if (param instanceof SystemProcedureExecutionContext) {
             return param;
         }
 

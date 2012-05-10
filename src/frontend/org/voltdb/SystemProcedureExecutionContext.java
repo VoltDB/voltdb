@@ -17,25 +17,35 @@
 
 package org.voltdb;
 
-import org.voltdb.catalog.Procedure;
+import java.util.HashMap;
 
-public class ProcedureRunnerFactory {
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.jni.ExecutionEngine;
 
-    protected SiteProcedureConnection m_site;
-    protected SystemProcedureExecutionContext m_context;
-    protected HsqlBackend m_hsql;
+public interface SystemProcedureExecutionContext {
+    public Database getDatabase();
 
-    public void configure(SiteProcedureConnection site,
-            SystemProcedureExecutionContext context, HsqlBackend hsql) {
-        m_site = site;
-        m_context = context;
-        m_hsql = hsql;
-    }
+    public Cluster getCluster();
 
-    public ProcedureRunner create(
-            VoltProcedure procedure,
-            Procedure catProc) {
-        return new ProcedureRunner(procedure, m_site, m_context, catProc, m_hsql);
-    }
+    public ExecutionEngine getExecutionEngine();
 
+    public long getLastCommittedTxnId();
+
+    public long getCurrentTxnId();
+
+    public long getNextUndo();
+
+    public ExecutionSite getExecutionSite();
+
+    public HashMap<String, ProcedureRunner> getProcedures();
+
+    public long getSiteId();
+
+    public int getHostId();
+
+    public int getPartitionId();
+
+    public SiteTracker getSiteTracker();
 }
