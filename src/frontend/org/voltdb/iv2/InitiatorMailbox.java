@@ -31,7 +31,6 @@ import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
-import org.voltdb.LoadedProcedureSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
