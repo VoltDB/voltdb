@@ -1375,6 +1375,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 final JSONObject jsObj = new JSONObject((String)params[0]);
 
                 path = jsObj.getString("uripath");
+                if (path.isEmpty()) {
+                    throw new Exception("uripath cannot be empty");
+                }
                 URI pathURI = new URI(path);
                 String pathURIScheme = pathURI.getScheme();
                 if (pathURIScheme == null) {
@@ -1387,6 +1390,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 path = pathURI.getPath();
 
                 nonce = jsObj.getString("nonce");
+                if (nonce.isEmpty()) {
+                    throw new Exception("nonce cannot be empty");
+                }
                 blocking = jsObj.optBoolean("block", false);
                 format = jsObj.optString("format", "native");
 

@@ -674,6 +674,107 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         validateTextFile(expectedText, true, fis);
     }
 
+    public void testBadSnapshotParams() throws Exception
+    {
+        System.out.println("Starting testBadSnapshotParams");
+        Client client = getClient();
+
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        Set<String> expectedText = new TreeSet<String>();
+
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks,
+                                 true,
+                                 expectedText);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+
+        boolean threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    new Object[] {null});
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"file:///tmp\", nonce:\"\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"file:///tmp\", nonce:\"-\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"file:///tmp\", nonce:\",\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"hdfs:///tmp\", nonce:\"foo\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"/tmp\", nonce:\"foo\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:true, nonce:\"foo\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        client.callProcedure("@SnapshotSave",
+                "{ uripath:\"file://" + TMPDIR +
+                "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }");
+
+        FileInputStream fis = new FileInputStream(
+                TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
+        validateTextFile(expectedText, true, fis);
+    }
     /*
      * Also does some basic smoke tests
      * of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
