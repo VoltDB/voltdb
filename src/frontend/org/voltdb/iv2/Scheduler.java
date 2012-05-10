@@ -98,9 +98,16 @@ public class Scheduler
             txn = new ParticipantTransactionState(localTxnId, message);
             m_outstandingTxns.put(message.getTxnId(), txn);
         }
-        final FragmentTask task =
-            new FragmentTask(m_mailbox, (ParticipantTransactionState)txn, message);
-        m_pendingTasks.offer(task);
+        if (message.isSysProcTask()) {
+            final SysprocFragmentTask task =
+                new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn, message);
+            m_tasks.offer(task);
+        }
+        else {
+            final FragmentTask task =
+                new FragmentTask(m_mailbox, (ParticipantTransactionState)txn, message);
+            m_tasks.offer(task);
+        }
     }
 
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
