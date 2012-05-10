@@ -34,13 +34,6 @@ public interface SiteProcedureConnection {
     public long getNextUndoToken();
 
     /**
-     * Allow system procedures to register plan fragments to the site.
-     * @param pfId
-     * @param proc
-     */
-    public void registerPlanFragment(final long pfId, final ProcedureRunner proc);
-
-    /**
      * Get the catalog site id for the corresponding SiteProcedureConnection
      */
     public long getCorrespondingSiteId();

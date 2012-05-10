@@ -32,7 +32,15 @@ import org.voltdb.utils.LogKeys;
 public class LoadedProcedureSet {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    public final HashMap<String, ProcedureRunner> procs = new HashMap<String, ProcedureRunner>(16, (float) .1);
+
+    // user procedures.
+    final HashMap<String, ProcedureRunner> procs =
+        new HashMap<String, ProcedureRunner>(16, (float) .1);
+
+    // map of sysproc fragment ids to system procedures.
+    final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
+        new HashMap<Long, ProcedureRunner>();
+
     final ProcedureRunnerFactory m_runnerFactory;
     final long m_siteId;
     final int m_siteIndex;
@@ -47,8 +55,22 @@ public class LoadedProcedureSet {
         m_site = site;
     }
 
-    public void loadProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
+   public ProcedureRunner getSysproc(long fragmentId) {
+        synchronized (m_registeredSysProcPlanFragments) {
+            return m_registeredSysProcPlanFragments.get(fragmentId);
+        }
+    }
+
+    public void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
+        synchronized (m_registeredSysProcPlanFragments) {
+            assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
+            m_registeredSysProcPlanFragments.put(pfId, proc);
+        }
+    }
+
+    void loadProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
         procs.clear();
+        m_registeredSysProcPlanFragments.clear();
         loadProceduresFromCatalog(catalogContext, backendTarget);
         loadSystemProcedures(catalogContext, backendTarget);
     }
@@ -144,7 +166,7 @@ public class LoadedProcedureSet {
             }
 
             runner = m_runnerFactory.create(procedure, proc);
-            procedure.initSysProc(m_numberOfPartitions, m_site, proc, catalogContext.cluster);
+            procedure.initSysProc(m_numberOfPartitions, m_site, this, proc, catalogContext.cluster);
             procs.put(entry.getKey(), runner);
         }
     }
