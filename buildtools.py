@@ -212,7 +212,7 @@ def buildMakefile(CTX):
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
     makefile.write("prod/voltdbipc: $(SRC)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) %s -o $@ $^\n" % CTX.TEST_EXTRAFLAGS)
+    makefile.write("\t$(LINK.cpp) %s -o $@ $^ %s\n" % (CTX.TEST_EXTRAFLAGS, CTX.LASTLDFLAGS))
     makefile.write("\n")
 
 
@@ -310,7 +310,6 @@ def runTests(CTX):
     retval = os.system("make --directory=%s test -j4" % (CTX.OUTPUT_PREFIX))
     if retval != 0:
         return -1
-    CATALOG_PATH = os.environ['M1CATALOG_PATH']
     TESTOBJECTS_DIR = os.environ['TEST_DIR']
     TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
     OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")
