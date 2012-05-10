@@ -21,8 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltDB;
@@ -51,7 +50,7 @@ public class Shutdown extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                                            long fragmentId,
                                            ParameterSet params,
-                                           ExecutionSite.SystemProcedureExecutionContext context)
+                                           SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_shutdownCommand) {
             // Choose the lowest site ID on this host to do the global

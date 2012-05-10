@@ -589,21 +589,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * SystemProcedures are "friends" with ExecutionSites and granted
      * access to internal state via m_systemProcedureContext.
      */
-    public interface SystemProcedureExecutionContext {
-        public Database getDatabase();
-        public Cluster getCluster();
-        public ExecutionEngine getExecutionEngine();
-        public long getLastCommittedTxnId();
-        public long getCurrentTxnId();
-        public long getNextUndo();
-        public ExecutionSite getExecutionSite();
-        public HashMap<String, ProcedureRunner> getProcedures();
-        public long getSiteId();
-        public int getHostId();
-        public int getPartitionId();
-        public SiteTracker getSiteTracker();
-    }
-
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
         @Override
         public Database getDatabase()                         { return m_context.database; }
