@@ -21,7 +21,10 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 
+import org.voltdb.logging.VoltLogger;
+
 public abstract class ShellTools {
+    private static VoltLogger log = new VoltLogger("HOST");
 
     private static Process createProcess(String dir, String command[], String passwordScript) {
         ProcessBuilder pb = new ProcessBuilder(command);
@@ -37,6 +40,13 @@ public abstract class ShellTools {
         try {
             p = pb.start();
         } catch (IOException e) {
+            StringBuilder sb = new StringBuilder();
+            if (command != null) {
+                for (String c : command) {
+                    sb.append(c).append(" ");
+                }
+            }
+            log.error("Failed to run command " + sb.toString() + ". Error is " + e.getMessage());
             return null;
         }
         return p;
