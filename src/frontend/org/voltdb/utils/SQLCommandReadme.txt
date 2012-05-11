@@ -103,6 +103,7 @@ Executing Stored Procedures ----------------------------------------------------
   + @SnapshotDelete varchar, varchar
   + @SnapshotRestore varchar, varchar
   + @SnapshotSave varchar, varchar, bit
+  + @SnapshotSave varchar
   + @SnapshotScan varchar
   + @Statistics StatisticsComponent, bit
   + @SystemInformation
