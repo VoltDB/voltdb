@@ -1398,7 +1398,26 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 if (nonce.isEmpty()) {
                     throw new Exception("nonce cannot be empty");
                 }
-                blocking = jsObj.optBoolean("block", false);
+
+                /*
+                 * Try and be very flexible about what we will accept
+                 * as the type of the block parameter.
+                 */
+                Object blockingObj = false;
+                if (jsObj.has("block")) {
+                    blockingObj = jsObj.get("block");
+                }
+                if (blockingObj instanceof Number) {
+                    blocking = ((Number)blockingObj).byteValue() == 0 ? false : true;
+                } else if (blockingObj instanceof Boolean) {
+                    blocking = (Boolean)blockingObj;
+                } else if (blockingObj instanceof String) {
+                    blocking = Boolean.valueOf((String)blockingObj);
+                } else {
+                    throw new Exception(blockingObj.getClass().getName() + " is not supported as " +
+                            " type for the block parameter");
+                }
+
                 format = jsObj.optString("format", "native");
 
                 if (!(format.equals("csv") || format.equals("native"))) {
