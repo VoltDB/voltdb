@@ -73,7 +73,7 @@ public class QueryPlanner {
         m_estimates = estimates;
         m_useGlobalIds = useGlobalIds;
         m_quietPlanner = suppressDebugOutput;
-        m_fullDebug = true;//System.getProperties().contains("compilerdebug");
+        m_fullDebug = System.getProperties().contains("compilerdebug");
     }
 
     /**
