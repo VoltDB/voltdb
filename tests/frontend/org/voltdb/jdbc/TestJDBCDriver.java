@@ -54,40 +54,51 @@ public class TestJDBCDriver {
     static String testjar;
     static ServerThread server;
     static Connection conn;
+    static TPCCProjectBuilder pb;
 
     @BeforeClass
-    public static void setUp() throws Exception {
+    public static void setUp() throws ClassNotFoundException, SQLException {
         testjar = BuildDirectoryUtils.getBuildDirectoryPath() + File.separator
                 + "jdbcdrivertest.jar";
 
         // compile a catalog
-        TPCCProjectBuilder pb = new TPCCProjectBuilder();
+        pb = new TPCCProjectBuilder();
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
         pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
         pb.compile(testjar, 2, 0);
 
-        server = new ServerThread(testjar, pb.getPathToDeployment(),
-                                  BackendTarget.NATIVE_EE_JNI);
-        server.start();
-        server.waitForInitialization();
-
-        Class.forName("org.voltdb.jdbc.Driver");
-        conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+        // Set up ServerThread and Connection
+        startServer();
     }
 
     @AfterClass
     public static void tearDown() throws Exception {
-        // May have been closed by a connection test.
-        if (conn != null) {
-            conn.close();
-        }
-        if (server != null) {
-            server.shutdown();
-        }
+    	stopServer();
         File f = new File(testjar);
         f.delete();
     }
+
+	private static void startServer() throws ClassNotFoundException, SQLException {
+		server = new ServerThread(testjar, pb.getPathToDeployment(),
+		                          BackendTarget.NATIVE_EE_JNI);
+		server.start();
+		server.waitForInitialization();
+		
+		Class.forName("org.voltdb.jdbc.Driver");
+		conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+	}
+
+	private static void stopServer() throws SQLException {
+        if (conn != null) {
+            conn.close();
+            conn = null;
+        }
+        if (server != null) {
+        	try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
+	        server = null;
+        }
+	}
 
     @Test
     public void testTableTypes() throws SQLException {
@@ -370,19 +381,18 @@ public class TestJDBCDriver {
         assertTrue(minor >= 0);
     }
 
-    // IMPORTANT: This must be the last test because it destroys the connection.
     @Test
-    public void testLostConnection() throws SQLException {
+    public void testLostConnection() throws SQLException, ClassNotFoundException {
+        // Break the current connection and try to execute a procedure call.
         CallableStatement cs = conn.prepareCall("{call Oopsy(?)}");
-        conn.close();
-        conn = null;
-        try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
-        server = null;
+        stopServer();
         cs.setLong(1, 99);
         try {
             cs.execute();
         } catch (SQLException e) {
             assertEquals(e.getSQLState(), SQLError.CONNECTION_FAILURE);
         }
+        // Restore a working connection for any remaining tests
+        startServer();
     }
 }
