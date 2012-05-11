@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.iv2.Site;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -44,6 +45,7 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        hostLog.debug("STARTING: " + this);
         if (!m_txn.isReadOnly()) {
             m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         }
@@ -54,6 +56,7 @@ public class SpProcedureTask extends ProcedureTask
         completeInitiateTask(siteConnection);
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        hostLog.debug("COMPLETE: " + this);
     }
 
     @Override
@@ -90,8 +93,9 @@ public class SpProcedureTask extends ProcedureTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("SpProcedureTask:");
-        sb.append("\n\tMP TXN ID: ").append(getMpTxnId());
-        sb.append("\n\tLOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  MP TXN ID: ").append(getMpTxnId());
+        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }
 }

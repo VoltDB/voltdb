@@ -22,6 +22,7 @@ import java.util.List;
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
+import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -54,9 +55,12 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        hostLog.debug("STARTING: " + this);
         // Cast up. Could avoid ugliness with Iv2TransactionClass baseclass
         MpTransactionState txn = (MpTransactionState)m_txn;
         m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+        // Exception path out of here for rollback is going to need to
+        // call m_txn.setDone() somehow
         final InitiateResponseMessage response = processInitiateTask(txn.m_task);
         if (!response.shouldCommit()) {
             txn.setNeedsRollback();
@@ -64,6 +68,7 @@ public class MpProcedureTask extends ProcedureTask
         completeInitiateTask(siteConnection);
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
+        hostLog.debug("COMPLETE: " + this);
     }
 
     @Override
@@ -106,8 +111,9 @@ public class MpProcedureTask extends ProcedureTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("MpProcedureTask:");
-        sb.append("\n\tMP TXN ID: ").append(getMpTxnId());
-        sb.append("\n\tLOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  MP TXN ID: ").append(getMpTxnId());
+        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }
 }

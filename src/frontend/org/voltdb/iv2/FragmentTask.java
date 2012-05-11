@@ -22,6 +22,7 @@ import java.nio.ByteBuffer;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
@@ -50,6 +51,7 @@ public class FragmentTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        hostLog.debug("STARTING: " + this);
         // Set the begin undo token if we haven't already
         // In the future we could record a token per batch
         // and do partial rollback
@@ -61,6 +63,7 @@ public class FragmentTask extends TransactionTask
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         // completion?
         m_initiator.deliver(response);
+        hostLog.debug("COMPLETE: " + this);
     }
 
     // Cut and pasted from ExecutionSite processFragmentTask(), then
@@ -129,8 +132,9 @@ public class FragmentTask extends TransactionTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("FragmentTask:");
-        sb.append("\n\tMP TXN ID: ").append(getMpTxnId());
-        sb.append("\n\tLOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  MP TXN ID: ").append(getMpTxnId());
+        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  ON HSID: ").append(CoreUtils.hsIdToString(m_initiator.getHSId()));
         return sb.toString();
     }
 }

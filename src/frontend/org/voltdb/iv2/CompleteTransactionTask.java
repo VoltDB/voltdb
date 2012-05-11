@@ -35,10 +35,12 @@ public class CompleteTransactionTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
+        hostLog.debug("STARTING: " + this);
         siteConnection.truncateUndoLog(m_msg.isRollback(),
                                        m_txn.getBeginUndoToken(),
                                        m_msg.getTxnId());
         m_txn.setDone();
+        hostLog.debug("COMPLETE: " + this);
     }
 
     @Override
@@ -52,8 +54,8 @@ public class CompleteTransactionTask extends TransactionTask
     {
         StringBuilder sb = new StringBuilder();
         sb.append("CompleteTransactionTask:");
-        sb.append("\n\tMP TXN ID: ").append(getMpTxnId());
-        sb.append("\n\tLOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  MP TXN ID: ").append(getMpTxnId());
+        sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
         return sb.toString();
     }
 }
