@@ -634,6 +634,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 CreateMode.PERSISTENT);
                         //Reset the watch
                         userSnapshotRequestExistenceCheck();
+                        return;
                     }
 
                     /*
@@ -654,6 +655,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 CreateMode.PERSISTENT);
                         //Reset the watch
                         userSnapshotRequestExistenceCheck();
+                        return;
                     }
                 }
             });
@@ -730,6 +732,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 hostLog.error(clientResponse.getStatusString());
                                 //Reset the watch, in case this is recoverable
                                 userSnapshotRequestExistenceCheck();
+                                return;
                             }
 
                             VoltTable results[] = clientResponse.getResults();
@@ -741,6 +744,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                  * Don't think this should happen, reset the watch to allow later requests
                                  */
                                 userSnapshotRequestExistenceCheck();
+                                return;
                             }
 
                             VoltTable result = results[0];
@@ -780,6 +784,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                              * Snapshot was started no problem, reset the watch for new requests
                              */
                                 userSnapshotRequestExistenceCheck();
+                                return;
                             }
                         }
                     });
