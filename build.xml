@@ -1612,7 +1612,7 @@ TEST CASES
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
-    <property name="log4j.configuration" location="voltdb/log4j.properties" />
+    <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
     <property name="default_config" location="${test.example.dir}/config.py" />
     <property name="regression_config"
               location="${test.example.dir}/regression-config.py" />
