@@ -1196,7 +1196,6 @@ TEST CASES
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/**/Iv2Test*.class'/>
                 <exclude name="**/*$*.class"/>
-                <exclude name="**/TestAdHocQueries.class" />
                 <exclude name="**/TestHSQLBackend.class" />
                 <exclude name="**/TestJSONInterface.class" />
                 <exclude name="**/TestRejoinEndToEnd.class" />
