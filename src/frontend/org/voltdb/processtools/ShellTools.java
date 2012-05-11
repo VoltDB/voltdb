@@ -21,7 +21,7 @@ import java.io.BufferedInputStream;
 import java.io.File;
 import java.io.IOException;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public abstract class ShellTools {
     private static VoltLogger log = new VoltLogger("HOST");
