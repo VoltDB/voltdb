@@ -72,7 +72,8 @@ public class SysprocFragmentTask extends TransactionTask
         for (int frag = 0; frag < m_task.getFragmentCount(); frag++)
         {
             final long fragmentId = m_task.getFragmentId(frag);
-            final int outputDepId = m_task.getOutputDepId(frag);
+            // equivalent to dep.depId:
+            // final int outputDepId = m_task.getOutputDepId(frag);
 
             ParameterSet params = m_task.getParameterSetForFragment(frag);
 
@@ -84,9 +85,6 @@ public class SysprocFragmentTask extends TransactionTask
                             new HashMap<Integer, List<VoltTable>>(),
                             fragmentId,
                             params);
-
-                System.out.printf("SYSPROCFRAG: outputDepId(%d) depId(%d) table(%s)\n",
-                        outputDepId, dep.depId, dep.dependency);
                 currentFragResponse.addDependency(dep.depId, dep.dependency);
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);

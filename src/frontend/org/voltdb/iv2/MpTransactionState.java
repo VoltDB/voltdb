@@ -215,17 +215,9 @@ public class MpTransactionState extends TransactionState
         // use siteConnection.stashWorkUnitDependencies()
         siteConnection.stashWorkUnitDependencies(m_remoteDepTables);
 
-        System.out.printf("MPTXNSTATE AGG m_remoteDepTables.size(%d)\n", m_remoteDepTables.size());
-        for (Entry<Integer, List<VoltTable>> key : m_remoteDepTables.entrySet()) {
-            System.out.printf("\tDEP list size: %d\n", key.getValue().size());
-            System.out.printf("\tDEP key:%d table:%s\n", key.getKey(), key.getValue().get(0));
-            System.out.printf("\tDEP key:%d table:%s\n", key.getKey(), key.getValue().get(1));
-        }
-
         // Then execute the fragment task.  Looks like ExecutionSite.processFragmentTask(),
         // kinda, at least for now while we're executing stuff locally.
         // Probably don't need to generate a FragmentResponse
-        System.out.println("MPTSXNSTATE LOCALFRAGMENT AGG: " + m_localWork);
         Map<Integer, List<VoltTable>> results =
             processLocalFragmentTask(m_localWork, siteConnection);
 
@@ -250,6 +242,7 @@ public class MpTransactionState extends TransactionState
             tables.add(table);
         }
         else {
+            // TODO: need an error path here.
             System.out.println("No remote dep for local site: " + hsid);
         }
     }
@@ -310,9 +303,6 @@ public class MpTransactionState extends TransactionState
                     depResults.put(outputDepId, tables);
                 }
                 tables.add(dep.dependency);
-                System.out.printf("SYSPROCFRAG LOCAL: outputDepId(%d) depId(%d) table(%s)\n",
-                        outputDepId, dep.depId, dep.dependency);
-
                 return depResults;
             }
             else {
