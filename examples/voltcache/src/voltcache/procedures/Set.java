@@ -29,6 +29,7 @@ import org.voltdb.*;
 
 public class Set extends VoltProcedure
 {
+    private final SQLStmt clean  = Shared.CleanSQLStmt;
     private final SQLStmt check  = new SQLStmt("SELECT CASVersion FROM cache WHERE Key = ? AND Expires > ?;");
     private final SQLStmt insert = new SQLStmt("INSERT INTO cache ( Key, Expires, Flags, Value ) VALUES( ?, ?, ?, ? );");
     private final SQLStmt update = new SQLStmt("UPDATE cache SET Expires = ?, Flags = ?, Value = ?, CASVersion = CASVersion+1 WHERE Key = ?;");

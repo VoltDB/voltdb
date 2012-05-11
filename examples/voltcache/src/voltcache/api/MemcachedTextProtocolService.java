@@ -23,17 +23,15 @@
 package voltcache.api;
 
 import java.io.BufferedOutputStream;
+import java.io.BufferedInputStream;
 import java.io.InputStream;
 import java.io.IOException;
-
 import java.net.Socket;
-
-import java.nio.charset.Charset;
-
 import java.util.Arrays;
 import java.util.Collection;
 import java.util.Iterator;
 import java.util.regex.Pattern;
+import java.nio.charset.Charset;
 
 public class MemcachedTextProtocolService implements Runnable
 {

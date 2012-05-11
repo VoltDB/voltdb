@@ -29,6 +29,7 @@ import org.voltdb.*;
 
 public class Delete extends VoltProcedure
 {
+    private final SQLStmt clean  = Shared.CleanSQLStmt;
     private final SQLStmt check  = new SQLStmt("SELECT Key FROM cache WHERE Key = ? AND Expires > ? AND CASVersion > -1;");
     private final SQLStmt update = new SQLStmt("UPDATE cache SET Expires = ?, CASVersion = -1 WHERE Key = ?;");
     private final SQLStmt delete = new SQLStmt("DELETE FROM cache WHERE Key = ?;");
