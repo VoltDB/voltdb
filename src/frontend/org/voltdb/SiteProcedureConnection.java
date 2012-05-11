@@ -80,4 +80,37 @@ public interface SiteProcedureConnection {
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
 
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
+
+    /**
+     * IV2 commit / rollback interface to the EE
+     */
+    public void truncateUndoLog(boolean rollback, long token, long txnId);
+
+    /**
+     * IV2: Run a plan fragment
+     * @param planFragmentId
+     * @param inputDepId
+     * @param parameterSet
+     * @param txnId
+     * @param readOnly
+     * @return
+     * @throws EEException
+     */
+    public VoltTable executePlanFragment(
+        long planFragmentId, int inputDepId, ParameterSet parameterSet,
+        long txnId, boolean readOnly) throws EEException;
+
+    /**
+     * IV2: send dependencies to the EE
+     */
+    public void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies);
+
+    /**
+     * IV2: run a system procedure plan fragment
+     */
+    public DependencyPair executePlanFragment(
+            TransactionState txnState,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params);
+
 }

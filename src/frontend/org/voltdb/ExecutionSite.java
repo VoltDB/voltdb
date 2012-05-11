@@ -2227,4 +2227,39 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         lom.m_sourceHSId = m_siteId;
         m_mailbox.deliver(lom);
     }
+
+    // do-nothing implementation of IV2 SiteProcedeConnection API
+    @Override
+    public void truncateUndoLog(boolean rollback, long token, long txnId) {
+        throw new RuntimeException("Unsupported IV2-only API.");
+    }
+
+    // do-nothing implementation of IV2 sysproc fragment API.
+    @Override
+    public DependencyPair executePlanFragment(
+            TransactionState txnState,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params) {
+        throw new RuntimeException("Unsupported IV2-only API.");
+     }
+
+
+    @Override
+    public VoltTable executePlanFragment(long planFragmentId, int inputDepId,
+                                         ParameterSet parameterSet, long txnId,
+                                         boolean readOnly) throws EEException
+    {
+        return ee.executePlanFragment(planFragmentId,
+                                      inputDepId,
+                                      parameterSet,
+                                      txnId,
+                                      lastCommittedTxnId,
+                                      readOnly ? Long.MAX_VALUE : getNextUndoToken());
+    }
+
+    @Override
+    public void stashWorkUnitDependencies(Map<Integer, List<VoltTable>> dependencies)
+    {
+        ee.stashWorkUnitDependencies(dependencies);
+    }
 }
