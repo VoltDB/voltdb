@@ -305,24 +305,7 @@ public class MpTransactionState extends TransactionState
             final long fragmentId = ftask.getFragmentId(frag);
             final int outputDepId = ftask.getOutputDepId(frag);
 
-            // this is a horrible performance hack, and can be removed with small changes
-            // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
-            ParameterSet params = null;
-            final ByteBuffer paramData = ftask.getParameterDataForFragment(frag);
-            if (paramData != null) {
-                final FastDeserializer fds = new FastDeserializer(paramData);
-                try {
-                    params = fds.readObject(ParameterSet.class);
-                }
-                catch (final IOException e) {
-                    hostLog.l7dlog(Level.FATAL,
-                                   LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
-            }
-            else {
-                params = new ParameterSet();
-            }
+            ParameterSet params = ftask.getParameterSetForFragment(frag);
 
             if (ftask.isSysProcTask()) {
                 final DependencyPair dep
