@@ -1403,7 +1403,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             } else {
                 path = (String)params[0];
                 nonce = (String)params[1];
-                blocking = ((Number)params[2]).byteValue() == 1 ? true : false;
+                blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
             }
 
             if (nonce.contains("-") || nonce.contains(",")) {
