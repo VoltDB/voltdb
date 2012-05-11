@@ -33,6 +33,7 @@ import java.util.concurrent.FutureTask;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.lang3.StringUtils;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
@@ -41,6 +42,7 @@ import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
+import org.voltdb.utils.MiscUtils;
 
 public class VoltCache implements IVoltCache
 {
@@ -97,13 +99,49 @@ public class VoltCache implements IVoltCache
     private static final NullCallback nullCallback = new NullCallback();
 
     /**
-     * Creates a new VoltCache instance with a given VoltDB client.  Optionally creates a background timer thread to cleanup the underlying cache from obsolete items.
-     * @param servers The list of VoltDB servers the instance will use.
+     * Creates a new VoltCache instance with a given VoltDB client.
+     * Optionally creates a background timer thread to cleanup the
+     * underlying cache from obsolete items.
+     * @param servers The comma separated list of VoltDB servers in
+     * hostname[:port] format that the instance will use.
+     */
+    public VoltCache(String servers) throws Exception {
+        this.servers = servers;
+
+        client = connect(servers);
+        // Make sure there is at least one cleanup task for this cluster
+        lock.lock();
+        try
+        {
+            String key = this.servers;
+            if (!cleanupTaskPool.containsKey(key))
+                cleanupTaskPool.put(key, new CleanupTask(this.servers));
+            else
+                cleanupTaskPool.get(key).use();
+        }
+        finally
+        {
+            lock.unlock();
+        }
+    }
+
+    /**
+     * Creates a new VoltCache instance with a given VoltDB client.
+     * Optionally creates a background timer thread to cleanup the
+     * underlying cache from obsolete items.
+     * @param servers The comma separated list of VoltDB servers the
+     * instance will use.
      * @param port The client port to connect to on the VoltDB servers.
      */
-    public VoltCache(String servers) throws Exception
-    {
-        this.servers = servers;
+    @Deprecated
+    public VoltCache(String servers, int port) throws Exception {
+        // make the ports work
+        String[] serverArray = servers.split(",");
+        for (int i = 0; i < serverArray.length; ++i) {
+            serverArray[i] = MiscUtils.getHostnameFromHostnameColonPort(serverArray[i]);
+            serverArray[i] = MiscUtils.getHostnameColonPortString(serverArray[i], port);
+        }
+        this.servers = StringUtils.join(serverArray, ',');
 
         client = connect(servers);
         // Make sure there is at least one cleanup task for this cluster
