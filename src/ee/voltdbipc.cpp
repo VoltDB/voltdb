@@ -443,6 +443,7 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
     cs->hostnameLength = ntohs(cs->hostnameLength);
+    cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
     cs->totalPartitions = ntohl(cs->totalPartitions);
     std::string hostname(cs->hostname, cs->hostnameLength);
