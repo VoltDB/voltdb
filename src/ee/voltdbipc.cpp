@@ -436,16 +436,6 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     }__attribute__((packed));
     struct initialize * cs = (struct initialize*) cmd;
 
-    printf("sizeof(ipc_command) = %d\n", (int)sizeof(ipc_command));
-    printf("sizeof(long) = %d\n", (int)sizeof(long));
-    printf("sizeof(int) = %d\n", (int)sizeof(int));
-    printf("sizeof(initialize) = %d\n", (int)sizeof(initialize));
-    printf("position(hostId) = %d\n", (int)((char*)&cs->hostId - (char*)cs));
-    printf("position(tempTableMemory) = %d\n", (int)((char*)&cs->tempTableMemory - (char*)cs));
-    printf("position(totalPartitions) = %d\n", (int)((char*)&cs->totalPartitions - (char*)cs));
-    printf("position(hostnameLength) = %d\n", (int)((char*)&cs->hostnameLength - (char*)cs));
-    printf("position(hostname) = %d\n", (int)((char*)&cs->hostname - (char*)cs));
-
     printf("initialize: cluster=%d, site=%jd\n",
            ntohl(cs->clusterId), (intmax_t)ntohll(cs->siteId));
     cs->clusterId = ntohl(cs->clusterId);
@@ -1202,7 +1192,7 @@ int main(int argc, char **argv) {
     /* max message size that can be read from java */
     int max_ipc_message_size = (1024 * 1024 * 2);
 
-    int port = 10001;
+    int port = 0;
 
     if (argc == 2) {
         printf("Binding to a specific socket is no longer supported\n");
