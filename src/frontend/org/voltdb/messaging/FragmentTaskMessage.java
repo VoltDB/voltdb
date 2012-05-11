@@ -21,10 +21,14 @@ import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
+import org.voltdb.utils.LogKeys;
+import org.voltdb.VoltDB;
 
 /**
  * Message from a stored procedure coordinator to an execution site
@@ -34,6 +38,8 @@ import org.voltdb.ParameterSet;
  */
 public class FragmentTaskMessage extends TransactionInfoBaseMessage
 {
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
     public static final byte USER_PROC = 0;
     public static final byte SYS_PROC_PER_PARTITION = 1;
     public static final byte SYS_PROC_PER_SITE = 2;
@@ -173,6 +179,26 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
     public ByteBuffer getParameterDataForFragment(int index) {
         return m_parameterSets[index].asReadOnlyBuffer();
+    }
+
+    public ParameterSet getParameterSetForFragment(int index) {
+        ParameterSet params = null;
+        final ByteBuffer paramData = m_parameterSets[index].asReadOnlyBuffer();
+        if (paramData != null) {
+            final FastDeserializer fds = new FastDeserializer(paramData);
+            try {
+                params = fds.readObject(ParameterSet.class);
+            }
+            catch (final IOException e) {
+                hostLog.l7dlog(Level.FATAL,
+                        LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+        }
+        else {
+            params = new ParameterSet();
+        }
+        return params;
     }
 
     @Override

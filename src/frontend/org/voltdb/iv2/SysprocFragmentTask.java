@@ -85,29 +85,7 @@ public class SysprocFragmentTask extends TransactionTask
             final long fragmentId = m_task.getFragmentId(frag);
             final int outputDepId = m_task.getOutputDepId(frag);
 
-            // TODO: copy-paste from FragmentTask. DRY / helper needed.
-            // this is a horrible performance hack, and can be removed with small changes
-            // to the ee interface layer.. (rtb: not sure what 'this' encompasses...)
-            // (izzy: still not sure what 'this' encompasses...)
-            ParameterSet params = null;
-            final ByteBuffer paramData = m_task.getParameterDataForFragment(frag);
-            if (paramData != null) {
-                final FastDeserializer fds = new FastDeserializer(paramData);
-                try {
-                    params = fds.readObject(ParameterSet.class);
-                }
-                catch (final IOException e) {
-                    // IZZY: why not send a non-success response back to the
-                    // MPI here?
-                    hostLog.l7dlog(Level.FATAL,
-                                   LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
-                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                }
-            }
-            else {
-                params = new ParameterSet();
-            }
-
+            ParameterSet params = m_task.getParameterSetForFragment(frag);
 
             try {
                 // Find the sysproc to invoke.
