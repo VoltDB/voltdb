@@ -65,9 +65,6 @@ public:
         m_engine = engine;
     }
 
-    /** Invoke a plannode's associated executor using the pull protocol */
-    bool execute_pull(const NValueArray& params);
-
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
@@ -81,6 +78,7 @@ private:
     TableTuple p_next_pull();
     bool support_pull() const;
     void p_pre_execute_pull(const NValueArray &params);
+    void p_execute_pull();
 
     Table* m_inputTable;
     VoltDBEngine *m_engine;

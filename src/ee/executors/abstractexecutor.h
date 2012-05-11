@@ -77,7 +77,10 @@ class AbstractExecutor {
     /** Invoke a plannode's associated executor */
     bool execute(const NValueArray& params);
 
-    // Temp
+    /** Invoke a plannode's associated executor using the pull protocol */
+    bool execute_pull(const NValueArray& params);
+
+    /** Returns true if executor supports pull mode */
     virtual bool support_pull() const;
 
     // @TODO: Eventually, every executor class will have its own p_next_pull implementation
@@ -154,6 +157,9 @@ class AbstractExecutor {
     /** Last minute init before the p_next_pull iteration */
     virtual void p_pre_execute_pull(const NValueArray& params);
 
+    /** Executor specific logic */
+    virtual void p_execute_pull();
+
     /** Cleans up after the p_next_pull iteration. */
     virtual void p_post_execute_pull();
 
@@ -191,6 +197,20 @@ inline bool AbstractExecutor::execute(const NValueArray& params)
 
     // run the executor
     return p_execute(params);
+}
+
+inline void AbstractExecutor::p_execute_pull()
+{
+    // run the executor
+    while (true)
+    {
+        // iteration stops when empty tuple is returned
+        TableTuple tuple = p_next_pull();
+        if (tuple.isNullTuple())
+            break;
+        // Insert processed tuple into the output table
+        p_insert_output_table_pull(tuple);
+    }
 }
 
 inline void AbstractExecutor::pre_execute_pull(const NValueArray& params) {

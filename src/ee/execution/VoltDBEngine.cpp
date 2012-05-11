@@ -368,7 +368,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     size_t ttl = execsForFrag->list.size();
     if (ttl > 0) {
 
-        SendExecutor* executor = dynamic_cast<SendExecutor*>(execsForFrag->list[ttl - 1]);
+        AbstractExecutor* executor = execsForFrag->list[ttl - 1];
         assert (executor);
 
         try {

@@ -169,6 +169,31 @@ AbstractExecutor::AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstr
 
 AbstractExecutor::~AbstractExecutor() {}
 
+// Top-level entry point for executor pull protocol
+bool AbstractExecutor::execute_pull(const NValueArray& params)
+{
+    assert(getPlanNode());
+    VOLT_TRACE("Starting execution of plannode(id=%d)...",
+               getPlanNode()->getPlanNodeId());
+
+    // hook to give executor a chance to perform some initialization if necessary
+    // potentially could be used to call children in push mode
+    // recurs to children
+    boost::function<void(AbstractExecutor*)> fpreexecute =
+        boost::bind(&AbstractExecutor::pre_execute_pull, _1, boost::cref(params));
+    depth_first_iterate_pull(fpreexecute, true);
+
+    // run the executor
+    p_execute_pull();
+
+    // some executors need to do some work after the iteration
+    boost::function<void(AbstractExecutor*)> fpostexecute =
+        &AbstractExecutor::post_execute_pull;
+    depth_first_iterate_pull(fpostexecute, true);
+
+    return true;
+}
+
 static void add_to_list(AbstractExecutor* exec, std::vector<AbstractExecutor*>& list)
 {
     list.push_back(exec);

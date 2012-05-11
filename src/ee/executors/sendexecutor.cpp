@@ -96,29 +96,10 @@ bool SendExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-// Top-level entry point for executor pull protocol
-bool SendExecutor::execute_pull(const NValueArray& params)
+void SendExecutor::p_execute_pull()
 {
-    assert(getPlanNode());
-    VOLT_TRACE("Starting execution of plannode(id=%d)...",
-               getPlanNode()->getPlanNodeId());
-
-    // hook to give executor a chance to perform some initialization if necessary
-    // potentially could be used to call children in push mode
-    // recurs to children
-    boost::function<void(AbstractExecutor*)> fpreexecute =
-        boost::bind(&AbstractExecutor::pre_execute_pull, _1, boost::cref(params));
-    depth_first_iterate_pull(fpreexecute, true);
-
     TableTuple tuple = p_next_pull();
     assert(tuple.isNullTuple());
-
-    // some executors need to do some work after the iteration
-    boost::function<void(AbstractExecutor*)> fpostexecute =
-        &AbstractExecutor::post_execute_pull;
-    depth_first_iterate_pull(fpostexecute, true);
-
-    return true;
 }
 
 
