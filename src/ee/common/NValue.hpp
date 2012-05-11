@@ -1063,7 +1063,7 @@ class NValue {
             const int32_t objectLength = getObjectLength();
             if (objectLength > maxLength) {
                 char msg[1024];
-                snprintf(msg, 1024, "Object exceeds specified size. Size is %d and max is %d", objectLength, maxLength);
+                snprintf(msg, 1024, "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d", objectLength, maxLength);
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                    msg);
             }
@@ -1983,7 +1983,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 const int32_t minlength = lengthLength + length;
                 if (length > maxLength) {
                     char msg[1024];
-                    snprintf(msg, 1024, "Object exceeds specified size. Size is %d"
+                    snprintf(msg, 1024, "In NValue::serializeToTupleStorageAllocateForObjects, Object exceeds specified size. Size is %d"
                             " and max is %d", length, maxLength);
                     throw SQLException(
                         SQLException::data_exception_string_data_length_mismatch,
@@ -2055,7 +2055,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             else {
                 const int32_t length = getObjectLength();
                 char msg[1024];
-                snprintf(msg, 1024, "Object exceeds specified size. Size is %d and max is %d", length, maxLength);
+                snprintf(msg, 1024, "In NValue::serializeToTupleStorage(), Object exceeds specified size. Size is %d and max is %d", length, maxLength);
                 throw SQLException(
                     SQLException::data_exception_string_data_length_mismatch,
                     msg);
@@ -2104,7 +2104,7 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
           const int32_t length = input.readInt();
           if (length > maxLength) {
               char msg[1024];
-              snprintf(msg, 1024, "Object exceeds specified size. Size is %d and max is %d", length, maxLength);
+              snprintf(msg, 1024, "In NValue::deserializeFrom, Object exceeds specified size. Size is %d and max is %d", length, maxLength);
               throw SQLException(
                   SQLException::data_exception_string_data_length_mismatch,
                   msg);

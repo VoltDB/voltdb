@@ -17,31 +17,43 @@
 
 package org.voltdb.utils;
 
-import java.io.*;
-import java.lang.StringBuilder;
-import java.util.List;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.Writer;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.TimeZone;
-import java.util.TreeSet;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.text.SimpleDateFormat;
-import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import jline.ConsoleReader;
+import jline.SimpleCompletor;
+
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import jline.*;
 
 public class SQLCommand
 {
@@ -717,6 +729,7 @@ public class SQLCommand
         Procedures.put("@AdHoc", new ArrayList<String>(Arrays.asList("varchar")));
         Procedures.put("@AdHocSP", new ArrayList<String>(Arrays.asList("varchar", "bigint")));
     }
+
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
         final Client client = ClientFactory.createClient(config);
@@ -736,13 +749,13 @@ public class SQLCommand
     private static void printUsage(int exitCode)
     {
         System.out.println(
-        "Usage: SQLCommand --help\n"
-        + "   or  SQLCommand [--servers=comma_separated_server_list]\n"
-        + "                  [--port=port_number]\n"
-        + "                  [--user=user]\n"
-        + "                  [--password=password]\n"
-        + "                  [--output-format=(fixed|csv|tab)]\n"
-        + "                  [--output-skip-metadata]\n"
+        "Usage: sqlcmd --help\n"
+        + "   or  sqlcmd [--servers=comma_separated_server_list]\n"
+        + "              [--port=port_number]\n"
+        + "              [--user=user]\n"
+        + "              [--password=password]\n"
+        + "              [--output-format=(fixed|csv|tab)]\n"
+        + "              [--output-skip-metadata]\n"
         + "\n"
         + "[--servers=comma_separated_server_list]\n"
         + "  List of servers to connect to.\n"
@@ -921,7 +934,7 @@ public class SQLCommand
                     printHelp();
                     printUsage(0);
                 }
-                else if (arg.equals("--usage"))
+                else if ((arg.equals("--usage")) || (arg.equals("-?")))
                     printUsage(0);
                 else
                     printUsage("Invalid Parameter: " + arg);
@@ -937,7 +950,9 @@ public class SQLCommand
             DateParser.setLenient(true);
 
             // Create connection
-            VoltDB = getClient(new ClientConfig(user, password), servers,port);
+            ClientConfig config = new ClientConfig(user, password);
+            config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
+            VoltDB = getClient(config, servers, port);
 
             // Load user stored procs
             loadStoredProcedures(Procedures);

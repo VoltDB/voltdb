@@ -23,15 +23,13 @@
 package voltcache.api;
 
 import java.io.BufferedOutputStream;
-import java.io.BufferedInputStream;
-import java.io.InputStream;
 import java.io.IOException;
+import java.io.InputStream;
 import java.net.Socket;
+import java.nio.charset.Charset;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Iterator;
 import java.util.regex.Pattern;
-import java.nio.charset.Charset;
 
 public class MemcachedTextProtocolService implements Runnable
 {
@@ -98,14 +96,14 @@ public class MemcachedTextProtocolService implements Runnable
     private boolean Active = false;
 
 
-    public MemcachedTextProtocolService(Socket socket, String voltcacheServerList, int voltcachePort) throws Exception
+    public MemcachedTextProtocolService(Socket socket, String voltcacheServerList) throws Exception
     {
         this.Id     = IdGenerator++;
         this.Socket = socket;
         this.in     = socket.getInputStream();
 //        this.in     = new BufferedInputStream(socket.getInputStream(), 65535);
         this.out    = new BufferedOutputStream(socket.getOutputStream(), 65535);
-        this.Cache  = new VoltCache(voltcacheServerList, voltcachePort);
+        this.Cache  = new VoltCache(voltcacheServerList);
         System.out.println("Opening Client Connection[" + this.Id + "] :: " + this.Socket.getInetAddress());
     }
 
@@ -515,9 +513,9 @@ public class MemcachedTextProtocolService implements Runnable
 
     private void replyData(VoltCacheResult response) throws Exception
     {
-        if (response.Data != null)
+        if (response.data != null)
         {
-            Iterator<VoltCacheItem> itr = (Iterator<VoltCacheItem>)((Collection<VoltCacheItem>)response.Data.values()).iterator();
+            Iterator<VoltCacheItem> itr = response.data.values().iterator();
             while (itr.hasNext())
             {
                 final VoltCacheItem item = itr.next();
@@ -555,11 +553,11 @@ public class MemcachedTextProtocolService implements Runnable
 
     private void replyData(String key, VoltCacheResult response) throws Exception
     {
-        if (response.Data != null)
+        if (response.data != null)
         {
-            if (response.Data.containsKey(key))
+            if (response.data.containsKey(key))
             {
-                final VoltCacheItem item = response.Data.get(key);
+                final VoltCacheItem item = response.data.get(key);
 
                 byte[] value;
 
@@ -600,15 +598,15 @@ public class MemcachedTextProtocolService implements Runnable
             this.replyStatus(response);
         else
         {
-            if (response.Code == VoltCacheResult.NOT_FOUND)
+            if (response.code == VoltCacheResult.NOT_FOUND)
                 this.reply(RESPONSE_NOT_FOUND);
             else
-                this.reply(Long.toString(response.IncrDecrValue) + "\r\n");
+                this.reply(Long.toString(response.incrDecrValue) + "\r\n");
         }
     }
 
     private void replyStatus(VoltCacheResult response) throws Exception
     {
-        this.reply(RESPONSES[(int)response.Code]);
+        this.reply(RESPONSES[(int)response.code]);
     }
 }

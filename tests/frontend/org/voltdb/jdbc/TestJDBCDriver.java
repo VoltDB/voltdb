@@ -74,31 +74,31 @@ public class TestJDBCDriver {
 
     @AfterClass
     public static void tearDown() throws Exception {
-    	stopServer();
+        stopServer();
         File f = new File(testjar);
         f.delete();
     }
 
-	private static void startServer() throws ClassNotFoundException, SQLException {
-		server = new ServerThread(testjar, pb.getPathToDeployment(),
-		                          BackendTarget.NATIVE_EE_JNI);
-		server.start();
-		server.waitForInitialization();
-		
-		Class.forName("org.voltdb.jdbc.Driver");
-		conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
-	}
+    private static void startServer() throws ClassNotFoundException, SQLException {
+        server = new ServerThread(testjar, pb.getPathToDeployment(),
+                                  BackendTarget.NATIVE_EE_JNI);
+        server.start();
+        server.waitForInitialization();
 
-	private static void stopServer() throws SQLException {
+        Class.forName("org.voltdb.jdbc.Driver");
+        conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
+    }
+
+    private static void stopServer() throws SQLException {
         if (conn != null) {
             conn.close();
             conn = null;
         }
         if (server != null) {
-        	try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
-	        server = null;
+            try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
+            server = null;
         }
-	}
+    }
 
     @Test
     public void testTableTypes() throws SQLException {
