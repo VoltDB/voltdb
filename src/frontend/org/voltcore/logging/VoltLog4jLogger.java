@@ -17,8 +17,10 @@
 
 package org.voltcore.logging;
 
+import java.io.InputStream;
 import java.io.StringReader;
 import java.io.StringWriter;
+import java.net.URL;
 import java.util.MissingResourceException;
 import java.util.ResourceBundle;
 
@@ -92,27 +94,62 @@ public class VoltLog4jLogger implements CoreVoltLogger {
     }
 
     public VoltLog4jLogger(String className) {
-        m_logger = Logger.getLogger(className);
+        boolean log4jConfigured = isLog4jConfigured();
+
+        if ( log4jConfigured == true) {
+            m_logger = Logger.getLogger(className);
+        } else {
+            m_logger = null;
+        }
+    }
+
+    protected boolean isLog4jConfigured() {
+        boolean log4jConfigured = false;
+
+        String log4jConfigFile = System.getProperty("log4j.configuration");
+        String log4jConfigClass = System.getProperty("log4j.configurationClass");
+
+        if ( log4jConfigClass != null && log4jConfigClass.trim().length() > 0 ) {
+            // let it be configured, but allow log4j to complain if the class does not exist.
+            log4jConfigured = true;
+        } else {
+            // check the config file property and whether the url leads to anything
+            try {
+                URL url = new URL(log4jConfigFile);
+                InputStream inStream = url.openStream();
+                log4jConfigured |= inStream.available() > 0;
+                inStream.close();
+            } catch (Exception e) {}
+
+            // check the classpath for either the properties file or the xml file
+            log4jConfigured |= Thread.currentThread().getContextClassLoader().getResource("log4j.xml") != null;
+            log4jConfigured |= Thread.currentThread().getContextClassLoader().getResource("log4j.properties") != null;
+        }
+        return log4jConfigured;
     }
 
     @Override
     public boolean isEnabledFor(Level level) {
-        return m_logger.isEnabledFor(getPriorityForLevel(level));
+        return (m_logger != null ? m_logger.isEnabledFor(getPriorityForLevel(level)) : false);
     }
 
     @Override
     public void l7dlog(Level level, String key, Object[] params, Throwable t) {
-        if (params == null) {
-            m_logger.l7dlog(getPriorityForLevel(level), key, t);
-        }
-        else {
-            m_logger.l7dlog(getPriorityForLevel(level), key, params, t);
+        if ( m_logger != null ) {
+            if (params == null) {
+                m_logger.l7dlog(getPriorityForLevel(level), key, t);
+            }
+            else {
+                m_logger.l7dlog(getPriorityForLevel(level), key, params, t);
+            }
         }
     }
 
     @Override
     public void log(Level level, Object message, Throwable t) {
-        m_logger.log(getPriorityForLevel(level), message, t);
+        if ( m_logger != null ) {
+            m_logger.log(getPriorityForLevel(level), message, t);
+        }
     }
 
     /**
@@ -121,40 +158,42 @@ public class VoltLog4jLogger implements CoreVoltLogger {
      */
     @Override
     public long getLogLevels(VoltLogger[] voltloggers) {
-        Logger[] loggers = new Logger[voltloggers.length];
-        for (int i = 0; i < voltloggers.length; i++)
-            loggers[i] = ((VoltLog4jLogger)voltloggers[i].m_logger).m_logger;
-
         long logLevels = 0;
-        for (int ii = 0; ii < loggers.length; ii++) {
-            final int level = loggers[ii].getEffectiveLevel().toInt();
-            switch (level) {
-            case org.apache.log4j.Level.TRACE_INT:
-                logLevels |= trace << (ii * 3);
-                break;
-            case org.apache.log4j.Level.ALL_INT:
-                logLevels |= all << (ii * 3);
-                break;
-            case org.apache.log4j.Level.DEBUG_INT:
-                logLevels |= debug << (ii * 3);
-                break;
-            case org.apache.log4j.Level.ERROR_INT:
-                logLevels |= error << (ii * 3);
-                break;
-            case org.apache.log4j.Level.FATAL_INT:
-                logLevels |= fatal << (ii * 3);
-                break;
-            case org.apache.log4j.Level.INFO_INT:
-                logLevels |= info << (ii * 3);
-                break;
-            case org.apache.log4j.Level.OFF_INT:
-                logLevels |= off << (ii * 3);
-                break;
-            case org.apache.log4j.Level.WARN_INT:
-                logLevels |= warn << (ii * 3);
-                break;
-                default:
-                    throw new RuntimeException("Unhandled log level " + level);
+        if ( m_logger != null ) {
+            Logger[] loggers = new Logger[voltloggers.length];
+            for (int i = 0; i < voltloggers.length; i++)
+                loggers[i] = ((VoltLog4jLogger)voltloggers[i].m_logger).m_logger;
+
+            for (int ii = 0; ii < loggers.length; ii++) {
+                final int level = loggers[ii].getEffectiveLevel().toInt();
+                switch (level) {
+                case org.apache.log4j.Level.TRACE_INT:
+                    logLevels |= trace << (ii * 3);
+                    break;
+                case org.apache.log4j.Level.ALL_INT:
+                    logLevels |= all << (ii * 3);
+                    break;
+                case org.apache.log4j.Level.DEBUG_INT:
+                    logLevels |= debug << (ii * 3);
+                    break;
+                case org.apache.log4j.Level.ERROR_INT:
+                    logLevels |= error << (ii * 3);
+                    break;
+                case org.apache.log4j.Level.FATAL_INT:
+                    logLevels |= fatal << (ii * 3);
+                    break;
+                case org.apache.log4j.Level.INFO_INT:
+                    logLevels |= info << (ii * 3);
+                    break;
+                case org.apache.log4j.Level.OFF_INT:
+                    logLevels |= off << (ii * 3);
+                    break;
+                case org.apache.log4j.Level.WARN_INT:
+                    logLevels |= warn << (ii * 3);
+                    break;
+                    default:
+                        throw new RuntimeException("Unhandled log level " + level);
+                }
             }
         }
         return logLevels;
@@ -162,12 +201,16 @@ public class VoltLog4jLogger implements CoreVoltLogger {
 
     @Override
     public void addSimpleWriterAppender(StringWriter writer) {
-        m_logger.addAppender(new org.apache.log4j.WriterAppender(new org.apache.log4j.SimpleLayout(), writer));
+        if ( m_logger != null ) {
+            m_logger.addAppender(new org.apache.log4j.WriterAppender(new org.apache.log4j.SimpleLayout(), writer));
+        }
     }
 
     @Override
     public void setLevel(Level level) {
-        m_logger.setLevel(getPriorityForLevel(level));
+        if ( m_logger != null ) {
+            m_logger.setLevel(getPriorityForLevel(level));
+        }
     }
 
     /**

@@ -19,8 +19,13 @@ package org.voltdb.jdbc;
 
 import java.io.IOException;
 
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+
 public interface IVoltDBConnection
 {
+    void writeSummaryCSV(ClientStats stats, String path) throws IOException;
+    ClientStatsContext getClientStatsContext();
     JDBC4PerfCounterMap getStatistics();
     JDBC4PerfCounter getStatistics(String procedure);
     JDBC4PerfCounter getStatistics(String... procedures);

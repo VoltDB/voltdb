@@ -29,6 +29,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
@@ -293,18 +295,30 @@ public class JDBC4ClientConnection implements Closeable {
         return future;
     }
 
+
     /**
+     * Gets the new version of the performance statistics for this connection only.
+     * @return A {@link ClientStatsContext} that correctly represents the client statistics.
+     */
+    public ClientStatsContext getClientStatsContext() {
+        return this.client.createStatsContext();
+    }
+
+    /**
+     * @deprecated
      * Gets the global performance statistics for this connection (and all connections with the same
      * parameters).
      *
      * @return the counter map aggregated across all the connections in the pool with the same
      *         parameters as this connection.
      */
+    @Deprecated
     public JDBC4PerfCounterMap getStatistics() {
         return JDBC4ClientConnectionPool.getStatistics(this);
     }
 
     /**
+     * @deprecated
      * Gets the performance statistics for a specific procedure on this connection (and all
      * connections with the same parameters).
      *
@@ -313,11 +327,13 @@ public class JDBC4ClientConnection implements Closeable {
      * @return the counter aggregated across all the connections in the pool with the same
      *         parameters as this connection.
      */
+    @Deprecated
     public JDBC4PerfCounter getStatistics(String procedure) {
         return JDBC4ClientConnectionPool.getStatistics(this).get(procedure);
     }
 
     /**
+     * @deprecated
      * Gets the aggregated performance statistics for a list of procedures on this connection (and
      * all connections with the same parameters).
      *
@@ -326,6 +342,7 @@ public class JDBC4ClientConnection implements Closeable {
      * @return the counter aggregated across all the connections in the pool with the same
      *         parameters as this connection, and across all procedures.
      */
+    @Deprecated
     public JDBC4PerfCounter getStatistics(String... procedures) {
         JDBC4PerfCounterMap map = JDBC4ClientConnectionPool.getStatistics(this);
         JDBC4PerfCounter result = new JDBC4PerfCounter(false);
@@ -348,6 +365,10 @@ public class JDBC4ClientConnection implements Closeable {
             fw.flush();
             fw.close();
         }
+    }
+
+    void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        this.client.writeSummaryCSV(stats, path);
     }
 
     /**
