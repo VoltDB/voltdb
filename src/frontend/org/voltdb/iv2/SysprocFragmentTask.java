@@ -62,8 +62,11 @@ public class SysprocFragmentTask extends TransactionTask
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        // TODO: need a token
-        assert(m_txn.getBeginUndoToken() == Site.kInvalidUndoToken);
+        if (!m_txn.isReadOnly()) {
+            if (m_txn.getBeginUndoToken() == Site.kInvalidUndoToken) {
+                m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
+            }
+        }
 
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         m_initiator.deliver(response);
