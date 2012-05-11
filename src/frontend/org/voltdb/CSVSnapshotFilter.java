@@ -68,6 +68,7 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
                     cont.b.limit(cont.b.limit() + 4);
                     final int rowCount = cont.b.getInt();
                     buf.putInt(rowCountPosition, rowCount);
+                    buf.flip();
 
                     VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
                     Pair<Integer, byte[]> p =
