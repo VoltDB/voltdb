@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,31 +26,25 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
-import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.utils.LogKeys;
 
 public class MpTransactionState extends TransactionState
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final Iv2InitiateTaskMessage m_task;
-    final ProcedureRunner m_runner;
 
     LinkedBlockingDeque<FragmentResponseMessage> m_newDeps =
         new LinkedBlockingDeque<FragmentResponseMessage>();
@@ -67,7 +59,6 @@ public class MpTransactionState extends TransactionState
     FragmentTaskMessage m_localWork = null;
 
     MpTransactionState(Mailbox mailbox, long txnId,
-                       ProcedureRunner runner,
                        TransactionInfoBaseMessage notice,
                        List<Long> useHSIds, long localHSId)
     {
@@ -75,7 +66,6 @@ public class MpTransactionState extends TransactionState
         m_task = (Iv2InitiateTaskMessage)notice;
         m_useHSIds = useHSIds;
         m_localHSId = localHSId;
-        m_runner = runner;
     }
 
     @Override
@@ -309,7 +299,7 @@ public class MpTransactionState extends TransactionState
 
             if (ftask.isSysProcTask()) {
                 final DependencyPair dep
-                    = m_runner.executePlanFragment(this,
+                    = siteConnection.executePlanFragment(this,
                             m_remoteDepTables,
                             fragmentId,
                             params);

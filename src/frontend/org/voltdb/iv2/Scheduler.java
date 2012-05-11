@@ -100,9 +100,7 @@ public class Scheduler
         }
         if (message.isSysProcTask()) {
             final SysprocFragmentTask task =
-                new SysprocFragmentTask(m_mailbox,
-                        (ParticipantTransactionState)txn, message,
-                        m_loadedProcs);
+                new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn, message);
             m_tasks.offer(task);
         }
         else {

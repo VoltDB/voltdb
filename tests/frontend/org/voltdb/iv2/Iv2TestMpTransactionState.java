@@ -204,7 +204,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, txnId, null, taskmsg, allHsids, localHsid);
+            new MpTransactionState(mailbox, txnId, taskmsg, allHsids, localHsid);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -255,7 +255,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, txnId, null, taskmsg, allHsids, localHsid);
+            new MpTransactionState(mailbox, txnId, taskmsg, allHsids, localHsid);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);
@@ -305,7 +305,7 @@ public class Iv2TestMpTransactionState extends TestCase
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
 
         MpTransactionState dut =
-            new MpTransactionState(mailbox, txnId, null, taskmsg, allHsids, localHsid);
+            new MpTransactionState(mailbox, txnId, taskmsg, allHsids, localHsid);
 
         // emulate ProcedureRunner's use for a single local fragment
         dut.setupProcedureResume(true, plan.depsToResume);

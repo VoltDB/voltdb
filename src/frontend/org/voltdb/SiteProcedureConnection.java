@@ -105,4 +105,13 @@ public interface SiteProcedureConnection {
      * IV2: send dependencies to the EE
      */
     public void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies);
+
+    /**
+     * IV2: run a system procedure plan fragment
+     */
+    public DependencyPair executePlanFragment(
+            TransactionState txnState,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params);
+
 }

@@ -2259,6 +2259,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 
+    // do-nothing implementation of IV2 sysproc fragment API.
+    @Override
+    public DependencyPair executePlanFragment(
+            TransactionState txnState,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params) {
+        throw new RuntimeException("Unsupported IV2-only API.");
+     }
+
+
     @Override
     public VoltTable executePlanFragment(long planFragmentId, int inputDepId,
                                          ParameterSet parameterSet, long txnId,

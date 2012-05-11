@@ -17,10 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.io.IOException;
-
-import java.nio.ByteBuffer;
-
 import java.util.HashMap;
 import java.util.List;
 
@@ -30,32 +26,25 @@ import org.voltcore.messaging.Mailbox;
 import org.voltdb.DependencyPair;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
-import org.voltdb.LoadedProcedureSet;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.ParameterSet;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 
 public class SysprocFragmentTask extends TransactionTask
 {
     final Mailbox m_initiator;
     final FragmentTaskMessage m_task;
-    final LoadedProcedureSet m_loadedProcSet;
 
     SysprocFragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
-                 FragmentTaskMessage message,
-                 LoadedProcedureSet procs)
+                 FragmentTaskMessage message)
     {
         super(txn);
         m_initiator = mailbox;
         m_task = message;
-        m_loadedProcSet = procs;
         assert(m_task.isSysProcTask());
     }
 
@@ -88,13 +77,10 @@ public class SysprocFragmentTask extends TransactionTask
             ParameterSet params = m_task.getParameterSetForFragment(frag);
 
             try {
-                // Find the sysproc to invoke.
-                ProcedureRunner runner = m_loadedProcSet.getSysproc(fragmentId);
-
                 // run the overloaded sysproc planfragment. pass an empty dependency
                 // set since remote (non-aggregator) fragments don't receive dependencies.
                 final DependencyPair dep
-                    = runner.executePlanFragment(m_txn,
+                    = siteConnection.executePlanFragment(m_txn,
                             new HashMap<Integer, List<VoltTable>>(),
                             fragmentId,
                             params);

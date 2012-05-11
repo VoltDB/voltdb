@@ -30,7 +30,9 @@ import org.voltdb.BackendTarget;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
+import org.voltdb.DependencyPair;
 import org.voltdb.iv2.SiteTasker;
+import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
@@ -80,6 +82,9 @@ public class Site implements Runnable, SiteProcedureConnection
 
     // Current catalog
     CatalogContext m_context;
+
+    // Currently available procedure
+    LoadedProcedureSet m_loadedProcedures;
 
     // Current topology
     int m_partitionId;
@@ -212,6 +217,12 @@ public class Site implements Runnable, SiteProcedureConnection
 
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, txnId);
+    }
+
+    /** Update the loaded procedures. */
+    void setLoadedProcedures(LoadedProcedureSet loadedProcedure)
+    {
+        m_loadedProcedures = loadedProcedure;
     }
 
     /** Thread specific initialization */
@@ -454,4 +465,15 @@ public class Site implements Runnable, SiteProcedureConnection
     {
         m_ee.stashWorkUnitDependencies(dependencies);
     }
+
+    @Override
+    public DependencyPair executePlanFragment(
+            TransactionState txnState,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params)
+    {
+        ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
+        return runner.executePlanFragment(txnState, dependencies, fragmentId, params);
+    }
+
 }

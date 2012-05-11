@@ -70,6 +70,7 @@ public class SpInitiator implements Initiator
                                            siteTracker.m_numberOfPartitions);
         m_procSet.loadProcedures(catalogContext, backend);
         m_scheduler.setProcedureSet(m_procSet);
+        m_executionSite.setLoadedProcedures(m_procSet);
 
 
         m_siteThread = new Thread(m_executionSite);
