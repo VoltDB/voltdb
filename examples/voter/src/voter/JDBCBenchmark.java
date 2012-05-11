@@ -207,8 +207,8 @@ public class JDBCBenchmark {
         timer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
             @Override
-            public void run() { 
-                printStatistics(); 
+            public void run() {
+                printStatistics();
             }
         };
         timer.scheduleAtFixedRate(statsPrinting, config.displayinterval * 1000,

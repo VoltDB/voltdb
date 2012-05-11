@@ -537,8 +537,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void writeSummaryCSV(ClientStats stats, String path)
             throws IOException {
         this.NativeConnection.writeSummaryCSV(stats, path);
-        
+
     }
 
 }
-
