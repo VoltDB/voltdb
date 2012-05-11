@@ -156,9 +156,9 @@ TEST_F(FilterTest, FunctionAbs1Filter) {
 
     TupleValueExpression *tup_val_exp = new TupleValueExpression(0, std::string("tablename"), std::string("colname"));
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
-    std::vector<AbstractExpression*> argument;
-    argument.push_back(const_val_exp);
-    AbstractExpression* abs_exp = ExpressionUtil::functionFactory(EXPRESSION_TYPE_FUNCTION_ABS, &argument);
+    std::vector<AbstractExpression*>* argument = new std::vector<AbstractExpression*>();
+    argument->push_back(const_val_exp);
+    AbstractExpression* abs_exp = ExpressionUtil::functionFactory(EXPRESSION_TYPE_FUNCTION_ABS, argument);
     ComparisonExpression<CmpEq> *equal = new ComparisonExpression<CmpEq>(EXPRESSION_TYPE_COMPARE_EQUAL, tup_val_exp, abs_exp);
 
     // ::printf("\nFilter:%s\n", equal->debug().c_str());
@@ -189,9 +189,9 @@ TEST_F(FilterTest, FunctionAbs2Filter) {
     ConstantValueExpression *zero_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(0));
     TupleValueExpression *tup_val_exp = new TupleValueExpression(0, std::string("tablename"), std::string("colname"));
     AbstractExpression* minus_exp = new OperatorExpression<OpMinus>(EXPRESSION_TYPE_OPERATOR_MINUS, zero_val_exp, tup_val_exp);
-    std::vector<AbstractExpression*> argument;
-    argument.push_back(minus_exp);
-    AbstractExpression* abs_exp = ExpressionUtil::functionFactory(EXPRESSION_TYPE_FUNCTION_ABS, &argument);
+    std::vector<AbstractExpression*>* argument = new std::vector<AbstractExpression*>();
+    argument->push_back(minus_exp);
+    AbstractExpression* abs_exp = ExpressionUtil::functionFactory(EXPRESSION_TYPE_FUNCTION_ABS, argument);
     ConstantValueExpression *const_val_exp = new ConstantValueExpression(ValueFactory::getBigIntValue(20));
     ComparisonExpression<CmpEq> *equal = new ComparisonExpression<CmpEq>(EXPRESSION_TYPE_COMPARE_EQUAL, abs_exp, const_val_exp);
 
