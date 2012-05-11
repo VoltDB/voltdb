@@ -1347,9 +1347,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // It's too easy for stdout to get lost, especially if we are crashing, so log FATAL, instead.
             // Logging also automatically prefixes lines with "ExecutionSite [X:Y] "
             // thrown.printStackTrace();
-        	hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
+           	hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
             for (StackTraceElement ste : thrown.getStackTrace()) {
-            	hostLog.fatal(ste.toString());
+                hostLog.fatal(ste.toString());
             }
             VoltDB.crashLocalVoltDB(errmsg, true, thrown);
         }
