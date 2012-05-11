@@ -98,7 +98,7 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     public long getMpTxnId()
     {
-        return m_msg.getTxnId();
+        return m_txn.txnId;
     }
 
     @Override
