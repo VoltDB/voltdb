@@ -42,6 +42,8 @@ import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.Pair;
 import org.voltcore.utils.DBBPool.BBContainer;
 
+import com.google.common.util.concurrent.Callables;
+
 /**
  * This test also provides pretty good coverage of DefaultSnapshotTarget
  *
@@ -92,7 +94,7 @@ public class TestTableSaveFile extends TestCase {
         chunkBuffer.position(crcPosition);
         chunkBuffer.putInt(crc);
         chunkBuffer.position(0);
-        target.write(new BBContainer(chunkBuffer, 0) {
+        target.write(Callables.returning((BBContainer)new BBContainer(chunkBuffer, 0) {
 
             @Override
             public void discard() {
@@ -100,7 +102,7 @@ public class TestTableSaveFile extends TestCase {
 
             }
 
-        });
+        }));
     }
 
     private Pair<VoltTable, File> generateTestTable(int numberOfItems)

@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.net.URI;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
@@ -52,6 +53,8 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.sysprocs.SnapshotSave;
+
+import com.google.common.base.Throwables;
 
 /**
  * A scheduler of automated snapshots and manager of archived and retained snapshots.
@@ -605,11 +608,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         if (event.getType() == EventType.NodeCreated) {
             byte data[] = m_zk.getData(event.getPath(), false, null);
             String jsonString = new String(data, "UTF-8");
-            JSONObject jsObj = new JSONObject(jsonString);
-            final String path = jsObj.getString("path");
-            final String nonce = jsObj.getString("nonce");
-            final long blocking = jsObj.getLong("blocking");
+            final JSONObject jsObj = new JSONObject(jsonString);
             final String requestId = jsObj.getString("requestId");
+            /*
+             * Going to reuse the request object, remove the requestId
+             * field now that it is consumed
+             */
+            jsObj.remove("requestId");
             final long handle = m_nextCallbackHandle++;
             m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
@@ -629,6 +634,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 CreateMode.PERSISTENT);
                         //Reset the watch
                         userSnapshotRequestExistenceCheck();
+                        return;
                     }
 
                     /*
@@ -638,7 +644,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                      * failure/success to the client.
                      */
                     if (isSnapshotInProgressResponse(clientResponse)) {
-                        scheduleSnapshotForLater( path, nonce, blocking, requestId, true);
+                        scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
                     } else {
                         ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
                         ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
@@ -649,13 +655,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 CreateMode.PERSISTENT);
                         //Reset the watch
                         userSnapshotRequestExistenceCheck();
+                        return;
                     }
                 }
             });
             m_initiator.initiateSnapshotDaemonWork(
                     "@SnapshotSave",
                     handle,
-                    new Object[] { path, nonce, blocking });
+                    new Object[] { jsObj.toString(4) });
             return;
         }
     }
@@ -667,9 +674,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * via ZK relay.
      */
     private void scheduleSnapshotForLater(
-            final String path,
-            final String nonce,
-            final long blocking,
+            final String requestObj,
             final String requestId,
             final boolean isFirstAttempt
             ) throws Exception {
@@ -708,81 +713,86 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         final Runnable r = new Runnable() {
             @Override
             public void run() {
-                /*
-                 * Construct a callback to handle the response to the
-                 * @SnapshotSave invocation that will reattempt the user snapshot
-                 */
-                final long handle = m_nextCallbackHandle++;
-                m_procedureCallbacks.put(handle, new ProcedureCallback() {
-                    @Override
-                    public void clientCallback(ClientResponse clientResponse)
-                            throws Exception {
-                        /*
-                         * If there is an error then we are done
-                         * attempting this user snapshot. The params must be bad
-                         * or things are broken.
-                         */
-                        if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                            hostLog.error(clientResponse.getStatusString());
-                            //Reset the watch, in case this is recoverable
-                            userSnapshotRequestExistenceCheck();
-                        }
-
-                        VoltTable results[] = clientResponse.getResults();
-                        //Do this check to avoid an NPE
-                        if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
-                            hostLog.error("Queued user snapshot request reattempt received an unexpected response" +
-                                    " and will not be reattempted");
+                try {
+                    /*
+                     * Construct a callback to handle the response to the
+                     * @SnapshotSave invocation that will reattempt the user snapshot
+                     */
+                    final long handle = m_nextCallbackHandle++;
+                    m_procedureCallbacks.put(handle, new ProcedureCallback() {
+                        @Override
+                        public void clientCallback(ClientResponse clientResponse)
+                                throws Exception {
                             /*
-                             * Don't think this should happen, reset the watch to allow later requests
+                             * If there is an error then we are done
+                             * attempting this user snapshot. The params must be bad
+                             * or things are broken.
                              */
-                            userSnapshotRequestExistenceCheck();
-                        }
+                            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                                hostLog.error(clientResponse.getStatusString());
+                                //Reset the watch, in case this is recoverable
+                                userSnapshotRequestExistenceCheck();
+                                return;
+                            }
 
-                        VoltTable result = results[0];
-                        boolean snapshotInProgress = false;
-                        boolean haveFailure = false;
-                        while (result.advanceRow()) {
-                            if (result.getString("RESULT").equals("FAILURE")) {
-                                if (result.getString("ERR_MSG").equals("SNAPSHOT IN PROGRESS")) {
-                                    snapshotInProgress = true;
-                                } else {
-                                    haveFailure = true;
+                            VoltTable results[] = clientResponse.getResults();
+                            //Do this check to avoid an NPE
+                            if (results == null || results.length == 0 || results[0].getRowCount() < 1) {
+                                hostLog.error("Queued user snapshot request reattempt received an unexpected response" +
+                                        " and will not be reattempted");
+                                /*
+                                 * Don't think this should happen, reset the watch to allow later requests
+                                 */
+                                userSnapshotRequestExistenceCheck();
+                                return;
+                            }
+
+                            VoltTable result = results[0];
+                            boolean snapshotInProgress = false;
+                            boolean haveFailure = false;
+                            while (result.advanceRow()) {
+                                if (result.getString("RESULT").equals("FAILURE")) {
+                                    if (result.getString("ERR_MSG").equals("SNAPSHOT IN PROGRESS")) {
+                                        snapshotInProgress = true;
+                                    } else {
+                                        haveFailure = true;
+                                    }
                                 }
                             }
-                        }
 
-                        /*
-                         * If a snapshot was in progress, reattempt later, otherwise,
-                         * if there was a failure, abort the attempt and log.
-                         */
-                        if (snapshotInProgress) {
-                            hostLog.info("Queued user snapshot was reattempted, but a snapshot was " +
-                                    " still in progress. It will be reattempted.");
-                            //Turtles all the way down
-                            scheduleSnapshotForLater(
-                                    path,
-                                    nonce,
-                                    blocking,
-                                    null,//null because it shouldn't be used, request already responded to
-                                    false);
-                        } else if (haveFailure) {
-                            hostLog.info("Queued user snapshot was attempted, but there was a failure.");
-                            //Reset the watch, in case this is recoverable
-                            userSnapshotRequestExistenceCheck();
-                            //Log the details of the failure, after resetting the watch in case of some odd NPE
-                            result.resetRowPosition();
-                            hostLog.info(result);
-                        } else {
-                        /*
-                         * Snapshot was started no problem, reset the watch for new requests
-                         */
-                            userSnapshotRequestExistenceCheck();
+                            /*
+                             * If a snapshot was in progress, reattempt later, otherwise,
+                             * if there was a failure, abort the attempt and log.
+                             */
+                            if (snapshotInProgress) {
+                                hostLog.info("Queued user snapshot was reattempted, but a snapshot was " +
+                                        " still in progress. It will be reattempted.");
+                                //Turtles all the way down
+                                scheduleSnapshotForLater(
+                                        requestObj,
+                                        null,//null because it shouldn't be used, request already responded to
+                                        false);
+                            } else if (haveFailure) {
+                                hostLog.info("Queued user snapshot was attempted, but there was a failure.");
+                                //Reset the watch, in case this is recoverable
+                                userSnapshotRequestExistenceCheck();
+                                //Log the details of the failure, after resetting the watch in case of some odd NPE
+                                result.resetRowPosition();
+                                hostLog.info(result);
+                            } else {
+                            /*
+                             * Snapshot was started no problem, reset the watch for new requests
+                             */
+                                userSnapshotRequestExistenceCheck();
+                                return;
+                            }
                         }
-                    }
-                });
-                m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle,
-                        new Object[] { path, nonce, blocking });
+                    });
+
+                    m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle,
+                            new Object[] { requestObj });
+                } catch (Exception e) {
+                }
             }
         };
         m_es.schedule(r, m_userSnapshotRetryInterval, TimeUnit.SECONDS);
@@ -1294,145 +1304,183 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         });
     }
 
+    private static final class ForwardClientException extends Exception {
+        /**
+         *
+         */
+        private static final long serialVersionUID = 1L;
+        private final VoltTable m_table;
+        public ForwardClientException(String msg, VoltTable table) {
+            super(msg);
+            m_table = table;
+        }
+
+    }
+
     private void submitUserSnapshotRequest(final StoredProcedureInvocation invocation, final Connection c) {
         Object params[] = invocation.getParams().toArray();
 
-        /*
-         * Dang it, have to parse the params here
-         */
-        if (params.length != 3) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave requires 3 parameters. Path, nonce, and blocking",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (params[0] == null) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave path is null",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (params[1] == null) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave nonce is null",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (params[2] == null) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave blocking is null",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (!(params[0] instanceof String)) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave path param is a " + params[0].getClass().getSimpleName() +
-                                           " and should be a java.lang.String",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (!(params[1] instanceof String)) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave nonce param is a " + params[0].getClass().getSimpleName() +
-                                           " and should be a java.lang.String",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        if (!(params[2] instanceof Byte ||
-                params[2] instanceof Short ||
-                params[2] instanceof Integer ||
-                params[2] instanceof Long)) {
-            final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                       new VoltTable[0],
-                                       "@SnapshotSave blocking param is a " + params[0].getClass().getSimpleName() +
-                                           " and should be a java.lang.[Byte|Short|Integer|Long]",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
-        }
-
-        boolean requestExists = false;
         try {
+            /*
+             * Dang it, have to parse the params here to validate
+             */
+            if (params.length != 3 && params.length != 1) {
+                throw new Exception("@SnapshotSave requires 3 parameters or alternatively a single JSON blob. " +
+                        "Path, nonce, and blocking");
+            }
+
+            if (params[0] == null) {
+                throw new Exception("@SnapshotSave path is null");
+            }
+
+            if (params.length == 3) {
+                if (params[1] == null) {
+                    throw new Exception("@SnapshotSave nonce is null");
+                }
+
+                if (params[2] == null) {
+                    throw new Exception("@SnapshotSave blocking is null");
+                }
+            }
+
+            if (!(params[0] instanceof String)) {
+                throw new Exception("@SnapshotSave path param is a " +
+                        params[0].getClass().getSimpleName() +
+                        " and should be a java.lang.String");
+            }
+
+            if (params.length == 3) {
+                if (!(params[1] instanceof String)) {
+                    throw new Exception("@SnapshotSave nonce param is a " +
+                            params[0].getClass().getSimpleName() +
+                            " and should be a java.lang.String");
+                }
+
+                if (!(params[2] instanceof Byte ||
+                        params[2] instanceof Short ||
+                        params[2] instanceof Integer ||
+                        params[2] instanceof Long)) {
+                    throw new Exception("@SnapshotSave blocking param is a " +
+                            params[0].getClass().getSimpleName() +
+                            " and should be a java.lang.[Byte|Short|Integer|Long]");
+                }
+            }
+
+            boolean requestExists = false;
+            String path;
+            String nonce;
+            boolean blocking;
+            String format = "native";
+
+            /*
+             * Parse the request as a JSON object, or parse it
+             * out of the parameter array.
+             */
+            if (params.length == 1) {
+                final JSONObject jsObj = new JSONObject((String)params[0]);
+
+                path = jsObj.getString("uripath");
+                if (path.isEmpty()) {
+                    throw new Exception("uripath cannot be empty");
+                }
+                URI pathURI = new URI(path);
+                String pathURIScheme = pathURI.getScheme();
+                if (pathURIScheme == null) {
+                    throw new Exception("URI scheme cannot be null");
+                }
+                if (!pathURIScheme.equals("file")) {
+                    throw new Exception("Unsupported URI scheme " + pathURIScheme +
+                            " if this is a file path then you must prepend file://");
+                }
+                path = pathURI.getPath();
+
+                nonce = jsObj.getString("nonce");
+                if (nonce.isEmpty()) {
+                    throw new Exception("nonce cannot be empty");
+                }
+
+                /*
+                 * Try and be very flexible about what we will accept
+                 * as the type of the block parameter.
+                 */
+                Object blockingObj = false;
+                if (jsObj.has("block")) {
+                    blockingObj = jsObj.get("block");
+                }
+                if (blockingObj instanceof Number) {
+                    blocking = ((Number)blockingObj).byteValue() == 0 ? false : true;
+                } else if (blockingObj instanceof Boolean) {
+                    blocking = (Boolean)blockingObj;
+                } else if (blockingObj instanceof String) {
+                    blocking = Boolean.valueOf((String)blockingObj);
+                } else {
+                    throw new Exception(blockingObj.getClass().getName() + " is not supported as " +
+                            " type for the block parameter");
+                }
+
+                format = jsObj.optString("format", "native");
+
+                if (!(format.equals("csv") || format.equals("native"))) {
+                    throw new Exception("@SnapshotSave format param is a " + format +
+                            " and should be one of [\"native\" | \"csv\"]");
+                }
+            } else {
+                path = (String)params[0];
+                nonce = (String)params[1];
+                blocking = ((Number)params[2]).byteValue() == 0 ? false : true;
+            }
+
+            if (nonce.contains("-") || nonce.contains(",")) {
+                throw new Exception("Provided nonce " + nonce + " contains a prohibited character (- or ,)");
+            }
+
+            /*
+             * Forward the request as a JSON object now that things are validated
+             */
             final JSONObject jsObj = new JSONObject();
-            jsObj.put("path", (params[0]));
-            jsObj.put("nonce", (params[1]));
-            final long blocking = ((Number)params[2]).longValue();
-            jsObj.put("blocking", blocking);
+            jsObj.put("path", path);
+            jsObj.put("nonce", nonce);
+            jsObj.put("block", blocking);
+            jsObj.put("format", format);
             final String requestId = java.util.UUID.randomUUID().toString();
             jsObj.put("requestId", requestId);
             String zkString = jsObj.toString(4);
             byte zkBytes[] = zkString.getBytes("UTF-8");
-            m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            registerUserSnapshotResponseWatch(requestId, invocation, c);
-        } catch (KeeperException.NodeExistsException e) {
-            requestExists = true;
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
-        }
+            try {
+                m_zk.create(VoltZK.user_snapshot_request, zkBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                registerUserSnapshotResponseWatch(requestId, invocation, c);
+            } catch (KeeperException.NodeExistsException e) {
+                requestExists = true;
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Exception while attempting to create user snapshot request in ZK", true, e);
+            }
 
-        if (requestExists) {
-            VoltTable result = org.voltdb.sysprocs.SnapshotSave.constructNodeResultsTable();
-            result.addRow(-1,
-                    CoreUtils.getHostnameOrAddress(),
-                    "",
-                    "FAILURE",
-                    "SNAPSHOT IN PROGRESS");
+            if (requestExists) {
+                VoltTable result = org.voltdb.sysprocs.SnapshotSave.constructNodeResultsTable();
+                result.addRow(-1,
+                        CoreUtils.getHostnameOrAddress(),
+                        "",
+                        "FAILURE",
+                        "SNAPSHOT IN PROGRESS");
+                throw new ForwardClientException("A request to perform a user snapshot already exists", result);
+           }
+        } catch (Exception e) {
+            VoltTable tables[] = new VoltTable[0];
+            byte status = ClientResponseImpl.GRACEFUL_FAILURE;
+            if (e instanceof ForwardClientException && ((ForwardClientException)e).m_table != null) {
+                tables = new VoltTable[] { ((ForwardClientException)e).m_table };
+                status = ClientResponseImpl.SUCCESS;
+            }
             final ClientResponseImpl errorResponse =
-                new ClientResponseImpl(ClientResponseImpl.SUCCESS,
-                                       new VoltTable[] { result },
-                                       "A request to perform a user snapshot already exists",
-                                       invocation.clientHandle);
-            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-            buf.putInt(buf.capacity() - 4);
-            errorResponse.flattenToBuffer(buf).flip();
-            c.writeStream().enqueue(buf);
-            return;
+                    new ClientResponseImpl(status,
+                                           tables,
+                                           Throwables.getStackTraceAsString(e),
+                                           invocation.clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                errorResponse.flattenToBuffer(buf).flip();
+                c.writeStream().enqueue(buf);
+                return;
         }
     }
 

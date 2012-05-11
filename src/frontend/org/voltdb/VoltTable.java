@@ -1374,4 +1374,16 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
         buf.position(0);
         return buf;
     }
+
+    public byte[] getSchemaBytes() {
+        if (getRowCount() > 0) {
+            throw new RuntimeException("getSchemaBytes() Only works if the table is empty");
+        }
+        ByteBuffer dup = m_buffer.duplicate();
+        dup.limit(dup.limit() - 4);
+        dup.position(0);
+        byte retvalBytes[] = new byte[dup.remaining()];
+        dup.get(retvalBytes);
+        return retvalBytes;
+    }
 }
