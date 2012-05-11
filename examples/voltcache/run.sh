@@ -63,7 +63,6 @@ function benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \
@@ -86,7 +85,6 @@ function memcached-interface() {
     srccompile
     java -classpath obj:$CLASSPATH:obj voltcache.api.MemcachedInterfaceServer \
         --vservers=localhost \
-        --vport=21212 \
         --mport=11211
 }
 

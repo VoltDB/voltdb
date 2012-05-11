@@ -107,22 +107,24 @@ Executing Stored Procedures ----------------------------------------------------
   + @SnapshotScan varchar
   + @Statistics StatisticsComponent, bit
   + @SystemInformation
+  + @SystemCatalog CatalogComponent
   + @UpdateApplicationCatalog varchar, varchar
   + @UpdateLogging varchar
+  + @Promote
 
 + 'bit' values may be provided as either {true|yes|1} or {false|no|0}.
 
 + 'StatisticsComponent' values should be one of the following:
+  + DR
   + INDEX
   + INITIATOR
   + IOSTATS
+  + LIVECLIENTS
   + MANAGEMENT
   + MEMORY
+  + PARTITIONCOUNT
   + PROCEDURE
   + TABLE
-  + PARTITIONCOUNT
-  + STARVATION
-  + LIVECLIENTS
 
 + Specify null values with the word "null" (without quotation marks).
 
@@ -254,7 +256,7 @@ Important note on standard output messages -------------------------------------
 --------------------------------------------------------------------------------
 Known Issues / Limitations
 --------------------------------------------------------------------------------
-+ SQLCOmmand executes SQL statements as ad-hoc queries using the @AdHoc system
++ SQLCommand executes SQL statements as ad-hoc queries using the @AdHoc system
   procedure. Ad hoc queries are always executed as multi-partition procedures
   and constrain how much data can be selected, aggregated, sorted, and returned.
   If any of these constraints are violated, the query will fail and produce

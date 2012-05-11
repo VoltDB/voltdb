@@ -61,6 +61,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected Procedure m_catProc;
     protected Cluster m_cluster;
     protected SiteProcedureConnection m_site;
+    private LoadedProcedureSet m_loadedProcedureSet;
     protected ProcedureRunner m_runner; // overrides private parent var
 
     @Override
@@ -70,12 +71,14 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     }
 
     void initSysProc(int numberOfPartitions, SiteProcedureConnection site,
+            LoadedProcedureSet loadedProcedureSet,
             Procedure catProc, Cluster cluster) {
 
         m_numberOfPartitions = numberOfPartitions;
         m_site = site;
         m_catProc = catProc;
         m_cluster = cluster;
+        m_loadedProcedureSet = loadedProcedureSet;
 
         init();
     }
@@ -248,8 +251,12 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
         }
     }
 
+    // It would be nicer if init() on a sysproc was really "getPlanFragmentIds()"
+    // and then the loader could ask for the ids directly instead of stashing
+    // its reference here and inverting the relationship between loaded procedure
+    // set and system procedure.
     public void registerPlanFragment(long fragmentId) {
         assert(m_runner != null);
-        m_site.registerPlanFragment(fragmentId, m_runner);
+        m_loadedProcedureSet.registerPlanFragment(fragmentId, m_runner);
     }
 }
