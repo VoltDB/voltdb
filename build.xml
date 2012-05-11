@@ -1548,7 +1548,7 @@ TEST CASES
 <!-- This target will run a junit suite. It will also run a single
      suite under valgrind with -Dbuild=memcheck.  NOTE: to use valgrind,
      you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
-<target name='junitclass'
+<target name="junitclass"
     description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
 
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
@@ -1561,7 +1561,14 @@ TEST CASES
 
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
         <formatters>
-            <formatter usefile="false" type="plain"/>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>
