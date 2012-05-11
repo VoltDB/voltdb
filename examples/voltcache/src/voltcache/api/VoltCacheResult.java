@@ -87,12 +87,10 @@ public class VoltCacheResult
 
     public enum Type
     {
-            CODE    (0)
-        ,   DATA    (1)
-        ,   IDOP    (2)
+            CODE
+        ,   DATA
+        ,   IDOP
         ;
-        private int Value;
-        Type(int value) { Value = value; }
     }
 
     public static VoltCacheResult get(Type type, ClientResponse response)

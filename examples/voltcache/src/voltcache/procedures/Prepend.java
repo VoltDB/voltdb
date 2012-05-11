@@ -30,7 +30,6 @@ import org.voltdb.*;
 
 public class Prepend extends VoltProcedure
 {
-    private final SQLStmt clean  = Shared.CleanSQLStmt;
     private final SQLStmt check  = new SQLStmt("SELECT Key, Value FROM cache WHERE Key = ? AND Expires > ? AND CASVersion > -1;");
     private final SQLStmt update = new SQLStmt("UPDATE cache SET Value = ?, CASVersion = CASVersion+1 WHERE Key = ?;");
 

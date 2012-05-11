@@ -28,7 +28,6 @@ import org.voltdb.*;
 
 public class Gets extends VoltProcedure
 {
-    private final SQLStmt clean  = Shared.CleanSQLStmt;
     private final SQLStmt select = new SQLStmt("SELECT Key, Flags, Value, CASVersion, Expires FROM cache WHERE Key = ? AND Expires > ? AND CASVersion > -1;");
 
     public VoltTable[] run(String[] keys)
