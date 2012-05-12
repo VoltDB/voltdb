@@ -45,6 +45,7 @@ import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.Connection;
@@ -451,10 +452,17 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             //Cause a cascading failure?
             VoltDB.crashLocalVoltDB("Setting data on the truncation snapshot request in ZK should never fail", true, e);
         }
-        final Object params[] = new Object[3];
-        params[0] = snapshotPath;
-        params[1] = nonce;
-        params[2] = 0;//don't block
+        JSONObject jsObj = new JSONObject();
+        try {
+            jsObj.put("path", snapshotPath );
+            jsObj.put("nonce", nonce);
+        } catch (JSONException e) {
+            /*
+             * Should never happen, so fail fast
+             */
+            VoltDB.crashLocalVoltDB("", false, e);
+        }
+
         long handle = m_nextCallbackHandle++;
 
         m_procedureCallbacks.put(handle, new ProcedureCallback() {
@@ -554,7 +562,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             }
 
         });
-        m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
+        try {
+            m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, new Object[] { jsObj.toString(4) });
+        } catch (JSONException e) {
+            /*
+             * Should never happen, so fail fast
+             */
+            VoltDB.crashLocalVoltDB("", false, e);
+        }
         return;
     }
 
@@ -1015,22 +1030,28 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         final Date nowDate = new Date(now);
         final String dateString = m_dateFormat.format(nowDate);
         final String nonce = m_prefix + dateString;
-        Object params[] = new Object[3];
-        params[0] = m_path;
-        params[1] = nonce;
-        params[2] = 0;//don't block
-        m_snapshots.offer(new Snapshot(m_path, nonce, now));
-        long handle = m_nextCallbackHandle++;
-        m_procedureCallbacks.put(handle, new ProcedureCallback() {
+        JSONObject jsObj = new JSONObject();
+        try {
+            jsObj.put("path", m_path);
+            jsObj.put("nonce", nonce);
+            m_snapshots.offer(new Snapshot(m_path, nonce, now));
+            long handle = m_nextCallbackHandle++;
+            m_procedureCallbacks.put(handle, new ProcedureCallback() {
 
-            @Override
-            public void clientCallback(final ClientResponse clientResponse)
-                    throws Exception {
-                processClientResponsePrivate(clientResponse);
-            }
+                @Override
+                public void clientCallback(final ClientResponse clientResponse)
+                        throws Exception {
+                    processClientResponsePrivate(clientResponse);
+                }
 
-        });
-        m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, params);
+            });
+            m_initiator.initiateSnapshotDaemonWork("@SnapshotSave", handle, new Object[] { jsObj.toString(4) });
+        } catch (JSONException e) {
+            /*
+             * Should never happen, so fail fast
+             */
+            VoltDB.crashLocalVoltDB("", false, e);
+        }
     }
 
     /**
@@ -1370,7 +1391,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             String path;
             String nonce;
             boolean blocking;
-            String format = "native";
+            String format = null;
 
             /*
              * Parse the request as a JSON object, or parse it
@@ -1418,11 +1439,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                             " type for the block parameter");
                 }
 
-                format = jsObj.optString("format", "native");
-
-                if (!(format.equals("csv") || format.equals("native"))) {
-                    throw new Exception("@SnapshotSave format param is a " + format +
-                            " and should be one of [\"native\" | \"csv\"]");
+                if (jsObj.has("format")) {
+                    format = jsObj.getString("format");
+                    if (!(format.equals("csv") || format.equals("native"))) {
+                        throw new Exception("@SnapshotSave format param is a " + format +
+                                " and should be one of [\"native\" | \"csv\"]");
+                    }
                 }
             } else {
                 path = (String)params[0];
@@ -1441,7 +1463,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             jsObj.put("path", path);
             jsObj.put("nonce", nonce);
             jsObj.put("block", blocking);
-            jsObj.put("format", format);
+            if (format != null) {
+                jsObj.put("format", format);
+            }
             final String requestId = java.util.UUID.randomUUID().toString();
             jsObj.put("requestId", requestId);
             String zkString = jsObj.toString(4);

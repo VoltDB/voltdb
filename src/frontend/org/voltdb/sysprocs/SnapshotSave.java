@@ -302,7 +302,7 @@ public class SnapshotSave extends VoltSystemProcedure
         final String async = !block ? "Asynchronously" : "Synchronously";
         final String path = jsObj.getString("path");
         final String nonce = jsObj.getString("nonce");
-        final String format = jsObj.getString("format");
+        final String format = jsObj.optString("format", "native");
         boolean csv = false;
         if (format.equals("csv")) {
             csv = true;
