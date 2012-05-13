@@ -547,6 +547,16 @@ public class ProcedureRunner {
                         continue;
                     m_procMethod = m;
                     m_paramTypes = m.getParameterTypes();
+                    int tempParamTypesLength = m_paramTypes.length;
+
+                    m_paramTypeIsPrimitive = new boolean[tempParamTypesLength];
+                    m_paramTypeIsArray = new boolean[tempParamTypesLength];
+                    m_paramTypeComponentType = new Class<?>[tempParamTypesLength];
+                    for (int ii = 0; ii < tempParamTypesLength; ii++) {
+                        m_paramTypeIsPrimitive[ii] = m_paramTypes[ii].isPrimitive();
+                        m_paramTypeIsArray[ii] = m_paramTypes[ii].isArray();
+                        m_paramTypeComponentType[ii] = m_paramTypes[ii].getComponentType();
+                    }
                 }
             }
 
