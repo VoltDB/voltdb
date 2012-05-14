@@ -401,6 +401,12 @@ public class Site implements Runnable, SiteProcedureConnection
     }
 
     @Override
+    public void updateBackendLogLevels()
+    {
+        m_ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
+    }
+
+    @Override
     public VoltTable[] executeQueryPlanFragmentsAndGetResults(
             long[] planFragmentIds, int numFragmentIds,
             ParameterSet[] parameterSets, int numParameterSets, long txnId,
