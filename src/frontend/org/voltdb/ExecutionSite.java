@@ -611,7 +611,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public int getPartitionId()                           { return m_tracker.getPartitionForSite(m_siteId); }
         @Override
         public SiteTracker getSiteTracker()                   { return m_tracker; }
-
+        @Override
+        public void updateBackendLogLevels()                  { ExecutionSite.this.updateBackendLogLevels(); }
     }
 
     SystemProcedureContext m_systemProcedureContext;
