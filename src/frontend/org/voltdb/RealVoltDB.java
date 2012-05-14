@@ -45,7 +45,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -105,6 +104,8 @@ import org.voltdb.utils.ResponseSampler;
 import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 import com.google.common.collect.ImmutableList;
 
 /**
@@ -142,7 +143,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.6";
+    private static final String m_defaultVersionString = "2.6.1";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -213,7 +214,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     volatile String m_localMetadata = "";
 
-    private ExecutorService m_computationService;
+    private ListeningExecutorService m_computationService;
 
     // methods accessed via the singleton
     @Override
@@ -289,18 +290,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_siteThreads = new HashMap<Long, Thread>();
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
-            m_computationService = Executors.newFixedThreadPool(
-                    Runtime.getRuntime().availableProcessors(),
-                    new ThreadFactory() {
-                        private int threadIndex = 0;
-                        @Override
-                        public synchronized Thread  newThread(Runnable r) {
-                            Thread t = new Thread(null, r, "Computation service thread - " + threadIndex++, 131072);
-                            t.setDaemon(true);
-                            return t;
-                        }
+            m_computationService = MoreExecutors.listeningDecorator(
+                    Executors.newFixedThreadPool(
+                        Runtime.getRuntime().availableProcessors(),
+                        new ThreadFactory() {
+                            private int threadIndex = 0;
+                            @Override
+                            public synchronized Thread  newThread(Runnable r) {
+                                Thread t = new Thread(null, r, "Computation service thread - " + threadIndex++, 131072);
+                                t.setDaemon(true);
+                                return t;
+                            }
 
-                    });
+                        })
+                    );
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -1823,7 +1826,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public ExecutorService getComputationService() {
+    public ListeningExecutorService getComputationService() {
         return m_computationService;
     }
 

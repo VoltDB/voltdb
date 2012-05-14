@@ -22,8 +22,12 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
 import java.util.HashSet;
 import java.util.List;
@@ -41,10 +45,14 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
+
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -71,7 +79,8 @@ public class SnapshotSaveAPI
      * @param hostname
      * @return VoltTable describing the results of the snapshot attempt
      */
-    public VoltTable startSnapshotting(String file_path, String file_nonce, byte block,
+    public VoltTable startSnapshotting(
+            String file_path, String file_nonce, boolean csv, byte block,
             long txnId, SystemProcedureExecutionContext context, String hostname)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
@@ -104,7 +113,7 @@ public class SnapshotSaveAPI
             }
 
             if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                createSetup(file_path, file_nonce, txnId, context, hostname, result);
+                createSetup(file_path, file_nonce, csv, txnId, context, hostname, result);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -287,11 +296,52 @@ public class SnapshotSaveAPI
 
 
     @SuppressWarnings("unused")
-    private void createSetup(String file_path, String file_nonce,
+    private void createSetup(
+            String file_path, String file_nonce, boolean csv,
             long txnId, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
+            SiteTracker tracker = context.getExecutionSite().m_tracker;
+
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-1");
+            } catch (NoSuchAlgorithmException e) {
+                throw new AssertionError(e);
+            }
+
+            /*
+             * List of partitions to include if this snapshot is
+             * going to be deduped. Attempts to break up the work
+             * by seeding an RNG selecting
+             * a random replica to do the work. Will not work in failure
+             * cases, but we don't use dedupe when we want durability.
+             *
+             * Originally used the partition id as the seed, but it turns out
+             * that nextInt(2) returns a 1 for seeds 0-4095. Now use SHA-1
+             * on the txnid + partition id.
+             */
+            List<Integer> partitionsToInclude = new ArrayList<Integer>();
+            List<Long> sitesToInclude = new ArrayList<Long>();
+            for (long localSite : tracker.getLocalSites()) {
+                final int partitionId = tracker.getPartitionForSite(localSite);
+                List<Long> sites =
+                        new ArrayList<Long>(tracker.getSitesForPartition(tracker.getPartitionForSite(localSite)));
+                Collections.sort(sites);
+
+                digest.update(Longs.toByteArray(txnId));
+                final long seed = Longs.fromByteArray(Arrays.copyOf( digest.digest(Ints.toByteArray(partitionId)), 8));
+
+                int siteIndex = new java.util.Random(seed).nextInt(sites.size());
+                if (localSite == sites.get(siteIndex)) {
+                    partitionsToInclude.add(partitionId);
+                    sitesToInclude.add(localSite);
+                }
+            }
+
+            assert(partitionsToInclude.size() == sitesToInclude.size());
+
             /*
              * Used to close targets on failure
              */
@@ -327,24 +377,40 @@ public class SnapshotSaveAPI
                             context.getExecutionSite().getCorrespondingHostId(),
                             file_path,
                             file_nonce,
+                            csv,
                             tables.toArray(new Table[0]));
                 for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
+                    /*
+                     * For a deduped csv snapshot, only produce the replicated tables on the "leader"
+                     * host.
+                     */
+                    if (csv && table.getIsreplicated() && !tracker.isFirstHost()) {
+                        continue;
+                    }
                     String canSnapshot = "SUCCESS";
                     String err_msg = "";
                     final File saveFilePath =
-                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce,
-                                              context.getHostId());
+                            SnapshotUtil.constructFileForTable(
+                                    table,
+                                    file_path,
+                                    file_nonce,
+                                    csv ? ".csv" : ".vpt",
+                                    context.getHostId());
                     SnapshotDataTarget sdt = null;
                     try {
-                        sdt =
-                            constructSnapshotDataTargetForTable(
-                                    context,
-                                    saveFilePath,
-                                    table,
-                                    context.getHostId(),
-                                    context.getSiteTracker().m_numberOfPartitions,
-                                    txnId);
+                        if (csv) {
+                            sdt = new SimpleFileSnapshotDataTarget(saveFilePath);
+                        } else {
+                            sdt =
+                                constructSnapshotDataTargetForTable(
+                                        context,
+                                        saveFilePath,
+                                        table,
+                                        context.getHostId(),
+                                        context.getSiteTracker().m_numberOfPartitions,
+                                        txnId);
+                        }
                         targets.add(sdt);
                         final SnapshotDataTarget sdtFinal = sdt;
                         final Runnable onClose = new Runnable() {
@@ -377,10 +443,24 @@ public class SnapshotSaveAPI
 
                         sdt.setOnCloseHandler(onClose);
 
+                        List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
+                        if (csv) {
+                            /*
+                             * Don't need to do filtering on a replicated table.
+                             */
+                            if (!table.getIsreplicated()) {
+                                filters.add(
+                                        new PartitionProjectionSnapshotFilter(
+                                                Ints.toArray(partitionsToInclude),
+                                                0));
+                            }
+                            filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
+                        }
                         final SnapshotTableTask task =
                             new SnapshotTableTask(
                                     table.getRelativeIndex(),
                                     sdt,
+                                    filters.toArray(new SnapshotDataFilter[filters.size()]),
                                     table.getIsreplicated(),
                                     table.getTypeName());
 
