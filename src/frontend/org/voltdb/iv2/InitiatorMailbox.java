@@ -187,6 +187,53 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
 
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
+        /*
+           if (replica):
+               if (sp procedure):
+                   log it
+                   make a SP-task cfg'd with respond-to-remote
+                if (mp fragment):
+                   log it
+                   make a MP-fragtask cfg'd with respond-to-master
+
+            if (master):
+                if (sp procedure):
+                    log it
+                    replicate
+                    make a SP-task cfg'd with respond-to-local
+                if (mp fragment)
+                    log it
+                    replicate
+                    make a MP-fragtask cfg'd with respond-to-local
+                if (sp-response):
+                    log it?
+                    if replicate.dedupe() says complete:
+                       send response to creator
+                if (mp fragment response)
+                    log it?
+                    if replicate.dedupe() says complete:
+                       send response to creator (must be MPI)
+                if (complete transaction)
+                    log it
+                    replicate
+                    make a complete-transaction task
+
+            if (mpi):
+                if (mp procedure):
+                    log it
+                    make a mp procedure task
+                if (mp fragment response):
+                    offer to txnstate
+                if (every-site):
+                    log it
+                    send sp procedure to every master
+                if (every-site-response):
+                    if all-responses-collected? respond to creator
+
+       */
+
+
+
         // If MPI and multipart, just schedule (for now)
         // If MPI or Partition master and singlepart, replicate and schedule
         // if partition replica, just schedule
