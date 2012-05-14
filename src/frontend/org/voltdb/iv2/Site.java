@@ -206,6 +206,11 @@ public class Site implements Runnable, SiteProcedureConnection
         {
             return Site.this;
         }
+
+        @Override
+        public void updateBackendLogLevels() {
+            Site.this.updateBackendLogLevels();
+        }
     };
 
     /** Create a new execution site and the corresponding EE */
