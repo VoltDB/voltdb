@@ -60,109 +60,109 @@ public class TestMPMultiRoundTripSuite extends RegressionSuite {
         }
     }
 
-//    public void testMultiRoundWrite() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        ClientResponse resp = client.callProcedure("LoadP1", 10);
-//        assertTrue("Successful multi-roundtrip write.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Expect touched=10", 10L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testMultiRoundReplicatedWrite() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        ClientResponse resp = client.callProcedure("LoadR1", 10);
-//        assertTrue("Successful multi-roundtrip replicated write.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Expect touched=10", 10L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testMultiRoundRead() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        loadData(client);
-//
-//        ClientResponse resp = client.callProcedure("MultiRoundP1Count", 10);
-//        assertTrue("Successful multi-roundtrip read.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Expect count=100", 100L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testMultiRoundReplicatedRead() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        client.callProcedure("LoadR1", 10);
-//
-//        ClientResponse resp = client.callProcedure("MultiRoundR1Count", 10);
-//        assertTrue("Successful multi-roundtrip read.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Expect count=100", 100L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testMultiRoundTripMixReadTypes() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        client.callProcedure("LoadP1", 11);
-//        client.callProcedure("LoadR1", 13);
-//
-//        ClientResponse resp = client.callProcedure("MultiRoundMixedReads", 10);
-//        assertTrue("Successful multi-roundtrip read.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Expect count=1430(11*13*10)", 1430L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testMultiRoundtripMixReadsAndWrites() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        // Make the die setting > than the # of batches to avoid death
-//        ClientResponse resp = client.callProcedure("MultiRoundMixReadsAndWrites", 10, 20);
-//        assertTrue("Successful multi-roundtrip read/write.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Expect count=55", 55L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testMultiRoundtripMixReplicatedReadsAndWrites() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        ClientResponse resp = client.callProcedure("MultiRoundMixReplicatedReadsAndWrites", 10, 20);
-//        assertTrue("Successful multi-roundtrip read/write.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Expect count=55", 55L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testMultiRoundTripMixReadsWritesConstraintViolation() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        boolean caught = false;
-//        try {
-//            ClientResponse resp = client.callProcedure("MultiRoundMixReadsAndWrites", 10, 6);
-//            assertFalse("Failed to produce constraint violation", true);
-//        }
-//        catch (ProcCallException e) {
-//            assertEquals("Client response is rollback.",
-//                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-//            caught = true;
-//        }
-//        assertTrue("Expected exception.", caught);
-//
-//        // Entire proc should have been rolled back
-//        ClientResponse resp = client.callProcedure("CountP1");
-//        assertEquals("Expected count=0", 0L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testMultiRoundTripMixReplicatedReadsWritesConstraintViolation() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        boolean caught = false;
-//        try {
-//            ClientResponse resp = client.callProcedure("MultiRoundMixReplicatedReadsAndWrites", 10, 6);
-//            assertFalse("Failed to produce constraint violation", true);
-//        }
-//        catch (ProcCallException e) {
-//            assertEquals("Client response is rollback.",
-//                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-//            caught = true;
-//        }
-//        assertTrue("Expected exception.", caught);
-//
-//        // Entire proc should have been rolled back
-//        ClientResponse resp = client.callProcedure("CountP1");
-//        assertEquals("Expected count=0", 0L, resp.getResults()[0].asScalarLong());
-//    }
+    public void testMultiRoundWrite() throws Exception
+    {
+        final Client client = this.getClient();
+        ClientResponse resp = client.callProcedure("LoadP1", 10);
+        assertTrue("Successful multi-roundtrip write.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expect touched=10", 10L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testMultiRoundReplicatedWrite() throws Exception
+    {
+        final Client client = this.getClient();
+        ClientResponse resp = client.callProcedure("LoadR1", 10);
+        assertTrue("Successful multi-roundtrip replicated write.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expect touched=10", 10L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testMultiRoundRead() throws Exception
+    {
+        final Client client = this.getClient();
+        loadData(client);
+
+        ClientResponse resp = client.callProcedure("MultiRoundP1Count", 10);
+        assertTrue("Successful multi-roundtrip read.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expect count=100", 100L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testMultiRoundReplicatedRead() throws Exception
+    {
+        final Client client = this.getClient();
+        client.callProcedure("LoadR1", 10);
+
+        ClientResponse resp = client.callProcedure("MultiRoundR1Count", 10);
+        assertTrue("Successful multi-roundtrip read.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expect count=100", 100L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testMultiRoundTripMixReadTypes() throws Exception
+    {
+        final Client client = this.getClient();
+        client.callProcedure("LoadP1", 11);
+        client.callProcedure("LoadR1", 13);
+
+        ClientResponse resp = client.callProcedure("MultiRoundMixedReads", 10);
+        assertTrue("Successful multi-roundtrip read.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expect count=1430(11*13*10)", 1430L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testMultiRoundtripMixReadsAndWrites() throws Exception
+    {
+        final Client client = this.getClient();
+        // Make the die setting > than the # of batches to avoid death
+        ClientResponse resp = client.callProcedure("MultiRoundMixReadsAndWrites", 10, 20);
+        assertTrue("Successful multi-roundtrip read/write.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expect count=55", 55L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testMultiRoundtripMixReplicatedReadsAndWrites() throws Exception
+    {
+        final Client client = this.getClient();
+        ClientResponse resp = client.callProcedure("MultiRoundMixReplicatedReadsAndWrites", 10, 20);
+        assertTrue("Successful multi-roundtrip read/write.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expect count=55", 55L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testMultiRoundTripMixReadsWritesConstraintViolation() throws Exception
+    {
+        final Client client = this.getClient();
+        boolean caught = false;
+        try {
+            ClientResponse resp = client.callProcedure("MultiRoundMixReadsAndWrites", 10, 6);
+            assertFalse("Failed to produce constraint violation", true);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is rollback.",
+                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            caught = true;
+        }
+        assertTrue("Expected exception.", caught);
+
+        // Entire proc should have been rolled back
+        ClientResponse resp = client.callProcedure("CountP1");
+        assertEquals("Expected count=0", 0L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testMultiRoundTripMixReplicatedReadsWritesConstraintViolation() throws Exception
+    {
+        final Client client = this.getClient();
+        boolean caught = false;
+        try {
+            ClientResponse resp = client.callProcedure("MultiRoundMixReplicatedReadsAndWrites", 10, 6);
+            assertFalse("Failed to produce constraint violation", true);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is rollback.",
+                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            caught = true;
+        }
+        assertTrue("Expected exception.", caught);
+
+        // Entire proc should have been rolled back
+        ClientResponse resp = client.callProcedure("CountP1");
+        assertEquals("Expected count=0", 0L, resp.getResults()[0].asScalarLong());
+    }
 
     public void testSimultaneousMultiAndSinglePartTxns() throws Exception
     {
@@ -187,7 +187,7 @@ public class TestMPMultiRoundTripSuite extends RegressionSuite {
         client.drain();
         ClientResponse resp2 = client.callProcedure("GetP1");
         ClientResponse resp = client.callProcedure("SumP1");
-        assertEquals(resp2.getResults()[0].toString(), 10 * 2, resp.getResults()[0].asScalarLong());
+        assertEquals(resp2.getResults()[0].toString(), test_size * 2, resp.getResults()[0].asScalarLong());
     }
 
     public void testSimultaneousMultiAndSinglePartTxnsWithRollback() throws Exception

@@ -41,9 +41,10 @@ public class FragmentTask extends TransactionTask
 
     FragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
+                 TransactionTaskQueue queue,
                  FragmentTaskMessage message)
     {
-        super(txn);
+        super(txn, queue);
         m_initiator = mailbox;
         m_task = message;
     }

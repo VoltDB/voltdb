@@ -42,9 +42,10 @@ abstract public class ProcedureTask extends TransactionTask
     final ProcedureRunner m_runner;
     final Mailbox m_initiator;
 
-    ProcedureTask(Mailbox initiator, ProcedureRunner runner, TransactionState txn)
+    ProcedureTask(Mailbox initiator, ProcedureRunner runner, TransactionState txn,
+                  TransactionTaskQueue queue)
     {
-        super(txn);
+        super(txn, queue);
         m_initiator = initiator;
         m_runner = runner;
     }

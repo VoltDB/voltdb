@@ -40,9 +40,10 @@ public class SysprocFragmentTask extends TransactionTask
 
     SysprocFragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
+                 TransactionTaskQueue queue,
                  FragmentTaskMessage message)
     {
-        super(txn);
+        super(txn, queue);
         m_initiator = mailbox;
         m_task = message;
         assert(m_task.isSysProcTask());

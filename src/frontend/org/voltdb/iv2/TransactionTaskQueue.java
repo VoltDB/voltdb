@@ -3,8 +3,12 @@ package org.voltdb.iv2;
 import java.util.ArrayDeque;
 import java.util.Deque;
 
+import org.voltcore.logging.VoltLogger;
+
 public class TransactionTaskQueue
 {
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
     final private Deque<TransactionTask> m_backlog =
         new ArrayDeque<TransactionTask>();
     final private SiteTaskerQueue m_taskQueue;
@@ -47,8 +51,6 @@ public class TransactionTaskQueue
             }
             m_taskQueue.offer(task);
         }
-        // IZZY: this is hacky?
-        flush();
         return retval;
     }
 

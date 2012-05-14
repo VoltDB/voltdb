@@ -42,11 +42,13 @@ public class MpProcedureTask extends ProcedureTask
     final Iv2InitiateTaskMessage m_msg;
 
     MpProcedureTask(Mailbox mailbox, ProcedureRunner runner,
-                  long txnId, Iv2InitiateTaskMessage msg, List<Long> pInitiators)
+                  long txnId, TransactionTaskQueue queue,
+                  Iv2InitiateTaskMessage msg, List<Long> pInitiators)
     {
         super(mailbox, runner,
               new MpTransactionState(mailbox, txnId, msg, pInitiators,
-                                     mailbox.getHSId()));
+                                     mailbox.getHSId()),
+              queue);
         m_msg = msg;
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
     }
@@ -98,6 +100,7 @@ public class MpProcedureTask extends ProcedureTask
             org.voltdb.VoltDB.crashLocalVoltDB("Messaging exception", true, fatal);
         }
         m_txn.setDone();
+        m_queue.flush();
     }
 
     @Override

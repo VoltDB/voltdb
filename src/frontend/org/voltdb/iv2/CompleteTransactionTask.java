@@ -26,9 +26,10 @@ public class CompleteTransactionTask extends TransactionTask
     final private CompleteTransactionMessage m_msg;
 
     public CompleteTransactionTask(TransactionState txn,
+                                   TransactionTaskQueue queue,
                                    CompleteTransactionMessage msg)
     {
-        super(txn);
+        super(txn, queue);
         m_msg = msg;
     }
 
@@ -40,6 +41,7 @@ public class CompleteTransactionTask extends TransactionTask
                                        m_txn.getBeginUndoToken(),
                                        m_msg.getTxnId());
         m_txn.setDone();
+        m_queue.flush();
         hostLog.debug("COMPLETE: " + this);
     }
 

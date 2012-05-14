@@ -72,7 +72,7 @@ public class Scheduler
         if (message.isSinglePartition()) {
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
-                        m_txnId.incrementAndGet(), message);
+                        m_txnId.incrementAndGet(), m_pendingTasks, message);
             m_pendingTasks.offer(task);
         }
         else {
@@ -81,7 +81,8 @@ public class Scheduler
             final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
             final MpProcedureTask task =
                 new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
-                        m_txnId.incrementAndGet(), message, partitionInitiators);
+                        m_txnId.incrementAndGet(), m_pendingTasks, message,
+                        partitionInitiators);
             m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
             m_pendingTasks.offer(task);
         }
@@ -100,13 +101,15 @@ public class Scheduler
         }
         if (message.isSysProcTask()) {
             final SysprocFragmentTask task =
-                new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn, message);
-            m_tasks.offer(task);
+                new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
+                                        m_pendingTasks, message);
+            m_pendingTasks.offer(task);
         }
         else {
             final FragmentTask task =
-                new FragmentTask(m_mailbox, (ParticipantTransactionState)txn, message);
-            m_tasks.offer(task);
+                new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
+                                 m_pendingTasks, message);
+            m_pendingTasks.offer(task);
         }
     }
 
@@ -132,7 +135,7 @@ public class Scheduler
         if (txn != null)
         {
             final CompleteTransactionTask task =
-                new CompleteTransactionTask(txn, message);
+                new CompleteTransactionTask(txn, m_pendingTasks, message);
             m_pendingTasks.offer(task);
         }
     }

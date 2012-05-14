@@ -36,9 +36,10 @@ import org.voltdb.utils.LogKeys;
 public class SpProcedureTask extends ProcedureTask
 {
     SpProcedureTask(Mailbox initiator, ProcedureRunner runner,
-                  long txnId, Iv2InitiateTaskMessage msg)
+                  long txnId, TransactionTaskQueue queue,
+                  Iv2InitiateTaskMessage msg)
     {
-       super(initiator, runner, new SpTransactionState(txnId, msg));
+       super(initiator, runner, new SpTransactionState(txnId, msg), queue);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -80,6 +81,7 @@ public class SpProcedureTask extends ProcedureTask
             siteConnection.truncateUndoLog(m_txn.needsRollback(), token, m_txn.txnId);
         }
         m_txn.setDone();
+        m_queue.flush();
     }
 
     @Override

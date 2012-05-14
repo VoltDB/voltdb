@@ -29,7 +29,6 @@ import java.util.Deque;
 import junit.framework.TestCase;
 
 import org.junit.Test;
-import org.voltcore.messaging.Mailbox;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -43,43 +42,47 @@ public class Iv2TestTransactionTaskQueue extends TestCase
     // Cases to test:
     // several single part txns
 
-    private SpProcedureTask createSpProc(long localTxnId)
+    private SpProcedureTask createSpProc(long localTxnId,
+                                         TransactionTaskQueue queue)
     {
         Iv2InitiateTaskMessage init = mock(Iv2InitiateTaskMessage.class);
         SpProcedureTask task =
-            new SpProcedureTask(null, null, localTxnId, init);
+            new SpProcedureTask(null, null, localTxnId, queue, init);
         return task;
     }
 
     // Create the first fragment of a MP txn
-    private FragmentTask createFrag(long localTxnId, long mpTxnId)
+    private FragmentTask createFrag(long localTxnId, long mpTxnId,
+                                    TransactionTaskQueue queue)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         ParticipantTransactionState pft =
             new ParticipantTransactionState(localTxnId, msg);
         FragmentTask task =
-            new FragmentTask(null, pft, msg);
+            new FragmentTask(null, pft, queue, msg);
         return task;
     }
 
     // Create follow-on fragments of an MP txn
-    private FragmentTask createFrag(TransactionState txn, long mpTxnId)
+    private FragmentTask createFrag(TransactionState txn, long mpTxnId,
+                                    TransactionTaskQueue queue)
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         FragmentTask task =
-            new FragmentTask(null, (ParticipantTransactionState)txn, msg);
+            new FragmentTask(null, (ParticipantTransactionState)txn, queue, msg);
         return task;
     }
 
     private CompleteTransactionTask createComplete(TransactionState txn,
-                                                   long mpTxnId)
+                                                   long mpTxnId,
+                                                   TransactionTaskQueue queue)
     {
         CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         CompleteTransactionTask task =
-            new CompleteTransactionTask(txn, msg);
+            new CompleteTransactionTask(txn, queue, msg);
         return task;
     }
 
@@ -102,45 +105,45 @@ public class Iv2TestTransactionTaskQueue extends TestCase
             new ArrayDeque<TransactionTask>();
 
         // add a few SP procs
-        TransactionTask next = createSpProc(localTxnId++);
+        TransactionTask next = createSpProc(localTxnId++, dut);
         addTask(next, dut, expected_order);
-        next = createSpProc(localTxnId++);
+        next = createSpProc(localTxnId++, dut);
         addTask(next, dut, expected_order);
-        next = createSpProc(localTxnId++);
+        next = createSpProc(localTxnId++, dut);
         addTask(next, dut, expected_order);
         // Should squirt on through the queue
         assertEquals(0, dut.size());
 
         // Now a fragment task to block things
         long blocking_mp_txnid = mpTxnId;
-        next = createFrag(localTxnId++, mpTxnId++);
+        next = createFrag(localTxnId++, mpTxnId++, dut);
         TransactionTask block = next;
         addTask(next, dut, expected_order);
         assertEquals(1, dut.size());
 
         // Add some tasks that are going to be blocked
         ArrayDeque<TransactionTask> blocked = new ArrayDeque<TransactionTask>();
-        next = createSpProc(localTxnId++);
+        next = createSpProc(localTxnId++, dut);
         addTask(next, dut, blocked);
-        next = createSpProc(localTxnId++);
+        next = createSpProc(localTxnId++, dut);
         addTask(next, dut, blocked);
 
         // here's our next blocker
         long next_blocking_local_txnid = localTxnId;
         long next_blocking_mp_txnid = mpTxnId;
-        next = createFrag(localTxnId++, mpTxnId++);
+        next = createFrag(localTxnId++, mpTxnId++, dut);
         TransactionTask next_block = next;
         addTask(next, dut, blocked);
         assertEquals(blocked.size() + 1, dut.size());
 
         // now, do more work on the blocked task
-        next = createFrag(block.getTransactionState(), blocking_mp_txnid);
+        next = createFrag(block.getTransactionState(), blocking_mp_txnid, dut);
         addTask(next, dut, expected_order);
         // Should have passed through and not be in the queue
         assertEquals(blocked.size() + 1, dut.size());
 
         // now, complete the blocked task
-        next = createComplete(block.getTransactionState(), blocking_mp_txnid);
+        next = createComplete(block.getTransactionState(), blocking_mp_txnid, dut);
         addTask(next, dut, expected_order);
         // Should have passed through and not be in the queue
         assertEquals(blocked.size() + 1, dut.size());

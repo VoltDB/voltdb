@@ -27,10 +27,12 @@ public abstract class TransactionTask extends SiteTasker
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
 
     final protected TransactionState m_txn;
+    final protected TransactionTaskQueue m_queue;
 
-    public TransactionTask(TransactionState txn)
+    public TransactionTask(TransactionState txn, TransactionTaskQueue queue)
     {
         m_txn = txn;
+        m_queue = queue;
     }
 
     abstract public void run(SiteProcedureConnection siteConnection);
