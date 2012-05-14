@@ -132,7 +132,7 @@ public class ProcedureRunner {
         reflect();
     }
 
-    boolean isSystemProcedure() {
+    public boolean isSystemProcedure() {
         return m_isSysProc;
     }
 
