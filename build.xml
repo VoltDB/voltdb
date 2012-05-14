@@ -17,6 +17,7 @@
     <attribute name="srcdir"/>
     <attribute name="destdir" default="${build.prod.dir}"/>
     <attribute name="excludes" default=""/>
+    <attribute name="includes" default=""/>
     <sequential>
         <javac
             target="1.6"
@@ -24,8 +25,10 @@
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
+            includes="@{includes}"
             encoding='UTF-8'
-            debug='true'>
+            debug='true'
+            includeAntRuntime='false'>
             <classpath refid="project.classpath" />
         </javac>
     </sequential>
@@ -868,8 +871,16 @@ JAVA COMPILATION
     </copy>
 
     <!-- compile the individual source directories -->
+    <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
-    <invoke-javac srcdir="${src.gpl.dir}:${vendor.src.dir}"/>
+    <!-- voltcore and third-party java (including our zookeeper -->
+    <invoke-javac
+        srcdir="${src.gpl.dir}:${vendor.src.dir}"
+        includes="org/voltcore/**/*.java,org/apache/**/*.java
+                  au/**/*.java
+                  org/json_voltpatches/**/*.java" />
+    <!-- non-voltcore voltdb code -->
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
@@ -1658,7 +1669,7 @@ TEST CASES
 <!-- This target will run a junit suite. It will also run a single
      suite under valgrind with -Dbuild=memcheck.  NOTE: to use valgrind,
      you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
-<target name='junitclass'
+<target name="junitclass"
     description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
 
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
@@ -1674,7 +1685,14 @@ TEST CASES
 
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
         <formatters>
-            <formatter usefile="false" type="plain"/>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>

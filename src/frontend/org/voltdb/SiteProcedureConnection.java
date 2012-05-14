@@ -48,6 +48,11 @@ public interface SiteProcedureConnection {
      */
     public int getCorrespondingHostId();
 
+    /**
+     * Log settings changed. Signal EE to update log level.
+     */
+    public void updateBackendLogLevels();
+
     public void loadTable(
             long txnId,
             String clusterName,

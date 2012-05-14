@@ -64,6 +64,8 @@ class VoltQueryClient(cmd.Cmd):
                                           [FastSerializer.VOLTTYPE_STRING,
                                            FastSerializer.VOLTTYPE_STRING,
                                            FastSerializer.VOLTTYPE_TINYINT])
+        self.snapshotsavejson = VoltProcedure(self.fs, "@SnapshotSave",
+                                          [FastSerializer.VOLTTYPE_STRING])
         self.snapshotscan = VoltProcedure(self.fs, "@SnapshotScan",
                                           [FastSerializer.VOLTTYPE_STRING])
         self.snapshotdelete = VoltProcedure(self.fs, "@SnapshotDelete",
@@ -73,6 +75,9 @@ class VoltQueryClient(cmd.Cmd):
                                              [FastSerializer.VOLTTYPE_STRING,
                                               FastSerializer.VOLTTYPE_STRING])
         self.snapshotstatus = VoltProcedure(self.fs, "@SnapshotStatus")
+
+        self.systemcatalog = VoltProcedure(self.fs, "@SystemCatalog",
+                                               [FastSerializer.VOLTTYPE_STRING])
 
         self.systeminformation = VoltProcedure(self.fs, "@SystemInformation",
                                                [FastSerializer.VOLTTYPE_STRING])
@@ -202,7 +207,7 @@ class VoltQueryClient(cmd.Cmd):
         self.safe_print("Getting statistics")
         self.response = self.__safe_call(self.stat, [args[0], int(args[1])],
                                          timeout = self.__timeout)
-        self.safe_print(self.response)
+        #self.safe_print(self.response)
 
     def help_stat(self):
         self.safe_print(
@@ -218,18 +223,26 @@ Get the statistics:
             return self.help_snapshotsave()
 
         args = command.split()
-        if len(args) != 3:
+        if len(args) not in (1,3):
             return self.help_snapshotsave()
 
         self.safe_print("Taking snapshot")
-        self.response = self.__safe_call(self.snapshotsave,
-                                         [args[0], args[1], int(args[2])],
-                                         timeout = self.__timeout)
+        if len(args) == 3:
+            self.response = self.__safe_call(self.snapshotsave,
+                                             [args[0], args[1], int(args[2])],
+                                             timeout = self.__timeout)
+        else:
+            print args
+            self.response = self.__safe_call(self.snapshotsavejson,
+                                             args,
+                                             timeout = self.__timeout)
         self.safe_print(self.response)
 
     def help_snapshotsave(self):
         self.safe_print("Take a snapshot:")
         self.safe_print("\tsnapshotsave directory nonce blocking")
+        self.safe_print("or")
+        self.safe_print('\tsnapshotsave {uripath:"file:///tmp",nonce:"mydb",block:true,format:"csv"}')
 
     def do_snapshotscan(self, command):
         if self.fs == None:
@@ -298,6 +311,23 @@ Get the statistics:
     def help_snapshotstatus(self):
         self.safe_print("Get snapshot status")
         self.safe_print("\tsnapshotstatus")
+
+    def do_syscatalog(self, command):
+        if self.fs == None:
+            return
+        selector = "TABLES"
+        if command:
+            selector = command
+
+        self.safe_print("Getting system catalog")
+        self.response = self.__safe_call(self.systemcatalog,
+                                         [selector],
+                                         timeout = self.__timeout)
+        self.safe_print(self.response)
+
+    def help_catalog(self):
+        self.safe_print("Get system information")
+        self.safe_print("\tsyscatalog {TABLES|COLUMNS|INDEXINFO|PRIMARYKEYS|PROCEDURES|PROCEDURECOLUMNS}")
 
     def do_sysinfo(self, command):
         if self.fs == None:

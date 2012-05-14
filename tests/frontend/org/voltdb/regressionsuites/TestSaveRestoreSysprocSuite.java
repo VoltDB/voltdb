@@ -36,6 +36,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.zip.GZIPInputStream;
 
@@ -99,7 +100,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 file.endsWith(".vpt") ||
                 file.endsWith(".digest") ||
                 file.endsWith(".tsv") ||
-                file.endsWith(".csv");
+                file.endsWith(".csv") ||
+                file.endsWith(".incomplete");
             }
         };
 
@@ -146,13 +148,13 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
     private VoltTable createReplicatedTable(int numberOfItems,
             int indexBase,
-            Set<String>[] expectedText) {
+            Set<String> expectedText) {
         return createReplicatedTable(numberOfItems, indexBase, expectedText, false);
     }
 
     private VoltTable createReplicatedTable(int numberOfItems,
                                             int indexBase,
-                                            Set<?>[] expectedText,
+                                            Set<String> expectedText,
                                             boolean generateCSV)
     {
         VoltTable repl_table =
@@ -192,29 +194,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                         break;
                     }
                 } else {
-                    int escapable = i % 5;
-                    switch (escapable) {
-                    case 0:
-                        stringVal = "name_" + i;
-                        escapedVal = "name_" + i;
-                        break;
-                    case 1:
-                        stringVal = "na\tme_" + i;
-                        escapedVal = "na\\tme_" + i;
-                        break;
-                    case 2:
-                        stringVal = "na\nme_" + i;
-                        escapedVal = "na\\nme_" + i;
-                        break;
-                    case 3:
-                        stringVal = "na\rme_" + i;
-                        escapedVal = "na\\rme_" + i;
-                        break;
-                    case 4:
-                        stringVal = "na\\me_" + i;
-                        escapedVal = "na\\\\me_" + i;
-                        break;
-                    }
+                    stringVal = "name_" + i;
+                    escapedVal = "name_" + i;
                 }
             } else {
                 stringVal = "name_" + i;
@@ -225,9 +206,16 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                          i,
                                          new Double(i)};
             if (expectedText != null) {
-                sb.append(i).append(delimeter).append(escapedVal).append(delimeter);
-                sb.append(i).append(delimeter).append(new Double(i).toString());
-                //expectedText.add(sb.toString());
+                if (generateCSV) {
+                    sb.append('"').append(i).append('"').append(delimeter).append(escapedVal).append(delimeter);
+                    sb.append('"').append(i).append('"').append(delimeter);
+                    sb.append('"').append(new Double(i).toString()).append('"');
+                } else {
+                    sb.append(i).append(delimeter).append(escapedVal).append(delimeter);
+                    sb.append(i).append(delimeter);
+                    sb.append(new Double(i).toString());
+                }
+                expectedText.add(sb.toString());
             }
             repl_table.addRow(row);
         }
@@ -277,7 +265,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
     }
 
     private void loadLargeReplicatedTable(Client client, String tableName,
-                                          int itemsPerChunk, int numChunks, boolean generateCSV, Set<?>[] expectedText)
+                                          int itemsPerChunk, int numChunks, boolean generateCSV, Set<String> expectedText)
     {
         for (int i = 0; i < numChunks; i++)
         {
@@ -393,9 +381,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
 
-        Set<?>[] expectedText = new Set<?>[4];
-        for (int i = 0; i < 4; i++)
-            expectedText[i] = new HashSet<String>();
+        Set<String> expectedText = new HashSet<String>();
 
         loadLargeReplicatedTable(client, "REPLICATED_TESTER",
                                  num_replicated_items_per_chunk,
@@ -451,6 +437,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             hadSuccess = validateSnapshot(true, true, TESTNONCE + "2");
             if (hadSuccess) break;
         }
+        assertTrue(hadSuccess);
 
         /*
          * Make sure errors are properly forwarded, this is one code path to handle errors,
@@ -477,9 +464,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
 
-        Set<?>[] expectedText = new Set<?>[4];
-        for (int i = 0; i < 4; i++)
-            expectedText[i] = new HashSet<String>();
+        Set<String> expectedText = new HashSet<String>();
 
         loadLargeReplicatedTable(client, "REPLICATED_TESTER",
                                  num_replicated_items_per_chunk,
@@ -633,9 +618,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
 
-        Set<?>[] expectedText = new Set<?>[4];
-        for (int i = 0; i < 4; i++)
-            expectedText[i] = new HashSet<String>();
+        Set<String> expectedText = new TreeSet<String>();
 
         loadLargeReplicatedTable(client, "REPLICATED_TESTER",
                                  num_replicated_items_per_chunk,
@@ -663,9 +646,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         int num_partitioned_items_per_chunk = 120;
         int num_partitioned_chunks = 10;
 
-        Set<?>[] expectedText = new Set<?>[4];
-        for (int i = 0; i < 4; i++)
-            expectedText[i] = new HashSet<String>();
+        Set<String> expectedText = new TreeSet<String>();
 
         loadLargeReplicatedTable(client, "REPLICATED_TESTER",
                                  num_replicated_items_per_chunk,
@@ -680,9 +661,120 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                                        TESTNONCE, (byte)1);
 
         validateSnapshot(true);
-        generateAndValidateTextFile( expectedText, true);
+        generateAndValidateTextFile( new TreeSet<String>(expectedText), true);
+
+        deleteTestFiles();
+
+        client.callProcedure("@SnapshotSave",
+                "{ uripath:\"file://" + TMPDIR +
+                "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }");
+
+        FileInputStream fis = new FileInputStream(
+                TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
+        validateTextFile(expectedText, true, fis);
     }
 
+    public void testBadSnapshotParams() throws Exception
+    {
+        System.out.println("Starting testBadSnapshotParams");
+        Client client = getClient();
+
+        int num_replicated_items_per_chunk = 100;
+        int num_replicated_chunks = 10;
+        int num_partitioned_items_per_chunk = 120;
+        int num_partitioned_chunks = 10;
+
+        Set<String> expectedText = new TreeSet<String>();
+
+        loadLargeReplicatedTable(client, "REPLICATED_TESTER",
+                                 num_replicated_items_per_chunk,
+                                 num_replicated_chunks,
+                                 true,
+                                 expectedText);
+        loadLargePartitionedTable(client, "PARTITION_TESTER",
+                                  num_partitioned_items_per_chunk,
+                                  num_partitioned_chunks);
+
+        boolean threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    new Object[] {null});
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"file:///tmp\", nonce:\"\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"file:///tmp\", nonce:\"-\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"file:///tmp\", nonce:\",\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"hdfs:///tmp\", nonce:\"foo\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:\"/tmp\", nonce:\"foo\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        threwexception = false;
+        try {
+            client.callProcedure("@SnapshotSave",
+                    "{ uripath:true, nonce:\"foo\", block:true }");
+        } catch (Exception e) {
+            threwexception = true;
+        }
+        assertTrue(threwexception);
+
+        client.callProcedure("@SnapshotSave",
+                "{ uripath:\"file://" + TMPDIR +
+                "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }");
+
+        FileInputStream fis = new FileInputStream(
+                TMPDIR + File.separator + TESTNONCE + "-REPLICATED_TESTER" + ".csv");
+        validateTextFile(expectedText, true, fis);
+    }
     /*
      * Also does some basic smoke tests
      * of @SnapshotStatus, @SnapshotScan and @SnapshotDelete
@@ -872,9 +964,23 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         assertTrue( hadZeroFiles);
 
         validateSnapshot(false);
+
+        try
+        {
+            results = client.callProcedure(
+                    "@SnapshotSave",
+                    "{ uripath:\"file://" + TMPDIR +
+                    "\", nonce:\"" + TESTNONCE + "\", block:true, format:\"csv\" }").getResults();
+        }
+        catch (Exception ex)
+        {
+            ex.printStackTrace();
+            fail("SnapshotSave exception: " + ex.getMessage());
+        }
+        System.out.println("Created CSV snapshot");
     }
 
-    private void generateAndValidateTextFile(Set<?>[] expectedText, boolean csv) throws Exception {
+    private void generateAndValidateTextFile(Set<String> expectedText, boolean csv) throws Exception {
         String args[] = new String[] {
                 TESTNONCE,
                "--dir",
@@ -889,6 +995,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         SnapshotConverter.main(args);
         FileInputStream fis = new FileInputStream(
                 TMPDIR + File.separator + "REPLICATED_TESTER" + (csv ? ".csv" : ".tsv"));
+        validateTextFile( expectedText, csv, fis);
+    }
+
+    private void validateTextFile(Set<String> expectedText, boolean csv, FileInputStream fis) throws Exception {
         try {
             InputStreamReader isr = new InputStreamReader(fis, "UTF-8");
             BufferedReader br = new BufferedReader(isr);
@@ -916,7 +1026,10 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                             prevChar = nextNextChar;
                         }
                     } else if (nextChar == '\n' || nextChar == '\r') {
-                        //assertTrue(expectedText.remove(sb.toString()));
+                        if (!expectedText.contains(sb.toString())) {
+                            System.out.println("Missing string is " + sb);
+                        }
+                        assertTrue(expectedText.remove(sb.toString()));
                         sb = new StringBuffer();
                     } else {
                         sb.append(nextChar);
@@ -928,14 +1041,17 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                         char nextNextChar = (char)nextNextCharInt;
                         sb.append(nextNextChar);
                     } else if (nextChar == '\n' || nextChar == '\r') {
-                        //assertTrue(expectedText.remove(sb.toString()));
+                        if (!expectedText.contains(sb.toString())) {
+                            System.out.println("Missing string is " + sb);
+                        }
+                        assertTrue(expectedText.remove(sb.toString()));
                         sb = new StringBuffer();
                     } else {
                         sb.append(nextChar);
                     }
                 }
             }
-            //assertTrue(expectedText.isEmpty());
+            assertTrue(expectedText.isEmpty());
         } finally {
             fis.close();
         }

@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.FileOutputStream;
 
 public class SSHTools {
-
     private final String m_username;
     private final String m_keyFile;
     private final String m_password;

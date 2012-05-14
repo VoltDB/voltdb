@@ -20,38 +20,41 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
+
 package voltcache.procedures;
 
-import org.voltdb.*;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-public class Shared
+public abstract class VoltCacheProcBase extends VoltProcedure
 {
-    public static final SQLStmt CleanSQLStmt  = new SQLStmt("DELETE FROM cache WHERE Key = ? AND Expires <= ?;");
-    private static final int MaxExpires = 2592000;
-    public static int now(VoltProcedure procedure)
-    {
-        return (int)(procedure.getTransactionTime().getTime()/1000);
+    public static final SQLStmt cleanSQLStmt = new SQLStmt("DELETE FROM cache WHERE Key = ? AND Expires <= ?;");
+
+    private static final int MAX_EXPIRES = 2592000;
+
+    public int now() {
+        return (int) (getTransactionTime().getTime() / 1000);
     }
-    public static int expires(VoltProcedure procedure, int expires)
-    {
+
+    public int expirationTimestamp(int expires) {
         if (expires <= 0)
-            return now(procedure) + MaxExpires;
-        else if (expires <= MaxExpires)
-            return now(procedure) + expires;
+            return now() + MAX_EXPIRES;
+        else if (expires <= MAX_EXPIRES)
+            return now() + expires;
         return expires;
     }
-    public static int init(VoltProcedure procedure, String key)
-    {
-        final int now = now(procedure);
-        procedure.voltQueueSQL(CleanSQLStmt, key, now);
+
+    public int baseInit(String key) {
+        final int now = now();
+        voltQueueSQL(cleanSQLStmt, key, now);
         return now;
     }
-    public static int init(VoltProcedure procedure, String[] keys)
-    {
-        final int now = now(procedure);
-        for(String key : keys)
-            procedure.voltQueueSQL(CleanSQLStmt, key, now);
-        procedure.voltExecuteSQL();
+
+    public int baseInit(String[] keys) {
+        final int now = now();
+        for(String key : keys) {
+            voltQueueSQL(cleanSQLStmt, key, now);
+        }
         return now;
     }
 }
