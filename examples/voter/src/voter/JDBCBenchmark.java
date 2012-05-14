@@ -23,7 +23,7 @@
 /*
  * This samples uses multiple threads to post synchronous requests to the
  * VoltDB server, simulating multiple client application posting
- * synchronous requests to the database, using the native VoltDB client
+ * synchronous requests to the database, using the VoltDB JDBC client
  * library.
  *
  * While synchronous processing can cause performance bottlenecks (each
@@ -194,8 +194,8 @@ public class JDBCBenchmark {
         client = DriverManager.getConnection(url, "", "");
 
         periodicStatsContext = ((IVoltDBConnection) client)
-                .getClientStatsContext();
-        fullStatsContext = ((IVoltDBConnection) client).getClientStatsContext();
+                .createStatsContext();
+        fullStatsContext = ((IVoltDBConnection) client).createStatsContext();
 
     }
 

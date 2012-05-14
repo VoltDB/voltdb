@@ -478,7 +478,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
      * @return A {@link ClientStatsContext} that correctly represents the client statistics.
      */
     @Override
-    public ClientStatsContext getClientStatsContext() {
+    public ClientStatsContext createStatsContext() {
         return this.NativeConnection.getClientStatsContext();
     }
 
