@@ -52,4 +52,6 @@ public interface SystemProcedureExecutionContext {
     public int getNumberOfPartitions();
 
     public SiteProcedureConnection getSiteProcedureConnection();
+
+    public void updateBackendLogLevels();
 }

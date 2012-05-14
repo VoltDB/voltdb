@@ -624,6 +624,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         {
             return ExecutionSite.this;
         }
+        @Override
+        public void updateBackendLogLevels()                  { ExecutionSite.this.updateBackendLogLevels(); }
     }
 
     SystemProcedureContext m_systemProcedureContext;

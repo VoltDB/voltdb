@@ -58,7 +58,7 @@ public class UpdateLogging extends VoltSystemProcedure
                            String xmlConfig)
     {
         VoltDB.instance().logUpdate(xmlConfig, getTransactionId());
-        ctx.getExecutionSite().updateBackendLogLevels();
+        ctx.updateBackendLogLevels();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);
