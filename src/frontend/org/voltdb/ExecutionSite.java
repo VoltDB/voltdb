@@ -327,6 +327,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     /**
      * Log settings changed. Signal EE to update log level.
      */
+    @Override
     public void updateBackendLogLevels() {
         ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
     }
