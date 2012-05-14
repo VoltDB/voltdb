@@ -17,6 +17,7 @@
     <attribute name="srcdir"/>
     <attribute name="destdir" default="${build.prod.dir}"/>
     <attribute name="excludes" default=""/>
+    <attribute name="includes" default=""/>
     <sequential>
         <javac
             target="1.6"
@@ -24,8 +25,10 @@
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
+            includes="@{includes}"
             encoding='UTF-8'
-            debug='true'>
+            debug='true'
+            includeAntRuntime='false'>
             <classpath refid="project.classpath" />
         </javac>
     </sequential>
@@ -864,8 +867,16 @@ JAVA COMPILATION
     </copy>
 
     <!-- compile the individual source directories -->
+    <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
-    <invoke-javac srcdir="${src.gpl.dir}:${vendor.src.dir}"/>
+    <!-- voltcore and third-party java (including our zookeeper -->
+    <invoke-javac
+        srcdir="${src.gpl.dir}:${vendor.src.dir}"
+        includes="org/voltcore/**/*.java,org/apache/**/*.java
+                  au/**/*.java
+                  org/json_voltpatches/**/*.java" />
+    <!-- non-voltcore voltdb code -->
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
