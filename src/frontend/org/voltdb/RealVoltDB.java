@@ -1365,106 +1365,111 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * null if called from that thread.
      */
     @Override
-    public void shutdown(Thread mainSiteThread) throws InterruptedException {
+    public boolean shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
-            m_mode = OperationMode.SHUTTINGDOWN;
-            m_mailboxTracker.shutdown();
-            // Things are going pear-shaped, tell the fault distributor to
-            // shut its fat mouth
-            m_faultManager.shutDown();
-            m_snapshotCompletionMonitor.shutdown();
-            m_periodicWorkThread.shutdown();
-            heartbeatThread.interrupt();
-            heartbeatThread.join();
+            boolean did_it = false;
+            if (m_mode != OperationMode.SHUTTINGDOWN) {
+                did_it = true;
+                m_mode = OperationMode.SHUTTINGDOWN;
+                m_mailboxTracker.shutdown();
+                // Things are going pear-shaped, tell the fault distributor to
+                // shut its fat mouth
+                m_faultManager.shutDown();
+                m_snapshotCompletionMonitor.shutdown();
+                m_periodicWorkThread.shutdown();
+                heartbeatThread.interrupt();
+                heartbeatThread.join();
 
-            if (m_hasStartedSampler.get()) {
-                m_sampler.setShouldStop();
-                m_sampler.join();
-            }
+                if (m_hasStartedSampler.get()) {
+                    m_sampler.setShouldStop();
+                    m_sampler.join();
+                }
 
-            // shutdown the web monitoring / json
-            if (m_adminListener != null)
-                m_adminListener.stop();
+                // shutdown the web monitoring / json
+                if (m_adminListener != null)
+                    m_adminListener.stop();
 
-            // shut down the client interface
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.shutdown();
-            }
+                // shut down the client interface
+                for (ClientInterface ci : m_clientInterfaces) {
+                    ci.shutdown();
+                }
 
-            // shut down Export and its connectors.
-            ExportManager.instance().shutdown();
+                // shut down Export and its connectors.
+                ExportManager.instance().shutdown();
 
-            // tell all m_sites to stop their runloops
-            if (m_localSites != null) {
-                for (ExecutionSite site : m_localSites.values())
-                    site.startShutdown();
-            }
+                // tell all m_sites to stop their runloops
+                if (m_localSites != null) {
+                    for (ExecutionSite site : m_localSites.values())
+                        site.startShutdown();
+                }
 
-            // try to join all threads but the main one
-            // probably want to check if one of these is the current thread
-            if (m_siteThreads != null) {
-                for (Thread siteThread : m_siteThreads.values()) {
-                    if (Thread.currentThread().equals(siteThread) == false) {
-                        // don't interrupt here. the site will start shutdown when
-                        // it sees the shutdown flag set.
-                        siteThread.join();
+                // try to join all threads but the main one
+                // probably want to check if one of these is the current thread
+                if (m_siteThreads != null) {
+                    for (Thread siteThread : m_siteThreads.values()) {
+                        if (Thread.currentThread().equals(siteThread) == false) {
+                            // don't interrupt here. the site will start shutdown when
+                            // it sees the shutdown flag set.
+                            siteThread.join();
+                        }
                     }
                 }
-            }
 
-            // try to join the main thread (possibly this one)
-            if (mainSiteThread != null) {
-                if (Thread.currentThread().equals(mainSiteThread) == false) {
-                    // don't interrupt here. the site will start shutdown when
-                    // it sees the shutdown flag set.
-                    mainSiteThread.join();
+                // try to join the main thread (possibly this one)
+                if (mainSiteThread != null) {
+                    if (Thread.currentThread().equals(mainSiteThread) == false) {
+                        // don't interrupt here. the site will start shutdown when
+                        // it sees the shutdown flag set.
+                        mainSiteThread.join();
+                    }
                 }
+
+                // After sites are terminated, shutdown the InvocationBufferServer.
+                // The IBS is shared by all sites; don't kill it while any site is active.
+                PartitionDRGateway.shutdown();
+
+                // help the gc along
+                m_localSites = null;
+                m_currentThreadSite = null;
+                m_siteThreads = null;
+                m_runners = null;
+
+                // shut down the network/messaging stuff
+                // Close the host messenger first, which should close down all of
+                // the ForeignHost sockets cleanly
+                if (m_messenger != null)
+                {
+                    m_messenger.shutdown();
+                }
+                m_messenger = null;
+
+                //Also for test code that expects a fresh stats agent
+                if (m_statsAgent != null) {
+                    m_statsAgent.shutdown();
+                    m_statsAgent = null;
+                }
+
+                if (m_asyncCompilerAgent != null) {
+                    m_asyncCompilerAgent.shutdown();
+                    m_asyncCompilerAgent = null;
+                }
+
+                // The network iterates this list. Clear it after network's done.
+                m_clientInterfaces.clear();
+
+                ExportManager.instance().shutdown();
+                m_computationService.shutdown();
+                m_computationService.awaitTermination(1, TimeUnit.DAYS);
+                m_computationService = null;
+                m_siteTracker = null;
+                m_catalogContext = null;
+                m_mailboxPublisher = null;
+
+                // probably unnecessary
+                System.gc();
+                m_isRunning = false;
             }
-
-            // After sites are terminated, shutdown the InvocationBufferServer.
-            // The IBS is shared by all sites; don't kill it while any site is active.
-            PartitionDRGateway.shutdown();
-
-            // help the gc along
-            m_localSites = null;
-            m_currentThreadSite = null;
-            m_siteThreads = null;
-            m_runners = null;
-
-            // shut down the network/messaging stuff
-            // Close the host messenger first, which should close down all of
-            // the ForeignHost sockets cleanly
-            if (m_messenger != null)
-            {
-                m_messenger.shutdown();
-            }
-            m_messenger = null;
-
-            //Also for test code that expects a fresh stats agent
-            if (m_statsAgent != null) {
-                m_statsAgent.shutdown();
-                m_statsAgent = null;
-            }
-
-            if (m_asyncCompilerAgent != null) {
-                m_asyncCompilerAgent.shutdown();
-                m_asyncCompilerAgent = null;
-            }
-
-            // The network iterates this list. Clear it after network's done.
-            m_clientInterfaces.clear();
-
-            ExportManager.instance().shutdown();
-            m_computationService.shutdown();
-            m_computationService.awaitTermination(1, TimeUnit.DAYS);
-            m_computationService = null;
-            m_siteTracker = null;
-            m_catalogContext = null;
-            m_mailboxPublisher = null;
-
-            // probably unnecessary
-            System.gc();
-            m_isRunning = false;
+            return did_it;
         }
     }
 
