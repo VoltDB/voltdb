@@ -34,7 +34,7 @@ uptodate_jni_h.check:
 jnicompile:
 
 buildinfo:
-     [exec] Version:  2.5 voltdb-2.5-36-g79f6f35-dirty-local
+     [exec] Version:  2.5 voltdb-2.5-41-g066f07d-dirty-local
 
 ee:
      [exec] make: Entering directory `/home/mike/voltdb/fork/voltdb/obj/debug'
@@ -83,7 +83,7 @@ check:
      [exec] jnicompile:
      [exec] 
      [exec] buildinfo:
-     [exec]      [exec] Version:  2.5 voltdb-2.5-36-g79f6f35-dirty-local
+     [exec]      [exec] Version:  2.5 voltdb-2.5-41-g066f07d-dirty-local
      [exec] 
      [exec] ee:
      [exec]      [exec] make: Entering directory `/home/mike/voltdb/fork/voltdb/obj/debug'
@@ -111,16 +111,16 @@ check:
      [exec]      [exec] 	SingleVarChar30: PASSED.
      [exec]      [exec] 	Int64Packing2Int32sWithSecondNull: PASSED.
      [exec]      [exec] PASSED
-     [exec]      [exec] successes/failures: 3/0 in 32us on UniqueGenericHash/CompactingTreeUniqueIndex
-     [exec]      [exec] successes/failures: 3/0 in 25us on UniqueIntsHash/CompactingHashUniqueIndex
-     [exec]      [exec] successes/failures: 3/0 in 11us on UniqueGenericTree/CompactingTreeUniqueIndex
-     [exec]      [exec] successes/failures: 3/0 in 16us on UniqueIntsTree/CompactingTreeUniqueIndex
-     [exec]      [exec] successes/failures: 3/0 in 10us on MultiGenericHash/CompactingTreeMultiMapIndex
-     [exec]      [exec] successes/failures: 3/0 in 13us on MultiIntsHash/CompactingHashMultiMapIndex
+     [exec]      [exec] successes/failures: 3/0 in 5625us on UniqueGenericHash/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 3/0 in 27us on UniqueIntsHash/CompactingHashUniqueIndex
+     [exec]      [exec] successes/failures: 3/0 in 14us on UniqueGenericTree/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 3/0 in 206us on UniqueIntsTree/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 3/0 in 11us on MultiGenericHash/CompactingTreeMultiMapIndex
+     [exec]      [exec] successes/failures: 3/0 in 15us on MultiIntsHash/CompactingHashMultiMapIndex
      [exec]      [exec] successes/failures: 3/0 in 7us on MultiGenericTree/CompactingTreeMultiMapIndex
-     [exec]      [exec] successes/failures: 3/0 in 9us on MultiIntsTree/CompactingTreeMultiMapIndex
-     [exec]      [exec] successes/failures: 4/0 in 18us on UniqueGenericHash/CompactingTreeUniqueIndex
-     [exec]      [exec] successes/failures: 4/0 in 6us on UniqueGenericTree/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 3/0 in 7us on MultiIntsTree/CompactingTreeMultiMapIndex
+     [exec]      [exec] successes/failures: 4/0 in 16us on UniqueGenericHash/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 4/0 in 7us on UniqueGenericTree/CompactingTreeUniqueIndex
      [exec]      [exec] successes/failures: 4/0 in 9us on MultiGenericHash/CompactingTreeMultiMapIndex
      [exec]      [exec] successes/failures: 4/0 in 7us on MultiGenericTree/CompactingTreeMultiMapIndex
      [exec]      [exec] /home/mike/voltdb/fork/voltdb/obj/debug/cpptests/indexes
@@ -259,17 +259,17 @@ check:
      [exec]      [exec] 	HexDecode: PASSED.
      [exec]      [exec] PASSED
      [exec]      [exec] DebugLogTest:
-     [exec]      [exec] 	SimpleTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:64:run()] 2012-05-07 21:16:01 - debug message
-     [exec]      [exec] [INFO ] [../../tests/ee/common/debuglog_test.cpp:65:run()] 2012-05-07 21:16:02 - debug message2
+     [exec]      [exec] 	SimpleTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:64:run()] 2012-05-13 18:52:14 - debug message
+     [exec]      [exec] [INFO ] [../../tests/ee/common/debuglog_test.cpp:65:run()] 2012-05-13 18:52:14 - debug message2
      [exec]      [exec] PASSED.
-     [exec]      [exec] 	ParamTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:69:run()] 2012-05-07 21:16:02 - debug value 123
-     [exec]      [exec] [INFO ] [../../tests/ee/common/debuglog_test.cpp:70:run()] 2012-05-07 21:16:02 - debug value2 hogehoge
-     [exec]      [exec] [ERROR] [../../tests/ee/common/debuglog_test.cpp:71:run()] 2012-05-07 21:16:02 - debug value3 -471
-     [exec]      [exec] [WARN ] [../../tests/ee/common/debuglog_test.cpp:72:run()] 2012-05-07 21:16:02 - debug value4 0
+     [exec]      [exec] 	ParamTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:69:run()] 2012-05-13 18:52:14 - debug value 123
+     [exec]      [exec] [INFO ] [../../tests/ee/common/debuglog_test.cpp:70:run()] 2012-05-13 18:52:14 - debug value2 hogehoge
+     [exec]      [exec] [ERROR] [../../tests/ee/common/debuglog_test.cpp:71:run()] 2012-05-13 18:52:14 - debug value3 -471
+     [exec]      [exec] [WARN ] [../../tests/ee/common/debuglog_test.cpp:72:run()] 2012-05-13 18:52:14 - debug value4 0
      [exec]      [exec] PASSED.
-     [exec]      [exec] 	MultiParamTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:75:run()] 2012-05-07 21:16:02 - debug value 123, hoho, 10
+     [exec]      [exec] 	MultiParamTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:75:run()] 2012-05-13 18:52:14 - debug value 123, hoho, 10
      [exec]      [exec] PASSED.
-     [exec]      [exec] 	EnabledTest: [ERROR] [../../tests/ee/common/debuglog_test.cpp:79:run()] 2012-05-07 21:16:02 - this should be displayed
+     [exec]      [exec] 	EnabledTest: [ERROR] [../../tests/ee/common/debuglog_test.cpp:79:run()] 2012-05-13 18:52:14 - this should be displayed
      [exec]      [exec] PASSED.
      [exec]      [exec] PASSED
      [exec]      [exec] SerializeIOTest:
@@ -385,59 +385,56 @@ check:
      [exec] 
      [exec] junit:
      [exec]     [junit] Running org.hsqldb_voltpatches.TestHSQLDB
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.42 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.45 sec
      [exec]     [junit] Running org.hsqldb_voltpatches.TestJDBC
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 0.64 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 0.63 sec
      [exec]     [junit] Running org.voltdb.TestAdHocQueries
-     [exec]     [junit] [ERROR] [../../src/ee/executors/insertexecutor.cpp:307:p_next_pull()] 2012-05-07 21:17:53 - Mispartitioned Tuple in single-partition plan.
-     [exec]     [junit]     testSimple failed an assertion.
-     [exec]     [junit]         org.voltdb.TestAdHocQueries(TestAdHocQueries.java:101)
-     [exec]     [junit] Tests run:   1, Failures:   1, Errors:   0, Time elapsed: 2.99 sec
-     [exec]     [junit] Test org.voltdb.TestAdHocQueries FAILED
+     [exec]     [junit] [ERROR] [../../src/ee/executors/insertexecutor.cpp:307:p_next_pull()] 2012-05-13 18:54:09 - Mispartitioned Tuple in single-partition plan.
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 4.15 sec
      [exec]     [junit] Running org.voltdb.TestBuildString
      [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.22 sec
      [exec]     [junit] Running org.voltdb.TestClientInterface
-     [exec]     [junit] Tests run:  15, Failures:   0, Errors:   0, Time elapsed: 1.35 sec
+     [exec]     [junit] Tests run:  15, Failures:   0, Errors:   0, Time elapsed: 1.31 sec
      [exec]     [junit] Running org.voltdb.TestEELibraryLoader
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.40 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.39 sec
      [exec]     [junit] Running org.voltdb.TestExecutionSite
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 2.22 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 2.21 sec
      [exec]     [junit] Running org.voltdb.TestExpectations
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 2.75 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 3.13 sec
      [exec]     [junit] Running org.voltdb.TestHSQLBackend
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 12.10 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 11.69 sec
      [exec]     [junit] Running org.voltdb.TestJSONInterface
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 50.01 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 48.13 sec
      [exec]     [junit] Running org.voltdb.TestJdbcDatabaseMetaDataGenerator
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 1.46 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 1.45 sec
      [exec]     [junit] Running org.voltdb.TestParameterSet
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.25 sec
      [exec]     [junit] Running org.voltdb.TestRejoinEndToEnd
-     [exec]     [junit] Tests run:  14, Failures:   0, Errors:   0, Time elapsed: 156.07 sec
+     [exec]     [junit] Tests run:  14, Failures:   0, Errors:   0, Time elapsed: 149.07 sec
      [exec]     [junit] Running org.voltdb.TestRejoinFuzz
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 164.00 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 165.45 sec
      [exec]     [junit] Running org.voltdb.TestRejoinFuzz2
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 108.83 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 108.28 sec
      [exec]     [junit] Running org.voltdb.TestReplicatedInvocation
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 6.48 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 6.47 sec
      [exec]     [junit] Running org.voltdb.TestRestoreAgent
-     [exec]     [junit] Tests run:  21, Failures:   0, Errors:   0, Time elapsed: 44.34 sec
+     [exec]     [junit] Tests run:  21, Failures:   0, Errors:   0, Time elapsed: 44.33 sec
      [exec]     [junit] Running org.voltdb.TestSimpleCJK
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 4.33 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 6.09 sec
      [exec]     [junit] Running org.voltdb.TestSnapshotDaemon
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 9.02 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 9.00 sec
      [exec]     [junit] Running org.voltdb.TestStatsAgent
      [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 2.12 sec
      [exec]     [junit] Running org.voltdb.TestTheHashinator
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.81 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.78 sec
      [exec]     [junit] Running org.voltdb.TestTransactionIdManager
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.36 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.34 sec
      [exec]     [junit] Running org.voltdb.TestTwoSitePlans
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 2.92 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 2.93 sec
      [exec]     [junit] Running org.voltdb.TestVoltDB
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 6.99 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 7.18 sec
      [exec]     [junit] Running org.voltdb.TestVoltProcedure
-     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 1.06 sec
+     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 1.10 sec
      [exec]     [junit] Running org.voltdb.TestVoltTable
      [exec]     [junit] Tests run:  29, Failures:   0, Errors:   0, Time elapsed: 0.57 sec
      [exec]     [junit] Running org.voltdb.TestVoltType
@@ -445,293 +442,265 @@ check:
      [exec]     [junit] Running org.voltdb.catalog.TestCatalogDiffs
      [exec]     [junit] Tests run:  27, Failures:   0, Errors:   0, Time elapsed: 25.37 sec
      [exec]     [junit] Running org.voltdb.catalog.TestCatalogSerialization
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 4.78 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 4.67 sec
      [exec]     [junit] Running org.voltdb.client.TestClientTimeouts
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.77 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 10.22 sec
      [exec]     [junit] Running org.voltdb.client.TestDistributer
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 13.76 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 13.80 sec
      [exec]     [junit] Running org.voltdb.client.TestProcedureInvocation
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.25 sec
      [exec]     [junit] Running org.voltdb.compiler.TestAsyncCompilerAgent
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.49 sec
      [exec]     [junit] Running org.voltdb.compiler.TestClusterCompiler
      [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 0.16 sec
      [exec]     [junit] Running org.voltdb.compiler.TestDDLCompiler
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 1.52 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 1.50 sec
      [exec]     [junit] Running org.voltdb.compiler.TestMilestoneOneCompile
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 1.04 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 1.12 sec
      [exec]     [junit] Running org.voltdb.compiler.TestVoltCompiler
-     [exec]     [junit] Tests run:  56, Failures:   0, Errors:   0, Time elapsed: 10.86 sec
+     [exec]     [junit] Tests run:  56, Failures:   0, Errors:   0, Time elapsed: 10.88 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestDtxnInitiatorMailbox
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.69 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.70 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestInFlightTxnState
      [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 0.22 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestNonDetermisticSeppuku
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 13.16 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 12.30 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestRestrictedPriorityQueue
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.26 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.27 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestSimpleWorkUnit
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.50 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.52 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestSiteTracker
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.67 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.64 sec
      [exec]     [junit] Running org.voltdb.executionsitefuzz.TestExecutionSiteFuzzChecker
-     [exec]     [junit] Tests run:  13, Failures:   0, Errors:   0, Time elapsed: 0.29 sec
+     [exec]     [junit] Tests run:  13, Failures:   0, Errors:   0, Time elapsed: 0.31 sec
      [exec]     [junit] Running org.voltdb.export.TestExportDataSource
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.58 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.49 sec
      [exec]     [junit] Running org.voltdb.export.TestExportProtoMessage
-     [exec]     [junit] Tests run:  11, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
+     [exec]     [junit] Tests run:  11, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
      [exec]     [junit] Running org.voltdb.export.TestStreamBlockQueue
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 7.36 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 7.41 sec
      [exec]     [junit] Running org.voltdb.export.processors.TestRawProcessor
-     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 0.50 sec
+     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 0.49 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestCtrlC
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 35.05 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 31.00 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestExportDataSink
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.22 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestExportDecoderBase
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.15 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestExportOpsEvents
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 8.15 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 8.21 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestExportToFileClient
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.36 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 8.78 sec
      [exec]     [junit] Running org.voltdb.expressions.TestExpressionUtil
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.16 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.17 sec
      [exec]     [junit] Running org.voltdb.fault.TestFaultDistributor
      [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.66 sec
      [exec]     [junit] Running org.voltdb.jdbc.TestJDBCDriver
-     [exec]     [junit] Tests run:  15, Failures:   0, Errors:   0, Time elapsed: 4.75 sec
+     [exec]     [junit] Tests run:  15, Failures:   0, Errors:   0, Time elapsed: 5.26 sec
      [exec]     [junit] Running org.voltdb.jni.TestExecutionEngine
-     [exec]     [junit] [ERROR] [../../src/ee//voltdbjni.cpp:336:Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog()] 2012-05-07 21:30:26 - loadCatalog failed
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 28.81 sec
+     [exec]     [junit] [ERROR] [../../src/ee//voltdbjni.cpp:336:Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog()] 2012-05-13 19:06:31 - loadCatalog failed
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 28.79 sec
      [exec]     [junit] Running org.voltdb.messaging.TestFastSerializer
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.35 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.36 sec
      [exec]     [junit] Running org.voltdb.messaging.TestMessaging
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 1.35 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 1.36 sec
      [exec]     [junit] Running org.voltdb.messaging.TestVoltMessageSerialization
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.25 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.26 sec
      [exec]     [junit] Running org.voltdb.network.TestNIOReadStream
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
      [exec]     [junit] Running org.voltdb.network.TestNIOWriteStream
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.31 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.30 sec
      [exec]     [junit] Running org.voltdb.network.TestVoltNetwork
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.network.TestVoltPort
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.planner.TestColumnTrimmingPlans
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.82 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.81 sec
      [exec]     [junit] Running org.voltdb.planner.TestCoveringIndexPlans
      [exec]     [junit]     testSingleColumnLessThan failed an assertion.
      [exec]     [junit]         org.voltdb.planner.TestCoveringIndexPlans(TestCoveringIndexPlans.java:188)
-     [exec]     [junit] Tests run:   6, Failures:   1, Errors:   0, Time elapsed: 0.94 sec
+     [exec]     [junit] Tests run:   6, Failures:   1, Errors:   0, Time elapsed: 0.89 sec
+
+     //@PULLEXEC OK       Plan is now ProjectionPlanNode
+                                             SeqScanPlanNode
+                        Projectiuon used to be inlined
+                        
      [exec]     [junit] Test org.voltdb.planner.TestCoveringIndexPlans FAILED
      [exec]     [junit] Running org.voltdb.planner.TestFunctions
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.51 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.50 sec
      [exec]     [junit] Running org.voltdb.planner.TestIndexVSHashChoice
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.60 sec
      [exec]     [junit] Running org.voltdb.planner.TestJoinOrder
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.64 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.63 sec
      [exec]     [junit] Running org.voltdb.planner.TestParsedStatements
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 11.95 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 11.74 sec
      [exec]     [junit] Running org.voltdb.planner.TestPlannerTool
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 17.15 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 18.49 sec
      [exec]     [junit] Running org.voltdb.planner.TestPlansGroupBy
      [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.81 sec
      [exec]     [junit] Running org.voltdb.planner.TestPlansOrderBy
-     [exec]     [junit] Tests run:   9, Failures:   0, Errors:   0, Time elapsed: 0.90 sec
+     [exec]     [junit] Tests run:   9, Failures:   0, Errors:   0, Time elapsed: 0.89 sec
      [exec]     [junit] Running org.voltdb.planner.TestPlansTPCC
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 1.78 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 1.82 sec
      [exec]     [junit] Running org.voltdb.planner.TestPushDownAggregates
-     [exec]     [junit] Tests run:  19, Failures:   0, Errors:   0, Time elapsed: 1.55 sec
+     [exec]     [junit] Tests run:  19, Failures:   0, Errors:   0, Time elapsed: 1.28 sec
      [exec]     [junit] Running org.voltdb.planner.TestVerbotenPlans
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.93 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.91 sec
      [exec]     [junit] Running org.voltdb.plannodes.TestNestLoopPlanNode
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.20 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.18 sec
      [exec]     [junit] Running org.voltdb.plannodes.TestScanPlanNode
      [exec]     [junit]     testOutputSchemaSomeScanColumns failed an assertion.
      [exec]     [junit]         org.voltdb.plannodes.TestScanPlanNode(TestScanPlanNode.java:116)
-     [exec]     [junit] Tests run:   3, Failures:   1, Errors:   0, Time elapsed: 0.47 sec
+     
+     //@PULLEXEC OK     Projectiuon used to be inlined. Now it's above the scan node
+                         see SeqScanPlanNode::generateOutputSchema line 210
+                         
+     [exec]     [junit] Tests run:   3, Failures:   1, Errors:   0, Time elapsed: 0.49 sec
      [exec]     [junit] Test org.voltdb.plannodes.TestScanPlanNode FAILED
      [exec]     [junit] Running org.voltdb.regressionsuites.TestAdminMode
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 8.99 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.38 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestCRUDSuite
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestCRUDSuite FAILED (crashed)
+     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 25.16 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestCatalogUpdateSuite
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestCatalogUpdateSuite FAILED (crashed)
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 237.96 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestDecimalDefaults
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestDecimalDefaults FAILED (crashed)
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 1.61 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestExecutionSiteDeath
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 5.49 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 5.31 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestFailureDetectSuite
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 19.49 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 19.01 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestFailuresSuite
-     [exec]     [junit] Tests run:  42, Failures:   0, Errors:   0, Time elapsed: 151.20 sec
+     [exec]     [junit] Tests run:  42, Failures:   0, Errors:   0, Time elapsed: 153.09 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestFixedSQLSuite
-     [exec]     [junit]     testTicket201-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestFixedSQLSuite(TestFixedSQLSuite.java:686)
-     [exec]     [junit]     testTicket216-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestFixedSQLSuite(TestFixedSQLSuite.java:744)
-     [exec]     [junit]     testTicket194-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestFixedSQLSuite(TestFixedSQLSuite.java:764)
-     [exec]     [junit]     testTicket231-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestFixedSQLSuite(TestFixedSQLSuite.java:1009)
-     [exec]     [junit]     testTicket293-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestFixedSQLSuite(TestFixedSQLSuite.java:1057)
      [exec]     [junit] java: ../../src/ee/executors/limitexecutor.cpp:189: virtual void voltdb::LimitExecutor::p_pre_execute_pull(const voltdb::NValueArray&): Assertion `limit >= 0' failed.
+
+     //@PULLEXEC OK fixed linit executor
+
+
      [exec]     [junit] Test org.voltdb.regressionsuites.TestFixedSQLSuite FAILED (crashed)
      [exec]     [junit] Running org.voltdb.regressionsuites.TestGiantDeleteSuite
      [exec]     [junit]     testGiantDelete-localSingleProcess-2-JNI had an error.
      [exec]     [junit]         org.voltdb.client.ClientImpl(ClientImpl.java:218)
      [exec]     [junit]         org.voltdb.client.ClientImpl(ClientImpl.java:178)
      [exec]     [junit]         org.voltdb.regressionsuites.TestGiantDeleteSuite(TestGiantDeleteSuite.java:50)
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   1, Time elapsed: 237.23 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   1, Time elapsed: 241.78 sec
      [exec]     [junit] Test org.voltdb.regressionsuites.TestGiantDeleteSuite FAILED
      [exec]     [junit] Running org.voltdb.regressionsuites.TestIndexMemoryOwnershipSuite
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 4.40 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 3.80 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestIndexesSuite
-     [exec]     [junit]     testOrderedMultiOneColumnIntIndex-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestIndexesSuite(TestIndexesSuite.java:183)
-     [exec]     [junit]     testTicket195-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestIndexesSuite(TestIndexesSuite.java:284)
-     [exec]     [junit] Tests run:  18, Failures:   2, Errors:   0, Time elapsed: 35.57 sec
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestIndexesSuite FAILED
+     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 35.86 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestLimitOffsetSuite
-     [exec]     [junit]     testDistinctLimitOffset-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestLimitOffsetSuite(TestLimitOffsetSuite.java:110)
-     [exec]     [junit]     testDistinctLimitOffset-localSingleProcess-3-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestLimitOffsetSuite(TestLimitOffsetSuite.java:110)
-     [exec]     [junit]     testDistinctLimitOffset-localCluster-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestLimitOffsetSuite(TestLimitOffsetSuite.java:110)
-     [exec]     [junit] Tests run:  18, Failures:   3, Errors:   0, Time elapsed: 37.79 sec
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestLimitOffsetSuite FAILED
+     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 37.43 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestLoadingSuite
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 12.34 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 12.45 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestMaterializedViewSuite
-     [exec]     [junit] Tests run:  24, Failures:   0, Errors:   0, Time elapsed: 54.36 sec
+     [exec]     [junit] Tests run:  24, Failures:   0, Errors:   0, Time elapsed: 52.63 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestMultiPartitionSuite
-     [exec]     [junit] Tests run:  20, Failures:   0, Errors:   0, Time elapsed: 55.16 sec
+     [exec]     [junit] Tests run:  20, Failures:   0, Errors:   0, Time elapsed: 54.28 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestOrderBySuite
-     [exec]     [junit] Tests run:  40, Failures:   0, Errors:   0, Time elapsed: 83.85 sec
+     [exec]     [junit] Tests run:  40, Failures:   0, Errors:   0, Time elapsed: 83.54 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestPartitionDetection
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 8.97 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 9.54 sec
      [exec]     [junit] External VoltDB process terminated abnormally with return: 255
      [exec]     [junit] Running org.voltdb.regressionsuites.TestPlansGroupBySuite
-     [exec]     [junit]     testSelectDistinctA-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestPlansGroupBySuite(TestPlansGroupBySuite.java:275)
-     [exec]     [junit]     testSelectDistinctA-localSingleProcess-3-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestPlansGroupBySuite(TestPlansGroupBySuite.java:275)
-     [exec]     [junit] Tests run:  42, Failures:   2, Errors:   0, Time elapsed: 75.86 sec
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestPlansGroupBySuite FAILED
+     [exec]     [junit] Tests run:  42, Failures:   0, Errors:   0, Time elapsed: 75.24 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestReplicatedSaveRestoreSysprocSuite
-     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 45.29 sec
+     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 44.97 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestReplicationSuite
-     [exec]     [junit] Tests run:  20, Failures:   0, Errors:   0, Time elapsed: 100.69 sec
+     [exec]     [junit] Tests run:  20, Failures:   0, Errors:   0, Time elapsed: 96.61 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestRollbackSuite
-     [exec]     [junit]     testAllTypesJavaError-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:418)
-     [exec]     [junit]     testAllTypesJavaAbort-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:422)
-     [exec]     [junit]     testAllTypesUpdateJavaError-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:426)
-     [exec]     [junit]     testAllTypesUpdateJavaAbort-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:430)
-     [exec]     [junit]     testAllTypesMultiOpsJavaError-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:435)
-     [exec]     [junit]     testAllTypesJavaError-localSingleProcess-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:418)
-     [exec]     [junit]     testAllTypesJavaAbort-localSingleProcess-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:422)
-     [exec]     [junit]     testAllTypesUpdateJavaError-localSingleProcess-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:426)
-     [exec]     [junit]     testAllTypesUpdateJavaAbort-localSingleProcess-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:430)
-     [exec]     [junit]     testAllTypesMultiOpsJavaError-localSingleProcess-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:435)
-     [exec]     [junit]     testAllTypesJavaError-localCluster-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:418)
-     [exec]     [junit]     testAllTypesJavaAbort-localCluster-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:422)
-     [exec]     [junit]     testAllTypesUpdateJavaError-localCluster-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:426)
-     [exec]     [junit]     testAllTypesUpdateJavaAbort-localCluster-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:430)
-     [exec]     [junit]     testAllTypesMultiOpsJavaError-localCluster-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:391)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestRollbackSuite(TestRollbackSuite.java:435)
-     [exec]     [junit] Tests run:  48, Failures:  15, Errors:   0, Time elapsed: 210.10 sec
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestRollbackSuite FAILED
+     [exec]     [junit] Tests run:  48, Failures:   0, Errors:   0, Time elapsed: 216.75 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSQLFeaturesSuite
-     [exec]     [junit]     testUTF8Predicate-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestSQLFeaturesSuite(TestSQLFeaturesSuite.java:139)
-     [exec]     [junit]     testUTF8Predicate-localSingleProcess-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestSQLFeaturesSuite(TestSQLFeaturesSuite.java:139)
-     [exec]     [junit]     testUTF8Predicate-localCluster-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestSQLFeaturesSuite(TestSQLFeaturesSuite.java:139)
-     [exec]     [junit]     testUTF8Predicate-localClusterOneRecov-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestSQLFeaturesSuite(TestSQLFeaturesSuite.java:139)
-     [exec]     [junit] Tests run:  45, Failures:   4, Errors:   0, Time elapsed: 697.96 sec
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestSQLFeaturesSuite FAILED
+     [exec]     [junit] Tests run:  45, Failures:   0, Errors:   0, Time elapsed: 689.55 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSQLTypesSuite
-     [exec]     [junit]     testSimpleExpressions-localSingleProcess-1-JNI had an error.
-     [exec]     [junit]         org.voltdb.VoltTable(VoltTable.java:488)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestSQLTypesSuite(TestSQLTypesSuite.java:908)
-     [exec]     [junit]     testSimpleExpressions-localCluster-2-2-JNI had an error.
-     [exec]     [junit]         org.voltdb.VoltTable(VoltTable.java:488)
-     [exec]     [junit]         org.voltdb.regressionsuites.TestSQLTypesSuite(TestSQLTypesSuite.java:908)
-     [exec]     [junit] Tests run:  36, Failures:   0, Errors:   2, Time elapsed: 153.25 sec
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestSQLTypesSuite FAILED
+     [exec]     [junit] Tests run:  36, Failures:   0, Errors:   0, Time elapsed: 151.82 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSaveRestoreSysprocSuite
-     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 108.20 sec
+     [exec]     [junit] WARNING in native method: JNI FindClass received a bad class descriptor "Lorg/xerial/snappy/SnappyNative;".  A correct class descriptor has no leading "L" or trailing ";".  Incorrect descriptors will not be accepted in future releases.
+     [exec]     [junit] 	at org.xerial.snappy.SnappyNative.rawUncompress(Native Method)
+     [exec]     [junit] 	at org.xerial.snappy.Snappy.uncompress(Snappy.java:463)
+     [exec]     [junit] 	at org.voltdb.utils.CompressionService.decompressBuffer(CompressionService.java:189)
+     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.readChunks(TableSaveFile.java:637)
+     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.run(TableSaveFile.java:769)
+     [exec]     [junit] 	at java.lang.Thread.run(Thread.java:662)
+     [exec]     [junit] WARNING in native method: JNI FindClass received a bad class descriptor "Lorg/xerial/snappy/SnappyNative;".  A correct class descriptor has no leading "L" or trailing ";".  Incorrect descriptors will not be accepted in future releases.
+     [exec]     [junit] 	at org.xerial.snappy.SnappyNative.rawUncompress(Native Method)
+     [exec]     [junit] 	at org.xerial.snappy.Snappy.uncompress(Snappy.java:463)
+     [exec]     [junit] 	at org.voltdb.utils.CompressionService.decompressBuffer(CompressionService.java:189)
+     [exec]     [junit] WARNING in native method: JNI FindClass received a bad class descriptor "Lorg/xerial/snappy/SnappyNative;".  A correct class descriptor has no leading "L" or trailing ";".  Incorrect descriptors will not be accepted in future releases.
+     [exec]     [junit] 	at org.xerial.snappy.SnappyNative.rawUncompress(Native Method)
+     [exec]     [junit] 	at org.xerial.snappy.Snappy.uncompress(Snappy.java:463)
+     [exec]     [junit] 	at org.voltdb.utils.CompressionService.decompressBuffer(CompressionService.java:189)
+     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.readChunks(TableSaveFile.java:637)
+     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.run(TableSaveFile.java:769)
+     [exec]     [junit] 	at java.lang.Thread.run(Thread.java:662)
+     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.readChunks(TableSaveFile.java:637)
+     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.run(TableSaveFile.java:769)
+     [exec]     [junit] 	at java.lang.Thread.run(Thread.java:662)
+     [exec]     [junit] WARNING in native method: JNI FindClass received a bad class descriptor "Lorg/xerial/snappy/SnappyNative;".  A correct class descriptor has no leading "L" or trailing ";".  Incorrect descriptors will not be accepted in future releases.
+     [exec]     [junit] 	at org.xerial.snappy.SnappyNative.rawUncompress(Native Method)
+     [exec]     [junit] 	at org.xerial.snappy.Snappy.uncompress(Snappy.java:463)
+     [exec]     [junit] 	at org.voltdb.utils.CompressionService.decompressBuffer(CompressionService.java:189)
+     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.readChunks(TableSaveFile.java:637)
+     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.run(TableSaveFile.java:769)
+     [exec]     [junit] 	at java.lang.Thread.run(Thread.java:662)
+     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 106.85 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSecuritySuite
-     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 34.24 sec
+     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 35.66 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSneakyExecutionOrderSuite
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 5.24 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 5.20 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSqlAggregateSuite
-     [exec]     [junit]     testDistinct-localSingleProcess-1-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestSqlAggregateSuite(TestSqlAggregateSuite.java:64)
-     [exec]     [junit]     testDistinct-localCluster-2-2-JNI failed an assertion.
-     [exec]     [junit]         org.voltdb.regressionsuites.TestSqlAggregateSuite(TestSqlAggregateSuite.java:64)
-     [exec]     [junit] Tests run:  18, Failures:   2, Errors:   0, Time elapsed: 51.96 sec
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestSqlAggregateSuite FAILED
+     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 51.29 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSqlLogicOperatorsSuite
-     [exec]     [junit] Tests run:  16, Failures:   0, Errors:   0, Time elapsed: 40.62 sec
+     [exec]     [junit] Tests run:  16, Failures:   0, Errors:   0, Time elapsed: 40.05 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSqlUpdateSuite
-     [exec]     [junit] Tests run:  36, Failures:   0, Errors:   0, Time elapsed: 82.46 sec
+     [exec]     [junit] Tests run:  36, Failures:   0, Errors:   0, Time elapsed: 78.95 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSystemCatalogSuite
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 25.59 sec
+     [exec]     [junit]     testColumnsSelector-localCluster-2-2-JNI had an error.
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:435)
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:258)
+     [exec]     [junit]         org.voltdb.regressionsuites.RegressionSuite(RegressionSuite.java:74)
+     [exec]     [junit]     testIndexInfoSelector-localCluster-2-2-JNI had an error.
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:435)
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:258)
+     [exec]     [junit]         org.voltdb.regressionsuites.RegressionSuite(RegressionSuite.java:74)
+     [exec]     [junit]     testPrimaryKeysSelector-localCluster-2-2-JNI had an error.
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:435)
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:258)
+     [exec]     [junit]         org.voltdb.regressionsuites.RegressionSuite(RegressionSuite.java:74)
+     [exec]     [junit]     testProceduresSelector-localCluster-2-2-JNI had an error.
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:435)
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:258)
+     [exec]     [junit]         org.voltdb.regressionsuites.RegressionSuite(RegressionSuite.java:74)
+     [exec]     [junit]     testProcedureColumnsSelector-localCluster-2-2-JNI had an error.
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:435)
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:258)
+     [exec]     [junit]         org.voltdb.regressionsuites.RegressionSuite(RegressionSuite.java:74)
+     [exec]     [junit]     testJdbcAccess-localCluster-2-2-JNI had an error.
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:435)
+     [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:258)
+     [exec]     [junit]         org.voltdb.regressionsuites.RegressionSuite(RegressionSuite.java:74)
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   6, Time elapsed: 366.52 sec
+     [exec]     [junit] Test org.voltdb.regressionsuites.TestSystemCatalogSuite FAILED
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSystemInformationSuite
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 13.85 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 14.18 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSystemProcedureSuite
-     [exec]     [junit] Tests run:  38, Failures:   0, Errors:   0, Time elapsed: 133.40 sec
+     [exec]     [junit] Tests run:  38, Failures:   0, Errors:   0, Time elapsed: 133.66 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestTPCCSuite
-     [exec]     [junit] Tests run:  14, Failures:   0, Errors:   0, Time elapsed: 95.02 sec
+     [exec]     [junit] Tests run:  14, Failures:   0, Errors:   0, Time elapsed: 95.14 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestTempTableMemoryKnob
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 11.74 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 11.95 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestClusterSaveFileState
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.30 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.29 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestPartitionedTableSaveFileState
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.70 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.69 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestReplicatedTableSaveFileState
      [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.47 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestSavedTableConverter
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.56 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.57 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestTableSaveFile
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 1.45 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 1.42 sec
      [exec]     [junit] Running org.voltdb.types.TestBlobType
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 6.18 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 6.23 sec
      [exec]     [junit] Running org.voltdb.types.TestExpressionType
      [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 0.16 sec
      [exec]     [junit] Running org.voltdb.types.TestVoltDecimalHelper
@@ -739,77 +708,45 @@ check:
      [exec]     [junit] Running org.voltdb.utils.TestCLibrary
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.26 sec
      [exec]     [junit] Running org.voltdb.utils.TestCatalogUtil
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 26.30 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 25.20 sec
      [exec]     [junit] Running org.voltdb.utils.TestCommandLine
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.25 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
      [exec]     [junit] Running org.voltdb.utils.TestDBBPool
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.28 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.30 sec
      [exec]     [junit] Running org.voltdb.utils.TestEncoder
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 4.80 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 4.61 sec
      [exec]     [junit] Running org.voltdb.utils.TestInMemoryJarfile
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 13.01 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 12.91 sec
      [exec]     [junit] Running org.voltdb.utils.TestPersistentBinaryDeque
-     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 17.24 sec
+     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 11.95 sec
      [exec]     [junit] Running org.voltdb.utils.TestVoltTypeUtil
      [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.16 sec
      [exec]     [junit] Running org.voltdb.zk.TestZK
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 2.14 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 2.20 sec
      [exec]     [mkdir] Created dir: /home/mike/voltdb/fork/voltdb/obj/debug/testoutput/report
      [exec] [junitreport] Processing /home/mike/voltdb/fork/voltdb/obj/debug/testoutput/TESTS-TestSuites.xml to /home/mike/voltdb/fork/voltdb/obj/debug/testoutput/report/junit-noframes.html
      [exec] [junitreport] Loading stylesheet jar:file:/usr/share/ant/lib/ant-junit.jar!/org/apache/tools/ant/taskdefs/optional/junit/xsl/junit-noframes.xsl
-     [exec] [junitreport] Transform time: 1421ms
+     [exec] [junitreport] Transform time: 1371ms
      [exec] [junitreport] Processing /home/mike/voltdb/fork/voltdb/obj/debug/testoutput/TESTS-TestSuites.xml to /home/mike/voltdb/fork/voltdb/obj/debug/testoutput/junit-noframes.html
      [exec] [junitreport] Loading stylesheet /home/mike/voltdb/fork/voltdb/tools/junit-noframes.xsl
-     [exec] [junitreport] Transform time: 407ms
+     [exec] [junitreport] Transform time: 456ms
      [exec]      [exec] See obj/release/testoutput/report/junit-noframes.html for details.
-     [exec]      [exec] Suite TestAdHocQueries reports 1 failure(s).
-     [exec]      [exec]   Testcase testSimple junit.framework.AssertionFailedError
      [exec]      [exec] Suite TestCoveringIndexPlans reports 1 failure(s).
      [exec]      [exec]   Testcase testSingleColumnLessThan junit.framework.AssertionFailedError
+     //@PULLEXEC OK       Plan is now ProjectionPlanNode
+                                             SeqScanPlanNode
+                        Projectiuon used to be inlined
+                        
      [exec]      [exec] Suite TestScanPlanNode reports 1 failure(s).
      [exec]      [exec]   Testcase testOutputSchemaSomeScanColumns junit.framework.AssertionFailedError
-     [exec]      [exec] Suite TestIndexesSuite reports 2 failure(s).
-     [exec]      [exec]   Testcase testOrderedMultiOneColumnIntIndex-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testTicket195-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec] Suite TestLimitOffsetSuite reports 3 failure(s).
-     [exec]      [exec]   Testcase testDistinctLimitOffset-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testDistinctLimitOffset-localSingleProcess-3-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testDistinctLimitOffset-localCluster-2-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec] Suite TestPlansGroupBySuite reports 2 failure(s).
-     [exec]      [exec]   Testcase testSelectDistinctA-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testSelectDistinctA-localSingleProcess-3-JNI junit.framework.AssertionFailedError
-     [exec]      [exec] Suite TestRollbackSuite reports 15 failure(s).
-     [exec]      [exec]   Testcase testAllTypesJavaError-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesJavaAbort-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesUpdateJavaError-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesUpdateJavaAbort-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesMultiOpsJavaError-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesJavaError-localSingleProcess-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesJavaAbort-localSingleProcess-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesUpdateJavaError-localSingleProcess-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesUpdateJavaAbort-localSingleProcess-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesMultiOpsJavaError-localSingleProcess-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesJavaError-localCluster-2-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesJavaAbort-localCluster-2-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesUpdateJavaError-localCluster-2-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesUpdateJavaAbort-localCluster-2-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testAllTypesMultiOpsJavaError-localCluster-2-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec] Suite TestSQLFeaturesSuite reports 4 failure(s).
-     [exec]      [exec]   Testcase testUTF8Predicate-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testUTF8Predicate-localSingleProcess-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testUTF8Predicate-localCluster-2-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testUTF8Predicate-localClusterOneRecov-2-2-JNI junit.framework.AssertionFailedError
-     [exec]      [exec] Suite TestSqlAggregateSuite reports 2 failure(s).
-     [exec]      [exec]   Testcase testDistinct-localSingleProcess-1-JNI junit.framework.AssertionFailedError
-     [exec]      [exec]   Testcase testDistinct-localCluster-2-2-JNI junit.framework.AssertionFailedError
      [exec]      [exec] 
      [exec] 
      [exec] BUILD FAILED
      [exec] /home/mike/voltdb/fork/voltdb/build.xml:1241: JUnit had failures
      [exec] 
-     [exec] Total time: 69 minutes 14 seconds
+     [exec] Total time: 78 minutes 41 seconds
 
 BUILD FAILED
 /home/mike/voltdb/fork/voltdb/build.xml:143: exec returned: 1
 
-Total time: 69 minutes 51 seconds
+Total time: 79 minutes 18 seconds

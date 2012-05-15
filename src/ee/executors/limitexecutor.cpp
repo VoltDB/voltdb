@@ -61,16 +61,18 @@ namespace detail {
         LimitExecutorState(int limit, int offset, AbstractExecutor* childExec, Table* input_table) :
             m_limit(limit),
             m_offset(offset),
-            m_nullTuple(input_table->schema()),
-            m_childExecutor(childExec),
-            m_iterator(input_table->iterator())
+            m_tupleCtr(0),
+            m_skipped(0),
+            m_inputTableSchema(input_table->schema()),
+            m_childExecutor(childExec)
         {}
 
         int m_limit;
         int m_offset;
-        TableTuple m_nullTuple;
+        int m_tupleCtr;
+        bool m_skipped;
+        const TupleSchema* m_inputTableSchema;
         AbstractExecutor* m_childExecutor;
-        TableIterator m_iterator;
     };
 
 } // namespace detail
@@ -157,22 +159,21 @@ LimitExecutor::p_execute(const NValueArray &params)
 
 
 TableTuple LimitExecutor::p_next_pull() {
-    AbstractExecutor* childExec = m_state->m_childExecutor;
     // Skip first offset tuples
-    while (m_state->m_offset) {
-        TableTuple tuple = childExec->p_next_pull();
+    for (;m_state->m_skipped < m_state->m_offset; ++m_state->m_skipped) {
+        TableTuple tuple = m_state->m_childExecutor->p_next_pull();
         if (tuple.isNullTuple()) {
             return tuple;
         }
-        --(m_state->m_offset);
+        ++m_state->m_skipped;
     }
 
     // Check if limit has run out
-    if (m_state->m_limit) {
-        --(m_state->m_limit);
-        return childExec->p_next_pull();
-    }
-    return m_state->m_nullTuple;
+    if (m_state->m_limit >= 0 && m_state->m_tupleCtr >= m_state->m_limit)
+        return TableTuple(m_state->m_inputTableSchema);
+
+    ++m_state->m_tupleCtr;
+    return m_state->m_childExecutor->p_next_pull();
 }
 
 void LimitExecutor::p_pre_execute_pull(const NValueArray &params) {
@@ -183,11 +184,9 @@ void LimitExecutor::p_pre_execute_pull(const NValueArray &params) {
     assert(node);
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
-    int limit;
-    int offset;
+    int limit = 0;
+    int offset = 0;
     node->getLimitAndOffsetByReference(params, limit, offset);
-    assert(limit >= 0);
-    assert(offset >= 0);
     std::vector<AbstractPlanNode*>& children = node->getChildren();
     assert(children.size() == 1);
     AbstractExecutor* childExec = children[0]->getExecutor();
