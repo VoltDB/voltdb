@@ -81,5 +81,5 @@ public interface SiteProcedureConnection {
      */
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
 
-    public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
+    public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState, boolean isReplay);
 }

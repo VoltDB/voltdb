@@ -94,9 +94,10 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.messaging.RejoinResponseMessage;
-import org.voltdb.rejoin.RejoinCoordinator;
+import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.utils.Encoder;
@@ -187,10 +188,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private final SnapshotSiteProcessor m_snapshotter;
 
     private RecoverySiteProcessor m_recoveryProcessor = null;
+    // The following variables are used for new rejoin
     private RejoinSiteProcessor m_rejoinProcessor = null;
-    private volatile Pair<Long, RejoinResponseMessage> m_rejoinInitResponse = null;
+    private volatile Pair<Long, RejoinMessage> m_rejoinInitResponse = null;
     private long m_rejoinSnapshotTxnId = -1;
-    private RejoinCoordinator m_rejoinCoordinator = null;
+    private long m_rejoinCoordinatorHSId = -1;
+    private TaskLog m_rejoinTaskLog = null;
+    private long m_lastTimeLogWasEmpty = 0;
+    private long m_replayedTxnCount = 0;
+    private long m_loggedTxnCount = 0;
 
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
@@ -461,7 +467,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         @Override
         public void run() {
             final long now = System.currentTimeMillis();
-            final boolean newRejoin = m_rejoinProcessor != null;
+            final boolean newRejoin = m_recoveryProcessor == null;
             long transferred = 0;
             if (m_recoveryProcessor != null) {
                 transferred = m_recoveryProcessor.bytesTransferred();
@@ -469,11 +475,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
             final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
+            /*
+             * The logged txn count will be greater than the replayed txn count
+             * because some logged ones were before the stream snapshot
+             */
+            m_recoveryLog.info("Replayed " + m_replayedTxnCount + " txns");
+            m_recoveryLog.info("Logged " + m_loggedTxnCount + " txns");
             m_recoveryProcessor = null;
             m_rejoinProcessor = null;
             m_rejoinInitResponse = null;
             m_rejoinSnapshotTxnId = -1;
-            m_rejoinCoordinator = null;
+            m_rejoinTaskLog = null;
             m_recovering = false;
             if (m_haveRecoveryPermit) {
                 m_haveRecoveryPermit = false;
@@ -494,6 +506,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                      */
                     if (!newRejoin) {
                         VoltDB.instance().onExecutionSiteRecoveryCompletion(bytesTransferredTotal);
+                    } else {
+                        // Notify the rejoin coordinator that this site has finished
+                        if (m_rejoinCoordinatorHSId != -1) {
+                            RejoinMessage msg =
+                                    new RejoinMessage(getSiteId(), RejoinMessage.Type.REPLAY_FINISHED);
+                            try {
+                                m_mailbox.send(m_rejoinCoordinatorHSId, msg);
+                            } catch (MessagingException e) {
+                                VoltDB.crashLocalVoltDB("Unable to send message to rejoin " +
+                                        "coordinator", true, e);
+                            }
+                        }
+                        m_rejoinCoordinatorHSId = -1;
                     }
                 }
             } else {
@@ -967,11 +992,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     VoltMessage message = m_mailbox.recv();
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
-                        Object hadWork =
-                            m_snapshotter.doSnapshotWork(
+                        boolean hadWork =
+                            (m_snapshotter.doSnapshotWork(
                                     ee,
-                                    EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
-                        if ( hadWork != null) {
+                                    EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
+
+                        /*
+                         * Do rejoin work here before it blocks on the mailbox
+                         * so that it can rejoin quickly without interrupting
+                         * load too much.
+                         *
+                         * Rejoin and snapshot should never happen at the same
+                         * time on a rejoining node, so it's fine to assign the
+                         * value to hadWork here.
+                         */
+                        hadWork = doRejoinWork();
+                        if (hadWork) {
                             continue;
                         } else {
                             m_starvationTracker.beginStarvation();
@@ -987,8 +1023,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     } else {
                         //idle, do snapshot work
                         m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
-
-                        doRejoinWork();
                     }
                 }
                 if (currentTxnState != null) {
@@ -1000,7 +1034,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     if (m_recoveryProcessor != null) {
                         m_recoveryProcessor.doRecoveryWork(currentTxnState.txnId);
                     }
-                    recursableRun(currentTxnState);
+                    recursableRun(currentTxnState, false);
                 }
                 else if (m_recoveryProcessor != null) {
                     /*
@@ -1025,43 +1059,143 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     /**
      * Do rejoin work, including streaming snapshot blocks and replaying logged
      * transactions.
+     *
+     * @return true if there was real work done.
      */
-    private void doRejoinWork() {
-        // do rejoin work
+    private boolean doRejoinWork() {
+        boolean doneWork = false;
         if (m_rejoinProcessor != null && m_rejoinSnapshotTxnId != -1) {
-            Pair<Integer, ByteBuffer> rejoinWork = m_rejoinProcessor.poll();
-            if (rejoinWork != null) {
-                int tableId = rejoinWork.getFirst();
-                ByteBuffer buffer = rejoinWork.getSecond();
-                m_recoveryLog.info("Got a snapshot block for table " + tableId + " " +
-                        buffer.remaining());
-                VoltTable table =
-                        PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
-                                                                          true);
-                //m_recoveryLog.info("table " + tableId + ": " + table.toString());
-                loadTable(m_rejoinSnapshotTxnId, tableId, table);
-            } else if (m_rejoinProcessor.isEOF()) {
-                m_recoveryLog.info("New rejoin snapshot transfer is finished");
-                m_rejoinProcessor.close();
-                // Notify the rejoin coordinator so that it can start the next site
-                if (m_rejoinCoordinator != null) {
-                    m_rejoinCoordinator.onRejoinFinished(getSiteId());
+            doneWork = restoreSnapshotForRejoin();
+        } else if (m_rejoinProcessor == null && m_rejoinTaskLog != null) {
+            /*
+             * snapshot streaming is done, try to replay a batch of transactions
+             * to speed up the rejoin process. it should be really fast.
+             */
+            for (int i = 0; i < 1000; i++) {
+                doneWork = replayTransactionForRejoin();
+                if (!doneWork) {
+                    // no more work to do for now
+                    break;
                 }
+            }
+        }
 
-                // TODO: done streaming snapshot, start replaying logged transactions
+        return doneWork;
+    }
+
+    /**
+     * Restore snapshot blocks streamed from other site if there are any.
+     *
+     * @return true if there was real work done.
+     */
+    private boolean restoreSnapshotForRejoin() {
+        boolean doneWork = false;
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinProcessor.poll();
+        if (rejoinWork != null) {
+            int tableId = rejoinWork.getFirst();
+            ByteBuffer buffer = rejoinWork.getSecond();
+            m_recoveryLog.info("Got a snapshot block for table " + tableId + " " +
+                    buffer.remaining());
+            VoltTable table =
+                    PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
+                                                                      true);
+            //m_recoveryLog.info("table " + tableId + ": " + table.toString());
+            loadTable(m_rejoinSnapshotTxnId, tableId, table);
+            doneWork = true;
+        } else if (m_rejoinProcessor.isEOF()) {
+            m_recoveryLog.info("New rejoin snapshot transfer is finished");
+            m_rejoinProcessor.close();
+            m_rejoinProcessor = null;
+            // Notify the rejoin coordinator so that it can start the next site
+            if (m_rejoinCoordinatorHSId != -1) {
+                RejoinMessage msg =
+                        new RejoinMessage(getSiteId(), RejoinMessage.Type.SNAPSHOT_FINISHED);
+                try {
+                    m_mailbox.send(m_rejoinCoordinatorHSId, msg);
+                } catch (MessagingException e) {
+                    VoltDB.crashLocalVoltDB("Unable to send message to rejoin " +
+                            "coordinator", true, e);
+                }
+            }
+        }
+
+        return doneWork;
+    }
+
+    /**
+     * Replays transactions logged for rejoin since the stream snapshot was
+     * initiated.
+     *
+     * @return true if actual work was done, false otherwise
+     */
+    private boolean replayTransactionForRejoin() {
+        boolean doneWork = false;
+        if (m_rejoinTaskLog == null) {
+            return doneWork;
+        }
+
+        // get the next task to replay
+        TransactionState ts = null;
+        try {
+            TransactionInfoBaseMessage msg = m_rejoinTaskLog.getNextMessage();
+            if (msg != null) {
+                if (msg.isSinglePartition()) {
+                    ts = new SinglePartitionTxnState(m_mailbox, this, msg);
+                }
+                else {
+                    // TODO: multi-part is not supported yet
+                    m_recoveryLog.info("Unknown message " + msg.getClass());
+                }
+            }
+        } catch (IOException e) {
+            m_recoveryLog.error("Failed to replay logged transactions: " +
+                    e.getMessage());
+        }
+
+        if (ts != null) {
+            m_lastTimeLogWasEmpty = 0;
+            // Run the transaction, but don't send response
+            recursableRun(ts, true);
+            doneWork = true;
+            m_recoveryLog.trace("Replayed " + ts.getNotice().getTxnId());
+            m_replayedTxnCount++;
+        } else {
+            boolean rejoinCompleted = false;
+            try {
+                if (m_rejoinTaskLog.isEmpty()) {
+                    long currentTime = System.currentTimeMillis();
+                    if (m_lastTimeLogWasEmpty > 0 &&
+                            (currentTime - m_lastTimeLogWasEmpty) > 2000) {
+                        rejoinCompleted = true;
+                    } else if (m_lastTimeLogWasEmpty == 0) {
+                        m_lastTimeLogWasEmpty = currentTime;
+                    }
+                }
+            } catch (IOException e) {
+                m_recoveryLog.error("Failed to determine if the task log is empty: " +
+                        e.getMessage());
+            }
+
+            if (rejoinCompleted) {
+                m_recoveryLog.info("Replay of task messages are done");
+                try {
+                    m_rejoinTaskLog.close();
+                } catch (IOException e) {
+                    m_recoveryLog.error("Failed to close the task log:" +
+                            e.getMessage());
+                }
                 m_onRecoveryCompletion.run();
             }
         }
+
+        return doneWork;
     }
 
     /**
      * Construct a stream snapshot receiver and initiate rejoin.
      */
-    public void initiateRejoin(RejoinCoordinator coordinator) {
-        m_rejoinCoordinator = coordinator;
-        if (m_rejoinCoordinator == null) {
-            VoltDB.crashLocalVoltDB("No rejoin coordinator specified", false, null);
-        }
+    private void initiateRejoin(long rejoinCoordinatorHSId) {
+        m_rejoinCoordinatorHSId = rejoinCoordinatorHSId;
 
         // new rejoin code
         Class<?> klass =
@@ -1091,19 +1225,151 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                     false, null);
         }
 
-        // TODO: start logging transactions here
+        // Construct task log
+        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(),
+                                    "rejoin_overflow");
+        Class<?> taskLogKlass =
+                MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl",
+                                       "Rejoin", false);
+        Constructor<?> taskLogConstructor;
+        try {
+            taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
+            m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(partition, overflowDir);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to construct rejoin task log",
+                                    true, e);
+        }
 
         m_recoveryLog.info("Initiating new rejoin from " +
                 CoreUtils.hsIdToString(getSiteId()));
 
-        RecoveryMessage message = new RecoveryMessage(getSiteId(), 0l,
-                                                      addresses, port);
-        message.setNewRejoin();
+        RejoinMessage message = new RejoinMessage(getSiteId(), addresses, port);
         try {
             m_mailbox.send(sourceSite, message);
         } catch (MessagingException e) {
             VoltDB.crashLocalVoltDB("Unable to send recovery message to " +
                     CoreUtils.hsIdToString(sourceSite), true, e);
+        }
+    }
+
+    /**
+     * Upon receiving a rejoin request, try to request a stream snapshot.
+     *
+     * @param rm
+     *            The request message
+     */
+    private RejoinMessage initiateRejoinSnapshot(RejoinMessage rm) {
+        final long sourceSite = rm.m_sourceHSId;
+        List<byte[]> addresses = rm.addresses();
+        int port = rm.port();
+        final String srcSiteStr = CoreUtils.hsIdToString(sourceSite);
+
+        m_recoveryLog.info(srcSiteStr + " requested to rejoin");
+
+        // Initiate a snapshot with stream snapshot target
+        String data = null;
+        try {
+            JSONStringer jsStringer = new JSONStringer();
+            jsStringer.object();
+            jsStringer.key("addresses").array();
+            for (byte[] addr : addresses) {
+                InetAddress inetAddress = InetAddress.getByAddress(addr);
+                jsStringer.value(inetAddress.getHostAddress());
+            }
+            jsStringer.endArray();
+            jsStringer.key("port").value(port);
+            jsStringer.endObject();
+            data = jsStringer.toString();
+        } catch (Exception e) {
+            m_recoveryLog.error("Failed to serialize to JSON: " +
+                    e.getMessage());
+            return new RejoinMessage(getSiteId(), RejoinMessage.Type.FAILURE);
+        }
+
+        SnapshotResponseHandler handler = new SnapshotResponseHandler() {
+            @Override
+            public void handleResponse(ClientResponse resp) {
+                if (resp == null || resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                    RejoinMessage msg = new RejoinMessage(getSiteId(), RejoinMessage.Type.FAILURE);
+                    m_rejoinInitResponse = Pair.of(sourceSite, msg);
+                    return;
+                }
+
+                VoltTable[] results = resp.getResults();
+                if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                    long txnId = -1;
+                    String appStatus = resp.getAppStatusString();
+                    try {
+                        JSONObject jsObj = new JSONObject(appStatus);
+                        txnId = jsObj.getLong("txnId");
+                    } catch (JSONException e) {
+                        m_recoveryLog.error("Failed to get the snapshot txnId " +
+                                "for rejoining " + srcSiteStr + ": " + e.getMessage());
+                        RejoinMessage msg = new RejoinMessage(getSiteId(), RejoinMessage.Type.FAILURE);
+                        m_rejoinInitResponse = Pair.of(sourceSite, msg);
+                        return;
+                    }
+
+                    m_recoveryLog.info("Rejoin snapshot requested " + txnId +
+                                       " for " + srcSiteStr);
+                    m_rejoinInitResponse =
+                            Pair.of(sourceSite,
+                                    new RejoinMessage(getSiteId(), txnId));
+                } else {
+                    m_recoveryLog.error("Snapshot request for rejoining " +
+                            srcSiteStr + " didn't succeed");
+                    RejoinMessage msg = new RejoinMessage(getSiteId(), RejoinMessage.Type.FAILURE);
+                    m_rejoinInitResponse = Pair.of(sourceSite, msg);
+                }
+            }
+        };
+
+        SnapshotUtil.requestSnapshot(0l, "", "Rejoin snapshot", (byte) 0,
+                                     SnapshotFormat.STREAM, data, handler);
+
+        return null;
+    }
+
+    /**
+     * Handle rejoin message
+     * @param rm
+     */
+    private void handleRejoinMessage(RejoinMessage rm) {
+        int hostId = CoreUtils.getHostIdFromHSId(rm.m_sourceHSId);
+        Type type = rm.getType();
+        if (type == RejoinMessage.Type.FAILURE) {
+            // crash
+            VoltDB.crashLocalVoltDB("Unable to rejoin the cluster. " +
+                    "Please see the logs on host " + hostId +
+                    " for more detail.", false, null);
+        } else if (type == RejoinMessage.Type.INITIATION) {
+            // rejoin coordinator says go ahead
+            initiateRejoin(rm.m_sourceHSId);
+        } else if (type == RejoinMessage.Type.REQUEST) {
+            // a site wants to rejoin
+            RejoinMessage rejoinResponse = initiateRejoinSnapshot(rm);
+            if (rejoinResponse != null) {
+                // send the error response to the rejoining partition
+                try {
+                    m_mailbox.send(rm.m_sourceHSId, rejoinResponse);
+                } catch (MessagingException e) {
+                    throw new RuntimeException(e);
+                }
+            }
+        } else if (type == RejoinMessage.Type.REQUEST_RESPONSE) {
+            // Get the snapshot txnId
+            m_rejoinSnapshotTxnId = rm.txnId();
+            m_recoveryLog.info("Heard rejoin initiation response from " +
+                    CoreUtils.hsIdToString(rm.m_sourceHSId) +
+                    ", snapshot txnId is" + m_rejoinSnapshotTxnId);
+
+            // remove logged transactions older than this
+            if (m_rejoinTaskLog != null) {
+                m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
+            }
+        } else {
+            VoltDB.crashLocalVoltDB("Unknown rejoin message type " + type,
+                                    false, null);
         }
     }
 
@@ -1129,12 +1395,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
             }
             if (currentTxnState != null) {
-                recursableRun(currentTxnState);
+                recursableRun(currentTxnState, false);
             }
         }
     }
 
-    private void completeTransaction(TransactionState txnState) {
+    private void completeTransaction(TransactionState txnState, boolean isReplay) {
         if (m_txnlog.isTraceEnabled())
         {
             m_txnlog.trace("FUZZTEST completeTransaction " + txnState.txnId);
@@ -1164,6 +1430,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             if ((invocation != null) && (m_recovering == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+                }
+            }
+
+            // log task message for rejoin if it's not a replayed transaction
+            if (m_recovering && !isReplay && m_rejoinTaskLog != null && !txnState.needsRollback()) {
+                try {
+                    m_rejoinTaskLog.logTask(txnState.getNotice());
+                    m_loggedTxnCount++;
+                } catch (IOException e) {
+                    m_recoveryLog.error("Failed to log task message: " + e.getMessage());
                 }
             }
 
@@ -1331,66 +1607,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     "Recovery initiate received at site " + CoreUtils.hsIdToString(m_siteId) +
                     " from site " + CoreUtils.hsIdToString(rm.sourceSite()) + " requesting recovery start before txnid " +
                     recoveringPartitionTxnId);
-            if (rm.newRejoin()) {
-                m_recoveryLog.info(CoreUtils.hsIdToString(rm.sourceSite()) +
-                                   " requested new rejoin");
 
-                // Initiate a snapshot with stream snapshot target
-                String data = null;
-                try {
-                    JSONStringer jsStringer = new JSONStringer();
-                    jsStringer.object();
-                    jsStringer.key("addresses").array();
-                    for (byte[] addr : rm.addresses()) {
-                        InetAddress inetAddress = InetAddress.getByAddress(addr);
-                        jsStringer.value(inetAddress.getHostAddress());
-                    }
-                    jsStringer.endArray();
-                    jsStringer.key("port").value(rm.port());
-                    jsStringer.endObject();
-                    data = jsStringer.toString();
-                } catch (Exception e) {
-                    // TODO: error, send error response
-                    m_recoveryLog.error("Failed to serialize to JSON: " +
-                            e.getMessage());
-                }
-
-                SnapshotResponseHandler handler = new SnapshotResponseHandler() {
-                    @Override
-                    public void handleResponse(ClientResponse resp) {
-                        if (resp == null || resp.getStatus() != ClientResponseImpl.SUCCESS) {
-                            // TODO: error
-                            return;
-                        }
-
-                        VoltTable[] results = resp.getResults();
-                        if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
-                            long txnId = -1;
-                            String appStatus = resp.getAppStatusString();
-                            try {
-                                JSONObject jsObj = new JSONObject(appStatus);
-                                txnId = jsObj.getLong("txnId");
-                            } catch (JSONException e) {
-                                // TODO Failed to get txnId, respond with error
-                                m_recoveryLog.error("Failed to serialize to JSON: " +
-                                        e.getMessage());
-                            }
-
-                            m_recoveryLog.info("Rejoin snapshot requested " + txnId);
-                            m_rejoinInitResponse =
-                                    Pair.of(rm.sourceSite(),
-                                            new RejoinResponseMessage(getSiteId(), txnId));
-                        } else {
-                            // TODO: failed
-                            m_recoveryLog.error("Snapshot request didn't succeed");
-                        }
-                    }
-                };
-
-                SnapshotUtil.requestSnapshot(0l, "", "Rejoin snapshot", (byte) 0,
-                                             SnapshotFormat.STREAM, data, handler);
-            } else {
-                m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
+            m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
                         this,
                         rm,
                         m_context.database,
@@ -1400,15 +1618,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         m_siteId,
                         m_onRecoveryCompletion,
                         m_recoveryMessageHandler);
-            }
         }
-        else if (message instanceof RejoinResponseMessage) {
-            // Get the snapshot txnId
-            RejoinResponseMessage rm = (RejoinResponseMessage) message;
-            m_rejoinSnapshotTxnId = rm.txnId();
-            m_recoveryLog.info("Heard rejoin initiation response from " +
-                    CoreUtils.hsIdToString(message.m_sourceHSId) +
-                    ", snapshot txnId is" + m_rejoinSnapshotTxnId);
+        else if (message instanceof RejoinMessage) {
+            RejoinMessage rm = (RejoinMessage) message;
+            handleRejoinMessage(rm);
         }
         else if (message instanceof FragmentResponseMessage) {
             FragmentResponseMessage response = (FragmentResponseMessage)message;
@@ -2156,15 +2369,20 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      */
     @Override
     public Map<Integer, List<VoltTable>>
-    recursableRun(TransactionState currentTxnState)
+    recursableRun(TransactionState currentTxnState, boolean isReplay)
     {
         while (m_shouldContinue) {
-            if (currentTxnState.doWork(m_recovering)) {
+            /*
+             * when it's replaying transactions during rejoin, we want real work
+             * to be done.
+             */
+            boolean rejoining = m_recovering && !isReplay;
+            if (currentTxnState.doWork(rejoining, !isReplay)) {
                 if (currentTxnState.needsRollback())
                 {
                     rollbackTransaction(currentTxnState);
                 }
-                completeTransaction(currentTxnState);
+                completeTransaction(currentTxnState, isReplay);
                 TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
                 assert(ts != null);
                 return null;
@@ -2457,7 +2675,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)
             {
-                boolean success = nextTxn.doWork(m_recovering);
+                boolean success = nextTxn.doWork(m_recovering, false);
                 assert(success);
                 return true;
             }

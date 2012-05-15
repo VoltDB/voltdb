@@ -17,28 +17,29 @@
 
 package org.voltdb.rejoin;
 
+import org.voltcore.messaging.HostMessenger;
+import org.voltdb.messaging.LocalMailbox;
+
 /**
  * Coordinates the sites to perform rejoin
  */
-public interface RejoinCoordinator {
+public abstract class RejoinCoordinator extends LocalMailbox {
+    protected final HostMessenger m_messenger;
+
+    public RejoinCoordinator(HostMessenger hostMessenger) {
+        super(hostMessenger, hostMessenger.generateMailboxId(null));
+        m_messenger = hostMessenger;
+    }
+
     /**
      * Starts the rejoin process.
      */
-    public void startRejoin();
+    public abstract void startRejoin();
 
     /**
-     * Called when a site finishes rejoin.
-     *
-     * @param HSId
-     *            The HSId of the site.
+     * Discard the mailbox.
      */
-    public void onRejoinFinished(long HSId);
-
-    /**
-     * Called when a site fails to rejoin.
-     *
-     * @param HSId
-     *            The HSId of the site.
-     */
-    public void onRejoinFailed(long HSId);
+    public void close() {
+        m_messenger.removeMailbox(getHSId());
+    }
 }

@@ -40,7 +40,6 @@ public class RecoveryMessage extends VoltMessage {
     private long m_txnId;
     private List<byte[]> m_addresses;
     private int m_port;
-    private boolean m_newRejoin = false;
 
     // Is the source site ready to handle the rejoin?
     private boolean m_isSourceReady = true;
@@ -95,10 +94,6 @@ public class RecoveryMessage extends VoltMessage {
         m_addresses = new ArrayList<byte[]>();
     }
 
-    public void setNewRejoin() {
-        m_newRejoin = true;
-    }
-
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
@@ -107,7 +102,6 @@ public class RecoveryMessage extends VoltMessage {
             8 + // m_txnId
             4 + // address count
             1 + // is source ready
-            1 + // is new rejoin
             (4 * m_addresses.size()) + // 4 bytes per address
             4; // m_port
         for (byte address[] : m_addresses) {
@@ -122,7 +116,6 @@ public class RecoveryMessage extends VoltMessage {
         buf.putLong( m_sourceHSId);
         buf.putLong( m_txnId);
         buf.put(m_isSourceReady ? 1 : (byte) 0);
-        buf.put(m_newRejoin ? 1 : (byte) 0);
         buf.putInt(m_addresses.size());
         for (byte address[] : m_addresses) {
             buf.putInt(address.length);
@@ -150,10 +143,6 @@ public class RecoveryMessage extends VoltMessage {
         return m_port;
     }
 
-    public boolean newRejoin() {
-        return m_newRejoin;
-    }
-
     public boolean isSourceReady() {
         return m_isSourceReady;
     }
@@ -164,7 +153,6 @@ public class RecoveryMessage extends VoltMessage {
         m_sourceHSId = buf.getLong();
         m_txnId = buf.getLong();
         m_isSourceReady = buf.get() == 1;
-        m_newRejoin = buf.get() == 1;
         int numAddresses = buf.getInt();
         m_addresses = new ArrayList<byte[]>(numAddresses);
         for (int ii = 0; ii < numAddresses; ii++) {

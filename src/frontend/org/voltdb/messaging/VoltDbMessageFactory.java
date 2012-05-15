@@ -68,7 +68,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             message = new CompleteTransactionResponseMessage();
             break;
         case REJOIN_RESPONSE_ID:
-            message = new RejoinResponseMessage();
+            message = new RejoinMessage();
             break;
         default:
             message = null;

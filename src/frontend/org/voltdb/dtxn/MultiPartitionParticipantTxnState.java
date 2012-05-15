@@ -171,7 +171,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     private boolean m_startedWhileRecovering;
 
     @Override
-    public boolean doWork(boolean recovering) {
+    public boolean doWork(boolean recovering, boolean sendResponse) {
         if (!m_hasStartedWork) {
             m_site.beginNewTxn(this);
             m_hasStartedWork = true;

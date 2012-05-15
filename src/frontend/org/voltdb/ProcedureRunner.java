@@ -1044,7 +1044,7 @@ public class ProcedureRunner {
 
        // recursively call recurableRun and don't allow it to shutdown
        Map<Integer,List<VoltTable>> mapResults =
-           m_site.recursableRun(m_txnState);
+           m_site.recursableRun(m_txnState, false);
 
        assert(mapResults != null);
        assert(depsToResume != null);

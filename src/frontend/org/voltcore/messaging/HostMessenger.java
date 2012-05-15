@@ -753,6 +753,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return sm;
     }
 
+    /**
+     * Discard a mailbox
+     */
+    public void removeMailbox(long hsId) {
+        while (true) {
+            HashMap<Long, Mailbox> original = m_siteMailboxes.get();
+            HashMap<Long, Mailbox> update = new HashMap<Long, Mailbox>(original);
+            update.remove(hsId);
+            if (m_siteMailboxes.compareAndSet(original, update)) {
+                break;
+            }
+        }
+    }
+
     public void send(final long destinationHSId, final VoltMessage message)
     throws MessagingException
     {

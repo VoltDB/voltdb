@@ -420,6 +420,31 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 hostLog.info("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
+                // Construct and publish rejoin coordinator mailbox
+                if (m_config.m_newRejoin) {
+                    ArrayList<Long> sites = new ArrayList<Long>();
+                    for (Mailbox siteMailbox : siteMailboxes) {
+                        sites.add(siteMailbox.getHSId());
+                    }
+
+                    Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
+                                                            "Rejoin", false);
+                    Constructor<?> constructor;
+                    try {
+                        constructor = klass.getConstructor(HostMessenger.class, List.class);
+                        m_rejoinCoordinator =
+                                (RejoinCoordinator) constructor.newInstance(m_messenger,
+                                                                            sites);
+                        m_messenger.registerMailbox(m_rejoinCoordinator);
+                        m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
+                                                           new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
+                                                true, e);
+                    }
+                }
+
+                // All mailboxes should be set up, publish it
                 m_mailboxPublisher.publish(m_messenger.getZK());
 
                 /*
@@ -547,20 +572,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
                     assert(runner.m_siteObj != null);
                     m_localSites.put(runner.m_siteId, runner.m_siteObj);
-                }
-            }
-
-            // Construct rejoin coordinator
-            if (m_config.m_newRejoin) {
-                Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
-                                                        "Rejoin", false);
-                Constructor<?> constructor;
-                try {
-                    constructor = klass.getConstructor(Map.class);
-                    m_rejoinCoordinator = (RejoinCoordinator) constructor.newInstance(m_localSites);
-                } catch (Exception e) {
-                    VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
-                                            true, e);
                 }
             }
 
@@ -1655,6 +1666,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     private void onRecoveryCompletion() {
         // null out the rejoin coordinator
+        if (m_rejoinCoordinator != null) {
+            m_rejoinCoordinator.close();
+        }
         m_rejoinCoordinator = null;
 
         try {
