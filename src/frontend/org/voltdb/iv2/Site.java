@@ -238,7 +238,8 @@ public class Site implements Runnable, SiteProcedureConnection
             m_ee = new MockExecutionEngine();
         }
         else if (m_backend == BackendTarget.HSQLDB_BACKEND) {
-            m_hsql = initializeHSQLBackend();
+            m_hsql = HsqlBackend.initializeHSQLBackend(m_siteId,
+                                                       m_context);
             m_ee = new MockExecutionEngine();
         }
         else {
@@ -246,34 +247,6 @@ public class Site implements Runnable, SiteProcedureConnection
             m_ee = initializeEE(serializedCatalog, txnId);
         }
     }
-
-
-    /** Create an HSQL backend */
-    HsqlBackend initializeHSQLBackend()
-    {
-        HsqlBackend hsqlTemp = null;
-        try {
-            hsqlTemp = new HsqlBackend(m_siteId);
-            final String hexDDL = m_context.database.getSchema();
-            final String ddl = Encoder.hexDecodeToString(hexDDL);
-            final String[] commands = ddl.split("\n");
-            for (String command : commands) {
-                String decoded_cmd = Encoder.hexDecodeToString(command);
-                decoded_cmd = decoded_cmd.trim();
-                if (decoded_cmd.length() == 0) {
-                    continue;
-                }
-                hsqlTemp.runDDL(decoded_cmd);
-            }
-        }
-        catch (final Exception ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
-                            new Object[] { m_siteId, m_siteIndex }, ex);
-            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
-        }
-        return hsqlTemp;
-    }
-
 
     /** Create a native VoltDB execution engine */
     ExecutionEngine initializeEE(String serializedCatalog, final long txnId)
@@ -485,6 +458,12 @@ public class Site implements Runnable, SiteProcedureConnection
     {
         ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
         return runner.executePlanFragment(txnState, dependencies, fragmentId, params);
+    }
+
+    @Override
+    public HsqlBackend getHsqlBackendIfExists()
+    {
+        return m_hsql;
     }
 
 }
