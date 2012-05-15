@@ -53,34 +53,26 @@ public class Shutdown extends VoltSystemProcedure {
                                            SystemProcedureExecutionContext context)
     {
         if (fragmentId == SysProcFragmentId.PF_shutdownCommand) {
-            // Choose the lowest site ID on this host to do the global
-            // shutdown.  all other sites should just bail out (for now)
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Long lowest_site_id =
-                context.getSiteTracker().
-                getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() != lowest_site_id)
-            {
-                return null;
-            }
-
-            try {
-                Thread.sleep(1000);
-            }
-            catch (InterruptedException e1) {
-                e1.printStackTrace();
-            }
             Thread shutdownThread = new Thread() {
                 @Override
                 public void run() {
+                    boolean die = false;
                     try {
-                        VoltDB.instance().shutdown(this);
+                        die = VoltDB.instance().shutdown(this);
                     } catch (InterruptedException e) {
                         new VoltLogger("HOST").error(
                                 "Exception while attempting to shutdown VoltDB from shutdown sysproc",
                                 e);
                     }
-                    System.exit(0);
+                    if (die) {
+                        System.exit(0);
+                    }
+                    else {
+                        try {
+                            Thread.sleep(10000);
+                        }
+                        catch (InterruptedException e) {}
+                    }
                 }
             };
             shutdownThread.start();
