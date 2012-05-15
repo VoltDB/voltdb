@@ -286,13 +286,47 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             m_searchKey.setNValue(ctr, candidateValue);
         }
         catch (SQLException e) {
+            // This next bit of logic handles underflow and overflow while
+            // setting up the search keys.
+            // e.g. TINYINT > 200 or INT <= 6000000000
+
+            // rethow if not an overflow - currently, it's expected to always be an overflow
+            if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+                throw e;
+            }
+
+            // handle the case where this is a comparison, rather than equality match
+            // comparison is the only place where the executor might return matching tuples
+            // e.g. TINYINT < 1000 should return all values
             if ((m_lookupType != INDEX_LOOKUP_TYPE_EQ) &&
                 (ctr == (activeNumOfSearchKeys - 1))) {
+
+                if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+                    if ((m_lookupType == INDEX_LOOKUP_TYPE_GT) ||
+                        (m_lookupType == INDEX_LOOKUP_TYPE_GTE)) {
+
+                        // gt or gte when key overflows returns nothing
+                        return true;
+                    }
+                }
+                if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+                    if ((m_lookupType == INDEX_LOOKUP_TYPE_LT) ||
+                        (m_lookupType == INDEX_LOOKUP_TYPE_LTE)) {
+
+                        // lt or lte when key underflows returns nothing
+                        return true;
+                    }
+                }
+
+                // if here, means all tuples with the previous searchkey
+                // columns need to be scaned. Note, if only one column,
+                // then all tuples will be scanned
                 activeNumOfSearchKeys--;
                 if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
                     localSortDirection = SORT_DIRECTION_TYPE_ASC;
                 }
             }
+            // if a EQ comparison is out of range, then return no tuples
             else {
                 return true;
             }
