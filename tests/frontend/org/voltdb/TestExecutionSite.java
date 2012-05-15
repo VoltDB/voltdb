@@ -552,7 +552,7 @@ public class TestExecutionSite extends TestCase {
         final ExecutionSite m_site;
 
         MockSPProcedureRunner(MockSPVoltProcedure procedure, ExecutionSite site) {
-            super(procedure, site, null, null, null);
+            super(procedure, site, null, null);
             m_procedure = procedure;
             m_site = site;
         }
@@ -626,7 +626,7 @@ public class TestExecutionSite extends TestCase {
         */
 
         public MockMPProcedureRunner(MockMPVoltProcedure procedure, ExecutionSite site) {
-            super(procedure, site, null, null, null);
+            super(procedure, site, null, null);
             m_procedure = procedure;
             m_site = site;
         }

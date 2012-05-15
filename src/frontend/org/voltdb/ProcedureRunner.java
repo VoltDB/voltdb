@@ -36,7 +36,6 @@ import java.util.Map;
 import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.ExecutionSite;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
@@ -95,8 +94,6 @@ public class ProcedureRunner {
     //
     protected final SiteProcedureConnection m_site;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
-    protected final HsqlBackend m_hsql;
-    protected final boolean m_isNative;
 
     // per procedure state and catalog info
     //
@@ -114,14 +111,11 @@ public class ProcedureRunner {
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
                     SystemProcedureExecutionContext sysprocContext,
-                    Procedure catProc,
-                    HsqlBackend hsql) {
+                    Procedure catProc) {
         m_procedureName = procedure.getClass().getSimpleName();
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
-        m_hsql = hsql;
-        m_isNative = hsql == null;
         m_site = site;
         m_systemProcedureContext = sysprocContext;
 
@@ -250,9 +244,10 @@ public class ProcedureRunner {
                 try {
                     m_cachedSingleStmt.params = getCleanParams(
                             m_cachedSingleStmt.stmt, paramList);
-                    if (!m_isNative) {
+                    if (getHsqlBackendIfExists() != null) {
                         // HSQL handling
-                        VoltTable table = m_hsql.runSQLWithSubstitutions(
+                        VoltTable table =
+                            getHsqlBackendIfExists().runSQLWithSubstitutions(
                                 m_cachedSingleStmt.stmt, m_cachedSingleStmt.params);
                         results = new VoltTable[] { table };
                     }
@@ -313,7 +308,7 @@ public class ProcedureRunner {
      * If returns non-null, then using hsql backend
      */
     public HsqlBackend getHsqlBackendIfExists() {
-        return m_hsql;
+        return m_site.getHsqlBackendIfExists();
     }
 
     public void setAppStatusCode(byte statusCode) {
@@ -377,11 +372,11 @@ public class ProcedureRunner {
         }
 
         // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
-        if (!m_isNative) {
+        if (getHsqlBackendIfExists() != null) {
             results = new VoltTable[batchSize];
             int i = 0;
             for (QueuedSQL qs : batch) {
-                results[i++] = m_hsql.runSQLWithSubstitutions(qs.stmt, qs.params);
+                results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(qs.stmt, qs.params);
             }
         }
 

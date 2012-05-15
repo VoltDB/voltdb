@@ -710,7 +710,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // setup the procedure runner wrappers.
         if (runnerFactory != null) {
-            runnerFactory.configure(this, m_systemProcedureContext, hsql);
+            runnerFactory.configure(this, m_systemProcedureContext);
         }
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
         m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType());
@@ -2261,5 +2261,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public void stashWorkUnitDependencies(Map<Integer, List<VoltTable>> dependencies)
     {
         ee.stashWorkUnitDependencies(dependencies);
+    }
+
+    @Override
+    public HsqlBackend getHsqlBackendIfExists()
+    {
+        return hsql;
     }
 }

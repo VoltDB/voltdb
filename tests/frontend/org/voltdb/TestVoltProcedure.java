@@ -404,8 +404,7 @@ public class TestVoltProcedure extends TestCase {
         NullProcedureWrapper wrapper = new LongProcedure();
         ProcedureRunner runner = new ProcedureRunner(
                 wrapper, site, null,
-                site.m_context.database.getProcedures().get(LongProcedure.class.getName()),
-                null);
+                site.m_context.database.getProcedures().get(LongProcedure.class.getName()));
 
         ParameterSet params = new ParameterSet();
         params.setParameters(1L);
@@ -443,8 +442,7 @@ public class TestVoltProcedure extends TestCase {
         }
         ProcedureRunner runner = new ProcedureRunner(
                 wrapper, site, null,
-                site.m_context.database.getProcedures().get(procedure.getName()),
-                null);
+                site.m_context.database.getProcedures().get(procedure.getName()));
 
         runner.setupTransaction(null);
         return runner.call(1, (Object) null);
