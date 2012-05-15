@@ -50,4 +50,6 @@ public interface SystemProcedureExecutionContext {
     public SiteTracker getSiteTracker();
 
     public int getNumberOfPartitions();
+
+    public SiteProcedureConnection getSiteProcedureConnection();
 }
