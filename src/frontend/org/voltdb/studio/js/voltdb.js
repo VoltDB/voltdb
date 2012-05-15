@@ -1,4 +1,4 @@
-(function( window, undefined ){
+(function (window, unused){
 
 var IVoltDB = (function(){
 
@@ -27,15 +27,15 @@ var IVoltDB = (function(){
         this.BuildURI = function(procedure, parameters)
         {
             var s = [];
-            if (!(procedure in this.Procedures))
+            if (!this.Procedures.hasOwnProperty(procedure)) {
                 return ['Procedure "' + procedure + '" is undefined.'];
+            }
 
             var signatures = this.Procedures[procedure];
-            var localParameters = parameters;
-            if (!jQuery.isArray(parameters))
-                localParameters = [parameters];
+            var localParameters = [];
+            localParameters = localParameters.concat(parameters);
 
-            if (jQuery.isArray(localParameters)  && !(localParameters.length in signatures)) {
+            if (!(signatures['' + localParameters.length])) {
                 var retval = 'Invalid parameter count for procedure "' + procedure + '" (received: ' + localParameters.length + ', expected: ';
                 for ( x in signatures ) {
                     retval += x + ', ';
@@ -48,10 +48,11 @@ var IVoltDB = (function(){
             if (localParameters != null)
             {
                 var params = '[';
-                for(var i = 0; i < localParameters.length; i++)
-                {
-                    if (i > 0)
+                var i = 0;
+                for(i = 0; i < localParameters.length; i++) {               
+                    if (i > 0) {
                         params += ',';
+                    }
                     switch(signature[i])
                     {
                         case 'tinyint':
