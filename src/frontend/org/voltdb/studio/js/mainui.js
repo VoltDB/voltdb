@@ -465,17 +465,19 @@ this.AddConnection = function(connection, success)
     src += '<ul>';
     for(var k in connection.Metadata['sysprocs'])
     {
-        src += '<li class="procedure closed"><span>' + k + '</span>';
-        src += '<ul>'
-        src += '<li class="folder closed"><span>Parameters</span>';
-        src += '<ul>'
-        for(var i = 0; i < connection.Metadata['sysprocs'][k].length-1; i++)
-            src += '<li class="paramin"><span>' + connection.Metadata['sysprocs'][k][i] + '</span></li>';
-        src += '<li class="paramreturn"><span>' + connection.Metadata['sysprocs'][k][i] + '</span></li>';
-        src += '</ul>';
-        src += '</li>';
-        src += '</ul>';
-        src += '</li>';
+        for (var paramCount in connection.Metadata['sysprocs'][k]) {
+            src += '<li class="procedure closed"><span>' + k + '(' + paramCount +')</span>';
+            src += '<ul>'
+            src += '<li class="folder closed"><span>Parameters</span>';
+            src += '<ul>'
+            for(var i = 0; i < connection.Metadata['sysprocs'][k][paramCount].length-1; i++) 
+                src += '<li class="paramin"><span>' + connection.Metadata['sysprocs'][k][paramCount][i] + '</span></li>';
+            src += '<li class="paramreturn"><span>' + connection.Metadata['sysprocs'][k][paramCount][i] + '</span></li>';
+            src += '</ul>';
+            src += '</li>';
+            src += '</ul>';
+            src += '</li>';
+        }
     }
     src += '</ul>';
     src += '</li>'; // System Stored Procedures
