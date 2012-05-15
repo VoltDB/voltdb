@@ -200,6 +200,12 @@ public class Site implements Runnable, SiteProcedureConnection
         public int getNumberOfPartitions() {
             return m_numberOfPartitions;
         }
+
+        @Override
+        public SiteProcedureConnection getSiteProcedureConnection()
+        {
+            return Site.this;
+        }
     };
 
     /** Create a new execution site and the corresponding EE */
