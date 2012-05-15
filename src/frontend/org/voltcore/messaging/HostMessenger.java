@@ -34,7 +34,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -47,10 +46,13 @@ import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.COWMap;
-import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.InstanceId;
+import org.voltcore.utils.PortGenerator;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.VoltDB;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -90,6 +92,16 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         public Config() {
             this(null, 3021);
+        }
+
+        public Config(PortGenerator ports) {
+            this(null, 3021);
+            zkInterface = "127.0.0.1:" + ports.next();
+            internalPort = ports.next();
+        }
+
+        public int getZKPort() {
+            return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
     }
 

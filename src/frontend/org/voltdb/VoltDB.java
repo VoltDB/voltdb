@@ -28,7 +28,9 @@ import java.util.Map;
 import java.util.TimeZone;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.PortGenerator;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.PlatformProperties;
 
 /**
@@ -40,6 +42,7 @@ public class VoltDB {
     public static final int DEFAULT_PORT = 21212;
     public static final int DEFAULT_ADMIN_PORT = 21211;
     public static final int DEFAULT_INTERNAL_PORT = 3021;
+    public static final int DEFAULT_ZK_PORT = 2181;
     public static final String DEFAULT_EXTERNAL_INTERFACE = "";
     public static final String DEFAULT_INTERNAL_INTERFACE = "";
     public static final int DEFAULT_DR_PORT = 5555;
@@ -92,7 +95,7 @@ public class VoltDB {
          */
         public boolean m_noLoadLibVOLTDB = false;
 
-        public String m_zkInterface = "127.0.0.1:2181";
+        public String m_zkInterface = "127.0.0.1:" + VoltDB.DEFAULT_ZK_PORT;
 
         /** port number for the first client interface for each server */
         public int m_port = DEFAULT_PORT;
@@ -159,7 +162,18 @@ public class VoltDB {
 
         public Integer m_leaderPort = DEFAULT_INTERNAL_PORT;
 
+        public int getZKPort() {
+            return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
+        }
+
         public Configuration() { }
+
+        public Configuration(PortGenerator ports) {
+            m_port = ports.nextClient();
+            m_adminPort = ports.nextAdmin();
+            m_internalPort = ports.next();
+            m_zkInterface = "127.0.0.1:" + ports.next();
+        }
 
         public Configuration(String args[]) {
             String arg;
