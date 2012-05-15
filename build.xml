@@ -1207,7 +1207,17 @@ TEST CASES
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/**/Iv2Test*.class'/>
                 <exclude name="**/*$*.class"/>
+                <!-- pro tests -->
+                <exclude name="**/TestCommandLogServer.class" />
+                <exclude name="**/TestResponseSampler.class" />
+                <exclude name="**/TestRestoreWithReplay.class" />
+                <exclude name="**/TestVoltLicense.class" />
+                <exclude name="**/TestPrimary.class" />
+                <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" />
+                <exclude name="**/TestSnapshotSaveTruncation.class" />
+                <!-- community tests -->
                 <exclude name="**/TestHSQLBackend.class" />
+<!--                <exclude name="**/TestAdHocQueries.class" /> -->
                 <exclude name="**/TestJSONInterface.class" />
                 <exclude name="**/TestRejoinEndToEnd.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
