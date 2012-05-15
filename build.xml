@@ -1762,6 +1762,9 @@ TEST CASES
         <arg line="-c 'rm -rf ${sqlcov.dir}'"/>
     </exec>
     <mkdir dir="${sqlcov.dir}" />
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
+    </condition>
     <condition property="" value="${env.VOLTBUILD}" else='release'>
         <isset property="env.VOLTBUILD"/>
     </condition>
@@ -1811,6 +1814,7 @@ TEST CASES
     <exec dir='tests/scripts' executable='python2.6' failonerror='true'>
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
+        <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
         <arg line='sql_coverage_test.py' />
         <arg line="${seed_arg}" />
         <arg line="${config_arg}" />
