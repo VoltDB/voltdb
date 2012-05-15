@@ -53,6 +53,31 @@ public class HsqlBackend {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger sqlLog = new VoltLogger("SQL");
 
+    static public HsqlBackend initializeHSQLBackend(long siteId,
+                                                    CatalogContext context)
+    {
+        HsqlBackend hsqlTemp = null;
+        try {
+            hsqlTemp = new HsqlBackend(siteId);
+            final String hexDDL = context.database.getSchema();
+            final String ddl = Encoder.hexDecodeToString(hexDDL);
+            final String[] commands = ddl.split("\n");
+            for (String command : commands) {
+                String decoded_cmd = Encoder.hexDecodeToString(command);
+                decoded_cmd = decoded_cmd.trim();
+                if (decoded_cmd.length() == 0) {
+                    continue;
+                }
+                hsqlTemp.runDDL(decoded_cmd);
+            }
+        }
+        catch (final Exception ex) {
+            hostLog.fatal("Unable to construct HSQL backend");
+            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
+        }
+        return hsqlTemp;
+    }
+
     Connection dbconn;
 
     public HsqlBackend(long siteId) {

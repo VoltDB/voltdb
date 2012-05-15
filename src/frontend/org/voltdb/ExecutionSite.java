@@ -694,7 +694,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             hsql = null;
         }
         else if (voltdb.getBackendTargetType() == BackendTarget.HSQLDB_BACKEND) {
-            hsql = initializeHSQLBackend();
+            hsql = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
             ee = new MockExecutionEngine();
         }
         else {
@@ -768,31 +768,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 m_mailbox,
                 useSafetyDance);
         return retval;
-    }
-
-    private HsqlBackend initializeHSQLBackend()
-    {
-        HsqlBackend hsqlTemp = null;
-        try {
-            hsqlTemp = new HsqlBackend(getSiteId());
-            final String hexDDL = m_context.database.getSchema();
-            final String ddl = Encoder.hexDecodeToString(hexDDL);
-            final String[] commands = ddl.split("\n");
-            for (String command : commands) {
-                String decoded_cmd = Encoder.hexDecodeToString(command);
-                decoded_cmd = decoded_cmd.trim();
-                if (decoded_cmd.length() == 0) {
-                    continue;
-                }
-                hsqlTemp.runDDL(decoded_cmd);
-            }
-        }
-        catch (final Exception ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
-                            new Object[] { getSiteId(), siteIndex }, ex);
-            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
-        }
-        return hsqlTemp;
     }
 
     private ExecutionEngine
