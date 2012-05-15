@@ -195,6 +195,11 @@ public class Site implements Runnable, SiteProcedureConnection
             throw new RuntimeException("Not implemented in iv2");
             // return m_tracker;
         }
+
+        @Override
+        public int getNumberOfPartitions() {
+            return m_numberOfPartitions;
+        }
     };
 
     /** Create a new execution site and the corresponding EE */
