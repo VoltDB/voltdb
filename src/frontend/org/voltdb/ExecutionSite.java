@@ -615,6 +615,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public void updateBackendLogLevels()                  { ExecutionSite.this.updateBackendLogLevels(); }
         @Override
         public int getNumberOfPartitions()                    { return m_tracker.m_numberOfPartitions; }
+        @Override
+        public SiteProcedureConnection getSiteProcedureConnection()
+        {
+            return ExecutionSite.this;
+        }
     }
 
     SystemProcedureContext m_systemProcedureContext;
