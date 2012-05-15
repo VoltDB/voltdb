@@ -50,4 +50,6 @@ public interface SystemProcedureExecutionContext {
     public SiteTracker getSiteTracker();
 
     public void updateBackendLogLevels();
+
+    public int getNumberOfPartitions();
 }
