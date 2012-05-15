@@ -687,7 +687,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     {
         HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
         survivorSet.removeAll(m_pendingFailedSites);
-        int responses = 0;
+
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
@@ -718,8 +718,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 return false;
             }
 
-            m_recoveryLog.info("Agreement, Received failure message " + responses +
-                    " from " + CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
+            m_recoveryLog.info("Agreement, Received failure message from " +
+                    CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
                     CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) +
                     " safe txn id " + fm.m_safeTxnId + " failed site " +
                     CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId));
