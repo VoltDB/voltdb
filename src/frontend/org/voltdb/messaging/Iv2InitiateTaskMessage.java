@@ -34,6 +34,10 @@ import org.voltdb.StoredProcedureInvocation;
  */
 public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
+    // The default MP transaction id set by client interface when
+    // initiating a single-partition transaction.
+    public static final long UNUSED_MP_TXNID = Long.MIN_VALUE;
+
     boolean m_isSinglePartition;
     StoredProcedureInvocation m_invocation;
     long m_clientInterfaceHandle; // this is the largest txn acked by all partitions running the java for it

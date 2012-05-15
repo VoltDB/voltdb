@@ -87,7 +87,11 @@ public class SpProcedureTask extends ProcedureTask
     @Override
     public long getMpTxnId()
     {
-        return Long.MAX_VALUE;
+        // Return the txn id from the initiate message that
+        // originated this procedure call. In the case of an
+        // every-site sysproc, this will be a MPI txnid!
+        SpTransactionState sptxn = (SpTransactionState)m_txn;
+        return sptxn.m_task.getTxnId();
     }
 
     @Override
