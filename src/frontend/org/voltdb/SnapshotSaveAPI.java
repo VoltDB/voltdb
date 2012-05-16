@@ -43,7 +43,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;

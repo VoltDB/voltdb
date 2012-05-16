@@ -50,7 +50,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;

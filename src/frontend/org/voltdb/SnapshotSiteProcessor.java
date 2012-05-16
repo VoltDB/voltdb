@@ -191,36 +191,6 @@ public class SnapshotSiteProcessor {
         return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
     }
 
-    /**
-     * A class identifying a table that should be snapshotted as well as the destination
-     * for the resulting tuple blocks
-     */
-    public static class SnapshotTableTask {
-        private final int m_tableId;
-        private final SnapshotDataTarget m_target;
-        private final SnapshotDataFilter m_filters[];
-        private final boolean m_isReplicated;
-        private final String m_name;
-
-        public SnapshotTableTask(
-                final int tableId,
-                final SnapshotDataTarget target,
-                final SnapshotDataFilter filters[],
-                boolean isReplicated,
-                final String tableName) {
-            m_tableId = tableId;
-            m_target = target;
-            m_filters = filters;
-            m_isReplicated = isReplicated;
-            m_name = tableName;
-        }
-
-        @Override
-        public String toString() {
-            return ("SnapshotTableTask for " + m_name + " replicated " + m_isReplicated);
-        }
-    }
-
     SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority) {
         m_onPotentialSnapshotWork = onPotentialSnapshotWork;
         m_snapshotPriority = snapshotPriority;
