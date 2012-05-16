@@ -169,7 +169,8 @@ public class SnapshotSiteProcessor {
                 m_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
-            long[] ackOffSetAndSequenceNumber = context.getExecutionEngine().getUSOForExportTable(t.getSignature());
+            long[] ackOffSetAndSequenceNumber =
+                context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
             sequenceNumbers.add(
                     Pair.of(
                             context.getExecutionSite().getCorrespondingPartitionId(),

@@ -597,8 +597,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         public Database getDatabase()                         { return m_context.database; }
         @Override
         public Cluster getCluster()                           { return m_context.cluster; }
-        @Override
-        public ExecutionEngine getExecutionEngine()           { return ee; }
+        //@Override
+        //public ExecutionEngine getExecutionEngine()           { return ee; }
         @Override
         public long getLastCommittedTxnId()                   { return lastCommittedTxnId; }
         @Override
@@ -2277,5 +2277,50 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public HsqlBackend getHsqlBackendIfExists()
     {
         return hsql;
+    }
+
+    @Override
+    public long[] getUSOForExportTable(String signature)
+    {
+        return ee.getUSOForExportTable(signature);
+    }
+
+    @Override
+    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
+                                               long txnId)
+    {
+        return ee.executeCustomPlanFragment(plan, inputDepId, txnId,
+                                            lastCommittedTxnId,
+                                            getNextUndoToken());
+    }
+
+    @Override
+    public void toggleProfiler(int toggle)
+    {
+        ee.toggleProfiler(toggle);
+    }
+
+    @Override
+    public void quiesce()
+    {
+        ee.quiesce(lastCommittedTxnId);
+    }
+
+    @Override
+    public void exportAction(boolean syncAction,
+                             int ackOffset,
+                             Long sequenceNumber,
+                             Integer partitionId,
+                             String tableSignature)
+    {
+        ee.exportAction(syncAction, ackOffset, sequenceNumber, partitionId,
+                        tableSignature);
+    }
+
+    @Override
+    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+                                boolean interval, Long now)
+    {
+        return ee.getStats(selector, locators, interval, now);
     }
 }

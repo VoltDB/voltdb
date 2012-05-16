@@ -59,7 +59,7 @@ public class Quiesce extends VoltSystemProcedure {
         try {
             if (fragmentId == SysProcFragmentId.PF_quiesce_sites) {
                 // tell each site to quiesce
-                context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
+                context.getSiteProcedureConnection().quiesce();
                 try {
                     int result = Runtime.getRuntime().exec("sync").waitFor();
                     if (result != 0) {

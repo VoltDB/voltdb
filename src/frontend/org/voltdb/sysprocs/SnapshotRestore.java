@@ -292,7 +292,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                         continue;
                     }
                     //Forward the sequence number to the EE
-                    context.getExecutionEngine().exportAction(
+                    context.getSiteProcedureConnection().exportAction(
                             false,
                             0,
                             sequenceNumber,

@@ -21,12 +21,12 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.jni.ExecutionEngine;
 
 @ProcInfo(
     singlePartition = true,
@@ -52,12 +52,11 @@ public class AdHocSP extends VoltSystemProcedure {
 
         assert(collectorFragment == null);
 
-        ExecutionEngine ee = ctx.getExecutionEngine();
+        SiteProcedureConnection spc = ctx.getSiteProcedureConnection();
         VoltTable t;
 
-        t = ee.executeCustomPlanFragment(aggregatorFragment, -1, getTransactionId(),
-                                         ctx.getLastCommittedTxnId(),
-                                         ctx.getNextUndo());
+        t = spc.executeCustomPlanFragment(aggregatorFragment, -1,
+                                          getTransactionId());
 
         return t;
     }

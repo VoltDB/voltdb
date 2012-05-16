@@ -136,7 +136,7 @@ public class Statistics extends VoltSystemProcedure {
                 tableGuids[ii++] = table.getRelativeIndex();
             }
             VoltTable result =
-                context.getExecutionEngine().getStats(
+                context.getSiteProcedureConnection().getStats(
                         SysProcSelector.TABLE,
                         tableGuids,
                         interval,
@@ -163,7 +163,7 @@ public class Statistics extends VoltSystemProcedure {
                 tableGuids[ii++] = table.getRelativeIndex();
             }
             VoltTable result =
-                context.getExecutionEngine().getStats(
+                context.getSiteProcedureConnection().getStats(
                         SysProcSelector.INDEX,
                         tableGuids,
                         interval,
