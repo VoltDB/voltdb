@@ -679,6 +679,11 @@ check:
      [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:435)
      [exec]     [junit]         org.voltdb.regressionsuites.LocalCluster(LocalCluster.java:258)
      [exec]     [junit]         org.voltdb.regressionsuites.RegressionSuite(RegressionSuite.java:74)
+   
+     //@PULLEXEC OK the reason for the above failures is the cluster configuration.
+     // If I change it to Sites: 1 hosts: 1 replication factor: 0 then all of them passed.
+     // Would be nice to test with the original parameters
+     
      [exec]     [junit] Tests run:   8, Failures:   0, Errors:   6, Time elapsed: 366.52 sec
      [exec]     [junit] Test org.voltdb.regressionsuites.TestSystemCatalogSuite FAILED
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSystemInformationSuite
