@@ -1524,22 +1524,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * execution site threads */
     private static Long lastLogUpdate_txnId = 0L;
     @Override
-    public void logUpdate(String xmlConfig, long currentTxnId)
+    synchronized public void logUpdate(String xmlConfig, long currentTxnId)
     {
-        synchronized(lastLogUpdate_txnId)
-        {
-            // another site already did this work.
-            if (currentTxnId == lastLogUpdate_txnId) {
-                return;
-            }
-            else if (currentTxnId < lastLogUpdate_txnId) {
-                throw new RuntimeException("Trying to update logging config with an old transaction.");
-            }
-            hostLog.info("Updating RealVoltDB logging config from txnid: " +
-                    lastLogUpdate_txnId + " to " + currentTxnId);
-            lastLogUpdate_txnId = currentTxnId;
-            VoltLogger.configure(xmlConfig);
+        // another site already did this work.
+        if (currentTxnId == lastLogUpdate_txnId) {
+            return;
         }
+        else if (currentTxnId < lastLogUpdate_txnId) {
+            throw new RuntimeException(
+                    "Trying to update logging config at transaction " + lastLogUpdate_txnId
+                    + " with an older transaction: " + currentTxnId);
+        }
+        hostLog.info("Updating RealVoltDB logging config from txnid: " +
+                lastLogUpdate_txnId + " to " + currentTxnId);
+        lastLogUpdate_txnId = currentTxnId;
+        VoltLogger.configure(xmlConfig);
     }
 
     /** Struct to associate a context with a counter of served sites */
