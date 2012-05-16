@@ -83,7 +83,13 @@ abstract public class ProcedureTask extends TransactionTask
                 ClientResponseImpl cr = null;
 
                 // find the txn id visible to the proc
-                long txnId = m_txn.txnId;
+                long txnId;
+                if (getMpTxnId() != Iv2InitiateTaskMessage.UNUSED_MP_TXNID) {
+                    txnId = getMpTxnId();
+                }
+                else {
+                    txnId = m_txn.txnId;
+                }
                 StoredProcedureInvocation invocation = m_txn.getInvocation();
                 if ((invocation != null) && (invocation.getType() == ProcedureInvocationType.REPLICATED)) {
                     txnId = invocation.getOriginalTxnId();
