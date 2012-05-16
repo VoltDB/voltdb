@@ -514,7 +514,8 @@ this.AddConnection = function(connection, success)
           src += '</ul>'
         src += '</li>'
         // make the procedure callable.
-        connection.Procedures[procName] = connTypeParams;
+        connection.Procedures[procName] = {};
+        connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
     }
 
     src += '</ul>'; // connection.Key_sp
