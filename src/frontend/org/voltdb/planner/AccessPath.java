@@ -67,6 +67,7 @@ public class AccessPath {
         Set<TupleValueExpression> eqPartitionKeySet = new HashSet<TupleValueExpression>();
         int result = 0;
         Object bindingObject = null;
+        Object bindingExpr = null;
 
         // Work backwards through the join order list to simulate the scanning order
         for (int i = accessPath.length-1; i >=0; --i) {
@@ -76,7 +77,6 @@ public class AccessPath {
             String partitionedTable = null;
             String columnNeedingCoverage = null;
             boolean columnCovered = true;
-            boolean columnWasCovered = true;
 
             // Iterate over the tables to collect partition columns.
             if ( ! table.getIsreplicated()) {
@@ -121,17 +121,13 @@ public class AccessPath {
                 AbstractExpression leftExpr = expr.getLeft();
                 AbstractExpression constExpr = null;
                 boolean needsRelevanceCheck = false;
-                columnWasCovered = columnCovered;
                 if (leftExpr instanceof TupleValueExpression) {
                     tveExpr = (TupleValueExpression) leftExpr;
                     if (partitionedTable != null &&
                         tveExpr.getTableName().equals(partitionedTable) &&
                         tveExpr.getColumnName().equals(columnNeedingCoverage)) {
-                        columnCovered = true;
                         if (firstPartitionKeyScanned == null) {
                             firstPartitionKeyScanned = tveExpr;
-                            // Start the collection of columns that are equal to each other (at least one of which is a partition key column).
-                            eqPartitionKeySet.add(tveExpr);
                         } else {
                             needsRelevanceCheck = true;
                         }
@@ -150,44 +146,41 @@ public class AccessPath {
                         if (partitionedTable != null &&
                             tve2.getTableName().equals(partitionedTable) &&
                             tve2.getColumnName().equals(columnNeedingCoverage)) {
-                            columnCovered = true;
+                            // swap partition key into tveExpr
+                            tve2 = tveExpr;
+                            tveExpr = (TupleValueExpression) constExpr;
                             if (firstPartitionKeyScanned == null) {
-                                firstPartitionKeyScanned = tve2;
-                                // Start the collection of columns that are equal to each other (at least one of which is a partition key column).
-                                eqPartitionKeySet.add(tve2);
-                                eqPartitionKeySet.add(tveExpr);
-                                continue;
+                                firstPartitionKeyScanned = tveExpr;
+                            } else {
+                                needsRelevanceCheck = true;
                             }
-                            needsRelevanceCheck = true;
-                        } else if (firstPartitionKeyScanned == tveExpr) {
-                            // Add to the collection of columns that are equal to each other (but possibly not equal to other sets of columns).
+                        }
+                        if (firstPartitionKeyScanned == tveExpr) {
+                            // Start the collection of columns that are equal to the first partition key.
+                            eqPartitionKeySet.add(tveExpr);
                             eqPartitionKeySet.add(tve2);
-                            continue;
                         } else if (needsRelevanceCheck) {
-                            // one TVE is the partition key for this table, but DOES this equality link it in with other partition keys?
-                            if (eqPartitionKeySet.contains(tveExpr)) {
-                                // Yes, another equivalent column.
-                                eqPartitionKeySet.add(tve2);
-                                continue;
-                            }
+                            // tveExpr is the partition key for this table, but DOES this equality link it in with other partition keys?
                             if (eqPartitionKeySet.contains(tve2)) {
                                 // Yes, another equivalent column.
                                 eqPartitionKeySet.add(tveExpr);
+                                columnCovered = true;
                                 continue;
                             }
                             // Neither of the equivalent columns, one of which is a partition key,
                             // has any connection (YET!) to a previously scanned partition key.
                             // This is probably going to require a send-receive on this scan, so don't consider the column now "covered".
-                            columnCovered = columnWasCovered;
+                            // XXX: We completely ignore TVE to TVE equalities that seem irrelevant (so far) at the risk of not recognizing their
+                            // contribution in strange edge cases like the contribution of "A.x = A.partitionKey"
+                            // in strange edge cases like "A.x = A.partitionKey and A.x = B.partitionKey"
+                            // or "A.x = A.partitionKey and A.x = 1"
+                        } else {
+                            // XXX: Here, we miss the contribution of "A.x = A.y" in strange edge cases like
+                            // "A.x = A.y and A.y = A.partitionKey and A.x = B.partitionKey"
+                            // The alternative would be to maintain multiple equivalence sets of the current table's TVEs.
+                            // Similarly, we could track all constant-filtered TVEs in case a later TVE to TVE equality made them relevant
+                            // to the partition key, and possibly to the first partition key.
                         }
-                        // XXX: We completely ignore TVE to TVE equalities that seem irrelevant (so far) at the risk of not recognizing their
-                        // contribution in strange edge cases like the contribution of "A.x = A.partitionKey"
-                        // in strange edge cases like "A.x = A.partitionKey and A.x = B.partitionKey"
-                        // Or the contribution of "A.x = A.y" in strange edge cases like
-                        // "A.x = A.y and A.y = A.partitionKey and A.x = B.partitionKey"
-                        // The alternative would be to maintain equivalence sets of the table's TVEs.
-                        // Similarly, we could track all constant-filtered TVEs in case a later TVE to TVE equality made them relevant
-                        // to the partition key, and possibly to the first partition key.
                         continue;
                     }
                 } else {
@@ -197,17 +190,11 @@ public class AccessPath {
                         continue; // ... no, neither side is a column.
                     }
                     // fall through with the LHS and RHS roles reversed
-                    constExpr = tveExpr;
+                    constExpr = leftExpr;
                     tveExpr = (TupleValueExpression) rightExpr;
                     if (partitionedTable != null &&
                         tveExpr.getTableName().equals(partitionedTable) &&
                         tveExpr.getColumnName().equals(columnNeedingCoverage)) {
-                        columnCovered = true;
-                    }
-                    if (partitionedTable != null &&
-                        tveExpr.getTableName().equals(partitionedTable) &&
-                        tveExpr.getColumnName().equals(columnNeedingCoverage)) {
-                        columnCovered = true;
                         if (firstPartitionKeyScanned == null) {
                             firstPartitionKeyScanned = tveExpr;
                             // Start the collection of columns that are equal to each other (at least one of which is a partition key column).
@@ -219,7 +206,6 @@ public class AccessPath {
                 }
 
                 if (constExpr.hasAnySubexpressionOfClass(TupleValueExpression.class)) {
-                    columnCovered = columnWasCovered;
                     continue; // expression is based on column values, so is not a suitable constant.
                 }
 
@@ -227,25 +213,36 @@ public class AccessPath {
                     // the TVE is equal to a constant AND to the first partition key.
                     // By implication, the partition key must have a constant value.
                     if (bindingObject == null) {
+                        bindingExpr = constExpr;
                         bindingObject = extractPartitioningValue(tveExpr, constExpr);
                     }
+                    columnCovered = true;
                     continue;
-                } else if (needsRelevanceCheck) {
-                    if (bindingObject != null) {
+                }
+
+                if (needsRelevanceCheck) {
+                    if (bindingExpr != null) {
+                        if (bindingExpr == constExpr) {
+                            // Equality to a common constant expression works for TVE equality.
+                            eqPartitionKeySet.add(tveExpr);
+                            columnCovered = true;
+                            continue;
+                        }
                         Object altBinding = extractPartitioningValue(tveExpr, constExpr);
                         if (altBinding.equals(bindingObject)) {
-                            // Equality to a common constant works as TVE equality.
+                            // Equality to a common constant expression works for TVE equality.
                             eqPartitionKeySet.add(tveExpr);
+                            columnCovered = true;
                             continue;
                         }
                     }
                 }
-                // Apparently an irrelevant filter.
-                columnCovered = columnWasCovered;
+                // If fallen through, apparently this is an irrelevant filter.
+                // XXX: ignoring constant equality filters that SEEM at this point to be irrelevant to partition keys.
             }
 
             // All expressions for this access path have been considered.
-            // Any partition column better have been filtered by an equality by now.
+            // Any dependent partition column better have been filtered by an equality by now.
 
             if ( ! columnCovered) {
                 accessPath[i].requiresSendReceive = true;
@@ -253,7 +250,7 @@ public class AccessPath {
             }
         }
         bindingOut[1] = bindingObject;
-        // It's only a little strange to sometimes be set bindingOut[1] to a non-null value even when returning true.
+        // It's only a little strange to sometimes be set bindingOut[1] to a non-null value even when returning a value > 0.
         // What it means in that case is that the query could IN THEORY distribute the results of a multi-partition
         // scan to the single partition designated by the bindingObject for a final join with that partition's local
         // data. This currently unsupported edge case is currently promptly detected and kept out of the candidate plans.

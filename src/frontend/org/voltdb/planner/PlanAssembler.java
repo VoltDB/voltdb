@@ -271,6 +271,7 @@ public class PlanAssembler {
                 boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
                 boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
                 retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
+                retval.setPartitioningKey(m_partitionParam[1]);
             }
         } else {
             if (m_parsedInsert != null) {
@@ -1449,8 +1450,12 @@ public class PlanAssembler {
         return m_partitionParam[0] != null;
     }
 
-    private boolean isSinglePartitionStatement() {
-        return m_partitionParam[1] != null;
+    public Object getPartitioningKey() {
+        return m_partitionParam[1];
+    }
+
+    public void restorePartitioningKey(Object best) {
+        m_partitionParam[1] = best;
     }
 
 }

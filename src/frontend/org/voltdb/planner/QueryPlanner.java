@@ -144,6 +144,7 @@ public class QueryPlanner {
         // get ready to find the plan with minimal cost
         CompiledPlan rawplan = null;
         CompiledPlan bestPlan = null;
+        Object bestPartitioningKey = null;
         String bestFilename = null;
         double minCost = Double.MAX_VALUE;
 
@@ -204,6 +205,7 @@ public class QueryPlanner {
                         // free the PlanColumns held by the previous best plan
                         bestPlan = plan;
                         bestFilename = filename;
+                        bestPartitioningKey = plan.getPartitioningKey();
                     }
 
                     if (!m_quietPlanner) {
@@ -246,7 +248,9 @@ public class QueryPlanner {
                 "This is statement not supported at this time.";
             return null;
         }
-
+        // Restore this output parameter to correspond to its setting for the best plan.
+        // This writable state is shared by m_assembler and the caller (passed by reference via vector).
+        m_assembler.restorePartitioningKey(bestPartitioningKey);
         return bestPlan;
     }
 

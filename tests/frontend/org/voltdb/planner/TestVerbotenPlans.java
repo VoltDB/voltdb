@@ -75,8 +75,7 @@ public class TestVerbotenPlans extends TestCase {
 
         final boolean success = compiler.compile(projectPath, "testout.jar");
 
-        // The plan is no longer verboten. This test suite is no longer aptly named.
-        assertTrue(success);
+        assertFalse(success);
     }
 
 }
