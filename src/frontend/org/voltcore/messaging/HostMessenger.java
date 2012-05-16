@@ -41,6 +41,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
@@ -102,6 +103,26 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
+        }
+
+        public String toString() {
+            JSONStringer js = new JSONStringer();
+            try {
+                js.object();
+                js.key("coordinatorip").value(coordinatorIp.toString());
+                js.key("zkinterface").value(zkInterface);
+                js.key("internalinterface").value(internalInterface);
+                js.key("internalport").value(internalPort);
+                js.key("deadhosttimeout").value(deadHostTimeout);
+                js.key("backwardstimeforgivenesswindow").value(backwardsTimeForgivenessWindow);
+                js.key("networkThreads").value(networkThreads);
+                js.endObject();
+
+                return js.toString();
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

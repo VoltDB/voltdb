@@ -639,9 +639,11 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
         eeProcs.clear();
-        for (int ii = 0; ii < m_siteCount; ii++) {
-            String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
-            eeProcs.add(new EEProcess(templateCmdLine.target(), logfile));
+        if (templateCmdLine.target().isIPC) {
+            for (int ii = 0; ii < m_siteCount; ii++) {
+                String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
+                eeProcs.add(new EEProcess(templateCmdLine.target(), logfile));
+            }
         }
 
         PipeToFile ptf = null;
@@ -680,8 +682,17 @@ public class LocalCluster implements VoltServerConfig {
                 assert(status);
             }
 
-            ptf = new PipeToFile(testoutputdir + File.separator +
-                    getName() + "-" + hostId + ".txt", proc.getInputStream(),
+            String timestampStr = MiscUtils.getCompactStringTimestamp(System.currentTimeMillis());
+
+            ptf = new PipeToFile(
+                    testoutputdir +
+                    File.separator +
+                    "LC-" +
+                    timestampStr + "-" +
+                    getFileName() + "-" +
+                    hostId +
+                    ".rejoined.txt",
+                    proc.getInputStream(),
                     PipeToFile.m_rejoinToken, true, proc);
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
@@ -711,7 +722,7 @@ public class LocalCluster implements VoltServerConfig {
 
                 try {
                     // wait for explicit notification
-                    ptf.wait();
+                    ptf.wait(1000);
                 }
                 catch (InterruptedException ex) {
                     log.error(ex.toString(), ex);
@@ -1012,7 +1023,7 @@ public class LocalCluster implements VoltServerConfig {
         CommandLine cl = m_cmdLines.get(hostId);
         assert(cl != null);
         cl.m_port = config.m_port;
-        cl.m_adminPort = config.m_port;
+        cl.m_adminPort = config.m_adminPort;
         cl.m_zkInterface = config.m_zkInterface;
         cl.m_internalPort = config.m_internalPort;
         cl.m_leaderPort = config.m_leaderPort;
