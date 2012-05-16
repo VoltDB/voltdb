@@ -35,6 +35,7 @@ import org.voltdb.iv2.SiteTasker;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
@@ -142,11 +143,6 @@ public class Site implements Runnable, SiteProcedureConnection
         @Override
         public Cluster getCluster() {
             return m_context.cluster;
-        }
-
-        @Override
-        public ExecutionEngine getExecutionEngine() {
-            return m_ee;
         }
 
         @Override
@@ -477,4 +473,47 @@ public class Site implements Runnable, SiteProcedureConnection
         return m_hsql;
     }
 
+    @Override
+    public long[] getUSOForExportTable(String signature)
+    {
+        return m_ee.getUSOForExportTable(signature);
+    }
+
+    @Override
+    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
+                                               long txnId)
+    {
+        return m_ee.executeCustomPlanFragment(plan, inputDepId, txnId,
+                                              m_lastCommittedTxnId,
+                                              getNextUndoToken());
+    }
+
+    @Override
+    public void toggleProfiler(int toggle)
+    {
+        m_ee.toggleProfiler(toggle);
+    }
+
+    @Override
+    public void quiesce()
+    {
+        m_ee.quiesce(m_lastCommittedTxnId);
+    }
+
+    @Override
+    public void exportAction(boolean syncAction,
+                             int ackOffset,
+                             Long sequenceNumber,
+                             Integer partitionId, String tableSignature)
+    {
+        m_ee.exportAction(syncAction, ackOffset, sequenceNumber,
+                          partitionId, tableSignature);
+    }
+
+    @Override
+    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+                                boolean interval, Long now)
+    {
+        return m_ee.getStats(selector, locators, interval, now);
+    }
 }
