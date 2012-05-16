@@ -68,7 +68,7 @@ public class ProfCtl extends VoltSystemProcedure {
                 Long lowest_site_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
-                if (context.getExecutionSite().getSiteId() != lowest_site_id)
+                if (context.getSiteId() != lowest_site_id)
                 {
                     table.addRow("GPERF_NOOP");
                     return new DependencyPair(DEP_ID, table);

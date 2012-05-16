@@ -242,7 +242,7 @@ public class Statistics extends VoltSystemProcedure {
             Long lowest_site_id =
                 context.getSiteTracker().
                 getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() != lowest_site_id)
+            if (context.getSiteId() != lowest_site_id)
             {
                 // Hacky way to generate an empty table with the correct schema
                 result.clearRowData();
@@ -272,7 +272,7 @@ public class Statistics extends VoltSystemProcedure {
             Long lowestSiteId =
                 context.getSiteTracker().
                 getLowestSiteForHost(hostId);
-            if (context.getExecutionSite().getSiteId() == lowestSiteId) {
+            if (context.getSiteId() == lowestSiteId) {
                 assert(result.getRowCount() == 1);
             }
             else {
@@ -299,7 +299,7 @@ public class Statistics extends VoltSystemProcedure {
             Long lowest_site_id =
                 context.getSiteTracker().
                 getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.getSiteId() == lowest_site_id)
             {
                 assert(params.toArray() != null);
                 assert(params.toArray().length == 2);
@@ -350,7 +350,7 @@ public class Statistics extends VoltSystemProcedure {
                 context.getSiteTracker().
                 getLowestSiteForHost(hostId);
             VoltTable result = new VoltTable(LiveClientStats.liveClientColumnInfo);
-            if (context.getExecutionSite().getSiteId() == lowestSiteId) {
+            if (context.getSiteId() == lowestSiteId) {
                 assert(params.toArray().length == 2);
                 final Long now = (Long)params.toArray()[1];
                 Map<Long, Pair<String,long[]>> stats =

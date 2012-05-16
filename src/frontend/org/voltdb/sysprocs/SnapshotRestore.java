@@ -245,7 +245,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
+            if (context.getSiteId() == lowest_hs_id)
             {
                 ExportManager.instance().
                 truncateExportToTxnId(snapshotTxnId);
@@ -333,7 +333,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
+            if (context.getSiteId() == lowest_hs_id)
             {
                 try {
                     // implicitly synchronized by the way restore operates.
@@ -392,7 +392,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
+            if (context.getSiteId() == lowest_hs_id)
             {
                 // implicitly synchronized by the way restore operates.
                 // this scan must complete on every site and return results

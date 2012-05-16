@@ -199,7 +199,7 @@ public class SnapshotSave extends VoltSystemProcedure
             Long lowest_site_id =
                 context.getSiteTracker().
                 getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.getSiteId() == lowest_site_id)
             {
                 TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
                                 + file_path + ", " + file_nonce);
