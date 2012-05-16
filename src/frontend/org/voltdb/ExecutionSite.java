@@ -632,6 +632,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
         @Override
         public void updateBackendLogLevels()                  { ExecutionSite.this.updateBackendLogLevels(); }
+
+        @Override
+        public boolean updateCatalog(String diffCmds, CatalogContext context)
+        {
+            return ExecutionSite.this.updateCatalog(diffCmds, context);
+        }
     }
 
     SystemProcedureContext m_systemProcedureContext;

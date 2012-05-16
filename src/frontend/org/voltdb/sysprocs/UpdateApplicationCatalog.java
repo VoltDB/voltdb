@@ -95,7 +95,7 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
         CatalogContext context =
             VoltDB.instance().catalogUpdate(commands, catalogBytes, expectedCatalogVersion, getTransactionId(), deploymentCRC);
-        ctx.getExecutionSite().updateCatalog(commands, context);
+        ctx.updateCatalog(commands, context);
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
