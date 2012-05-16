@@ -55,22 +55,21 @@ public abstract class SubPlanAssembler {
     /** The catalog's database object which contains tables and access path info */
     final Database m_db;
 
-    /** Do the plan need to scan all partitions or just one? */
-    final boolean m_singlePartition;
+    /** Does the plan need to scan all partitions or just one designated by parameter? */
+    final Object[] m_partitionParam;
 
-    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition)
+    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, Object[] partitionParam)
     {
         m_db = db;
         m_parsedStmt = parsedStmt;
-        m_singlePartition = singlePartition;
+        m_partitionParam = partitionParam;
     }
 
     /**
-     * Determines whether a table will require a distributed scan.
-     * @param table The table that may or may not require a distributed scan
-     * @return true if the table requires a distributed scan, false otherwise
+     * Determines whether a statement will be executed on multiple partitions.
+     * @return true if the statement requires a distributed scan, false otherwise
      */
-    abstract protected boolean tableRequiresDistributedScan(Table table);
+    protected boolean isStatementMultiPartition() { return m_partitionParam[1] == null; }
 
     /**
      * Called repeatedly to iterate through possible embedable select plans.
@@ -487,6 +486,7 @@ public abstract class SubPlanAssembler {
         // this will make the child planfragment be sent to all partitions
         sendNode.isMultiPartition = true;
         sendNode.addAndLinkChild(scanNode);
+        sendNode.generateOutputSchema(m_db);
 
         ReceivePlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);
@@ -502,10 +502,9 @@ public abstract class SubPlanAssembler {
      *
      * @param table The table to get data from.
      * @param path The access path to access the data in the table (index/scan/etc).
-     * @param needDistributedScan indicator whether distribute scan is required
      * @return The root of a plan graph to get the data.
      */
-    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path, boolean needDistributedScan) {
+    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path) {
         assert(table != null);
         assert(path != null);
 
@@ -526,29 +525,7 @@ public abstract class SubPlanAssembler {
             scanNode.setScanColumns(m_parsedStmt.scanColumns.get(table.getTypeName()));
         }
         scanNode.generateOutputSchema(m_db);
-
-        AbstractPlanNode rootNode = scanNode;
-
-        // if we need to scan everywhere...
-        if (tableRequiresDistributedScan(table) && needDistributedScan) {
-            // all sites to a scan -> send
-            // root site has many recvs feeding into a union
-            rootNode = addSendReceivePair(scanNode);
-        }
-
-        return rootNode;
-    }
-
-    /**
-     * Given an access path, build the single-site or distributed plan that will
-     * assess the data from the table according to the path.
-     *
-     * @param table The table to get data from.
-     * @param path The access path to access the data in the table (index/scan/etc).
-     * @return The root of a plan graph to get the data.
-     */
-    protected AbstractPlanNode getAccessPlanForTable(Table table, AccessPath path) {
-        return getAccessPlanForTable(table, path, true);
+        return scanNode;
     }
 
     /**

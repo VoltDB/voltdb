@@ -18,17 +18,15 @@
 package org.voltdb.planner;
 
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
-import java.util.Map;
 import java.util.Set;
 
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
@@ -38,6 +36,7 @@ public class AccessPath {
     Index index = null;
     IndexUseType use = IndexUseType.COVERING_UNIQUE_EQUALITY;
     boolean nestLoopIndexJoin = false;
+    boolean requiresSendReceive = false;
     boolean keyIterate = false;
     IndexLookupType lookupType = IndexLookupType.EQ;
     SortDirectionType sortDirection = SortDirectionType.INVALID;
@@ -48,75 +47,247 @@ public class AccessPath {
 
     /**
      * Given a specific join order and access path set for that join order, determine whether
-     * all join expressions involving distributed tables are simple equality comparison between
-     * partition columns. Example: select * from T1, T2 where T1.ID = T2.ID
+     * all join expressions involving distributed tables can be executed on a single partition.
+     * This is only the case when they include equality comparisons between partition columns.
+     * Example: select * from T1, T2 where T1.ID = T2.ID
+     * Additionally, in this case, there may be a constant equality filter on any of the columns,
+     * which we want to extract as our SP partitioning parameter.
      *
      * @param joinOrder An array of tables in a specific join order.
      * @param accessPath An array of access paths that match with the input tables.
-     * @return true if all tables are joined on a respective partition key, false otherwise
+     *        As a side effect, these get marked as requiring a Send/Receive if they use partitioned tables that
+     *        aren't equality filtered on their partitioning column.
+     * @param bindingOut - the second element of this array is set to the constant (if any) by which ALL partition
+     *        keys are (at least transitively) equality filtered.
+     * @return true if all partitioned tables are joined on a respective partition key, false otherwise
      */
-    static boolean isPartitionKeyEquality(Table[] joinOrder, AccessPath[] accessPath) {
-        if (joinOrder.length < 2)
-            // nothing to join
-            return false;
-
+    static int tagForMultiPartitionAccess(Table[] joinOrder, AccessPath[] accessPath, Object[] bindingOut) {
         //Collect all index and join expressions from the accessPath for each table
-        List<AbstractExpression> expressions = new ArrayList<AbstractExpression>();
-        for (int i = 0; i < accessPath.length; ++i) {
+        TupleValueExpression firstPartitionKeyScanned = null;
+        Set<TupleValueExpression> eqPartitionKeySet = new HashSet<TupleValueExpression>();
+        int result = 0;
+        Object bindingObject = null;
+
+        // Work backwards through the join order list to simulate the scanning order
+        for (int i = accessPath.length-1; i >=0; --i) {
+            Table table = joinOrder[i];
+
+            // Replicated tables don't need filter coverage.
+            String partitionedTable = null;
+            String columnNeedingCoverage = null;
+            boolean columnCovered = true;
+            boolean columnWasCovered = true;
+
+            // Iterate over the tables to collect partition columns.
+            if ( ! table.getIsreplicated()) {
+                if (table.getMaterializer() != null) {
+                    // TODO: Not yet supporting materialized views.
+                    // This will give a false negative for a join against a materialized view
+                    // whose underlying table is partitioned by (one of the) view's GROUP BY columns.
+                    // It should not be that difficult to parse that info out of the view definition OR
+                    // to tag the properly grouped view in the catalog as having that same partition column.
+                    accessPath[i].requiresSendReceive = true;
+                    result++;
+                    continue;
+                }
+                Column partitionCol = table.getPartitioncolumn();
+                if (partitionCol == null) {
+                    // This is an obscure edge case exercised far too regularly by lazy unit tests.
+                    // The table is declared non-replicated yet specifies no partitioning column.
+                    // One interpretation of this edge case is that the table has "randomly distributed data".
+                    // This is a failure case for the purposes of this function.
+                    accessPath[i].requiresSendReceive = true;
+                    result++;
+                    continue;
+                }
+                partitionedTable = table.getTypeName();
+                columnNeedingCoverage = partitionCol.getTypeName();
+                columnCovered = false;
+            }
+
+            List<AbstractExpression> expressions = new ArrayList<AbstractExpression>();
             expressions.addAll(accessPath[i].joinExprs);
-            expressions.addAll(accessPath[i].indexExprs);
-        }
-        // The total expression count should be one less than the tables count
-        if (expressions.size() != joinOrder.length - 1)
-            return false;
+            expressions.addAll(accessPath[i].otherExprs);
 
-        //Iterate over the tables to collect partition columns
-        Map<String, String> partitionMap = new HashMap<String, String>();
-        for (Table t : joinOrder) {
-            if (!t.getIsreplicated() && t.getMaterializer() == null) {
-                Column partition = t.getPartitioncolumn();
-                assert(partition != null);
-                partitionMap.put(t.getTypeName(), partition.getTypeName());
-            } else
-                partitionMap.put(t.getTypeName(), null);
-        }
+            for (AbstractExpression expr : expressions) {
+                // Ignore expressions that are not of COMPARE_EQUAL type
+                if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+                    continue;
+                }
 
-        boolean joinOnPartition = true;
-        Set<String> seenTables = new HashSet<String>();
-        for (AbstractExpression expr : expressions) {
-            //Expression must be of COMPARE_EQUAL type
-            if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
-                joinOnPartition = false;
-                break;
+                // Left and right subexpressions must be TVE based on the partition columns or
+                // a unique constant-based or parameter-based expression.
+                TupleValueExpression tveExpr = null;
+                AbstractExpression leftExpr = expr.getLeft();
+                AbstractExpression constExpr = null;
+                boolean needsRelevanceCheck = false;
+                columnWasCovered = columnCovered;
+                if (leftExpr instanceof TupleValueExpression) {
+                    tveExpr = (TupleValueExpression) leftExpr;
+                    if (partitionedTable != null &&
+                        tveExpr.getTableName().equals(partitionedTable) &&
+                        tveExpr.getColumnName().equals(columnNeedingCoverage)) {
+                        columnCovered = true;
+                        if (firstPartitionKeyScanned == null) {
+                            firstPartitionKeyScanned = tveExpr;
+                            // Start the collection of columns that are equal to each other (at least one of which is a partition key column).
+                            eqPartitionKeySet.add(tveExpr);
+                        } else {
+                            needsRelevanceCheck = true;
+                        }
+                    }
+                    constExpr = expr.getRight();
+                    if (constExpr instanceof TupleValueExpression) {
+                        // Actually, RHS is not a constant at all -- "column1 = column2".
+                        // XXX: For the case of self-joins, there MUST be some way (missed here) to distinguish a TVE based on the
+                        // current (Access Path's) occurrence of (i.e. "range over") the table and a TVE based on another
+                        // (Access Path's) use of that same table.
+                        // As a result of this miss, we may report a false positive for odd edge cases like:
+                        // "select A.*, B.* from SameTable A, SameTable B where A.partitionColumn = B.nonPartitionColumn".
+                        // Here the A.partitionKey could get mistaken for a filter on B.partitionKey because all that we are testing for
+                        // is whether any filter on (Access Path) B references the partition column of B's underlying table.
+                        TupleValueExpression tve2 = (TupleValueExpression) constExpr;
+                        if (partitionedTable != null &&
+                            tve2.getTableName().equals(partitionedTable) &&
+                            tve2.getColumnName().equals(columnNeedingCoverage)) {
+                            columnCovered = true;
+                            if (firstPartitionKeyScanned == null) {
+                                firstPartitionKeyScanned = tve2;
+                                // Start the collection of columns that are equal to each other (at least one of which is a partition key column).
+                                eqPartitionKeySet.add(tve2);
+                                eqPartitionKeySet.add(tveExpr);
+                                continue;
+                            }
+                            needsRelevanceCheck = true;
+                        } else if (firstPartitionKeyScanned == tveExpr) {
+                            // Add to the collection of columns that are equal to each other (but possibly not equal to other sets of columns).
+                            eqPartitionKeySet.add(tve2);
+                            continue;
+                        } else if (needsRelevanceCheck) {
+                            // one TVE is the partition key for this table, but DOES this equality link it in with other partition keys?
+                            if (eqPartitionKeySet.contains(tveExpr)) {
+                                // Yes, another equivalent column.
+                                eqPartitionKeySet.add(tve2);
+                                continue;
+                            }
+                            if (eqPartitionKeySet.contains(tve2)) {
+                                // Yes, another equivalent column.
+                                eqPartitionKeySet.add(tveExpr);
+                                continue;
+                            }
+                            // Neither of the equivalent columns, one of which is a partition key,
+                            // has any connection (YET!) to a previously scanned partition key.
+                            // This is probably going to require a send-receive on this scan, so don't consider the column now "covered".
+                            columnCovered = columnWasCovered;
+                        }
+                        // XXX: We completely ignore TVE to TVE equalities that seem irrelevant (so far) at the risk of not recognizing their
+                        // contribution in strange edge cases like the contribution of "A.x = A.partitionKey"
+                        // in strange edge cases like "A.x = A.partitionKey and A.x = B.partitionKey"
+                        // Or the contribution of "A.x = A.y" in strange edge cases like
+                        // "A.x = A.y and A.y = A.partitionKey and A.x = B.partitionKey"
+                        // The alternative would be to maintain equivalence sets of the table's TVEs.
+                        // Similarly, we could track all constant-filtered TVEs in case a later TVE to TVE equality made them relevant
+                        // to the partition key, and possibly to the first partition key.
+                        continue;
+                    }
+                } else {
+                    // Not "column = constant" -- try "constant = column"
+                    AbstractExpression rightExpr = expr.getRight();
+                    if ( ! (rightExpr instanceof TupleValueExpression)) {
+                        continue; // ... no, neither side is a column.
+                    }
+                    // fall through with the LHS and RHS roles reversed
+                    constExpr = tveExpr;
+                    tveExpr = (TupleValueExpression) rightExpr;
+                    if (partitionedTable != null &&
+                        tveExpr.getTableName().equals(partitionedTable) &&
+                        tveExpr.getColumnName().equals(columnNeedingCoverage)) {
+                        columnCovered = true;
+                    }
+                    if (partitionedTable != null &&
+                        tveExpr.getTableName().equals(partitionedTable) &&
+                        tveExpr.getColumnName().equals(columnNeedingCoverage)) {
+                        columnCovered = true;
+                        if (firstPartitionKeyScanned == null) {
+                            firstPartitionKeyScanned = tveExpr;
+                            // Start the collection of columns that are equal to each other (at least one of which is a partition key column).
+                            eqPartitionKeySet.add(tveExpr);
+                        } else {
+                            needsRelevanceCheck = true;
+                        }
+                    }
+                }
+
+                if (constExpr.hasAnySubexpressionOfClass(TupleValueExpression.class)) {
+                    columnCovered = columnWasCovered;
+                    continue; // expression is based on column values, so is not a suitable constant.
+                }
+
+                if (eqPartitionKeySet.contains(tveExpr)) {
+                    // the TVE is equal to a constant AND to the first partition key.
+                    // By implication, the partition key must have a constant value.
+                    if (bindingObject == null) {
+                        bindingObject = extractPartitioningValue(tveExpr, constExpr);
+                    }
+                    continue;
+                } else if (needsRelevanceCheck) {
+                    if (bindingObject != null) {
+                        Object altBinding = extractPartitioningValue(tveExpr, constExpr);
+                        if (altBinding.equals(bindingObject)) {
+                            // Equality to a common constant works as TVE equality.
+                            eqPartitionKeySet.add(tveExpr);
+                            continue;
+                        }
+                    }
+                }
+                // Apparently an irrelevant filter.
+                columnCovered = columnWasCovered;
             }
 
-            // Left and right subexpressions must be TVE based on the partition columns
-            AbstractExpression[] subs = new AbstractExpression[2];
-            subs[0] = expr.getLeft();
-            subs[1] = expr.getRight();
-            for (AbstractExpression sub : subs) {
-                if (sub == null || !(sub instanceof TupleValueExpression)) {
-                    joinOnPartition = false;
-                    break;
-                }
-                TupleValueExpression tve = (TupleValueExpression) sub;
-                // by now table must be in the map
-                assert(partitionMap.containsKey(tve.getTableName()));
-                String c = partitionMap.get(tve.getTableName());
-                if (c != null && !tve.getColumnName().equals(c)) {
-                    joinOnPartition = false;
-                    break;
-                }
-                seenTables.add(tve.getTableName());
-            }
-            if (!joinOnPartition)
-                break;
-        }
-        //Last check. All input tables must be part of some join expression
-        if (seenTables.size() != joinOrder.length)
-            joinOnPartition = false;
+            // All expressions for this access path have been considered.
+            // Any partition column better have been filtered by an equality by now.
 
-        return joinOnPartition;
+            if ( ! columnCovered) {
+                accessPath[i].requiresSendReceive = true;
+                result++;
+            }
+        }
+        bindingOut[1] = bindingObject;
+        // It's only a little strange to sometimes be set bindingOut[1] to a non-null value even when returning true.
+        // What it means in that case is that the query could IN THEORY distribute the results of a multi-partition
+        // scan to the single partition designated by the bindingObject for a final join with that partition's local
+        // data. This currently unsupported edge case is currently promptly detected and kept out of the candidate plans.
+        // But THIS code, anyway, stands ready.
+        return result;
+    }
+
+    public static Object extractPartitioningValue(TupleValueExpression tveExpr, AbstractExpression constExpr) {
+        // TODO: There is currently no way to pass back as a partition key value
+        // the constant value resulting from a general constant expression such as
+        // "WHERE a.pk = b.pk AND b.pk = SQRT(3*3+4*4)" because the planner has no expression evaluation capabilities.
+        if (constExpr instanceof ConstantValueExpression) {
+            // ConstantValueExpression exports its value as a string, which is handy for serialization,
+            // but the hashinator wants a partition-key-column-type-appropriate value.
+            // For safety, don't trust the constant's type
+            // -- it's apparently comparable to the column, but may not be an exact match(?).
+            // XXX: Actually, there may need to be additional filtering in the code above to not accept
+            // constant equality filters that would require the COLUMN type to be non-trivially converted (?)
+            // -- it MAY not be safe to limit execution of such a filter on any single partition.
+            // For now, for partitioning purposes, leave constants for string columns as they are,
+            // and process matches for integral columns via constant-to-string-to-bigInt conversion.
+            String stringValue = ((ConstantValueExpression) constExpr).getValue();
+            if (tveExpr.getValueType().isInteger()) {
+                try {
+                    return new Long(stringValue);
+                } catch (NumberFormatException nfe) {
+                    // Disqualify this constant by leaving objValue null -- probably should have caught this earlier?
+                    // This causes the statement to fall back to being identified as multi-partition.
+                }
+            } else {
+                return stringValue;
+            }
+        }
+        return null;
     }
 
     @Override

@@ -22,14 +22,11 @@ import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
 import java.util.HashSet;
-import java.util.List;
 
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
-import org.voltdb.catalog.Column;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
@@ -54,16 +51,26 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
     ArrayDeque<Table[]> m_joinOrders = new ArrayDeque<Table[]>();
 
+    private int m_countOfPartitionedTables;
+
     /**
      *
      * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
-     * @param singlePartition Does this statement access one or multiple partitions?
+     * @param partitionParam in/out param first element is partition key value, forcing a single-partition statement if non-null,
+     * second may be an inferred partition key if no explicit single-partitioning was specified
      */
-    SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt,
-                           boolean singlePartition)
+    SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, Object[] partitionParam)
     {
-        super(db, parsedStmt, singlePartition);
+        super(db, parsedStmt, partitionParam);
+        // Do we have a need for a distributed scan at all?
+        for (Table table : parsedStmt.tableList) {
+            if (table.getIsreplicated()) {
+                continue;
+            }
+            ++m_countOfPartitionedTables;
+        }
+
         //If a join order was provided
         if (parsedStmt.joinOrder != null) {
             //Extract the table names from the , separated list
@@ -127,13 +134,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * Compute every permutation of the list of involved tables and put them in a deque.
      */
     private void queueAllJoinOrders() {
-        // inserts can't have predicates
-        // XXX these asserts seem useless here in SelectSubPlanAssembler? --izzy
-        assert(((m_parsedStmt instanceof ParsedInsertStmt) && (m_parsedStmt.where != null)) == false);
-        // only selects can have more than one table
-        if (m_parsedStmt.tableList.size() > 1)
-            assert(m_parsedStmt instanceof ParsedSelectStmt);
-
         // these just shouldn't happen right?
         assert(m_parsedStmt.multiTableSelectionList.size() == 0);
         assert(m_parsedStmt.noTableSelectionList.size() == 0);
@@ -231,10 +231,86 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // compute all combinations of access paths for this particular join order
         ArrayList<AccessPath[]> listOfAccessPathCombos = generateAllAccessPathCombinationsForJoinOrder(joinOrder);
 
+        // Identify whether all the partitioned tables in the join are filtered/joined on a common partition key
+        // Currently, if a partition key was provided to the planner,
+        // a single-partition scan is required and all partitioned tables accessed are
+        // assumed to follow this partition-key-equality pattern -- the query will only operate on the rows within a single partition,
+        // so caveat emptor if the query designating a single-partition does not fit the pattern.
+        // If no partition key was provided to the planner, multi-partition execution is initially assumed.
+        // That leaves several interesting cases.
+        // 1) In the best case, analysis of the plan can detect the partition-key-equality-join pattern and also detect a
+        // constant equality filter on any of the equivalent keys. In this case, the constant can be field-promoted
+        // to a partitioning value and the statement run single-partition on whichever partition the value hashes to.
+        // 2) In the next best case, a partition-key-equality pattern is detected but a constant equality filter does
+        // not exist or can not be resolved to a (hashable) constant value. The result is a two-fragment query where
+        // the top fragment coordinates the results of the distributed partition-based scan/joins in the bottom fragment.
+        // 3) In the worst case, there is no partition-key-equality -- or an incomplete one that does not cover all partitioned tables.
+        // Such a query would require a 3-fragment plan, with a top fragment joining the results of scans received from two lower fragments
+        // -- 3-fragment plans are not supported, so such plans can be rejected at this stage with no loss of functionality.
+        // 4) There is an additional edge case that would theoretically not have to exceed the 2-fragment limit.
+        // This would involve an arbitrary join with two partitioned tables (and, as implied in the above cases,
+        // any number of replicated tables) with no constraints on the join criteria BUT a requirement that the last
+        // partitioned table to be scanned (the first as listed in the reversed "joinOrder/accessPath" vector) have a
+        // constant equality filter as in case 1 that can be used as a partition key. In that case, the partition designated
+        // by that key could be selected as the coordinator to execute a top fragment join of the results of the bottom
+        // fragment's multi-partition scan.  The problem with this case is that (AFAIK --paul) there is no way to
+        // separately indicate to the initiator that a plan (fragment) must be run on a particular partition (like an SP query)
+        // but that the query has also has a distributed lower fragment (like an MP query).
+        // Supporting cases 1 and 2 but rejecting cases 3 and 4 simplifies the required analysis and supports
+        // inferred SP ad hocs based on a constant equality filter and a partition-key-equality pattern (case 1)
+        // in the context of and without regressing the fix for ENG-496 (case 2) which was the original motivation for
+        // AccessPath.isPartitionKeyEquality.
+
+        // Restore the effective partition key to its explicit value.
+        // It's possible that a left over inferred value from the previous join order may not hold for the current one.
+        // TODO: Make sure that the partitionParam that applies to a winning plan "sticks" to it.
+        m_partitionParam[1] = m_partitionParam[0];
+        boolean suppressSendReceivePair = true;
+        if (isStatementMultiPartition() && m_countOfPartitionedTables > 0) {
+            // It's usually better to send and receive pre-join tuples than post-join tuples.
+            suppressSendReceivePair = false;
+            // This analysis operates independently of indexes, so only needs to operate on the naive (first) accessPath.
+            // Note that this call may mess with m_partitionParam[1]
+            // which determines the behavior of isStatementMultiPartition(), called below.
+            int multiPartitionScanCount = AccessPath.tagForMultiPartitionAccess(joinOrder, listOfAccessPathCombos.get(0), m_partitionParam);
+            if (multiPartitionScanCount > 1) {
+                // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
+                return;
+            }
+            if (m_partitionParam[1] == null) {
+                // For (multiPartitionScanCount == 1), "case 2" where the last-listed (first-scanned) partitioned table
+                // has no constant filter, it accounts for the 1 independent partitioned scan.
+                // In this case, whether to suppress the usual Receive/Send nodes below the joins depends on whether
+                // there are other partitioned tables being scanned but not counted because of partition key equality.
+                // If not, (for joins solely against replicated tables) it's probably better to try to inject the Receive/Send nodes
+                // below the join.
+                // If so, the Receive/Send nodes must be suppressed until after the join.
+
+                // For (multiPartitionScanCount == 0), the failure to produce a partitionKey
+                // when that would involve expression evaluation has forced a degenerate case
+                // that case can be handled the same way.
+                if (m_countOfPartitionedTables > 1) {
+                    suppressSendReceivePair = true;
+                }
+            } else {
+                if (multiPartitionScanCount == 1) {
+                    // "case 4" IF the last-listed (first-scanned) partitioned table has a constant filter,
+                    // then some other independent partitioned scan is getting counted as the 1.
+                    // We WISH we could support this case, but we don't.
+                    // When we do, we'll have to figure out how to deal with the possible existence of both
+                    // localized and non-localized joins.
+                    return;
+                } else {
+                    assert(isStatementMultiPartition() == false);
+                    suppressSendReceivePair = true; // No Send/Receive needed in a single-partition statement.
+                }
+            }
+            // Anything else can be handled in one or two plan fragments, injecting Receive/Send nodes below any joins.
+        }
         // for each access path
         for (AccessPath[] accessPath : listOfAccessPathCombos) {
             // get a plan
-            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinOrder, accessPath);
+            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinOrder, accessPath, suppressSendReceivePair);
             m_plans.add(scanPlan);
         }
     }
@@ -246,35 +322,22 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param joinOrder An array of tables in a specific join order.
      * @param accessPath An array of access paths that match with the input tables.
+     * @param suppressSendReceivePair A flag preventing the usual injection of Receive and Send nodes above scans of non-replicated tables.
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath) {
-
-        //Do we have a need for the distributed scan at all?
-        boolean needDistributedScan = false;
-        for (Table t : joinOrder) {
-            if (!needDistributedScan)
-                needDistributedScan = tableRequiresDistributedScan(t);
-            if (needDistributedScan)
-                break;
-        }
-        //Before we do the actual work we need to identify whether all the tables in the join are joined
-        //on a respective partition key or not. In the former case, all intermediate send/receive nodes
-        //for distributed tables can be replaced with a single send/receive pair at the very top of
-        //the generated access plan. See ENG-496 for more detailed explanation.
-        boolean joinOnPartition = (needDistributedScan) ?
-                AccessPath.isPartitionKeyEquality(joinOrder, accessPath) : true;
+    private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath, boolean suppressSendReceivePair) {
 
         // do the actual work
-        AbstractPlanNode retv = getSelectSubPlanForAccessPathRecursive(joinOrder, accessPath, joinOnPartition);
-        // If join is on partition columns and there is at least one distributed table add Send/Receive node pair
-        if (joinOnPartition && needDistributedScan)
+        AbstractPlanNode retv = getSelectSubPlanForAccessPathRecursive(joinOrder, accessPath, suppressSendReceivePair);
+        // If there is a multi-partition statement on one or more partitioned Tables and the Send/Receive nodes were suppressed,
+        // they need to come into play "post-join".
+        if (isStatementMultiPartition() && m_countOfPartitionedTables > 0 && suppressSendReceivePair)
             retv = addSendReceivePair(retv);
         return retv;
     }
 
-   /**
+    /**
      * Given a specific join order and access path set for that join order, construct the plan
      * that gives the right tuples. This method is the meat of sub-plan-graph generation, but all
      * of the smarts are probably done by now, so this is just boring actual construction.
@@ -294,10 +357,10 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         //
         // If there is one table to scan from, then just
         if (joinOrder.length == 1)
-            return getAccessPlanForTable(joinOrder[0], accessPath[0], !supressSendReceivePair);
+            return getAccessPlanForTable(joinOrder[0], accessPath[0], supressSendReceivePair);
 
         // recursive step:
-        AbstractPlanNode nljAccessPlan = getAccessPlanForTable(joinOrder[0], accessPath[0], !supressSendReceivePair);
+        AbstractPlanNode nljAccessPlan = getAccessPlanForTable(joinOrder[0], accessPath[0], supressSendReceivePair);
 
         /*
          * If the access plan for the table in the join order was for a
@@ -373,6 +436,94 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
 
         return retval;
+    }
+
+   /**
+     * Given a specific join order and access path set for that join order, construct the plan
+     * that gives the right tuples. This method is the meat of sub-plan-graph generation, but all
+     * of the smarts are probably done by now, so this is just boring actual construction.
+     * In case of all participant tables are joined on respective partition keys generation of
+     * Send/Received node pair is suppressed.
+     *
+     * @param joinOrder An array of tables in a specific join order.
+     * @param accessPath An array of access paths that match with the input tables.
+     * @param supressSendReceivePair indicator whether to suppress intermediate Send/Receive pairs or not
+     * @return A completed plan-sub-graph that should match the correct tuples from the
+     * correct tables.
+     */
+    private AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath, boolean suppressSendReceivePair) {
+        AbstractPlanNode resultPlan = null;
+        for (int at = joinOrder.length-1; at >= 0; --at) {
+            AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at]);
+            if (resultPlan == null) {
+                resultPlan = scanPlan;
+            } else {
+                /*
+                 * The optimizations (nestloop, nestloopindex) that follow don't care
+                 * about the send/receive pair. Send in the IndexScanPlanNode or
+                 * ScanPlanNode for them to work on.
+                 */
+                resultPlan = getSelectSubPlanForAccessPathStep(accessPath[at], resultPlan, scanPlan);
+            }
+            /*
+             * If the access plan for the table in the join order was for a
+             * distributed table scan there will be a send/receive pair at the top.
+             */
+            if (suppressSendReceivePair || joinOrder[at].getIsreplicated()) {
+                continue;
+            }
+            resultPlan = addSendReceivePair(resultPlan);
+        }
+        return resultPlan;
+    }
+
+    private AbstractPlanNode getSelectSubPlanForAccessPathStep(AccessPath accessPath, AbstractPlanNode subPlan, AbstractPlanNode nljAccessPlan) {
+
+        // get all the clauses that join the applicable two tables
+        ArrayList<AbstractExpression> joinClauses = accessPath.joinExprs;
+
+        AbstractPlanNode retval = null;
+        if (nljAccessPlan instanceof IndexScanPlanNode) {
+            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
+
+            nlijNode.setJoinType(JoinType.INNER);
+
+            @SuppressWarnings("unused")
+            IndexScanPlanNode innerNode = (IndexScanPlanNode) nljAccessPlan;
+
+            nlijNode.addInlinePlanNode(nljAccessPlan);
+
+            // combine the tails plan graph with the new head node
+            nlijNode.addAndLinkChild(subPlan);
+            // now generate the output schema for this join
+            nlijNode.generateOutputSchema(m_db);
+
+            retval = nlijNode;
+        }
+        else {
+            NestLoopPlanNode nljNode = new NestLoopPlanNode();
+            if ((joinClauses != null) && (joinClauses.size() > 0))
+                nljNode.setPredicate(ExpressionUtil.combine(joinClauses));
+            nljNode.setJoinType(JoinType.LEFT);
+
+            // combine the tails plan graph with the new head node
+            nljNode.addAndLinkChild(nljAccessPlan);
+
+            nljNode.addAndLinkChild(subPlan);
+            // now generate the output schema for this join
+            nljNode.generateOutputSchema(m_db);
+
+            retval = nljNode;
+        }
+
+        return retval;
+    }
+
+    private AbstractPlanNode getAccessPlanForTable(Table table, AccessPath accessPath, boolean suppressSendReceivePair) {
+        AbstractPlanNode result = getAccessPlanForTable(table, accessPath);
+        if (suppressSendReceivePair || table.getIsreplicated())
+            return result;
+        return addSendReceivePair(result);
     }
 
     /**
@@ -457,16 +608,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
 
         return retval;
-    }
-
-    /**
-     * Determines whether a table will require a distributed scan.
-     * @param table The table that may or may not require a distributed scan
-     * @return true if the table requires a distributed scan, false otherwise
-     */
-    @Override
-    protected boolean tableRequiresDistributedScan(Table table) {
-        return ((m_singlePartition == false) && (table.getIsreplicated() == false));
     }
 
 }

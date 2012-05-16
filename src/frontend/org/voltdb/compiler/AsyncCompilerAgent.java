@@ -17,25 +17,22 @@
 
 package org.voltdb.compiler;
 
-import java.lang.Runnable;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.CatalogContext;
-import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltcore.logging.VoltLogger;
+import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -146,12 +143,12 @@ public class AsyncCompilerAgent {
         plannedStmt.catalogVersion = context.catalogVersion;
 
         try {
-            PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam != null);
+            PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam);
             plannedStmt.aggregatorFragment = result.onePlan;
             plannedStmt.collectorFragment = result.allPlan;
             plannedStmt.isReplicatedTableDML = result.replicatedDML;
             plannedStmt.sql = work.sql;
-            plannedStmt.partitionParam = work.partitionParam;
+            plannedStmt.partitionParam = result.partitionParam;
         }
         catch (Exception e) {
             plannedStmt.errorMsg = "Unexpected Ad Hoc Planning Error: " + e.getMessage();

@@ -100,8 +100,14 @@ public abstract class StatementCompiler {
         PlanNodeList node_list = null;
         TrivialCostModel costModel = new TrivialCostModel();
 
+        Object[] partitionParameter = new Object[2];
+        if (singlePartition) {
+            // dummy up a partitioning value so that the planner will not try to infer one.
+            partitionParameter[0] = "dummied up in StatementCompiler to force single partitioning in QueryPlanner";
+            partitionParameter[1] = partitionParameter[0];
+        }
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, catalogStmt.getSinglepartition(), hsql, estimates, true, false);
+                catalog.getClusters().get("cluster"), db, partitionParameter, hsql, estimates, true, false);
 
         CompiledPlan plan = null;
         try {

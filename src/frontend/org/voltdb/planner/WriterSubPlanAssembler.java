@@ -17,9 +17,12 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
-import org.voltdb.catalog.*;
-import org.voltdb.plannodes.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
+import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
  * For a delete or update plan, this class builds the part of the plan
@@ -45,12 +48,11 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      *
      * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
-     * @param singlePartition Does this statement access one or multiple partitions?
+     * @param partitionParam A vector of two optional partition parameter values.
      */
-    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition)
+    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, Object[] partitionParam)
     {
-        super(db, parsedStmt, singlePartition);
-
+        super(db, parsedStmt, partitionParam);
         assert(m_parsedStmt.tableList.size() == 1);
         m_targetTable = m_parsedStmt.tableList.get(0);
     }
@@ -75,16 +77,11 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             }
 
         }
-        return m_plans.poll();
+        AbstractPlanNode result = m_plans.poll();
+        if (result != null && (m_targetTable.getIsreplicated() || isStatementMultiPartition())) {
+            result = addSendReceivePair(result);
+        }
+        return result;
     }
 
-    /**
-     * Determines whether a table will require a distributed scan.
-     * @param table The table that may or may not require a distributed scan
-     * @return true if the table requires a distributed scan, false otherwise
-     */
-    @Override
-    protected boolean tableRequiresDistributedScan(Table table) {
-        return m_singlePartition == false;
-    }
 }

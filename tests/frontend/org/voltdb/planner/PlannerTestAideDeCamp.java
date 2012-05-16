@@ -32,6 +32,7 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -48,7 +49,6 @@ import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltcore.utils.Pair;
 
 /**
  * Some utility functions to compile SQL statements for plan generation tests.
@@ -151,8 +151,15 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
+        Object[] partitionParameter = new Object[2];
+        if (singlePartition) {
+            // Dummy up a partitioning value to indicate the intent and prevent the planner
+            // from trying to infer a constant partitioning value from the statement.
+            partitionParameter[0] = "PlannerTestAideDeCamp dummied up single partitioning for QueryPlanner";
+            partitionParameter[1] = partitionParameter[0];
+        }
         QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, catalogStmt.getSinglepartition(),
+            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitionParameter,
                              hsql, estimates, true, false);
 
         CompiledPlan plan = null;

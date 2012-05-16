@@ -25,7 +25,6 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.Stack;
 
-import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -92,7 +91,7 @@ public class PlanAssembler {
     ParsedSelectStmt m_parsedSelect = null;
 
     /** does the statement touch more than one partition? */
-    final boolean m_singlePartition;
+    private final Object[] m_partitionParam;
 
     /**
      * Used to generate the table-touching parts of a plan. All join-order and
@@ -118,10 +117,10 @@ public class PlanAssembler {
      * @param catalogDb
      *            Catalog info about schema, metadata and procedures.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, boolean singlePartition) {
+    PlanAssembler(Cluster catalogCluster, Database catalogDb, Object[] partitionParam) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
-        m_singlePartition = singlePartition;
+        m_partitionParam = partitionParam;
     }
 
     String getSQLText() {
@@ -202,9 +201,7 @@ public class PlanAssembler {
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
-            subAssembler =
-                new SelectSubPlanAssembler(m_catalogDb,
-                                           parsedStmt, m_singlePartition);
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitionParam);
         } else {
             // check that no modification happens to views
             if (tableListIncludesView(parsedStmt.tableList)) {
@@ -212,27 +209,38 @@ public class PlanAssembler {
                 "Illegal to modify a materialized view.");
             }
 
+            // Check that only multi-partition writes are made to replicated tables.
+            // figure out which table we're updating/deleting
+            assert (parsedStmt.tableList.size() == 1);
+            Table targetTable = parsedStmt.tableList.get(0);
+            if (isSinglePartitionPlan() && (targetTable.getIsreplicated())) {
+                String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
+                             + "' in a single-partition procedure.";
+                throw new PlanningErrorException(msg);
+            }
+
             if (parsedStmt instanceof ParsedInsertStmt) {
                 m_parsedInsert = (ParsedInsertStmt) parsedStmt;
-            } else if (parsedStmt instanceof ParsedUpdateStmt) {
+                // The currently handled inserts are too simple to even require a subplan assembler. So, done.
+                return;
+            }
+
+            if (parsedStmt instanceof ParsedUpdateStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
                     "Illegal to update an export table.");
                 }
                 m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
-                subAssembler =
-                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition);
             } else if (parsedStmt instanceof ParsedDeleteStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
                     "Illegal to delete from an export table.");
                 }
                 m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
-                subAssembler =
-                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition);
             } else
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");
+            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitionParam);
         }
     }
 
@@ -392,15 +400,6 @@ public class PlanAssembler {
         assert (m_parsedDelete.tableList.size() == 1);
         Table targetTable = m_parsedDelete.tableList.get(0);
 
-        // this is never going to go well
-        if (m_singlePartition && (targetTable.getIsreplicated())) {
-            String msg =
-                "Trying to delete from replicated table '"
-                        + targetTable.getTypeName() + "'";
-            msg += " in a single-partition procedure.";
-            throw new PlanningErrorException(msg);
-        }
-
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
         if (subSelectRoot == null)
             return null;
@@ -419,7 +418,7 @@ public class PlanAssembler {
                                                addressExpr));
         projectionNode.setOutputSchema(proj_schema);
 
-        if (m_singlePartition == true) {
+        if (isSinglePartitionPlan()) {
 
             assert(subSelectRoot instanceof AbstractScanPlanNode);
 
@@ -480,24 +479,12 @@ public class PlanAssembler {
     private AbstractPlanNode getNextUpdatePlan() {
         assert (subAssembler != null);
 
-        // figure out which table we're updating
-        assert (m_parsedUpdate.tableList.size() == 1);
-        Table targetTable = m_parsedUpdate.tableList.get(0);
-
-        // this is never going to go well
-        if (m_singlePartition && (targetTable.getIsreplicated())) {
-            String msg =
-                "Trying to update replicated table '" + targetTable.getTypeName()
-                        + "'";
-            msg += " in a single-partition procedure.";
-            throw new PlanningErrorException(msg);
-        }
-
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
         if (subSelectRoot == null)
             return null;
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
+        Table targetTable = m_parsedUpdate.tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
         updateNode.setUpdateIndexes(false);
@@ -546,7 +533,7 @@ public class PlanAssembler {
         }
         projectionNode.setOutputSchema(proj_schema);
 
-        if (m_singlePartition == true) {
+        if (isSinglePartitionPlan()) {
 
             // add the projection inline (TODO: this will break if more than one
             // layer is below this)
@@ -590,7 +577,7 @@ public class PlanAssembler {
             sendNode.generateOutputSchema(m_catalogDb);
             // fix the receive node's output columns
             recvNode.generateOutputSchema(m_catalogDb);
-            // add a count and send on top of the union
+            // add a sum and send on top of the union
             return addSumAndSendToDMLNode(subSelectRoot);
         }
     }
@@ -612,19 +599,10 @@ public class PlanAssembler {
         assert (m_parsedInsert.tableList.size() == 1);
         Table targetTable = m_parsedInsert.tableList.get(0);
 
-        // this is never going to go well
-        if (m_singlePartition && targetTable.getIsreplicated()) {
-            String msg =
-                "Trying to insert into replicated table '"
-                        + targetTable.getTypeName() + "'";
-            msg += " in a single-partition procedure.";
-            throw new PlanningErrorException(msg);
-        }
-
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
-        insertNode.setMultiPartition(m_singlePartition == false);
+        insertNode.setMultiPartition(isSinglePartitionPlan() == false);
 
         // the materialize node creates a tuple to insert (which is frankly not
         // always optimal)
@@ -692,7 +670,7 @@ public class PlanAssembler {
         insertNode.generateOutputSchema(m_catalogDb);
         AbstractPlanNode rootNode = insertNode;
 
-        if (m_singlePartition == false) {
+        if (isSinglePartitionPlan() == false) {
             // all sites to a scan -> send
             // root site has many recvs feeding into a union
 
@@ -1466,4 +1444,13 @@ public class PlanAssembler {
 
         return columns;
     }
+
+    public boolean isSinglePartitionPlan() {
+        return m_partitionParam[0] != null;
+    }
+
+    private boolean isSinglePartitionStatement() {
+        return m_partitionParam[1] != null;
+    }
+
 }

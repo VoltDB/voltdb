@@ -59,7 +59,7 @@ public class QueryPlanner {
      * @param HSQL HSQLInterface pointer used for parsing SQL into XML.
      * @param useGlobalIds
      */
-    public QueryPlanner(Cluster catalogCluster, Database catalogDb, boolean singlePartition,
+    public QueryPlanner(Cluster catalogCluster, Database catalogDb, Object[] partitionParam,
                         HSQLInterface HSQL, DatabaseEstimates estimates,
                         boolean useGlobalIds, boolean suppressDebugOutput) {
         assert(HSQL != null);
@@ -67,13 +67,13 @@ public class QueryPlanner {
         assert(catalogDb != null);
 
         m_HSQL = HSQL;
-        m_assembler = new PlanAssembler(catalogCluster, catalogDb, singlePartition);
+        m_assembler = new PlanAssembler(catalogCluster, catalogDb, partitionParam);
         m_db = catalogDb;
         m_cluster = catalogCluster;
         m_estimates = estimates;
         m_useGlobalIds = useGlobalIds;
-        m_quietPlanner = suppressDebugOutput;
-        m_fullDebug = System.getProperties().contains("compilerdebug");
+        m_quietPlanner = false;//suppressDebugOutput;
+        m_fullDebug = true; //System.getProperties().contains("compilerdebug");
     }
 
     /**
