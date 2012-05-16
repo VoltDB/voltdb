@@ -35,6 +35,7 @@ import org.voltdb.iv2.SiteTasker;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SysProcSelector;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.SiteTracker;
@@ -187,6 +188,11 @@ public class Site implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public long getCatalogCRC() {
+            return m_context.getCatalogCRC();
+        }
+
+        @Override
         public SiteTracker getSiteTracker() {
             throw new RuntimeException("Not implemented in iv2");
             // return m_tracker;
@@ -201,6 +207,12 @@ public class Site implements Runnable, SiteProcedureConnection
         public SiteProcedureConnection getSiteProcedureConnection()
         {
             return Site.this;
+        }
+
+        @Override
+        public SiteSnapshotConnection getSiteSnapshotConnection()
+        {
+            throw new RuntimeException("Not implemented in iv2");
         }
 
         @Override

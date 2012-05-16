@@ -172,8 +172,6 @@ public class ClusterConfig
         stringer.endObject();
 
         JSONObject topo = new JSONObject(stringer.toString());
-        hostLog.info("TOPO: " + topo.toString(2));
-
         return topo;
     }
 
