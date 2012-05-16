@@ -115,7 +115,8 @@ public class ClusterConfig
         return true;
     }
 
- // XXX ZOMG THIS WILL NEVER WORK PAST INITIAL CLUSTER STARTUP
+    // Statically build a topology. This only runs at startup;
+    // rejoin clones this from an existing server.
     public JSONObject getTopology(List<Integer> hostIds) throws JSONException
     {
         int hostCount = getHostCount();
@@ -172,7 +173,7 @@ public class ClusterConfig
         stringer.endObject();
 
         JSONObject topo = new JSONObject(stringer.toString());
-        hostLog.info("TOPO: " + topo.toString(2));
+        hostLog.debug("TOPO: " + topo.toString(2));
 
         return topo;
     }
