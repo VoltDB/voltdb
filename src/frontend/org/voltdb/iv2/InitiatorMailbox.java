@@ -244,13 +244,18 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     {
         // If MPI and multipart, deliver to client interface
         // if MPI or partition master and singlepart, dedupe and deliver to client interface
-        // if partition replica, deliver to partition master
-        try {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            send(message.getInitiatorHSId(), message);
+        if (m_partitionId == 0) {
+            m_scheduler.handleInitiateResponseMessage(message);
         }
-        catch (MessagingException e) {
-            hostLog.error("Failed to deliver response from execution site.", e);
+        // if partition replica, deliver to partition master
+        else {
+            try {
+                // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+                send(message.getInitiatorHSId(), message);
+            }
+            catch (MessagingException e) {
+                // hostLog.error("Failed to deliver response from execution site.", e);
+            }
         }
     }
 
