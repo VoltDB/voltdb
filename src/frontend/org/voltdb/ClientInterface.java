@@ -1374,7 +1374,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // initiate the transaction
         createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
                 plannedStmt.adminConnection,
-                task, false, isSinglePartition, false, partitions,
+                task, false, (isSinglePartition  &&  ! m_isConfiguredForHSQL), false, partitions,
                 partitions.length, plannedStmt.clientData,
                 0, EstTime.currentTimeMillis());
 
