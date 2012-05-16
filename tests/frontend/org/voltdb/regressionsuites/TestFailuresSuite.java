@@ -43,6 +43,7 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.DivideByZero;
 import org.voltdb_testprocs.regressionsuites.failureprocs.FetchTooMuch;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertBigString;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
+import org.voltdb_testprocs.regressionsuites.failureprocs.LastBatchLie;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ReturnAppStatus;
 import org.voltdb_testprocs.regressionsuites.failureprocs.SelectBigString;
 import org.voltdb_testprocs.regressionsuites.failureprocs.TooFewParams;
@@ -59,7 +60,8 @@ public class TestFailuresSuite extends RegressionSuite {
         ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
         DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
         InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
-        ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class
+        ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class,
+        LastBatchLie.class
     };
 
     /**
@@ -68,6 +70,32 @@ public class TestFailuresSuite extends RegressionSuite {
      */
     public TestFailuresSuite(String name) {
         super(name);
+    }
+
+    // This was the root cause of the defect reported in ENG-2875.
+    // Rather than deadlock, we'll abort the procedure if we see
+    // two voltExecuteSQL() calls with final batch as true.
+    public void testLastBatchLie() throws IOException
+    {
+        System.out.println("STARTING testLastBatchLie");
+        Client client = getClient();
+
+        boolean threw = false;
+        try
+        {
+            client.callProcedure("LastBatchLie").getResults();
+            fail();
+        }
+        catch (ProcCallException e)
+        {
+            if (e.getMessage().contains("claiming a previous batch was final")) {
+                threw = true;
+            }
+            else {
+                e.printStackTrace();
+            }
+        }
+        assertTrue(threw);
     }
 
     // Subcase of ENG-800

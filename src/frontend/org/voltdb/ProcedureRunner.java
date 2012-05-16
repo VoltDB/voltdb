@@ -71,6 +71,7 @@ public class ProcedureRunner {
     protected final ArrayList<QueuedSQL> m_batch = new ArrayList<QueuedSQL>(100);
     // cached fake SQLStmt array for single statement non-java procs
     QueuedSQL m_cachedSingleStmt = new QueuedSQL(); // never null
+    boolean m_seenFinalBatch = false;
 
     // reflected info
     //
@@ -293,6 +294,7 @@ public class ProcedureRunner {
             m_cachedRNG = null;
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
+            m_seenFinalBatch = false;
         }
 
         return retval;
@@ -345,6 +347,16 @@ public class ProcedureRunner {
     }
 
     public VoltTable[] voltExecuteSQL(boolean isFinalSQL) {
+        if (m_seenFinalBatch) {
+            throw new RuntimeException("Procedure " + m_procedureName +
+                                       " attempted to execute a batch " +
+                                       "after claiming a previous batch was final " +
+                                       "and will be aborted.\n  Examine calls to " +
+                                       "voltExecuteSQL() and verify that the call " +
+                                       "with the argument value 'true' is actually " +
+                                       "the final one");
+        }
+        m_seenFinalBatch = isFinalSQL;
         return executeQueriesInABatch(m_batch, isFinalSQL);
     }
 
