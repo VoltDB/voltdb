@@ -31,6 +31,8 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
+import org.voltdb.ProcedureRunner;
+
 import junit.framework.TestCase;
 
 import org.junit.Test;
@@ -57,15 +59,24 @@ public class Iv2TestScheduler extends TestCase
     SiteTracker clerk;
     LoadedProcedureSet procs;
     VoltDBInterface vdbi;
+    ProcedureRunner runner;
 
     Scheduler dut;
+
+    static final String MockSPName = "MOCKSP";
 
     @Override
     public void setUp()
     {
         mbox = mock(Mailbox.class);
         clerk = mock(SiteTracker.class);
+
+        // Mock a procedure set that always returns a proc with name MockSPName
+        // that is never a system procedure.
         procs = mock(LoadedProcedureSet.class);
+        runner = mock(ProcedureRunner.class);
+        when(runner.isSystemProcedure()).thenReturn(false);
+        when(procs.getProcByName(MockSPName)).thenReturn(runner);
 
         dut = new Scheduler(clerk);
         dut.setMailbox(mbox);
@@ -79,7 +90,9 @@ public class Iv2TestScheduler extends TestCase
     private Iv2InitiateTaskMessage createMsg(long txnId, boolean readOnly,
                                              boolean singlePart)
     {
+        // Mock an invocation for MockSPName.
         StoredProcedureInvocation spi = mock(StoredProcedureInvocation.class);
+        when(spi.getProcName()).thenReturn(MockSPName);
         Iv2InitiateTaskMessage task =
             new Iv2InitiateTaskMessage(Long.MIN_VALUE, // don't care?
                                        Long.MIN_VALUE, // don't care

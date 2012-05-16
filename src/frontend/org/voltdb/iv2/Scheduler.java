@@ -90,8 +90,7 @@ public class Scheduler
         m_clerk = VoltDB.instance().getSiteTracker();
 
         // Handle every-site system procedures (at the MPI)
-        // Let runner be null for tests that mock setup and don't load sysprocs.
-        if (runner != null && runner.isSystemProcedure()) {
+        if (runner.isSystemProcedure()) {
             SystemProcedureCatalog.Config cfg =
                 SystemProcedureCatalog.listing.get(procedureName);
             if (cfg.everySite) {

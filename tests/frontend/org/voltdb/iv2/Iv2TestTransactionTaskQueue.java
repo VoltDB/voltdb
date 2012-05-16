@@ -45,7 +45,11 @@ public class Iv2TestTransactionTaskQueue extends TestCase
     private SpProcedureTask createSpProc(long localTxnId,
                                          TransactionTaskQueue queue)
     {
+        // Mock an initiate message; override its txnid to return
+        // the default SP value (usually set by ClientInterface).
         Iv2InitiateTaskMessage init = mock(Iv2InitiateTaskMessage.class);
+        when(init.getTxnId()).thenReturn(Iv2InitiateTaskMessage.UNUSED_MP_TXNID);
+
         SpProcedureTask task =
             new SpProcedureTask(null, null, localTxnId, queue, init);
         return task;
@@ -122,6 +126,8 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         assertEquals(1, dut.size());
 
         // Add some tasks that are going to be blocked
+        // Manually track the should-be-blocked procedures
+        // for comparison later.
         ArrayDeque<TransactionTask> blocked = new ArrayDeque<TransactionTask>();
         next = createSpProc(localTxnId++, dut);
         addTask(next, dut, blocked);
@@ -129,10 +135,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         addTask(next, dut, blocked);
 
         // here's our next blocker
-        long next_blocking_local_txnid = localTxnId;
-        long next_blocking_mp_txnid = mpTxnId;
         next = createFrag(localTxnId++, mpTxnId++, dut);
-        TransactionTask next_block = next;
         addTask(next, dut, blocked);
         assertEquals(blocked.size() + 1, dut.size());
 
