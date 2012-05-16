@@ -219,6 +219,11 @@ public class Site implements Runnable, SiteProcedureConnection
         public void updateBackendLogLevels() {
             Site.this.updateBackendLogLevels();
         }
+
+        @Override
+        public boolean updateCatalog(String diffCmds, CatalogContext context) {
+            throw new RuntimeException("Not implemented in iv2");
+        }
     };
 
     /** Create a new execution site and the corresponding EE */
