@@ -259,7 +259,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 Map<String, Map<Integer, Long>> exportSequenceNumbers =
                         (Map<String, Map<Integer, Long>>)ois.readObject();
                 Database db = context.getDatabase();
-                Integer myPartitionId = context.getExecutionSite().getCorrespondingPartitionId();
+                Integer myPartitionId = context.getPartitionId();
 
                 //Iterate the export tables
                 for (Table t : db.getTables()) {
