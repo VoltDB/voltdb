@@ -931,12 +931,6 @@ public class SQLCommand
             this_params.set((int)params.getLong("ORDINAL_POSITION") - 1,
                             params.getString("TYPE_NAME").toLowerCase());
         }
-        for (Map.Entry<String, Integer> entry : proc_param_counts.entrySet()) {
-            if (entry.getValue() > 0) continue;
-            TreeMap<Integer, List<String>> signatures = new TreeMap<Integer, List<String>>();
-            signatures.put(entry.getValue(), Arrays.asList(new String[0]));
-            Procedures.put(entry.getKey(), signatures);
-        }
     }
 
     private static InputStream in = null;
