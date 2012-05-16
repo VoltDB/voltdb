@@ -74,12 +74,12 @@ public class ProfCtl extends VoltSystemProcedure {
                     return new DependencyPair(DEP_ID, table);
                 }
                 if (command.equalsIgnoreCase("GPERF_ENABLE")) {
-                    context.getExecutionEngine().toggleProfiler(1);
+                    context.getSiteProcedureConnection().toggleProfiler(1);
                     table.addRow("GPERF_ENABLE");
                     return new DependencyPair(DEP_ID, table);
                 }
                 else {
-                    context.getExecutionEngine().toggleProfiler(0);
+                    context.getSiteProcedureConnection().toggleProfiler(0);
                     table.addRow("GPERF_DISABLE");
                     return new DependencyPair(DEP_ID, table);
                 }

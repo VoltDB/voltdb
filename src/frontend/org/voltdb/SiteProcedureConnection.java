@@ -119,4 +119,21 @@ public interface SiteProcedureConnection {
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params);
 
+    public long[] getUSOForExportTable(String signature);
+
+    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
+                                               long txnId);
+
+    public void toggleProfiler(int toggle);
+
+    public void quiesce();
+
+    public void exportAction(boolean syncAction,
+                             int ackOffset,
+                             Long sequenceNumber,
+                             Integer partitionId,
+                             String tableSignature);
+
+    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+                                boolean interval, Long now);
 }

@@ -142,7 +142,7 @@ public class SnapshotSave extends VoltSystemProcedure
             return createSnapshotTargetsResults(dependencies);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesce) {
             // tell each site to quiesce
-            context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
+            context.getSiteProcedureConnection().quiesce();
             VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
             results.addRow(context.getSiteId());
             return new DependencyPair(DEP_snapshotSaveQuiesce, results);

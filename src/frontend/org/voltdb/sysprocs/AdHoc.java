@@ -68,7 +68,7 @@ public class AdHoc extends VoltSystemProcedure {
             for (int x : dependencies.keySet()) {
                 inputDepId = x; break;
             }
-            context.getExecutionEngine().stashWorkUnitDependencies(dependencies);
+            context.getSiteProcedureConnection().stashWorkUnitDependencies(dependencies);
         }
 
         VoltTable table = null;
@@ -83,10 +83,9 @@ public class AdHoc extends VoltSystemProcedure {
         {
             assert(plan != null);
             table =
-                context.getExecutionEngine().
-                executeCustomPlanFragment(plan, inputDepId, m_runner.getTxnState().txnId,
-                                          context.getLastCommittedTxnId(),
-                                          context.getNextUndo());
+                context.getSiteProcedureConnection().
+                executeCustomPlanFragment(plan, inputDepId,
+                                          m_runner.getTxnState().txnId);
         }
 
         return new DependencyPair(outputDepId, table);

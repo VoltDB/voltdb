@@ -22,14 +22,11 @@ import java.util.HashMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.jni.ExecutionEngine;
 
 public interface SystemProcedureExecutionContext {
     public Database getDatabase();
 
     public Cluster getCluster();
-
-    public ExecutionEngine getExecutionEngine();
 
     public long getLastCommittedTxnId();
 
