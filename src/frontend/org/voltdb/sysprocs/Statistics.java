@@ -238,7 +238,7 @@ public class Statistics extends VoltSystemProcedure {
 
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_site_id =
                 context.getSiteTracker().
                 getLowestSiteForHost(host_id);
@@ -268,7 +268,7 @@ public class Statistics extends VoltSystemProcedure {
 
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            int hostId = context.getExecutionSite().getCorrespondingHostId();
+            int hostId = context.getHostId();
             Long lowestSiteId =
                 context.getSiteTracker().
                 getLowestSiteForHost(hostId);
@@ -295,7 +295,7 @@ public class Statistics extends VoltSystemProcedure {
             final VoltTable result = new VoltTable(ioColumnInfo);
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_site_id =
                 context.getSiteTracker().
                 getLowestSiteForHost(host_id);
@@ -345,7 +345,7 @@ public class Statistics extends VoltSystemProcedure {
         else if (fragmentId == SysProcFragmentId.PF_liveClientData) {
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            int hostId = context.getExecutionSite().getCorrespondingHostId();
+            int hostId = context.getHostId();
             Long lowestSiteId =
                 context.getSiteTracker().
                 getLowestSiteForHost(hostId);

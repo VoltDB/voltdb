@@ -52,7 +52,7 @@ public class Promote extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx) throws Exception
     {
         // Choose the lowest site ID on this host to actually flip the bit
-        int host_id = ctx.getExecutionSite().getCorrespondingHostId();
+        int host_id = ctx.getHostId();
         Long lowest_site_id =
             ctx.getSiteTracker().
             getLowestSiteForHost(host_id);

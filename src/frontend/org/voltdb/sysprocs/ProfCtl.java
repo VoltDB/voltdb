@@ -64,7 +64,7 @@ public class ProfCtl extends VoltSystemProcedure {
             }
             else if (command.equalsIgnoreCase("GPERF_ENABLE") || command.equalsIgnoreCase("GPERF_DISABLE")) {
                 // Choose the lowest site ID on this host to do the work.
-                int host_id = context.getExecutionSite().getCorrespondingHostId();
+                int host_id = context.getHostId();
                 Long lowest_site_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);

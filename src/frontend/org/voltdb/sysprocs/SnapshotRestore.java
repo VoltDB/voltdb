@@ -241,7 +241,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             long snapshotTxnId = ((Long)params.toArray()[1]).longValue();
 
             // Choose the lowest site ID on this host to truncate export data
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
@@ -329,7 +329,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                     new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
@@ -388,7 +388,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             VoltTable result = ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
