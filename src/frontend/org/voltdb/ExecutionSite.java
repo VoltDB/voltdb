@@ -613,8 +613,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public SiteTracker getSiteTracker()                   { return m_tracker; }
         @Override
-        public void updateBackendLogLevels()                  { ExecutionSite.this.updateBackendLogLevels(); }
-        @Override
         public int getNumberOfPartitions()                    { return m_tracker.m_numberOfPartitions; }
         @Override
         public SiteProcedureConnection getSiteProcedureConnection()
