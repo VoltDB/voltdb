@@ -44,11 +44,15 @@ public interface SystemProcedureExecutionContext {
 
     public int getPartitionId();
 
+    public long getCatalogCRC();
+
     public SiteTracker getSiteTracker();
 
     public int getNumberOfPartitions();
 
     public SiteProcedureConnection getSiteProcedureConnection();
+
+    public SiteSnapshotConnection getSiteSnapshotConnection();
 
     public void updateBackendLogLevels();
 }
