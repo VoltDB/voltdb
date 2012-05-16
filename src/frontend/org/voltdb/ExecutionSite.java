@@ -97,7 +97,7 @@ import org.voltdb.utils.LogKeys;
  * do other things, but this is where the good stuff happens.
  */
 public class ExecutionSite
-implements Runnable, SiteTransactionConnection, SiteProcedureConnection
+implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSnapshotConnection
 {
     private VoltLogger m_txnlog;
     private final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
@@ -609,6 +609,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         @Override
         public int getPartitionId()                           { return m_tracker.getPartitionForSite(m_siteId); }
         @Override
+        public long getCatalogCRC()                           { return m_context.getCatalogCRC(); }
+        @Override
         public SiteTracker getSiteTracker()                   { return m_tracker; }
         @Override
         public void updateBackendLogLevels()                  { ExecutionSite.this.updateBackendLogLevels(); }
@@ -619,6 +621,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         {
             return ExecutionSite.this;
         }
+        @Override
+        public SiteSnapshotConnection getSiteSnapshotConnection()
+        {
+            return ExecutionSite.this;
+        }
+        @Override
+        public void updateBackendLogLevels()                  { ExecutionSite.this.updateBackendLogLevels(); }
     }
 
     SystemProcedureContext m_systemProcedureContext;
@@ -1790,10 +1799,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
      */
+    @Override
     public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
         m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts);
     }
 
+    @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
         return m_snapshotter.completeSnapshotWork(ee);
     }

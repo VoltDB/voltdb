@@ -130,10 +130,10 @@ public class SnapshotSaveAPI
                 return result;
             } else {
                 assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
-                context.getExecutionSite().initiateSnapshots(
+                context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
                         txnId,
-                        context.getExecutionSite().getSiteTracker().getAllHosts().size());
+                        context.getSiteTracker().getAllHosts().size());
             }
         }
 
@@ -142,7 +142,7 @@ public class SnapshotSaveAPI
             String status = "SUCCESS";
             String err = "";
             try {
-                failures = context.getExecutionSite().completeSnapshotWork();
+                failures = context.getSiteSnapshotConnection().completeSnapshotWork();
             } catch (InterruptedException e) {
                 status = "FAILURE";
                 err = e.toString();
@@ -230,7 +230,7 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        int hosts = context.getExecutionSite().getSiteTracker().getAllHosts().size();
+        int hosts = context.getSiteTracker().getAllHosts().size();
         createSnapshotCompletionNode( nonce, txnId, isTruncation, hosts);
 
         try {
@@ -301,7 +301,7 @@ public class SnapshotSaveAPI
             String hostname, final VoltTable result) {
         {
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
-            SiteTracker tracker = context.getExecutionSite().m_tracker;
+            SiteTracker tracker = context.getSiteTracker();
 
             MessageDigest digest;
             try {
@@ -356,11 +356,11 @@ public class SnapshotSaveAPI
 
                 Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                         txnId,
-                        context.getExecutionSite().m_context.getCatalogCRC(),
+                        context.getCatalogCRC(),
                         file_path,
                         file_nonce,
                         tables,
-                        context.getExecutionSite().getCorrespondingHostId(),
+                        context.getHostId(),
                         SnapshotSiteProcessor.getExportSequenceNumbers());
                 if (completionTask != null) {
                     SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
@@ -373,7 +373,7 @@ public class SnapshotSaveAPI
                 final SnapshotRegistry.Snapshot snapshotRecord =
                     SnapshotRegistry.startSnapshot(
                             txnId,
-                            context.getExecutionSite().getCorrespondingHostId(),
+                            context.getHostId(),
                             file_path,
                             file_nonce,
                             csv,
