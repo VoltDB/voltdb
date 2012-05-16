@@ -56,7 +56,7 @@ public class Promote extends VoltSystemProcedure {
         Long lowest_site_id =
             ctx.getSiteTracker().
             getLowestSiteForHost(host_id);
-        if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
+        if (ctx.getSiteId() == lowest_site_id)
         {
             VoltDB.instance().getHostMessenger().getZK().setData(
                     VoltZK.replicationrole,

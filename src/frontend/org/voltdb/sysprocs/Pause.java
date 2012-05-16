@@ -57,7 +57,7 @@ public class Pause extends VoltSystemProcedure
         int host_id = ctx.getHostId();
         Long lowest_site_id =
             ctx.getSiteTracker().getLowestSiteForHost(host_id);
-        if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
+        if (ctx.getSiteId() == lowest_site_id)
         {
             VoltDB.instance().setMode(OperationMode.PAUSED);
             try {
