@@ -77,6 +77,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.javaExecutable = javaExecutable;
         cl.jmxPort = jmxPort;
         cl.jmxHost = jmxHost;
+        cl.customCmdLn = customCmdLn;
 
         return cl;
     }
@@ -337,6 +338,16 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    // user-customizable string appeneded to commandline.
+    // useful to allow customization of VEM/REST cmdlns.
+    // Please don't abuse this by shoving lots of long-term
+    // things here that really deserve top-level fields.
+    String customCmdLn;
+    public CommandLine customCmdLn(String customCmdLn)
+    {
+        this.customCmdLn = customCmdLn;
+        return this;
+    }
 
     public void dumpToFile(String filename) {
         try {
@@ -468,6 +479,11 @@ public class CommandLine extends VoltDB.Configuration
         if (m_enableIV2)
         {
             cmdline.add("enableiv2");
+        }
+
+        if (customCmdLn != null && !customCmdLn.isEmpty())
+        {
+            cmdline.add(customCmdLn);
         }
 
         return cmdline;

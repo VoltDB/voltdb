@@ -15,7 +15,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj *.java
+    javac -target 1.6 -classpath $CLASSPATH -d obj *.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }
