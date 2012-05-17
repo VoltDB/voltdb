@@ -64,7 +64,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
             cluster.startUp();
 
             for (String s : cluster.getListenerAddresses()) {
-                client.createConnection(s, cluster.port(0));
+                client.createConnection(s);
             }
         }
         catch (Exception e) {
