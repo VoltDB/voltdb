@@ -17,9 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.Map;
-import java.util.concurrent.ConcurrentHashMap;
-
 import org.voltcore.utils.Pair;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -34,9 +31,6 @@ public class PrimaryRole implements InitiatorRole {
     private long txnIdSequence = 0;
     volatile long lastRespondedTxnId = -1;
     private volatile long[] replicas = null;
-
-    private final Map<Long, InFlightTxnState> pendingResponses =
-            new ConcurrentHashMap<Long, InFlightTxnState>();
 
     @Override
     public void offerInitiateTask(InitiateTaskMessage message)
