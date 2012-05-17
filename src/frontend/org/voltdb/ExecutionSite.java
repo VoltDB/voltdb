@@ -1135,6 +1135,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             boolean rejoinCompleted = false;
             try {
                 if (m_rejoinTaskLog.isEmpty()) {
+                    // if it's idle for 2 secs, switch over
                     long currentTime = System.currentTimeMillis();
                     if (m_lastTimeLogWasEmpty > 0 &&
                             (currentTime - m_lastTimeLogWasEmpty) > 2000) {
@@ -1169,7 +1170,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private void initiateRejoin(long rejoinCoordinatorHSId) {
         m_rejoinCoordinatorHSId = rejoinCoordinatorHSId;
 
-        // new rejoin code
+        // Construct a snapshot stream receiver
         Class<?> klass =
                 MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotSink",
                                        "Rejoin", false);
@@ -1186,6 +1187,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         List<byte[]> addresses = endPoints.getFirst();
         int port = endPoints.getSecond();
 
+        // Send a rejoin request to a replica of the same partition
         int partition = m_tracker.getPartitionForSite(getSiteId());
         long sourceSite = 0;
         List<Long> sourceSites = new ArrayList<Long>(m_tracker.getSitesForPartition(partition));
@@ -1197,7 +1199,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                     false, null);
         }
 
-        // Construct task log
+        // Construct task log and start logging task messages
         File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(),
                                     "rejoin_overflow");
         Class<?> taskLogKlass =
@@ -1258,6 +1260,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             return new RejoinMessage(getSiteId(), RejoinMessage.Type.FAILURE);
         }
 
+        /*
+         * The handler will be called when a snapshot request response comes
+         * back. It could potentially take a long time to successfully queue the
+         * snapshot request, or it may fail.
+         */
         SnapshotResponseHandler handler = new SnapshotResponseHandler() {
             @Override
             public void handleResponse(ClientResponse resp) {
