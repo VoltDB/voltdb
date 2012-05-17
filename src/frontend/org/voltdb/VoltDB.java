@@ -180,6 +180,13 @@ public class VoltDB {
         }
 
         public Configuration(PortGenerator ports) {
+            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
+            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
+            if (iv2 != null && iv2.equals("true"))
+            {
+                m_enableIV2 = true;
+            }
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
