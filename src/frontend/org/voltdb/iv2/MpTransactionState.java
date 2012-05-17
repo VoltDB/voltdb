@@ -22,7 +22,6 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.LinkedBlockingDeque;
 
@@ -43,6 +42,17 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class MpTransactionState extends TransactionState
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    /**
+     *  This is thrown by the TransactionState instance when something
+     *  goes wrong mid-fragment, and execution needs to back all the way
+     *  out to the stored procedure call.
+     */
+    // IZZY Consolidate me with MultiPartitionParticipantTransactionState
+    // and perhaps make me more descriptive
+    public static class FragmentFailureException extends RuntimeException {
+        private static final long serialVersionUID = 1L;
+    }
 
     final Iv2InitiateTaskMessage m_task;
 
@@ -137,17 +147,13 @@ public class MpTransactionState extends TransactionState
         // At some point maybe ProcedureRunner.slowPath() can get smarter
         if (task.getFragmentCount() > 0) {
             m_remoteWork = task;
-            // Distribute fragments to remote (not-this-site) destinations.
-            long[] non_local_hsids = new long[m_useHSIds.size() - 1];
-            int index = 0;
-            for (Long hsid : m_useHSIds) {
-                if (hsid != m_localHSId) {
-                    non_local_hsids[index] = hsid;
-                    ++index;
-                }
+            // Distribute fragments to remote destinations.
+            long[] non_local_hsids = new long[m_useHSIds.size()];
+            for (int i = 0; i < m_useHSIds.size(); i++) {
+                non_local_hsids[i] = m_useHSIds.get(i);
             }
             try {
-                // send to all non-local sites (for now)
+                // send to all non-local sites
                 // IZZY: This needs to go through mailbox.deliver()
                 // so that fragments could get replicated for k>0
                 if (non_local_hsids.length > 0) {
@@ -188,15 +194,18 @@ public class MpTransactionState extends TransactionState
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
                                                              m_useHSIds);
             // Add code to do local remote work.
-            Map<Integer, List<VoltTable>> local_frag =
-                processLocalFragmentTask(m_remoteWork, siteConnection);
-            for (Entry<Integer, List<VoltTable>> dep : local_frag.entrySet()) {
-                // every place that processes the map<int, list<volttable>> assumes
-                // only one returned table.
-                trackDependency(m_localHSId, dep.getKey(), dep.getValue().get(0));
-            }
+            //Map<Integer, List<VoltTable>> local_frag =
+            //    processLocalFragmentTask(m_remoteWork, siteConnection);
+            //for (Entry<Integer, List<VoltTable>> dep : local_frag.entrySet()) {
+            //    // every place that processes the map<int, list<volttable>> assumes
+            //    // only one returned table.
+            //    trackDependency(m_localHSId, dep.getKey(), dep.getValue().get(0));
+            //}
 
-            // if there are remote deps, block on them.
+            // if there are remote deps, block on them
+            // FragmentResponses indicating failure will throw an exception
+            // which will propogate out of handleReceivedFragResponse and
+            // cause ProcedureRunner to do the right thing and cause rollback.
             while (!checkDoneReceivingFragResponses()) {
                 try {
                     FragmentResponseMessage msg = m_newDeps.take();
@@ -210,6 +219,10 @@ public class MpTransactionState extends TransactionState
             }
         }
 
+        // Need to shortcut around local work here on rollback?
+        // Probably need to throw
+
+        // Rewrite these two calls to do the borrow from our local buddy
         // Next do local aggregating (or MP read) fragment stuff
         // Inject input deps for the local frags into the EE
         // use siteConnection.stashWorkUnitDependencies()
@@ -249,15 +262,20 @@ public class MpTransactionState extends TransactionState
 
     private void handleReceivedFragResponse(FragmentResponseMessage msg)
     {
+        if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
+            m_needsRollback = true;
+            if (msg.getException() != null) {
+                throw msg.getException();
+            } else {
+                throw new FragmentFailureException();
+            }
+        }
         for (int i = 0; i < msg.getTableCount(); i++)
         {
             int this_depId = msg.getTableDependencyIdAtIndex(i);
             VoltTable this_dep = msg.getTableAtIndex(i);
             long src_hsid = msg.getExecutorSiteId();
             trackDependency(src_hsid, this_depId, this_dep);
-        }
-        if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
-            m_needsRollback = true;
         }
     }
 

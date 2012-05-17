@@ -41,6 +41,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.exceptions.EEException;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -71,7 +72,7 @@ public class Iv2TestMpTransactionState extends TestCase
     // So any change to how that stuff is build will need to
     // be reflected here
     MpTestPlan createTestPlan(int batchSize, boolean readOnly,
-                              boolean replicatedTable,
+                              boolean replicatedTable, boolean rollback,
                               long[] remoteHSIds) throws IOException
     {
         boolean single_frag = readOnly && replicatedTable;
@@ -123,10 +124,16 @@ public class Iv2TestMpTransactionState extends TestCase
             for (int i = 0; i < remoteHSIds.length; i++) {
                 FragmentResponseMessage resp =
                     new FragmentResponseMessage(plan.remoteWork, remoteHSIds[i]);
-                for (int j = 0; j < distributedOutputDepIdArray.length; j++) {
-                    resp.addDependency(distributedOutputDepIdArray[j],
-                                       new VoltTable(new VoltTable.ColumnInfo("BOGO",
-                                                                              VoltType.BIGINT)));
+                if (rollback && i == (remoteHSIds.length - 1)) {
+                    resp.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR,
+                                   new EEException(1234));
+                }
+                else {
+                    for (int j = 0; j < distributedOutputDepIdArray.length; j++) {
+                        resp.addDependency(distributedOutputDepIdArray[j],
+                                           new VoltTable(new VoltTable.ColumnInfo("BOGO",
+                                                                                  VoltType.BIGINT)));
+                    }
                 }
                 System.out.println("RESPONSE: " + resp);
                 plan.generatedResponses.add(resp);
@@ -173,15 +180,13 @@ public class Iv2TestMpTransactionState extends TestCase
 
     private long[] configureHSIds(int count)
     {
-        long[] non_local = new long[count - 1];
+        long[] non_local = new long[count];
         int index = 0;
         for (long i = 0; i < count; i++)
         {
             allHsids.add(i);
-            if (i != localHsid) {
-                non_local[index] = i;
-                ++index;
-            }
+            non_local[index] = i;
+            ++index;
         }
         System.out.println(allHsids);
         return non_local;
@@ -198,7 +203,7 @@ public class Iv2TestMpTransactionState extends TestCase
         localHsid = 0;
         long[] non_local = configureHSIds(hsids);
 
-        MpTestPlan plan = createTestPlan(batch_size, true, false, non_local);
+        MpTestPlan plan = createTestPlan(batch_size, true, false, false, non_local);
 
         Mailbox mailbox = mock(Mailbox.class);
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
@@ -212,21 +217,18 @@ public class Iv2TestMpTransactionState extends TestCase
 
         // This will be passed a FragmentTaskMessage with no deps
         dut.createAllParticipatingFragmentWork(plan.remoteWork);
-        // verify no messages sent to remote initiators
-        verify(mailbox, never()).send(anyLong(), (VoltMessage)any());
-        verify(mailbox, never()).send(new long[] {anyLong()}, (VoltMessage)any());
+        // we should send one message
+        verify(mailbox).send(eq(new long[] {0}), (VoltMessage)any());
 
         // to simplify, offer messages first
         // offer all the necessary fragment responses to satisfy deps
         for (FragmentResponseMessage msg : plan.generatedResponses) {
+            System.out.println("Offering response: " + msg);
             dut.offerReceivedFragmentResponse(msg);
         }
 
         // if we've satisfied everything, this should run to completion
         Map<Integer, List<VoltTable>> results = dut.recursableRun(siteConnection);
-        // executePlanFragment called once per stmt for the distributed frag.
-        verify(siteConnection, times(batch_size)).
-            executePlanFragment(anyLong(), eq(-1), (ParameterSet)any(), anyLong(), eq(true));
         verify(siteConnection).executePlanFragment(anyLong(), eq(1000),
                                                    (ParameterSet)any(), anyLong(), eq(true));
         verify(siteConnection).executePlanFragment(anyLong(), eq(1001),
@@ -236,7 +238,7 @@ public class Iv2TestMpTransactionState extends TestCase
         // verify returned deps/tables
         assertEquals(batch_size, results.size());
         System.out.println(results);
-}
+    }
 
     @Test
     public void testMultiSitePartitionedRead() throws IOException, MessagingException
@@ -249,7 +251,7 @@ public class Iv2TestMpTransactionState extends TestCase
         localHsid = 0;
         long[] non_local = configureHSIds(hsids);
 
-        MpTestPlan plan = createTestPlan(batch_size, true, false, non_local);
+        MpTestPlan plan = createTestPlan(batch_size, true, false, false, non_local);
 
         Mailbox mailbox = mock(Mailbox.class);
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
@@ -263,8 +265,8 @@ public class Iv2TestMpTransactionState extends TestCase
 
         // This will be passed a FragmentTaskMessage with no deps
         dut.createAllParticipatingFragmentWork(plan.remoteWork);
-        // we should send 5 messages
-        verify(mailbox).send(eq(new long[] {1,2,3,4,5}), (VoltMessage)any());
+        // we should send 6 messages
+        verify(mailbox).send(eq(new long[] {0,1,2,3,4,5}), (VoltMessage)any());
 
         // to simplify, offer messages first
         // offer all the necessary fragment responses to satisfy deps
@@ -274,9 +276,6 @@ public class Iv2TestMpTransactionState extends TestCase
 
         // if we've satisfied everything, this should run to completion
         Map<Integer, List<VoltTable>> results = dut.recursableRun(siteConnection);
-        // executePlanFragment called once per stmt for the distributed frag.
-        verify(siteConnection, times(batch_size)).
-            executePlanFragment(anyLong(), eq(-1), (ParameterSet)any(), anyLong(), eq(true));
         verify(siteConnection).executePlanFragment(anyLong(), eq(1000),
                                                    (ParameterSet)any(), anyLong(), eq(true));
         verify(siteConnection).executePlanFragment(anyLong(), eq(1001),
@@ -299,7 +298,7 @@ public class Iv2TestMpTransactionState extends TestCase
         localHsid = 3;
         long[] non_local = configureHSIds(hsids);
 
-        MpTestPlan plan = createTestPlan(batch_size, true, true, non_local);
+        MpTestPlan plan = createTestPlan(batch_size, true, true, false, non_local);
 
         Mailbox mailbox = mock(Mailbox.class);
         SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
@@ -331,5 +330,54 @@ public class Iv2TestMpTransactionState extends TestCase
         // verify returned deps/tables
         assertEquals(batch_size, results.size());
         System.out.println(results);
+    }
+
+    @Test
+    public void testOneSitePartitionedReadWithRollback() throws IOException, MessagingException
+    {
+        long txnId = 1234l;
+        int batch_size = 3;
+        Iv2InitiateTaskMessage taskmsg =
+            new Iv2InitiateTaskMessage(0, 0, txnId, true, false, null, 0);
+        int hsids = 1;
+        localHsid = 0;
+        long[] non_local = configureHSIds(hsids);
+
+        MpTestPlan plan = createTestPlan(batch_size, true, false, true, non_local);
+
+        Mailbox mailbox = mock(Mailbox.class);
+        SiteProcedureConnection siteConnection = mock(SiteProcedureConnection.class);
+
+        MpTransactionState dut =
+            new MpTransactionState(mailbox, txnId, taskmsg, allHsids, localHsid);
+
+        // emulate ProcedureRunner's use for a single local fragment
+        dut.setupProcedureResume(true, plan.depsToResume);
+        dut.createLocalFragmentWork(plan.localWork, false);
+
+        // This will be passed a FragmentTaskMessage with no deps
+        dut.createAllParticipatingFragmentWork(plan.remoteWork);
+        // we should send one message
+        verify(mailbox).send(eq(new long[] {0}), (VoltMessage)any());
+
+        // to simplify, offer messages first
+        // offer all the necessary fragment responses to satisfy deps
+        for (FragmentResponseMessage msg : plan.generatedResponses) {
+            System.out.println("Offering response: " + msg);
+            dut.offerReceivedFragmentResponse(msg);
+        }
+
+        // We're getting an error, so this should throw something
+        boolean threw = false;
+        try {
+            Map<Integer, List<VoltTable>> results = dut.recursableRun(siteConnection);
+            fail();
+        }
+        catch (EEException eee) {
+            if (eee.getErrorCode() == 1234) {
+                threw = true;
+            }
+        }
+        assertTrue(threw);
     }
 }

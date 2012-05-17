@@ -799,7 +799,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             long initiatorHSId = isSinglePartition ?
                 VoltDB.instance().getSiteTracker().m_partitionToInitiatorsImmutable.get(partitions[0]).get(0) :
-                VoltDB.instance().getSiteTracker().m_partitionToInitiatorsImmutable.get(0).get(0);
+                VoltDB.instance().getSiteTracker().getHSIdForMultiPartitionInitiator();
 
             Iv2InitiateTaskMessage workRequest =
                 new Iv2InitiateTaskMessage(m_siteId,

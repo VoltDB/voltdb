@@ -244,7 +244,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     {
         // If MPI and multipart, deliver to client interface
         // if MPI or partition master and singlepart, dedupe and deliver to client interface
-        if (m_partitionId == 0) {
+        if (m_partitionId == -1) {
             m_scheduler.handleInitiateResponseMessage(message);
         }
         // if partition replica, deliver to partition master
@@ -270,7 +270,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         // if MPI, schedule
-        if (m_partitionId == 0)
+        if (m_partitionId == -1)
         {
             m_scheduler.handleFragmentResponseMessage(message);
         }
