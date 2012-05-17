@@ -40,12 +40,6 @@ public interface SiteProcedureConnection {
     public HsqlBackend getHsqlBackendIfExists();
 
     /**
-     * Get the HSQL backend, if any.  Returns null if we're not configured
-     * to use it
-     */
-    public HsqlBackend getHsqlBackendIfExists();
-
-    /**
      * Get the catalog site id for the corresponding SiteProcedureConnection
      */
     public long getCorrespondingSiteId();
