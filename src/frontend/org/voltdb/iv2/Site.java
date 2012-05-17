@@ -17,43 +17,39 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.atomic.AtomicInteger;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.BackendTarget;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
-import org.voltdb.iv2.SiteTasker;
+import org.voltdb.ExecutionSite;
+import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ParameterSet;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
 import org.voltdb.SysProcSelector;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.VoltTable;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
-import org.voltdb.ExecutionSite;
-import org.voltdb.HsqlBackend;
-import org.voltdb.iv2.SiteTaskerQueue;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
-import org.voltdb.ProcedureRunner;
-import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
-import org.voltdb.VoltProcedure.VoltAbortException;
-import org.voltdb.VoltTable;
 
 public class Site implements Runnable, SiteProcedureConnection
 {

@@ -17,19 +17,14 @@
 
 package org.voltdb.iv2;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.utils.LogKeys;
