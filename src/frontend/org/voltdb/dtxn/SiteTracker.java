@@ -58,6 +58,8 @@ public class SiteTracker implements PartitionClerk {
 
     public final ImmutableSet<Long> m_allIv2InitiatorsImmutable;
 
+    public final ImmutableSet<Long> m_allIv2MpInitiatorsImmutable;
+
     public final ImmutableMap<Integer, ImmutableList<Long>> m_hostsToSitesImmutable;
 
     public final ImmutableMap<Integer, ImmutableList<Integer>> m_hostsToPartitionsImmutable;
@@ -95,6 +97,7 @@ public class SiteTracker implements PartitionClerk {
         m_allSitesImmutable = null;
         m_allInitiatorsImmutable = null;
         m_allIv2InitiatorsImmutable = null;
+        m_allIv2MpInitiatorsImmutable = null;
         m_hostsToSitesImmutable = null;
         m_numberOfHosts = 1;
         m_numberOfExecutionSites = 0;
@@ -131,6 +134,7 @@ public class SiteTracker implements PartitionClerk {
         ImmutableSet.Builder<Long> allExecutionSites = ImmutableSet.<Long>builder();
         ImmutableSet.Builder<Long> allInitiators = ImmutableSet.<Long>builder();
         ImmutableSet.Builder<Long> allIv2Initiators = ImmutableSet.<Long>builder();
+        ImmutableSet.Builder<Long> allIv2MpInitiators = ImmutableSet.<Long>builder();
 
         Map<MailboxType, Map<Integer, List<Long>>> hostsToOtherHSIds =
             new HashMap<MailboxType, Map<Integer, List<Long>>>();
@@ -145,7 +149,12 @@ public class SiteTracker implements PartitionClerk {
                         allHosts,
                         allExecutionSites);
             } else if (e.getKey().equals(MailboxType.Initiator)) {
-                populateInitiators(e.getValue(), hostsToInitiators, partitionToInitiators, allInitiators, allIv2Initiators);
+                populateInitiators(e.getValue(),
+                                   hostsToInitiators,
+                                   partitionToInitiators,
+                                   allInitiators,
+                                   allIv2Initiators,
+                                   allIv2MpInitiators);
             } if (e.getKey().equals(MailboxType.StatsAgent)) {
                 populateStatsAgents(e.getValue());
             } else {
@@ -163,6 +172,7 @@ public class SiteTracker implements PartitionClerk {
 
         m_allInitiatorsImmutable = allInitiators.build();
         m_allIv2InitiatorsImmutable = allIv2Initiators.build();
+        m_allIv2MpInitiatorsImmutable = allIv2MpInitiators.build();
         m_allExecutionSitesImmutable = allExecutionSites.build();
         m_allHostsImmutable = allHosts.build();
 
@@ -190,6 +200,7 @@ public class SiteTracker implements PartitionClerk {
         allSites.addAll(m_allExecutionSitesImmutable);
         allSites.addAll(m_allInitiatorsImmutable);
         allSites.addAll(m_allIv2InitiatorsImmutable);
+        allSites.addAll(m_allIv2MpInitiatorsImmutable);
         for (List<Long> siteIds : otherHSIds.values()) {
             allSites.addAll(siteIds);
         }
@@ -263,7 +274,8 @@ public class SiteTracker implements PartitionClerk {
                                     Map<Integer, List<Long>> hostsToInitiators,
                                     Map<Integer, List<Long>> partitionToInitiators,
                                     ImmutableSet.Builder<Long> allInitiators,
-                                    ImmutableSet.Builder<Long> allIv2Initiators)
+                                    ImmutableSet.Builder<Long> allIv2Initiators,
+                                    ImmutableSet.Builder<Long> allIv2MpInitiators)
     {
         for (MailboxNodeContent obj : objs) {
             int hostId = CoreUtils.getHostIdFromHSId(obj.HSId);
@@ -278,15 +290,23 @@ public class SiteTracker implements PartitionClerk {
                 initiators.add(obj.HSId);
                 allInitiators.add(obj.HSId);
             } else {
-                List<Long> initiators_for_part =
-                    partitionToInitiators.get(obj.partitionId);
-                if (initiators_for_part == null) {
-                    initiators_for_part = new ArrayList<Long>();
-                    partitionToInitiators.put(obj.partitionId,
-                                              initiators_for_part);
+                // This builds the IV2 initiator lookup.
+                // We currently hack partition ID -1 as the MPI.
+                // Consider making a different MailboxType in the future
+                if (obj.partitionId == -1) {
+                    allIv2MpInitiators.add(obj.HSId);
                 }
-                initiators_for_part.add(obj.HSId);
-                allIv2Initiators.add(obj.HSId);
+                else {
+                    List<Long> initiators_for_part =
+                        partitionToInitiators.get(obj.partitionId);
+                    if (initiators_for_part == null) {
+                        initiators_for_part = new ArrayList<Long>();
+                        partitionToInitiators.put(obj.partitionId,
+                                                  initiators_for_part);
+                    }
+                    initiators_for_part.add(obj.HSId);
+                    allIv2Initiators.add(obj.HSId);
+                }
             }
         }
     }
@@ -492,6 +512,12 @@ public class SiteTracker implements PartitionClerk {
             return new ArrayList<Long>();
         }
         return hostIdList.get(host);
+    }
+
+    public Long getHSIdForMultiPartitionInitiator() {
+        // There's only one for now, just return it.  We'll need
+        // some leader election/master business when we replicate the MPI
+        return m_allIv2MpInitiatorsImmutable.iterator().next();
     }
 
     @Override

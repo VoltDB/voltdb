@@ -424,6 +424,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     JSONObject topo = registerClusterConfig(p.getSecond());
                     List<Integer> partitions =
                         ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
+                    if (topo.getInt("MPI") == m_messenger.getHostId()) {
+                        partitions.add(-1);
+                    }
                     m_iv2Initiators = createIv2Initiators(partitions);
                 }
 

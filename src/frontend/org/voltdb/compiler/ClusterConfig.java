@@ -156,6 +156,7 @@ public class ClusterConfig
         stringer.key("hostcount").value(m_hostCount);
         stringer.key("kfactor").value(getReplicationFactor());
         stringer.key("sites_per_host").value(sitesPerHost);
+        stringer.key("MPI").value(hostIds.get(0));
         stringer.key("partitions").array();
         for (int part = 0; part < partitionCount; part++)
         {
@@ -173,6 +174,7 @@ public class ClusterConfig
         stringer.endObject();
 
         JSONObject topo = new JSONObject(stringer.toString());
+        hostLog.info("TOPO: " + topo.toString(2));
         return topo;
     }
 
