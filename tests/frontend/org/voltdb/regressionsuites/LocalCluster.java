@@ -873,7 +873,9 @@ public class LocalCluster implements VoltServerConfig {
             return null;
         }
         ArrayList<String> listeners = new ArrayList<String>();
-        listeners.add("localhost");
+        for (CommandLine cl : m_cmdLines) {
+            listeners.add("localhost:" + cl.m_port);
+        }
         return listeners;
     }
 

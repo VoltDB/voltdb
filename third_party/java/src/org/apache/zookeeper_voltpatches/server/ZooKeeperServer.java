@@ -32,9 +32,10 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
+import javax.management.InstanceAlreadyExistsException;
+
 import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.apache.jute_voltpatches.Record;
-import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
@@ -278,14 +279,21 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
 
             try {
                 jmxDataTreeBean = new DataTreeBean(zkDb.getDataTree());
-                MBeanRegistry.getInstance().register(jmxDataTreeBean,
-                        jmxServerBean);
-            } catch (Exception e) {
-                LOG.warn("Failed to register with JMX", e);
+                MBeanRegistry.getInstance().register(jmxDataTreeBean, jmxServerBean);
+            }
+            catch (Exception e) {
+                LOG.error("Failed to register with JMX.", e);
                 jmxDataTreeBean = null;
             }
-        } catch (Exception e) {
-            LOG.warn("Failed to register with JMX", e);
+        }
+        catch (InstanceAlreadyExistsException e) {
+            LOG.error("Failed to register ZooKeeper with JMX due to a conflict. " +
+            		"You are likely running two VoltDB instances on one system. " +
+            		"This will only affect JMX management.");
+            jmxServerBean = null;
+        }
+        catch (Exception e) {
+            LOG.error("Failed to register with JMX.", e);
             jmxServerBean = null;
         }
     }

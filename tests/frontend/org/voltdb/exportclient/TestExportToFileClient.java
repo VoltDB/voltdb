@@ -32,7 +32,6 @@ import java.net.InetSocketAddress;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -102,7 +101,7 @@ public class TestExportToFileClient extends TestCase {
 
         final String listener = cluster.getListenerAddresses().get(0);
         final Client client = ClientFactory.createClient();
-        client.createConnection(listener, cluster.port(0));
+        client.createConnection(listener);
         client.callProcedure("Insert", 5);
         client.close();
 
