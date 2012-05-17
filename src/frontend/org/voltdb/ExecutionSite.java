@@ -596,16 +596,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public Database getDatabase()                         { return m_context.database; }
         @Override
         public Cluster getCluster()                           { return m_context.cluster; }
-        //@Override
-        //public ExecutionEngine getExecutionEngine()           { return ee; }
         @Override
         public long getLastCommittedTxnId()                   { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                         { return m_currentTransactionState.txnId; }
         @Override
         public long getNextUndo()                             { return getNextUndoToken(); }
-        @Override
-        public ExecutionSite getExecutionSite()               { return ExecutionSite.this; }
         @Override
         public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
@@ -631,8 +627,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             return ExecutionSite.this;
         }
         @Override
-        public void updateBackendLogLevels()                  { ExecutionSite.this.updateBackendLogLevels(); }
-
+        public void updateBackendLogLevels()
+        {
+            ExecutionSite.this.updateBackendLogLevels();
+        }
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context)
         {

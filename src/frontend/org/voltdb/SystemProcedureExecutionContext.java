@@ -34,8 +34,6 @@ public interface SystemProcedureExecutionContext {
 
     public long getNextUndo();
 
-    public ExecutionSite getExecutionSite();
-
     public HashMap<String, ProcedureRunner> getProcedures();
 
     public long getSiteId();

@@ -162,11 +162,6 @@ public class Site implements Runnable, SiteProcedureConnection
         }
 
         @Override
-        public ExecutionSite getExecutionSite() {
-            throw new RuntimeException("Not implemented in iv2");
-        }
-
-        @Override
         public HashMap<String, ProcedureRunner> getProcedures() {
             throw new RuntimeException("Not implemented in iv2");
             // return m_loadedProcedures.procs;
