@@ -1,0 +1,113 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2012 VoltDB Inc.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
+package org.voltdb.messaging;
+
+import java.io.IOException;
+import java.nio.ByteBuffer;
+import java.util.List;
+import java.util.Map;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltTable;
+
+/**
+ * Message from a stored procedure coordinator to an execution site
+ * which is participating in the transaction. This message specifies
+ * which planfragment to run and with which parameters.
+ *
+ * This message should NEVER go over the network, so there
+ */
+public class BorrowTaskMessage extends TransactionInfoBaseMessage
+{
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
+    Map<Integer, List<VoltTable>> m_inputDeps = null;
+    FragmentTaskMessage m_fragTask;
+
+    /** Empty constructor for de-serialization */
+    BorrowTaskMessage() {
+        m_subject = Subject.DEFAULT.getId();
+    }
+
+    public BorrowTaskMessage(FragmentTaskMessage frag)
+    {
+        super(frag.getInitiatorHSId(),
+              frag.getCoordinatorHSId(),
+              frag.getTxnId(),
+              frag.isReadOnly());
+        m_subject = Subject.DEFAULT.getId();
+        m_fragTask = frag;
+    }
+
+    public FragmentTaskMessage getFragmentTaskMessage()
+    {
+        return m_fragTask;
+    }
+
+    public void addInputDepMap(Map<Integer, List<VoltTable>> inputDeps)
+    {
+        assert(inputDeps.size() == m_fragTask.m_inputDepCount);
+        m_inputDeps = inputDeps;
+    }
+
+    public Map<Integer, List<VoltTable>> getInputDepMap()
+    {
+        return m_inputDeps;
+    }
+
+    @Override
+    public int getSerializedSize()
+    {
+        throw new RuntimeException("Preparing to serialize BorrowTaskMessage, " +
+                                   "which should never happen");
+    }
+
+    @Override
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+        throw new RuntimeException("Preparing to serialize BorrowTaskMessage, " +
+                                   "which should never happen");
+    }
+
+    @Override
+    public void initFromBuffer(ByteBuffer buf) throws IOException {
+        throw new RuntimeException("Preparing to serialize BorrowTaskMessage, " +
+                                   "which should never happen");
+    }
+
+    @Override
+    public String toString() {
+        StringBuilder sb = new StringBuilder();
+
+        sb.append("BORROW_TASK (FROM ");
+        sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
+        sb.append(") FOR TXN ");
+        sb.append(m_txnId);
+
+        sb.append("\n");
+        if (m_isReadOnly)
+            sb.append("  READ, COORD ");
+        else
+            sb.append("  WRITE, COORD ");
+        sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
+
+        return sb.toString();
+    }
+}

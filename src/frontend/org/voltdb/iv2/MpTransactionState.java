@@ -29,12 +29,11 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.DependencyPair;
-import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -64,18 +63,18 @@ public class MpTransactionState extends TransactionState
     Map<Integer, Set<Long>> m_localDeps;
     Set<Integer> m_finalDeps;
     List<Long> m_useHSIds;
-    long m_localHSId;
+    long m_buddyHSId;
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
 
     MpTransactionState(Mailbox mailbox, long txnId,
                        TransactionInfoBaseMessage notice,
-                       List<Long> useHSIds, long localHSId)
+                       List<Long> useHSIds, long buddyHSId)
     {
         super(txnId, mailbox, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
         m_useHSIds = useHSIds;
-        m_localHSId = localHSId;
+        m_buddyHSId = buddyHSId;
     }
 
     @Override
@@ -193,18 +192,9 @@ public class MpTransactionState extends TransactionState
             // Create some record of expected dependencies for tracking
             m_remoteDeps = createTrackedDependenciesFromTask(m_remoteWork,
                                                              m_useHSIds);
-            // Add code to do local remote work.
-            //Map<Integer, List<VoltTable>> local_frag =
-            //    processLocalFragmentTask(m_remoteWork, siteConnection);
-            //for (Entry<Integer, List<VoltTable>> dep : local_frag.entrySet()) {
-            //    // every place that processes the map<int, list<volttable>> assumes
-            //    // only one returned table.
-            //    trackDependency(m_localHSId, dep.getKey(), dep.getValue().get(0));
-            //}
-
             // if there are remote deps, block on them
             // FragmentResponses indicating failure will throw an exception
-            // which will propogate out of handleReceivedFragResponse and
+            // which will propagate out of handleReceivedFragResponse and
             // cause ProcedureRunner to do the right thing and cause rollback.
             while (!checkDoneReceivingFragResponses()) {
                 try {
@@ -219,20 +209,51 @@ public class MpTransactionState extends TransactionState
             }
         }
 
-        // Need to shortcut around local work here on rollback?
-        // Probably need to throw
+        BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
+        borrowmsg.addInputDepMap(m_remoteDepTables);
+        try {
+            m_mbox.send(m_buddyHSId, borrowmsg);
+        }
+        catch (MessagingException me) {
+            throw new RuntimeException(me);
+        }
 
-        // Rewrite these two calls to do the borrow from our local buddy
-        // Next do local aggregating (or MP read) fragment stuff
-        // Inject input deps for the local frags into the EE
-        // use siteConnection.stashWorkUnitDependencies()
-        siteConnection.stashWorkUnitDependencies(m_remoteDepTables);
+        FragmentResponseMessage msg = null;
+        try {
+            msg = m_newDeps.take();
+        }
+        catch (InterruptedException e) {
+            // this is a valid shutdown path.
+            hostLog.warn("Interrupted coordinating a multi-partition transaction. " +
+                         "Terminating the transaction. " + e);
+            terminateTransaction();
+        }
 
-        // Then execute the fragment task.  Looks like ExecutionSite.processFragmentTask(),
-        // kinda, at least for now while we're executing stuff locally.
-        // Probably don't need to generate a FragmentResponse
+        // If the final fragment caused an error we'll need to trip rollback
+        // This is duped from handleReceivedFragResponse, consolidate later
+        if (msg.getStatusCode() != FragmentResponseMessage.SUCCESS) {
+            m_needsRollback = true;
+            if (msg.getException() != null) {
+                throw msg.getException();
+            } else {
+                throw new FragmentFailureException();
+            }
+        }
+        // Build results from the FragmentResponseMessage
+        // This is similar to dependency tracking...maybe some
+        // sane way to merge it
         Map<Integer, List<VoltTable>> results =
-            processLocalFragmentTask(m_localWork, siteConnection);
+            new HashMap<Integer, List<VoltTable>>();
+        for (int i = 0; i < msg.getTableCount(); i++) {
+            int this_depId = msg.getTableDependencyIdAtIndex(i);
+            VoltTable this_dep = msg.getTableAtIndex(i);
+            List<VoltTable> tables = results.get(this_depId);
+            if (tables == null) {
+                tables = new ArrayList<VoltTable>();
+                results.put(this_depId, tables);
+            }
+            tables.add(this_dep);
+        }
 
         // Need some sanity check that we got all of the expected output dependencies?
         return results;
@@ -240,7 +261,6 @@ public class MpTransactionState extends TransactionState
 
     private void trackDependency(long hsid, int depId, VoltTable table)
     {
-        // check me for null for sanity
         // Remove the distributed fragment for this site from remoteDeps
         // for the dependency Id depId.
         Set<Long> localRemotes = m_remoteDeps.get(depId);
@@ -290,76 +310,6 @@ public class MpTransactionState extends TransactionState
         return done;
     }
 
-
-    // Cut-and-pasted from ExecutionSite.processFragmentTask().
-    // Very similar to FragmentTask.processFragmentTask()...consider future
-    // consolidation.
-    private Map<Integer, List<VoltTable>>
-    processLocalFragmentTask(FragmentTaskMessage ftask,
-                             SiteProcedureConnection siteConnection)
-    {
-        Map<Integer, List<VoltTable>> depResults =
-            new HashMap<Integer, List<VoltTable>>();
-
-        for (int frag = 0; frag < ftask.getFragmentCount(); frag++)
-        {
-            final long fragmentId = ftask.getFragmentId(frag);
-            final int outputDepId = ftask.getOutputDepId(frag);
-
-            ParameterSet params = ftask.getParameterSetForFragment(frag);
-
-            if (ftask.isSysProcTask()) {
-                final DependencyPair dep
-                    = siteConnection.executePlanFragment(this,
-                            m_remoteDepTables,
-                            fragmentId,
-                            params);
-
-                List<VoltTable> tables = depResults.get(outputDepId);
-                if (tables == null) {
-                    tables = new ArrayList<VoltTable>();
-                    depResults.put(outputDepId, tables);
-                }
-                tables.add(dep.dependency);
-                return depResults;
-            }
-            else {
-                final int inputDepId = ftask.getOnlyInputDepId(frag);
-
-                // The try/catch from ExecutionSite goes away here, and
-                // we let the exceptions bubble up to ProcedureRunner.call()
-                // for handling?
-                // IZZY: skeptical, need to test exception on final
-                // fragment rollback
-                final VoltTable dependency =
-                    siteConnection.executePlanFragment(fragmentId,
-                                                       inputDepId,
-                                                       params,
-                                                       txnId,
-                                                       isReadOnly());
-                List<VoltTable> tables = depResults.get(outputDepId);
-                if (tables == null) {
-                    tables = new ArrayList<VoltTable>();
-                    depResults.put(outputDepId, tables);
-                }
-                tables.add(dependency);
-                // IZZY: Keep the handled exceptions around for now until we
-                // verify functionality
-                //} catch (final EEException e) {
-                //    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                //    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                //    break;
-                //} catch (final SQLException e) {
-                //    hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
-                //    currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-                //    break;
-                //}
-            }
-        }
-
-        return depResults;
-    }
-
     // Runs from Mailbox's network thread
     public void offerReceivedFragmentResponse(FragmentResponseMessage message)
     {
@@ -377,5 +327,4 @@ public class MpTransactionState extends TransactionState
     {
         throw new RuntimeException("terminateTransaction is not yet implemented.");
     }
-
 }
