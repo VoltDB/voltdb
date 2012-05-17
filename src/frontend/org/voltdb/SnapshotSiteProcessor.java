@@ -43,6 +43,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.utils.CatalogUtil;
@@ -158,9 +159,9 @@ public class SnapshotSiteProcessor {
      * set and reset the contents.
      */
     public static void populateExportSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
-        ExecutionSite site = context.getExecutionSite();
-        for (Table t : site.m_context.database.getTables()) {
-            if (!CatalogUtil.isTableExportOnly(site.m_context.database, t))
+        Database database = context.getDatabase();
+        for (Table t : database.getTables()) {
+            if (!CatalogUtil.isTableExportOnly(database, t))
                 continue;
 
             List<Pair<Integer, Long>> sequenceNumbers = m_exportSequenceNumbers.get(t.getTypeName());
@@ -173,7 +174,7 @@ public class SnapshotSiteProcessor {
                 context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
             sequenceNumbers.add(
                     Pair.of(
-                            context.getExecutionSite().getCorrespondingPartitionId(),
+                            context.getPartitionId(),
                             ackOffSetAndSequenceNumber[1]));
         }
     }
