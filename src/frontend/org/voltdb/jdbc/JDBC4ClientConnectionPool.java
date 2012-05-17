@@ -187,7 +187,7 @@ public class JDBC4ClientConnectionPool {
      * provided.
      *
      * @param clientConnectionKeyBase
-     *            the base hash/key identifying the connections from which stattistics will be
+     *            the base hash/key identifying the connections from which statistics will be
      *            pulled.
      * @return the counter map aggregated across all the connections in the pool with the same
      *         parameters as provided.

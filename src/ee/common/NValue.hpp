@@ -97,8 +97,14 @@ inline void throwCastSQLValueOutOfRangeException<int64_t>(
             valueToString(origType).c_str(),
             (intmax_t)value,
             valueToString(newType).c_str());
+
+    // record underflow or overflow for executors that catch this (indexes, mostly)
+    int internalFlags = 0;
+    if (value > 0) internalFlags |= SQLException::TYPE_OVERFLOW;
+    if (value < 0) internalFlags |= SQLException::TYPE_UNDERFLOW;
+
     throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                       msg);
+                       msg, internalFlags);
 }
 
 

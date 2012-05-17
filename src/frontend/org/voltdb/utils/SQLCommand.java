@@ -39,6 +39,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -914,7 +915,12 @@ public class SQLCommand
                 }
             }
             HashMap<Integer, List<String>> argLists = new HashMap<Integer, List<String>>();
-            argLists.put(proc_param_counts.get(proc_name), this_params);
+            if (proc_param_counts.containsKey(proc_name)) {
+                argLists.put(proc_param_counts.get(proc_name), this_params);
+            } else {
+                argLists.put(0, this_params);
+
+            }
             procedures.put(procs.getString("PROCEDURE_NAME"), argLists);
         }
         while (params.advanceRow())
