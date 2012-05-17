@@ -186,6 +186,7 @@ public class ClientConfig {
             throw new IllegalArgumentException(
                     "Max TPS must be greater than 0, " + maxTxnsPerSecond + " was specified");
         }
+        m_maxTransactionsPerSecond = maxTxnsPerSecond;
     }
 
     /**

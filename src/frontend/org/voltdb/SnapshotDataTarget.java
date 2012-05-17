@@ -23,7 +23,6 @@ import java.io.IOException;
 import java.util.concurrent.Callable;
 
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 
 public interface SnapshotDataTarget {
     /**

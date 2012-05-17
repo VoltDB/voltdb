@@ -22,6 +22,7 @@
 #include <cfloat>
 #include <climits>
 #include <cmath>
+#include <cstdlib>
 #include <exception>
 #include <limits>
 #include <stdint.h>
@@ -96,8 +97,14 @@ inline void throwCastSQLValueOutOfRangeException<int64_t>(
             valueToString(origType).c_str(),
             (intmax_t)value,
             valueToString(newType).c_str());
+
+    // record underflow or overflow for executors that catch this (indexes, mostly)
+    int internalFlags = 0;
+    if (value > 0) internalFlags |= SQLException::TYPE_OVERFLOW;
+    if (value < 0) internalFlags |= SQLException::TYPE_UNDERFLOW;
+
     throw SQLException(SQLException::data_exception_numeric_value_out_of_range,
-                       msg);
+                       msg, internalFlags);
 }
 
 
@@ -237,13 +244,22 @@ class NValue {
     /* Return a copy of MIN(this, rhs) */
     NValue op_min(const NValue rhs) const;
 
-    /* For number NValues, compute new NValues for arthimetic operators */
+    /* For number NValues, compute new NValues for arithmetic operators */
     NValue op_increment() const;
     NValue op_decrement() const;
     NValue op_subtract(const NValue rhs) const;
     NValue op_add(const NValue rhs) const;
     NValue op_multiply(const NValue rhs) const;
     NValue op_divide(const NValue rhs) const;
+
+    template <ExpressionType E> // template for SQL functions returning constants (like pi)
+    static NValue callConstant();
+
+    template <ExpressionType E> // template for SQL functions of one NValue
+    NValue callUnary() const;
+
+    template <ExpressionType E> // template for SQL functions of multiple NValues
+    static NValue call(const std::vector<NValue>& arguments);
 
     /* For boost hashing */
     void hashCombine(std::size_t &seed) const;
@@ -1053,7 +1069,7 @@ class NValue {
             const int32_t objectLength = getObjectLength();
             if (objectLength > maxLength) {
                 char msg[1024];
-                snprintf(msg, 1024, "Object exceeds specified size. Size is %d and max is %d", objectLength, maxLength);
+                snprintf(msg, 1024, "In NValue::inlineCopyObject, Object exceeds specified size. Size is %d and max is %d", objectLength, maxLength);
                 throw SQLException(SQLException::data_exception_string_data_length_mismatch,
                                    msg);
             }
@@ -1973,7 +1989,7 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
                 const int32_t minlength = lengthLength + length;
                 if (length > maxLength) {
                     char msg[1024];
-                    snprintf(msg, 1024, "Object exceeds specified size. Size is %d"
+                    snprintf(msg, 1024, "In NValue::serializeToTupleStorageAllocateForObjects, Object exceeds specified size. Size is %d"
                             " and max is %d", length, maxLength);
                     throw SQLException(
                         SQLException::data_exception_string_data_length_mismatch,
@@ -2045,7 +2061,7 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             else {
                 const int32_t length = getObjectLength();
                 char msg[1024];
-                snprintf(msg, 1024, "Object exceeds specified size. Size is %d and max is %d", length, maxLength);
+                snprintf(msg, 1024, "In NValue::serializeToTupleStorage(), Object exceeds specified size. Size is %d and max is %d", length, maxLength);
                 throw SQLException(
                     SQLException::data_exception_string_data_length_mismatch,
                     msg);
@@ -2094,7 +2110,7 @@ inline void NValue::deserializeFrom(SerializeInput &input, const ValueType type,
           const int32_t length = input.readInt();
           if (length > maxLength) {
               char msg[1024];
-              snprintf(msg, 1024, "Object exceeds specified size. Size is %d and max is %d", length, maxLength);
+              snprintf(msg, 1024, "In NValue::deserializeFrom, Object exceeds specified size. Size is %d and max is %d", length, maxLength);
               throw SQLException(
                   SQLException::data_exception_string_data_length_mismatch,
                   msg);
@@ -2688,6 +2704,29 @@ inline NValue NValue::op_divide(const NValue rhs) const {
                getTypeName(rhs.getValueType()).c_str());
 }
 
+
+template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const {
+    const ValueType type = getValueType();
+    NValue retval(type);
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+        retval.getTinyInt() = static_cast<int8_t>(std::abs(getTinyInt())); break;
+    case VALUE_TYPE_SMALLINT:
+        retval.getSmallInt() = static_cast<int16_t>(std::abs(getSmallInt())); break;
+    case VALUE_TYPE_INTEGER:
+        retval.getInteger() = std::abs(getInteger()); break;
+    case VALUE_TYPE_BIGINT:
+        retval.getBigInt() = std::abs(getBigInt()); break;
+    case VALUE_TYPE_DOUBLE:
+        retval.getDouble() = std::abs(getDouble()); break;
+    case VALUE_TYPE_TIMESTAMP:
+    default:
+        throwFatalException ("type %d is not numeric", (int) type);
+        break;
+    }
+    return retval;
 }
+
+} // namespace voltdb
 
 #endif /* NVALUE_HPP_ */

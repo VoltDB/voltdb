@@ -23,19 +23,17 @@ import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ThreadFactory;
+import java.util.concurrent.TimeUnit;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
+import org.voltdb.SnapshotTableTask;
 
+import com.google.common.base.Throwables;
 import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
-import com.google.common.util.concurrent.SettableFuture;
 
 public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     private final File m_tempFile;
     private final File m_file;
     private final FileChannel m_fc;
@@ -83,17 +81,20 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
 
     @Override
     public ListenableFuture<?> write(final Callable<BBContainer> tupleData, SnapshotTableTask context) {
-        final SettableFuture<Object> retval = SettableFuture.create();
         final ListenableFuture<BBContainer> computedData = VoltDB.instance().getComputationService().submit(tupleData);
-        computedData.addListener(new Runnable() {
+
+        return m_es.submit(new Callable<Object>() {
             @Override
-            public void run() {
+            public Object call() throws Exception {
                 try {
                     final BBContainer data = computedData.get();
+                    /*
+                     * If a filter nulled out the buffer do nothing.
+                     */
+                    if (data == null) return null;
                     if (m_writeFailed) {
-                        retval.set(null);
                         data.discard();
-                        return;
+                        return null;
                     }
                     try {
                         while (data.b.hasRemaining()) {
@@ -107,20 +108,19 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
                     }
                 } catch (Throwable t) {
                     m_writeException = t;
-                    hostLog.error("Error while attempting to write snapshot data to file " + m_file, t);
                     m_writeFailed = true;
-                    retval.setException(t);
-                    return;
+                    throw Throwables.propagate(t);
                 }
-                retval.set(null);
+                return null;
             }
-        }, m_es);
-        return retval;
+        });
     }
 
     @Override
     public void close() throws IOException, InterruptedException {
         try {
+            m_es.shutdown();
+            m_es.awaitTermination(356, TimeUnit.DAYS);
             m_fc.force(false);
             m_fc.close();
             m_tempFile.renameTo(m_file);
@@ -147,5 +147,10 @@ public class SimpleFileSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public SnapshotFormat getFormat() {
         return SnapshotFormat.CSV;
+    }
+
+    @Override
+    public String toString() {
+        return m_file.toString();
     }
 }

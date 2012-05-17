@@ -226,7 +226,8 @@ public abstract class SubPlanAssembler {
                     }
 
                     ColumnRef colRef = colRefIter.next();
-                    if (colInfo.tableName.equals(table.getTypeName()) &&
+                    if (colInfo.expression instanceof TupleValueExpression &&
+                        colInfo.tableName.equals(table.getTypeName()) &&
                         colInfo.columnName.equals(colRef.getColumn().getTypeName()) &&
                         colInfo.ascending == ascending) {
 

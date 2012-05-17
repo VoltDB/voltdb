@@ -81,7 +81,6 @@ public class TestSystemInformationSuite extends RegressionSuite {
         // This is all horribly hardcoded for now.  Would be great to
         // add accessors to VoltServerConfig and VoltProjectBuilder to get them
         // at some point, maybe
-        assertEquals(m_expectedVals.get("adminport"), sysinfo.get("adminport"));
         assertEquals(m_expectedVals.get("adminstartup"), sysinfo.get("adminstartup"));
         assertEquals(m_expectedVals.get("heartbeattimeout"), sysinfo.get("heartbeattimeout"));
         assertEquals(m_expectedVals.get("partitiondetection"), sysinfo.get("partitiondetection"));
@@ -171,7 +170,6 @@ public class TestSystemInformationSuite extends RegressionSuite {
         //                         Integer.valueOf(m_expectedVals.get("commandlogfreqtxns")));
 
         // Add other defaults
-        m_expectedVals.put("adminport", "21211");
         m_expectedVals.put("adminstartup", "false");
         m_expectedVals.put("heartbeattimeout", "10");
         m_expectedVals.put("httpenabled", "false");

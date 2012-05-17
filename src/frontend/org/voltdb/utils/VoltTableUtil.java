@@ -22,6 +22,7 @@ import java.math.BigDecimal;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
@@ -104,17 +105,29 @@ public class VoltTableUtil {
         csv.flush();
     }
 
-    public static byte[] toCSV(VoltTable vt, char delimiter, char fullDelimiters[]) throws IOException {
+    public static Pair<Integer,byte[]>  toCSV(
+            VoltTable vt,
+            char delimiter,
+            char fullDelimiters[],
+            int lastNumCharacters) throws IOException {
         ArrayList<VoltType> types = new ArrayList<VoltType>(vt.getColumnCount());
         for (int ii = 0; ii < vt.getColumnCount(); ii++) {
             types.add(vt.getColumnType(ii));
         }
-        return toCSV(vt, types, delimiter, fullDelimiters);
+        return toCSV(vt, types, delimiter, fullDelimiters, lastNumCharacters);
     }
 
-    public static byte[] toCSV(VoltTable vt, ArrayList<VoltType> columns, char delimiter, char fullDelimiters[]) throws IOException {
-        final int size = vt.getBuffer().capacity();
-        StringWriter sw = new StringWriter(size * 2);
+    /*
+     * Returns the number of characters generated and the csv data
+     * in UTF-8 encoding.
+     */
+    public static Pair<Integer,byte[]> toCSV(
+            VoltTable vt,
+            ArrayList<VoltType> columns,
+            char delimiter,
+            char fullDelimiters[],
+            int lastNumCharacters) throws IOException {
+        StringWriter sw = new StringWriter((int)(lastNumCharacters * 1.2));
         CSVWriter writer;
         if (fullDelimiters != null) {
             writer = new CSVWriter(sw,
@@ -128,6 +141,7 @@ public class VoltTableUtil {
             writer = CSVWriter.getStrictTSVWriter(sw);
         }
         toCSVWriter(writer, vt, columns);
-        return sw.toString().getBytes(com.google.common.base.Charsets.UTF_8);
+        String csvString = sw.toString();
+        return Pair.of(csvString.length(), csvString.getBytes(com.google.common.base.Charsets.UTF_8));
     }
 }

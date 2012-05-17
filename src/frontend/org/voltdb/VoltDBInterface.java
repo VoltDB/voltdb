@@ -62,8 +62,9 @@ public interface VoltDBInterface
      * initialize again.
      * @param mainSiteThread The thread that m_inititalized the VoltDB or
      * null if called from that thread.
+     * @return
      */
-    public void shutdown(Thread mainSiteThread) throws InterruptedException;
+    public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
 
     public void startSampler();
 

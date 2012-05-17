@@ -58,6 +58,7 @@ import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
+import org.voltdb.SnapshotDaemon.ForwardClientException;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -881,7 +882,7 @@ public class SnapshotUtil {
     public static void requestSnapshot(final long clientHandle,
                                        final String path,
                                        final String nonce,
-                                       final byte blocking,
+                                       final boolean blocking,
                                        final SnapshotFormat format,
                                        final String data,
                                        final SnapshotResponseHandler handler) {
@@ -981,8 +982,8 @@ public class SnapshotUtil {
                 // abort if unable to succeed in 2 hours
                 final long startTime = System.currentTimeMillis();
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
-                    sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking, format, data);
                     try {
+                        sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking, format, data);
                         response = responseExchanger.exchange(null);
                         VoltTable[] results = response.getResults();
                         if (response.getStatus() != ClientResponse.SUCCESS) {
@@ -995,6 +996,8 @@ public class SnapshotUtil {
                             // other errors are not recoverable
                             break;
                         }
+                    } catch (ForwardClientException e) {
+                        break;
                     } catch (InterruptedException ignore) {}
                 }
 

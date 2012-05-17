@@ -107,7 +107,7 @@ public class TestSystemCatalogSuite extends RegressionSuite {
 
     public void testJdbcAccess() throws IOException, ProcCallException, ClassNotFoundException, SQLException
     {
-        String url = "jdbc:voltdb://localhost:21212";
+        String url = String.format("jdbc:voltdb://localhost:%d", port(0));
         String driver = "org.voltdb.jdbc.Driver";
         Class.forName(driver);
         Connection huh = DriverManager.getConnection(url, "", "");

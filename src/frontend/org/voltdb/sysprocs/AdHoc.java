@@ -22,7 +22,7 @@ import java.util.Map;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -68,7 +68,7 @@ public class AdHoc extends VoltSystemProcedure {
             for (int x : dependencies.keySet()) {
                 inputDepId = x; break;
             }
-            context.getExecutionEngine().stashWorkUnitDependencies(dependencies);
+            context.getSiteProcedureConnection().stashWorkUnitDependencies(dependencies);
         }
 
         VoltTable table = null;
@@ -83,10 +83,9 @@ public class AdHoc extends VoltSystemProcedure {
         {
             assert(plan != null);
             table =
-                context.getExecutionEngine().
-                executeCustomPlanFragment(plan, inputDepId, m_runner.getTxnState().txnId,
-                                          context.getLastCommittedTxnId(),
-                                          context.getNextUndo());
+                context.getSiteProcedureConnection().
+                executeCustomPlanFragment(plan, inputDepId,
+                                          m_runner.getTxnState().txnId);
         }
 
         return new DependencyPair(outputDepId, table);
@@ -172,10 +171,10 @@ public class AdHoc extends VoltSystemProcedure {
         if (replicatedTableDML) {
             assert(results.length == 1);
             long changedTuples = results[0].asScalarLong();
-            assert((changedTuples % ctx.getSiteTracker().m_numberOfPartitions) == 0);
+            assert((changedTuples % ctx.getNumberOfPartitions()) == 0);
 
             VoltTable retval = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
-            retval.addRow(changedTuples / ctx.getSiteTracker().m_numberOfPartitions);
+            retval.addRow(changedTuples / ctx.getNumberOfPartitions());
             results[0] = retval;
         }
 

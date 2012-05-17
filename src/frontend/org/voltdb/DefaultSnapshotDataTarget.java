@@ -33,7 +33,6 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 import java.util.zip.CRC32;
 
 import org.json_voltpatches.JSONObject;
@@ -42,7 +41,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
+import org.voltdb.SnapshotTableTask;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CompressionService;
 
@@ -313,6 +312,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         BBContainer tupleDataTemp;
         try {
             tupleDataTemp = tupleDataC.call();
+            /*
+             * Can be null if the dedupe filter nulled out the buffer
+             */
+            if (tupleDataTemp == null) {
+                return Futures.immediateFuture(null);
+            }
         } catch (Throwable t) {
             return Futures.immediateFailedFuture(t);
         }
@@ -330,11 +335,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             tupleData.b.position(tupleData.b.position() + 12);
             compressionTask = CompressionService.compressBufferAsync(tupleData.b);
         }
-
-        //Need to be able to null this out to prevent pack rat on the future
-        //that wraps up the result of the write.
-        final AtomicReference<Future<byte[]>> compressionTaskFinal =
-            new AtomicReference<Future<byte[]>>(compressionTask);
+        final Future<byte[]> compressionTaskFinal = compressionTask;
 
         ListenableFuture<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
@@ -353,12 +354,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
                     int totalWritten = 0;
                     if (prependLength) {
-                        ByteBuffer payloadBuffer = null;
-                        try {
-                            payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get().get());
-                        } finally {
-                            compressionTaskFinal.set(null);
-                        }
+                        final ByteBuffer payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get());
+
                         ByteBuffer lengthPrefix = ByteBuffer.allocate(16);
                         m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining() + 16);
                         lengthPrefix.putInt(payloadBuffer.remaining());
@@ -421,5 +418,10 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public SnapshotFormat getFormat() {
         return SnapshotFormat.NATIVE;
+    }
+
+    @Override
+    public String toString() {
+        return m_file.toString();
     }
 }

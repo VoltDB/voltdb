@@ -55,7 +55,8 @@ if CTX.PROFILE:
     CTX.CPPFLAGS += " -fvisibility=default -DPROFILE_ENABLED"
 
 # linker flags
-CTX.LDFLAGS = """ -g3 -rdynamic -ldl"""
+CTX.LDFLAGS = """ -g3 -rdynamic"""
+CTX.LASTLDFLAGS = """ -ldl"""
 
 if CTX.COVERAGE:
     CTX.LDFLAGS += " -ftest-coverage -fprofile-arcs"
@@ -65,6 +66,7 @@ if CTX.COVERAGE:
 # at the library location (/usr/local/lib).
 if CTX.PROFILE:
     CTX.LDFLAGS = """  -L/usr/local/lib -g3 -rdynamic -lprofiler -lunwind"""
+    # consider setting CTX.LASTLDFLAGS to " " rather than -ldl if that option really is unwanted.
 
 # this is where the build will look for header files
 # - the test source will also automatically look in the test root dir
@@ -238,6 +240,7 @@ CTX.INPUT['executors'] = """
 CTX.INPUT['expressions'] = """
  abstractexpression.cpp
  expressionutil.cpp
+ functionexpression.cpp
  tupleaddressexpression.cpp
 """
 

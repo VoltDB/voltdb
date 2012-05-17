@@ -99,7 +99,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             Client client;
 
             client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost", 21213);
+            client.createConnection("localhost", cluster.port(1));
 
             response = client.callProcedure("InsertSinglePartition", 33);
             assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -159,11 +159,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
             ServerThread localServer = null;
             try {
-                VoltDB.Configuration config = new VoltDB.Configuration();
+                VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
                 config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
                 config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
                 config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
                 config.m_isRejoinTest = true;
+                cluster.setPortsFromConfig(0, config);
                 localServer = new ServerThread(config);
 
                 localServer.start();
@@ -172,7 +174,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 Thread.sleep(2000);
 
                 client = ClientFactory.createClient(m_cconfig);
-                client.createConnection("localhost", 21213);
+                client.createConnection("localhost", cluster.port(1));
 
                 //
                 // Check that the recovery data transferred
@@ -227,7 +229,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             client.close();
 
             client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost", 21212);
+            client.createConnection("localhost", cluster.port(0));
 
             //
             // See that the cluster is available and the data is still there.
@@ -269,7 +271,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.setMaxHeap(64);
         ServerThread localServer = null;
         try {
-            boolean success = cluster.compileWithAdminMode(builder, VoltDB.DEFAULT_ADMIN_PORT, false);
+            boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note, this admin port is ignored
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
             cluster.setHasLocalServer(false);
@@ -279,7 +281,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             Client client;
 
             client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost");
+            client.createConnection("localhost", cluster.port(0));
 
             deleteTestFiles();
 
@@ -291,11 +293,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             cluster.shutDownSingleHost(0);
             Thread.sleep(1000);
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
             config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
             config.m_isRejoinTest = true;
+            cluster.setPortsFromConfig(0, config);
             localServer = new ServerThread(config);
 
             localServer.start();
@@ -308,7 +312,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             assertTrue(didRestore());
 
             client = ClientFactory.createClient(m_cconfig);
-            client.createConnection("localhost");
+            client.createConnection("localhost", cluster.port(0));
 
             // Also make sure a catalog update doesn't reset m_haveDoneRestore
             File newCatalog = new File(Configuration.getPathToCatalogForTest("rejoin.jar"));
@@ -352,7 +356,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 File deployment = new File(Configuration.getPathToCatalogForTest("rejoin.xml"));
 
                 Client client = ClientFactory.createClient();
-                client.createConnection("localhost");
+                client.createConnection("localhost", cluster.port(0));
 
                 VoltTable[] results =
                     client.updateApplicationCatalog(newCatalog, deployment).getResults();
@@ -412,7 +416,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Client client;
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         ProcedureCallback callback = new ProcedureCallback() {
 
@@ -473,7 +477,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Client client;
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         response = client.callProcedure("InsertSinglePartition", 0);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -484,7 +488,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
+        client.createConnection("localhost", cluster.port(1));
         response = client.callProcedure("InsertSinglePartition", 2);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 3);
@@ -494,12 +498,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(100);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
-        config.m_zkInterface = "127.0.0.1:2179";
+
         config.m_isRejoinTest = true;
+        cluster.setPortsFromConfig(0, config);
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -508,7 +513,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(5000);
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         response = client.callProcedure("InsertSinglePartition", 5);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -519,7 +524,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
+        client.createConnection("localhost", cluster.port(1));
         response = client.callProcedure("InsertSinglePartition", 8);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 9);
@@ -539,7 +544,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
         cluster.setMaxHeap(64);
-        boolean success = cluster.compileWithAdminMode(builder, VoltDB.DEFAULT_ADMIN_PORT, false);
+        boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note this admin port is ignored
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
         cluster.setHasLocalServer(false);
@@ -550,7 +555,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Client client;
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", VoltDB.DEFAULT_ADMIN_PORT - 1);
+        client.createConnection("localhost", cluster.adminPort(1));
 
         response = client.callProcedure("@Pause");
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -559,12 +564,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(100);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
         config.m_isRejoinTest = true;
-        config.m_zkInterface = "127.0.0.1:2179";
+        cluster.setPortsFromConfig(0, config);
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -597,8 +603,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         }
 
-        public TrivialExportClient() throws ExportClientException {
-            super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+        public TrivialExportClient(int port) throws ExportClientException {
+            super.addServerInfo(new InetSocketAddress("localhost", port));
             super.addCredentials(null, null);
             super.connect();
         }
@@ -643,7 +649,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Client client;
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         response = client.callProcedure("InsertSinglePartition", 0);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -654,14 +660,14 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
+        client.createConnection("localhost", cluster.port(1));
         response = client.callProcedure("InsertSinglePartition", 2);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 3);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         client.close();
 
-        TrivialExportClient exportClient = new TrivialExportClient();
+        TrivialExportClient exportClient = new TrivialExportClient(cluster.port(0));
         exportClient.work();
         exportClient.work();
 
@@ -676,12 +682,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(100);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
         config.m_isRejoinTest = true;
-        config.m_zkInterface = "127.0.0.1:2179";
+        cluster.setPortsFromConfig(0, config);
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -693,7 +700,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         response = client.callProcedure("InsertSinglePartition", 5);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -704,14 +711,14 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
+        client.createConnection("localhost", cluster.port(1));
         response = client.callProcedure("InsertSinglePartition", 8);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         response = client.callProcedure("Insert", 9);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
         client.close();
 
-        exportClient = new TrivialExportClient();
+        exportClient = new TrivialExportClient(cluster.port(0));
         exportClient.work();
 
         Thread.sleep(4000);
@@ -745,7 +752,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Client client;
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         response = client.callProcedure("InsertSinglePartition", 0);
         assertEquals(ClientResponse.SUCCESS, response.getStatus());
@@ -757,12 +764,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(1000);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
+
         config.m_isRejoinTest = true;
-        config.m_zkInterface = "127.0.0.1:2179";
+        cluster.setPortsFromConfig(0, config);
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -773,7 +781,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21213);
+        client.createConnection("localhost", cluster.port(1));
 
         //
         // Check that the recovery data transferred
@@ -824,7 +832,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         client.close();
 
         client = ClientFactory.createClient(m_cconfig);
-        client.createConnection("localhost", 21212);
+        client.createConnection("localhost", cluster.port(0));
 
         //
         // See that the cluster is available and the data is still there.

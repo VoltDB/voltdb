@@ -34,7 +34,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -42,14 +41,19 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
-import org.voltcore.utils.InstanceId;
+import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.InstanceId;
+import org.voltcore.utils.PortGenerator;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.VoltDB;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -90,6 +94,36 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public Config() {
             this(null, 3021);
         }
+
+        public Config(PortGenerator ports) {
+            this(null, 3021);
+            zkInterface = "127.0.0.1:" + ports.next();
+            internalPort = ports.next();
+        }
+
+        public int getZKPort() {
+            return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
+        }
+
+        public String toString() {
+            JSONStringer js = new JSONStringer();
+            try {
+                js.object();
+                js.key("coordinatorip").value(coordinatorIp.toString());
+                js.key("zkinterface").value(zkInterface);
+                js.key("internalinterface").value(internalInterface);
+                js.key("internalport").value(internalPort);
+                js.key("deadhosttimeout").value(deadHostTimeout);
+                js.key("backwardstimeforgivenesswindow").value(backwardsTimeForgivenessWindow);
+                js.key("networkThreads").value(networkThreads);
+                js.endObject();
+
+                return js.toString();
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
+        }
     }
 
     private static final VoltLogger m_logger = new VoltLogger("org.voltdb.messaging.impl.HostMessenger");
@@ -112,14 +146,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * References to other hosts in the mesh.
      * Updates via COW
      */
-    final AtomicReference<HashMap<Integer, ForeignHost>> m_foreignHosts =
-        new AtomicReference<HashMap<Integer, ForeignHost>>(new HashMap<Integer, ForeignHost>());
+    final COWMap<Integer, ForeignHost> m_foreignHosts = new COWMap<Integer, ForeignHost>();
+
     /*
      * References to all the local mailboxes
      * Updates via COW
      */
-    final AtomicReference<HashMap<Long, Mailbox>> m_siteMailboxes =
-        new AtomicReference<HashMap<Long, Mailbox>>(new HashMap<Long, Mailbox>());
+    final COWMap<Long, Mailbox> m_siteMailboxes = new COWMap<Long, Mailbox>();
 
     /*
      * All failed hosts that have ever been seen.
@@ -132,7 +165,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     private final AtomicInteger m_nextSiteId = new AtomicInteger(0);
 
     public Mailbox getMailbox(long hsId) {
-        return m_siteMailboxes.get().get(hsId);
+        return m_siteMailboxes.get(hsId);
     }
 
     /**
@@ -335,32 +368,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Convenience method for doing the verbose COW insert into the map
      */
     private void putForeignHost(int hostId, ForeignHost fh) {
-        while (true) {
-            HashMap<Integer, ForeignHost> original = m_foreignHosts.get();
-            HashMap<Integer, ForeignHost> update = new HashMap<Integer, ForeignHost>(original);
-            update.put(hostId, fh);
-            if (m_foreignHosts.compareAndSet(original, update)) {
-                break;
-            }
-        }
+        m_foreignHosts.put(hostId, fh);
     }
 
     /*
      * Convenience method for doing the verbose COW remove from the map
      */
     private void removeForeignHost(int hostId) {
-        ForeignHost fh = null;
-        while (true) {
-            fh = null;
-            HashMap<Integer, ForeignHost> original = m_foreignHosts.get();
-            HashMap<Integer, ForeignHost> update = new HashMap<Integer, ForeignHost>(original);
-            if ((fh = update.remove(hostId)) == null) {
-                return;
-            }
-            if (m_foreignHosts.compareAndSet(original, update)) {
-                break;
-            }
-        }
+        ForeignHost fh = m_foreignHosts.remove(hostId);
         if (fh != null) {
             fh.close();
         }
@@ -465,7 +480,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                         socket.socket().getLocalAddress().getHostAddress() : m_config.internalInterface);
         hostObj.put("port", m_config.internalPort);
         jsArray.put(hostObj);
-        for (Map.Entry<Integer, ForeignHost>  entry : m_foreignHosts.get().entrySet()) {
+        for (Map.Entry<Integer, ForeignHost>  entry : m_foreignHosts.entrySet()) {
             if (entry.getValue() == null) continue;
             int hsId = entry.getKey();
             ForeignHost fh = entry.getValue();
@@ -541,7 +556,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
          * Now that the agreement site mailbox has been created it is safe
          * to enable read
          */
-        for (ForeignHost fh : m_foreignHosts.get().values()) {
+        for (ForeignHost fh : m_foreignHosts.values()) {
             fh.enableRead();
         }
         m_agreementSite.start();
@@ -619,9 +634,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     @Override
     public String getHostnameForHostID(int hostId) {
-        HashMap<Integer, ForeignHost> foreignHosts = m_foreignHosts.get();
-        ForeignHost fh = foreignHosts.get(hostId);
-        return fh == null ? "UNKNOWN" : foreignHosts.get(hostId).hostname();
+        ForeignHost fh = m_foreignHosts.get(hostId);
+        return fh == null ? "UNKNOWN" : fh.hostname();
     }
 
     /**
@@ -639,7 +653,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         // the local machine case
         if (hostId == m_localHostId) {
-            Mailbox mbox = m_siteMailboxes.get().get(hsId);
+            Mailbox mbox = m_siteMailboxes.get(hsId);
             if (mbox != null) {
                 mbox.deliver(message);
                 return null;
@@ -647,7 +661,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
 
         // the foreign machine case
-        ForeignHost fhost = m_foreignHosts.get().get(hostId);
+        ForeignHost fhost = m_foreignHosts.get(hostId);
 
         if (fhost == null)
         {
@@ -674,17 +688,10 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void registerMailbox(Mailbox mailbox) {
-        while (true) {
-            HashMap<Long, Mailbox> original = m_siteMailboxes.get();
-            if (!original.containsKey(mailbox.getHSId())) {
+        if (!m_siteMailboxes.containsKey(mailbox.getHSId())) {
                 throw new RuntimeException("Can only register a mailbox with an hsid alreadly generated");
-            }
-            HashMap<Long, Mailbox> update = new HashMap<Long, Mailbox>(original);
-            update.put(mailbox.getHSId(), mailbox);
-            if (m_siteMailboxes.compareAndSet(original, update)) {
-                break;
-            }
         }
+        m_siteMailboxes.put(mailbox.getHSId(), mailbox);
     }
 
     /*
@@ -693,44 +700,37 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public long generateMailboxId(Long mailboxId) {
         final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
-        while (true) {
-            HashMap<Long, Mailbox> original = m_siteMailboxes.get();
-            HashMap<Long, Mailbox> update = new HashMap<Long, Mailbox>(original);
-            update.put(hsId, new Mailbox() {
-                @Override
-                public void send(long hsId, VoltMessage message)
-                throws MessagingException {}
-                @Override
-                public void send(long[] hsIds, VoltMessage message)
-                throws MessagingException {}
-                @Override
-                public void deliver(VoltMessage message) {
-                    hostLog.warn("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
-                }
-                @Override
-                public void deliverFront(VoltMessage message) {}
-                @Override
-                public VoltMessage recv() {return null;}
-                @Override
-                public VoltMessage recvBlocking() {return null;}
-                @Override
-                public VoltMessage recvBlocking(long timeout) {return null;}
-                @Override
-                public VoltMessage recv(Subject[] s) {return null;}
-                @Override
-                public VoltMessage recvBlocking(Subject[] s) {return null;}
-                @Override
-                public VoltMessage recvBlocking(Subject[] s, long timeout) { return null;}
-                @Override
-                public long getHSId() {return 0L;}
-                @Override
-                public void setHSId(long hsId) {}
-
-            });
-            if (m_siteMailboxes.compareAndSet(original, update)) {
-                break;
+        m_siteMailboxes.put(hsId, new Mailbox() {
+            @Override
+            public void send(long hsId, VoltMessage message)
+            throws MessagingException {}
+            @Override
+            public void send(long[] hsIds, VoltMessage message)
+            throws MessagingException {}
+            @Override
+            public void deliver(VoltMessage message) {
+                hostLog.warn("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
             }
-        }
+            @Override
+            public void deliverFront(VoltMessage message) {}
+            @Override
+            public VoltMessage recv() {return null;}
+            @Override
+            public VoltMessage recvBlocking() {return null;}
+            @Override
+            public VoltMessage recvBlocking(long timeout) {return null;}
+            @Override
+            public VoltMessage recv(Subject[] s) {return null;}
+            @Override
+            public VoltMessage recvBlocking(Subject[] s) {return null;}
+            @Override
+            public VoltMessage recvBlocking(Subject[] s, long timeout) { return null;}
+            @Override
+            public long getHSId() {return 0L;}
+            @Override
+            public void setHSId(long hsId) {}
+
+        });
         return hsId;
     }
 
@@ -741,15 +741,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         final int siteId = m_nextSiteId.getAndIncrement();
         long hsId = getHSIdForLocalSite(siteId);
         SiteMailbox sm = new SiteMailbox( this, hsId);
-
-        while (true) {
-            HashMap<Long, Mailbox> original = m_siteMailboxes.get();
-            HashMap<Long, Mailbox> update = new HashMap<Long, Mailbox>(original);
-            update.put(hsId, sm);
-            if (m_siteMailboxes.compareAndSet(original, update)) {
-                break;
-            }
-        }
+        m_siteMailboxes.put(hsId, sm);
         return sm;
     }
 
@@ -757,14 +749,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * Discard a mailbox
      */
     public void removeMailbox(long hsId) {
-        while (true) {
-            HashMap<Long, Mailbox> original = m_siteMailboxes.get();
-            HashMap<Long, Mailbox> update = new HashMap<Long, Mailbox>(original);
-            update.remove(hsId);
-            if (m_siteMailboxes.compareAndSet(original, update)) {
-                break;
-            }
-        }
+        m_siteMailboxes.remove(hsId);
     }
 
     public void send(final long destinationHSId, final VoltMessage message)
@@ -836,7 +821,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     {
         m_zk.close();
         m_agreementSite.shutdown();
-        for (ForeignHost host : m_foreignHosts.get().values())
+        for (ForeignHost host : m_foreignHosts.values())
         {
             // null is OK. It means this host never saw this host id up
             if (host != null)
@@ -854,7 +839,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public void createMailbox(Long proposedHSId, Mailbox mailbox) {
         long hsId = 0;
         if (proposedHSId != null) {
-            if (m_siteMailboxes.get().containsKey(proposedHSId)) {
+            if (m_siteMailboxes.containsKey(proposedHSId)) {
                 org.voltdb.VoltDB.crashLocalVoltDB(
                         "Attempted to create a mailbox for site " +
                         CoreUtils.hsIdToString(proposedHSId) + " twice", true, null);
@@ -865,14 +850,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             mailbox.setHSId(hsId);
         }
 
-        while (true) {
-            HashMap<Long, Mailbox> original = m_siteMailboxes.get();
-            HashMap<Long, Mailbox> update = new HashMap<Long, Mailbox>(original);
-            update.put(hsId, mailbox);
-            if (m_siteMailboxes.compareAndSet(original, update)) {
-                break;
-            }
-        }
+        m_siteMailboxes.put(hsId, mailbox);
     }
 
     /**
@@ -881,7 +859,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      */
     public int countForeignHosts() {
         int retval = 0;
-        for (ForeignHost host : m_foreignHosts.get().values())
+        for (ForeignHost host : m_foreignHosts.values())
             if ((host != null) && (host.isUp()))
                 retval++;
         return retval;
@@ -892,7 +870,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @param hostId The id of the foreign host to kill.
      */
     public void closeForeignHostSocket(int hostId) {
-        ForeignHost fh = m_foreignHosts.get().get(hostId);
+        ForeignHost fh = m_foreignHosts.get(hostId);
         if (fh != null && fh.isUp()) {
             fh.killSocket();
         }
@@ -904,7 +882,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void sendPoisonPill(String err) {
-        for (ForeignHost fh : m_foreignHosts.get().values()) {
+        for (ForeignHost fh : m_foreignHosts.values()) {
             if (fh != null && fh.isUp()) {
                 fh.sendPoisonPill(err);
             }

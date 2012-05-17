@@ -17,15 +17,11 @@
 
 package org.voltdb.sysprocs;
 
-import java.io.UnsupportedEncodingException;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -58,10 +54,10 @@ public class Pause extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx)
     {
         // Choose the lowest site ID on this host to actually flip the bit
-        int host_id = ctx.getExecutionSite().getCorrespondingHostId();
+        int host_id = ctx.getHostId();
         Long lowest_site_id =
             ctx.getSiteTracker().getLowestSiteForHost(host_id);
-        if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
+        if (ctx.getSiteId() == lowest_site_id)
         {
             VoltDB.instance().setMode(OperationMode.PAUSED);
             try {

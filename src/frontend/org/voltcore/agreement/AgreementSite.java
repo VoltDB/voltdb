@@ -21,7 +21,6 @@ import java.io.ByteArrayOutputStream;
 import java.io.DataInputStream;
 import java.io.DataOutputStream;
 import java.io.IOException;
-import java.net.BindException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.Arrays;
@@ -648,7 +647,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     {
         HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
         survivorSet.removeAll(m_pendingFailedSites);
-        long survivors[] = CoreUtils.toLongArray(survivorSet);
+        long survivors[] = com.google.common.primitives.Longs.toArray(survivorSet);
         m_recoveryLog.info("Agreement, Sending fault data " + CoreUtils.hsIdCollectionToString(m_pendingFailedSites)
                 + " to "
                 + CoreUtils.hsIdCollectionToString(survivorSet) + " survivors");
@@ -688,7 +687,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     {
         HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
         survivorSet.removeAll(m_pendingFailedSites);
-        int responses = 0;
+
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
@@ -719,8 +718,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 return false;
             }
 
-            m_recoveryLog.info("Agreement, Received failure message " + responses +
-                    " from " + CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
+            m_recoveryLog.info("Agreement, Received failure message from " +
+                    CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
                     CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) +
                     " safe txn id " + fm.m_safeTxnId + " failed site " +
                     CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId));

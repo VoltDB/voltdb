@@ -24,8 +24,11 @@ import java.io.StringWriter;
 import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
@@ -45,8 +48,6 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotRegistry;
@@ -56,6 +57,7 @@ import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
 
 import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -136,10 +138,10 @@ public class SnapshotSaveAPI
                 return result;
             } else {
                 assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
-                context.getExecutionSite().initiateSnapshots(
+                context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
                         txnId,
-                        context.getExecutionSite().getSiteTracker().getAllHosts().size());
+                        context.getSiteTracker().getAllHosts().size());
             }
         }
 
@@ -148,7 +150,7 @@ public class SnapshotSaveAPI
             String status = "SUCCESS";
             String err = "";
             try {
-                failures = context.getExecutionSite().completeSnapshotWork();
+                failures = context.getSiteSnapshotConnection().completeSnapshotWork();
             } catch (InterruptedException e) {
                 status = "FAILURE";
                 err = e.toString();
@@ -236,7 +238,7 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        int hosts = context.getExecutionSite().getSiteTracker().getAllHosts().size();
+        int hosts = context.getSiteTracker().getAllHosts().size();
         createSnapshotCompletionNode( nonce, txnId, isTruncation, hosts);
 
         try {
@@ -305,14 +307,25 @@ public class SnapshotSaveAPI
             String hostname, final VoltTable result) {
         {
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
-            SiteTracker tracker = context.getExecutionSite().m_tracker;
+            SiteTracker tracker = context.getSiteTracker();
+
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-1");
+            } catch (NoSuchAlgorithmException e) {
+                throw new AssertionError(e);
+            }
 
             /*
              * List of partitions to include if this snapshot is
              * going to be deduped. Attempts to break up the work
-             * by seeding an RNG with the partition id and then selecting
+             * by seeding an RNG selecting
              * a random replica to do the work. Will not work in failure
              * cases, but we don't use dedupe when we want durability.
+             *
+             * Originally used the partition id as the seed, but it turns out
+             * that nextInt(2) returns a 1 for seeds 0-4095. Now use SHA-1
+             * on the txnid + partition id.
              */
             List<Integer> partitionsToInclude = new ArrayList<Integer>();
             List<Long> sitesToInclude = new ArrayList<Long>();
@@ -321,7 +334,11 @@ public class SnapshotSaveAPI
                 List<Long> sites =
                         new ArrayList<Long>(tracker.getSitesForPartition(tracker.getPartitionForSite(localSite)));
                 Collections.sort(sites);
-                int siteIndex = new java.util.Random(partitionId).nextInt(sites.size());
+
+                digest.update(Longs.toByteArray(txnId));
+                final long seed = Longs.fromByteArray(Arrays.copyOf( digest.digest(Ints.toByteArray(partitionId)), 8));
+
+                int siteIndex = new java.util.Random(seed).nextInt(sites.size());
                 if (localSite == sites.get(siteIndex)) {
                     partitionsToInclude.add(partitionId);
                     sitesToInclude.add(localSite);
@@ -346,11 +363,11 @@ public class SnapshotSaveAPI
                 if (format.isFileBased()) {
                     Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
                                                   txnId,
-                                                  context.getExecutionSite().m_context.getCatalogCRC(),
+                                                  context.getCatalogCRC(),
                                                   file_path,
                                                   file_nonce,
                                                   tables,
-                                                  context.getExecutionSite().getCorrespondingHostId(),
+                                                  context.getHostId(),
                                                   SnapshotSiteProcessor.getExportSequenceNumbers());
                     if (completionTask != null) {
                         SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
@@ -365,7 +382,7 @@ public class SnapshotSaveAPI
                 final SnapshotRegistry.Snapshot snapshotRecord =
                     SnapshotRegistry.startSnapshot(
                             txnId,
-                            context.getExecutionSite().getCorrespondingHostId(),
+                            context.getHostId(),
                             file_path,
                             file_nonce,
                             format,
@@ -476,10 +493,15 @@ public class SnapshotSaveAPI
 
                         List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
                         if (format == SnapshotFormat.CSV) {
-                            filters.add(
-                                    new PartitionProjectionSnapshotFilter(
-                                            Ints.toArray(partitionsToInclude),
-                                            0));
+                            /*
+                             * Don't need to do filtering on a replicated table.
+                             */
+                            if (!table.getIsreplicated()) {
+                                filters.add(
+                                        new PartitionProjectionSnapshotFilter(
+                                                Ints.toArray(partitionsToInclude),
+                                                0));
+                            }
                             filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
                         }
                         final SnapshotTableTask task =

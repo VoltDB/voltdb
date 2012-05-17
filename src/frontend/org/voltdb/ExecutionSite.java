@@ -56,7 +56,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -100,7 +99,6 @@ import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
 
@@ -111,7 +109,7 @@ import org.voltdb.utils.MiscUtils;
  * do other things, but this is where the good stuff happens.
  */
 public class ExecutionSite
-implements Runnable, SiteTransactionConnection, SiteProcedureConnection
+implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSnapshotConnection
 {
     private VoltLogger m_txnlog;
     private final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
@@ -346,13 +344,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
     }
 
-    private final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
-        new HashMap<Long, ProcedureRunner>();
-
-
     /**
      * Log settings changed. Signal EE to update log level.
      */
+    @Override
     public void updateBackendLogLevels() {
         ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
     }
@@ -645,36 +640,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * SystemProcedures are "friends" with ExecutionSites and granted
      * access to internal state via m_systemProcedureContext.
      */
-    public interface SystemProcedureExecutionContext {
-        public Database getDatabase();
-        public Cluster getCluster();
-        public ExecutionEngine getExecutionEngine();
-        public long getLastCommittedTxnId();
-        public long getCurrentTxnId();
-        public long getNextUndo();
-        public ExecutionSite getExecutionSite();
-        public HashMap<String, ProcedureRunner> getProcedures();
-        public long getSiteId();
-        public int getHostId();
-        public int getPartitionId();
-        public SiteTracker getSiteTracker();
-    }
-
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
         @Override
         public Database getDatabase()                         { return m_context.database; }
         @Override
         public Cluster getCluster()                           { return m_context.cluster; }
         @Override
-        public ExecutionEngine getExecutionEngine()           { return ee; }
-        @Override
         public long getLastCommittedTxnId()                   { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                         { return m_currentTransactionState.txnId; }
         @Override
         public long getNextUndo()                             { return getNextUndoToken(); }
-        @Override
-        public ExecutionSite getExecutionSite()               { return ExecutionSite.this; }
         @Override
         public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
@@ -684,8 +660,31 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         @Override
         public int getPartitionId()                           { return m_tracker.getPartitionForSite(m_siteId); }
         @Override
+        public long getCatalogCRC()                           { return m_context.getCatalogCRC(); }
+        @Override
         public SiteTracker getSiteTracker()                   { return m_tracker; }
-
+        @Override
+        public int getNumberOfPartitions()                    { return m_tracker.m_numberOfPartitions; }
+        @Override
+        public SiteProcedureConnection getSiteProcedureConnection()
+        {
+            return ExecutionSite.this;
+        }
+        @Override
+        public SiteSnapshotConnection getSiteSnapshotConnection()
+        {
+            return ExecutionSite.this;
+        }
+        @Override
+        public void updateBackendLogLevels()
+        {
+            ExecutionSite.this.updateBackendLogLevels();
+        }
+        @Override
+        public boolean updateCatalog(String diffCmds, CatalogContext context)
+        {
+            return ExecutionSite.this.updateCatalog(diffCmds, context);
+        }
     }
 
     SystemProcedureContext m_systemProcedureContext;
@@ -761,7 +760,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             hsql = null;
         }
         else if (voltdb.getBackendTargetType() == BackendTarget.HSQLDB_BACKEND) {
-            hsql = initializeHSQLBackend();
+            hsql = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
             ee = new MockExecutionEngine();
         }
         else {
@@ -781,9 +780,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // setup the procedure runner wrappers.
         if (runnerFactory != null) {
-            runnerFactory.configure(this, hsql);
+            runnerFactory.configure(this, m_systemProcedureContext);
         }
-        m_registeredSysProcPlanFragments.clear();
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
         m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType());
 
@@ -836,31 +834,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 m_mailbox,
                 useSafetyDance);
         return retval;
-    }
-
-    private HsqlBackend initializeHSQLBackend()
-    {
-        HsqlBackend hsqlTemp = null;
-        try {
-            hsqlTemp = new HsqlBackend(getSiteId());
-            final String hexDDL = m_context.database.getSchema();
-            final String ddl = Encoder.hexDecodeToString(hexDDL);
-            final String[] commands = ddl.split("\n");
-            for (String command : commands) {
-                String decoded_cmd = Encoder.hexDecodeToString(command);
-                decoded_cmd = decoded_cmd.trim();
-                if (decoded_cmd.length() == 0) {
-                    continue;
-                }
-                hsqlTemp.runDDL(decoded_cmd);
-            }
-        }
-        catch (final Exception ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
-                            new Object[] { getSiteId(), siteIndex }, ex);
-            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
-        }
-        return hsqlTemp;
     }
 
     private ExecutionEngine
@@ -919,7 +892,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
         m_context = context;
-        m_registeredSysProcPlanFragments.clear();
         m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType());
 
         //Necessary to quiesce before updating the catalog
@@ -1324,7 +1296,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             }
         };
 
-        SnapshotUtil.requestSnapshot(0l, "", "Rejoin snapshot", (byte) 0,
+        SnapshotUtil.requestSnapshot(0l, "", "Rejoin snapshot", false,
                                      SnapshotFormat.STREAM, data, handler);
 
         return null;
@@ -1932,7 +1904,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                  txnId != null ? txnId : Long.MIN_VALUE,
                                                  lastKnownGloballyCommitedMultiPartTxnId);
 
-                m_mailbox.send(CoreUtils.toLongArray(survivors), srcmsg);
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), srcmsg);
             }
         }
         catch (MessagingException e) {
@@ -2195,22 +2167,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     {
         // assume success. errors correct this assumption as they occur
         currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
-
-        ProcedureRunner runner = null;
-        synchronized (m_registeredSysProcPlanFragments) {
-            runner = m_registeredSysProcPlanFragments.get(fragmentId);
-        }
-        if (runner == null) {
-            assert(false);
-        }
+        ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
 
         try {
             final DependencyPair dep
                 = runner.executePlanFragment(txnState,
                                              dependencies,
                                              fragmentId,
-                                             params,
-                                             m_systemProcedureContext);
+                                             params);
 
             sendDependency(currentFragResponse, dep.depId, dep.dependency);
         }
@@ -2252,10 +2216,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
      */
+    @Override
     public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
         m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts);
     }
 
+    @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
         return m_snapshotter.completeSnapshotWork(ee);
     }
@@ -2264,15 +2230,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     /*
      *  SiteConnection Interface (VoltProcedure -> ExecutionSite)
      */
-
-    @Override
-    public void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
-        synchronized (m_registeredSysProcPlanFragments) {
-            assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
-            m_registeredSysProcPlanFragments.put(pfId, proc);
-        }
-    }
-
     @Override
     public long getCorrespondingSiteId() {
         return m_siteId;
@@ -2616,16 +2573,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
                     // call the proc
                     runner.setupTransaction(txnState);
-                    if (runner.isSystemProcedure()) {
-                        final Object[] combinedParams = new Object[callerParams.length + 1];
-                        combinedParams[0] = m_systemProcedureContext;
-                        for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                        cr = runner.call(txnId, combinedParams);
-                    }
-                    else {
-                        cr = runner.call(txnId, itask.getParameters());
-                    }
+                    cr = runner.call(txnId, itask.getParameters());
                     response.setResults(cr, itask);
+
                     // record the results of write transactions to the transaction state
                     // this may be used to verify the DR replica cluster gets the same value
                     // skip for multi-partition txns because only 1 of k+1 partitions will
@@ -2722,5 +2672,91 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         LocalObjectMessage lom = new LocalObjectMessage(r);
         lom.m_sourceHSId = m_siteId;
         m_mailbox.deliver(lom);
+    }
+
+    // do-nothing implementation of IV2 SiteProcedeConnection API
+    @Override
+    public void truncateUndoLog(boolean rollback, long token, long txnId) {
+        throw new RuntimeException("Unsupported IV2-only API.");
+    }
+
+    // do-nothing implementation of IV2 sysproc fragment API.
+    @Override
+    public DependencyPair executePlanFragment(
+            TransactionState txnState,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params) {
+        throw new RuntimeException("Unsupported IV2-only API.");
+     }
+
+
+    @Override
+    public VoltTable executePlanFragment(long planFragmentId, int inputDepId,
+                                         ParameterSet parameterSet, long txnId,
+                                         boolean readOnly) throws EEException
+    {
+        return ee.executePlanFragment(planFragmentId,
+                                      inputDepId,
+                                      parameterSet,
+                                      txnId,
+                                      lastCommittedTxnId,
+                                      readOnly ? Long.MAX_VALUE : getNextUndoToken());
+    }
+
+    @Override
+    public void stashWorkUnitDependencies(Map<Integer, List<VoltTable>> dependencies)
+    {
+        ee.stashWorkUnitDependencies(dependencies);
+    }
+
+    @Override
+    public HsqlBackend getHsqlBackendIfExists()
+    {
+        return hsql;
+    }
+
+    @Override
+    public long[] getUSOForExportTable(String signature)
+    {
+        return ee.getUSOForExportTable(signature);
+    }
+
+    @Override
+    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
+                                               long txnId)
+    {
+        return ee.executeCustomPlanFragment(plan, inputDepId, txnId,
+                                            lastCommittedTxnId,
+                                            getNextUndoToken());
+    }
+
+    @Override
+    public void toggleProfiler(int toggle)
+    {
+        ee.toggleProfiler(toggle);
+    }
+
+    @Override
+    public void quiesce()
+    {
+        ee.quiesce(lastCommittedTxnId);
+    }
+
+    @Override
+    public void exportAction(boolean syncAction,
+                             int ackOffset,
+                             Long sequenceNumber,
+                             Integer partitionId,
+                             String tableSignature)
+    {
+        ee.exportAction(syncAction, ackOffset, sequenceNumber, partitionId,
+                        tableSignature);
+    }
+
+    @Override
+    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+                                boolean interval, Long now)
+    {
+        return ee.getStats(selector, locators, interval, now);
     }
 }

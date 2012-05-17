@@ -31,6 +31,7 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 
 public class CSVTableSaveFile {
     private final AtomicInteger m_availableBytes = new AtomicInteger(0);
@@ -96,6 +97,7 @@ public class CSVTableSaveFile {
 
     private class ConverterThread implements Runnable {
         private void convertChunks() throws IOException, InterruptedException {
+            int lastNumCharacters = 1024 * 64;
             while (!Thread.interrupted() && m_saveFile.hasMoreChunks()) {
                 if (m_availableBytes.get() > m_maxAvailableBytes) {
                     Thread.sleep(5);
@@ -110,7 +112,9 @@ public class CSVTableSaveFile {
                 try {
                     final VoltTable vt = PrivateVoltTableFactory
                             .createVoltTableFromBuffer(c.b, true);
-                    byte csvBytes[] = VoltTableUtil.toCSV( vt, m_delimiter, null);
+                    Pair<Integer, byte[]> p = VoltTableUtil.toCSV( vt, m_delimiter, null, lastNumCharacters);
+                    lastNumCharacters = p.getFirst();
+                    byte csvBytes[] = p.getSecond();
                     m_availableBytes.addAndGet(csvBytes.length);
                     m_available.offer(csvBytes);
                 } finally {

@@ -27,7 +27,7 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotFormat;
@@ -149,7 +149,7 @@ public class SnapshotSave extends VoltSystemProcedure
             return createSnapshotTargetsResults(dependencies);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesce) {
             // tell each site to quiesce
-            context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
+            context.getSiteProcedureConnection().quiesce();
             VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
             results.addRow(context.getSiteId());
             return new DependencyPair(DEP_snapshotSaveQuiesce, results);
@@ -205,11 +205,11 @@ public class SnapshotSave extends VoltSystemProcedure
             VoltTable result = constructNodeResultsTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_site_id =
                 context.getSiteTracker().
                 getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.getSiteId() == lowest_site_id)
             {
                 TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
                                 + file_path + ", " + file_nonce);
@@ -302,10 +302,6 @@ public class SnapshotSave extends VoltSystemProcedure
         }
     }
 
-
-
-
-
     public VoltTable[] run(SystemProcedureExecutionContext ctx, String command) throws Exception
     {
         final long startTime = System.currentTimeMillis();
@@ -315,7 +311,8 @@ public class SnapshotSave extends VoltSystemProcedure
         final String async = !block ? "Asynchronously" : "Synchronously";
         final String path = jsObj.getString("path");
         final String nonce = jsObj.getString("nonce");
-        final SnapshotFormat format = SnapshotFormat.getEnumIgnoreCase(jsObj.getString("format"));
+        String formatStr = jsObj.optString("format", SnapshotFormat.NATIVE.toString());
+        final SnapshotFormat format = SnapshotFormat.getEnumIgnoreCase(formatStr);
         final String data = jsObj.optString("data");
 
         HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);

@@ -17,6 +17,7 @@
     <attribute name="srcdir"/>
     <attribute name="destdir" default="${build.prod.dir}"/>
     <attribute name="excludes" default=""/>
+    <attribute name="includes" default=""/>
     <sequential>
         <javac
             target="1.6"
@@ -24,14 +25,18 @@
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
+            includes="@{includes}"
             encoding='UTF-8'
-            debug='true'>
+            debug='true'
+            includeAntRuntime='false'>
             <classpath refid="project.classpath" />
         </javac>
     </sequential>
 </macrodef>
 
 <!-- PATHS AND PROPERTIES -->
+
+<tstamp/>
 
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
@@ -365,7 +370,9 @@ DISTRIBUTION
     <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="voltdb" defaultexcludes="yes">
             <include name="voltdb-${dist.version}.jar" />
+            <include name="voltdb-${dist.version}-javadoc.jar" />
             <include name="voltdbclient-${dist.version}.jar" />
+            <include name="voltdbclient-${dist.version}-javadoc.jar" />
         </fileset>
     </copy>
     <copy todir="${dist.dir}/voltdb" flatten="true" >
@@ -595,7 +602,7 @@ CLEANING
     <arg line="-c 'rm -rf voltdb/*.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf voltdb/*.so'"/>
+    <arg line="-c 'rm -rf voltdb/*.so voltdb/*.jnilib'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/ee/catalog/*'"/>
@@ -639,13 +646,12 @@ JAR BUILDING
             <include name="org/voltdb/**"/>
             <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
+            <include name="org/apache/**" />
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
-            <include name="org/apache/jute_voltpatches/**" />
-            <include name="org/apache/zookeeper_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
@@ -669,13 +675,50 @@ JAR BUILDING
             </section>
         </manifest>
     </jar>
+    <!--jar destfile="voltdb/voltdb-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}/javadoc/procedure-api" defaultexcludes="no" >
+            <include name="**"/>
+        </fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB Inc." />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB Database JavaDoc"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar>
+    <jar destfile="voltdb/voltdbclient-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}/javadoc/java-client-api" defaultexcludes="no" >
+            <include name="**"/>
+        </fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB Inc." />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB Client JavaDoc"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar-->
+
 </target>
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">
     <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
+            <include name="org/voltcore/**" />
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/apache/hadoop_voltpatches/**" />
         </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
@@ -825,8 +868,16 @@ JAVA COMPILATION
     </copy>
 
     <!-- compile the individual source directories -->
+    <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
-    <invoke-javac srcdir="${src.gpl.dir}:${vendor.src.dir}"/>
+    <!-- voltcore and third-party java (including our zookeeper -->
+    <invoke-javac
+        srcdir="${src.gpl.dir}:${vendor.src.dir}"
+        includes="org/voltcore/**/*.java,org/apache/**/*.java
+                  au/**/*.java
+                  org/json_voltpatches/**/*.java" />
+    <!-- non-voltcore voltdb code -->
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
@@ -1001,13 +1052,17 @@ TEST CASES
     <property name="emma.dir" location="${build.dir}/emma" />
     <mkdir dir="${emma.dir}" />
     <emma>
-        <!-- don't instrument build.test.dir or any non-voltdb code -->
-        <instr
-            instrpath="${build.prod.dir}/org/voltdb"
-            destdir="${build.instr.dir}/org/voltdb"
-            metadatafile="${emma.dir}/metadata.emma"
-            merge="true"
-        />
+        <instr destdir="${build.instr.dir}/org/"
+               metadatafile="${emma.dir}/metadata.emma"
+               merge="true">
+          <instrpath path="${build.prod.dir}/org"/>
+
+          <filter includes="*voltdb.*"/>
+          <filter includes="*voltcore.*"/>
+          <!--pmsg is the protobuf-generated code for dragent-->
+          <filter excludes="*pmsg.*"/>
+          <filter excludes="*exampleutils.*"/>
+        </instr>
     </emma>
 </target>
 
@@ -1362,7 +1417,8 @@ TEST CASES
     lcov.dir is the directory in which to put the coverage report
     lcov.target is the ant target to run under coverage
 -->
-<target name='with.lcov' description="Generate C++ code coverage reports.">
+<target name='with.lcov' depends="jnicompile"
+        description="Generate C++ code coverage reports.">
   <property name="lcov.base.tracefile" value="lcov_base.info" />
   <property name="lcov.test.tracefile" value="lcov_test.info" />
   <property name="lcov.tracefile" value="lcov.info" />
@@ -1504,7 +1560,7 @@ TEST CASES
 <!-- This target will run a junit suite. It will also run a single
      suite under valgrind with -Dbuild=memcheck.  NOTE: to use valgrind,
      you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
-<target name='junitclass'
+<target name="junitclass"
     description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
 
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
@@ -1517,7 +1573,14 @@ TEST CASES
 
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
         <formatters>
-            <formatter usefile="false" type="plain"/>
+            <formatter type="plain" unless="hudson"/>
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <formatter type="xml" />
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1568,7 +1631,7 @@ TEST CASES
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
-    <property name="log4j.configuration" location="voltdb/log4j.properties" />
+    <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
     <property name="default_config" location="${test.example.dir}/config.py" />
     <property name="regression_config"
               location="${test.example.dir}/regression-config.py" />

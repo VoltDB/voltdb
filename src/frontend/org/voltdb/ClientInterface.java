@@ -85,6 +85,7 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -269,21 +270,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (!m_serverSocket.socket().isBound()) {
                 try {
                     m_serverSocket.socket().bind(new InetSocketAddress(m_port));
-                } catch (IOException e) {
+                }
+                catch (IOException e) {
                     hostLog.fatal("Client interface failed to bind to port " + m_port);
                     hostLog.fatal("IOException message: \"" + e.getMessage() + "\"");
-                    {
-                        Process p = Runtime.getRuntime().exec("lsof -i");
-                        java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
-                        java.io.BufferedReader br = new java.io.BufferedReader(reader);
-                        String str = null;
-                        while((str = br.readLine()) != null) {
-                            if (str.contains("LISTEN")) {
-                                hostLog.fatal(str);
-                            }
-                        }
-                    }
-                    System.exit(-1);
+                    MiscUtils.printPortsInUse(hostLog);
+                    VoltDB.crashLocalVoltDB("Client interface failed to bind to port " + m_port, false, e);
                 }
             }
             m_running = true;
@@ -1024,6 +1016,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (plan != null) {
             // check catalog version
             if (plan.catalogVersion == m_catalogContext.get().catalogVersion) {
+                // make a copy for threadsafety
+                plan = (AdHocPlannedStmt) plan.clone();
+
+                // set the fields that are specific to this call
                 plan.adminConnection = handler.isAdmin();
                 plan.clientData = ccxn;
                 plan.partitionParam = partitionParam;

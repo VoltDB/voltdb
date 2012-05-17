@@ -123,6 +123,7 @@ public class TestExportOpsEvents extends TestCase {
 
         VoltDBFickleCluster.start();
 
+        client.addServerInfo(new InetSocketAddress("localhost", VoltDBFickleCluster.getPort(0)));
         assertTrue(client.connect());
         client.disconnect();
         VoltDBFickleCluster.stop();

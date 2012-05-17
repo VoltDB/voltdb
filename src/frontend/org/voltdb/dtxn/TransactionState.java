@@ -75,6 +75,11 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_notice;
     }
 
+    // Assume that done-ness is a latch.
+    public void setDone() {
+        m_done = true;
+    }
+
     final public boolean isDone() {
         return m_done;
     }
@@ -123,6 +128,12 @@ public abstract class TransactionState extends OrderableTransaction  {
     public long getBeginUndoToken()
     {
         return m_beginUndoToken;
+    }
+
+    // Assume that rollback-ness is a latch.
+    public void setNeedsRollback()
+    {
+        m_needsRollback = true;
     }
 
     public boolean needsRollback()

@@ -37,7 +37,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
+import org.voltdb.SnapshotTableTask;
 import org.voltdb.messaging.FastSerializer;
 
 import com.google.common.util.concurrent.Callables;

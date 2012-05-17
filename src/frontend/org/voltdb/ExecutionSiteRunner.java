@@ -17,10 +17,10 @@
 
 package org.voltdb;
 
-import java.util.HashSet;
+import java.util.concurrent.CountDownLatch;
 
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 
 /**
  * A class that instantiates an ExecutionSite and then waits for notification before
@@ -29,10 +29,14 @@ import org.voltcore.logging.VoltLogger;
  */
 public class ExecutionSiteRunner implements Runnable {
 
-    volatile boolean m_isSiteCreated = false;
-    long m_siteId;
-    private final String m_serializedCatalog;
+    // volatile because they are read by RealVoltDB
+    volatile long m_siteId;
     volatile ExecutionSite m_siteObj;
+
+    CountDownLatch m_siteIsLoaded = new CountDownLatch(1);
+    CountDownLatch m_shouldStartRunning = new CountDownLatch(1);
+
+    private final String m_serializedCatalog;
     private final boolean m_recovering;
     private final boolean m_replicationActive;
     private final long m_txnId;
@@ -72,15 +76,16 @@ public class ExecutionSiteRunner implements Runnable {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
-        synchronized (this) {
-            m_isSiteCreated = true;
-            this.notifyAll();
-            try {
-                wait();
-            } catch (InterruptedException e) {
-                throw new RuntimeException(e);
-            }
+        // notify this site is created
+        m_siteIsLoaded.countDown();
+
+        // wait for the go-ahead signal
+        try {
+            m_shouldStartRunning.await();
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("EE Runnner thread interrupted while waiting to start.", true, e);
         }
+
         try
         {
             m_siteObj.run();

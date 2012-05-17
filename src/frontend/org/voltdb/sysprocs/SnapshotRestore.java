@@ -51,7 +51,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
@@ -241,11 +241,11 @@ public class SnapshotRestore extends VoltSystemProcedure
             long snapshotTxnId = ((Long)params.toArray()[1]).longValue();
 
             // Choose the lowest site ID on this host to truncate export data
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
+            if (context.getSiteId() == lowest_hs_id)
             {
                 ExportManager.instance().
                 truncateExportToTxnId(snapshotTxnId);
@@ -259,7 +259,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                 Map<String, Map<Integer, Long>> exportSequenceNumbers =
                         (Map<String, Map<Integer, Long>>)ois.readObject();
                 Database db = context.getDatabase();
-                Integer myPartitionId = context.getExecutionSite().getCorrespondingPartitionId();
+                Integer myPartitionId = context.getPartitionId();
 
                 //Iterate the export tables
                 for (Table t : db.getTables()) {
@@ -292,7 +292,7 @@ public class SnapshotRestore extends VoltSystemProcedure
                         continue;
                     }
                     //Forward the sequence number to the EE
-                    context.getExecutionEngine().exportAction(
+                    context.getSiteProcedureConnection().exportAction(
                             false,
                             0,
                             sequenceNumber,
@@ -329,11 +329,11 @@ public class SnapshotRestore extends VoltSystemProcedure
                     new VoltTable.ColumnInfo("ERR_MSG", VoltType.STRING));
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
+            if (context.getSiteId() == lowest_hs_id)
             {
                 try {
                     // implicitly synchronized by the way restore operates.
@@ -388,11 +388,11 @@ public class SnapshotRestore extends VoltSystemProcedure
             VoltTable result = ClusterSaveFileState.constructEmptySaveFileStateVoltTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
+            int host_id = context.getHostId();
             Long lowest_hs_id =
                     context.getSiteTracker().
                     getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_hs_id)
+            if (context.getSiteId() == lowest_hs_id)
             {
                 // implicitly synchronized by the way restore operates.
                 // this scan must complete on every site and return results

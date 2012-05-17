@@ -45,6 +45,7 @@ import java.util.Random;
 import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -95,6 +96,7 @@ import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.RejoinCoordinator;
+import org.voltcore.utils.COWMap;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -106,6 +108,7 @@ import org.voltdb.utils.VoltSampler;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.collect.ImmutableList;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -142,7 +145,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.6";
+    private static final String m_defaultVersionString = "2.7";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -288,7 +291,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_replicationActive = false;
 
             // set up site structure
-            m_localSites = new HashMap<Long, ExecutionSite>();
+            m_localSites = new COWMap<Long, ExecutionSite>();
             m_siteThreads = new HashMap<Long, Thread>();
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
@@ -562,17 +565,39 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              * the constructed ExecutionSites in the local site map.
              */
             for (ExecutionSiteRunner runner : m_runners) {
-                synchronized (runner) {
-                    if (!runner.m_isSiteCreated) {
-                        try {
-                            runner.wait();
-                        } catch (InterruptedException e) {
-                            throw new RuntimeException(e);
+                try {
+                    runner.m_siteIsLoaded.await();
+                } catch (InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Unable to wait on starting execution site.", true, e);
+                }
+                assert(runner.m_siteObj != null);
+                m_localSites.put(runner.m_siteId, runner.m_siteObj);
+            }
+
+            /*
+             * At this point all of the execution sites have been published to m_localSites
+             * It is possible that while they were being created the mailbox tracker found additional
+             * sites, but was unable to deliver the notification to some or all of the execution sites.
+             * Since notifying them of new sites is idempotent (version number check), let's do that here so there
+             * are no lost updates for additional sites. But... it must be done from the
+             * mailbox tracker thread or there is a race with failure detection and handling.
+             * Generally speaking it seems like retrieving a reference to a site tracker not via a message
+             * from the mailbox tracker thread that builds the site tracker is bug. If it isn't delivered to you by
+             * a site tracker then you lose sequential consistency.
+             */
+            try {
+                m_mailboxTracker.executeTask(new Runnable() {
+                    @Override
+                    public void run() {
+                        for (ExecutionSite es : m_localSites.values()) {
+                            es.notifySitesAdded(m_siteTracker);
                         }
                     }
-                    assert(runner.m_siteObj != null);
-                    m_localSites.put(runner.m_siteId, runner.m_siteObj);
-                }
+                }).get();
+            } catch (InterruptedException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            } catch (ExecutionException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
             }
 
             // Create the client interface
@@ -648,7 +673,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             m_validateConfiguredNumberOfPartitionsOnMailboxUpdate = true;
             if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
-                for (Map.Entry<Integer, List<Long>> entry : m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
+                for (Map.Entry<Integer, ImmutableList<Long>> entry :
+                    m_siteTracker.m_partitionsToSitesImmutable.entrySet()) {
                     hostLog.info(entry.getKey() + " -- "
                             + CoreUtils.hsIdCollectionToString(entry.getValue()));
                 }
@@ -973,6 +999,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (m_deployment.getUsers() != null) {
                 for (UsersType.User user : m_deployment.getUsers().getUser()) {
                     String groupsCSV = user.getGroups();
+                    if (groupsCSV == null || groupsCSV.isEmpty()) {
+                        continue;
+                    }
                     String[] groups = groupsCSV.split(",");
                     for (String group : groups) {
                         if (db.getGroups().get(group) == null) {
@@ -1326,10 +1355,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public void run() {
         // start the separate EE threads
         for (ExecutionSiteRunner r : m_runners) {
-            synchronized (r) {
-                assert(r.m_isSiteCreated) : "Site should already have been created by ExecutionSiteRunner";
-                r.notifyAll();
-            }
+            r.m_shouldStartRunning.countDown();
         }
 
         if (m_restoreAgent != null) {
@@ -1352,14 +1378,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         {
             m_currentThreadSite.run();
         }
-        catch (Throwable t)
+        catch (Throwable thrown)
         {
-            String errmsg = "ExecutionSite: " + org.voltcore.utils.CoreUtils.hsIdToString(m_currentThreadSite.m_siteId) +
-            " encountered an " +
-            "unexpected error and will die, taking this VoltDB node down.";
+            String errmsg = " encountered an unexpected error and will die, taking this VoltDB node down.";
             hostLog.error(errmsg);
-            t.printStackTrace();
-            VoltDB.crashLocalVoltDB(errmsg, true, t);
+            // It's too easy for stdout to get lost, especially if we are crashing, so log FATAL, instead.
+            // Logging also automatically prefixes lines with "ExecutionSite [X:Y] "
+            // thrown.printStackTrace();
+            hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
+            for (StackTraceElement ste : thrown.getStackTrace()) {
+                hostLog.fatal(ste.toString());
+            }
+            VoltDB.crashLocalVoltDB(errmsg, true, thrown);
         }
     }
 
@@ -1370,106 +1400,111 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * null if called from that thread.
      */
     @Override
-    public void shutdown(Thread mainSiteThread) throws InterruptedException {
+    public boolean shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
-            m_mode = OperationMode.SHUTTINGDOWN;
-            m_mailboxTracker.shutdown();
-            // Things are going pear-shaped, tell the fault distributor to
-            // shut its fat mouth
-            m_faultManager.shutDown();
-            m_snapshotCompletionMonitor.shutdown();
-            m_periodicWorkThread.shutdown();
-            heartbeatThread.interrupt();
-            heartbeatThread.join();
+            boolean did_it = false;
+            if (m_mode != OperationMode.SHUTTINGDOWN) {
+                did_it = true;
+                m_mode = OperationMode.SHUTTINGDOWN;
+                m_mailboxTracker.shutdown();
+                // Things are going pear-shaped, tell the fault distributor to
+                // shut its fat mouth
+                m_faultManager.shutDown();
+                m_snapshotCompletionMonitor.shutdown();
+                m_periodicWorkThread.shutdown();
+                heartbeatThread.interrupt();
+                heartbeatThread.join();
 
-            if (m_hasStartedSampler.get()) {
-                m_sampler.setShouldStop();
-                m_sampler.join();
-            }
+                if (m_hasStartedSampler.get()) {
+                    m_sampler.setShouldStop();
+                    m_sampler.join();
+                }
 
-            // shutdown the web monitoring / json
-            if (m_adminListener != null)
-                m_adminListener.stop();
+                // shutdown the web monitoring / json
+                if (m_adminListener != null)
+                    m_adminListener.stop();
 
-            // shut down the client interface
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.shutdown();
-            }
+                // shut down the client interface
+                for (ClientInterface ci : m_clientInterfaces) {
+                    ci.shutdown();
+                }
 
-            // shut down Export and its connectors.
-            ExportManager.instance().shutdown();
+                // shut down Export and its connectors.
+                ExportManager.instance().shutdown();
 
-            // tell all m_sites to stop their runloops
-            if (m_localSites != null) {
-                for (ExecutionSite site : m_localSites.values())
-                    site.startShutdown();
-            }
+                // tell all m_sites to stop their runloops
+                if (m_localSites != null) {
+                    for (ExecutionSite site : m_localSites.values())
+                        site.startShutdown();
+                }
 
-            // try to join all threads but the main one
-            // probably want to check if one of these is the current thread
-            if (m_siteThreads != null) {
-                for (Thread siteThread : m_siteThreads.values()) {
-                    if (Thread.currentThread().equals(siteThread) == false) {
-                        // don't interrupt here. the site will start shutdown when
-                        // it sees the shutdown flag set.
-                        siteThread.join();
+                // try to join all threads but the main one
+                // probably want to check if one of these is the current thread
+                if (m_siteThreads != null) {
+                    for (Thread siteThread : m_siteThreads.values()) {
+                        if (Thread.currentThread().equals(siteThread) == false) {
+                            // don't interrupt here. the site will start shutdown when
+                            // it sees the shutdown flag set.
+                            siteThread.join();
+                        }
                     }
                 }
-            }
 
-            // try to join the main thread (possibly this one)
-            if (mainSiteThread != null) {
-                if (Thread.currentThread().equals(mainSiteThread) == false) {
-                    // don't interrupt here. the site will start shutdown when
-                    // it sees the shutdown flag set.
-                    mainSiteThread.join();
+                // try to join the main thread (possibly this one)
+                if (mainSiteThread != null) {
+                    if (Thread.currentThread().equals(mainSiteThread) == false) {
+                        // don't interrupt here. the site will start shutdown when
+                        // it sees the shutdown flag set.
+                        mainSiteThread.join();
+                    }
                 }
+
+                // After sites are terminated, shutdown the InvocationBufferServer.
+                // The IBS is shared by all sites; don't kill it while any site is active.
+                PartitionDRGateway.shutdown();
+
+                // help the gc along
+                m_localSites = null;
+                m_currentThreadSite = null;
+                m_siteThreads = null;
+                m_runners = null;
+
+                // shut down the network/messaging stuff
+                // Close the host messenger first, which should close down all of
+                // the ForeignHost sockets cleanly
+                if (m_messenger != null)
+                {
+                    m_messenger.shutdown();
+                }
+                m_messenger = null;
+
+                //Also for test code that expects a fresh stats agent
+                if (m_statsAgent != null) {
+                    m_statsAgent.shutdown();
+                    m_statsAgent = null;
+                }
+
+                if (m_asyncCompilerAgent != null) {
+                    m_asyncCompilerAgent.shutdown();
+                    m_asyncCompilerAgent = null;
+                }
+
+                // The network iterates this list. Clear it after network's done.
+                m_clientInterfaces.clear();
+
+                ExportManager.instance().shutdown();
+                m_computationService.shutdown();
+                m_computationService.awaitTermination(1, TimeUnit.DAYS);
+                m_computationService = null;
+                m_siteTracker = null;
+                m_catalogContext = null;
+                m_mailboxPublisher = null;
+
+                // probably unnecessary
+                System.gc();
+                m_isRunning = false;
             }
-
-            // After sites are terminated, shutdown the InvocationBufferServer.
-            // The IBS is shared by all sites; don't kill it while any site is active.
-            PartitionDRGateway.shutdown();
-
-            // help the gc along
-            m_localSites = null;
-            m_currentThreadSite = null;
-            m_siteThreads = null;
-            m_runners = null;
-
-            // shut down the network/messaging stuff
-            // Close the host messenger first, which should close down all of
-            // the ForeignHost sockets cleanly
-            if (m_messenger != null)
-            {
-                m_messenger.shutdown();
-            }
-            m_messenger = null;
-
-            //Also for test code that expects a fresh stats agent
-            if (m_statsAgent != null) {
-                m_statsAgent.shutdown();
-                m_statsAgent = null;
-            }
-
-            if (m_asyncCompilerAgent != null) {
-                m_asyncCompilerAgent.shutdown();
-                m_asyncCompilerAgent = null;
-            }
-
-            // The network iterates this list. Clear it after network's done.
-            m_clientInterfaces.clear();
-
-            ExportManager.instance().shutdown();
-            m_computationService.shutdown();
-            m_computationService.awaitTermination(1, TimeUnit.DAYS);
-            m_computationService = null;
-            m_siteTracker = null;
-            m_catalogContext = null;
-            m_mailboxPublisher = null;
-
-            // probably unnecessary
-            System.gc();
-            m_isRunning = false;
+            return did_it;
         }
     }
 
@@ -1478,22 +1513,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * execution site threads */
     private static Long lastLogUpdate_txnId = 0L;
     @Override
-    public void logUpdate(String xmlConfig, long currentTxnId)
+    synchronized public void logUpdate(String xmlConfig, long currentTxnId)
     {
-        synchronized(lastLogUpdate_txnId)
-        {
-            // another site already did this work.
-            if (currentTxnId == lastLogUpdate_txnId) {
-                return;
-            }
-            else if (currentTxnId < lastLogUpdate_txnId) {
-                throw new RuntimeException("Trying to update logging config with an old transaction.");
-            }
-            hostLog.info("Updating RealVoltDB logging config from txnid: " +
-                    lastLogUpdate_txnId + " to " + currentTxnId);
-            lastLogUpdate_txnId = currentTxnId;
-            VoltLogger.configure(xmlConfig);
+        // another site already did this work.
+        if (currentTxnId == lastLogUpdate_txnId) {
+            return;
         }
+        else if (currentTxnId < lastLogUpdate_txnId) {
+            throw new RuntimeException(
+                    "Trying to update logging config at transaction " + lastLogUpdate_txnId
+                    + " with an older transaction: " + currentTxnId);
+        }
+        hostLog.info("Updating RealVoltDB logging config from txnid: " +
+                lastLogUpdate_txnId + " to " + currentTxnId);
+        lastLogUpdate_txnId = currentTxnId;
+        VoltLogger.configure(xmlConfig);
     }
 
     /** Struct to associate a context with a counter of served sites */
@@ -1914,6 +1948,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 }
                 for (ExecutionSite es : getLocalSites().values()) {
                     es.notifySitesAdded(m_siteTracker);
+                }
+
+                if (ExportManager.instance() != null) {
+                    //Notify the export manager the cluster topology has changed
+                    ExportManager.instance().notifyOfClusterTopologyChange();
                 }
             }
         }

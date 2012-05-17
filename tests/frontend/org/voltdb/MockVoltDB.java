@@ -351,7 +351,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void shutdown(Thread mainSiteThread) throws InterruptedException
+    public boolean shutdown(Thread mainSiteThread) throws InterruptedException
     {
         if (m_faultDistributor != null) {
             m_faultDistributor.shutDown();
@@ -363,6 +363,7 @@ public class MockVoltDB implements VoltDBInterface
         m_es.awaitTermination( 1, TimeUnit.DAYS);
         m_statsAgent.shutdown();
         m_hostMessenger.shutdown();
+        return true;
     }
 
     @Override

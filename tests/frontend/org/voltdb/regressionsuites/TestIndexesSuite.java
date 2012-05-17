@@ -26,8 +26,15 @@ package org.voltdb.regressionsuites;
 import java.io.IOException;
 import java.util.TreeSet;
 
-import org.voltdb.*;
-import org.voltdb.client.*;
+import org.voltdb.BackendTarget;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.NullCallback;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.indexes.CheckMultiMultiIntGTEFailure;
 import org.voltdb_testprocs.regressionsuites.indexes.Insert;
@@ -556,6 +563,12 @@ public class TestIndexesSuite extends RegressionSuite {
         assertEquals(16, modified);
     }
 
+    public void testKeyCastingOverflow() throws NoConnectionsException, IOException, ProcCallException {
+        Client client = getClient();
+        ClientResponseImpl cr = (ClientResponseImpl) client.callProcedure("@AdHoc", "select * from P1 where ID = 6000000000;", 0);
+        assertEquals(cr.getStatus(), ClientResponse.SUCCESS);
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -579,6 +592,7 @@ public class TestIndexesSuite extends RegressionSuite {
         project.addStmtProcedure("Eng397LimitIndexP1", "select * from P1 where P1.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexR2", "select * from R2 where R2.ID > 2 Limit ?");
         project.addStmtProcedure("Eng397LimitIndexP2", "select * from P2 where P2.ID > 2 Limit ?");
+        project.addStmtProcedure("Eng2914BigKeyP1", "select * from P1 where ID < 600000000000");
         project.addStmtProcedure("Eng506UpdateRange", "UPDATE P1IX SET NUM = ? WHERE (P1IX.ID>P1IX.NUM) AND (P1IX.NUM>?)");
         project.addStmtProcedure("InsertP1IX", "insert into P1IX values (?, ?, ?, ?);");
 

@@ -31,11 +31,10 @@ import org.voltdb.exceptions.EEException;
 public interface SiteProcedureConnection {
 
     /**
-     * Allow system procedures to register plan fragments to the site.
-     * @param pfId
-     * @param proc
+     * Get the HSQL backend, if any.  Returns null if we're not configured
+     * to use it
      */
-    public void registerPlanFragment(final long pfId, final ProcedureRunner proc);
+    public HsqlBackend getHsqlBackendIfExists();
 
     /**
      * Get the catalog site id for the corresponding SiteProcedureConnection
@@ -51,6 +50,11 @@ public interface SiteProcedureConnection {
      * Get the catalog host id for the corresponding SiteProcedureConnection
      */
     public int getCorrespondingHostId();
+
+    /**
+     * Log settings changed. Signal EE to update log level.
+     */
+    public void updateBackendLogLevels();
 
     public void loadTable(
             long txnId,
@@ -82,4 +86,54 @@ public interface SiteProcedureConnection {
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
 
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState, boolean isReplay);
+
+    /**
+     * IV2 commit / rollback interface to the EE
+     */
+    public void truncateUndoLog(boolean rollback, long token, long txnId);
+
+    /**
+     * IV2: Run a plan fragment
+     * @param planFragmentId
+     * @param inputDepId
+     * @param parameterSet
+     * @param txnId
+     * @param readOnly
+     * @return
+     * @throws EEException
+     */
+    public VoltTable executePlanFragment(
+        long planFragmentId, int inputDepId, ParameterSet parameterSet,
+        long txnId, boolean readOnly) throws EEException;
+
+    /**
+     * IV2: send dependencies to the EE
+     */
+    public void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies);
+
+    /**
+     * IV2: run a system procedure plan fragment
+     */
+    public DependencyPair executePlanFragment(
+            TransactionState txnState,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params);
+
+    public long[] getUSOForExportTable(String signature);
+
+    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
+                                               long txnId);
+
+    public void toggleProfiler(int toggle);
+
+    public void quiesce();
+
+    public void exportAction(boolean syncAction,
+                             int ackOffset,
+                             Long sequenceNumber,
+                             Integer partitionId,
+                             String tableSignature);
+
+    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+                                boolean interval, Long now);
 }

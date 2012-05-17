@@ -20,7 +20,7 @@ package org.voltdb.expressions;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 public class OperatorExpression extends AbstractExpression {
     public OperatorExpression(ExpressionType type) {
@@ -40,4 +40,12 @@ public class OperatorExpression extends AbstractExpression {
 
     @Override
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
+
+    @Override
+    public boolean needsRightExpression() {
+        ExpressionType type = getExpressionType();
+        //XXX Not sure how unary minus (and unary plus?) are handled (possibly via an implicit zero left argument?)
+        return type != ExpressionType.OPERATOR_NOT && type != ExpressionType.OPERATOR_IS_NULL;
+    }
+
 }

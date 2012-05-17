@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.concurrent.Callable;
 
 import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.Pair;
 import org.voltdb.utils.VoltTableUtil;
 import org.voltcore.utils.DBBPool.BBContainer;
 
@@ -32,6 +33,7 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
     private final char m_fullDelimiters[];
     private final byte m_schemaBytes[];
     private final ArrayList<VoltType> m_columnTypes;
+    private int m_lastNumCharacters = 64 * 1024;
 
     public CSVSnapshotFilter(
             VoltTable vt,
@@ -52,21 +54,35 @@ public class CSVSnapshotFilter implements SnapshotDataFilter {
             @Override
             public BBContainer call() throws Exception {
                 final BBContainer cont = input.call();
-                ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b.remaining());
-                buf.put(m_schemaBytes);
-                final int rowCountPosition = buf.position();
-                buf.position(rowCountPosition + 4);
-                cont.b.position(12);
-                cont.b.limit(cont.b.limit() - 4);
-                buf.put(cont.b);
-                cont.b.limit(cont.b.limit() + 4);
-                final int rowCount = cont.b.getInt();
-                buf.putInt(rowCountPosition, rowCount);
+                if (cont == null) {
+                    return null;
+                }
+                try {
+                    ByteBuffer buf = ByteBuffer.allocate(m_schemaBytes.length + cont.b.remaining());
+                    buf.put(m_schemaBytes);
+                    final int rowCountPosition = buf.position();
+                    buf.position(rowCountPosition + 4);
+                    cont.b.position(12);
+                    cont.b.limit(cont.b.limit() - 4);
+                    buf.put(cont.b);
+                    cont.b.limit(cont.b.limit() + 4);
+                    final int rowCount = cont.b.getInt();
+                    buf.putInt(rowCountPosition, rowCount);
+                    buf.flip();
 
-                VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
-                return DBBPool.wrapBB(
-                        ByteBuffer.wrap(
-                                VoltTableUtil.toCSV(vt, m_columnTypes, m_delimiter, m_fullDelimiters)));
+                    VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
+                    Pair<Integer, byte[]> p =
+                                    VoltTableUtil.toCSV(
+                                            vt,
+                                            m_columnTypes,
+                                            m_delimiter,
+                                            m_fullDelimiters,
+                                            m_lastNumCharacters);
+                    m_lastNumCharacters = p.getFirst();
+                    return DBBPool.wrapBB(ByteBuffer.wrap(p.getSecond()));
+                } finally {
+                    cont.discard();
+                }
             }
         };
     }
