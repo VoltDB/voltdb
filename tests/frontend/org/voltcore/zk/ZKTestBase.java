@@ -33,13 +33,13 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.messaging.HostMessenger;
-import org.voltdb.regressionsuites.LocalCluster;
+import org.voltcore.utils.PortGenerator;
 
 /**
  *
  */
 public class ZKTestBase {
-    LocalCluster.PortGenerator m_ports = new LocalCluster.PortGenerator();
+    PortGenerator m_ports = new PortGenerator();
 
     protected Map<Integer, Integer> m_siteIdToZKPort;
     protected ArrayList<HostMessenger> m_messengers;

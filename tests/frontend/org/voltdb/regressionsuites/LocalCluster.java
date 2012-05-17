@@ -29,6 +29,7 @@ import java.util.List;
 import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.PortGenerator;
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
@@ -99,48 +100,6 @@ public class LocalCluster implements VoltServerConfig {
 
     // Produce a (presumably) available IP port number.
     public final PortGenerator portGenerator = new PortGenerator();
-    public static class PortGenerator {
-        private int nextPort = 12000;
-        private static int portOffset = 0;    // Shift ports away from defaults for testing
-        private int nextCport = VoltDB.DEFAULT_PORT+portOffset;
-        private int nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
-
-        final int MIN_STATIC_PORT = 10000;
-        final int MAX_STATIC_PORT = 49151;
-
-        /** Return the next bindable port */
-        public synchronized int next() {
-            while(nextPort <= MAX_STATIC_PORT) {
-                int port = nextPort++;
-                if (MiscUtils.isBindable(port)) {
-                    return port;
-                }
-            }
-            throw new RuntimeException("Exhausted all possible ports");
-        }
-        public synchronized int nextClient() {
-            while(nextCport <= MAX_STATIC_PORT) {
-                int port = nextCport++;
-                if (MiscUtils.isBindable(port)) {
-                    return port;
-                }
-            }
-            throw new RuntimeException("Exhausted all possible client ports");
-        }
-        public synchronized int nextAdmin() {
-            while(nextAport >= MIN_STATIC_PORT) {
-                int port = nextAport--;
-                if (MiscUtils.isBindable(port)) {
-                    return port;
-                }
-            }
-            throw new RuntimeException("Exhausted all possible admin ports");
-        }
-        public synchronized void reset() {
-            nextCport = VoltDB.DEFAULT_PORT+portOffset;
-            nextAport = VoltDB.DEFAULT_ADMIN_PORT+portOffset;
-        }
-    }
 
     // The base command line - each process copies and customizes this.
     // Each local cluster process has a CommandLine instance configured
@@ -680,9 +639,11 @@ public class LocalCluster implements VoltServerConfig {
             }
         }
         eeProcs.clear();
-        for (int ii = 0; ii < m_siteCount; ii++) {
-            String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
-            eeProcs.add(new EEProcess(templateCmdLine.target(), logfile));
+        if (templateCmdLine.target().isIPC) {
+            for (int ii = 0; ii < m_siteCount; ii++) {
+                String logfile = "LocalCluster_host_" + hostId + "_site" + ii + ".log";
+                eeProcs.add(new EEProcess(templateCmdLine.target(), logfile));
+            }
         }
 
         PipeToFile ptf = null;
@@ -695,6 +656,12 @@ public class LocalCluster implements VoltServerConfig {
                 rejoinCmdLn.debugPort(portGenerator.next());
             }
             rejoinCmdLn.rejoinHostAndPort(rejoinHost + ":" + String.valueOf(portNoToRejoin));
+
+            rejoinCmdLn.m_port = portGenerator.nextClient();
+            rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();
+            rejoinCmdLn.m_zkInterface = "127.0.0.1:" + portGenerator.next();
+            rejoinCmdLn.m_internalPort = portGenerator.next();
+            setPortsFromConfig(hostId, rejoinCmdLn);
 
             m_procBuilder.command().clear();
             m_procBuilder.command().addAll(rejoinCmdLn.createCommandLine());
@@ -715,8 +682,17 @@ public class LocalCluster implements VoltServerConfig {
                 assert(status);
             }
 
-            ptf = new PipeToFile(testoutputdir + File.separator +
-                    getName() + "-" + hostId + ".txt", proc.getInputStream(),
+            String timestampStr = MiscUtils.getCompactStringTimestamp(System.currentTimeMillis());
+
+            ptf = new PipeToFile(
+                    testoutputdir +
+                    File.separator +
+                    "LC-" +
+                    timestampStr + "-" +
+                    getFileName() + "-" +
+                    hostId +
+                    ".rejoined.txt",
+                    proc.getInputStream(),
                     PipeToFile.m_rejoinToken, true, proc);
             synchronized (this) {
                 m_pipes.set(hostId, ptf);
@@ -746,7 +722,7 @@ public class LocalCluster implements VoltServerConfig {
 
                 try {
                     // wait for explicit notification
-                    ptf.wait();
+                    ptf.wait(1000);
                 }
                 catch (InterruptedException ex) {
                     log.error(ex.toString(), ex);
@@ -815,6 +791,7 @@ public class LocalCluster implements VoltServerConfig {
         }
         if (proc != null) {
             proc.destroy();
+            proc.waitFor();
         }
 
         // if (ptf != null) {
@@ -1042,12 +1019,14 @@ public class LocalCluster implements VoltServerConfig {
         return m_cmdLines.get(hostId).adminPort();
     }
 
-    public int setPort(int hostId, int port) {
-        return m_cmdLines.get(hostId).m_port = port;
-    }
-
-    public int setAdminPort(int hostId, int port) {
-        return m_cmdLines.get(hostId).m_adminPort = port;
+    public void setPortsFromConfig(int hostId, VoltDB.Configuration config) {
+        CommandLine cl = m_cmdLines.get(hostId);
+        assert(cl != null);
+        cl.m_port = config.m_port;
+        cl.m_adminPort = config.m_adminPort;
+        cl.m_zkInterface = config.m_zkInterface;
+        cl.m_internalPort = config.m_internalPort;
+        cl.m_leaderPort = config.m_leaderPort;
     }
 
     @Override

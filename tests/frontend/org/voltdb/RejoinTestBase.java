@@ -29,21 +29,12 @@ import java.net.URLEncoder;
 
 import junit.framework.TestCase;
 
-import org.apache.zookeeper_voltpatches.CreateMode;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.Mailbox;
-import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientConfigForTest;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.compiler.VoltProjectBuilder.GroupInfo;
 import org.voltdb.compiler.VoltProjectBuilder.ProcedureInfo;
 import org.voltdb.compiler.VoltProjectBuilder.UserInfo;
-import org.voltdb.dtxn.MailboxPublisher;
-import org.voltdb.utils.InMemoryJarfile;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb_testprocs.rejoinfuzz.NonOrgVoltDBProc;
 
 public class RejoinTestBase extends TestCase {
@@ -127,71 +118,5 @@ public class RejoinTestBase extends TestCase {
     static class Context {
         long catalogCRC;
         ServerThread localServer;
-    }
-
-    Context getServerReadyToReceiveNewNode() throws Exception {
-        Context retval = new Context();
-
-        VoltProjectBuilder builder = getBuilderForTest();
-        boolean success = builder.compile(Configuration.getPathToCatalogForTest("rejoin.jar"), 1, 2, 1, 9998, false);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
-        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
-        config.m_adminPort = 9998;
-        config.m_isRejoinTest = true;
-        retval.localServer = new ServerThread(config);
-
-        //long deploymentCRC = CatalogUtil.getDeploymentCRC(builder.getPathToDeployment());
-
-        // start the fake HostMessenger
-        InMemoryJarfile jarFile = new InMemoryJarfile(Configuration.getPathToCatalogForTest("rejoin.jar"));
-        retval.catalogCRC = jarFile.getCRC();
-        HostMessenger.Config config2 = new HostMessenger.Config();
-        config2.internalPort++;
-        config2.zkInterface = "127.0.0.1:2182";
-        HostMessenger host2 = new HostMessenger(config2);
-        retval.localServer.start();
-        while (VoltDB.instance().getHostMessenger() != null) {
-            Thread.sleep(1);
-        }
-        Thread.sleep(200);
-        host2.start();
-        host2.waitForGroupJoin(2);
-
-        MailboxPublisher publisher = new MailboxPublisher(VoltZK.mailboxes + "/1");
-        Mailbox mbox = host2.createMailbox();
-        Mailbox mbox2 = host2.createMailbox();
-        publisher.registerMailbox(MailboxType.ExecutionSite, new MailboxNodeContent(mbox.getHSId(), 0));
-        publisher.registerMailbox(MailboxType.Initiator, new MailboxNodeContent(mbox2.getHSId(), 0));
-        publisher.publish(host2.getZK());
-        VoltZK.createPersistentZKNodes(host2.getZK());
-        host2.getZK().create(
-                VoltZK.cluster_metadata + "/" + host2.getHostId(),
-                "{ interfaces : [ \"localhost\"], clientPort : 23, adminPort : 43, httpPort : 32 }".getBytes("UTF-8"),
-                Ids.OPEN_ACL_UNSAFE,
-                CreateMode.PERSISTENT);
-        host2.waitForAllHostsToBeReady(2);
-
-        HostMessenger host1 = VoltDB.instance().getHostMessenger();
-
-        host2.closeForeignHostSocket(host1.getHostId());
-        // this is just to wait for the fault manager to kick in
-        Thread.sleep(50);
-        host2.shutdown();
-        // this is just to wait for the fault manager to kick in
-        Thread.sleep(50);
-
-        // wait until the fault manager has kicked in
-
-        for (int i = 0; host1.countForeignHosts() > 0; i++) {
-            if (i > 10) fail();
-            Thread.sleep(50);
-        }
-        assertEquals(0, host1.countForeignHosts());
-
-        return retval;
     }
 }
