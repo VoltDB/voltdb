@@ -31,6 +31,8 @@ import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
@@ -83,6 +85,9 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final String m_tableName;
 
     private final AtomicInteger m_outstandingWriteTasks = new AtomicInteger(0);
+    private final ReentrantLock m_outstandingWriteTasksLock = new ReentrantLock();
+    private final Condition m_noMoreOutstandingWriteTasksCondition =
+            m_outstandingWriteTasksLock.newCondition();
 
     private static final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(
             Executors.newSingleThreadExecutor(new ThreadFactory() {
@@ -242,10 +247,13 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public void close() throws IOException, InterruptedException {
         try {
-            synchronized (m_outstandingWriteTasks) {
+            m_outstandingWriteTasksLock.lock();
+            try {
                 while (m_outstandingWriteTasks.get() > 0) {
-                    m_outstandingWriteTasks.wait();
+                    m_noMoreOutstandingWriteTasksCondition.await();
                 }
+            } finally {
+                m_outstandingWriteTasksLock.unlock();
             }
             m_syncTask.cancel(false);
             m_channel.force(false);
@@ -323,10 +331,13 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
                     throw e;
                 } finally {
                     tupleData.discard();
-                    synchronized (m_outstandingWriteTasks) {
+                    m_outstandingWriteTasksLock.lock();
+                    try {
                         if (m_outstandingWriteTasks.decrementAndGet() == 0) {
-                            m_outstandingWriteTasks.notify();
+                            m_noMoreOutstandingWriteTasksCondition.signalAll();
                         }
+                    } finally {
+                        m_outstandingWriteTasksLock.unlock();
                     }
                 }
                 return null;
