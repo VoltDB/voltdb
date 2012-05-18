@@ -99,7 +99,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             return new DependencyPair(DEP_distribute, result);
 
         } else if (fragmentId == SysProcFragmentId.PF_aggregate) {
-            long[] modifiedTuples = new long[context.getSiteTracker().m_numberOfPartitions];
+            long[] modifiedTuples = new long[context.getNumberOfPartitions()];
             List<VoltTable> deps = dependencies.get(DEP_distribute);
             assert(deps.size() > 0);
 
@@ -227,7 +227,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             VoltType partitionType = VoltType.get((byte) intType);
 
             // create a table for each partition
-            int numPartitions = ctx.getSiteTracker().m_numberOfPartitions;
+            int numPartitions = ctx.getNumberOfPartitions();
             VoltTable partitionedTables[] = new VoltTable[numPartitions];
             for (int i = 0; i < partitionedTables.length; i++) {
                 partitionedTables[i] = table.clone(1024 * 1024);
