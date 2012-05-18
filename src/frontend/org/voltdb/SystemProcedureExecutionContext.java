@@ -38,6 +38,9 @@ public interface SystemProcedureExecutionContext {
 
     public long getSiteId();
 
+    // does this site have "lowest site id" responsibilities.
+    public boolean isLowestSiteId();
+
     public int getHostId();
 
     public int getPartitionId();
