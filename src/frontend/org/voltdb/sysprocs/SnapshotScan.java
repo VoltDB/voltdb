@@ -92,11 +92,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             final VoltTable results = constructFragmentResultsTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getHostId();
-            Long lowest_site_id =
-                context.getSiteTracker().
-                getLowestSiteForHost(host_id);
-            if (context.getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 assert(params.toArray()[0] != null);
                 assert(params.toArray()[0] instanceof String);
@@ -212,11 +208,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             final VoltTable results = constructDigestResultsTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getHostId();
-            Long lowest_site_id =
-                context.getSiteTracker().
-                getLowestSiteForHost(host_id);
-            if (context.getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 assert(params.toArray()[0] != null);
                 assert(params.toArray()[0] instanceof String);
@@ -285,11 +277,7 @@ public class SnapshotScan extends VoltSystemProcedure {
             final VoltTable results = constructDiskFreeResultsTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getHostId();
-            Long lowest_site_id =
-                context.getSiteTracker().
-                getLowestSiteForHost(host_id);
-            if (context.getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 assert(params.toArray()[0] != null);
                 assert(params.toArray()[0] instanceof String);
