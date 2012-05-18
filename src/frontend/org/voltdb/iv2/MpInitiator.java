@@ -39,10 +39,10 @@ public class MpInitiator implements Initiator
 
     private Thread m_siteThread = null;
 
-    public MpInitiator(HostMessenger messenger, Integer partition, PartitionClerk clerk)
+    public MpInitiator(HostMessenger messenger, PartitionClerk clerk)
     {
         m_messenger = messenger;
-        m_partitionId = partition;
+        m_partitionId = -1;
         m_scheduler = new Scheduler(clerk);
         m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_partitionId, clerk);
     }
