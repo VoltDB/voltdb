@@ -60,7 +60,8 @@ public class VoltZK {
      * "partitionId" field.
      */
     public static enum MailboxType {
-        ClientInterface, ExecutionSite, Initiator, StatsAgent
+        ClientInterface, ExecutionSite, Initiator, StatsAgent,
+        MpInitiator
     }
     public static final String mailboxes = "/db/mailboxes";
 

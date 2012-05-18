@@ -96,6 +96,7 @@ import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.iv2.Initiator;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltcore.utils.COWMap;
@@ -424,10 +425,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     JSONObject topo = registerClusterConfig(p.getSecond());
                     List<Integer> partitions =
                         ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                    if (topo.getInt("MPI") == m_messenger.getHostId()) {
-                        partitions.add(-1);
-                    }
                     m_iv2Initiators = createIv2Initiators(partitions);
+                    // Create the MPI if we're the correct host
+                    if (topo.getInt("MPI") == m_messenger.getHostId()) {
+                        Initiator initiator = new MpInitiator(m_messenger, -1, m_siteTracker);
+                        MailboxNodeContent mnc = new MailboxNodeContent(initiator.getInitiatorHSId(),
+                                                                        null);
+                        m_mailboxPublisher.registerMailbox(MailboxType.MpInitiator, mnc);
+                        m_iv2Initiators.add(initiator);
+                    }
                 }
 
                 siteMailboxes = p.getFirst();
