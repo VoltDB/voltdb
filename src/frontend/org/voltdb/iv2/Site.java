@@ -169,6 +169,14 @@ public class Site implements Runnable, SiteProcedureConnection
         }
 
         @Override
+        public boolean isLowestSiteId()
+        {
+            // TODO: should pass this status in at construction.
+            return m_siteId == VoltDB.instance().getSiteTracker().getLowestSiteForHost(getHostId());
+        }
+
+
+        @Override
         public int getHostId() {
             return SiteTracker.getHostForSite(m_siteId);
         }
