@@ -98,17 +98,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
 
     public void testPromoteMaster() throws Exception {
         Client client = getClient();
-        boolean threw = false;
-        try
-        {
+        try {
             client.callProcedure("@Promote");
+            fail();
         }
-        catch (ProcCallException pce)
-        {
+        catch (ProcCallException pce) {
             assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, pce.getClientResponse().getStatus());
-            threw = true;
         }
-        assertTrue(threw);
     }
 
     public void testStatistics() throws Exception {
@@ -121,7 +117,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
         // one aggregate table returned
-        assertTrue(results.length == 1);
+        assertEquals(1, results.length);
         System.out.println("Test initiators table: " + results[0].toString());
         assertEquals(1, results[0].getRowCount());
         VoltTableRow resultRow = results[0].fetchRow(0);
@@ -172,13 +168,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertTrue(results.length == 1);
         // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-        assertTrue(results[0].getRowCount() == 60);
+        assertEquals(18, results[0].getRowCount());
 
         System.out.println("Test statistics table: " + results[0].toString());
 
         results = client.callProcedure("@Statistics", "index", 0).getResults();
         // one aggregate table returned
-        assertTrue(results.length == 1);
+        assertEquals(1, results.length);
 
         //
         // memory
@@ -187,12 +183,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         Thread.sleep(1000);
         results = client.callProcedure("@Statistics", "memory", 0).getResults();
         // one aggregate table returned
-        assertTrue(results.length == 1);
+        assertEquals(1, results.length);
         System.out.println("Node memory statistics table: " + results[0].toString());
         // alternate form
         results = client.callProcedure("@Statistics", "nodememory", 0).getResults();
         // one aggregate table returned
-        assertTrue(results.length == 1);
+        assertEquals(1, results.length);
         System.out.println("Node memory statistics table: " + results[0].toString());
 
         //
@@ -203,7 +199,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
         results = client.callProcedure("@Statistics", "procedure", 0).getResults();
         // one aggregate table returned
-        assertTrue(results.length == 1);
+        assertEquals(1, results.length);
         System.out.println("Test procedures table: " + results[0].toString());
 
         VoltTable stats = results[0];
@@ -235,7 +231,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         //
         results = client.callProcedure("@Statistics", "iostats", 0).getResults();
         // one aggregate table returned
-        assertTrue(results.length == 1);
+        assertEquals(1, results.length);
         System.out.println("Test iostats table: " + results[0].toString());
     }
 
@@ -340,12 +336,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                 {
                     ++foundItem;
                     //Different values depending on local cluster vs. single process hence ||
-                    assertTrue(20 == results[0].getLong("TUPLE_COUNT"));
+                    assertEquals(20, results[0].getLong("TUPLE_COUNT"));
                 }
             }
             // make sure both warehouses were located
-            assertTrue(6 == foundWarehouse);
-            assertTrue(6 == foundItem);
+            assertEquals(6, foundWarehouse);
+            assertEquals(6, foundItem);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -446,9 +442,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                         "  I_PRICE FLOAT DEFAULT NULL,\n" +
                         "  I_DATA VARCHAR(64) DEFAULT NULL,\n" +
                         "  CONSTRAINT I_PK_TREE PRIMARY KEY (I_ID)\n" +
-                        ");");
+                        ");\n" +
+                        "CREATE TABLE NEW_ORDER (\n" +
+                        "  NO_W_ID SMALLINT DEFAULT '0' NOT NULL\n" +
+                        ");\n");
 
         project.addPartitionInfo("WAREHOUSE", "W_ID");
+        project.addPartitionInfo("NEW_ORDER", "NO_W_ID");
         project.addProcedures(PROCEDURES);
 
         /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
@@ -463,7 +463,8 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         config = new LocalCluster("sysproc-cluster.jar", 3, 2, 1,
                                   BackendTarget.NATIVE_EE_JNI);
         ((LocalCluster) config).setHasLocalServer(false);
-        config.compile(project);
+        boolean success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         return builder;
