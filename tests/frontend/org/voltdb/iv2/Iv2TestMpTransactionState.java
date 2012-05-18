@@ -232,7 +232,7 @@ public class Iv2TestMpTransactionState extends TestCase
         // This will be passed a FragmentTaskMessage with no deps
         dut.createAllParticipatingFragmentWork(plan.remoteWork);
         // we should send one message
-        verify(mailbox).send(eq(new long[] {0}), (VoltMessage)any());
+        verify(mailbox).send(eq(new long[] {buddyHSId}), (VoltMessage)any());
 
         // to simplify, offer messages first
         // offer all the necessary fragment responses to satisfy deps
@@ -277,7 +277,7 @@ public class Iv2TestMpTransactionState extends TestCase
         // This will be passed a FragmentTaskMessage with no deps
         dut.createAllParticipatingFragmentWork(plan.remoteWork);
         // we should send 6 messages
-        verify(mailbox).send(eq(new long[] {0,1,2,3,4,5}), (VoltMessage)any());
+        verify(mailbox).send(eq(non_local), (VoltMessage)any());
 
         // to simplify, offer messages first
         // offer all the necessary fragment responses to satisfy deps
@@ -412,7 +412,7 @@ public class Iv2TestMpTransactionState extends TestCase
         // This will be passed a FragmentTaskMessage with no deps
         dut.createAllParticipatingFragmentWork(plan.remoteWork);
         // we should send one message
-        verify(mailbox).send(eq(new long[] {0}), (VoltMessage)any());
+        verify(mailbox).send(eq(new long[] {buddyHSId}), (VoltMessage)any());
 
         // to simplify, offer messages first
         // offer all the necessary fragment responses to satisfy deps
