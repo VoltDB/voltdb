@@ -192,7 +192,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private long m_rejoinSnapshotTxnId = -1;
     private long m_rejoinCoordinatorHSId = -1;
     private TaskLog m_rejoinTaskLog = null;
-    private long m_lastTimeLogWasEmpty = 0;
     private long m_replayedTxnCount = 0;
     private long m_loggedTxnCount = 0;
 
@@ -1125,7 +1124,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
 
         if (ts != null) {
-            m_lastTimeLogWasEmpty = 0;
             // Run the transaction, but don't send response
             recursableRun(ts, true);
             doneWork = true;
@@ -1135,14 +1133,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             boolean rejoinCompleted = false;
             try {
                 if (m_rejoinTaskLog.isEmpty()) {
-                    // if it's idle for 2 secs, switch over
-                    long currentTime = System.currentTimeMillis();
-                    if (m_lastTimeLogWasEmpty > 0 &&
-                            (currentTime - m_lastTimeLogWasEmpty) > 2000) {
-                        rejoinCompleted = true;
-                    } else if (m_lastTimeLogWasEmpty == 0) {
-                        m_lastTimeLogWasEmpty = currentTime;
-                    }
+                    rejoinCompleted = true;
                 }
             } catch (IOException e) {
                 m_recoveryLog.error("Failed to determine if the task log is empty: " +
