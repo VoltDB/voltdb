@@ -244,12 +244,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     //    not sure how to test this.
     // }
 
-    public void testSystemInformation() throws IOException, ProcCallException {
+    // covered by TestSystemInformationSuite
+    /*public void testSystemInformation() throws IOException, ProcCallException {
         Client client = getClient();
         VoltTable results[] = client.callProcedure("@SystemInformation").getResults();
         assertEquals(1, results.length);
         System.out.println(results[0]);
-    }
+    }*/
 
     // Pretty lame test but at least invoke the procedure.
     // "@Quiesce" is used more meaningfully in TestExportSuite.
