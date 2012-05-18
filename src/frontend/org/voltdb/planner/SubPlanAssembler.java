@@ -55,21 +55,15 @@ public abstract class SubPlanAssembler {
     /** The catalog's database object which contains tables and access path info */
     final Database m_db;
 
-    /** Does the plan need to scan all partitions or just one designated by parameter? */
-    final Object[] m_partitionParam;
+    /** Describes the specified and inferred partition context. */
+    final PartitioningForStatement m_partitioning;
 
-    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, Object[] partitionParam)
+    SubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
         m_db = db;
         m_parsedStmt = parsedStmt;
-        m_partitionParam = partitionParam;
+        m_partitioning = partitioning;
     }
-
-    /**
-     * Determines whether a statement will be executed on multiple partitions.
-     * @return true if the statement requires a distributed scan, false otherwise
-     */
-    protected boolean isStatementMultiPartition() { return m_partitionParam[1] == null; }
 
     /**
      * Called repeatedly to iterate through possible embedable select plans.
@@ -486,7 +480,6 @@ public abstract class SubPlanAssembler {
         // this will make the child planfragment be sent to all partitions
         sendNode.isMultiPartition = true;
         sendNode.addAndLinkChild(scanNode);
-        sendNode.generateOutputSchema(m_db);
 
         ReceivePlanNode recvNode = new ReceivePlanNode();
         recvNode.addAndLinkChild(sendNode);

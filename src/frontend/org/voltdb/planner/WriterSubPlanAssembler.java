@@ -48,11 +48,12 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      *
      * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
-     * @param partitionParam A vector of two optional partition parameter values.
+     * @param partitioning Describes the specified and inferred partition context.
      */
-    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, Object[] partitionParam)
+    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
-        super(db, parsedStmt, partitionParam);
+        super(db, parsedStmt, partitioning);
+
         assert(m_parsedStmt.tableList.size() == 1);
         m_targetTable = m_parsedStmt.tableList.get(0);
     }
@@ -77,11 +78,7 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             }
 
         }
-        AbstractPlanNode result = m_plans.poll();
-        if (result != null && (m_targetTable.getIsreplicated() || isStatementMultiPartition())) {
-            result = addSendReceivePair(result);
-        }
-        return result;
+        return m_plans.poll();
     }
 
 }

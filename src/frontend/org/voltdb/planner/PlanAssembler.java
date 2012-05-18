@@ -90,8 +90,8 @@ public class PlanAssembler {
     /** parsed statement for an select */
     ParsedSelectStmt m_parsedSelect = null;
 
-    /** does the statement touch more than one partition? */
-    private final Object[] m_partitionParam;
+    /** Describes the specified and inferred partition context. */
+    private final PartitioningForStatement m_partitioning;
 
     /**
      * Used to generate the table-touching parts of a plan. All join-order and
@@ -116,11 +116,13 @@ public class PlanAssembler {
      *            Catalog info about the physical layout of the cluster.
      * @param catalogDb
      *            Catalog info about schema, metadata and procedures.
+     * @param partitioning
+     *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, Object[] partitionParam) {
+    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
-        m_partitionParam = partitionParam;
+        m_partitioning = partitioning;
     }
 
     String getSQLText() {
@@ -201,7 +203,7 @@ public class PlanAssembler {
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
-            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitionParam);
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         } else {
             // check that no modification happens to views
             if (tableListIncludesView(parsedStmt.tableList)) {
@@ -213,7 +215,7 @@ public class PlanAssembler {
             // figure out which table we're updating/deleting
             assert (parsedStmt.tableList.size() == 1);
             Table targetTable = parsedStmt.tableList.get(0);
-            if (isSinglePartitionPlan() && (targetTable.getIsreplicated())) {
+            if (m_partitioning.wasSpecifiedAsSingle() && (targetTable.getIsreplicated())) {
                 String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
                              + "' in a single-partition procedure.";
                 throw new PlanningErrorException(msg);
@@ -240,7 +242,7 @@ public class PlanAssembler {
             } else
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");
-            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitionParam);
+            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         }
     }
 
@@ -271,7 +273,6 @@ public class PlanAssembler {
                 boolean orderIsDeterministic = m_parsedSelect.isOrderDeterministic();
                 boolean contentIsDeterministic = (m_parsedSelect.hasLimitOrOffset() == false) || orderIsDeterministic;
                 retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
-                retval.setPartitioningKey(m_partitionParam[1]);
             }
         } else {
             if (m_parsedInsert != null) {
@@ -308,8 +309,12 @@ public class PlanAssembler {
         retval.fullWinnerPlan = fragment.planGraph;
         // Do a final generateOutputSchema pass.
         fragment.planGraph.generateOutputSchema(m_catalogDb);
-
+        retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
+    }
+
+    void resetPartitioningKey(Object best) {
+        m_partitioning.setEffectiveValue(best);
     }
 
     private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
@@ -419,7 +424,7 @@ public class PlanAssembler {
                                                addressExpr));
         projectionNode.setOutputSchema(proj_schema);
 
-        if (isSinglePartitionPlan()) {
+        if (m_partitioning.wasSpecifiedAsSingle()) {
 
             assert(subSelectRoot instanceof AbstractScanPlanNode);
 
@@ -447,6 +452,12 @@ public class PlanAssembler {
             return deleteNode;
 
         } else {
+            subSelectRoot = subAssembler.addSendReceivePair(subSelectRoot);
+
+            // TODO: There's a fair amount of hoop-jumping here to work around the Receive/Send pair that
+            // was explicitly inserted at the top of the plan by WriterSubPlanAssembler.
+            // Is there some way to interject this code BEFORE that addition?
+
             // make sure the thing we have is a receive node which
             // indicates it's a multi-site plan
             assert (subSelectRoot instanceof ReceivePlanNode);
@@ -534,7 +545,8 @@ public class PlanAssembler {
         }
         projectionNode.setOutputSchema(proj_schema);
 
-        if (isSinglePartitionPlan()) {
+
+        if (m_partitioning.wasSpecifiedAsSingle()) {
 
             // add the projection inline (TODO: this will break if more than one
             // layer is below this)
@@ -553,6 +565,11 @@ public class PlanAssembler {
 
             return updateNode;
         } else {
+            // TODO: There's a fair amount of hoop-jumping here to work around the Receive/Send pair that
+            // was explicitly inserted at the top of the plan by WriterSubPlanAssembler.
+            // Is there some way to interject this code BEFORE that addition?
+            subSelectRoot = subAssembler.addSendReceivePair(subSelectRoot);
+
             // make sure the thing we have is a receive node which
             // indicates it's a multi-site plan
             assert (subSelectRoot instanceof ReceivePlanNode);
@@ -603,7 +620,7 @@ public class PlanAssembler {
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
-        insertNode.setMultiPartition(isSinglePartitionPlan() == false);
+        insertNode.setMultiPartition(m_partitioning.wasSpecifiedAsSingle() == false);
 
         // the materialize node creates a tuple to insert (which is frankly not
         // always optimal)
@@ -671,7 +688,7 @@ public class PlanAssembler {
         insertNode.generateOutputSchema(m_catalogDb);
         AbstractPlanNode rootNode = insertNode;
 
-        if (isSinglePartitionPlan() == false) {
+        if (m_partitioning.wasSpecifiedAsSingle() == false) {
             // all sites to a scan -> send
             // root site has many recvs feeding into a union
 
@@ -1445,17 +1462,4 @@ public class PlanAssembler {
 
         return columns;
     }
-
-    public boolean isSinglePartitionPlan() {
-        return m_partitionParam[0] != null;
-    }
-
-    public Object getPartitioningKey() {
-        return m_partitionParam[1];
-    }
-
-    public void restorePartitioningKey(Object best) {
-        m_partitionParam[1] = best;
-    }
-
 }

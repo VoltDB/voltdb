@@ -55,19 +55,18 @@ public class AccessPath {
      *
      * @param joinOrder An array of tables in a specific join order.
      * @param accessPath An array of access paths that match with the input tables.
-     *        As a side effect, these get marked as requiring a Send/Receive if they use partitioned tables that
-     *        aren't equality filtered on their partitioning column.
-     * @param bindingOut - the second element of this array is set to the constant (if any) by which ALL partition
+     * @param m_partitioning.resetInferredValue(best) - the second element of this array is set to the constant (if any) by which ALL partition
      *        keys are (at least transitively) equality filtered.
-     * @return true if all partitioned tables are joined on a respective partition key, false otherwise
+     * @return number of partitioned tables whose partition keys may vary independently
+     * (i.e. that are not equality filtered with the first scanned partition key or a constant)
      */
-    static int tagForMultiPartitionAccess(Table[] joinOrder, AccessPath[] accessPath, Object[] bindingOut) {
+    static int tagForMultiPartitionAccess(Table[] joinOrder, AccessPath[] accessPath, PartitioningForStatement m_partitioning) {
         //Collect all index and join expressions from the accessPath for each table
         TupleValueExpression firstPartitionKeyScanned = null;
         Set<TupleValueExpression> eqPartitionKeySet = new HashSet<TupleValueExpression>();
         int result = 0;
-        Object bindingObject = null;
-        Object bindingExpr = null;
+        Object partitioningObject = null;
+        Object partitioningExpr = null;
 
         // Work backwards through the join order list to simulate the scanning order
         for (int i = accessPath.length-1; i >=0; --i) {
@@ -159,27 +158,32 @@ public class AccessPath {
                             // Start the collection of columns that are equal to the first partition key.
                             eqPartitionKeySet.add(tveExpr);
                             eqPartitionKeySet.add(tve2);
-                        } else if (needsRelevanceCheck) {
-                            // tveExpr is the partition key for this table, but DOES this equality link it in with other partition keys?
-                            if (eqPartitionKeySet.contains(tve2)) {
-                                // Yes, another equivalent column.
-                                eqPartitionKeySet.add(tveExpr);
+                        } else if (eqPartitionKeySet.contains(tve2)) {
+                            eqPartitionKeySet.add(tveExpr);
+                            if (needsRelevanceCheck) {
+                                // tveExpr is the partition key for this table, and this equality links it in with other partition keys?
+                                // Another equivalent column.
                                 columnCovered = true;
                                 continue;
                             }
                             // Neither of the equivalent columns, one of which is a partition key,
                             // has any connection (YET!) to a previously scanned partition key.
-                            // This is probably going to require a send-receive on this scan, so don't consider the column now "covered".
-                            // XXX: We completely ignore TVE to TVE equalities that seem irrelevant (so far) at the risk of not recognizing their
-                            // contribution in strange edge cases like the contribution of "A.x = A.partitionKey"
+                            // This usually means that a send-receive will be required on this scan, so the column is not "covered".
+                            // XXX: For now, we completely ignore TVE to TVE equalities that seem irrelevant (so far)
+                            // -- at the risk of not recognizing their contribution in strange edge cases
+                            // like the contribution of "A.x = A.partitionKey"
                             // in strange edge cases like "A.x = A.partitionKey and A.x = B.partitionKey"
-                            // or "A.x = A.partitionKey and A.x = 1"
-                        } else {
-                            // XXX: Here, we miss the contribution of "A.x = A.y" in strange edge cases like
-                            // "A.x = A.y and A.y = A.partitionKey and A.x = B.partitionKey"
-                            // The alternative would be to maintain multiple equivalence sets of the current table's TVEs.
-                            // Similarly, we could track all constant-filtered TVEs in case a later TVE to TVE equality made them relevant
-                            // to the partition key, and possibly to the first partition key.
+                            // or "A.x = A.partitionKey and A.x = 1".
+                        } else if (eqPartitionKeySet.contains(tveExpr)) {
+                            // Neither of the equivalent columns, neither of which is a partition key,
+                            // has any connection (YET!) to a previously scanned partition key.
+                            // XXX: Here, we hope to catch the contribution of "A.x = A.y" in strange edge cases like
+                            // "A.x = A.y and A.y = A.partitionKey and A.x = B.partitionKey" but there may be misses
+                            // here due to order of processing non-join filters on a given table.
+                            // At least we recognize the edge case where one of the two TVEs
+                            // have already been linked to the first scanned partition key, and slightly widen the net.
+                            // A more extensive solution would be to maintain multiple equivalence sets of the current table's TVEs.
+                            eqPartitionKeySet.add(tve2);
                         }
                         continue;
                     }
@@ -209,36 +213,49 @@ public class AccessPath {
                     continue; // expression is based on column values, so is not a suitable constant.
                 }
 
+                if (tveExpr == firstPartitionKeyScanned) {
+                    eqPartitionKeySet.add(tveExpr);
+                }
+
                 if (eqPartitionKeySet.contains(tveExpr)) {
                     // the TVE is equal to a constant AND to the first partition key.
-                    // By implication, the partition key must have a constant value.
-                    if (bindingObject == null) {
-                        bindingExpr = constExpr;
-                        bindingObject = extractPartitioningValue(tveExpr, constExpr);
+                    // By implication, the partition key must have this constant value.
+                    m_partitioning.addPartitioningExpression(constExpr);
+                    if (partitioningObject == null) {
+                        partitioningExpr = constExpr;
+                        partitioningObject = extractPartitioningValue(tveExpr, constExpr);
                     }
                     columnCovered = true;
                     continue;
                 }
 
                 if (needsRelevanceCheck) {
-                    if (bindingExpr != null) {
-                        if (bindingExpr == constExpr) {
+                    if (partitioningExpr != null) {
+                        if (partitioningExpr == constExpr) {
                             // Equality to a common constant expression works for TVE equality.
                             eqPartitionKeySet.add(tveExpr);
                             columnCovered = true;
                             continue;
                         }
+                        m_partitioning.addPartitioningExpression(constExpr);
                         Object altBinding = extractPartitioningValue(tveExpr, constExpr);
-                        if (altBinding.equals(bindingObject)) {
+                        if (altBinding.equals(partitioningObject)) {
                             // Equality to a common constant expression works for TVE equality.
                             eqPartitionKeySet.add(tveExpr);
                             columnCovered = true;
                             continue;
                         }
+                        // else -- non-equal non-null partitioning objects usually indicates an N-partition statement
                     }
                 }
                 // If fallen through, apparently this is an irrelevant filter.
                 // XXX: ignoring constant equality filters that SEEM at this point to be irrelevant to partition keys.
+                // Again, we could keep track here of all TVEs that have been equality-filtered with constants, in case
+                // some later TVE to TVE equality makes them relevant to the first scanned partitioning key.
+                // The cases we miss now are narrowed quite a bit by processing joinExprs before otherExprs for a given table.
+                // But there may still be missed cases dealing with joins of more than two tables?
+                // We COULD try all constant filters on all tables before all TVE filters, but that would likely just
+                // open up different holes.
             }
 
             // All expressions for this access path have been considered.
@@ -249,11 +266,11 @@ public class AccessPath {
                 result++;
             }
         }
-        bindingOut[1] = bindingObject;
-        // It's only a little strange to sometimes be set bindingOut[1] to a non-null value even when returning a value > 0.
-        // What it means in that case is that the query could IN THEORY distribute the results of a multi-partition
-        // scan to the single partition designated by the bindingObject for a final join with that partition's local
-        // data. This currently unsupported edge case is currently promptly detected and kept out of the candidate plans.
+        m_partitioning.setEffectiveValue(partitioningObject);
+        // It's only a little strange to sometimes be setting the inferred value to a non-null value even when returning a value > 0.
+        // That happens when the query could IN THEORY distribute the results of a multi-partition
+        // scan to the single partition designated by the partitioningObject for a final join with that partition's local data.
+        // This currently unsupported edge case is currently promptly detected and kept out of the candidate plans.
         // But THIS code, anyway, stands ready.
         return result;
     }

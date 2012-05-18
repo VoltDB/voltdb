@@ -151,15 +151,15 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
-        Object[] partitionParameter = new Object[2];
+        Object partitionParameter = null;
         if (singlePartition) {
             // Dummy up a partitioning value to indicate the intent and prevent the planner
             // from trying to infer a constant partitioning value from the statement.
-            partitionParameter[0] = "PlannerTestAideDeCamp dummied up single partitioning for QueryPlanner";
-            partitionParameter[1] = partitionParameter[0];
+            partitionParameter = "PlannerTestAideDeCamp dummied up single partitioning for QueryPlanner";
         }
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter);
         QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitionParameter,
+            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
                              hsql, estimates, true, false);
 
         CompiledPlan plan = null;

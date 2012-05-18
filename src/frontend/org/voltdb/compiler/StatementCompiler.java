@@ -32,6 +32,7 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParameterInfo;
+import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -99,15 +100,15 @@ public abstract class StatementCompiler {
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
         PlanNodeList node_list = null;
         TrivialCostModel costModel = new TrivialCostModel();
-
-        Object[] partitionParameter = new Object[2];
+        Object partitionParameter = null;
         if (singlePartition) {
-            // dummy up a partitioning value so that the planner will not try to infer one.
-            partitionParameter[0] = "dummied up in StatementCompiler to force single partitioning in QueryPlanner";
-            partitionParameter[1] = partitionParameter[0];
+            // Dummy up a partitioning value to indicate the intent and prevent the planner
+            // from trying to infer a constant partitioning value from the statement.
+            partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
         }
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter);
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, partitionParameter, hsql, estimates, true, false);
+                catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, true, false);
 
         CompiledPlan plan = null;
         try {
@@ -137,6 +138,10 @@ public abstract class StatementCompiler {
         catalogStmt.setNondeterminismdetail(nondeterminismDetail);
 
         catalogStmt.setSeqscancount(plan.countSeqScans());
+
+        // TODO: This could be the right place to validate the inferred statement partitioning
+        // given the statement's possible usage -- this may require more context
+        // (whether the statement is being used in (or completely defines) a single- or multi-partition procedure).
 
         // Input Parameters
         // We will need to update the system catalogs with this new information

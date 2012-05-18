@@ -57,12 +57,12 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      *
      * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
-     * @param partitionParam in/out param first element is partition key value, forcing a single-partition statement if non-null,
+     * @param m_partitioning in/out param first element is partition key value, forcing a single-partition statement if non-null,
      * second may be an inferred partition key if no explicit single-partitioning was specified
      */
-    SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, Object[] partitionParam)
+    SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
-        super(db, parsedStmt, partitionParam);
+        super(db, parsedStmt, partitioning);
         // Do we have a need for a distributed scan at all?
         for (Table table : parsedStmt.tableList) {
             if (table.getIsreplicated()) {
@@ -261,23 +261,19 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // in the context of and without regressing the fix for ENG-496 (case 2) which was the original motivation for
         // AccessPath.isPartitionKeyEquality.
 
-        // Restore the effective partition key to its explicit value.
-        // It's possible that a left over inferred value from the previous join order may not hold for the current one.
-        // TODO: Make sure that the partitionParam that applies to a winning plan "sticks" to it.
-        m_partitionParam[1] = m_partitionParam[0];
         boolean suppressSendReceivePair = true;
-        if (isStatementMultiPartition() && m_countOfPartitionedTables > 0) {
+        if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_countOfPartitionedTables > 0) {
+            // It's possible that a leftover inferred value from the previous join order may not hold for the current one?
+            m_partitioning.setEffectiveValue(null);
             // It's usually better to send and receive pre-join tuples than post-join tuples.
-            suppressSendReceivePair = false;
+            suppressSendReceivePair = false; // tentative/default value.
             // This analysis operates independently of indexes, so only needs to operate on the naive (first) accessPath.
-            // Note that this call may mess with m_partitionParam[1]
-            // which determines the behavior of isStatementMultiPartition(), called below.
-            int multiPartitionScanCount = AccessPath.tagForMultiPartitionAccess(joinOrder, listOfAccessPathCombos.get(0), m_partitionParam);
+            int multiPartitionScanCount = AccessPath.tagForMultiPartitionAccess(joinOrder, listOfAccessPathCombos.get(0), m_partitioning);
             if (multiPartitionScanCount > 1) {
                 // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
                 return;
             }
-            if (m_partitionParam[1] == null) {
+            if (m_partitioning.effectivePartitioningValue() == null) {
                 // For (multiPartitionScanCount == 1), "case 2" where the last-listed (first-scanned) partitioned table
                 // has no constant filter, it accounts for the 1 independent partitioned scan.
                 // In this case, whether to suppress the usual Receive/Send nodes below the joins depends on whether
@@ -301,7 +297,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     // localized and non-localized joins.
                     return;
                 } else {
-                    assert(isStatementMultiPartition() == false);
                     suppressSendReceivePair = true; // No Send/Receive needed in a single-partition statement.
                 }
             }
@@ -332,8 +327,11 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         AbstractPlanNode retv = getSelectSubPlanForAccessPathRecursive(joinOrder, accessPath, suppressSendReceivePair);
         // If there is a multi-partition statement on one or more partitioned Tables and the Send/Receive nodes were suppressed,
         // they need to come into play "post-join".
-        if (isStatementMultiPartition() && m_countOfPartitionedTables > 0 && suppressSendReceivePair)
+        if (suppressSendReceivePair &&
+                (m_countOfPartitionedTables > 0) &&
+                m_partitioning.effectivePartitioningValue() == null) {
             retv = addSendReceivePair(retv);
+        }
         return retv;
     }
 
@@ -451,7 +449,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath, boolean suppressSendReceivePair) {
+    protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath, boolean suppressSendReceivePair) {
         AbstractPlanNode resultPlan = null;
         for (int at = joinOrder.length-1; at >= 0; --at) {
             AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at]);

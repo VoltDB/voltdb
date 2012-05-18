@@ -23,6 +23,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CompiledPlan.Fragment;
+import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.PlanNodeList;
@@ -106,11 +107,9 @@ public class PlannerTool {
         //////////////////////
 
         TrivialCostModel costModel = new TrivialCostModel();
-        Object[] partitionParamInOut = new Object[2];
-        partitionParamInOut[0] = partitionParam;
-        partitionParamInOut[1] = partitionParam;
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam);
         QueryPlanner planner = new QueryPlanner(
-                m_context.cluster, m_context.database, partitionParamInOut, m_hsql, new DatabaseEstimates(), false, true);
+                m_context.cluster, m_context.database, partitioning, m_hsql, new DatabaseEstimates(), false, true);
         CompiledPlan plan = null;
         try {
             plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
@@ -165,7 +164,7 @@ public class PlannerTool {
         }
 
         retval.replicatedDML = plan.replicatedTableDML;
-        retval.partitionParam = partitionParamInOut[1];
+        retval.partitionParam = partitioning.effectivePartitioningValue();
         return retval;
     }
 }
