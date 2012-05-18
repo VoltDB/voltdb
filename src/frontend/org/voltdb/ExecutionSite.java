@@ -2367,7 +2367,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                      !currentTxnState.hasTransactionalWork())
             {
                 assert(!currentTxnState.isSinglePartition());
-                tryToSneakInASinglePartitionProcedure();
+                tryToSneakInASinglePartitionProcedure(isReplay);
             }
             else
             {
@@ -2618,7 +2618,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      *
      * @return false if there is no possibility for speculative work.
      */
-    public boolean tryToSneakInASinglePartitionProcedure() {
+    private boolean tryToSneakInASinglePartitionProcedure(boolean isReplay) {
         // poll for an available message. don't block
         VoltMessage message = m_mailbox.recv();
         tick(); // unclear if this necessary (rtb)
@@ -2632,7 +2632,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)
             {
-                boolean success = nextTxn.doWork(m_recovering, false);
+                boolean success = nextTxn.doWork(m_recovering, !isReplay);
                 assert(success);
                 return true;
             }
