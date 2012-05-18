@@ -607,6 +607,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public long getSiteId()                               { return m_siteId; }
         @Override
+        public boolean isLowestSiteId()                       { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
+        @Override
         public int getHostId()                                { return SiteTracker.getHostForSite(m_siteId); }
         @Override
         public int getPartitionId()                           { return m_tracker.getPartitionForSite(m_siteId); }
