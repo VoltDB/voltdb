@@ -30,4 +30,9 @@ public interface PartitionClerk
      * in no particular order.
      */
     public List<Long> getHSIdsForPartitionInitiators();
+
+    // Hacky...for now get the buddy from "SiteTracker"
+    // Later: make an MpInitiator and construct it with buddy in
+    // RealVoltDB
+    public long getBuddySiteForMPI(long hsId);
 }

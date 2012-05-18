@@ -19,19 +19,18 @@ package org.voltdb.dtxn;
 
 import java.util.ArrayList;
 import java.util.Arrays;
-import java.util.Collection;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.iv2.PartitionClerk;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK.MailboxType;
+import org.voltdb.iv2.PartitionClerk;
 
 import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
@@ -528,5 +527,17 @@ public class SiteTracker implements PartitionClerk {
             results.add(ptoi.get(0));
         }
         return results;
+    }
+
+    @Override
+    public long getBuddySiteForMPI(long hsId)
+    {
+        int host = getHostForSite(hsId);
+        for (long hsid : getHSIdsForPartitionInitiators()) {
+            if (host == getHostForSite(hsid)) {
+                return hsid;
+            }
+        }
+        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " + hsId);
     }
 }
