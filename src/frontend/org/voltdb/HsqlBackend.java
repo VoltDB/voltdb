@@ -53,29 +53,45 @@ public class HsqlBackend {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger sqlLog = new VoltLogger("SQL");
 
+    private final static Object backendLock = new Object();
+    private static HsqlBackend m_backend = null;
+
     static public HsqlBackend initializeHSQLBackend(long siteId,
                                                     CatalogContext context)
     {
-        HsqlBackend hsqlTemp = null;
-        try {
-            hsqlTemp = new HsqlBackend(siteId);
-            final String hexDDL = context.database.getSchema();
-            final String ddl = Encoder.hexDecodeToString(hexDDL);
-            final String[] commands = ddl.split("\n");
-            for (String command : commands) {
-                String decoded_cmd = Encoder.hexDecodeToString(command);
-                decoded_cmd = decoded_cmd.trim();
-                if (decoded_cmd.length() == 0) {
-                    continue;
+        synchronized(backendLock) {
+            if (m_backend == null) {
+                try {
+                    m_backend = new HsqlBackend(siteId);
+                    final String hexDDL = context.database.getSchema();
+                    final String ddl = Encoder.hexDecodeToString(hexDDL);
+                    final String[] commands = ddl.split("\n");
+                    for (String command : commands) {
+                        String decoded_cmd = Encoder.hexDecodeToString(command);
+                        decoded_cmd = decoded_cmd.trim();
+                        if (decoded_cmd.length() == 0) {
+                            continue;
+                        }
+                        m_backend.runDDL(decoded_cmd);
+                    }
                 }
-                hsqlTemp.runDDL(decoded_cmd);
+                catch (final Exception ex) {
+                    hostLog.fatal("Unable to construct HSQL backend");
+                    VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
+                }
+            }
+            return m_backend;
+        }
+    }
+
+    static public void shutdownInstance()
+    {
+        synchronized(backendLock) {
+            if (m_backend != null) {
+                m_backend.shutdown();
+                m_backend = null;
             }
         }
-        catch (final Exception ex) {
-            hostLog.fatal("Unable to construct HSQL backend");
-            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
-        }
-        return hsqlTemp;
     }
 
     Connection dbconn;
@@ -98,7 +114,7 @@ public class HsqlBackend {
     }
 
     /** Creates a new backend wrapping dbconn. This is used for testing only. */
-    public HsqlBackend(Connection dbconn) {
+    private HsqlBackend(Connection dbconn) {
         this.dbconn = dbconn;
     }
 
@@ -318,7 +334,7 @@ public class HsqlBackend {
         return "\'" + input.replace("'", "''") + "\'";
     }
 
-    public void shutdown() {
+    private void shutdown() {
         try {
             try {
                 Statement stmt = dbconn.createStatement();
@@ -331,5 +347,4 @@ public class HsqlBackend {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);
         }
     }
-
 }

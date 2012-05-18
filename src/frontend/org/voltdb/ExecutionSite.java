@@ -362,7 +362,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 m_partitionDRGateway = null;
 
                 if (hsql != null) {
-                    hsql.shutdown();
+                    HsqlBackend.shutdownInstance();
                 }
                 if (ee != null) {
                     ee.release();
