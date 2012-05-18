@@ -95,14 +95,16 @@ public class MultiConfigSuiteBuilder extends TestSuite {
             {
                 return true;
             }
-            if ((config instanceof LocalSingleProcessServer) &&
-                !(enabled_configs.contains("local")))
+            if (config instanceof LocalSingleProcessServer)
             {
-                return true;
-            }
-            if (config.isHSQL() && !(enabled_configs.contains("hsql")))
-            {
-                return true;
+                if (config.isHSQL()) {
+                    if (!enabled_configs.contains("hsql")) {
+                        return true;
+                    }
+                }
+                else if (!enabled_configs.contains("local")) {
+                    return true;
+                }
             }
         }
 
