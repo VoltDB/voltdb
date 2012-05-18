@@ -28,7 +28,6 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ParameterSet;
@@ -363,7 +362,7 @@ public class Site implements Runnable, SiteProcedureConnection
     {
         try {
             if (m_hsql != null) {
-                m_hsql.shutdown();
+                HsqlBackend.shutdownInstance();
             }
             if (m_ee != null) {
                 m_ee.release();
