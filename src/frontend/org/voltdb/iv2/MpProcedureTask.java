@@ -43,11 +43,12 @@ public class MpProcedureTask extends ProcedureTask
 
     MpProcedureTask(Mailbox mailbox, ProcedureRunner runner,
                   long txnId, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg, List<Long> pInitiators)
+                  Iv2InitiateTaskMessage msg, List<Long> pInitiators,
+                  long buddyHSId)
     {
         super(mailbox, runner,
               new MpTransactionState(mailbox, txnId, msg, pInitiators,
-                                     mailbox.getHSId()),
+                                     buddyHSId),
               queue);
         m_msg = msg;
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);

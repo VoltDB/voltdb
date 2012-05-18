@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
@@ -37,15 +38,21 @@ public class SysprocFragmentTask extends TransactionTask
 {
     final Mailbox m_initiator;
     final FragmentTaskMessage m_task;
+    Map<Integer, List<VoltTable>> m_inputDeps;
 
     SysprocFragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
                  TransactionTaskQueue queue,
-                 FragmentTaskMessage message)
+                 FragmentTaskMessage message,
+                 Map<Integer, List<VoltTable>> inputDeps)
     {
         super(txn, queue);
         m_initiator = mailbox;
         m_task = message;
+        m_inputDeps = inputDeps;
+        if (m_inputDeps == null) {
+            m_inputDeps = new HashMap<Integer, List<VoltTable>>();
+        }
         assert(m_task.isSysProcTask());
     }
 
@@ -83,9 +90,9 @@ public class SysprocFragmentTask extends TransactionTask
                 // set since remote (non-aggregator) fragments don't receive dependencies.
                 final DependencyPair dep
                     = siteConnection.executePlanFragment(m_txn,
-                            new HashMap<Integer, List<VoltTable>>(),
-                            fragmentId,
-                            params);
+                                                         m_inputDeps,
+                                                         fragmentId,
+                                                         params);
                 currentFragResponse.addDependency(dep.depId, dep.dependency);
             } catch (final EEException e) {
                 hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);

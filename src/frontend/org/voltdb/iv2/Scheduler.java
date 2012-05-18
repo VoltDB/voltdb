@@ -30,6 +30,7 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -132,9 +133,11 @@ public class Scheduler
 
         // Multi-partition initiation (at the MPI)
         final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
+        long buddy_hsid = m_clerk.getBuddySiteForMPI(m_mailbox.getHSId());
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
-                    m_txnId.incrementAndGet(), m_pendingTasks, message, partitionInitiators);
+                    m_txnId.incrementAndGet(), m_pendingTasks, message, partitionInitiators,
+                    buddy_hsid);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);
     }
@@ -171,7 +174,12 @@ public class Scheduler
     }
 
 
-    public void handleFragmentTaskMessage(FragmentTaskMessage message)
+    public void handleFragmentTaskMessage(FragmentTaskMessage message) {
+        handleFragmentTaskMessage(message, null);
+    }
+
+    public void handleFragmentTaskMessage(FragmentTaskMessage message,
+                                          Map<Integer, List<VoltTable>> inputDeps)
     {
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         // bit of a hack...we will probably not want to create and
@@ -185,13 +193,13 @@ public class Scheduler
         if (message.isSysProcTask()) {
             final SysprocFragmentTask task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                        m_pendingTasks, message);
+                                        m_pendingTasks, message, inputDeps);
             m_pendingTasks.offer(task);
         }
         else {
             final FragmentTask task =
                 new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                 m_pendingTasks, message);
+                                 m_pendingTasks, message, inputDeps);
             m_pendingTasks.offer(task);
         }
     }

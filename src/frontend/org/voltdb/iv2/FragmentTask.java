@@ -17,6 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.List;
+import java.util.Map;
+
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
@@ -33,15 +36,18 @@ public class FragmentTask extends TransactionTask
 {
     final Mailbox m_initiator;
     final FragmentTaskMessage m_task;
+    final Map<Integer, List<VoltTable>> m_inputDeps;
 
     FragmentTask(Mailbox mailbox,
                  ParticipantTransactionState txn,
                  TransactionTaskQueue queue,
-                 FragmentTaskMessage message)
+                 FragmentTaskMessage message,
+                 Map<Integer, List<VoltTable>> inputDeps)
     {
         super(txn, queue);
         m_initiator = mailbox;
         m_task = message;
+        m_inputDeps = inputDeps;
     }
 
     @Override
@@ -71,9 +77,8 @@ public class FragmentTask extends TransactionTask
             new FragmentResponseMessage(m_task, m_initiator.getHSId());
         currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
 
-        if (m_task.isSysProcTask())
-        {
-            throw new RuntimeException("IV2 unable to handle system procedures yet");
+        if (m_inputDeps != null) {
+            siteConnection.stashWorkUnitDependencies(m_inputDeps);
         }
 
         for (int frag = 0; frag < m_task.getFragmentCount(); frag++)

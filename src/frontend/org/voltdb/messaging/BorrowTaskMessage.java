@@ -64,7 +64,6 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
 
     public void addInputDepMap(Map<Integer, List<VoltTable>> inputDeps)
     {
-        assert(inputDeps.size() == m_fragTask.m_inputDepCount);
         m_inputDeps = inputDeps;
     }
 

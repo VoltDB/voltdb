@@ -64,7 +64,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         ParticipantTransactionState pft =
             new ParticipantTransactionState(localTxnId, msg);
         FragmentTask task =
-            new FragmentTask(null, pft, queue, msg);
+            new FragmentTask(null, pft, queue, msg, null);
         return task;
     }
 
@@ -75,7 +75,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
         FragmentTask task =
-            new FragmentTask(null, (ParticipantTransactionState)txn, queue, msg);
+            new FragmentTask(null, (ParticipantTransactionState)txn, queue, msg, null);
         return task;
     }
 
