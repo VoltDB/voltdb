@@ -33,13 +33,7 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
-import org.voltdb.messaging.BorrowTaskMessage;
-import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.FragmentResponseMessage;
-import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -49,7 +43,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
 {
     VoltLogger hostLog = new VoltLogger("HOST");
     private final int m_partitionId;
-    private final Scheduler m_scheduler;
+    private final InitiatorMessageHandler m_msgHandler;
     private final HostMessenger m_messenger;
     private long m_hsId;
 
@@ -94,14 +88,14 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     };
 
 
-    public InitiatorMailbox(Scheduler scheduler, HostMessenger messenger,
+    public InitiatorMailbox(InitiatorMessageHandler msgHandler, HostMessenger messenger,
             int partitionId, PartitionClerk partitionClerk)
     {
-        m_scheduler = scheduler;
+        m_msgHandler = msgHandler;
         m_messenger = messenger;
         m_partitionId = partitionId;
         m_messenger.createMailbox(null, this);
-        m_scheduler.setMailbox(this);
+        m_msgHandler.setMailbox(this);
     }
 
     /**
@@ -169,138 +163,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     @Override
     public void deliver(VoltMessage message)
     {
-        if (message instanceof Iv2InitiateTaskMessage) {
-            handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
-        }
-        else if (message instanceof InitiateResponseMessage) {
-            handleInitiateResponseMessage((InitiateResponseMessage)message);
-        }
-        else if (message instanceof FragmentTaskMessage) {
-            handleFragmentTaskMessage((FragmentTaskMessage)message);
-        }
-        else if (message instanceof FragmentResponseMessage) {
-            handleFragmentResponseMessage((FragmentResponseMessage)message);
-        }
-        else if (message instanceof CompleteTransactionMessage) {
-            handleCompleteTransactionMessage((CompleteTransactionMessage)message);
-        }
-        else if (message instanceof BorrowTaskMessage) {
-            handleBorrowTaskMessage((BorrowTaskMessage)message);
-        }
-        else {
-            throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
-        }
-    }
-
-    private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
-    {
-        /*
-           if (replica):
-               if (sp procedure):
-                   log it
-                   make a SP-task cfg'd with respond-to-remote
-                if (mp fragment):
-                   log it
-                   make a MP-fragtask cfg'd with respond-to-master
-
-            if (master):
-                if (sp procedure):
-                    log it
-                    replicate
-                    make a SP-task cfg'd with respond-to-local
-                if (mp fragment)
-                    log it
-                    replicate
-                    make a MP-fragtask cfg'd with respond-to-local
-                if (sp-response):
-                    log it?
-                    if replicate.dedupe() says complete:
-                       send response to creator
-                if (mp fragment response)
-                    log it?
-                    if replicate.dedupe() says complete:
-                       send response to creator (must be MPI)
-                if (complete transaction)
-                    log it
-                    replicate
-                    make a complete-transaction task
-
-            if (mpi):
-                if (mp procedure):
-                    log it
-                    make a mp procedure task
-                if (mp fragment response):
-                    offer to txnstate
-                if (every-site):
-                    log it
-                    send sp procedure to every master
-                if (every-site-response):
-                    if all-responses-collected? respond to creator
-
-       */
-
-
-
-        // If MPI and multipart, just schedule (for now)
-        // If MPI or Partition master and singlepart, replicate and schedule
-        // if partition replica, just schedule
-        m_scheduler.handleIv2InitiateTaskMessage(message);
-    }
-
-    private void handleInitiateResponseMessage(InitiateResponseMessage message)
-    {
-        // If MPI and multipart, deliver to client interface
-        // if MPI or partition master and singlepart, dedupe and deliver to client interface
-        if (m_partitionId == -1) {
-            m_scheduler.handleInitiateResponseMessage(message);
-        }
-        // if partition replica, deliver to partition master
-        else {
-            try {
-                // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-                send(message.getInitiatorHSId(), message);
-            }
-            catch (MessagingException e) {
-                // hostLog.error("Failed to deliver response from execution site.", e);
-            }
-        }
-    }
-
-    private void handleFragmentTaskMessage(FragmentTaskMessage message)
-    {
-        // if MPI just replicate (as partition master)
-        // if partition master, replicate and schedule
-        // if partition replica, just schedule
-        m_scheduler.handleFragmentTaskMessage(message);
-    }
-
-    private void handleFragmentResponseMessage(FragmentResponseMessage message)
-    {
-        // if MPI, schedule
-        if (m_partitionId == -1)
-        {
-            m_scheduler.handleFragmentResponseMessage(message);
-        }
-        else {
-            // if partition master, dedupe and deliver to MPI
-            // if partition replica, deliver to partition master
-            try {
-                send(message.getDestinationSiteId(), message);
-            }
-            catch (MessagingException e) {
-                hostLog.error("Failed to deliver response from execution site.", e);
-            }
-        }
-    }
-
-    private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
-    {
-        m_scheduler.handleCompleteTransactionMessage(message);
-    }
-
-    private void handleBorrowTaskMessage(BorrowTaskMessage message) {
-        m_scheduler.handleFragmentTaskMessage(message.getFragmentTaskMessage(),
-                                              message.getInputDepMap());
+        m_msgHandler.deliver(message);
     }
 
     /**

@@ -22,13 +22,11 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-public class MpInitiatorMessageHandler implements InitiatorMessageHandler
+public class MpInitiatorMessageHandler extends InitiatorMessageHandler
 {
-    final Scheduler m_scheduler;
-
     public MpInitiatorMessageHandler(Scheduler scheduler)
     {
-        m_scheduler = scheduler;
+        super(scheduler);
     }
 
     public void deliver(VoltMessage message)

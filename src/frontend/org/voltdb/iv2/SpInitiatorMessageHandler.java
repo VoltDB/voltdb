@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.BorrowTaskMessage;
@@ -27,15 +26,11 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
-public class SpInitiatorMessageHandler implements InitiatorMessageHandler
+public class SpInitiatorMessageHandler extends InitiatorMessageHandler
 {
-    final Scheduler m_scheduler;
-    final Mailbox m_mailbox;
-
-    public SpInitiatorMessageHandler(Scheduler scheduler, Mailbox mailbox)
+    public SpInitiatorMessageHandler(Scheduler scheduler)
     {
-        m_scheduler = scheduler;
-        m_mailbox = mailbox;
+        super(scheduler);
     }
 
     public void deliver(VoltMessage message)

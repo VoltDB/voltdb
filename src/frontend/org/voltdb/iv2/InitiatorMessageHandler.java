@@ -18,11 +18,71 @@
 package org.voltdb.iv2;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 
-public interface InitiatorMessageHandler
+abstract public class InitiatorMessageHandler
 {
     static VoltLogger hostLog = new VoltLogger("HOST");
 
-    public void deliver(VoltMessage message);
+    final protected Scheduler m_scheduler;
+    protected Mailbox m_mailbox;
+
+    InitiatorMessageHandler(Scheduler scheduler)
+    {
+        m_scheduler = scheduler;
+    }
+
+    void setMailbox(Mailbox mailbox)
+    {
+        m_mailbox = mailbox;
+        m_scheduler.setMailbox(m_mailbox);
+    }
+
+        /*
+           if (replica):
+               if (sp procedure):
+                   log it
+                   make a SP-task cfg'd with respond-to-remote
+                if (mp fragment):
+                   log it
+                   make a MP-fragtask cfg'd with respond-to-master
+
+            if (master):
+                if (sp procedure):
+                    log it
+                    replicate
+                    make a SP-task cfg'd with respond-to-local
+                if (mp fragment)
+                    log it
+                    replicate
+                    make a MP-fragtask cfg'd with respond-to-local
+                if (sp-response):
+                    log it?
+                    if replicate.dedupe() says complete:
+                       send response to creator
+                if (mp fragment response)
+                    log it?
+                    if replicate.dedupe() says complete:
+                       send response to creator (must be MPI)
+                if (complete transaction)
+                    log it
+                    replicate
+                    make a complete-transaction task
+
+            if (mpi):
+                if (mp procedure):
+                    log it
+                    make a mp procedure task
+                if (mp fragment response):
+                    offer to txnstate
+                if (every-site):
+                    log it
+                    send sp procedure to every master
+                if (every-site-response):
+                    if all-responses-collected? respond to creator
+
+       */
+
+    abstract public void deliver(VoltMessage message);
 }

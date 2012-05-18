@@ -36,6 +36,7 @@ public class SpInitiator implements Initiator
     private Site m_executionSite = null;
     private Scheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
+    private InitiatorMessageHandler m_msgHandler = null;
 
     private Thread m_siteThread = null;
 
@@ -44,7 +45,8 @@ public class SpInitiator implements Initiator
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = new Scheduler(clerk);
-        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_partitionId, clerk);
+        m_msgHandler = new SpInitiatorMessageHandler(m_scheduler);
+        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, m_partitionId, clerk);
     }
 
     @Override
