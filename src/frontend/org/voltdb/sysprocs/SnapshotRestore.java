@@ -218,7 +218,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         registerPlanFragment(SysProcFragmentId.PF_restoreDistributeExportSequenceNumbers);
         registerPlanFragment(SysProcFragmentId.PF_restoreDistributeExportSequenceNumbersResults);
         m_siteId = CoreUtils.getSiteIdFromHSId(m_site.getCorrespondingSiteId());
-        m_hostId = SiteTracker.getHostForSite(m_site.getCorrespondingSiteId());
+        m_hostId = m_site.getCorrespondingHostId();
         // XXX HACK GIANT HACK given the current assumption that there is
         // only one database per cluster, I'm asserting this and then
         // skirting around the need to have the database name in order to get
@@ -1443,7 +1443,7 @@ public class SnapshotRestore extends VoltSystemProcedure
 
 
                 byte[][] partitioned_tables =
-                        createPartitionedTables(tableName, table, tracker.m_numberOfPartitions);
+                        createPartitionedTables(tableName, table, ctx.getNumberOfPartitions());
                 if (c != null) {
                     c.discard();
                 }
