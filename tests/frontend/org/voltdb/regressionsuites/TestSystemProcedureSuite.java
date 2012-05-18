@@ -33,10 +33,10 @@ import org.voltdb.SysProcSelector;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.malicious.GoSleep;
 
 public class TestSystemProcedureSuite extends RegressionSuite {
@@ -111,9 +111,63 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertTrue(threw);
     }
 
-    public void testStatistics_Table() throws Exception {
-        Client client = getClient();
+    public void testStatistics() throws Exception {
+        Client client  = getClient();
+
+        //
+        // initiator selector
+        //
         VoltTable results[] = null;
+        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
+        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
+        // one aggregate table returned
+        assertTrue(results.length == 1);
+        System.out.println("Test initiators table: " + results[0].toString());
+        assertEquals(1, results[0].getRowCount());
+        VoltTableRow resultRow = results[0].fetchRow(0);
+        assertNotNull(resultRow);
+        assertEquals("@Statistics", resultRow.getString("PROCEDURE_NAME"));
+        assertEquals( 1, resultRow.getLong("INVOCATIONS"));
+
+        //
+        // invalid selector
+        //
+        try {
+            // No selector at all.
+            client.callProcedure("@Statistics");
+            fail();
+        }
+        catch (ProcCallException ex) {
+            // All badness gets turned into ProcCallExceptions, so we need
+            // to check specifically for this error, otherwise things that
+            // crash the cluster also turn into ProcCallExceptions and don't
+            // trigger failure (ENG-2347)
+            assertEquals("VOLTDB ERROR: PROCEDURE Statistics EXPECTS 3 PARAMS, BUT RECEIVED 1",
+                         ex.getMessage());
+        }
+        try {
+            // Invalid selector
+            client.callProcedure("@Statistics", "garbage", 0);
+            fail();
+        }
+        catch (ProcCallException ex) {}
+
+        //
+        // Partition count
+        //
+        results = client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name(), 0).getResults();
+        assertEquals( 1, results.length);
+        assertTrue( results[0] != null);
+        assertEquals( 1, results[0].getRowCount());
+        assertEquals( 1, results[0].getColumnCount());
+        assertEquals( VoltType.INTEGER, results[0].getColumnType(0));
+        assertTrue( results[0].advanceRow());
+        final int columnCount = (int)results[0].getLong(0);
+        assertTrue (columnCount == 3);
+
+        //
+        // table
+        //
         results = client.callProcedure("@Statistics", "table", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
@@ -126,34 +180,24 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertTrue(results.length == 1);
 
-        //System.out.println("Test statistics table: " + results[0].toString());
-    }
-
-    public void testStatistics_Memory() throws Exception {
-        Client client = getClient();
-        VoltTable results[] = null;
-
+        //
+        // memory
+        //
         // give time to seed the stats cache?
         Thread.sleep(1000);
-
         results = client.callProcedure("@Statistics", "memory", 0).getResults();
-
         // one aggregate table returned
         assertTrue(results.length == 1);
-
         System.out.println("Node memory statistics table: " + results[0].toString());
-
         // alternate form
         results = client.callProcedure("@Statistics", "nodememory", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
-
         System.out.println("Node memory statistics table: " + results[0].toString());
-    }
 
-    public void testStatistics_Procedure() throws Exception {
-        Client client  = getClient();
-        VoltTable results[] = null;
+        //
+        // procedure
+        //
         // 3 seconds translates to 3 billion nanos, which overflows internal
         // values (ENG-1039)
         results = client.callProcedure("GoSleep", 3000, 0, null).getResults();
@@ -185,74 +229,14 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertTrue("Failed AVG_EXECUTION_TIME > 2,400,000,000ns, value was: " +
                    avg_time,
                    avg_time > 2400000000L);
-    }
 
-    public void testStatistics_iostats() throws Exception {
-        Client client  = getClient();
-        VoltTable results[] = null;
+        //
+        // iostats
+        //
         results = client.callProcedure("@Statistics", "iostats", 0).getResults();
         // one aggregate table returned
         assertTrue(results.length == 1);
         System.out.println("Test iostats table: " + results[0].toString());
-    }
-
-    public void testStatistics_Initiator() throws Exception {
-        Client client  = getClient();
-        VoltTable results[] = null;
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        results = client.callProcedure("@Statistics", "INITIATOR", 0).getResults();
-        // one aggregate table returned
-        assertTrue(results.length == 1);
-        System.out.println("Test initiators table: " + results[0].toString());
-        assertEquals(1, results[0].getRowCount());
-        VoltTableRow resultRow = results[0].fetchRow(0);
-        assertNotNull(resultRow);
-        assertEquals("@Statistics", resultRow.getString("PROCEDURE_NAME"));
-        assertEquals( 1, resultRow.getLong("INVOCATIONS"));
-    }
-
-    public void testStatistics_InvalidSelector() throws IOException {
-        Client client = getClient();
-        boolean exceptionThrown = false;
-
-        // No selector at all.
-        try {
-            client.callProcedure("@Statistics");
-        }
-        catch (ProcCallException ex) {
-            // All badness gets turned into ProcCallExceptions, so we need
-            // to check specifically for this error, otherwise things that
-            // crash the cluster also turn into ProcCallExceptions and don't
-            // trigger failure (ENG-2347)
-            assertEquals("VOLTDB ERROR: PROCEDURE Statistics EXPECTS 3 PARAMS, BUT RECEIVED 1",
-                         ex.getMessage());
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-        exceptionThrown = false;
-
-        // Invalid selector
-        try {
-            client.callProcedure("@Statistics", "garbage", 0);
-        }
-        catch (ProcCallException ex) {
-            exceptionThrown = true;
-        }
-        assertTrue(exceptionThrown);
-    }
-
-    public void testStatistics_PartitionCount() throws Exception {
-        Client client = getClient();
-        final VoltTable results[] =
-            client.callProcedure("@Statistics", SysProcSelector.PARTITIONCOUNT.name(), 0).getResults();
-        assertEquals( 1, results.length);
-        assertTrue( results[0] != null);
-        assertEquals( 1, results[0].getRowCount());
-        assertEquals( 1, results[0].getColumnCount());
-        assertEquals( VoltType.INTEGER, results[0].getColumnType(0));
-        assertTrue( results[0].advanceRow());
-        final int columnCount = (int)results[0].getLong(0);
-        assertTrue (columnCount == 3);
     }
 
     //public void testShutdown() {
@@ -277,19 +261,15 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals(results[0].get(0, VoltType.BIGINT), new Long(0));
     }
 
-    public void testLoadMulipartitionTable_InvalidTableName() throws IOException, ProcCallException {
-        Client client = getClient();
-        try {
-            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, 1);
-        } catch (ProcCallException ex) {
-            assertTrue(true);
-            return;
-        }
-        fail();
-    }
-
     public void testLoadMultipartitionTable() throws IOException {
         Client client = getClient();
+
+        // try the failure case first
+        try {
+            client.callProcedure("@LoadMultipartitionTable", "DOES_NOT_EXIST", null, 1);
+            fail();
+        } catch (ProcCallException ex) {}
+
         // make a TPCC warehouse table
         VoltTable partitioned_table = new VoltTable(
                 new VoltTable.ColumnInfo("W_ID", org.voltdb.VoltType.SMALLINT),
@@ -372,10 +352,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
     }
 
-
-    // verify that the start sampler command doesn't blow up
-    public void testProfCtlStartSampler() throws Exception {
+    // verify that these commands don't blow up
+    public void testProfCtl() throws Exception {
         Client client = getClient();
+
+        //
+        // SAMPLER_START
+        //
         ClientResponse resp = client.callProcedure("@ProfCtl", "SAMPLER_START");
         VoltTable vt = resp.getResults()[0];
         boolean foundResponse = false;
@@ -386,14 +369,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             foundResponse = true;
         }
         assertTrue(foundResponse);
-    }
 
-    // verify that the gperf enable command doesn't blow up
-    public void testProfCtlGperfEnable() throws Exception {
-        Client client = getClient();
-        ClientResponse resp = client.callProcedure("@ProfCtl", "GPERF_ENABLE");
-        VoltTable vt = resp.getResults()[0];
-        boolean foundResponse = false;
+        //
+        // GPERF_ENABLE
+        //
+        resp = client.callProcedure("@ProfCtl", "GPERF_ENABLE");
+        vt = resp.getResults()[0];
+        foundResponse = false;
         while (vt.advanceRow()) {
             if (vt.getString("Result").equalsIgnoreCase("GPERF_ENABLE")) {
                 foundResponse = true;
@@ -403,15 +385,13 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             }
         }
         assertTrue(foundResponse);
-    }
 
-
-    // verify that the gperf disable command doesn't blow up
-    public void testProfCtlGperfDisable() throws Exception {
-        Client client = getClient();
-        ClientResponse resp = client.callProcedure("@ProfCtl", "GPERF_DISABLE");
-        VoltTable vt = resp.getResults()[0];
-        boolean foundResponse = false;
+        //
+        // GPERF_DISABLE
+        //
+        resp = client.callProcedure("@ProfCtl", "GPERF_DISABLE");
+        vt = resp.getResults()[0];
+        foundResponse = false;
         while (vt.advanceRow()) {
             if (vt.getString("Result").equalsIgnoreCase("gperf_disable")) {
                 foundResponse = true;
@@ -421,15 +401,12 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             }
         }
         assertTrue(foundResponse);
-    }
 
-
-    // verify correct behavior on invalid command
-    public void testProfCtlInvalidCommand() throws Exception {
-        Client client = getClient();
-        ClientResponse resp = client.callProcedure("@ProfCtl", "MakeAPony");
-        @SuppressWarnings("unused")
-        VoltTable vt = resp.getResults()[0];
+        //
+        // garbage
+        //
+        resp = client.callProcedure("@ProfCtl", "MakeAPony");
+        vt = resp.getResults()[0];
         assertTrue(true);
     }
 
@@ -438,7 +415,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
     // helpers to allow multiple backends.
     // JUnit magic that uses the regression suite helper classes.
     //
-    static public Test suite() {
+    static public Test suite() throws IOException {
         VoltServerConfig config = null;
 
         MultiConfigSuiteBuilder builder =
@@ -447,11 +424,31 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // Not really using TPCC functionality but need a database.
         // The testLoadMultipartitionTable procedure assumes partitioning
         // on warehouse id.
-        TPCCProjectBuilder project = new TPCCProjectBuilder();
-        project.addDefaultSchema();
-        project.addDefaultPartitioning();
+        VoltProjectBuilder project = new VoltProjectBuilder();
+        project.addLiteralSchema(
+                        "CREATE TABLE WAREHOUSE (\n" +
+                        "  W_ID SMALLINT DEFAULT '0' NOT NULL,\n" +
+                        "  W_NAME VARCHAR(16) DEFAULT NULL,\n" +
+                        "  W_STREET_1 VARCHAR(32) DEFAULT NULL,\n" +
+                        "  W_STREET_2 VARCHAR(32) DEFAULT NULL,\n" +
+                        "  W_CITY VARCHAR(32) DEFAULT NULL,\n" +
+                        "  W_STATE VARCHAR(2) DEFAULT NULL,\n" +
+                        "  W_ZIP VARCHAR(9) DEFAULT NULL,\n" +
+                        "  W_TAX FLOAT DEFAULT NULL,\n" +
+                        "  W_YTD FLOAT DEFAULT NULL,\n" +
+                        "  CONSTRAINT W_PK_TREE PRIMARY KEY (W_ID)\n" +
+                        ");\n" +
+                        "CREATE TABLE ITEM (\n" +
+                        "  I_ID INTEGER DEFAULT '0' NOT NULL,\n" +
+                        "  I_IM_ID INTEGER DEFAULT NULL,\n" +
+                        "  I_NAME VARCHAR(32) DEFAULT NULL,\n" +
+                        "  I_PRICE FLOAT DEFAULT NULL,\n" +
+                        "  I_DATA VARCHAR(64) DEFAULT NULL,\n" +
+                        "  CONSTRAINT I_PK_TREE PRIMARY KEY (I_ID)\n" +
+                        ");");
+
+        project.addPartitionInfo("WAREHOUSE", "W_ID");
         project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 
         /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
                                   BackendTarget.NATIVE_EE_JNI);
