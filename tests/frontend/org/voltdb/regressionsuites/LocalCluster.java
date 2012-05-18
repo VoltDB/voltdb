@@ -553,7 +553,6 @@ public class LocalCluster implements VoltServerConfig {
 
             // for debug, dump the command line to a file.
             //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
-            System.out.println(cmdln);
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
 
