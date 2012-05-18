@@ -51,7 +51,10 @@ public class ClientConfigForTest extends ClientConfig {
          */
         @Override
         public void backpressure(boolean status) {
-            log.info(String.format("ClientConfigForTest reports new backpressure status: %b", status));
+            /*
+             * Commented out because it is pretty noisy and not very informative.
+             */
+            //log.info(String.format("ClientConfigForTest reports new backpressure status: %b", status));
         }
 
         /* (non-Javadoc)
