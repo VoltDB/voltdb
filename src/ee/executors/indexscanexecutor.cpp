@@ -244,8 +244,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
 bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
-    IndexScanPlanNode* node = dynamic_cast<IndexScanPlanNode*>(getPlanNode());
-    assert(m_node == node);
     assert(m_outputTable);
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
     assert(m_targetTable);
