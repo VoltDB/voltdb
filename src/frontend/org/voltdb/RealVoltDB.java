@@ -1692,13 +1692,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public synchronized void onExecutionSiteRecoveryCompletion(long transferred) {
+    public synchronized void onExecutionSiteRejoinCompletion(long transferred) {
         m_executionSiteRecoveryFinish = System.currentTimeMillis();
         m_executionSiteRecoveryTransferred = transferred;
-        onRecoveryCompletion();
+        onRejoinCompletion();
     }
 
-    private void onRecoveryCompletion() {
+    private void onRejoinCompletion() {
         // null out the rejoin coordinator
         if (m_rejoinCoordinator != null) {
             m_rejoinCoordinator.close();

@@ -457,7 +457,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     /**
      * This is invoked after all recovery data has been received/sent. The processor can be nulled out for GC.
      */
-    private final Runnable m_onRecoveryCompletion = new Runnable() {
+    private final Runnable m_onRejoinCompletion = new Runnable() {
         @Override
         public void run() {
             final long now = System.currentTimeMillis();
@@ -499,7 +499,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                      * handles this.
                      */
                     if (!newRejoin) {
-                        VoltDB.instance().onExecutionSiteRecoveryCompletion(bytesTransferredTotal);
+                        VoltDB.instance().onExecutionSiteRejoinCompletion(bytesTransferredTotal);
                     } else {
                         // Notify the rejoin coordinator that this site has finished
                         if (m_rejoinCoordinatorHSId != -1) {
@@ -935,7 +935,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                         ee,
                                         m_mailbox,
                                         m_siteId,
-                                        m_onRecoveryCompletion,
+                                        m_onRejoinCompletion,
                                         m_recoveryMessageHandler);
                         }
                     }
@@ -1148,7 +1148,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     m_recoveryLog.error("Failed to close the task log:" +
                             e.getMessage());
                 }
-                m_onRecoveryCompletion.run();
+                m_onRejoinCompletion.run();
             }
         }
 
@@ -1586,7 +1586,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         ee,
                         m_mailbox,
                         m_siteId,
-                        m_onRecoveryCompletion,
+                        m_onRejoinCompletion,
                         m_recoveryMessageHandler);
         }
         else if (message instanceof RejoinMessage) {
