@@ -569,7 +569,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
+    public synchronized void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
         if (m_finishedSegments.isEmpty()) {
             exportLog.debug("PBD " + m_nonce + " has no finished segments");
             return;
