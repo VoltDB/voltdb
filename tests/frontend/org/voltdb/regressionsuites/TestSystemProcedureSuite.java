@@ -118,7 +118,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         // one aggregate table returned
         assertTrue(results.length == 1);
         // with 10 rows per site. Can be two values depending on the test scenario of cluster vs. local.
-        assertTrue(results[0].getRowCount() == 20 || results[0].getRowCount() == 40);
+        assertTrue(results[0].getRowCount() == 60);
 
         System.out.println("Test statistics table: " + results[0].toString());
 
@@ -252,7 +252,7 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         assertEquals( VoltType.INTEGER, results[0].getColumnType(0));
         assertTrue( results[0].advanceRow());
         final int columnCount = (int)results[0].getLong(0);
-        assertTrue (columnCount == 2 || columnCount == 4);
+        assertTrue (columnCount == 3);
     }
 
     //public void testShutdown() {
@@ -351,22 +351,20 @@ public class TestSystemProcedureSuite extends RegressionSuite {
             while(results[0].advanceRow()) {
                 if (results[0].getString("TABLE_NAME").equals("WAREHOUSE")) {
                     ++foundWarehouse;
-                    //Different values depending on local cluster vs. single process hence ||
-                    assertTrue(5 == results[0].getLong("TUPLE_COUNT") ||
-                            10 == results[0].getLong("TUPLE_COUNT"));
+                    //Different values depending on which partition
+                    assertTrue(6 == results[0].getLong("TUPLE_COUNT") ||
+                               7 == results[0].getLong("TUPLE_COUNT"));
                 }
                 if (results[0].getString("TABLE_NAME").equals("ITEM"))
                 {
                     ++foundItem;
                     //Different values depending on local cluster vs. single process hence ||
-                    assertTrue(10 == results[0].getLong("TUPLE_COUNT") ||
-                            20 == results[0].getLong("TUPLE_COUNT"));
+                    assertTrue(20 == results[0].getLong("TUPLE_COUNT"));
                 }
             }
             // make sure both warehouses were located
-            //Different values depending on local cluster vs. single process hence ||
-            assertTrue(2 == foundWarehouse || 4 == foundWarehouse);
-            assertTrue(2 == foundItem || 4 == foundItem);
+            assertTrue(6 == foundWarehouse);
+            assertTrue(6 == foundItem);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -455,17 +453,18 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
 
-        config = new LocalSingleProcessServer("sysproc-twosites.jar", 2,
-                                              BackendTarget.NATIVE_EE_JNI);
+        /*config = new LocalCluster("sysproc-twosites.jar", 2, 1, 0,
+                                  BackendTarget.NATIVE_EE_JNI);
+        ((LocalCluster) config).setHasLocalServer(false);
         config.compile(project);
-        builder.addServerConfig(config);
-
+        builder.addServerConfig(config);*/
 
         /*
          * Add a cluster configuration for sysprocs too
          */
-        config = new LocalCluster("sysproc-cluster.jar", 2, 2, 1,
+        config = new LocalCluster("sysproc-cluster.jar", 3, 2, 1,
                                   BackendTarget.NATIVE_EE_JNI);
+        ((LocalCluster) config).setHasLocalServer(false);
         config.compile(project);
         builder.addServerConfig(config);
 
