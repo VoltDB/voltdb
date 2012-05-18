@@ -156,7 +156,9 @@ public class ClusterConfig
         stringer.key("hostcount").value(m_hostCount);
         stringer.key("kfactor").value(getReplicationFactor());
         stringer.key("sites_per_host").value(sitesPerHost);
-        stringer.key("MPI").value(hostIds.get(0));
+        // XXX-IZZY HACK hardwire this to 0 for now, until
+        // replication works
+        stringer.key("MPI").value(0);
         stringer.key("partitions").array();
         for (int part = 0; part < partitionCount; part++)
         {

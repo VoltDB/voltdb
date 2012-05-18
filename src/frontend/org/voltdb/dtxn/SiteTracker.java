@@ -538,6 +538,7 @@ public class SiteTracker implements PartitionClerk {
                 return hsid;
             }
         }
-        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " + hsId);
+        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
+                                   CoreUtils.hsIdToString(hsId));
     }
 }
