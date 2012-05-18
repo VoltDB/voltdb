@@ -867,6 +867,13 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
+    <!-- copy zmq to voltdb dir / would be nice to only copy the right one -->
+    <copy todir="voltdb" flatten="true" >
+        <fileset dir="." defaultexcludes="yes">
+            <include name="third_party/cpp/jnilib/libjzmq*" />
+        </fileset>
+    </copy>
+
     <!-- compile the individual source directories -->
     <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
