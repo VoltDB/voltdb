@@ -99,9 +99,9 @@ bool SendExecutor::p_execute(const NValueArray &params) {
 void SendExecutor::p_execute_pull()
 {
     TableTuple tuple = p_next_pull();
-    bool tupleIsNull = tuple.isNullTuple();
-    // avoid "value not used warning" when assert is disabled
-    if (tupleIsNull) { assert(tupleIsNull); }
+    bool isTupleNull = tuple.isNullTuple();
+    // Avoid warnings -- trivially use the variable even when asserts are disabled.
+    if ( ! isTupleNull ) { assert(isTupleNull); }
 }
 
 
