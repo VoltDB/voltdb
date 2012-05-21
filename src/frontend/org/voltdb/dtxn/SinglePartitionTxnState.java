@@ -70,9 +70,9 @@ public class SinglePartitionTxnState extends TransactionState {
     }
 
     @Override
-    public boolean doWork(boolean recovering) {
-        if (recovering) {
-            return doWorkRecovering();
+    public boolean doWork(boolean rejoining) {
+        if (rejoining) {
+            return doWorkRejoining();
         }
         if (!m_done) {
             m_site.beginNewTxn(this);
@@ -94,7 +94,7 @@ public class SinglePartitionTxnState extends TransactionState {
         return m_done;
     }
 
-    private boolean doWorkRecovering() {
+    private boolean doWorkRejoining() {
         if (!m_done) {
             InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
             InitiateResponseMessage response = new InitiateResponseMessage(task);

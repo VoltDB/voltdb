@@ -115,7 +115,7 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract boolean hasTransactionalWork();
 
-    public abstract boolean doWork(boolean recovering);
+    public abstract boolean doWork(boolean rejoining);
 
     public void storeResults(ClientResponseImpl response) {
         m_response = response;

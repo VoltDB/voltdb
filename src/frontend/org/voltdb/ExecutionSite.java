@@ -138,7 +138,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     public static final Semaphore m_recoveryPermit = new Semaphore(Integer.MAX_VALUE);
 
-    private boolean m_recovering = false;
+    private boolean m_rejoining = false;
     private boolean m_haveRecoveryPermit = false;
     private long m_recoveryStartTime = 0;
     private static AtomicLong m_recoveryBytesTransferred = new AtomicLong();
@@ -480,7 +480,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             m_rejoinInitResponse = null;
             m_rejoinSnapshotTxnId = -1;
             m_rejoinTaskLog = null;
-            m_recovering = false;
+            m_rejoining = false;
             if (m_haveRecoveryPermit) {
                 m_haveRecoveryPermit = false;
                 m_recoveryPermit.release();
@@ -742,7 +742,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         final int partitionId = m_tracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
-        m_recovering = recovering;
+        m_rejoining = recovering;
         //lastCommittedTxnId = txnId;
 
         VoltDB.instance().getFaultDistributor().
@@ -923,7 +923,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * readiness. If it is time, create a recovery processor and send
                  * the initiate message.
                  */
-                if (m_recovering && !m_haveRecoveryPermit) {
+                if (m_rejoining && !m_haveRecoveryPermit) {
                     Long safeTxnId = m_transactionQueue.safeToRecover();
                     if (safeTxnId != null && m_recoveryPermit.tryAcquire()) {
                         m_haveRecoveryPermit = true;
@@ -1383,7 +1383,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             assert(latestUndoToken >= txnState.getBeginUndoToken());
 
             if (txnState.getBeginUndoToken() == kInvalidUndoToken) {
-                if (m_recovering == false) {
+                if (m_rejoining == false) {
                     throw new AssertionError("Non-recovering write txn has invalid undo state.");
                 }
             }
@@ -1400,7 +1400,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              */
             StoredProcedureInvocation invocation = txnState.getInvocation();
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
-            if ((invocation != null) && (m_recovering == false) && (ts > m_startupTime)) {
+            if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
                 }
@@ -1410,7 +1410,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * log task message for rejoin if it's not a replayed transaction.
              * Replayed transactions do not send responses.
              */
-            if (m_recovering && txnState.shouldSendResponse() &&
+            if (m_rejoining && txnState.shouldSendResponse() &&
                 m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
                     m_rejoinTaskLog.logTask(txnState.getNotice());
@@ -1442,7 +1442,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     private void handleMailboxMessage(VoltMessage message) {
-        if (m_recovering == true && m_recoveryProcessor == null && m_currentTransactionState != null) {
+        if (m_rejoining == true && m_recoveryProcessor == null && m_currentTransactionState != null) {
             m_recoveryMessageHandler.handleMessage(message, m_currentTransactionState.txnId);
         } else {
             handleMailboxMessageNonRecursable(message);
@@ -1558,7 +1558,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (rm.recoveryMessagesAvailable()) {
                 return;
             }
-            assert(!m_recovering);
+            assert(!m_rejoining);
 
             /*
              * Recovery site processor hasn't been cleaned up from the previous
@@ -1751,7 +1751,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private void discoverGlobalFaultData(ExecutionSiteNodeFailureMessage message)
     {
         //Keep it simple and don't try to recover on the recovering node.
-        if (m_recovering) {
+        if (m_rejoining) {
             VoltDB.crashLocalVoltDB("Aborting recovery due to a remote node failure. Retry again.", false, null);
         }
         SiteTracker newTracker = VoltDB.instance().getSiteTracker();
@@ -2341,7 +2341,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * during rejoin needs real work to be done, but no response to be
              * sent.
              */
-            boolean rejoining = m_recovering && currentTxnState.shouldSendResponse();
+            boolean rejoining = m_rejoining && currentTxnState.shouldSendResponse();
             if (currentTxnState.doWork(rejoining)) {
                 if (currentTxnState.needsRollback())
                 {
@@ -2629,7 +2629,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
         else {
             TransactionState nextTxn = (TransactionState)m_transactionQueue.peek();
-            boolean rejoining = m_recovering && nextTxn.shouldSendResponse();
+            boolean rejoining = m_rejoining && nextTxn.shouldSendResponse();
 
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)
