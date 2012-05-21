@@ -171,7 +171,9 @@ public class Site implements Runnable, SiteProcedureConnection
         public boolean isLowestSiteId()
         {
             // TODO: should pass this status in at construction.
-            return m_siteId == VoltDB.instance().getSiteTracker().getLowestSiteForHost(getHostId());
+            long lowestSiteId = VoltDB.instance().getSiteTracker().getLowestIv2SiteForHost(getHostId());
+            System.out.println("\t\tLowest. Site: " + m_siteId + " lowest: " + lowestSiteId);
+            return m_siteId == lowestSiteId;
         }
 
 

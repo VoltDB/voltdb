@@ -472,6 +472,21 @@ public class SiteTracker implements PartitionClerk {
         return Collections.min(sites);
     }
 
+    /**
+     * param hostId
+     * @return the ID of the lowest iv2 initiator on the given hostId
+     */
+    public Long getLowestIv2SiteForHost(int hostId)
+    {
+        long result = Long.MAX_VALUE;
+        for (Long hsid : m_allIv2InitiatorsImmutable) {
+            if (getHostForSite(hsid) == hostId) {
+                result = Math.min(result, hsid);
+            }
+        }
+        return result;
+    }
+
     /*
      * Get an array of local sites that need heartbeats. This will get individually generated heartbeats.
      */
