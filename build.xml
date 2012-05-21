@@ -1237,7 +1237,7 @@ TEST CASES
                 <exclude name="**/TestExportToFileClient.class" />
                 <exclude name="**/TestNonDetermisticSeppuku.class" />
                 <exclude name="**/TestJDBCDriver.class" />
-                <exclude name="**/TestAdminMode.class" />
+<!--                <exclude name="**/TestAdminMode.class" /> -->
                 <exclude name="**/TestCatalogUpdateSuite.class" />
 <!--                <exclude name="**/TestCRUDSuite.class" /> -->
                 <exclude name="**/TestExecutionSiteDeath.class" />
