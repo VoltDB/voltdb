@@ -355,7 +355,7 @@ public class SystemInformation extends VoltSystemProcedure
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
         if (VoltDB.instance().isIV2Enabled()) {
-            vt.addRow(hostId, "IV2ENABLED", true);
+            vt.addRow(hostId, "IV2ENABLED", "true");
         }
 
         return vt;
