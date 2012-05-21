@@ -1267,7 +1267,7 @@ TEST CASES
 <!--                <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
 <!--                <exclude name="**/TestSqlUpdateSuite.class" /> -->
                 <exclude name="**/TestSystemCatalogSuite.class" />
-                <exclude name="**/TestSystemInformationSuite.class" />
+<!--                <exclude name="**/TestSystemInformationSuite.class" /> -->
                 <exclude name="**/TestSystemProcedureSuite.class" />
 <!--                <exclude name="**/TestTPCCSuite.class" /> -->
 <!--                <exclude name="**/TestBlobType.class" /> -->
