@@ -171,7 +171,7 @@ def buildMakefile(CTX):
     if CTX.TARGET == "CLEAN":
         makefile.write(".PHONY: clean\n")
         makefile.write("clean: \n")
-        makefile.write("\trm -drf *\n")
+        makefile.write("\trm -rf *\n")
         makefile.close()
         return
 
