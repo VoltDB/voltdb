@@ -136,8 +136,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * IV2 stuff
      */
     private final AtomicLong m_sequence = new AtomicLong(0);
-    private ConcurrentHashMap<Long, Pair<Long, Connection>> m_sequenceToConnection =
-        new ConcurrentHashMap<Long, Pair<Long, Connection>>();
+    private ConcurrentHashMap<Long, Iv2InFlight> m_sequenceToConnection =
+        new ConcurrentHashMap<Long, Iv2InFlight>();
 
     /**
      * Policies used to determine if we can accept an invocation.
@@ -775,6 +775,34 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    /** Return a map of ConnectionId::(adminmode, txn count) */
+    Map<Long, long[]> getIv2OutstandingTxnStats()
+    {
+        HashMap<Long, long[]> retval = new HashMap<Long, long[]>();
+        for (Iv2InFlight inFlight : m_sequenceToConnection.values())
+        {
+            long connId = inFlight.m_connection.connectionId();
+            if (!retval.containsKey(connId)) {
+                retval.put(connId, new long[]{0,0});
+            }
+            retval.get(connId)[0] = (inFlight.m_isAdmin ? 1 : 0);
+            retval.get(connId)[1]++;
+        }
+        return retval;
+    }
+
+    private static class Iv2InFlight
+    {
+        final long m_clientHandle;
+        final Connection m_connection;
+        final boolean m_isAdmin;
+        Iv2InFlight(long handle, Connection conn, boolean admin)
+        {
+            m_clientHandle = handle;
+            m_connection = conn;
+            m_isAdmin = admin;
+        }
+    }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
     public  boolean createTransaction(
@@ -793,9 +821,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         if (VoltDB.instance().isIV2Enabled()) {
             long handle = m_sequence.incrementAndGet();
-            m_sequenceToConnection.put(handle,
-                    new Pair<Long, Connection>(invocation.getClientHandle(),
-                        (Connection)clientData));
+            Iv2InFlight inFlight = new Iv2InFlight(invocation.getClientHandle(),
+                    (Connection)clientData, adminConnection);
+            m_sequenceToConnection.put(handle, inFlight);
 
             long initiatorHSId = isSinglePartition ?
                 VoltDB.instance().getSiteTracker().m_partitionToInitiatorsImmutable.get(partitions[0]).get(0) :
@@ -887,14 +915,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (message instanceof InitiateResponseMessage) {
                         // forward response; copy is annoying. want slice of response.
                         InitiateResponseMessage response = (InitiateResponseMessage)message;
-                        Pair<Long, Connection> clientData = m_sequenceToConnection.remove(response.getClientInterfaceHandle());
-                        response.getClientResponseData().setClientHandle(clientData.getFirst());
+                        Iv2InFlight clientData = m_sequenceToConnection.remove(response.getClientInterfaceHandle());
+                        response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
 
                         ByteBuffer results = ByteBuffer.allocate(response.getClientResponseData().getSerializedSize() + 4);
                         results.putInt(results.capacity() - 4);
                         response.getClientResponseData().flattenToBuffer(results);
                         results.flip();
-                        clientData.getSecond().writeStream().enqueue(results);
+                        clientData.m_connection.writeStream().enqueue(results);
                     } else {
                         m_d.offer(message);
                     }
@@ -1782,6 +1810,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             new HashMap<Long, Pair<String, long[]>>();
 
         Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
+        Map<Long, long[]> inflight_iv2_stats = getIv2OutstandingTxnStats();
+        inflight_txn_stats.putAll(inflight_iv2_stats);
 
         // put all the live connections in the stats map, then fill in admin and
         // outstanding txn info from the inflight stats
