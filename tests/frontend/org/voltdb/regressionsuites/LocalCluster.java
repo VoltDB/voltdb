@@ -154,9 +154,9 @@ public class LocalCluster implements VoltServerConfig {
         m_callingClassName = traces[i].getClassName().substring(dot + 1);
         m_callingMethodName = traces[i].getMethodName();
 
-        System.out.println("Instantiating LocalCluster for " + jarFileName + " with class.method: " +
+        log.info("Instantiating LocalCluster for " + jarFileName + " with class.method: " +
                 m_callingClassName + "." + m_callingMethodName);
-        System.out.println("Sites: " + siteCount + " hosts: " + hostCount + " replication factor: " + kfactor);
+        log.info("Sites: " + siteCount + " hosts: " + hostCount + " replication factor: " + kfactor);
 
         m_cluster.ensureCapacity(hostCount);
 
@@ -473,7 +473,7 @@ public class LocalCluster implements VoltServerConfig {
 
     private void killOne()
     {
-        System.out.println("Killing one cluster member.");
+        log.info("Killing one cluster member.");
         int procIndex = 0;
         if (m_hasLocalServer) {
             procIndex = 1;
@@ -488,13 +488,13 @@ public class LocalCluster implements VoltServerConfig {
                 eeproc.waitForShutdown();
             }
         } catch (InterruptedException e) {
-            System.out.println("External VoltDB process is acting crazy.");
+            log.info("External VoltDB process is acting crazy.");
         } finally {
             m_cluster.set(procIndex, null);
         }
         // exit code 143 is the forcible shutdown code from .destroy()
         if (retval != 0 && retval != 143) {
-            System.out.println("External VoltDB process terminated abnormally with return: " + retval);
+            log.info("External VoltDB process terminated abnormally with return: " + retval);
         }
     }
 
@@ -544,7 +544,6 @@ public class LocalCluster implements VoltServerConfig {
 
             // for debug, dump the command line to a file.
             //cmdln.dumpToFile("/tmp/izzy/cmd_" + Integer.toString(portGenerator.next()));
-            System.out.println(cmdln);
             Process proc = m_procBuilder.start();
             m_cluster.add(proc);
 
@@ -627,7 +626,7 @@ public class LocalCluster implements VoltServerConfig {
             rejoinHostId = 0;
         }
         int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
-        System.out.println("Rejoining " + hostId + " to hostID: " + rejoinHostId);
+        log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
         ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
@@ -731,12 +730,11 @@ public class LocalCluster implements VoltServerConfig {
         }
         if (ptf.m_witnessedReady.get()) {
             long finish = System.currentTimeMillis();
-            System.out.println(
-                    "Took " + (finish - start) +
-                    " milliseconds, time from init was " + (finish - ptf.m_initTime));
+            log.info("Took " + (finish - start) +
+                     " milliseconds, time from init was " + (finish - ptf.m_initTime));
             return true;
         } else {
-            System.out.println("Recovering process exited before recovery completed");
+            log.info("Recovering process exited before recovery completed");
             try {
                 silentShutdownSingleHost(hostId, true);
             } catch (InterruptedException e) {
@@ -768,7 +766,7 @@ public class LocalCluster implements VoltServerConfig {
 
     public void shutDownSingleHost(int hostNum) throws InterruptedException
     {
-        System.out.println("Shutting down " + hostNum);
+        log.info("Shutting down " + hostNum);
         silentShutdownSingleHost(hostNum, false);
     }
 
@@ -876,7 +874,8 @@ public class LocalCluster implements VoltServerConfig {
         for (int i = 0; i < m_cmdLines.size(); i++) {
             CommandLine cl = m_cmdLines.get(i);
             Process p = m_cluster.get(i);
-            if (p != null) {
+            // if the process is alive, or is the in-process server
+            if ((p != null) || (i == 0 && m_hasLocalServer)) {
                 listeners.add("localhost:" + cl.m_port);
             }
         }

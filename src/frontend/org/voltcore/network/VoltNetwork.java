@@ -175,14 +175,12 @@ class VoltNetwork implements Runnable
                  * background thread to do reverse DNS lookup.
                  */
                 if (m_es != null) {
-                    synchronized (m_es) {
-                        m_es.schedule(new Runnable() {
-                            @Override
-                            public void run() {
-                                port.resolveHostname();
-                            }
-                        }, 5, TimeUnit.SECONDS);
-                    }
+                    m_es.schedule(new Runnable() {
+                        @Override
+                        public void run() {
+                            port.resolveHostname();
+                        }
+                    }, 5, TimeUnit.SECONDS);
                 } else {
                     /*
                      * This means we are used by a client. No need to wait then, trigger

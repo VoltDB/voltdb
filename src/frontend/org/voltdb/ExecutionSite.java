@@ -376,7 +376,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 m_partitionDRGateway = null;
 
                 if (hsql != null) {
-                    hsql.shutdown();
+                    HsqlBackend.shutdownInstance();
                 }
                 if (ee != null) {
                     ee.release();
@@ -654,6 +654,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
         public long getSiteId()                               { return m_siteId; }
+        @Override
+        public boolean isLowestSiteId()                       { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
         @Override
         public int getHostId()                                { return SiteTracker.getHostForSite(m_siteId); }
         @Override

@@ -54,11 +54,7 @@ public class Resume extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx)
     {
         // Choose the lowest site ID on this host to actually flip the bit
-        int host_id = ctx.getHostId();
-        Long lowest_site_id =
-            ctx.getSiteTracker().
-            getLowestSiteForHost(host_id);
-        if (ctx.getSiteId() == lowest_site_id)
+        if (ctx.isLowestSiteId())
         {
             VoltDB.instance().setMode(OperationMode.RUNNING);
             try {
