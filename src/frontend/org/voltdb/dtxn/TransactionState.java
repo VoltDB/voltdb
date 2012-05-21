@@ -50,6 +50,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     protected boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
+    private boolean m_sendResponse = true; // whether or not to send response
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -73,6 +74,14 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     final public TransactionInfoBaseMessage getNotice() {
         return m_notice;
+    }
+
+    public boolean shouldSendResponse() {
+        return m_sendResponse;
+    }
+
+    public void setSendResponse(boolean sendResponse) {
+        m_sendResponse = sendResponse;
     }
 
     // Assume that done-ness is a latch.
@@ -106,7 +115,7 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract boolean hasTransactionalWork();
 
-    public abstract boolean doWork(boolean recovering, boolean sendResponse);
+    public abstract boolean doWork(boolean recovering);
 
     public void storeResults(ClientResponseImpl response) {
         m_response = response;

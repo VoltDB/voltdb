@@ -85,7 +85,7 @@ public interface SiteProcedureConnection {
      */
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
 
-    public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState, boolean isReplay);
+    public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
 
     /**
      * IV2 commit / rollback interface to the EE

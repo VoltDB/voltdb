@@ -711,7 +711,7 @@ public class TestExecutionSite extends TestCase {
                     m_txnState.setupProcedureResume(finalTask, new int[] {localTask_outputDep});
 
                     final Map<Integer, List<VoltTable>> resultDeps =
-                        m_site.recursableRun(m_txnState, false);
+                        m_site.recursableRun(m_txnState);
                     assertTrue(resultDeps != null);
                 }
 
@@ -814,7 +814,7 @@ public class TestExecutionSite extends TestCase {
         assertEquals(0, m_sites.get(siteId0).lastCommittedTxnId);
         assertEquals(0, m_sites.get(siteId0).lastKnownGloballyCommitedMultiPartTxnId);
         m_sites.get(siteId0).m_transactionsById.put(tx1.txnId, tx1);
-        m_sites.get(siteId0).recursableRun(tx1, false);
+        m_sites.get(siteId0).recursableRun(tx1);
 
         assertTrue(tx1.isDone());
         assertEquals(null, m_sites.get(siteId0).m_transactionsById.get(tx1.txnId));
@@ -847,7 +847,7 @@ public class TestExecutionSite extends TestCase {
 
         assertFalse(tx1.isDone());
         m_sites.get(siteId0).m_transactionsById.put(tx1.txnId, tx1);
-        m_sites.get(siteId0).recursableRun(tx1, false);
+        m_sites.get(siteId0).recursableRun(tx1);
         assertTrue(tx1.isDone());
         assertEquals(null, m_sites.get(siteId0).m_transactionsById.get(tx1.txnId));
         assertEquals((++callcheck), MockSPProcedureRunner.m_called);
@@ -900,12 +900,12 @@ public class TestExecutionSite extends TestCase {
         // execute transaction
         es1 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites.get(siteId0).recursableRun(tx1_1, false);}});
+            public void run() {m_sites.get(siteId0).recursableRun(tx1_1);}});
         es1.start();
 
         es2 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites.get(siteId1).recursableRun(tx1_2, false);}});
+            public void run() {m_sites.get(siteId1).recursableRun(tx1_2);}});
         es2.start();
 
         es1.join();
@@ -1024,12 +1024,12 @@ public class TestExecutionSite extends TestCase {
         // execute transaction
         es1 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites.get(siteId0).recursableRun(tx1_1, false);}});
+            public void run() {m_sites.get(siteId0).recursableRun(tx1_1);}});
         es1.start();
 
         es2 = new Thread(new Runnable() {
             @Override
-            public void run() {m_sites.get(siteId1).recursableRun(tx1_2, false);}});
+            public void run() {m_sites.get(siteId1).recursableRun(tx1_2);}});
         es2.start();
 
         es1.join();
@@ -1164,7 +1164,7 @@ public class TestExecutionSite extends TestCase {
         // execute transaction
         es1 = new Thread(new Runnable() {
             @Override
-            public void run() {es0.recursableRun(tx1_1, false);}});
+            public void run() {es0.recursableRun(tx1_1);}});
         es1.start();
 
         m_voltdb.killSite(getHSIdForES(1));

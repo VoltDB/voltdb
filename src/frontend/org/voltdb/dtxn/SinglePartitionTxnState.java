@@ -70,7 +70,7 @@ public class SinglePartitionTxnState extends TransactionState {
     }
 
     @Override
-    public boolean doWork(boolean recovering, boolean sendResponse) {
+    public boolean doWork(boolean recovering) {
         if (recovering) {
             return doWorkRecovering();
         }
@@ -82,7 +82,7 @@ public class SinglePartitionTxnState extends TransactionState {
                 m_needsRollback = true;
             }
 
-            if (sendResponse) {
+            if (shouldSendResponse()) {
                 try {
                     m_mbox.send(initiatorHSId, response);
                 } catch (MessagingException e) {

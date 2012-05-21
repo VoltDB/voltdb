@@ -165,7 +165,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
         // execute the tasks that just got queued.
         // recursively call recurableRun and don't allow it to shutdown
-        Map<Integer, List<VoltTable>> mapResults = m_site.recursableRun(txnState, false);
+        Map<Integer, List<VoltTable>> mapResults = m_site.recursableRun(txnState);
 
         List<VoltTable> matchingTablesForId = mapResults.get(aggregatorOutputDependencyId);
         if (matchingTablesForId == null) {

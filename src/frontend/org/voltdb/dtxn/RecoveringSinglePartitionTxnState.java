@@ -34,7 +34,7 @@ public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
     }
 
     @Override
-    public boolean doWork(boolean recovering, boolean sendResponse) {
+    public boolean doWork(boolean recovering) {
         if (!m_done) {
             InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
             InitiateResponseMessage response = new InitiateResponseMessage(task);

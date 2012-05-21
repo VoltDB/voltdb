@@ -1007,7 +1007,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     if (m_recoveryProcessor != null) {
                         m_recoveryProcessor.doRecoveryWork(currentTxnState.txnId);
                     }
-                    recursableRun(currentTxnState, false);
+                    recursableRun(currentTxnState);
                 }
                 else if (m_recoveryProcessor != null) {
                     /*
@@ -1114,8 +1114,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (msg != null) {
                 if (msg.isSinglePartition()) {
                     ts = new SinglePartitionTxnState(m_mailbox, this, msg);
-                }
-                else {
+                    // Don't send response
+                    ts.setSendResponse(false);
+                } else {
                     // TODO: multi-part is not supported yet
                     m_recoveryLog.info("Unknown message " + msg.getClass());
                 }
@@ -1127,7 +1128,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         if (ts != null) {
             // Run the transaction, but don't send response
-            recursableRun(ts, true);
+            recursableRun(ts);
             doneWork = true;
             m_recoveryLog.trace("Replayed " + ts.getNotice().getTxnId());
             m_replayedTxnCount++;
@@ -1367,12 +1368,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 }
             }
             if (currentTxnState != null) {
-                recursableRun(currentTxnState, false);
+                recursableRun(currentTxnState);
             }
         }
     }
 
-    private void completeTransaction(TransactionState txnState, boolean isReplay) {
+    private void completeTransaction(TransactionState txnState) {
         if (m_txnlog.isTraceEnabled())
         {
             m_txnlog.trace("FUZZTEST completeTransaction " + txnState.txnId);
@@ -1405,8 +1406,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 }
             }
 
-            // log task message for rejoin if it's not a replayed transaction
-            if (m_recovering && !isReplay && m_rejoinTaskLog != null && !txnState.needsRollback()) {
+            /*
+             * log task message for rejoin if it's not a replayed transaction.
+             * Replayed transactions do not send responses.
+             */
+            if (m_recovering && txnState.shouldSendResponse() &&
+                m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
                     m_rejoinTaskLog.logTask(txnState.getNotice());
                     m_loggedTxnCount++;
@@ -2326,20 +2331,23 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     @Override
     public Map<Integer, List<VoltTable>>
-    recursableRun(TransactionState currentTxnState, boolean isReplay)
+    recursableRun(TransactionState currentTxnState)
     {
         while (m_shouldContinue) {
             /*
              * when it's replaying transactions during rejoin, we want real work
-             * to be done.
+             * to be done. If during rejoin, a transaction needs to send a
+             * response, only send a dummy response. A replayed transaction
+             * during rejoin needs real work to be done, but no response to be
+             * sent.
              */
-            boolean rejoining = m_recovering && !isReplay;
-            if (currentTxnState.doWork(rejoining, !isReplay)) {
+            boolean rejoining = m_recovering && currentTxnState.shouldSendResponse();
+            if (currentTxnState.doWork(rejoining)) {
                 if (currentTxnState.needsRollback())
                 {
                     rollbackTransaction(currentTxnState);
                 }
-                completeTransaction(currentTxnState, isReplay);
+                completeTransaction(currentTxnState);
                 TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
                 assert(ts != null);
                 return null;
@@ -2360,7 +2368,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                      !currentTxnState.hasTransactionalWork())
             {
                 assert(!currentTxnState.isSinglePartition());
-                tryToSneakInASinglePartitionProcedure(isReplay);
+                tryToSneakInASinglePartitionProcedure();
             }
             else
             {
@@ -2611,7 +2619,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      *
      * @return false if there is no possibility for speculative work.
      */
-    private boolean tryToSneakInASinglePartitionProcedure(boolean isReplay) {
+    private boolean tryToSneakInASinglePartitionProcedure() {
         // poll for an available message. don't block
         VoltMessage message = m_mailbox.recv();
         tick(); // unclear if this necessary (rtb)
@@ -2621,11 +2629,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
         else {
             TransactionState nextTxn = (TransactionState)m_transactionQueue.peek();
+            boolean rejoining = m_recovering && nextTxn.shouldSendResponse();
 
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)
             {
-                boolean success = nextTxn.doWork(m_recovering, !isReplay);
+                boolean success = nextTxn.doWork(rejoining);
                 assert(success);
                 return true;
             }
