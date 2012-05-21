@@ -1096,25 +1096,14 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
         boolean success;
 
-        /*
-         * // CONFIG #1: Local Site/Partitions running on IPC backend config =
-         * new LocalSingleProcessServer("sqltypes-onesite.jar", 1,
-         * BackendTarget.NATIVE_EE_IPC); success = config.compile(project);
-         * assertTrue(success); builder.addServerConfig(config); // CONFIG #2:
-         * HSQL config = new LocalSingleProcessServer("sqltypes-hsql.jar", 1,
-         * BackendTarget.HSQLDB_BACKEND); success = config.compile(project);
-         * assertTrue(success); builder.addServerConfig(config);
-         */
         // JNI
-        config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1,
-                BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
         // CLUSTER?
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 1,
-                BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

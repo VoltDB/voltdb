@@ -623,25 +623,20 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         // config.compile(project);
         // builder.addServerConfig(config);
 
-        config = new LocalSingleProcessServer("plansgroupby-onesite.jar",1,
-                BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("plansgroupby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        boolean success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
-        config = new LocalSingleProcessServer("plansgroupby-threesites.jar",3,
-                BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
-        config = new LocalSingleProcessServer("plansgroupby-hsql.jar", 1,
-                BackendTarget.HSQLDB_BACKEND);
-        config.compile(project);
+        config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("plansgroupby-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
 
         return builder;
     }
