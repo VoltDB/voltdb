@@ -45,8 +45,8 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.locks.ReentrantLock;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -72,7 +72,8 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocCompilerCache;
-import org.voltdb.compiler.AdHocPlannedStmt;
+import org.voltdb.compiler.AdHocPlannedStatement;
+import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.CatalogChangeResult;
@@ -87,6 +88,7 @@ import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
+import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1033,25 +1035,38 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
+        List<AdHocPlannedStatement> statements = new ArrayList<AdHocPlannedStatement>();
+
         // try the cache
-        AdHocPlannedStmt plan = m_adhocCache.get(sql, partitionParam != null);
-        if (plan != null) {
-            // check catalog version
-            if (plan.catalogVersion == m_catalogContext.get().catalogVersion) {
-                // make a copy for threadsafety
-                plan = (AdHocPlannedStmt) plan.clone();
-
-                // set the fields that are specific to this call
-                plan.adminConnection = handler.isAdmin();
-                plan.clientData = ccxn;
-                plan.partitionParam = partitionParam;
-                plan.clientHandle = task.clientHandle;
-                plan.hostname = handler.m_hostname;
-                plan.connectionId = handler.connectionId();
-
-                createAdHocTransaction(plan);
-                return null;
+        // For now it's all or nothing on a batch of statements, i.e. all statements must match or
+        // none.
+        // TODO: Handle a mix of cached and uncached statements.
+        List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
+        AdHocPlannedStmtBatch planBatch =
+                new AdHocPlannedStmtBatch(sql,
+                                          partitionParam,
+                                          m_catalogContext.get().catalogVersion,
+                                          task.clientHandle,
+                                          handler.connectionId(),
+                                          handler.m_hostname,
+                                          handler.isAdmin(),
+                                          ccxn);
+        for (String sqlStatement : sqlStatements) {
+            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sql, partitionParam != null);
+            // check the catalog version if there is a cached plan
+            if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
+                break;
             }
+            // make a copy for threadsafety
+            planBatch.addStatement(sqlStatement,
+                                   plannedStatement.aggregatorFragment,
+                                   plannedStatement.collectorFragment,
+                                   plannedStatement.isReplicatedTableDML);
+        }
+        // All statements retrieved from cache?
+        if (planBatch.plannedStatements.size() == sqlStatements.size()) {
+            createAdHocTransaction(planBatch);
+            return null;
         }
 
         LocalObjectMessage work = new LocalObjectMessage(
@@ -1059,7 +1074,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     false, task.clientHandle, handler.connectionId(),
                     handler.m_hostname, handler.isAdmin(), ccxn,
-                    sql, partitionParam));
+                    sql, sqlStatements, partitionParam));
 
         try {
             m_mailbox.send(m_plannerSiteId, work);
@@ -1353,25 +1368,43 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
-    void createAdHocTransaction(final AdHocPlannedStmt plannedStmt) {
+    void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // pick the sysproc based on the presence of partition info
-        boolean isSinglePartition = (plannedStmt.partitionParam != null);
+        boolean isSinglePartition = (plannedStmtBatch.partitionParam != null);
         int partitions[] = null;
 
         if (isSinglePartition) {
             task.procName = "@AdHocSP";
-            partitions = new int[] { TheHashinator.hashToPartition(plannedStmt.partitionParam) };
+            partitions = new int[] { TheHashinator.hashToPartition(plannedStmtBatch.partitionParam) };
         }
         else {
             task.procName = "@AdHoc";
             partitions = m_allPartitions;
         }
 
-        task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                       plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
-        task.clientHandle = plannedStmt.clientHandle;
+        // Set up the parameters.
+        // Need separate lists due to limitations on the kind of objects that can be dispatched.
+        // Convert to arrays, preferring primitive types.
+        List<String> aggregatorFragmentList = plannedStmtBatch.getAggregatorFragments();
+        String[] aggregatorFragments = aggregatorFragmentList.toArray(
+                new String[aggregatorFragmentList.size()]);
+        List<String> collectorFragmentList = plannedStmtBatch.getCollectorFragments();
+        String[] collectorFragments = collectorFragmentList.toArray(
+                new String[collectorFragmentList.size()]);
+        List<String> sqlStatementList = plannedStmtBatch.getSQLStatements();
+        String[] sqlStatements = sqlStatementList.toArray(
+                new String[sqlStatementList.size()]);
+        List<Integer> replicatedTableDMLFlagList = plannedStmtBatch.getReplicatedTableDMLFlags();
+        int[] replicatedTableDMLFlags = ArrayUtils.toPrimitive(
+                replicatedTableDMLFlagList.toArray(
+                        new Integer[replicatedTableDMLFlagList.size()]));
+        task.setParams(aggregatorFragments,
+                       collectorFragments,
+                       sqlStatements,
+                       replicatedTableDMLFlags);
+        task.clientHandle = plannedStmtBatch.clientHandle;
 
         /*
          * Round trip the invocation to initialize it for command logging
@@ -1391,15 +1424,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // initiate the transaction
-        createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
-                plannedStmt.adminConnection,
+        createTransaction(plannedStmtBatch.connectionId, plannedStmtBatch.hostname,
+                plannedStmtBatch.adminConnection,
                 task, false, isSinglePartition, false, partitions,
-                partitions.length, plannedStmt.clientData,
+                partitions.length, plannedStmtBatch.clientData,
                 0, EstTime.currentTimeMillis());
 
-        // cache this plan, but don't hold onto the connection object
-        plannedStmt.clientData = null;
-        m_adhocCache.put(plannedStmt);
+        // cache the plans, but don't hold onto the connection object
+        plannedStmtBatch.clientData = null;
+        for (AdHocPlannedStatement plannedStatement : plannedStmtBatch.plannedStatements) {
+            m_adhocCache.put(plannedStatement);
+        }
     }
 
     final void checkForFinishedCompilerWork() {
@@ -1417,20 +1452,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             final AsyncCompilerResult result = (AsyncCompilerResult)lom.payload;
             if (result.errorMsg == null) {
-                if (result instanceof AdHocPlannedStmt) {
-                    final AdHocPlannedStmt plannedStmt = (AdHocPlannedStmt) result;
-                    if (plannedStmt.catalogVersion != m_catalogContext.get().catalogVersion) {
+                if (result instanceof AdHocPlannedStmtBatch) {
+                    final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
+                    if (plannedStmtBatch.catalogVersion != m_catalogContext.get().catalogVersion) {
 
                         /* The adhoc planner learns of catalog updates after the EE and the
                            rest of the system. If the adhoc sql was planned against an
                            obsolete catalog, re-plan. */
-
                         LocalObjectMessage work = new LocalObjectMessage(
-                                new AdHocPlannerWork(
-                                    m_siteId,
-                                    false, plannedStmt.clientHandle, plannedStmt.connectionId,
-                                    plannedStmt.hostname, plannedStmt.adminConnection, plannedStmt.clientData,
-                                    plannedStmt.sql, plannedStmt.partitionParam));
+                                new AdHocPlannerWork(m_siteId,
+                                                     false,
+                                                     plannedStmtBatch.clientHandle,
+                                                     plannedStmtBatch.connectionId,
+                                                     plannedStmtBatch.hostname,
+                                                     plannedStmtBatch.adminConnection,
+                                                     plannedStmtBatch.clientData,
+                                                     plannedStmtBatch.sqlBatchText,
+                                                     plannedStmtBatch.getSQLStatements(),
+                                                     plannedStmtBatch.partitionParam));
 
                         try {
                             // XXX: Need to know the async mailbox id.
@@ -1439,16 +1478,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             final ClientResponseImpl errorResponse =
                                 new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                                         new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
-                                        plannedStmt.clientHandle);
+                                        plannedStmtBatch.clientHandle);
                             ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
                             buf.putInt(buf.capacity() + 4);
                             errorResponse.flattenToBuffer(buf);
                             buf.flip();
-                            ((Connection)(plannedStmt.clientData)).writeStream().enqueue(buf);
+                            ((Connection)(plannedStmtBatch.clientData)).writeStream().enqueue(buf);
                         }
                     }
                     else {
-                        createAdHocTransaction(plannedStmt);
+                        createAdHocTransaction(plannedStmtBatch);
                     }
                 }
                 else if (result instanceof CatalogChangeResult) {

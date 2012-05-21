@@ -17,31 +17,31 @@
 
 package org.voltdb.compiler;
 
-import java.lang.Runnable;
-
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.CatalogContext;
-import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltcore.logging.VoltLogger;
+import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
 public class AsyncCompilerAgent {
 
-    private static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
+    static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
     // if more than this amount of work is queued, reject new work
     static final int MAX_QUEUE_DEPTH = 250;
@@ -105,7 +105,7 @@ public class AsyncCompilerAgent {
         hostMessenger.createMailbox(hsId, m_mailbox);
     }
 
-    private void handleMailboxMessage(final VoltMessage message) {
+    void handleMailboxMessage(final VoltMessage message) {
         final LocalObjectMessage wrapper = (LocalObjectMessage)message;
         try {
             if (wrapper.payload instanceof AdHocPlannerWork) {
@@ -126,12 +126,6 @@ public class AsyncCompilerAgent {
     }
 
     AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
-        AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
-        plannedStmt.clientHandle = work.clientHandle;
-        plannedStmt.connectionId = work.connectionId;
-        plannedStmt.hostname = work.hostname;
-        plannedStmt.adminConnection = work.adminConnection;
-        plannedStmt.clientData = work.clientData;
 
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
@@ -143,21 +137,37 @@ public class AsyncCompilerAgent {
             }
             m_ptool = new PlannerTool(context);
         }
-        plannedStmt.catalogVersion = context.catalogVersion;
 
-        try {
-            PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam != null);
-            plannedStmt.aggregatorFragment = result.onePlan;
-            plannedStmt.collectorFragment = result.allPlan;
-            plannedStmt.isReplicatedTableDML = result.replicatedDML;
-            plannedStmt.sql = work.sql;
-            plannedStmt.partitionParam = work.partitionParam;
+        AdHocPlannedStmtBatch plannedStmtBatch =
+                new AdHocPlannedStmtBatch(work.sqlBatchText,
+                                          work.partitionParam,
+                                          context.catalogVersion,
+                                          work.clientHandle,
+                                          work.connectionId,
+                                          work.hostname,
+                                          work.adminConnection,
+                                          work.clientData);
+
+        List<String> errorMsgs = new ArrayList<String>();
+        if (work.sqlStatements != null) {
+            for (final String sqlStatement : work.sqlStatements) {
+                try {
+                    PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam != null);
+                    plannedStmtBatch.addStatement(sqlStatement,
+                                                  result.onePlan,
+                                                  result.allPlan,
+                                                  result.replicatedDML);
+                }
+                catch (Exception e) {
+                    errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+                }
+            }
         }
-        catch (Exception e) {
-            plannedStmt.errorMsg = "Unexpected Ad Hoc Planning Error: " + e.getMessage();
+        if (!errorMsgs.isEmpty()) {
+            plannedStmtBatch.errorMsg = StringUtils.join(errorMsgs, "\n");
         }
 
-        return plannedStmt;
+        return plannedStmtBatch;
     }
 
     private AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {

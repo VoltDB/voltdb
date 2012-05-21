@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
 
@@ -46,18 +47,25 @@ public class AdHocSP extends VoltSystemProcedure {
         return null;
     }
 
-    public VoltTable run(SystemProcedureExecutionContext ctx,
-            String aggregatorFragment, String collectorFragment,
-            String sql, int isReplicatedTableDML) {
-
-        assert(collectorFragment == null);
+    public VoltTable[] run(SystemProcedureExecutionContext ctx,
+            String[] aggregatorFragments, String[] collectorFragments,
+            String[] sqlStatements, int[] replicatedTableDMLFlags) {
 
         SiteProcedureConnection spc = ctx.getSiteProcedureConnection();
-        VoltTable t;
+        List<VoltTable> results = new ArrayList<VoltTable>();
 
-        t = spc.executeCustomPlanFragment(aggregatorFragment, -1,
-                                          getTransactionId());
+        for (String aggregatorFragment : aggregatorFragments) {
 
-        return t;
+            VoltTable t = spc.executeCustomPlanFragment(aggregatorFragment, -1,
+                                                        getTransactionId());
+            if (t != null) {
+                results.add(t);
+            }
+        }
+
+        if (results.isEmpty()) {
+            return null;
+        }
+        return results.toArray(new VoltTable[]{});
     }
 }

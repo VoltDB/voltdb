@@ -17,15 +17,17 @@
 
 package org.voltdb.sysprocs;
 
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
@@ -97,11 +99,14 @@ public class AdHoc extends VoltSystemProcedure {
      * The user passes a single parameter, the SQL statement to compile and
      * execute.
      *
+     * One ad hoc SQL string can contain multiple SQL statements separated by
+     * semi-colons. All per-query data is provided as collections.
+     *
      * @param ctx                         Internal.
-     * @param aggregatorFragment          Internal.
-     * @param collectorFragment           Internal.
-     * @param sql                         User provided SQL statement.
-     * @param isReplicatedTableDML        Internal.
+     * @param aggregatorFragments         Internal.
+     * @param collectorFragments          Internal.
+     * @param sqlStatements               User provided SQL statements.
+     * @param replicatedTableDMLFlags     Internal.
      * @return The result of the user's query. If the user's SQL statement was
      * a DML query, a table with a single untitled column is returned containing
      * a single {@link org.voltdb.VoltType#BIGINT} row value: the number of tuples
@@ -109,75 +114,90 @@ public class AdHoc extends VoltSystemProcedure {
      * procedure.
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String aggregatorFragment, String collectorFragment,
-            String sql, int isReplicatedTableDML) {
+                           String[] aggregatorFragments,
+                           String[] collectorFragments,
+                           String[] sqlStatements,
+                           int[] replicatedTableDMLFlags) {
 
-        boolean replicatedTableDML = isReplicatedTableDML == 1;
+        // Collections must be the same size since they all contain slices of the same data.
+        assert(sqlStatements != null);
+        assert(aggregatorFragments != null && aggregatorFragments.length == sqlStatements.length);
+        assert(collectorFragments != null && collectorFragments.length == sqlStatements.length);
+        assert(replicatedTableDMLFlags != null && replicatedTableDMLFlags.length == sqlStatements.length);
 
-        SynthesizedPlanFragment[] pfs = null;
-        VoltTable[] results = null;
-        ParameterSet params = null;
-        if (VoltDB.getEEBackendType() == BackendTarget.HSQLDB_BACKEND) {
-            pfs = new SynthesizedPlanFragment[1];
+        List<VoltTable> results = new ArrayList<VoltTable>();
 
-            // JUST SEND ONE FRAGMENT TO HSQL, IT'LL IGNORE EVERYTHING BUT SQL AND DEPID
-            pfs[0] = new SynthesizedPlanFragment();
-            pfs[0].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
-            pfs[0].outputDepId = AGG_DEPID;
-            pfs[0].multipartition = false;
-            params = new ParameterSet();
-            params.setParameters(AGG_DEPID, "", sql);
-            pfs[0].parameters = params;
-        }
-        else {
-            pfs = new SynthesizedPlanFragment[2];
+        for (int i = 0; i < sqlStatements.length; i++) {
 
-            if (collectorFragment != null) {
-                pfs = new SynthesizedPlanFragment[2];
+            boolean replicatedTableDML = replicatedTableDMLFlags[i] == 1;
 
-                // COLLECTION FRAGMENT NEEDS TO RUN FIRST
-                pfs[1] = new SynthesizedPlanFragment();
-                pfs[1].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
-                pfs[1].outputDepId = COLLECT_DEPID;
-                pfs[1].multipartition = true;
+            SynthesizedPlanFragment[] pfs = null;
+            ParameterSet params = null;
+            if (VoltDB.getEEBackendType() == BackendTarget.HSQLDB_BACKEND) {
+                pfs = new SynthesizedPlanFragment[1];
+
+                // JUST SEND ONE FRAGMENT TO HSQL, IT'LL IGNORE EVERYTHING BUT SQL AND DEPID
+                pfs[0] = new SynthesizedPlanFragment();
+                pfs[0].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
+                pfs[0].outputDepId = AGG_DEPID;
+                pfs[0].multipartition = false;
                 params = new ParameterSet();
-                params.setParameters(COLLECT_DEPID, collectorFragment, sql);
-                pfs[1].parameters = params;
+                params.setParameters(AGG_DEPID, "", sqlStatements[i]);
+                pfs[0].parameters = params;
             }
             else {
-                pfs = new SynthesizedPlanFragment[1];
+                if (collectorFragments[i] != null) {
+                    pfs = new SynthesizedPlanFragment[2];
+
+                    // COLLECTION FRAGMENT NEEDS TO RUN FIRST
+                    pfs[1] = new SynthesizedPlanFragment();
+                    pfs[1].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
+                    pfs[1].outputDepId = COLLECT_DEPID;
+                    pfs[1].multipartition = true;
+                    params = new ParameterSet();
+                    params.setParameters(COLLECT_DEPID, collectorFragments[i], sqlStatements[i]);
+                    pfs[1].parameters = params;
+                }
+                else {
+                    pfs = new SynthesizedPlanFragment[1];
+                }
+
+                // AGGREGATION FRAGMENT DEPENDS ON THE COLLECTION FRAGMENT
+                pfs[0] = new SynthesizedPlanFragment();
+                pfs[0].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
+                pfs[0].outputDepId = AGG_DEPID;
+                if (collectorFragments[i] != null)
+                    pfs[0].inputDepIds = new int[] { COLLECT_DEPID };
+                pfs[0].multipartition = false;
+                pfs[0].suppressDuplicates = true;
+                params = new ParameterSet();
+                params.setParameters(AGG_DEPID, aggregatorFragments[i], sqlStatements[i]);
+                pfs[0].parameters = params;
             }
 
-            // AGGREGATION FRAGMENT DEPENDS ON THE COLLECTION FRAGMENT
-            pfs[0] = new SynthesizedPlanFragment();
-            pfs[0].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
-            pfs[0].outputDepId = AGG_DEPID;
-            if (collectorFragment != null)
-                pfs[0].inputDepIds = new int[] { COLLECT_DEPID };
-            pfs[0].multipartition = false;
-            pfs[0].suppressDuplicates = true;
-            params = new ParameterSet();
-            params.setParameters(AGG_DEPID, aggregatorFragment, sql);
-            pfs[0].parameters = params;
+            // distribute and execute these fragments providing pfs and id of the
+            // aggregator's output dependency table.
+            VoltTable[] partialResults = executeSysProcPlanFragments(pfs, AGG_DEPID);
+
+            // rather icky hack to handle how the number of modified tuples will always be
+            // inflated when changing replicated tables - the user really doesn't want to know
+            // the big number, just the small one
+            if (replicatedTableDML) {
+                assert(partialResults.length == 1);
+                long changedTuples = partialResults[0].asScalarLong();
+                assert((changedTuples % ctx.getNumberOfPartitions()) == 0);
+
+                VoltTable retval = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
+                retval.addRow(changedTuples / ctx.getNumberOfPartitions());
+                partialResults[0] = retval;
+            }
+
+            results.addAll(Arrays.asList(partialResults));
         }
 
-        // distribute and execute these fragments providing pfs and id of the
-        // aggregator's output dependency table.
-        results = executeSysProcPlanFragments(pfs, AGG_DEPID);
-
-        // rather icky hack to handle how the number of modified tuples will always be
-        // inflated when changing replicated tables - the user really doesn't want to know
-        // the big number, just the small one
-        if (replicatedTableDML) {
-            assert(results.length == 1);
-            long changedTuples = results[0].asScalarLong();
-            assert((changedTuples % ctx.getNumberOfPartitions()) == 0);
-
-            VoltTable retval = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
-            retval.addRow(changedTuples / ctx.getNumberOfPartitions());
-            results[0] = retval;
+        if (results.isEmpty()) {
+            return null;
         }
-
-        return results;
+        return results.toArray(new VoltTable[]{});
     }
 }

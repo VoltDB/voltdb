@@ -90,14 +90,14 @@ public class PlannerTool {
         m_hsql.close();
     }
 
-    public Result planSql(String sql, boolean singlePartition) {
+    public Result planSql(String sqlIn, boolean singlePartition) {
         Result retval = new Result();
 
-        if ((sql == null) || (sql.length() == 0)) {
+        if ((sqlIn == null) || (sqlIn.length() == 0)) {
             throw new RuntimeException("Can't plan empty or null SQL.");
         }
         // remove any spaces or newlines
-        sql = sql.trim();
+        String sql = sqlIn.trim();
 
         hostLog.debug("received sql stmt: " + sql);
 

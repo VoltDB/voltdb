@@ -23,6 +23,25 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertFalse;
+import static org.junit.Assert.assertNotNull;
+import static org.junit.Assert.assertNull;
+import static org.junit.Assert.assertTrue;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyBoolean;
+import static org.mockito.Matchers.anyInt;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.anyString;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.reset;
+import static org.mockito.Mockito.spy;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -34,11 +53,18 @@ import org.junit.After;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.network.Connection;
+import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.ClientInterface.ClientInputHandler;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.compiler.AdHocPlannedStmt;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
@@ -46,17 +72,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.messaging.FastSerializer;
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.LocalObjectMessage;
-import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
-import org.voltcore.network.Connection;
-import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
 
 public class TestClientInterface {
     // mocked objects that CI requires
@@ -248,19 +265,11 @@ public class TestClientInterface {
                                            any(int[].class), anyInt(), anyObject(),
                                            anyInt(), anyLong())).thenReturn(true);
 
-        AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
-        plannedStmt.catalogVersion = 0;
-        plannedStmt.clientHandle = 0;
-        plannedStmt.connectionId = 0;
-        plannedStmt.hostname = "localhost";
-        plannedStmt.adminConnection = false;
-        plannedStmt.clientData = null;
-        plannedStmt.aggregatorFragment = null;
-        plannedStmt.collectorFragment = null;
-        plannedStmt.isReplicatedTableDML = false;
-        plannedStmt.sql = "select * from a";
-        plannedStmt.partitionParam = null;
-        m_mb.deliver(new LocalObjectMessage(plannedStmt));
+        // Need a batch and a statement
+        AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
+                "select * from a", null, 0, 0, 0, "localhost", false, null);
+        plannedStmtBatch.addStatement("select * from a", null, null, false);
+        m_mb.deliver(new LocalObjectMessage(plannedStmtBatch));
         m_ci.checkForFinishedCompilerWork();
 
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
@@ -277,7 +286,10 @@ public class TestClientInterface {
         assertFalse(boolValues.get(2)); // single-part
         assertFalse(boolValues.get(3)); // every site
         assertEquals("@AdHoc", invocationCaptor.getValue().getProcName());
-        assertEquals("select * from a", invocationCaptor.getValue().getParameterAtIndex(2));
+        String[] sqlStatements = (String[]) invocationCaptor.getValue().getParameterAtIndex(2);
+        assertNotNull(sqlStatements);
+        assertEquals(1, sqlStatements.length);
+        assertEquals("select * from a", sqlStatements[0]);
     }
 
     @Test
@@ -403,7 +415,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("hello", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNotNull(resp);
-        assertEquals(ClientResponseImpl.SERVER_UNAVAILABLE, resp.getStatus());
+        assertEquals(ClientResponse.SERVER_UNAVAILABLE, resp.getStatus());
         when(m_volt.getMode()).thenReturn(OperationMode.RUNNING);
     }
 
@@ -412,7 +424,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("hellooooo", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNotNull(resp);
-        assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
     }
 
     @Test
@@ -420,12 +432,12 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@Pause");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNotNull(resp);
-        assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
 
         msg = createMsg("@Resume");
         resp = m_ci.handleRead(msg, m_handler, null);
         assertNotNull(resp);
-        assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
     }
 
     @Test
@@ -434,7 +446,7 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg(12345l, "hello", 1);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNotNull(resp);
-        assertEquals(ClientResponseImpl.UNEXPECTED_FAILURE, resp.getStatus());
+        assertEquals(ClientResponse.UNEXPECTED_FAILURE, resp.getStatus());
     }
 
     @Test
@@ -443,6 +455,6 @@ public class TestClientInterface {
         ByteBuffer msg = createMsg("@AdHoc", 1, 3, 3);
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNotNull(resp);
-        assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
+        assertEquals(ClientResponse.GRACEFUL_FAILURE, resp.getStatus());
     }
 }

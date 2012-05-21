@@ -131,6 +131,29 @@ public class TestAdHocQueries extends TestCase {
             result = client.callProcedure("@AdHoc", "SELECT * FROM BLAH WHERE IVAL = 2;").getResults()[0];
             assertTrue(result.getRowCount() == 1);
             System.out.println(result.toString());
+
+            // try query batches
+            VoltTable[] batchResults = client.callProcedure("@AdHoc",
+                    "INSERT INTO BLAH VALUES (100, '2012-05-21 12:00:00.000000', 1000);" +
+                    "INSERT INTO BLAH VALUES (101, '2012-05-21 12:01:00.000000', 1001) ; " +
+                    "INSERT INTO BLAH VALUES (102, '2012-05-21 12:02:00.000000', 1002);;;;" +
+                    "INSERT INTO BLAH VALUES (103, '2012-05-21 12:03:00.000000', 1003); " +
+                    "INSERT INTO BLAH VALUES (104, '2012-05-21 12:04:00.000000', 1004) ;;"
+                    ).getResults();
+            assertEquals(5, batchResults.length);
+            for (VoltTable batchResult : batchResults) {
+                assertTrue(batchResult.getRowCount() == 1);
+                assertTrue(batchResult.asScalarLong() == 1);
+            }
+            batchResults = client.callProcedure("@AdHoc",
+                    "SELECT * FROM BLAH WHERE IVAL = 102;" +
+                    "SELECT * FROM BLAH WHERE DVAL >= 1001 AND DVAL <= 1002;" +
+                    "SELECT * FROM BLAH WHERE DVAL >= 1002 AND DVAL <= 1004;"
+                    ).getResults();
+            assertEquals(3, batchResults.length);
+            assertTrue(batchResults[0].getRowCount() == 1);
+            assertTrue(batchResults[1].getRowCount() == 2);
+            assertTrue(batchResults[2].getRowCount() == 3);
         }
         finally {
             if (client != null) client.close();
