@@ -69,10 +69,6 @@ public class SpScheduler extends Scheduler
         }
     }
 
-    public void handleFragmentTaskMessage(FragmentTaskMessage message) {
-        handleFragmentTaskMessage(message, null);
-    }
-
     public void handleFragmentTaskMessage(FragmentTaskMessage message,
                                           Map<Integer, List<VoltTable>> inputDeps)
     {

@@ -31,9 +31,32 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
+/**
+ * Scheduler's rough current responsibility is to take appropriate local action
+ * based on a received message.
+ *
+ * For new work (InitiateTask, FragmentTask, CompleteTransactionTask):
+ *   - Create new TransactionStates for previously unseen transactions
+ *   - Look up TransactionStates for in-progress multi-part transactions
+ *   - Create appropriate TransactionTasks and offer them to the Site (via
+ *   TransactionTaskQueue)
+ * For responses (InitiateResponse, FragmentResponse):
+ *   - Perform response de-duping
+ *   - Offer responses to the corresponding TransactionState for MP dependency tracking
+ *
+ * Currently, Single- and Multi-partition schedulers extend this class and
+ * provide the specific message handling necessary for the different
+ * transaction types.
+ * IZZY: This class maybe folds into InitiatorMessageHandler nicely; let's see
+ * how it looks once partition replicas are implemented.
+ */
 abstract public class Scheduler
 {
     protected VoltLogger hostLog = new VoltLogger("HOST");
+    // The queue which the Site's runloop is going to poll for new work.  This
+    // is fronted here by the TransactionTaskQueue and should not be directly
+    // offered work.
+    // IZZY: We should refactor this to be inviolable in the future.
     final protected SiteTaskerQueue m_tasks;
     protected LoadedProcedureSet m_loadedProcs;
     protected PartitionClerk m_clerk;
@@ -69,7 +92,10 @@ abstract public class Scheduler
 
     abstract public void handleInitiateResponseMessage(InitiateResponseMessage message);
 
-    abstract public void handleFragmentTaskMessage(FragmentTaskMessage message);
+    public void handleFragmentTaskMessage(FragmentTaskMessage message)
+    {
+        handleFragmentTaskMessage(message, null);
+    }
 
     abstract public void handleFragmentTaskMessage(FragmentTaskMessage message,
             Map<Integer, List<VoltTable>> inputDeps);

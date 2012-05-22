@@ -45,6 +45,10 @@ public class MpScheduler extends Scheduler
         super(clerk);
     }
 
+    // MpScheduler expects to see initiations for multipartition procedures and
+    // system procedures which are "every-partition", meaning that they run as
+    // single-partition procedures at every partition, and the results are
+    // aggregated/deduped here at the MPI.
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
@@ -59,7 +63,6 @@ public class MpScheduler extends Scheduler
                 SystemProcedureCatalog.listing.get(procedureName);
             if (cfg.everySite) {
                 // Send an SP initiate task to all remote sites
-                // Process the local message immediately.
                 final Long localId = m_mailbox.getHSId();
                 final long mpTxnId = m_txnId.incrementAndGet();
                 Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
@@ -90,6 +93,8 @@ public class MpScheduler extends Scheduler
 
         // Multi-partition initiation (at the MPI)
         final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
+        // Figure out the local partition initiator that we can use to do BorrowTask work
+        // on our behalf.
         long buddy_hsid = m_clerk.getBuddySiteForMPI(m_mailbox.getHSId());
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
@@ -99,26 +104,29 @@ public class MpScheduler extends Scheduler
         m_pendingTasks.offer(task);
     }
 
+    // The MpScheduler will see InitiateResponseMessages from the Partition masters when
+    // performing an every-partition system procedure.  A consequence of this deduping
+    // is that the MpScheduler will also need to forward the final InitiateResponseMessage
+    // for a normal multipartition procedure back to the client interface since it must
+    // see all of these messages and control their transmission.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
-        if (message.getTxnId() != Iv2InitiateTaskMessage.UNUSED_MP_TXNID) {
-            DuplicateCounter counter = m_duplicateCounters.get(message.getTxnId());
-            if (counter != null) {
-                int result = counter.offer(message);
-                if (result == DuplicateCounter.DONE) {
-                    m_duplicateCounters.remove(message.getTxnId());
-                    try {
-                        m_mailbox.send(counter.m_destinationId, message);
-                    } catch (MessagingException e) {
-                        VoltDB.crashLocalVoltDB("Failed to send every-site response.", true, e);
-                    }
+        DuplicateCounter counter = m_duplicateCounters.get(message.getTxnId());
+        if (counter != null) {
+            int result = counter.offer(message);
+            if (result == DuplicateCounter.DONE) {
+                m_duplicateCounters.remove(message.getTxnId());
+                try {
+                    m_mailbox.send(counter.m_destinationId, message);
+                } catch (MessagingException e) {
+                    VoltDB.crashLocalVoltDB("Failed to send every-site response.", true, e);
                 }
-                else if (result == DuplicateCounter.MISMATCH) {
-                    VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
-                }
-                // doing duplicate suppresion: all done.
-                return;
             }
+            else if (result == DuplicateCounter.MISMATCH) {
+                VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
+            }
+            // doing duplicate suppresion: all done.
+            return;
         }
 
         try {
@@ -128,11 +136,6 @@ public class MpScheduler extends Scheduler
         catch (MessagingException e) {
             hostLog.error("Failed to deliver response from execution site.", e);
         }
-    }
-
-
-    public void handleFragmentTaskMessage(FragmentTaskMessage message) {
-        handleFragmentTaskMessage(message, null);
     }
 
     public void handleFragmentTaskMessage(FragmentTaskMessage message,
