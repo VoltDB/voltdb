@@ -16,6 +16,7 @@
  */
 package org.voltcore.zk;
 
+import java.util.concurrent.ExecutionException;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.ExecutorService;
@@ -93,7 +94,8 @@ public class LeaderElector {
      * @param block true for blocking operation, false for nonblocking
      * @throws Exception
      */
-    public void start(boolean block) throws Exception {
+    public void start(boolean block) throws KeeperException, InterruptedException, ExecutionException
+    {
         // create the election root node if it doesn't exist.
         try {
             zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);

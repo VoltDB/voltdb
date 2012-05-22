@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
@@ -37,7 +38,6 @@ public class MpInitiator implements Initiator
     private Scheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
     private InitiatorMessageHandler m_msgHandler = null;
-
     private Thread m_siteThread = null;
 
     public MpInitiator(HostMessenger messenger, PartitionClerk clerk)

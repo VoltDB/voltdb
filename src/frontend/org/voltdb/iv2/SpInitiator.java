@@ -17,16 +17,23 @@
 
 package org.voltdb.iv2;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Site;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
-public class SpInitiator implements Initiator
+public class SpInitiator implements Initiator, LeaderNoticeHandler
 {
+    VoltLogger hostLog = new VoltLogger("HOST");
+
     // External references/config
     private HostMessenger m_messenger = null;
     private int m_partitionId;
@@ -37,7 +44,7 @@ public class SpInitiator implements Initiator
     private Scheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
     private InitiatorMessageHandler m_msgHandler = null;
-
+    private LeaderElector m_leaderElector = null;
     private Thread m_siteThread = null;
 
     public SpInitiator(HostMessenger messenger, Integer partition, PartitionClerk clerk)
@@ -49,11 +56,47 @@ public class SpInitiator implements Initiator
         m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, m_partitionId, clerk);
     }
 
+    /** Return the zk leader node for this initiator's partition */
+    String zkLeaderNode()
+    {
+        return VoltZK.leaders_initiators + "_" + m_partitionId;
+    }
+
+    @Override
+    public void becomeLeader()
+    {
+    }
+
+    /** Register with m_partition's leader elector node */
+    public boolean joinElectoralCollege()
+    {
+        // perform leader election before continuing configuration.
+        m_leaderElector = new LeaderElector(m_messenger.getZK(),
+                VoltZK.leaders_initiators + "_" + m_partitionId, "sp",
+                new byte[]{}, this);
+        try {
+            m_leaderElector.start(true);
+        } catch (Exception ex) {
+            VoltDB.crashLocalVoltDB("Partition " + m_partitionId + " failed to initialize " +
+                    "leader elector. ", false, ex);
+        }
+        return m_leaderElector.isLeader();
+    }
+
+
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
                           SiteTracker siteTracker)
     {
+        boolean isLeader = joinElectoralCollege();
+        if (isLeader) {
+            hostLog.info("Chosen as leader for partition " + m_partitionId);
+        }
+        else {
+            hostLog.info("Chosen as replica for partition " + m_partitionId);
+        }
+
         m_executionSite = new Site(m_scheduler.getQueue(),
                                    m_initiatorMailbox.getHSId(),
                                    backend, catalogContext,
