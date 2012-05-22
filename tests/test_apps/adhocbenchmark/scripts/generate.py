@@ -184,7 +184,7 @@ def generate_file(path, generator):
             if text_block is not None:
                 try:
                     f.write('%s\n' % text_block)
-                except (OSError, IOError) as e:
+                except (OSError, IOError), e:
                     raise Fatal('Failed to write to %s' % path, e)
     finally:
         f.close()
