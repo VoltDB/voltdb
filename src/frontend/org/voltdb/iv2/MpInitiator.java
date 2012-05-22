@@ -44,7 +44,7 @@ public class MpInitiator implements Initiator
     {
         m_messenger = messenger;
         m_partitionId = -1;
-        m_scheduler = new Scheduler(clerk);
+        m_scheduler = new MpScheduler(clerk);
         m_msgHandler = new MpInitiatorMessageHandler(m_scheduler);
         m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, m_partitionId, clerk);
     }

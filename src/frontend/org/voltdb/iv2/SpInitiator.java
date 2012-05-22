@@ -44,7 +44,7 @@ public class SpInitiator implements Initiator
     {
         m_messenger = messenger;
         m_partitionId = partition;
-        m_scheduler = new Scheduler(clerk);
+        m_scheduler = new SpScheduler(clerk);
         m_msgHandler = new SpInitiatorMessageHandler(m_scheduler);
         m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, m_partitionId, clerk);
     }

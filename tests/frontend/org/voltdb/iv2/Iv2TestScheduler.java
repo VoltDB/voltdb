@@ -65,8 +65,7 @@ public class Iv2TestScheduler extends TestCase
 
     static final String MockSPName = "MOCKSP";
 
-    @Override
-    public void setUp()
+    public void createObjs(boolean isMPI)
     {
         mbox = mock(Mailbox.class);
         clerk = mock(SiteTracker.class);
@@ -78,7 +77,12 @@ public class Iv2TestScheduler extends TestCase
         when(runner.isSystemProcedure()).thenReturn(false);
         when(procs.getProcByName(MockSPName)).thenReturn(runner);
 
-        dut = new Scheduler(clerk);
+        if (isMPI) {
+            dut = new MpScheduler(clerk);
+        }
+        else {
+            dut = new SpScheduler(clerk);
+        }
         dut.setMailbox(mbox);
         dut.setProcedureSet(procs);
 
@@ -123,6 +127,7 @@ public class Iv2TestScheduler extends TestCase
     {
         long txnid = 1234l;
 
+        createObjs(false);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true);
         dut.handleIv2InitiateTaskMessage(sptask);
 
@@ -137,6 +142,7 @@ public class Iv2TestScheduler extends TestCase
     {
         long txnid = 1234l;
 
+        createObjs(true);
         Iv2InitiateTaskMessage mptask = createMsg(txnid, true, false);
         dut.handleIv2InitiateTaskMessage(mptask);
 
@@ -151,6 +157,7 @@ public class Iv2TestScheduler extends TestCase
     {
         long txnid = 1234l;
 
+        createObjs(false);
         FragmentTaskMessage fragtask = createFrag(txnid, true);
         dut.handleFragmentTaskMessage(fragtask);
 
