@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
 import java.util.Collections;
@@ -191,6 +192,13 @@ public class VoltDB {
                 {
                     continue;
                 }
+
+                // Handle request for help/usage
+                if (arg.equalsIgnoreCase("-h") || arg.equalsIgnoreCase("--help")) {
+                    usage(System.out);
+                    System.exit(-1);
+                }
+
                 if (arg.equals("noloadlib")) {
                     m_noLoadLibVOLTDB = true;
                 }
@@ -369,19 +377,32 @@ public class VoltDB {
         }
 
         /**
-         * Prints a usage message as a fatal error.
+         * Prints a usage message on stderr.
          */
-        public void usage() {
+        public void usage() { usage(System.err); }
+
+        /**
+         * Prints a usage message on the designated output stream.
+         */
+        public void usage(PrintStream os) {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
+            String message = "";
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover|replica) [leader <hostname> [deployment <deployment.xml>]] license <license.xml> catalog <catalog.jar>");
+                message = "Usage: voltdb [create|recover|replica] [leader <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>";
+                os.println(message);
+                // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
+                hostLog.info(message);
             } else {
-                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover) [leader <hostname> [deployment <deployment.xml>]] catalog <catalog.jar>");
+                message = "Usage: voltdb [create|recover] [leader <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>";
+                os.println(message);
+                // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
+                hostLog.info(message);
             }
-            hostLog.fatal("Defaults will be used if no deployment is specified.");
-            hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
+            // Don't bother logging these for log4j, only dump them to the designated stream.
+            os.println("If action is not specified the default is to 'recover' the database if a snapshot is present otherwise 'create'.");
+            os.println("If no deployment is specified, a default 1 node cluster deployment will be configured.");
         }
 
         /**

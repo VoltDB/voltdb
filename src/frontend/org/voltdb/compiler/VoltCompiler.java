@@ -48,6 +48,8 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
@@ -73,8 +75,6 @@ import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -1194,8 +1194,7 @@ public class VoltCompiler {
     public static void main(final String[] args) {
         // Parse arguments
         if (args.length != 2) {
-            System.err.println("USAGE (1): voltcompiler [classpath] [project file] [output JAR]");
-            System.err.println("USAGE (2): java -cp $CLASSPATH org.voltdb.compiler.VoltCompiler [project file] [output JAR]");
+            System.err.println("Usage: voltcompiler <classpath> <project-file> <output-JAR>");
             System.exit(1);
         }
         final String projectPath = args[0];
