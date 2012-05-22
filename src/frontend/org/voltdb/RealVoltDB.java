@@ -424,7 +424,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
                 // Construct and publish rejoin coordinator mailbox
-                if (m_config.m_newRejoin) {
+                if (isRejoin && m_config.m_newRejoin) {
                     ArrayList<Long> sites = new ArrayList<Long>();
                     for (Mailbox siteMailbox : siteMailboxes) {
                         sites.add(siteMailbox.getHSId());
@@ -441,6 +441,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         m_messenger.registerMailbox(m_rejoinCoordinator);
                         m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
                                                            new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
+                        hostLog.info("Using pauseless rejoin");
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
                                                 true, e);
