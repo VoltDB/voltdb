@@ -144,6 +144,10 @@ public class MpScheduler extends Scheduler
         throw new RuntimeException("MpScheduler should never see a FragmentTaskMessage");
     }
 
+    // MpScheduler will receive FragmentResponses from the partition masters, and needs
+    // to offer them to the corresponding TransactionState so that the TransactionTask in
+    // the runloop which is awaiting these responses can do dependency tracking and eventually
+    // unblock.
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());

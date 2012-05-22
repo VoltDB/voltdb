@@ -21,7 +21,6 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.messaging.MessagingException;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.VoltTable;
@@ -41,6 +40,8 @@ public class SpScheduler extends Scheduler
         super(clerk);
     }
 
+    // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
+    // procedures only.
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
@@ -58,17 +59,20 @@ public class SpScheduler extends Scheduler
         }
     }
 
+    // InitiateResponses for single-partition initiators currently get completely handled
+    // by SpInitiatorMessageHandler.  This may change when replication is added.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
-        try {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            m_mailbox.send(message.getInitiatorHSId(), message);
-        }
-        catch (MessagingException e) {
-            hostLog.error("Failed to deliver response from execution site.", e);
-        }
+        throw new RuntimeException("Should never have gotten here.");
     }
 
+    // SpSchedulers will see FragmentTaskMessage for:
+    // - The scatter fragment(s) of a multi-part transaction (normal or sysproc)
+    // - Borrow tasks to do the local fragment work if this partition is the
+    //   buddy of the MPI.  Borrow tasks may include input dependency tables for
+    //   aggregation fragments, or not, if it's a replicated table read.
+    // For multi-batch MP transactions, we'll need to look up the transaction state
+    // that gets created when the first batch arrives.
     public void handleFragmentTaskMessage(FragmentTaskMessage message,
                                           Map<Integer, List<VoltTable>> inputDeps)
     {
@@ -95,6 +99,8 @@ public class SpScheduler extends Scheduler
         }
     }
 
+    // Eventually, the master for a partition set will need to be able to dedupe
+    // FragmentResponses from its replicas.
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         throw new RuntimeException("Partition masters don't yet handle fragment responses");
