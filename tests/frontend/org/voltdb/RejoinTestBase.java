@@ -42,7 +42,7 @@ public class RejoinTestBase extends TestCase {
 
     static final Class<?>[] PROCEDURES = { NonOrgVoltDBProc.class };
 
-    VoltProjectBuilder getBuilderForTest() throws UnsupportedEncodingException {
+    public VoltProjectBuilder getBuilderForTest() throws UnsupportedEncodingException {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
