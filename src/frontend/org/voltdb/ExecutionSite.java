@@ -2349,8 +2349,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     rollbackTransaction(currentTxnState);
                 }
                 completeTransaction(currentTxnState);
-                TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
-                assert(ts != null);
+                m_transactionsById.remove(currentTxnState.txnId);
                 return null;
             }
             else if (currentTxnState.shouldResumeProcedure()){
