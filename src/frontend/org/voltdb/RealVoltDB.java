@@ -1714,6 +1714,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         final double megabytesPerSecond = megabytes / ((m_executionSiteRecoveryFinish - m_recoveryStartTime) / 1000.0);
         for (ClientInterface intf : getClientInterfaces()) {
             intf.mayActivateSnapshotDaemon();
+            try {
+                intf.startAcceptingConnections();
+            } catch (IOException e) {
+                hostLog.l7dlog(Level.FATAL,
+                        LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
+                        e);
+                VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
+            }
         }
         consoleLog.info(
                 "Node data recovery completed after " + delta + " seconds with " + megabytes +
@@ -1823,14 +1831,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             dtxn.setSendHeartbeats(true);
         }
 
-        for (ClientInterface ci : m_clientInterfaces) {
-            try {
-                ci.startAcceptingConnections();
-            } catch (IOException e) {
-                hostLog.l7dlog(Level.FATAL,
-                        LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
-                        e);
-                VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
+        if (!m_recovering) {
+            for (ClientInterface ci : m_clientInterfaces) {
+                try {
+                    ci.startAcceptingConnections();
+                } catch (IOException e) {
+                    hostLog.l7dlog(Level.FATAL,
+                                   LogKeys.host_VoltDB_ErrorStartAcceptingConnections.name(),
+                                   e);
+                    VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
+                }
             }
         }
 
