@@ -1258,7 +1258,7 @@ TEST CASES
                 <exclude name="**/TestReplicatedSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestReplicationSuite.class" />
                 <exclude name="**/TestRollbackSuite.class" />
-<!--                <exclude name="**/TestSQLFeaturesSuite.class" /> -->
+                <exclude name="**/TestSQLFeaturesSuite.class" /> 
 <!--                <exclude name="**/TestSQLTypesSuite.class" /> -->
                 <exclude name="**/TestSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestSecuritySuite.class" />
