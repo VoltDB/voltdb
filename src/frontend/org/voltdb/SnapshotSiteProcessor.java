@@ -39,7 +39,6 @@ import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -47,7 +46,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.utils.CatalogUtil;
-
 
 import com.google.common.util.concurrent.Callables;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -233,7 +231,7 @@ public class SnapshotSiteProcessor {
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         for (final SnapshotTableTask task : tasks) {
-            if (!task.m_isReplicated) {
+            if ((!task.m_isReplicated) || (!task.m_target.getFormat().isTableBased())) {
                 assert(task != null);
                 assert(m_snapshotTargets != null);
                 m_snapshotTargets.add(task.m_target);

@@ -29,6 +29,8 @@ import com.google.common.util.concurrent.ListenableFuture;
  */
 public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
+    Runnable m_onClose = null;
+
     @Override
     public int getHeaderSize() {
         return 0;
@@ -42,6 +44,9 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
     @Override
     public void close() throws IOException, InterruptedException {
+        if (m_onClose != null) {
+            m_onClose.run();
+        }
     }
 
     @Override
@@ -51,6 +56,7 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
     @Override
     public void setOnCloseHandler(Runnable onClose) {
+        m_onClose = onClose;
     }
 
     @Override
