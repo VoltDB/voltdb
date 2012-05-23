@@ -27,6 +27,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -90,19 +91,14 @@ public class MultiConfigSuiteBuilder extends TestSuite {
 
         if (!(enabled_configs == null || enabled_configs.contentEquals("all")))
         {
-            if ((config instanceof LocalCluster) &&
-                !(enabled_configs.contains("cluster")))
-            {
-                return true;
-            }
-            if (config instanceof LocalSingleProcessServer)
-            {
-                if (config.isHSQL()) {
-                    if (!enabled_configs.contains("hsql")) {
-                        return true;
-                    }
+            if (config instanceof LocalCluster) {
+                if (config.isHSQL() && !enabled_configs.contains("hsql")) {
+                    return true;
                 }
-                else if (!enabled_configs.contains("local")) {
+                if ((config.getNodeCount() == 1) && !enabled_configs.contains("local")) {
+                    return true;
+                }
+                if ((config.getNodeCount() > 1) && !enabled_configs.contains("cluster")) {
                     return true;
                 }
             }

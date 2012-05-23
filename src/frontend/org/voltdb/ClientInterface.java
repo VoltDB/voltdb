@@ -46,6 +46,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
@@ -114,6 +115,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
     private final TransactionInitiator m_initiator;
+
+    /*
+     * This lock must be held while checking and signaling a backpressure condition
+     * in order to avoid ensure that nothing misses the end of backpressure notification
+     */
+    private final ReentrantLock m_backpressureLock = new ReentrantLock();
     private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
@@ -161,7 +168,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public boolean queue(int queued) {
-            synchronized (m_connections) {
+            m_backpressureLock.lock();
+            try {
                 m_queued += queued;
                 if (m_queued > MAX_QUEABLE) {
                     if (m_hasGlobalClientBackPressure || m_hasDTXNBackPressure) {
@@ -200,6 +208,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                     m_hasGlobalClientBackPressure = false;
                 }
+            } finally {
+                m_backpressureLock.unlock();
             }
             return false;
         }
@@ -372,11 +382,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                                         if (handler instanceof ClientInputHandler) {
                                             Connection c = m_network.registerChannel(socket, handler, 0);
-                                            synchronized (m_connections){
+                                            m_backpressureLock.lock();
+                                            try {
                                                 if (!m_hasDTXNBackPressure) {
                                                     c.enableReadSelection();
                                                 }
                                                 m_connections.add(c);
+                                            } finally {
+                                                m_backpressureLock.unlock();
                                             }
                                         } else {
                                             m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
@@ -703,10 +716,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      * and this attempt to reenable read selection (which should not occur
                      * if there is DTXN backpressure)
                      */
-                    synchronized (m_connections) {
+                    m_backpressureLock.lock();
+                    try {
                         if (!m_hasDTXNBackPressure) {
                             m_connection.enableReadSelection();
                         }
+                    } finally {
+                        m_backpressureLock.unlock();
                     }
                 }
             };
@@ -736,11 +752,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void onBackPressure() {
         log.trace("Had back pressure disabling read selection");
-        synchronized (m_connections) {
+        m_backpressureLock.lock();
+        try {
             m_hasDTXNBackPressure = true;
             for (final Connection c : m_connections) {
                 c.disableReadSelection();
             }
+        } finally {
+            m_backpressureLock.unlock();
         }
     }
 
@@ -750,7 +769,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void offBackPressure() {
         log.trace("No more back pressure attempting to enable read selection");
-        synchronized (m_connections) {
+        m_backpressureLock.lock();
+        try {
             m_hasDTXNBackPressure = false;
             if (m_hasGlobalClientBackPressure) {
                 return;
@@ -772,6 +792,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
             }
+        } finally {
+            m_backpressureLock.unlock();
         }
     }
 

@@ -302,19 +302,15 @@ public class TestSecuritySuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        config = new LocalSingleProcessServer("security-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("security-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile
-        config.compile(project);
+        if (!config.compile(project)) fail();
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
-        // Cluster
-        config = new LocalCluster("security-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
+        // Not testing a cluster and assuming security shouldn't be affected by this
 
         return builder;
     }

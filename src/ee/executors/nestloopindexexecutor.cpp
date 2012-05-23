@@ -340,6 +340,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                    outer_tuple.debug(outer_table->name()).c_str());
 
         int activeNumOfSearchKeys = num_of_searchkeys;
+        IndexLookupType localLookupType = m_lookupType;
         SortDirectionType localSortDirection = m_sortDirection;
 
         // did this loop body find at least one match for this tuple?
@@ -372,7 +373,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 // handle the case where this is a comparison, rather than equality match
                 // comparison is the only place where the executor might return matching tuples
                 // e.g. TINYINT < 1000 should return all values
-                if ((m_lookupType != INDEX_LOOKUP_TYPE_EQ) &&
+                if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
                     (ctr == (activeNumOfSearchKeys - 1))) {
 
                     // sanity check that there is at least one EQ column
@@ -380,19 +381,31 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                     assert(activeNumOfSearchKeys > 1);
 
                     if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                        if ((m_lookupType == INDEX_LOOKUP_TYPE_GT) ||
-                            (m_lookupType == INDEX_LOOKUP_TYPE_GTE)) {
+                        if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
+                            (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
 
-                            // gt or gte when key overflows returns nothing
-                            return true;
+                            // gt or gte when key overflows breaks out
+                            // and only returns for left-outer
+                            keyException = true;
+                            break; // the outer while loop
+                        }
+                        else {
+                            // VoltDB should only support LT or LTE with
+                            // empty search keys for order-by without lookup
+                            throw e;
                         }
                     }
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                        if ((m_lookupType == INDEX_LOOKUP_TYPE_LT) ||
-                            (m_lookupType == INDEX_LOOKUP_TYPE_LTE)) {
+                        if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
+                            (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
 
-                            // lt or lte when key underflows returns nothing
-                            return true;
+                            // VoltDB should only support LT or LTE with
+                            // empty search keys for order-by without lookup
+                            throw e;
+                        }
+                        else {
+                            // don't allow GTE because it breaks null handling
+                            localLookupType = INDEX_LOOKUP_TYPE_GT;
                         }
                     }
 
@@ -435,13 +448,13 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
             // index scan executor
             if (num_of_searchkeys > 0)
             {
-                if (m_lookupType == INDEX_LOOKUP_TYPE_EQ) {
+                if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
                     index->moveToKey(&index_values);
                 }
-                else if (m_lookupType == INDEX_LOOKUP_TYPE_GT) {
+                else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
                     index->moveToGreaterThanKey(&index_values);
                 }
-                else if (m_lookupType == INDEX_LOOKUP_TYPE_GTE) {
+                else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
                     index->moveToKeyOrGreater(&index_values);
                 }
                 else {
@@ -467,9 +480,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 return false;
             }
 
-            while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
+            while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
                     !(inner_tuple = index->nextValueAtKey()).isNullTuple()) ||
-                   ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
+                   ((localLookupType != INDEX_LOOKUP_TYPE_EQ || num_of_searchkeys == 0) &&
                     !(inner_tuple = index->nextValue()).isNullTuple()))
             {
                 match = true;

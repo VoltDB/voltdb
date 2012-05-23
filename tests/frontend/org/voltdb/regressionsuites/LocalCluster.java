@@ -73,9 +73,11 @@ public class LocalCluster implements VoltServerConfig {
     String m_callingClassName = "";
     String m_callingMethodName = "";
     boolean m_compiled = false;
-    int m_siteCount;
+    protected int m_siteCount;
     int m_hostCount;
     int m_kfactor = 0;
+    protected final BackendTarget m_target;
+    protected String m_jarFileName;
     boolean m_running = false;
     private final boolean m_debug;
     FailureState m_failureState;
@@ -154,9 +156,9 @@ public class LocalCluster implements VoltServerConfig {
         m_callingClassName = traces[i].getClassName().substring(dot + 1);
         m_callingMethodName = traces[i].getMethodName();
 
-        System.out.println("Instantiating LocalCluster for " + jarFileName + " with class.method: " +
+        log.info("Instantiating LocalCluster for " + jarFileName + " with class.method: " +
                 m_callingClassName + "." + m_callingMethodName);
-        System.out.println("Sites: " + siteCount + " hosts: " + hostCount + " replication factor: " + kfactor);
+        log.info("Sites: " + siteCount + " hosts: " + hostCount + " replication factor: " + kfactor);
 
         m_cluster.ensureCapacity(hostCount);
 
@@ -164,6 +166,8 @@ public class LocalCluster implements VoltServerConfig {
         m_hostCount = hostCount;
         m_kfactor = kfactor;
         m_debug = debug;
+        m_target = target;
+        m_jarFileName = jarFileName;
         m_failureState = kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<PipeToFile>();
         m_cmdLines = new ArrayList<CommandLine>();
@@ -183,7 +187,7 @@ public class LocalCluster implements VoltServerConfig {
         java_library_path = System.getProperty("java.library.path", java_library_path);
 
         String classPath = System.getProperty("java.class.path") + ":" + buildDir
-            + File.separator + jarFileName + ":" + buildDir + File.separator + "prod";
+            + File.separator + m_jarFileName + ":" + buildDir + File.separator + "prod";
 
         // First try 'ant' syntax and then 'eclipse' syntax...
         String log4j = System.getProperty("log4j.configuration");
@@ -214,7 +218,7 @@ public class LocalCluster implements VoltServerConfig {
             leader("").
             target(target).
             startCommand("create").
-            jarFileName(VoltDB.Configuration.getPathToCatalogForTest(jarFileName)).
+            jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
             javaLibraryPath(java_library_path).
             classPath(classPath).
@@ -482,7 +486,7 @@ public class LocalCluster implements VoltServerConfig {
 
     private void killOne()
     {
-        System.out.println("Killing one cluster member.");
+        log.info("Killing one cluster member.");
         int procIndex = 0;
         if (m_hasLocalServer) {
             procIndex = 1;
@@ -497,13 +501,13 @@ public class LocalCluster implements VoltServerConfig {
                 eeproc.waitForShutdown();
             }
         } catch (InterruptedException e) {
-            System.out.println("External VoltDB process is acting crazy.");
+            log.info("External VoltDB process is acting crazy.");
         } finally {
             m_cluster.set(procIndex, null);
         }
         // exit code 143 is the forcible shutdown code from .destroy()
         if (retval != 0 && retval != 143) {
-            System.out.println("External VoltDB process terminated abnormally with return: " + retval);
+            log.info("External VoltDB process terminated abnormally with return: " + retval);
         }
     }
 
@@ -635,7 +639,7 @@ public class LocalCluster implements VoltServerConfig {
             rejoinHostId = 0;
         }
         int portNoToRejoin = m_cmdLines.get(rejoinHostId).internalPort();
-        System.out.println("Rejoining " + hostId + " to hostID: " + rejoinHostId);
+        log.info("Rejoining " + hostId + " to hostID: " + rejoinHostId);
 
         // rebuild the EE proc set.
         ArrayList<EEProcess> eeProcs = m_eeProcs.get(hostId);
@@ -739,12 +743,11 @@ public class LocalCluster implements VoltServerConfig {
         }
         if (ptf.m_witnessedReady.get()) {
             long finish = System.currentTimeMillis();
-            System.out.println(
-                    "Took " + (finish - start) +
-                    " milliseconds, time from init was " + (finish - ptf.m_initTime));
+            log.info("Took " + (finish - start) +
+                     " milliseconds, time from init was " + (finish - ptf.m_initTime));
             return true;
         } else {
-            System.out.println("Recovering process exited before recovery completed");
+            log.info("Recovering process exited before recovery completed");
             try {
                 silentShutdownSingleHost(hostId, true);
             } catch (InterruptedException e) {
@@ -776,7 +779,7 @@ public class LocalCluster implements VoltServerConfig {
 
     public void shutDownSingleHost(int hostNum) throws InterruptedException
     {
-        System.out.println("Shutting down " + hostNum);
+        log.info("Shutting down " + hostNum);
         silentShutdownSingleHost(hostNum, false);
     }
 
@@ -884,7 +887,8 @@ public class LocalCluster implements VoltServerConfig {
         for (int i = 0; i < m_cmdLines.size(); i++) {
             CommandLine cl = m_cmdLines.get(i);
             Process p = m_cluster.get(i);
-            if (p != null) {
+            // if the process is alive, or is the in-process server
+            if ((p != null) || (i == 0 && m_hasLocalServer)) {
                 listeners.add("localhost:" + cl.m_port);
             }
         }

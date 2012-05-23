@@ -28,7 +28,6 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -63,7 +62,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, true);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         if (cluster.isValgrind()) {
             //Way to much data in this test. Using less data makes it redundant
             return;

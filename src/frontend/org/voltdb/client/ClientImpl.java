@@ -24,10 +24,10 @@ import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.MiscUtils;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -45,6 +45,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     // stored credentials
     private boolean m_credentialsSet = false;
+    private final ReentrantLock m_credentialComparisonLock =
+            new ReentrantLock();
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
@@ -109,7 +111,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return true;
         }
 
-        synchronized(m_createConnectionUsername) {
+        m_credentialComparisonLock.lock();
+        try {
             if (m_credentialsSet == false) {
                 m_credentialsSet = true;
                 m_createConnectionUsername = username;
@@ -129,6 +132,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                             return false;
                 return true;
             }
+        } finally {
+            m_credentialComparisonLock.unlock();
         }
     }
 

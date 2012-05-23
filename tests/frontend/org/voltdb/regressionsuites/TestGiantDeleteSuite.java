@@ -96,8 +96,7 @@ public class TestGiantDeleteSuite extends RegressionSuite {
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
 
-        config = new LocalSingleProcessServer("giantdelete-onesite.jar", 2,
-                                              BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("giantdelete-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
         builder.addServerConfig(config);
 

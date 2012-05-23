@@ -148,7 +148,7 @@ public class TestIndexMemoryOwnershipSuite extends RegressionSuite {
         boolean success;
 
         // JNI
-        config = new LocalSingleProcessServer("updatememoryownership.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("updatememoryownership.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

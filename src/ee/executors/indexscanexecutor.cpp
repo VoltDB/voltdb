@@ -245,6 +245,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
                m_index->getName().c_str());
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
+    IndexLookupType localLookupType = m_lookupType;
     SortDirectionType localSortDirection = m_sortDirection;
 
     // INLINE PROJECTION
@@ -298,23 +299,32 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // handle the case where this is a comparison, rather than equality match
             // comparison is the only place where the executor might return matching tuples
             // e.g. TINYINT < 1000 should return all values
-            if ((m_lookupType != INDEX_LOOKUP_TYPE_EQ) &&
+            if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
                 (ctr == (activeNumOfSearchKeys - 1))) {
 
                 if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    if ((m_lookupType == INDEX_LOOKUP_TYPE_GT) ||
-                        (m_lookupType == INDEX_LOOKUP_TYPE_GTE)) {
+                    if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
+                        (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
 
                         // gt or gte when key overflows returns nothing
                         return true;
                     }
+                    else {
+                        // VoltDB should only support LT or LTE with
+                        // empty search keys for order-by without lookup
+                        throw e;
+                    }
                 }
                 if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                    if ((m_lookupType == INDEX_LOOKUP_TYPE_LT) ||
-                        (m_lookupType == INDEX_LOOKUP_TYPE_LTE)) {
+                    if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
+                        (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
 
                         // lt or lte when key underflows returns nothing
                         return true;
+                    }
+                    else {
+                        // don't allow GTE because it breaks null handling
+                        localLookupType = INDEX_LOOKUP_TYPE_GT;
                     }
                 }
 
@@ -383,13 +393,13 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                    localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
-        if (m_lookupType == INDEX_LOOKUP_TYPE_EQ) {
+        if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
             m_index->moveToKey(&m_searchKey);
         }
-        else if (m_lookupType == INDEX_LOOKUP_TYPE_GT) {
+        else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
             m_index->moveToGreaterThanKey(&m_searchKey);
         }
-        else if (m_lookupType == INDEX_LOOKUP_TYPE_GTE) {
+        else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
             m_index->moveToKeyOrGreater(&m_searchKey);
         }
         else {
@@ -418,9 +428,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // We have to different nextValue() methods for different lookup types
     //
-    while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
+    while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
             !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
-           ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
+           ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
             !(m_tuple = m_index->nextValue()).isNullTuple()))
     {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());

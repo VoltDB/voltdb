@@ -207,7 +207,7 @@ class RateLimiter {
         return timestamp;
     }
 
-    public void debug() {
+    public synchronized void debug() {
         System.out.printf("Target throughput/s is %d and max outstanding txns is %d\n",
                 m_targetTxnsPerSecond, m_maxOutstandingTxns);
         System.out.printf("Current outstanding is %d and recent internal latency is %.2f\n",

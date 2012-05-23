@@ -7,7 +7,7 @@ VOLTCOMPILER="../../../bin/voltcompiler"
 LOG4J="`pwd`/../../../voltdb/log4j.xml"
 LICENSE="../../../voltdb/license.xml"
 LEADER="localhost"
-GENERATE="python scripts/generate.py"
+GENERATE="python2.6 scripts/generate.py"
 
 # remove build artifacts
 function clean() {
