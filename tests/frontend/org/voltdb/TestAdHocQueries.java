@@ -23,16 +23,480 @@
 
 package org.voltdb;
 
+import java.io.IOException;
+
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdHocQueries extends TestCase {
+
+    public void testSP() throws Exception {
+        String spSchema =
+            "create table PARTED1 (" +
+            "PARTVAL bigint not null, " +
+            "NONPART bigint not null," +
+            "PRIMARY KEY(PARTVAL));" +
+
+            "create table PARTED2 (" +
+            "PARTVAL bigint not null, " +
+            "NONPART bigint not null," +
+            "PRIMARY KEY(PARTVAL));" +
+
+            "create table PARTED3 (" +
+            "PARTVAL bigint not null, " +
+            "NONPART bigint not null," +
+            "PRIMARY KEY(NONPART));" +
+
+            "create table REPPED1 (" +
+            "REPPEDVAL bigint not null, " +
+            "NONPART bigint not null," +
+            "PRIMARY KEY(REPPEDVAL));" +
+
+            "create table REPPED2 (" +
+            "REPPEDVAL bigint not null, " +
+            "NONPART bigint not null," +
+            "PRIMARY KEY(REPPEDVAL));";
+
+        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
+        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(spSchema);
+        builder.addPartitionInfo("PARTED1", "PARTVAL");
+        builder.addPartitionInfo("PARTED2", "PARTVAL");
+        builder.addPartitionInfo("PARTED3", "PARTVAL");
+        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+        assertTrue(success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = pathToCatalog;
+        config.m_pathToDeployment = pathToDeployment;
+        ServerThread localServer = new ServerThread(config);
+
+        Client client = null;
+
+        try {
+            localServer.start();
+            localServer.waitForInitialization();
+
+            // do the test
+            client = ClientFactory.createClient();
+            client.createConnection("localhost");
+
+            VoltTable modCount;
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO PARTED1 VALUES (0, 0);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO PARTED1 VALUES (1, 1);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO PARTED2 VALUES (0, 0);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO PARTED2 VALUES (2, 2);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO PARTED3 VALUES (0, 0);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO PARTED3 VALUES (3, 3);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO REPPED1 VALUES (0, 0);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO REPPED1 VALUES (1, 1);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO REPPED2 VALUES (0, 0);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            modCount = client.callProcedure("@AdHoc", "INSERT INTO REPPED2 VALUES (2, 2);").getResults()[0];
+            assertTrue(modCount.getRowCount() == 1);
+            assertTrue(modCount.asScalarLong() == 1);
+
+            callAdHoc(client);
+            callSPAdHoc(client, "@AdHocSP");
+            callSPAdHoc(client, "@AdHoc");
+
+        }
+        finally {
+            if (client != null) client.close();
+            client = null;
+
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+    }
+
+    /**
+     * @param client
+     * @param adHocMaybeSP the system proc name
+     * @throws ProcCallException
+     * @throws IOException
+     * @throws NoConnectionsException
+     */
+    private void callSPAdHoc(Client client, String adHocMaybeSP) throws NoConnectionsException, IOException, ProcCallException {
+        // TODO Auto-generated method stub
+
+        VoltTable result;
+        int count0 = 0;
+        int count1 = 0;
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1;", 0).getResults()[0];
+        count0 = result.getRowCount();
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 WHERE PARTVAL != 0;", 1).getResults()[0];
+        count1 = result.getRowCount();
+        assertTrue(count0 + count1 == 2);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3;", 0).getResults()[0];
+        count0 = result.getRowCount();
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 WHERE PARTVAL != 0;", 1).getResults()[0];
+        count1 = result.getRowCount();
+        assertTrue(count0 + count1 == 2);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 2);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 WHERE PARTVAL = 0;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 WHERE PARTVAL = 0;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 WHERE REPPEDVAL = 0;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = 0;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = 0;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+/* NYET
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+*/
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 0).getResults()[0];
+        count0 = result.getRowCount();
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 1).getResults()[0];
+        count1 = result.getRowCount();
+        assertTrue(count0 + count1 == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL != A.PARTVAL;", 0).getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+    }
+
+    /**
+     * @param client
+     * @param adHocMaybeSP the system proc name
+     * @throws ProcCallException
+     * @throws IOException
+     * @throws NoConnectionsException
+     */
+    private void callAdHoc(Client client) throws NoConnectionsException, IOException, ProcCallException {
+        // TODO Auto-generated method stub
+
+        String adHocMaybeSP = "@AdHoc"; // only implicitly SP
+        VoltTable result;
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1;").getResults()[0];
+        assertTrue(result.getRowCount() == 2);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 WHERE PARTVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 WHERE PARTVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 WHERE REPPEDVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = 0;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.REPPEDVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = A.REPPEDVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.REPPEDVAL = B.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and A.PARTVAL = B.REPPEDVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.REPPEDVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+/* Not SP and not YET supported.
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+*/
+/* NOT SP
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+*/
+
+        result = client.callProcedure(adHocMaybeSP, "SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL != A.PARTVAL;").getResults()[0];
+        assertTrue(result.getRowCount() == 1);
+        System.out.println(result.toString());
+    }
 
     public void testSimple() throws Exception {
         String simpleSchema =
@@ -147,189 +611,4 @@ public class TestAdHocQueries extends TestCase {
         }
     }
 
-    static class LikeTest
-    {
-        String pattern;
-        int matches;
-        boolean crashes;
-        boolean addNot = false;
-        String escape  = null;
-
-        public LikeTest(String pattern, int matches) {
-            this.pattern = pattern;
-            this.matches = matches;
-            this.crashes = false;
-        }
-
-        public LikeTest(String pattern, int matches, boolean crashes, boolean addNot, String escape) {
-            this.pattern = pattern;
-            this.matches = matches;
-            this.crashes = crashes;
-            this.addNot  = addNot;
-            this.escape  = escape;
-        }
-
-        public String getClause() {
-            String not = (this.addNot ? "NOT " : "");
-            String escape = (this.escape != null ? String.format(" ESCAPE '%s'", this.escape) : "");
-            String clause = String.format("%sLIKE '%s'%s", not, this.pattern, escape);
-            return clause;
-        }
-    }
-
-    static class NotLikeTest extends LikeTest {
-        public NotLikeTest(String pattern, int matches) {
-            super(pattern, matches, false, true, null);
-        }
-    }
-
-    static class EscapeLikeTest extends LikeTest {
-        public EscapeLikeTest(String pattern, int matches, String escape) {
-            super(pattern, matches, false, false, escape);
-        }
-    }
-
-    static class UnsupportedLikeTest extends LikeTest {
-        public UnsupportedLikeTest(String pattern, int matches) {
-            super(pattern, matches, true, false, null);
-        }
-    }
-
-    static class UnsupportedEscapeLikeTest extends LikeTest {
-        public UnsupportedEscapeLikeTest(String pattern, int matches, String escape) {
-            super(pattern, matches, true, false, escape);
-        }
-    }
-
-    static class LikeTestData {
-        public final String val;
-        public final String pat;
-        public LikeTestData(String val, String pat) {
-            this.val = val;
-            this.pat = pat;
-        }
-    }
-
-    public void testLikeClause() throws Exception {
-
-        final String schema =
-            "create table STRINGS (" +
-            "ID int default 0 not null, " +
-            "VAL varchar(32) default null," +
-            "PAT varchar(32) default null," +
-            "PRIMARY KEY(ID));";
-
-        final LikeTestData[] rowData = {
-            new LikeTestData("aaaaaaa", "aaa%"),
-            new LikeTestData("abcccc%", "abc%"),
-            new LikeTestData("abcdefg", "abcdefg"),
-            new LikeTestData("âxxxéyy", "âxxx%"),
-        };
-
-        final LikeTest[] tests = {
-            // Patterns that pass (currently supported)
-            new LikeTest("aaa%", 1),
-            new LikeTest("abc%", 2),
-            new LikeTest("AbC%", 0),
-            new LikeTest("zzz%", 0),
-            new LikeTest("%", rowData.length),
-            new LikeTest("a%", 3),
-            new LikeTest("âxxx%", 1),
-            new NotLikeTest("aaa%", rowData.length - 1),
-            new EscapeLikeTest("abcccc|%", 1, "|"),
-            new EscapeLikeTest("abc%", 2, "|"),
-            new EscapeLikeTest("aaa", 0, "|"),
-            // Patterns that fail (unsupported until we fix the parser)
-            new UnsupportedLikeTest("aaaaaaa", 0),
-            new UnsupportedLikeTest("aaa", 0),
-            new UnsupportedLikeTest("abcdef_", 1),
-            new UnsupportedLikeTest("ab_d_fg", 1),
-            new UnsupportedLikeTest("%defg", 1),
-            new UnsupportedLikeTest("%de%", 1),
-            new UnsupportedLikeTest("%de% ", 0),
-            new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
-        };
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhoc_like.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhoc_like.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(schema);
-        builder.addPartitionInfo("STRINGS", "ID");
-        builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);", null);
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue("Insert compilation failed", success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-        ServerThread localServer = new ServerThread(config);
-
-        Client client = null;
-
-        try {
-            localServer.start();
-            localServer.waitForInitialization();
-
-            // do the test
-            client = ClientFactory.createClient();
-            client.createConnection("localhost");
-
-            int id = 0;
-            for (LikeTestData data : rowData) {
-                id++;
-                String query = String.format("insert into strings values (%d,'%s','%s');", id, data.val, data.pat);
-                VoltTable modCount = client.callProcedure("@AdHoc", query).getResults()[0];
-                assertEquals("Bad insert row count:", 1, modCount.getRowCount());
-                assertEquals("Bad insert modification count:", 1, modCount.asScalarLong());
-            }
-
-            // Tests based on LikeTest list
-            for (LikeTest test : tests) {
-                String clause = test.getClause();
-                String query = String.format("select * from strings where val %s", clause);
-                System.out.printf("LIKE clause \"%s\"\n", clause);
-                try {
-                    VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
-                    assertEquals(String.format("\"%s\": bad row count:", clause),
-                                 test.matches, result.getRowCount());
-                    System.out.println(result.toString());
-                    assertFalse(String.format("Expected to crash on \"%s\", but didn't", clause), test.crashes);
-                } catch (ProcCallException e) {
-                    System.out.printf("LIKE clause \"%s\" failed\n", clause);
-                    System.out.println(e.toString());
-                    assertTrue("This failure was unexpected", test.crashes);
-                    System.out.println("(This failure was expected)");
-                }
-            }
-
-            // Tests using PAT column for pattern data
-            {
-                // Expact all PAT column patterns to produce a match with the VAL column string.
-                // We don't support non-literal likes yet. Remove the catch when we do.
-                String query = "select * from strings where val like pat";
-                try {
-                    VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
-                    assertEquals(String.format("LIKE column test: bad row count:"),
-                                 tests.length, result.getRowCount());
-                } catch (ProcCallException e) {
-                    System.out.println("LIKE column test failed (expected for now)");
-                }
-            }
-        }
-        finally {
-            if (client != null) client.close();
-            client = null;
-
-            if (localServer != null) {
-                localServer.shutdown();
-                localServer.join();
-            }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
-        }
-    }
 }

@@ -227,6 +227,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Wait until they receive data or have been booted.
      */
     private boolean m_hasGlobalClientBackPressure = false;
+    private final boolean m_isConfiguredForHSQL;
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -880,6 +881,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         registerMailbox(messenger.getZK());
         m_siteId = m_mailbox.getHSId();
+        m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
     /**
@@ -1360,17 +1362,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         boolean isSinglePartition = (plannedStmt.partitionParam != null);
         int partitions[] = null;
 
-        if (isSinglePartition) {
+        // HSQL does not specifically implement AdHocSP -- use its SP implementation of AdHoc
+        if (isSinglePartition &&  ! m_isConfiguredForHSQL) {
             task.procName = "@AdHocSP";
+            assert(plannedStmt.isReplicatedTableDML == false);
+            assert(plannedStmt.collectorFragment == null);
             partitions = new int[] { TheHashinator.hashToPartition(plannedStmt.partitionParam) };
+            task.setParams(plannedStmt.aggregatorFragment, null, plannedStmt.sql, 0);
         }
         else {
             task.procName = "@AdHoc";
             partitions = m_allPartitions;
+            task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                    plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         }
 
-        task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                       plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         task.clientHandle = plannedStmt.clientHandle;
 
         /*
@@ -1393,7 +1399,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // initiate the transaction
         createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
                 plannedStmt.adminConnection,
-                task, false, isSinglePartition, false, partitions,
+                task, false, (isSinglePartition  &&  ! m_isConfiguredForHSQL), false, partitions,
                 partitions.length, plannedStmt.clientData,
                 0, EstTime.currentTimeMillis());
 
