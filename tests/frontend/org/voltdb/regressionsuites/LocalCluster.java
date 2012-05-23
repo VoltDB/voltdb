@@ -218,6 +218,10 @@ public class LocalCluster implements VoltServerConfig {
             log4j(log4j);
     }
 
+    public void setCustomCmdLn(String customCmdLn) {
+        templateCmdLine.customCmdLn(customCmdLn);
+    }
+
     @Override
     public void setCallingMethodName(String name) {
         m_callingMethodName = name;
