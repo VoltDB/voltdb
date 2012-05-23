@@ -57,7 +57,7 @@ public abstract class StatementCompiler {
 
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
-            Statement catalogStmt, String stmt, String joinOrder, boolean singlePartition)
+            Statement catalogStmt, String stmt, String joinOrder, PartitioningForStatement partitioning)
     throws VoltCompiler.VoltCompilerException {
 
         boolean compilerDebug = System.getProperties().contains("compilerdebug");
@@ -93,20 +93,13 @@ public abstract class StatementCompiler {
 
         // put the data in the catalog that we have
         catalogStmt.setSqltext(stmt);
-        catalogStmt.setSinglepartition(singlePartition);
+        catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(0);
 
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
         PlanNodeList node_list = null;
         TrivialCostModel costModel = new TrivialCostModel();
-        Object partitionParameter = null;
-        if (singlePartition) {
-            // Dummy up a partitioning value to indicate the intent and prevent the planner
-            // from trying to infer a constant partitioning value from the statement.
-            partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
-        }
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter);
         QueryPlanner planner = new QueryPlanner(
                 catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, true, false);
 
@@ -139,13 +132,8 @@ public abstract class StatementCompiler {
 
         catalogStmt.setSeqscancount(plan.countSeqScans());
 
-        // TODO: This could be the right place to validate the inferred statement partitioning
-        // given the statement's possible usage -- this may require more context
-        // (whether the statement is being used in (or completely defines) a single- or multi-partition procedure).
-
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        // If this is an adhoc query then there won't be any parameters
         for (ParameterInfo param : plan.parameters) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(param.index));
             catalogParam.setJavatype(param.type.getValue());
@@ -172,6 +160,7 @@ public abstract class StatementCompiler {
             index++;
         }
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
+        partitioning.setIsReplicatedTableDML(plan.replicatedTableDML);
 
         // output the explained plan to disk for debugging
         PrintStream plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(

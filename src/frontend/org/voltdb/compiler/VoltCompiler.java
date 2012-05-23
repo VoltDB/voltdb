@@ -48,6 +48,8 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
@@ -73,8 +75,6 @@ import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -1208,10 +1208,10 @@ public class VoltCompiler {
             compiler.summarizeErrors(System.out);
             System.exit(-1);
         }
-        compiler.summarizeSuccess(System.out);
+        compiler.summarizeSuccess(System.out, null);
     }
 
-    public void summarizeSuccess(PrintStream outputStream) {
+    public void summarizeSuccess(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
 
             Database database = m_catalog.getClusters().get("cluster").
@@ -1260,6 +1260,14 @@ public class VoltCompiler {
                 outputStream.println();
             }
             outputStream.println("------------------------------------------");
+        }
+        if (feedbackStream != null) {
+            for (Feedback fb : m_warnings) {
+                feedbackStream.println(fb.getLogString());
+            }
+            for (Feedback fb : m_infos) {
+                feedbackStream.println(fb.getLogString());
+            }
         }
     }
 

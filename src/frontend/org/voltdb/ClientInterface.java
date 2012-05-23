@@ -1343,15 +1343,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // HSQL does not specifically implement AdHocSP -- use its SP implementation of AdHoc
         if (isSinglePartition &&  ! m_isConfiguredForHSQL) {
             task.procName = "@AdHocSP";
+            assert(plannedStmt.isReplicatedTableDML == false);
+            assert(plannedStmt.collectorFragment == null);
             partitions = new int[] { TheHashinator.hashToPartition(plannedStmt.partitionParam) };
+            task.setParams(plannedStmt.aggregatorFragment, null, plannedStmt.sql, 0);
         }
         else {
             task.procName = "@AdHoc";
             partitions = m_allPartitions;
+            task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                    plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         }
 
-        task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                       plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         task.clientHandle = plannedStmt.clientHandle;
 
         /*

@@ -66,10 +66,13 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             m_generatedPlans = true;
-            // for each table, just add the empty access path (the full table scan)
             Table nextTables[] = new Table[0];
             ArrayList<AccessPath> paths = getRelevantAccessPathsForTable(m_targetTable, nextTables);
-
+            if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_partitioning.getCountOfPartitionedTables() > 0) {
+                m_partitioning.setEffectiveValue(null);
+                // Search the one partitioned table for a constant- or parameter-based equality filter that would justify SP processing.
+                AccessPath.tagForMultiPartitionAccess(new Table[] { m_targetTable }, new AccessPath[] { paths.get(0) }, m_partitioning);
+            }
             // for each access path
             for (AccessPath accessPath : paths) {
                 // get a plan

@@ -31,7 +31,6 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.NestLoopIndexPlanNode;
 import org.voltdb.plannodes.NestLoopPlanNode;
-import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.types.JoinType;
 
 /**
@@ -51,8 +50,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     /** The list of all possible join orders, assembled by queueAllJoinOrders */
     ArrayDeque<Table[]> m_joinOrders = new ArrayDeque<Table[]>();
 
-    private int m_countOfPartitionedTables;
-
     /**
      *
      * @param db The catalog's Database object.
@@ -63,14 +60,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     SelectSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
         super(db, parsedStmt, partitioning);
-        // Do we have a need for a distributed scan at all?
-        for (Table table : parsedStmt.tableList) {
-            if (table.getIsreplicated()) {
-                continue;
-            }
-            ++m_countOfPartitionedTables;
-        }
-
         //If a join order was provided
         if (parsedStmt.joinOrder != null) {
             //Extract the table names from the , separated list
@@ -262,13 +251,15 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         // AccessPath.isPartitionKeyEquality.
 
         boolean suppressSendReceivePair = true;
-        if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_countOfPartitionedTables > 0) {
+        int partitionedTableCount = m_partitioning.getCountOfPartitionedTables();
+        if ((m_partitioning.wasSpecifiedAsSingle() == false) &&  partitionedTableCount > 0) {
             // It's possible that a leftover inferred value from the previous join order may not hold for the current one?
             m_partitioning.setEffectiveValue(null);
             // It's usually better to send and receive pre-join tuples than post-join tuples.
             suppressSendReceivePair = false; // tentative/default value.
             // This analysis operates independently of indexes, so only needs to operate on the naive (first) accessPath.
-            int multiPartitionScanCount = AccessPath.tagForMultiPartitionAccess(joinOrder, listOfAccessPathCombos.get(0), m_partitioning);
+            AccessPath.tagForMultiPartitionAccess(joinOrder, listOfAccessPathCombos.get(0), m_partitioning);
+            int multiPartitionScanCount = m_partitioning.getCountOfIndependentlyPartitionedTables();
             if (multiPartitionScanCount > 1) {
                 // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
                 return;
@@ -285,7 +276,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // For (multiPartitionScanCount == 0), the failure to produce a partitionKey
                 // when that would involve expression evaluation has forced a degenerate case
                 // that case can be handled the same way.
-                if (m_countOfPartitionedTables > 1) {
+                if (partitionedTableCount > 1) {
                     suppressSendReceivePair = true;
                 }
             } else {
@@ -324,117 +315,17 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
     private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath, boolean suppressSendReceivePair) {
 
         // do the actual work
-        AbstractPlanNode retv = getSelectSubPlanForAccessPathRecursive(joinOrder, accessPath, suppressSendReceivePair);
+        AbstractPlanNode retv = getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath, suppressSendReceivePair);
         // If there is a multi-partition statement on one or more partitioned Tables and the Send/Receive nodes were suppressed,
         // they need to come into play "post-join".
         if (suppressSendReceivePair &&
-                (m_countOfPartitionedTables > 0) &&
+                (m_partitioning.getCountOfPartitionedTables() > 0) &&
                 m_partitioning.effectivePartitioningValue() == null) {
             retv = addSendReceivePair(retv);
         }
         return retv;
     }
 
-    /**
-     * Given a specific join order and access path set for that join order, construct the plan
-     * that gives the right tuples. This method is the meat of sub-plan-graph generation, but all
-     * of the smarts are probably done by now, so this is just boring actual construction.
-     * In case of all participant tables are joined on respective partition keys generation of
-     * Send/Received node pair is suppressed.
-     *
-     * @param joinOrder An array of tables in a specific join order.
-     * @param accessPath An array of access paths that match with the input tables.
-     * @param supressSendReceivePair indicator whether to suppress intermediate Send/Receive pairs or not
-     * @return A completed plan-sub-graph that should match the correct tuples from the
-     * correct tables.
-     */
-    private AbstractPlanNode getSelectSubPlanForAccessPathRecursive(Table[] joinOrder, AccessPath[] accessPath,
-            boolean supressSendReceivePair) {
-
-        // recursive stopping condition:
-        //
-        // If there is one table to scan from, then just
-        if (joinOrder.length == 1)
-            return getAccessPlanForTable(joinOrder[0], accessPath[0], supressSendReceivePair);
-
-        // recursive step:
-        AbstractPlanNode nljAccessPlan = getAccessPlanForTable(joinOrder[0], accessPath[0], supressSendReceivePair);
-
-        /*
-         * If the access plan for the table in the join order was for a
-         * distributed table scan there will be a send/receive pair at the top.
-         * The optimizations (nestloop, nestloopindex) that follow don't care
-         * about the send/receive pair pop up the IndexScanPlanNode or
-         * ScanPlanNode for them to work on.
-         */
-        boolean accessPlanIsSendReceive = false;
-        AbstractPlanNode accessPlanTemp = nljAccessPlan;
-        if (nljAccessPlan instanceof ReceivePlanNode) {
-            accessPlanIsSendReceive = true;
-            nljAccessPlan = nljAccessPlan.getChild(0).getChild(0);
-            nljAccessPlan.clearParents();
-        }
-
-        //
-        // create copies of the tails of the joinOrder and accessPath arrays
-        Table[] subJoinOrder = Arrays.copyOfRange(joinOrder, 1, joinOrder.length);
-        AccessPath[] subAccessPath = Arrays.copyOfRange(accessPath, 1, accessPath.length);
-
-        // recursively call this method to get the plan for the tail of the join order
-        AbstractPlanNode subPlan =
-            getSelectSubPlanForAccessPathRecursive(subJoinOrder, subAccessPath, supressSendReceivePair);
-
-        // get all the clauses that join the applicable two tables
-        ArrayList<AbstractExpression> joinClauses = accessPath[0].joinExprs;
-
-        AbstractPlanNode retval = null;
-        if (nljAccessPlan instanceof IndexScanPlanNode) {
-            NestLoopIndexPlanNode nlijNode = new NestLoopIndexPlanNode();
-
-            nlijNode.setJoinType(JoinType.INNER);
-
-            @SuppressWarnings("unused")
-            IndexScanPlanNode innerNode = (IndexScanPlanNode) nljAccessPlan;
-
-            nlijNode.addInlinePlanNode(nljAccessPlan);
-
-            // combine the tails plan graph with the new head node
-            nlijNode.addAndLinkChild(subPlan);
-            // now generate the output schema for this join
-            nlijNode.generateOutputSchema(m_db);
-
-            retval = nlijNode;
-        }
-        else {
-            NestLoopPlanNode nljNode = new NestLoopPlanNode();
-            if ((joinClauses != null) && (joinClauses.size() > 0))
-                nljNode.setPredicate(ExpressionUtil.combine(joinClauses));
-            nljNode.setJoinType(JoinType.LEFT);
-
-            // combine the tails plan graph with the new head node
-            nljNode.addAndLinkChild(nljAccessPlan);
-
-            nljNode.addAndLinkChild(subPlan);
-            // now generate the output schema for this join
-            nljNode.generateOutputSchema(m_db);
-
-            retval = nljNode;
-        }
-
-        /*
-         * Now push back to the send receive pair that was squirreled away earlier.
-         * For joins of two partitioned tables on the partition key
-         * we don't actually need to generate more then one send/receive pair.
-         * See ENG-496 for more details
-         */
-        if (accessPlanIsSendReceive) {
-            accessPlanTemp.getChild(0).clearChildren();
-            accessPlanTemp.getChild(0).addAndLinkChild(retval);
-            retval = accessPlanTemp;
-        }
-
-        return retval;
-    }
 
    /**
      * Given a specific join order and access path set for that join order, construct the plan
@@ -449,7 +340,8 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath, boolean suppressSendReceivePair) {
+    protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath,
+            boolean suppressSendReceivePair) {
         AbstractPlanNode resultPlan = null;
         for (int at = joinOrder.length-1; at >= 0; --at) {
             AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at]);

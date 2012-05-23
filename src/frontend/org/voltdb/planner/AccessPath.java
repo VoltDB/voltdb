@@ -55,12 +55,11 @@ public class AccessPath {
      *
      * @param joinOrder An array of tables in a specific join order.
      * @param accessPath An array of access paths that match with the input tables.
-     * @param m_partitioning.resetInferredValue(best) - the second element of this array is set to the constant (if any) by which ALL partition
-     *        keys are (at least transitively) equality filtered.
+     * @param partitioning Describes the specified and inferred partition context.
      * @return number of partitioned tables whose partition keys may vary independently
      * (i.e. that are not equality filtered with the first scanned partition key or a constant)
      */
-    static int tagForMultiPartitionAccess(Table[] joinOrder, AccessPath[] accessPath, PartitioningForStatement m_partitioning) {
+    static void tagForMultiPartitionAccess(Table[] joinOrder, AccessPath[] accessPath, PartitioningForStatement partitioning) {
         //Collect all index and join expressions from the accessPath for each table
         TupleValueExpression firstPartitionKeyScanned = null;
         Set<TupleValueExpression> eqPartitionKeySet = new HashSet<TupleValueExpression>();
@@ -220,10 +219,11 @@ public class AccessPath {
                 if (eqPartitionKeySet.contains(tveExpr)) {
                     // the TVE is equal to a constant AND to the first partition key.
                     // By implication, the partition key must have this constant value.
-                    m_partitioning.addPartitioningExpression(constExpr);
+                    partitioning.addPartitioningExpression(tveExpr.getTableName() + '.' + tveExpr.getColumnName(), constExpr);
                     if (partitioningObject == null) {
                         partitioningExpr = constExpr;
-                        partitioningObject = extractPartitioningValue(tveExpr, constExpr);
+                        partitioningObject = ConstantValueExpression.extractPartitioningValue(tveExpr.getValueType(), constExpr);
+                        partitioning.setEffectiveValue(partitioningObject);
                     }
                     columnCovered = true;
                     continue;
@@ -237,8 +237,8 @@ public class AccessPath {
                             columnCovered = true;
                             continue;
                         }
-                        m_partitioning.addPartitioningExpression(constExpr);
-                        Object altBinding = extractPartitioningValue(tveExpr, constExpr);
+                        partitioning.addPartitioningExpression(tveExpr.getTableName() + '.' + tveExpr.getColumnName(), constExpr);
+                        Object altBinding = ConstantValueExpression.extractPartitioningValue(tveExpr.getValueType(), constExpr);
                         if (altBinding.equals(partitioningObject)) {
                             // Equality to a common constant expression works for TVE equality.
                             eqPartitionKeySet.add(tveExpr);
@@ -266,42 +266,12 @@ public class AccessPath {
                 result++;
             }
         }
-        m_partitioning.setEffectiveValue(partitioningObject);
         // It's only a little strange to sometimes be setting the inferred value to a non-null value even when returning a value > 0.
         // That happens when the query could IN THEORY distribute the results of a multi-partition
         // scan to the single partition designated by the partitioningObject for a final join with that partition's local data.
         // This currently unsupported edge case is currently promptly detected and kept out of the candidate plans.
         // But THIS code, anyway, stands ready.
-        return result;
-    }
-
-    public static Object extractPartitioningValue(TupleValueExpression tveExpr, AbstractExpression constExpr) {
-        // TODO: There is currently no way to pass back as a partition key value
-        // the constant value resulting from a general constant expression such as
-        // "WHERE a.pk = b.pk AND b.pk = SQRT(3*3+4*4)" because the planner has no expression evaluation capabilities.
-        if (constExpr instanceof ConstantValueExpression) {
-            // ConstantValueExpression exports its value as a string, which is handy for serialization,
-            // but the hashinator wants a partition-key-column-type-appropriate value.
-            // For safety, don't trust the constant's type
-            // -- it's apparently comparable to the column, but may not be an exact match(?).
-            // XXX: Actually, there may need to be additional filtering in the code above to not accept
-            // constant equality filters that would require the COLUMN type to be non-trivially converted (?)
-            // -- it MAY not be safe to limit execution of such a filter on any single partition.
-            // For now, for partitioning purposes, leave constants for string columns as they are,
-            // and process matches for integral columns via constant-to-string-to-bigInt conversion.
-            String stringValue = ((ConstantValueExpression) constExpr).getValue();
-            if (tveExpr.getValueType().isInteger()) {
-                try {
-                    return new Long(stringValue);
-                } catch (NumberFormatException nfe) {
-                    // Disqualify this constant by leaving objValue null -- probably should have caught this earlier?
-                    // This causes the statement to fall back to being identified as multi-partition.
-                }
-            } else {
-                return stringValue;
-            }
-        }
-        return null;
+        partitioning.setCountOfIndependentlyPartitionedTables(result);
     }
 
     @Override
