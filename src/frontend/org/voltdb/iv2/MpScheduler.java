@@ -56,6 +56,7 @@ public class MpScheduler extends Scheduler
 
         // HACK: grab the current sitetracker until we write leader notices.
         m_clerk = VoltDB.instance().getSiteTracker();
+        final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
 
         // Handle every-site system procedures (at the MPI)
         if (runner.isSystemProcedure()) {
@@ -75,24 +76,17 @@ public class MpScheduler extends Scheduler
                         message.getClientInterfaceHandle());
                 DuplicateCounter counter = new DuplicateCounter(
                         message.getInitiatorHSId(),
-                        m_clerk.getHSIdsForPartitionInitiators().size(),
-                        mpTxnId);
+                        partitionInitiators.size(), mpTxnId);
                 m_duplicateCounters.put(mpTxnId, counter);
-                for (Long hsid : m_clerk.getHSIdsForPartitionInitiators()) {
-                    try {
-                        System.out.println("Sending ESP to: " + hsid);
-                        m_mailbox.send(hsid, sp);
-                    } catch (MessagingException e) {
-                        VoltDB.crashLocalVoltDB("Failed to serialize initiation for " +
-                                procedureName, true, e);
-                    }
-                }
+                EveryPartitionTask eptask =
+                    new EveryPartitionTask(m_mailbox, mpTxnId, m_pendingTasks, sp,
+                            partitionInitiators);
+                m_pendingTasks.offer(eptask);
                 return;
             }
         }
 
         // Multi-partition initiation (at the MPI)
-        final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
         // Figure out the local partition initiator that we can use to do BorrowTask work
         // on our behalf.
         long buddy_hsid = m_clerk.getBuddySiteForMPI(m_mailbox.getHSId());
@@ -160,7 +154,7 @@ public class MpScheduler extends Scheduler
             ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
         }
         else {
-            hostLog.info("MpScheduler received a FragmentResponseMessage for a null TXN ID");
+            hostLog.info("MpScheduler received a FragmentResponseMessage for a null TXN ID: " + message);
         }
     }
 

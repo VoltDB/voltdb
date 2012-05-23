@@ -109,4 +109,14 @@ public class TransactionTaskQueue
     {
         return m_backlog.size();
     }
+
+    @Override
+    public String toString()
+    {
+        StringBuilder sb = new StringBuilder();
+        sb.append("TransactionTaskQueue:").append("\n");
+        sb.append("\tSIZE: ").append(size());
+        sb.append("\tHEAD: ").append(m_backlog.getFirst());
+        return sb.toString();
+    }
 }
