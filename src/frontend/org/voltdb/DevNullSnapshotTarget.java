@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.concurrent.Callable;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 
 import com.google.common.util.concurrent.ListenableFuture;
@@ -30,8 +29,6 @@ import com.google.common.util.concurrent.ListenableFuture;
  */
 public class DevNullSnapshotTarget implements SnapshotDataTarget {
 
-    VoltLogger m_log = new VoltLogger("HOST");
-
     @Override
     public int getHeaderSize() {
         return 0;
@@ -40,8 +37,6 @@ public class DevNullSnapshotTarget implements SnapshotDataTarget {
     @Override
     public ListenableFuture<?> write(Callable<BBContainer> tupleData,
             SnapshotTableTask context) {
-        m_log.info("DEBUG: writing block to dev null");
-
         return null;
     }
 
