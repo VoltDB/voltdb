@@ -19,9 +19,6 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 
@@ -33,38 +30,25 @@ import org.voltcore.messaging.VoltMessage;
 public class RejoinMessage extends VoltMessage {
     public static enum Type {
         INITIATION, // sent by the coordinator to a local site
-        REQUEST, // sent from a rejoining partition to an existing site
 
         // The following are response types
-        REQUEST_RESPONSE,
-        FAILURE,
+        REQUEST_RESPONSE, // sent from the rejoining site to itself
         SNAPSHOT_FINISHED, // sent from a local site to the coordinator
         REPLAY_FINISHED, // sent from a local site to the coordinator
     }
 
     private Type m_type;
-    private long m_txnId = -1; // snapshot txnId
-    private List<byte[]> m_addresses = new ArrayList<byte[]>();
-    private int m_port = -1;
+    private long m_snapshotTxnId = -1; // snapshot txnId
 
     /** Empty constructor for de-serialization */
     public RejoinMessage() {
         m_subject = Subject.DEFAULT.getId();
     }
 
-    public RejoinMessage(long sourceHSId, List<byte[]> addresses, int port) {
-        m_type = Type.REQUEST;
-        m_sourceHSId = sourceHSId;
+    public RejoinMessage(long snapshotTxnId) {
         m_subject = Subject.DEFAULT.getId();
-        m_addresses = addresses;
-        m_port = port;
-    }
-
-    public RejoinMessage(long sourceHSId, long txnId) {
         m_type = Type.REQUEST_RESPONSE;
-        m_sourceHSId = sourceHSId;
-        m_subject = Subject.DEFAULT.getId();
-        m_txnId = txnId;
+        m_snapshotTxnId = snapshotTxnId;
     }
 
     public RejoinMessage(long sourceHSId, Type type) {
@@ -77,16 +61,8 @@ public class RejoinMessage extends VoltMessage {
         return m_type;
     }
 
-    public long txnId() {
-        return m_txnId;
-    }
-
-    public List<byte[]> addresses() {
-        return m_addresses;
-    }
-
-    public int port() {
-        return m_port;
+    public long getSnapshotTxnId() {
+        return m_snapshotTxnId;
     }
 
     @Override
@@ -95,13 +71,7 @@ public class RejoinMessage extends VoltMessage {
         msgsize +=
             8 + // m_sourceHSId
             1 + // m_type
-            8 + // m_txnId
-            4 + // address count
-            (4 * m_addresses.size()) + // 4 bytes per address
-            4; // m_port
-        for (byte address[] : m_addresses) {
-            msgsize += address.length;
-        }
+            8; // m_snapshotTxnId
         return msgsize;
     }
 
@@ -109,15 +79,7 @@ public class RejoinMessage extends VoltMessage {
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
         m_sourceHSId = buf.getLong();
         m_type = Type.values()[buf.get()];
-        m_txnId = buf.getLong();
-        int numAddresses = buf.getInt();
-        m_addresses = new ArrayList<byte[]>(numAddresses);
-        for (int ii = 0; ii < numAddresses; ii++) {
-            byte address[] = new byte[buf.getInt()];
-            buf.get(address);
-            m_addresses.add(address);
-        }
-        m_port = buf.getInt();
+        m_snapshotTxnId = buf.getLong();
 
         assert(buf.capacity() == buf.position());
     }
@@ -127,13 +89,7 @@ public class RejoinMessage extends VoltMessage {
         buf.put(VoltDbMessageFactory.REJOIN_RESPONSE_ID);
         buf.putLong(m_sourceHSId);
         buf.put((byte) m_type.ordinal());
-        buf.putLong(m_txnId);
-        buf.putInt(m_addresses.size());
-        for (byte address[] : m_addresses) {
-            buf.putInt(address.length);
-            buf.put(address);
-        }
-        buf.putInt(m_port);
+        buf.putLong(m_snapshotTxnId);
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());

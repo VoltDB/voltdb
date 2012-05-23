@@ -661,8 +661,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     if (isSnapshotInProgressResponse(clientResponse)) {
                         scheduleSnapshotForLater( jsObj.toString(4), requestId, true);
                     } else {
-                        hostLog.info("Snapshot response weird " + clientResponse.getStatusString()
-                                     + clientResponse.getResults()[0].toString());
                         ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
                         ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
                         m_zk.create(
