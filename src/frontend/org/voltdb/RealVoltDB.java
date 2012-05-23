@@ -176,7 +176,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     // If CL is enabled this will be set to true
     // by the CL when the truncation snapshot completes
     // and this node is viable for replay
-    volatile boolean m_recovering = false;
+    volatile boolean m_rejoining = false;
     boolean m_replicationActive = false;
 
     //Only restrict recovery completion during test
@@ -208,7 +208,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     private volatile boolean m_isRunning = false;
 
     @Override
-    public boolean recovering() { return m_recovering; }
+    public boolean recovering() { return m_rejoining; }
 
     private long m_recoveryStartTime;
 
@@ -313,7 +313,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
             boolean isRejoin = config.m_rejoinToHostAndPort != null;
-            m_recovering = isRejoin;
+            m_rejoining = isRejoin;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
             try {
@@ -528,7 +528,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         new ExecutionSiteRunner(mailbox,
                                 m_catalogContext,
                                 m_serializedCatalog,
-                                m_recovering,
+                                m_rejoining,
                                 m_replicationActive,
                                 hostLog,
                                 m_configuredNumberOfPartitions);
@@ -551,7 +551,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             localThreadMailbox,
                             m_serializedCatalog,
                             null,
-                            m_recovering,
+                            m_rejoining,
                             m_replicationActive,
                             m_catalogContext.m_transactionId,
                             m_configuredNumberOfPartitions);
@@ -1150,8 +1150,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         hmconfig.deadHostTimeout = m_config.m_deadHostTimeoutMS;
         hmconfig.factory = new VoltDbMessageFactory();
 
-        m_messenger =
-            new org.voltcore.messaging.HostMessenger(hmconfig);
+        m_messenger = new org.voltcore.messaging.HostMessenger(hmconfig);
 
         hostLog.info(String.format("Beginning inter-node communication on port %d.", m_config.m_internalPort));
 
@@ -1738,7 +1737,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 logRecoveryCompleted = true;
             }
             if (logRecoveryCompleted) {
-                m_recovering = false;
+                m_rejoining = false;
                 consoleLog.info("Node recovery completed");
             }
         } catch (Exception e) {
@@ -1831,7 +1830,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             dtxn.setSendHeartbeats(true);
         }
 
-        if (!m_recovering) {
+        if (!m_rejoining) {
             for (ClientInterface ci : m_clientInterfaces) {
                 try {
                     ci.startAcceptingConnections();
@@ -1863,7 +1862,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     @Override
     public synchronized void recoveryComplete() {
-        m_recovering = false;
+        m_rejoining = false;
         consoleLog.info("Node recovery completed");
     }
 
