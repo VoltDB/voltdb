@@ -33,6 +33,9 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
         super(scheduler);
     }
 
+    // SpInitiators will see every message type.  The Responses currently come
+    // from local work, but will come from replicas when replication is
+    // implemented
     public void deliver(VoltMessage message)
     {
         if (message instanceof Iv2InitiateTaskMessage) {
@@ -58,11 +61,17 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
         }
     }
 
+    // InitiateTaskMessages for the primary initiator always get
+    // forwarded to the local scheduler for handling
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         m_scheduler.handleIv2InitiateTaskMessage(message);
     }
 
+    // InitiateResponses come from the local Site and just get forwarded
+    // on to either the client interface (for single-part work) or the MPI
+    // (for every-partition sysprocs).  Deduping for replicas will change this
+    // pattern.
     private void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
         try {
@@ -74,11 +83,17 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
         }
     }
 
+    // FragmentTaskMessages for the primary initiator always get
+    // forwarded to the local scheduler for handling
     private void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
         m_scheduler.handleFragmentTaskMessage(message);
     }
 
+    // FragmentResponses come from the local Site and just get forwarded
+    // on to either the client interface (for single-part work) or the MPI
+    // (for every-partition sysprocs).  Deduping for replicas will change this
+    // pattern.
     private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
         try {
@@ -94,6 +109,8 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
         m_scheduler.handleCompleteTransactionMessage(message);
     }
 
+    // BorrowTaskMessages just encapsulate a FragmentTaskMessage along with
+    // its input dependency tables.
     private void handleBorrowTaskMessage(BorrowTaskMessage message) {
         m_scheduler.handleFragmentTaskMessage(message.getFragmentTaskMessage(),
                                               message.getInputDepMap());

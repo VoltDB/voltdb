@@ -30,6 +30,11 @@ import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
+/**
+ * Subclass of Initiator to manage single-partition operations.
+ * This class is primarily used for object construction and configuration plumbing;
+ * Try to avoid filling it with lots of other functionality.
+ */
 public class SpInitiator implements Initiator, LeaderNoticeHandler
 {
     VoltLogger hostLog = new VoltLogger("HOST");
@@ -118,7 +123,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
 
 
         m_siteThread = new Thread(m_executionSite);
-        m_siteThread.start(); // Maybe this moves --izzy
+        m_siteThread.start();
     }
 
     @Override

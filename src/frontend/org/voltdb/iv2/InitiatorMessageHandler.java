@@ -21,6 +21,12 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 
+/**
+ * InitiatorMessageHandler delivers messages to internal Initiator components.
+ * Different roles (multi/single-part initiator/replica) should extend this
+ * class to provide routing appropriate to the role.
+ * IZZY: I think this could merge with Scheduler pretty cleanly.
+ */
 abstract public class InitiatorMessageHandler
 {
     static VoltLogger hostLog = new VoltLogger("HOST");
@@ -33,6 +39,7 @@ abstract public class InitiatorMessageHandler
         m_scheduler = scheduler;
     }
 
+    /** Inform the handler of the Initiator's Mailbox */
     void setMailbox(Mailbox mailbox)
     {
         m_mailbox = mailbox;

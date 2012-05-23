@@ -26,6 +26,11 @@ import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Site;
 
+/**
+ * Subclass of Initiator to manage multi-partition operations.
+ * This class is primarily used for object construction and configuration plumbing;
+ * Try to avoid filling it with lots of other functionality.
+ */
 public class MpInitiator implements Initiator
 {
     // External references/config
@@ -43,6 +48,7 @@ public class MpInitiator implements Initiator
     public MpInitiator(HostMessenger messenger, PartitionClerk clerk)
     {
         m_messenger = messenger;
+        // MPI currently pretends to have partition ID -1 just as a placeholder value
         m_partitionId = -1;
         m_scheduler = new MpScheduler(clerk);
         m_msgHandler = new MpInitiatorMessageHandler(m_scheduler);
