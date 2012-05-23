@@ -43,6 +43,7 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
@@ -309,6 +310,10 @@ public class SnapshotSaveAPI
             final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
             SiteTracker tracker = context.getSiteTracker();
 
+            // non-null if targeting only one site (used for rejoin)
+            // set later from the "data" JSON string
+            Long targetHSid = null;
+
             MessageDigest digest;
             try {
                 digest = MessageDigest.getInstance("SHA-1");
@@ -407,14 +412,30 @@ public class SnapshotSaveAPI
                             addresses.add(addr.getAddress());
                         }
 
-                        Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotDataTarget",
-                                                                "Rejoin", false);
-                        if (klass != null) {
-                            Constructor<?> constructor =
-                                    klass.getConstructor(List.class, int.class,
-                                                         Map.class);
-                            sdt = (SnapshotDataTarget) constructor.newInstance(addresses, port,
-                                                                               schemas);
+                        // if a target_hsid exists, set it for filtering a snapshot for a specific site
+                        try {
+                            targetHSid = jsObj.getLong("target_hsid");
+                        }
+                        catch (JSONException e) {} // leave value as null on exception
+
+                        // if this snapshot targets a specific site...
+                        if (targetHSid != null) {
+                            // get the list of sites on this node
+                            List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
+                            // if the target site is local to this node...
+                            if (localHSids.contains(targetHSid)) {
+                                Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotDataTarget",
+                                        "Rejoin", false);
+                                if (klass != null) {
+                                    Constructor<?> constructor =
+                                            klass.getConstructor(List.class, int.class,
+                                                                 Map.class);
+                                    sdt = (SnapshotDataTarget) constructor.newInstance(addresses, port, schemas);
+                                }
+                            }
+                            else {
+                                sdt = new DevNullSnapshotTarget();
+                            }
                         }
                     }
                 }
@@ -504,6 +525,26 @@ public class SnapshotSaveAPI
                             }
                             filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
                         }
+
+                        // if this snapshot targets a specific site...
+                        if (targetHSid != null) {
+                            // get the list of sites on this node
+                            List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
+                            // if the target site is local to this node...
+                            if (localHSids.contains(targetHSid)) {
+                                // ...get its partition id...
+                                int partitionId = tracker.getPartitionForSite(targetHSid);
+                                // ...and build a filter to only get that partition
+                                filters.add(new PartitionProjectionSnapshotFilter(
+                                        new int[] { partitionId }, sdt.getHeaderSize()));
+                            }
+                            else {
+                                // filter EVERYTHING because the site we want isn't local
+                                filters.add(new PartitionProjectionSnapshotFilter(
+                                        new int[0], sdt.getHeaderSize()));
+                            }
+                        }
+
                         final SnapshotTableTask task =
                             new SnapshotTableTask(
                                     table.getRelativeIndex(),

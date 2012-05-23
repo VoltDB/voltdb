@@ -1247,6 +1247,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             }
             jsStringer.endArray();
             jsStringer.key("port").value(port);
+            // make this snapshot only contain data from this site
+            jsStringer.key("target_hsid").value(m_siteId);
             jsStringer.endObject();
             data = jsStringer.toString();
         } catch (Exception e) {
