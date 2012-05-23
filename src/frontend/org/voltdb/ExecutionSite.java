@@ -1118,7 +1118,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     ts.setSendResponse(false);
                 } else {
                     // TODO: multi-part is not supported yet
-                    m_recoveryLog.info("Unknown message " + msg.getClass());
+                    VoltDB.crashLocalVoltDB("Cannot replay multi-part transactions yet",
+                                            false, null);
                 }
             }
         } catch (IOException e) {
