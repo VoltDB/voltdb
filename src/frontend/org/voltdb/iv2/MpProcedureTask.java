@@ -90,13 +90,7 @@ public class MpProcedureTask extends ProcedureTask
                 false);  // really don't want to have ack the ack.
 
         try {
-            // XXX IZZY hack don't send the complete transaction msg to ourselves
-            // in the current MPI hack
-            for (long hsid : m_initiatorHSIds) {
-                if (hsid != m_initiator.getHSId()) {
-                    m_initiator.send(hsid, complete);
-                }
-            }
+            m_initiator.send(m_initiatorHSIds, complete);
         } catch (MessagingException fatal) {
             org.voltdb.VoltDB.crashLocalVoltDB("Messaging exception", true, fatal);
         }
