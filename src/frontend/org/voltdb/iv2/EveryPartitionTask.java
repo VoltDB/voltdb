@@ -31,9 +31,10 @@ import org.voltdb.utils.LogKeys;
 import org.voltdb.VoltDB;
 
 /**
- * Implements the Multi-partition procedure ProcedureTask.
- * Runs multi-partition transaction, causing work to be distributed
- * across the cluster as necessary.
+ * Implements the Single-partition everywhere procedure ProcedureTask.
+ * Creates one SP transaction per partition. These are produced on
+ * the MPI so that all involved SPs have the same happens-before
+ * relationship with concurrent MPs.
  */
 public class EveryPartitionTask extends TransactionTask
 {
