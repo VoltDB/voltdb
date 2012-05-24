@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
@@ -52,7 +51,7 @@ public class MpInitiator implements Initiator
         m_partitionId = -1;
         m_scheduler = new MpScheduler(clerk);
         m_msgHandler = new MpInitiatorMessageHandler(m_scheduler);
-        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, m_partitionId, clerk);
+        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, clerk);
     }
 
     @Override

@@ -58,7 +58,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         m_partitionId = partition;
         m_scheduler = new SpScheduler(clerk);
         m_msgHandler = new SpInitiatorMessageHandler(m_scheduler);
-        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, m_partitionId, clerk);
+        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, clerk);
     }
 
     /** Return the zk leader node for this initiator's partition */
