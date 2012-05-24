@@ -17,8 +17,13 @@
 
 package org.voltdb.iv2;
 
+import java.util.List;
+
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.zk.BabySitter;
+import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltdb.BackendTarget;
@@ -50,7 +55,18 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     private LoadedProcedureSet m_procSet = null;
     private InitiatorMessageHandler m_msgHandler = null;
     private LeaderElector m_leaderElector = null;
+    // Only gets set non-null for the leader
+    private BabySitter m_babySitter = null;
     private Thread m_siteThread = null;
+
+    Callback m_replicasChangeHandler = new Callback()
+    {
+        @Override
+        public void run(List<String> children) {
+            hostLog.info("Babysitter for zkLeaderNode: " + zkLeaderNode() + ":");
+            hostLog.info("children: " + children);
+        }
+    };
 
     public SpInitiator(HostMessenger messenger, Integer partition, PartitionClerk clerk)
     {
@@ -77,8 +93,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         // perform leader election before continuing configuration.
         m_leaderElector = new LeaderElector(m_messenger.getZK(),
-                VoltZK.leaders_initiators + "_" + m_partitionId, "sp",
-                new byte[]{}, this);
+                zkLeaderNode(), "sp", new byte[]{}, this);
         try {
             m_leaderElector.start(true);
         } catch (Exception ex) {
@@ -97,6 +112,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         boolean isLeader = joinElectoralCollege();
         if (isLeader) {
             hostLog.info("Chosen as leader for partition " + m_partitionId);
+            m_babySitter = new BabySitter(m_messenger.getZK(), zkLeaderNode(), m_replicasChangeHandler);
         }
         else {
             hostLog.info("Chosen as replica for partition " + m_partitionId);
@@ -133,6 +149,18 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         // than to play java interrupt() games?
         if (m_executionSite != null) {
             m_executionSite.startShutdown();
+        }
+        try {
+            if (m_leaderElector != null) {
+                m_leaderElector.shutdown();
+            }
+            if (m_babySitter != null) {
+                m_babySitter.shutdown();
+            }
+        } catch (InterruptedException e) {
+            // what to do here?
+        } catch (KeeperException e) {
+            // What to do here?
         }
         if (m_siteThread != null) {
             try {
