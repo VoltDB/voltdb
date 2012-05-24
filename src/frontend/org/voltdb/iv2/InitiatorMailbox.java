@@ -161,7 +161,7 @@ public class InitiatorMailbox implements Mailbox, LeaderNoticeHandler
     }
 
     @Override
-    public void deliver(VoltMessage message)
+    public synchronized void deliver(VoltMessage message)
     {
         m_msgHandler.deliver(message);
     }
