@@ -1254,6 +1254,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
                     long txnId = -1;
                     String appStatus = resp.getAppStatusString();
+                    if (appStatus == null) {
+                        VoltDB.crashLocalVoltDB("Rejoin snapshot request failed: " +
+                                resp.getStatusString(), false, null);
+                    }
+
                     try {
                         JSONObject jsObj = new JSONObject(appStatus);
                         txnId = jsObj.getLong("txnId");
