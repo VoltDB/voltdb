@@ -35,6 +35,15 @@ import org.voltcore.utils.CoreUtils;
 /**
  * BabySitter watches a zookeeper node and alerts on appearances
  * and disappearances of direct children.
+ *
+ * Note: if you are using this to watch a LeaderElector chain,
+ * be aware that the BabySitter notices race with notices of
+ * becoming the Leader. That is, a non-leader's babysitter can
+ * change before the non-leader knows it is the new leader.
+ *
+ * It is easier to use as the Leader -- in this case the leader
+ * can observe appearances and disappearances of its non-leader
+ * peers.
  */
 public class BabySitter
 {
