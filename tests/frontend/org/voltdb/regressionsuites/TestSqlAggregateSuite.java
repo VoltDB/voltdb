@@ -431,9 +431,11 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        // hsql isn't currently working. This is worrysome, but it hasn't been working for a while
+        config = new LocalCluster("sqlaggregate-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
 
-        // No clustering for some SQL correctness tests
+        // hsql isn't currently working. This is worrysome, but it hasn't been working for a while
 
         return builder;
     }

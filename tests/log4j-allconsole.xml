@@ -9,7 +9,7 @@
     <appender name="console" class="org.apache.log4j.ConsoleAppender">
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern"
-            value="%m%n"/>
+            value="%d{ABSOLUTE}: %m%n"/>
         </layout>
         <filter class="org.apache.log4j.varia.LevelRangeFilter">
             <param name="levelMin" value="TRACE"/>
@@ -20,7 +20,7 @@
     <appender name="consolefiltered" class="org.apache.log4j.ConsoleAppender">
         <layout class="org.apache.log4j.PatternLayout">
             <param name="ConversionPattern"
-            value="%p: %m%n"/>
+            value="%d{ABSOLUTE}-%p: %m%n"/>
         </layout>
         <filter class="org.apache.log4j.varia.LevelRangeFilter">
             <param name="levelMin" value="INFO"/>
