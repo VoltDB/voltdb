@@ -167,12 +167,13 @@ namespace detail {
     {
         NestLoopExecutorState(AbstractExpression* predicate, TempTable* outputTable,
             AbstractExecutor* outerExecutor, AbstractExecutor* innerExecutor,
-            int outerCols, int innerCols) :
+            Table* innerTable, int outerCols, int innerCols) :
             m_iterator(outputTable->iterator()),
             m_predicate(predicate),
             m_outerExecutor(outerExecutor),
             m_innerExecutor(innerExecutor),
             m_outputTable(outputTable),
+            m_innerTable(innerTable),
             m_outerCols(outerCols),
             m_innerCols(innerCols)
         {}
@@ -182,6 +183,7 @@ namespace detail {
         AbstractExecutor* m_outerExecutor;
         AbstractExecutor* m_innerExecutor;
         TempTable* m_outputTable;
+        Table* m_innerTable;
         int m_outerCols;
         int m_innerCols;
 
@@ -328,26 +330,48 @@ TableTuple NestLoopExecutor::p_next_pull() {
                 joinedTuple.setNValue(col_ctr, outerTuple.getNValue(col_ctr));
             }
 
-            // Inner table is empty. Need to pull tuplse from inner executor
-            while (true)
+            // Here it gets complicated. Depending on the query type inner table
+            // can be already populated - table is distributed or there is no predicate
+            // associated with the replicated inner table
+            if (m_state->m_innerTable->activeTupleCount() == 0)
             {
-                TableTuple innerTuple = m_state->m_innerExecutor->p_next_pull();
-                if (innerTuple.isNullTuple())
+                // Inner table is empty. Need to pull tuplse from inner executor
+                while (true)
                 {
-                    break;
-                }
-                if (m_state->m_predicate == NULL ||
-                    m_state->m_predicate->eval(&outerTuple, &innerTuple).isTrue()) {
-                    // Matched! Complete the joined tuple with the inner column values.
-                    for (int col_ctr = 0; col_ctr < m_state->m_innerCols; col_ctr++) {
-                        joinedTuple.setNValue(col_ctr + m_state->m_outerCols, innerTuple.getNValue(col_ctr));
+                    TableTuple innerTuple = m_state->m_innerExecutor->p_next_pull();
+                    if (innerTuple.isNullTuple())
+                    {
+                        break;
                     }
-                    m_state->m_outputTable->insertTupleNonVirtual(joinedTuple);
+                    if (m_state->m_predicate == NULL ||
+                        m_state->m_predicate->eval(&outerTuple, &innerTuple).isTrue()) {
+                        // Matched! Complete the joined tuple with the inner column values.
+                        for (int col_ctr = 0; col_ctr < m_state->m_innerCols; col_ctr++) {
+                            joinedTuple.setNValue(col_ctr + m_state->m_outerCols, innerTuple.getNValue(col_ctr));
+                        }
+                        m_state->m_outputTable->insertTupleNonVirtual(joinedTuple);
+                    }
+                }
+                // Reset the inner table
+                boost::function<void(AbstractExecutor*)> freset = &AbstractExecutor::reset_state_pull;
+                m_state->m_innerExecutor->depth_first_iterate_pull(freset, false);
+            }
+            else
+            {
+                // Inner table is already populated. We can simply iterate over
+                TableIterator iterator = m_state->m_innerTable->iterator();
+                TableTuple innerTuple(m_state->m_innerTable->schema());
+                while (iterator.next(innerTuple)) {
+                    if (m_state->m_predicate == NULL ||
+                        m_state->m_predicate->eval(&outerTuple, &innerTuple).isTrue()) {
+                        // Matched! Complete the joined tuple with the inner column values.
+                        for (int col_ctr = 0; col_ctr < m_state->m_innerCols; col_ctr++) {
+                            joinedTuple.setNValue(col_ctr + m_state->m_outerCols, innerTuple.getNValue(col_ctr));
+                        }
+                        m_state->m_outputTable->insertTupleNonVirtual(joinedTuple);
+                    }
                 }
             }
-            // Reset the inner table
-            boost::function<void(AbstractExecutor*)> freset = &AbstractExecutor::reset_state_pull;
-            m_state->m_innerExecutor->depth_first_iterate_pull(freset, false);
         }
         // Reset the output table's iterator
         m_state->m_iterator = m_state->m_outputTable->iterator();
@@ -400,7 +424,7 @@ void NestLoopExecutor::p_pre_execute_pull(const NValueArray &params) {
     }
 
     m_state.reset(new detail::NestLoopExecutorState(predicate, output_table,
-        outer_executor, inner_executor, outer_cols, inner_cols));
+        outer_executor, inner_executor, inner_table, outer_cols, inner_cols));
 }
 
 bool NestLoopExecutor::support_pull() const {

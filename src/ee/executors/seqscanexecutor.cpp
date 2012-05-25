@@ -67,6 +67,7 @@ namespace detail {
     {
         SeqScanExecutorState(AbstractExpression* predicate, Table* targetTable,
             Table* outputTable) :
+            m_targetTable(targetTable),
             m_iterator(targetTable->iterator()),
             m_predicate(predicate),
             m_tupleCtr(0),
@@ -78,6 +79,7 @@ namespace detail {
 
         }
 
+        Table* m_targetTable;
         TableIterator m_iterator;
         AbstractExpression* m_predicate;
         int m_tupleCtr;
@@ -344,4 +346,8 @@ void SeqScanExecutor::p_pre_execute_pull(const NValueArray &params) {
 
 bool SeqScanExecutor::support_pull() const {
     return true;
+}
+
+void SeqScanExecutor::reset_state_pull() {
+    m_state->m_iterator = m_state->m_targetTable->iterator();
 }
