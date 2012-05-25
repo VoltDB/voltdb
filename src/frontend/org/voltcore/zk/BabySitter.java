@@ -44,7 +44,7 @@ public class BabySitter
     private final ZooKeeper zk;
     private final ExecutorService es;
     private final Object lock = new Object();
-    private List<String> children = null;
+    private List<String> children = new ArrayList<String>();
     private AtomicBoolean shutdown = new AtomicBoolean(false);
 
     /**
@@ -62,7 +62,9 @@ public class BabySitter
         if (shutdown.get()) {
             throw new RuntimeException("Requested children from shutdown babysitter.");
         }
-        return children;
+        synchronized(lock) {
+            return children;
+        }
     }
 
     /**

@@ -63,7 +63,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         @Override
         public void run(List<String> children) {
-            hostLog.info("Babysitter for zkLeaderNode: " + zkLeaderNode() + ":");
+            hostLog.info("Babysitter for zkLeaderNode: " + VoltZK.electionDirForPartition(m_partitionId) + ":");
             hostLog.info("children: " + children);
         }
     };
@@ -77,12 +77,6 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, clerk);
     }
 
-    /** Return the zk leader node for this initiator's partition */
-    String zkLeaderNode()
-    {
-        return VoltZK.leaders_initiators + "_" + m_partitionId;
-    }
-
     @Override
     public void becomeLeader()
     {
@@ -93,7 +87,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         // perform leader election before continuing configuration.
         m_leaderElector = new LeaderElector(m_messenger.getZK(),
-                zkLeaderNode(), "sp", new byte[]{}, this);
+                VoltZK.electionDirForPartition(m_partitionId), "sp", new byte[]{}, this);
         try {
             m_leaderElector.start(true);
         } catch (Exception ex) {
@@ -107,12 +101,21 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          SiteTracker siteTracker)
+                          SiteTracker siteTracker, int kfactor)
     {
         boolean isLeader = joinElectoralCollege();
         if (isLeader) {
             hostLog.info("Chosen as leader for partition " + m_partitionId);
-            m_babySitter = new BabySitter(m_messenger.getZK(), zkLeaderNode(), m_replicasChangeHandler);
+            m_babySitter = new BabySitter(m_messenger.getZK(), VoltZK.electionDirForPartition(m_partitionId),
+                    m_replicasChangeHandler);
+            List<String> children = m_babySitter.lastSeenChildren();
+            while (children.size() < kfactor) {
+                try {
+                    Thread.sleep(5);
+                } catch (InterruptedException e) {
+                }
+                children = m_babySitter.lastSeenChildren();
+            }
         }
         else {
             hostLog.info("Chosen as replica for partition " + m_partitionId);

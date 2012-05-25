@@ -30,7 +30,7 @@ public interface Initiator
     /** Configure an Initiator and prepare it for work */
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          SiteTracker siteTracker);
+                          SiteTracker siteTracker, int kfactor);
 
     /** Shutdown an Initiator and its sub-components. */
     public void shutdown();

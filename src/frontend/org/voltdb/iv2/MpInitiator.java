@@ -57,7 +57,7 @@ public class MpInitiator implements Initiator
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          SiteTracker siteTracker)
+                          SiteTracker siteTracker, int kfactor)
     {
         m_executionSite = new Site(m_scheduler.getQueue(),
                                    m_initiatorMailbox.getHSId(),
