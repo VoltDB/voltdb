@@ -92,6 +92,23 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(selfCheck());
     }
 
+    public FragmentTaskMessage(long initiatorHSId,
+            long coordinatorHSId,
+            FragmentTaskMessage ftask)
+    {
+        super(initiatorHSId, coordinatorHSId, ftask.m_txnId, ftask.m_isReadOnly);
+
+        m_taskType = ftask.m_taskType;
+        m_fragmentIds = ftask.m_fragmentIds;
+        m_outputDepIds = ftask.m_outputDepIds;
+        m_parameterSets = ftask.m_parameterSets;
+        m_isFinal = ftask.m_isFinal;
+        m_subject = ftask.m_subject;
+        m_inputDepCount = ftask.m_inputDepCount;
+        m_inputDepIds = ftask.m_inputDepIds;
+        assert(selfCheck());
+    }
+
     private boolean selfCheck() {
         for (ByteBuffer paramSet : m_parameterSets)
             if (paramSet == null)

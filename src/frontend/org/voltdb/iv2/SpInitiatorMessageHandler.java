@@ -73,6 +73,26 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
     // forwarded to the local scheduler for handling
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
+        hostLog.info("BEGIN INITIATE HSID: " + message.getInitiatorHSId());
+        if (m_replicaHSIds.length > 0) {
+            try {
+                Iv2InitiateTaskMessage replmsg =
+                    new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
+                            m_mailbox.getHSId(),
+                            message.getTxnId(),
+                            message.isReadOnly(),
+                            message.isSinglePartition(),
+                            message.getStoredProcedureInvocation(),
+                            message.getClientInterfaceHandle()) ;
+                m_mailbox.send(m_replicaHSIds, replmsg);
+            } catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
+            DuplicateCounter counter = new DuplicateCounter(
+                    message.getInitiatorHSId(), m_replicaHSIds.length + 1,
+                    message.getTxnId());
+        }
+        hostLog.info("END INITIATE HSID: " + message.getInitiatorHSId());
         m_scheduler.handleIv2InitiateTaskMessage(message);
     }
 
@@ -82,12 +102,14 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
     // pattern.
     private void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
-        try {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            m_mailbox.send(message.getInitiatorHSId(), message);
-        }
-        catch (MessagingException e) {
-            // hostLog.error("Failed to deliver response from execution site.", e);
+        if (message.getInitiatorHSId() != m_mailbox.getHSId()) {
+            try {
+                // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+                m_mailbox.send(message.getInitiatorHSId(), message);
+            }
+            catch (MessagingException e) {
+                // hostLog.error("Failed to deliver response from execution site.", e);
+            }
         }
     }
 
@@ -95,6 +117,16 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
     // forwarded to the local scheduler for handling
     private void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
+        if (m_replicaHSIds.length > 0) {
+            try {
+                FragmentTaskMessage replmsg =
+                    new FragmentTaskMessage(m_mailbox.getHSId(),
+                            m_mailbox.getHSId(), message);
+                m_mailbox.send(m_replicaHSIds, replmsg);
+            } catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
+        }
         m_scheduler.handleFragmentTaskMessage(message);
     }
 
@@ -104,16 +136,26 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
     // pattern.
     private void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
-        try {
-            m_mailbox.send(message.getDestinationSiteId(), message);
-        }
-        catch (MessagingException e) {
-            hostLog.error("Failed to deliver response from execution site.", e);
+        if (message.getDestinationSiteId() != m_mailbox.getHSId()) {
+            try {
+                m_mailbox.send(message.getDestinationSiteId(), message);
+            }
+            catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
         }
     }
 
     private void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
+        if (m_replicaHSIds.length > 0) {
+            try {
+                CompleteTransactionMessage replmsg = message;
+                m_mailbox.send(m_replicaHSIds, replmsg);
+            } catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
+        }
         m_scheduler.handleCompleteTransactionMessage(message);
     }
 
