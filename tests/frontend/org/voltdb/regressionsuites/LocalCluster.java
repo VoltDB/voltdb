@@ -166,11 +166,18 @@ public class LocalCluster implements VoltServerConfig {
         m_hostCount = hostCount;
         m_kfactor = kfactor;
         m_debug = debug;
-        m_target = target;
         m_jarFileName = jarFileName;
         m_failureState = kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<PipeToFile>();
         m_cmdLines = new ArrayList<CommandLine>();
+
+        // if the user wants valgrind, give it to 'em
+        if (isValgrind() && (target == BackendTarget.NATIVE_EE_JNI)) {
+            m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
+        }
+        else {
+            m_target = target;
+        }
 
         String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
         if (buildDir == null) {
@@ -208,7 +215,7 @@ public class LocalCluster implements VoltServerConfig {
         this.templateCmdLine.
             addTestOptions(true).
             leader("").
-            target(target).
+            target(m_target).
             startCommand("create").
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
@@ -216,6 +223,7 @@ public class LocalCluster implements VoltServerConfig {
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
+        this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
     }
 
     @Override
@@ -298,7 +306,7 @@ public class LocalCluster implements VoltServerConfig {
         portGenerator.next();
         for (EEProcess proc : m_eeProcs.get(0)) {
             assert(proc != null);
-            cmdln.ipcPort(portGenerator.next());
+            cmdln.ipcPort(proc.port());
         }
 
         // rtb: why is this? this flag short-circuits an Inits worker
