@@ -32,6 +32,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
 public class LeaderElector {
     private final ZooKeeper zk;
@@ -186,5 +187,17 @@ public class LeaderElector {
         }
 
         return lowest;
+    }
+
+    public static String electionDirForPartition(int partition) {
+        return ZKUtil.path(VoltZK.leaders_initiators, "partition_" + partition);
+    }
+
+    public static int getPartitionFromElectionDir(String partitionDir) {
+        return Integer.parseInt(partitionDir.substring("partition_".length()));
+    }
+
+    public static String getPrefixFromChildName(String childName) {
+        return childName.split("_")[0];
     }
 }

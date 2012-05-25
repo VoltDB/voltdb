@@ -33,7 +33,6 @@ import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -63,8 +62,22 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         @Override
         public void run(List<String> children) {
-            hostLog.info("Babysitter for zkLeaderNode: " + VoltZK.electionDirForPartition(m_partitionId) + ":");
+            hostLog.info("Babysitter for zkLeaderNode: " +
+                    LeaderElector.electionDirForPartition(m_partitionId) + ":");
             hostLog.info("children: " + children);
+            // make an HSId array out of the children
+            // The list contains the leader, skip it
+            long[] tmpArray = new long[children.size() -1];
+            int i = 0;
+            for (String child : children) {
+                long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
+                if (HSId != getInitiatorHSId())
+                {
+                    tmpArray[i++] = HSId;
+                    hostLog.info("Child: " + i + ", HSID: " + HSId);
+                }
+            }
+            m_initiatorMailbox.updateReplicas(tmpArray);
         }
     };
 
@@ -87,7 +100,8 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         // perform leader election before continuing configuration.
         m_leaderElector = new LeaderElector(m_messenger.getZK(),
-                VoltZK.electionDirForPartition(m_partitionId), "sp", new byte[]{}, this);
+                LeaderElector.electionDirForPartition(m_partitionId),
+                Long.toString(getInitiatorHSId()), null, this);
         try {
             m_leaderElector.start(true);
         } catch (Exception ex) {
@@ -106,8 +120,11 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         boolean isLeader = joinElectoralCollege();
         if (isLeader) {
             hostLog.info("Chosen as leader for partition " + m_partitionId);
-            m_babySitter = new BabySitter(m_messenger.getZK(), VoltZK.electionDirForPartition(m_partitionId),
+            m_babySitter = new BabySitter(m_messenger.getZK(),
+                    LeaderElector.electionDirForPartition(m_partitionId),
                     m_replicasChangeHandler);
+            // This block-on-all-the-replicas-at-startup thing sucks.  Hopefully this can
+            // go away when we get rejoin working.
             List<String> children = m_babySitter.lastSeenChildren();
             while (children.size() < kfactor) {
                 try {

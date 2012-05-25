@@ -46,6 +46,10 @@ abstract public class InitiatorMessageHandler
         m_scheduler.setMailbox(m_mailbox);
     }
 
+    void updateReplicas(long[] hsids)
+    {
+    }
+
         /*
            if (replica):
                if (sp procedure):

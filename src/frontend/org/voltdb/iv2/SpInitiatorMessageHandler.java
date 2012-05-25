@@ -28,9 +28,17 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class SpInitiatorMessageHandler extends InitiatorMessageHandler
 {
+    long[] m_replicaHSIds = new long[] {};
+
     public SpInitiatorMessageHandler(Scheduler scheduler)
     {
         super(scheduler);
+    }
+
+    @Override
+    public void updateReplicas(long[] hsids)
+    {
+        m_replicaHSIds = hsids;
     }
 
     // SpInitiators will see every message type.  The Responses currently come

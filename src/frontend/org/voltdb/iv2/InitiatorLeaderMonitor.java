@@ -34,6 +34,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.ZKUtil;
 import org.voltcore.zk.ZKUtil.ChildrenCallback;
 import org.voltdb.VoltDB;
@@ -149,7 +150,7 @@ public class InitiatorLeaderMonitor {
         List<String> partitions = zk.getChildren(VoltZK.leaders_initiators, partitionWatcher);
         Map<Integer, ChildrenCallback> callbacks = new HashMap<Integer, ChildrenCallback>();
         for (String partitionString : partitions) {
-            int partition = VoltZK.getPartitionFromElectionDir(partitionString);
+            int partition = LeaderElector.getPartitionFromElectionDir(partitionString);
             ChildrenCallback cb = new ChildrenCallback();
 
             if (!existingPartitions.contains(partition)) {

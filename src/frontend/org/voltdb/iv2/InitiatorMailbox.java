@@ -49,6 +49,11 @@ public class InitiatorMailbox implements Mailbox
         m_msgHandler.setMailbox(this);
     }
 
+    public synchronized void updateReplicas(long[] hsids)
+    {
+        m_msgHandler.updateReplicas(hsids);
+    }
+
     @Override
     public void send(long destHSId, VoltMessage message) throws MessagingException
     {
