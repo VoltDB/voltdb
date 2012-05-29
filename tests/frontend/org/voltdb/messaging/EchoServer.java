@@ -102,7 +102,8 @@ public class EchoServer {
                     fs.writeVarbinary(bin);
                     break;
                 case TIMESTAMP:
-                    fs.writeTimestamp(fds.readTimestamp());
+                    long micros = fds.readLong();
+                    fs.writeLong(micros);
                     break;
                 case DECIMAL:
                     BigDecimal bd = VoltDecimalHelper.deserializeBigDecimal(fds);

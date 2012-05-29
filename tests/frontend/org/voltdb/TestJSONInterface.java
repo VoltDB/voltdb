@@ -422,7 +422,7 @@ public class TestJSONInterface extends TestCase {
         responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, response.status);
 
         // check the JSON itself makes sense
         JSONObject jsonObj = new JSONObject(responseJSON);
