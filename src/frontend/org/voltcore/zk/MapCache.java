@@ -31,9 +31,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
@@ -53,11 +55,14 @@ public class MapCache {
     //
     // API
     //
+
+    /** Instantiate a MapCache of parent rootNode. The rootNode must exist. */
     public MapCache(ZooKeeper zk, String rootNode) {
         m_zk = zk;
         m_rootNode = rootNode;
     }
 
+    /** Initialize and start watching the cache. */
     public void start(boolean block) throws InterruptedException, ExecutionException {
         Future<?> task = m_es.submit(new ParentEvent(null));
         if (block) {
@@ -65,17 +70,34 @@ public class MapCache {
         }
     }
 
+    /** Stop caring */
     public void shutdown() throws InterruptedException {
         m_shutdown.set(true);
         m_es.shutdown();
         m_es.awaitTermination(356, TimeUnit.DAYS);
     }
 
+    /**
+     * Get a current snapshot of the watched root node's children. This snapshot
+     * promises no cross-children atomicity guarantees.
+     */
     public ImmutableMap<String, JSONObject> pointInTimeCache() {
         if (m_shutdown.get()) {
             throw new RuntimeException("Requested cache from shutdown MapCache.");
         }
         return m_publicCache.get();
+    }
+
+    /**
+     * Create or update a new rootNode child
+     */
+    public void put(String key, JSONObject value) throws KeeperException, InterruptedException {
+        try {
+            m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            m_zk.setData(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(), -1);
+        }
     }
 
     //
