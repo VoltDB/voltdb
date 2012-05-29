@@ -307,6 +307,11 @@ public class ZKUtil {
             return getResult();
         }
 
+        public String getPath() throws InterruptedException, KeeperException {
+            done.await();
+            return (String)getResult()[1];
+        }
+
         public byte[] getData() throws InterruptedException, KeeperException {
             done.await();
             return (byte[])getResult()[3];

@@ -20,6 +20,10 @@ obj/
 /examples/*/*.jar
 /.DS_Store
 debugoutput/
-/voltdbroot/
-/log/
-/voltipc.xcodeproj/
+voltdbroot/
+log/
+voltipc.xcodeproj/
+.cache/
+*runapp*.py
+*.log
+tests/test_apps/*/*.jar

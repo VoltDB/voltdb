@@ -39,7 +39,6 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
-import java.util.TreeMap;
 import java.util.TreeSet;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
@@ -445,35 +444,80 @@ public class SQLCommand
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_TINYINT;
                         else
-                            objectParams[i] = Byte.parseByte(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Byte.parseByte(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a byte numeric value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("smallint"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_SMALLINT;
                         else
-                            objectParams[i] = Short.parseShort(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Short.parseShort(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a short numeric value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("int") || paramType.equals("integer"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_INTEGER;
                         else
-                            objectParams[i] = Integer.parseInt(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Integer.parseInt(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a numeric value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("bigint"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_BIGINT;
                         else
-                            objectParams[i] = Long.parseLong(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Long.parseLong(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a numeric value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("float"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_FLOAT;
                         else
-                            objectParams[i] = Double.parseDouble(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Double.parseDouble(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a float value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("varchar"))
                     {
@@ -498,21 +542,24 @@ public class SQLCommand
                     }
                     else if (paramType.equals("statisticscomponent"))
                     {
-                        if (!StatisticsComponents.contains(param.toUpperCase()))
+                        String p = preprocessParam(param);
+                        if (!StatisticsComponents.contains(p))
                             throw new Exception("Invalid Statistics Component: " + param);
-                        objectParams[i] = param.toUpperCase();
+                        objectParams[i] = p;
                     }
                     else if (paramType.equals("sysinfoselector"))
                     {
-                        if (!SysInfoSelectors.contains(param.toUpperCase()))
+                        String p = preprocessParam(param);
+                        if (!SysInfoSelectors.contains(p))
                             throw new Exception("Invalid SysInfo Selector: " + param);
-                        objectParams[i] = param.toUpperCase();
+                        objectParams[i] = p;
                     }
                     else if (paramType.equals("metadataselector"))
                     {
-                        if (!MetaDataSelectors.contains(param.toUpperCase()))
+                        String p = preprocessParam(param);
+                        if (!MetaDataSelectors.contains(p))
                             throw new Exception("Invalid Meta-Data Selector: " + param);
-                        objectParams[i] = param.toUpperCase();
+                        objectParams[i] = p;
                     }
                     else if (paramType.equals("varbinary"))
                     {
@@ -541,6 +588,20 @@ public class SQLCommand
             printResponse(VoltDB.callProcedure("@AdHoc", query));
         }
         return;
+    }
+
+    // Uppercase param.
+    // Remove any quotes.
+    // Trim
+    private static String preprocessParam(String param)
+    {
+        param = param.toUpperCase();
+        if (param.startsWith("'") && param.endsWith("'"))
+            param = param.substring(1, param.length()-1);
+        if (param.charAt(0)=='"' && param.charAt(param.length()-1)=='"')
+            param = param.substring(1, param.length()-1);
+        param = param.trim();
+        return param;
     }
 
     private static String byteArrayToHexString(byte[] data)

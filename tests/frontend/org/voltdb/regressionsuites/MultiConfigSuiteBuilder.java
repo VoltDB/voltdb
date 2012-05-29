@@ -108,7 +108,11 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         if (buildType != null) {
             if (buildType.startsWith("memcheck")) {
                 if (config instanceof LocalCluster) {
-                    return true;
+                    LocalCluster lc = (LocalCluster) config;
+                    // don't run valgrind on multi-node clusters without embedded processes
+                    if ((lc.getNodeCount() > 1) || (lc.m_hasLocalServer == false)) {
+                        return true;
+                    }
                 }
                 if (config.isHSQL()) {
                     return true;
