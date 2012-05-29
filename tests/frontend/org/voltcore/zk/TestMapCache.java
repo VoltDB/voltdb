@@ -143,7 +143,7 @@ public class TestMapCache extends ZKTestBase {
     }
 
     @Test
-    public void testAddChild() throws Exception
+    public void testAddChildWithPut() throws Exception
     {
         ZooKeeper zk = getClient(0);
         configure("/cache04", zk);
@@ -153,7 +153,7 @@ public class TestMapCache extends ZKTestBase {
         Map<String, JSONObject> cache = dut.pointInTimeCache();
 
         JSONObject dd = new JSONObject("{key:ddval}");
-        zk.create("/cache04/dd", dd.toString().getBytes(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        dut.put("dd", dd);
 
         while(true) {
             cache = dut.pointInTimeCache();
@@ -172,7 +172,7 @@ public class TestMapCache extends ZKTestBase {
 
         // modify the new child and make sure it has a watch set.
         JSONObject dd2 = new JSONObject("{key:ddval2}");
-        zk.setData("/cache04/dd", dd2.toString().getBytes(), -1);
+        dut.put("dd", dd2);
         while(true) {
             cache = dut.pointInTimeCache();
             if (cache.get("/cache04/dd").get("key").equals("ddval2")) {
