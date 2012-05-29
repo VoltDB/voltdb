@@ -38,7 +38,9 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
     @Override
     public void updateReplicas(long[] hsids)
     {
+        for (long l : m_replicaHSIds) hostLog.info("Before Updating replicas: " + l);
         m_replicaHSIds = hsids;
+        for (long l : m_replicaHSIds) hostLog.info("After Updating replicas: " + l);
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -73,7 +75,6 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
     // forwarded to the local scheduler for handling
     private void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
-        hostLog.info("BEGIN INITIATE HSID: " + message.getInitiatorHSId());
         if (m_replicaHSIds.length > 0) {
             try {
                 Iv2InitiateTaskMessage replmsg =
@@ -84,6 +85,9 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
                             message.isSinglePartition(),
                             message.getStoredProcedureInvocation(),
                             message.getClientInterfaceHandle()) ;
+                for (long i : m_replicaHSIds) {
+                    hostLog.info("replicationg " + message.getTxnId() + " to " + i);
+                }
                 m_mailbox.send(m_replicaHSIds, replmsg);
             } catch (MessagingException e) {
                 hostLog.error("Failed to deliver response from execution site.", e);
@@ -92,7 +96,6 @@ public class SpInitiatorMessageHandler extends InitiatorMessageHandler
                     message.getInitiatorHSId(), m_replicaHSIds.length + 1,
                     message.getTxnId());
         }
-        hostLog.info("END INITIATE HSID: " + message.getInitiatorHSId());
         m_scheduler.handleIv2InitiateTaskMessage(message);
     }
 
