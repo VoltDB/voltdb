@@ -92,6 +92,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         assert(selfCheck());
     }
 
+    // The parameter sets are .duplicate()'d in flattenToBuffer,
+    // so we can make a shallow copy here and still be thread-safe
+    // when we serialize the copy.
     public FragmentTaskMessage(long initiatorHSId,
             long coordinatorHSId,
             FragmentTaskMessage ftask)
