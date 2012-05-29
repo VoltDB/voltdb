@@ -89,14 +89,23 @@ public class MapCache {
     }
 
     /**
+     * Read a single key from the cache. Matches the semantics of put()
+     */
+    public JSONObject get(String key) {
+        return m_publicCache.get().get(ZKUtil.joinZKPath(m_rootNode, key));
+    }
+
+    /**
      * Create or update a new rootNode child
      */
     public void put(String key, JSONObject value) throws KeeperException, InterruptedException {
         try {
-            m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
+            String createdNode = m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
                     Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            System.out.println("\t\tCREATED MAPCACHE NODE path:" + createdNode + " key:" + key + " value:" + value.toString());
         } catch (KeeperException.NodeExistsException e) {
             m_zk.setData(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(), -1);
+            System.out.println("\t\tUPDATED MAPCACHE NODE. key:" + key + " val:" + value.toString());
         }
     }
 
@@ -118,9 +127,11 @@ public class MapCache {
     // previous children snapshot for internal use.
     private Set<String> m_lastChildren = new HashSet<String>();
 
-    // the cache exposed to the public. Start empty.
+    // the cache exposed to the public. Start empty. Love it.
     private AtomicReference<ImmutableMap<String, JSONObject>> m_publicCache =
-        new AtomicReference<ImmutableMap<String, JSONObject>>();
+        new AtomicReference<ImmutableMap<String, JSONObject>>(
+                ImmutableMap.copyOf(new HashMap<String, JSONObject>())
+                );
 
     // parent (root node) sees new or deleted child
     private class ParentEvent implements Runnable {
