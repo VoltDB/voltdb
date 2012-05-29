@@ -17,15 +17,19 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.ExecutionException;
 import java.util.List;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
+
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
+import org.voltcore.zk.MapCache;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
@@ -33,6 +37,7 @@ import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -81,33 +86,51 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         }
     };
 
-    public SpInitiator(HostMessenger messenger, Integer partition, PartitionClerk clerk)
+    public SpInitiator(HostMessenger messenger, Integer partition)
     {
         m_messenger = messenger;
         m_partitionId = partition;
-        m_scheduler = new SpScheduler(clerk);
+        m_scheduler = new SpScheduler();
         m_msgHandler = new SpInitiatorMessageHandler(m_scheduler);
-        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, clerk);
+        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger);
     }
 
     @Override
     public void becomeLeader()
     {
+        try {
+            MapCache iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
+
+            m_babySitter = new BabySitter(m_messenger.getZK(),
+                    LeaderElector.electionDirForPartition(m_partitionId),
+                    m_replicasChangeHandler);
+
+            // with leadership election complete, update the master list
+            // for non-initiator components that care.
+            hostLog.info("Registering " + m_partitionId + " to mapcache.");
+            iv2masters.put(Integer.toString(m_partitionId),
+                    new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Bad news.", true, e);
+        }
     }
 
     /** Register with m_partition's leader elector node */
     public boolean joinElectoralCollege()
+        throws InterruptedException, ExecutionException
     {
         // perform leader election before continuing configuration.
         m_leaderElector = new LeaderElector(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null, this);
         try {
+            // becomeLeader() will run before start(true) returns (if this is the leader).
             m_leaderElector.start(true);
         } catch (Exception ex) {
             VoltDB.crashLocalVoltDB("Partition " + m_partitionId + " failed to initialize " +
                     "leader elector. ", false, ex);
         }
+
         return m_leaderElector.isLeader();
     }
 
@@ -117,49 +140,51 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                           CatalogContext catalogContext,
                           SiteTracker siteTracker, int kfactor)
     {
-        boolean isLeader = joinElectoralCollege();
-        if (isLeader) {
-            hostLog.info("Chosen as leader for partition " + m_partitionId);
-            m_babySitter = new BabySitter(m_messenger.getZK(),
-                    LeaderElector.electionDirForPartition(m_partitionId),
-                    m_replicasChangeHandler);
-            // This block-on-all-the-replicas-at-startup thing sucks.  Hopefully this can
-            // go away when we get rejoin working.
-            List<String> children = m_babySitter.lastSeenChildren();
-            while (children.size() < kfactor) {
-                try {
-                    Thread.sleep(5);
-                } catch (InterruptedException e) {
+        try {
+            boolean isLeader = joinElectoralCollege();
+            if (isLeader) {
+                hostLog.info("Chosen as leader for partition " + m_partitionId);
+                // This block-on-all-the-replicas-at-startup thing sucks.  Hopefully this can
+                // go away when we get rejoin working.
+                List<String> children = m_babySitter.lastSeenChildren();
+                while (children.size() < kfactor) {
+                    try {
+                        Thread.sleep(5);
+                    } catch (InterruptedException e) {
+                    }
+                    children = m_babySitter.lastSeenChildren();
                 }
-                children = m_babySitter.lastSeenChildren();
             }
+            else {
+                hostLog.info("Chosen as replica for partition " + m_partitionId);
+            }
+
+            m_executionSite = new Site(m_scheduler.getQueue(),
+                                       m_initiatorMailbox.getHSId(),
+                                       backend, catalogContext,
+                                       serializedCatalog,
+                                       catalogContext.m_transactionId,
+                                       m_partitionId,
+                                       siteTracker.m_numberOfPartitions);
+            ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
+            prf.configure(m_executionSite,
+                    m_executionSite.m_sysprocContext);
+            m_procSet = new LoadedProcedureSet(m_executionSite,
+                                               prf,
+                                               m_initiatorMailbox.getHSId(),
+                                               0, // this has no meaning
+                                               siteTracker.m_numberOfPartitions);
+            m_procSet.loadProcedures(catalogContext, backend);
+            m_scheduler.setProcedureSet(m_procSet);
+            m_executionSite.setLoadedProcedures(m_procSet);
+
+
+            m_siteThread = new Thread(m_executionSite);
+            m_siteThread.start();
         }
-        else {
-            hostLog.info("Chosen as replica for partition " + m_partitionId);
+        catch (Exception e) {
+           VoltDB.crashLocalVoltDB("Failed to configure initiator", true, e);
         }
-
-        m_executionSite = new Site(m_scheduler.getQueue(),
-                                   m_initiatorMailbox.getHSId(),
-                                   backend, catalogContext,
-                                   serializedCatalog,
-                                   catalogContext.m_transactionId,
-                                   m_partitionId,
-                                   siteTracker.m_numberOfPartitions);
-        ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
-        prf.configure(m_executionSite,
-                m_executionSite.m_sysprocContext);
-        m_procSet = new LoadedProcedureSet(m_executionSite,
-                                           prf,
-                                           m_initiatorMailbox.getHSId(),
-                                           0, // this has no meaning
-                                           siteTracker.m_numberOfPartitions);
-        m_procSet.loadProcedures(catalogContext, backend);
-        m_scheduler.setProcedureSet(m_procSet);
-        m_executionSite.setLoadedProcedures(m_procSet);
-
-
-        m_siteThread = new Thread(m_executionSite);
-        m_siteThread.start();
     }
 
     @Override

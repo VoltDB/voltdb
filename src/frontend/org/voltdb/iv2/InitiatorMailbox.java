@@ -40,8 +40,7 @@ public class InitiatorMailbox implements Mailbox
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
 
-    public InitiatorMailbox(InitiatorMessageHandler msgHandler, HostMessenger messenger,
-            PartitionClerk partitionClerk)
+    public InitiatorMailbox(InitiatorMessageHandler msgHandler, HostMessenger messenger)
     {
         m_msgHandler = msgHandler;
         m_messenger = messenger;

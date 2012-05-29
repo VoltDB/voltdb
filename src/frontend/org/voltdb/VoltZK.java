@@ -80,6 +80,7 @@ public class VoltZK {
     public static final String initial_catalog_txnid = "/db/initial_catalog_txnid";
 
     // leader election
+    public static final String iv2masters = "/db/iv2masters";
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
 
@@ -89,6 +90,7 @@ public class VoltZK {
             mailboxes,
             cluster_metadata,
             operationMode,
+            iv2masters,
             leaders,
             leaders_initiators
     };

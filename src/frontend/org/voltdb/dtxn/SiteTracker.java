@@ -30,15 +30,13 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK.MailboxType;
-import org.voltdb.iv2.PartitionClerk;
 
-import com.google.common.collect.ImmutableCollection;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
 import com.google.common.collect.ImmutableSet.Builder;
 
-public class SiteTracker implements PartitionClerk {
+public class SiteTracker {
     private final int m_hostId;
     private boolean m_isFirstHost;
 
@@ -534,28 +532,5 @@ public class SiteTracker implements PartitionClerk {
         // There's only one for now, just return it.  We'll need
         // some leader election/master business when we replicate the MPI
         return m_allIv2MpInitiatorsImmutable.iterator().next();
-    }
-
-    @Override
-    public List<Long> getHSIdsForPartitionInitiators() {
-        List<Long> results = new ArrayList<Long>(m_numberOfPartitions);
-        ImmutableCollection<ImmutableList<Long>> pis = m_partitionToInitiatorsImmutable.values();
-        for (List<Long> ptoi : pis) {
-            results.add(ptoi.get(0));
-        }
-        return results;
-    }
-
-    @Override
-    public long getBuddySiteForMPI(long hsId)
-    {
-        int host = getHostForSite(hsId);
-        for (long hsid : getHSIdsForPartitionInitiators()) {
-            if (host == getHostForSite(hsid)) {
-                return hsid;
-            }
-        }
-        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
-                                   CoreUtils.hsIdToString(hsId));
     }
 }

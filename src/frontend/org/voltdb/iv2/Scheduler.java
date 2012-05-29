@@ -59,18 +59,16 @@ abstract public class Scheduler
     // IZZY: We should refactor this to be inviolable in the future.
     final protected SiteTaskerQueue m_tasks;
     protected LoadedProcedureSet m_loadedProcs;
-    protected PartitionClerk m_clerk;
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
 
     // hacky temp txnid
     protected AtomicLong m_txnId = new AtomicLong(0);
 
-    Scheduler(PartitionClerk clerk)
+    Scheduler()
     {
         m_tasks = new SiteTaskerQueue();
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
-        m_clerk = clerk;
     }
 
     void setMailbox(Mailbox mailbox)

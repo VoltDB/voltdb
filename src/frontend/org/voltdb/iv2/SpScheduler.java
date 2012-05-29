@@ -35,9 +35,9 @@ public class SpScheduler extends Scheduler
     private Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
 
-    SpScheduler(PartitionClerk clerk)
+    SpScheduler()
     {
-        super(clerk);
+        super();
     }
 
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition

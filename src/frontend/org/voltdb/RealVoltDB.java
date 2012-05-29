@@ -428,7 +428,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     m_iv2Initiators = createIv2Initiators(partitions);
                     // Create the MPI if we're the correct host
                     if (topo.getInt("MPI") == m_messenger.getHostId()) {
-                        Initiator initiator = new MpInitiator(m_messenger, m_siteTracker);
+                        Initiator initiator = new MpInitiator(m_messenger);
                         MailboxNodeContent mnc = new MailboxNodeContent(initiator.getInitiatorHSId(),
                                                                         null);
                         m_mailboxPublisher.registerMailbox(MailboxType.MpInitiator, mnc);
@@ -858,7 +858,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         List<Initiator> initiators = new ArrayList<Initiator>();
         for (Integer partition : partitions)
         {
-            Initiator initiator = new SpInitiator(m_messenger, partition, m_siteTracker);
+            Initiator initiator = new SpInitiator(m_messenger, partition);
             MailboxNodeContent mnc = new MailboxNodeContent(initiator.getInitiatorHSId(),
                                                             partition);
             m_mailboxPublisher.registerMailbox(MailboxType.Initiator, mnc);

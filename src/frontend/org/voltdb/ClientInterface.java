@@ -49,6 +49,9 @@ import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -65,6 +68,7 @@ import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.MapCache;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
@@ -142,6 +146,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * IV2 stuff
      */
+    private final MapCache m_iv2Masters;
     private final AtomicLong m_sequence = new AtomicLong(0);
     private ConcurrentHashMap<Long, Iv2InFlight> m_sequenceToConnection =
         new ConcurrentHashMap<Long, Iv2InFlight>();
@@ -847,24 +852,40 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     (Connection)clientData, adminConnection);
             m_sequenceToConnection.put(handle, inFlight);
 
-            long initiatorHSId = isSinglePartition ?
-                VoltDB.instance().getSiteTracker().m_partitionToInitiatorsImmutable.get(partitions[0]).get(0) :
-                VoltDB.instance().getSiteTracker().getHSIdForMultiPartitionInitiator();
-
-            Iv2InitiateTaskMessage workRequest =
-                new Iv2InitiateTaskMessage(m_siteId,
-                        initiatorHSId,
-                        Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
-                        isReadOnly,
-                        isSinglePartition,
-                        invocation,
-                        handle);
             try {
-                    m_mailbox.send(initiatorHSId, workRequest);
+                long initiatorHSId;
+                if (isSinglePartition) {
+                    JSONObject master = m_iv2Masters.get(Integer.toString(partitions[0]));
+                    if (master == null) {
+                        hostLog.error("Failed to find master initiator for partition: "
+                                + Integer.toString(partitions[0]) + ". Transaction not initiated.");
+                        m_sequenceToConnection.remove(handle);
+                        return false;
+                    }
+                    initiatorHSId = master.getLong("hsid");
+                }
+                else {
+                    initiatorHSId = VoltDB.instance().getSiteTracker().getHSIdForMultiPartitionInitiator();
+                }
+
+                Iv2InitiateTaskMessage workRequest =
+                    new Iv2InitiateTaskMessage(m_siteId,
+                            initiatorHSId,
+                            Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                            isReadOnly,
+                            isSinglePartition,
+                            invocation,
+                            handle);
+
+                        m_mailbox.send(initiatorHSId, workRequest);
             } catch (MessagingException e) {
+                m_sequenceToConnection.remove(handle);
+                throw new RuntimeException(e);
+            } catch (JSONException e) {
+                m_sequenceToConnection.remove(handle);
                 throw new RuntimeException(e);
             }
-            return true; //YEEHAW
+            return true;
         } else {
             return m_initiator.createTransaction(connectionId,
                                                  connectionHostname,
@@ -961,6 +982,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         registerMailbox(messenger.getZK());
         m_siteId = m_mailbox.getHSId();
+
+        m_iv2Masters = new MapCache(messenger.getZK(), VoltZK.iv2masters);
+        m_iv2Masters.start(true);
     }
 
     /**
@@ -1660,6 +1684,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         if (m_snapshotDaemon != null) {
             m_snapshotDaemon.shutdown();
+        }
+        if (m_iv2Masters != null) {
+            m_iv2Masters.shutdown();
         }
     }
 

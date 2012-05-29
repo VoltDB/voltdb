@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.List;
 
 /**
  * PartitionClerk provides an interface to map partition ids to
@@ -25,14 +24,4 @@ import java.util.List;
  */
 public interface PartitionClerk
 {
-    /**
-     * Get the master partition initiator for all known partitions
-     * in no particular order.
-     */
-    public List<Long> getHSIdsForPartitionInitiators();
-
-    // Hacky...for now get the buddy from "SiteTracker"
-    // Later: make an MpInitiator and construct it with buddy in
-    // RealVoltDB
-    public long getBuddySiteForMPI(long hsId);
 }

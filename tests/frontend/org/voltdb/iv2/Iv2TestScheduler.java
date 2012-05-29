@@ -23,13 +23,13 @@
 
 package org.voltdb.iv2;
 
+import org.json_voltpatches.JSONException;
+
 import static org.mockito.Mockito.*;
 
-import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
-import java.util.List;
-import java.util.Map;
+
+import org.voltcore.zk.MapCache;
 
 import org.voltdb.ProcedureRunner;
 
@@ -37,38 +37,36 @@ import junit.framework.TestCase;
 
 import org.junit.Test;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
-import org.voltcore.messaging.VoltMessage;
 import org.voltdb.LoadedProcedureSet;
-import org.voltdb.ParameterSet;
-import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltDBInterface;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
+import com.google.common.collect.ImmutableMap;
+import java.util.HashMap;
+import org.json_voltpatches.JSONObject;
 
 public class Iv2TestScheduler extends TestCase
 {
     Mailbox mbox;
-    SiteTracker clerk;
+    MapCache iv2masters;
     LoadedProcedureSet procs;
     VoltDBInterface vdbi;
     ProcedureRunner runner;
-
     Scheduler dut;
 
     static final String MockSPName = "MOCKSP";
 
-    public void createObjs(boolean isMPI)
+    public void createObjs(boolean isMPI) throws JSONException
     {
         mbox = mock(Mailbox.class);
-        clerk = mock(SiteTracker.class);
+        iv2masters = mock(MapCache.class);
+
+        // make fake MapCache of iv2masters
+        HashMap<String,JSONObject> fakecache = new HashMap<String, JSONObject>();
+        fakecache.put("0", new JSONObject("{hsid:0}"));
+        when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
         // Mock a procedure set that always returns a proc with name MockSPName
         // that is never a system procedure.
@@ -78,17 +76,14 @@ public class Iv2TestScheduler extends TestCase
         when(procs.getProcByName(MockSPName)).thenReturn(runner);
 
         if (isMPI) {
-            dut = new MpScheduler(clerk);
+            dut = new MpScheduler(iv2masters);
         }
         else {
-            dut = new SpScheduler(clerk);
+            dut = new SpScheduler();
         }
         dut.setMailbox(mbox);
         dut.setProcedureSet(procs);
 
-        vdbi = mock(VoltDBInterface.class);
-        VoltDB.replaceVoltDBInstanceForTest(vdbi);
-        when(vdbi.getSiteTracker()).thenReturn(clerk);
     }
 
     private Iv2InitiateTaskMessage createMsg(long txnId, boolean readOnly,
@@ -123,7 +118,7 @@ public class Iv2TestScheduler extends TestCase
     }
 
     @Test
-    public void testSpTaskCreate() throws InterruptedException
+    public void testSpTaskCreate() throws Exception
     {
         long txnid = 1234l;
 
@@ -138,7 +133,7 @@ public class Iv2TestScheduler extends TestCase
     }
 
     @Test
-    public void testMpTaskCreate() throws InterruptedException
+    public void testMpTaskCreate() throws Exception
     {
         long txnid = 1234l;
 
@@ -153,7 +148,7 @@ public class Iv2TestScheduler extends TestCase
     }
 
     @Test
-    public void testFragTaskCreate() throws InterruptedException
+    public void testFragTaskCreate() throws Exception
     {
         long txnid = 1234l;
 

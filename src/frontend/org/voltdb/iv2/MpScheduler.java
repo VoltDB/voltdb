@@ -17,11 +17,18 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Map.Entry;
+
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 
 import org.voltcore.messaging.MessagingException;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.MapCache;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SystemProcedureCatalog;
@@ -39,10 +46,39 @@ public class MpScheduler extends Scheduler
         new HashMap<Long, TransactionState>();
     private Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
+    private final MapCache m_iv2Masters;
 
-    MpScheduler(PartitionClerk clerk)
+    MpScheduler(MapCache iv2masters)
     {
-        super(clerk);
+        super();
+        m_iv2Masters = iv2masters;
+    }
+
+    List<Long> getHSIdsForPartitionInitiators()
+    {
+        Map<String, JSONObject> cache = m_iv2Masters.pointInTimeCache();
+        List<Long> results = new ArrayList<Long>(cache.size());
+        for (Entry<String, JSONObject> entry : cache.entrySet()) {
+            try {
+                results.add(entry.getValue().getLong("hsid"));
+            } catch (JSONException e) {
+                VoltDB.crashLocalVoltDB("Invalid JSON in iv2masters MapCache.", false, e);
+            }
+        }
+        return results;
+    }
+
+    long getBuddySiteForMPI(long hsId)
+    {
+        int host = CoreUtils.getHostIdFromHSId(hsId);
+
+        for (long pHsId : getHSIdsForPartitionInitiators()) {
+            if (host == CoreUtils.getHostIdFromHSId(pHsId)) {
+                return pHsId;
+            }
+        }
+        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
+                                   CoreUtils.hsIdToString(hsId));
     }
 
     // MpScheduler expects to see initiations for multipartition procedures and
@@ -54,9 +90,7 @@ public class MpScheduler extends Scheduler
         final String procedureName = message.getStoredProcedureName();
         final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
 
-        // HACK: grab the current sitetracker until we write leader notices.
-        m_clerk = VoltDB.instance().getSiteTracker();
-        final List<Long> partitionInitiators = m_clerk.getHSIdsForPartitionInitiators();
+        final List<Long> partitionInitiators = getHSIdsForPartitionInitiators();
 
         // Handle every-site system procedures (at the MPI)
         if (runner.isSystemProcedure()) {
@@ -89,7 +123,8 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         // Figure out the local partition initiator that we can use to do BorrowTask work
         // on our behalf.
-        long buddy_hsid = m_clerk.getBuddySiteForMPI(m_mailbox.getHSId());
+        // HACK: grab the current sitetracker until we write leader notices.
+        long buddy_hsid = getBuddySiteForMPI(m_mailbox.getHSId());
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
                     m_txnId.incrementAndGet(), m_pendingTasks, message, partitionInitiators,

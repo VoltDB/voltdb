@@ -17,13 +17,18 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.ExecutionException;
+
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.zk.MapCache;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Site;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
 /**
  * Subclass of Initiator to manage multi-partition operations.
@@ -43,15 +48,17 @@ public class MpInitiator implements Initiator
     private LoadedProcedureSet m_procSet = null;
     private InitiatorMessageHandler m_msgHandler = null;
     private Thread m_siteThread = null;
+    private MapCache m_iv2masters = null;
 
-    public MpInitiator(HostMessenger messenger, PartitionClerk clerk)
+    public MpInitiator(HostMessenger messenger)
     {
         m_messenger = messenger;
         // MPI currently pretends to have partition ID -1 just as a placeholder value
         m_partitionId = -1;
-        m_scheduler = new MpScheduler(clerk);
+        m_iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
+        m_scheduler = new MpScheduler(m_iv2masters);
         m_msgHandler = new MpInitiatorMessageHandler(m_scheduler);
-        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger, clerk);
+        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger);
     }
 
     @Override
@@ -59,6 +66,14 @@ public class MpInitiator implements Initiator
                           CatalogContext catalogContext,
                           SiteTracker siteTracker, int kfactor)
     {
+        try {
+            m_iv2masters.start(true);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
+        } catch (ExecutionException e) {
+            VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
+        }
+
         m_executionSite = new Site(m_scheduler.getQueue(),
                                    m_initiatorMailbox.getHSId(),
                                    backend, catalogContext,
@@ -78,9 +93,9 @@ public class MpInitiator implements Initiator
         m_scheduler.setProcedureSet(m_procSet);
         m_executionSite.setLoadedProcedures(m_procSet);
 
-
         m_siteThread = new Thread(m_executionSite);
         m_siteThread.start(); // Maybe this moves --izzy
+
     }
 
     @Override
@@ -97,6 +112,13 @@ public class MpInitiator implements Initiator
                 m_siteThread.join();
             }
             catch (InterruptedException giveup) {
+            }
+        }
+        if (m_iv2masters != null) {
+            try {
+                m_iv2masters.shutdown();
+            } catch (Exception e) {
+                // nobody cares at shutdown.
             }
         }
     }
