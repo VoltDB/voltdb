@@ -96,13 +96,7 @@ public class BabySitter
         this.dir = dir;
         this.cb = cb;
         this.es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Babysitter-" + dir));
-        try {
-            watch();
-        } catch (KeeperException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Failed to start babysitter watch", true, e);
-        } catch (InterruptedException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Interrupted while starting babysitter watch", true, e);
-        }
+        es.submit(eventHandler);
     }
 
     // eventHandler fetches the new children and resets the watch.
