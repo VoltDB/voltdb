@@ -33,7 +33,6 @@ import org.voltcore.zk.MapCache;
 
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
-import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
@@ -119,31 +118,27 @@ public class MpScheduler extends Scheduler
         final List<Long> partitionInitiators = getHSIdsForPartitionInitiators();
 
         // Handle every-site system procedures (at the MPI)
-        if (runner.isSystemProcedure()) {
-            SystemProcedureCatalog.Config cfg =
-                SystemProcedureCatalog.listing.get(procedureName);
-            if (cfg.everySite) {
-                // Send an SP initiate task to all remote sites
-                final Long localId = m_mailbox.getHSId();
-                final long mpTxnId = m_txnId.incrementAndGet();
-                Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
-                        localId, // make the MPI the initiator.
-                        message.getCoordinatorHSId(),
-                        mpTxnId,
-                        message.isReadOnly(),
-                        true, // isSinglePartition
-                        message.getStoredProcedureInvocation(),
-                        message.getClientInterfaceHandle());
-                DuplicateCounter counter = new DuplicateCounter(
-                        message.getInitiatorHSId(),
-                        partitionInitiators.size(), mpTxnId);
-                m_duplicateCounters.put(mpTxnId, counter);
-                EveryPartitionTask eptask =
-                    new EveryPartitionTask(m_mailbox, mpTxnId, m_pendingTasks, sp,
-                            partitionInitiators);
-                m_pendingTasks.offer(eptask);
-                return;
-            }
+        if (runner.isEverySite()) {
+            // Send an SP initiate task to all remote sites
+            final Long localId = m_mailbox.getHSId();
+            final long mpTxnId = m_txnId.incrementAndGet();
+            Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
+                    localId, // make the MPI the initiator.
+                    message.getCoordinatorHSId(),
+                    mpTxnId,
+                    message.isReadOnly(),
+                    true, // isSinglePartition
+                    message.getStoredProcedureInvocation(),
+                    message.getClientInterfaceHandle());
+            DuplicateCounter counter = new DuplicateCounter(
+                    message.getInitiatorHSId(),
+                    partitionInitiators.size(), mpTxnId);
+            m_duplicateCounters.put(mpTxnId, counter);
+            EveryPartitionTask eptask =
+                new EveryPartitionTask(m_mailbox, mpTxnId, m_pendingTasks, sp,
+                        partitionInitiators);
+            m_pendingTasks.offer(eptask);
+            return;
         }
 
         // Multi-partition initiation (at the MPI)
