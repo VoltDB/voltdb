@@ -58,6 +58,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
                     LocalCluster.FailureState.ALL_RUNNING,
                     true);
         cluster.setMaxHeap(256);
+        cluster.overrideAnyRequestForValgrind();
 
         final int numTuples = cluster.isValgrind() ? 1000 : 60000;
         boolean success = cluster.compile(builder);
