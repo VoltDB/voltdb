@@ -17,20 +17,12 @@
 
 package org.voltdb.iv2;
 
-import java.util.List;
-import java.util.Map;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.LoadedProcedureSet;
-import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.VoltTable;
-import org.voltdb.messaging.CompleteTransactionMessage;
-import org.voltdb.messaging.FragmentResponseMessage;
-import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
  * Scheduler's rough current responsibility is to take appropriate local action
@@ -93,20 +85,4 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     @Override
     abstract public void deliver(VoltMessage message);
-
-    abstract public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message);
-
-    abstract public void handleInitiateResponseMessage(InitiateResponseMessage message);
-
-    public void handleFragmentTaskMessage(FragmentTaskMessage message)
-    {
-        handleFragmentTaskMessage(message, null);
-    }
-
-    abstract public void handleFragmentTaskMessage(FragmentTaskMessage message,
-            Map<Integer, List<VoltTable>> inputDeps);
-
-    abstract public void handleFragmentResponseMessage(FragmentResponseMessage message);
-
-    abstract public void handleCompleteTransactionMessage(CompleteTransactionMessage message);
 }

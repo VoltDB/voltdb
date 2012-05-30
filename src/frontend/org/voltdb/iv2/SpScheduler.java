@@ -39,10 +39,11 @@ public class SpScheduler extends Scheduler
     long[] m_replicaHSIds = new long[] {};
     private Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
+    private Map<Long, DuplicateCounter> m_duplicateCounters =
+        new HashMap<Long, DuplicateCounter>();
 
     SpScheduler()
     {
-        super();
     }
 
     @Override
@@ -64,7 +65,7 @@ public class SpScheduler extends Scheduler
             handleInitiateResponseMessage((InitiateResponseMessage)message);
         }
         else if (message instanceof FragmentTaskMessage) {
-            handleFragmentTaskMessage((FragmentTaskMessage)message);
+            handleFragmentTaskMessage((FragmentTaskMessage)message, null);
         }
         else if (message instanceof FragmentResponseMessage) {
             handleFragmentResponseMessage((FragmentResponseMessage)message);

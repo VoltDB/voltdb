@@ -124,7 +124,7 @@ public class Iv2TestScheduler extends TestCase
 
         createObjs(false);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true);
-        dut.handleIv2InitiateTaskMessage(sptask);
+        dut.deliver(sptask);
 
         SpProcedureTask task = (SpProcedureTask)dut.getQueue().poll();
         // This txnid validation is a bit of a hack until we have real TXN IDs
@@ -139,7 +139,7 @@ public class Iv2TestScheduler extends TestCase
 
         createObjs(true);
         Iv2InitiateTaskMessage mptask = createMsg(txnid, true, false);
-        dut.handleIv2InitiateTaskMessage(mptask);
+        dut.deliver(mptask);
 
         MpProcedureTask task = (MpProcedureTask)dut.getQueue().poll();
         // This txnid validation is a bit of a hack until we have real TXN IDs
@@ -154,7 +154,7 @@ public class Iv2TestScheduler extends TestCase
 
         createObjs(false);
         FragmentTaskMessage fragtask = createFrag(txnid, true);
-        dut.handleFragmentTaskMessage(fragtask);
+        dut.deliver(fragtask);
 
         FragmentTask task = (FragmentTask)dut.getQueue().poll();
         // This txnid validation is a bit of a hack until we have real TXN IDs
