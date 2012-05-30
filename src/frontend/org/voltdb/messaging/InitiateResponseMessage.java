@@ -32,6 +32,7 @@ import org.voltdb.ClientResponseImpl;
 public class InitiateResponseMessage extends VoltMessage {
 
     private long m_txnId;
+    private long m_spHandle;
     private long m_initiatorHSId;
     private long m_coordinatorHSId;
     private long m_clientInterfaceHandle;
@@ -52,6 +53,7 @@ public class InitiateResponseMessage extends VoltMessage {
      */
     public InitiateResponseMessage(Iv2InitiateTaskMessage task) {
         m_txnId = task.getTxnId();
+        m_spHandle = task.getSpHandle();
         m_initiatorHSId = task.getInitiatorHSId();
         m_coordinatorHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
@@ -66,6 +68,7 @@ public class InitiateResponseMessage extends VoltMessage {
      */
     public InitiateResponseMessage(InitiateTaskMessage task) {
         m_txnId = task.getTxnId();
+        m_spHandle = task.getSpHandle();
         m_initiatorHSId = task.getInitiatorHSId();
         m_coordinatorHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
@@ -78,6 +81,10 @@ public class InitiateResponseMessage extends VoltMessage {
 
     public long getTxnId() {
         return m_txnId;
+    }
+
+    public long getSpHandle() {
+        return m_spHandle;
     }
 
     public long getInitiatorHSId() {
@@ -118,6 +125,7 @@ public class InitiateResponseMessage extends VoltMessage {
     {
         int msgsize = super.getSerializedSize();
         msgsize += 8 // txnId
+            + 8 // m_spHandle
             + 8 // initiator HSId
             + 8 // coordinator HSId
             + 8 // client interface handle
@@ -133,6 +141,7 @@ public class InitiateResponseMessage extends VoltMessage {
     {
         buf.put(VoltDbMessageFactory.INITIATE_RESPONSE_ID);
         buf.putLong(m_txnId);
+        buf.putLong(m_spHandle);
         buf.putLong(m_initiatorHSId);
         buf.putLong(m_coordinatorHSId);
         buf.putLong(m_clientInterfaceHandle);
@@ -146,6 +155,7 @@ public class InitiateResponseMessage extends VoltMessage {
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
         m_txnId = buf.getLong();
+        m_spHandle = buf.getLong();
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
         m_clientInterfaceHandle = buf.getLong();
@@ -162,6 +172,7 @@ public class InitiateResponseMessage extends VoltMessage {
 
         sb.append("INITITATE_RESPONSE FOR TXN ");
         sb.append(m_txnId);
+        sb.append("\n SP HANDLE: " + m_spHandle);
         sb.append("\n INITIATOR HSID: " + CoreUtils.hsIdToString(m_initiatorHSId));
         sb.append("\n COORDINATOR HSID: " + CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append("\n CLIENT INTERFACE HANDLE: " + m_clientInterfaceHandle);
@@ -169,8 +180,6 @@ public class InitiateResponseMessage extends VoltMessage {
             sb.append("\n  COMMIT");
         else
             sb.append("\n  ROLLBACK/ABORT, ");
-
-        // TODO More work here
 
         return sb.toString();
     }

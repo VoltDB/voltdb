@@ -43,6 +43,7 @@ public class FragmentResponseMessage extends VoltMessage {
     long m_executorHSId;
     long m_destinationHSId;
     long m_txnId;
+    private long m_spHandle;
     byte m_status;
     // default dirty to true until proven otherwise
     // Not currently used; leaving it in for now
@@ -64,6 +65,7 @@ public class FragmentResponseMessage extends VoltMessage {
     public FragmentResponseMessage(FragmentTaskMessage task, long HSId) {
         m_executorHSId = HSId;
         m_txnId = task.getTxnId();
+        m_spHandle = task.getSpHandle();
         m_destinationHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
     }
@@ -104,6 +106,10 @@ public class FragmentResponseMessage extends VoltMessage {
         return m_txnId;
     }
 
+    public long getSpHandle() {
+        return m_spHandle;
+    }
+
     public byte getStatusCode() {
         return m_status;
     }
@@ -132,6 +138,7 @@ public class FragmentResponseMessage extends VoltMessage {
         msgsize += 8 // executorHSId
             + 8 // destinationHSId
             + 8 // txnId
+            + 8 // m_spHandle
             + 1 // status byte
             + 1 // dirty flag
             + 1 // node recovering flag
@@ -164,6 +171,7 @@ public class FragmentResponseMessage extends VoltMessage {
         buf.putLong(m_executorHSId);
         buf.putLong(m_destinationHSId);
         buf.putLong(m_txnId);
+        buf.putLong(m_spHandle);
         buf.put(m_status);
         buf.put((byte) (m_dirty ? 1 : 0));
         buf.put((byte) (m_recovering ? 1 : 0));
@@ -191,6 +199,7 @@ public class FragmentResponseMessage extends VoltMessage {
         m_executorHSId = buf.getLong();
         m_destinationHSId = buf.getLong();
         m_txnId = buf.getLong();
+        m_spHandle = buf.getLong();
         m_status = buf.get();
         m_dirty = buf.get() == 0 ? false : true;
         m_recovering = buf.get() == 0 ? false : true;
@@ -220,6 +229,8 @@ public class FragmentResponseMessage extends VoltMessage {
         sb.append(CoreUtils.hsIdToString(m_destinationHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
+        sb.append(", SP HANDLE: ");
+        sb.append(m_spHandle);
 
         if (m_status == SUCCESS)
             sb.append("\n  SUCCESS");
