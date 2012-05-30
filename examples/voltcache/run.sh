@@ -16,7 +16,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj \
+    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj \
         src/voltcache/*.java \
         src/voltcache/api/*.java \
         src/voltcache/procedures/*.java
@@ -63,7 +63,6 @@ function benchmark() {
         --displayinterval=5 \
         --duration=120 \
         --servers=localhost \
-        --port=21212 \
         --poolsize=100000 \
         --preload=true \
         --getputratio=0.90 \
@@ -86,7 +85,6 @@ function memcached-interface() {
     srccompile
     java -classpath obj:$CLASSPATH:obj voltcache.api.MemcachedInterfaceServer \
         --vservers=localhost \
-        --vport=21212 \
         --mport=11211
 }
 

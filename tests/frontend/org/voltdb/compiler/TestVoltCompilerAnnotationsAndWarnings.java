@@ -29,12 +29,24 @@ import java.io.PrintStream;
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRONonSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicROSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRWProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.NondeterministicROProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.NondeterministicRWProc;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate1;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate2;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate3;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate4;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate5;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate6;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate1;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate2;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate3;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate4;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate5;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate6;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate7;
 
 public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
     public void testSimple() throws Exception {
@@ -63,10 +75,43 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addProcedures(DeterministicRONonSeqProc.class);
         builder.addProcedures(DeterministicROSeqProc.class);
         builder.addProcedures(DeterministicRWProc.class);
+
+        builder.addProcedures(ProcSPcandidate1.class);
+        builder.addProcedures(ProcSPcandidate2.class);
+        builder.addProcedures(ProcSPcandidate3.class);
+        builder.addProcedures(ProcSPcandidate4.class);
+        builder.addProcedures(ProcSPcandidate5.class);
+        builder.addProcedures(ProcSPcandidate6.class);
+        builder.addProcedures(ProcSPcandidate7.class);
+
+        builder.addProcedures(ProcSPNoncandidate1.class);
+        builder.addProcedures(ProcSPNoncandidate2.class);
+        builder.addProcedures(ProcSPNoncandidate3.class);
+        builder.addProcedures(ProcSPNoncandidate4.class);
+        builder.addProcedures(ProcSPNoncandidate5.class);
+        builder.addProcedures(ProcSPNoncandidate6.class);
+
+        builder.addStmtProcedure("StmtSPcandidate1", "select count(*) from blah where ival = ?", null);
+        builder.addStmtProcedure("StmtSPcandidate2", "select count(*) from blah where ival = 12345678", null);
+        builder.addStmtProcedure("StmtSPcandidate3",
+                                 "select count(*) from blah, indexed_blah " +
+                                 "where indexed_blah.sval = blah.sval and blah.ival = 12345678", null);
+        builder.addStmtProcedure("StmtSPcandidate4",
+                                 "select count(*) from blah, indexed_blah " +
+                                 "where indexed_blah.sval = blah.sval and blah.ival = abs(1)+1", null);
+        builder.addStmtProcedure("StmtSPcandidate5", "select count(*) from blah where sval = ? and ival = 12345678", null);
+        builder.addStmtProcedure("StmtSPcandidate6", "select count(*) from blah where sval = ? and ival = ?", null);
+        builder.addStmtProcedure("StmtSPNoncandidate1", "select count(*) from blah where sval = ?", null);
+        builder.addStmtProcedure("StmtSPNoncandidate2", "select count(*) from blah where sval = '12345678'", null);
+        builder.addStmtProcedure("StmtSPNoncandidate3", "select count(*) from indexed_blah where ival = ?", null);
+
+
+
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
         assert(success);
         String captured = capturer.toString("UTF-8");
         String[] lines = captured.split("\n");
+
         assertTrue(foundLineMatching(lines, ".*\\[RO].*NondeterministicROProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[RO].*NondeterministicROProc.*"));
         assertTrue(foundLineMatching(lines, ".*\\[RO].*DeterministicRONonSeqProc.*"));
@@ -91,13 +136,39 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertFalse(foundLineMatching(lines, ".*\\[RO].*NondeterministicRWProc.*"));
         assertFalse(foundLineMatching(lines, ".*\\[RO].*DeterministicRWProc.*"));
 
-        // test prettying-up of statement in feedback output.
-        assertFalse(foundLineMatching(lines, ".*values.*  .*")); // includes 2 embedded or trailing spaces.
-        assertFalse(foundLineMatching(lines, ".*nsert.*  .*values.*")); // includes 2 embedded spaces.
-        assertFalse(foundLineMatching(lines, ".*values.*\u0009.*")); // that's an embedded or trailing unicode tab.
-        assertFalse(foundLineMatching(lines, ".*nsert.*\u0009.*values.*")); // that's an embedded unicode tab.
-        assertFalse(foundLineMatching(lines, ".*values.*\\s\\s.*")); // includes 2 successive embedded or trailing whitespace of any kind
-        assertFalse(foundLineMatching(lines, ".*nsert.*\\s\\s.*values.*")); // includes 2 successive embedded whitespace of any kind
+        // test SP improvement warnings
+        assertEquals(4, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:0.*")); // StmtSPcandidates 1,2,3,4
+        assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*partitioninfo=BLAH\\.IVAL:0.*")); // 2, 3
+        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*ABS.*partitioninfo=BLAH\\.IVAL:0.*")); // just 4
+        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*partitioninfo=BLAH\\.IVAL:1.*")); // just 5
+        assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:1.*")); // 5, 6
+
+        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 0 .*")); // ProcSPcandidate 1
+        assertEquals(4, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*87654321.*")); // 2, 3, 5, 6
+        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*ABS.*")); // just 4
+        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 1 .*")); // 7
+
+        // Non-candidates disqualify themselves by various means.
+        assertEquals(0, countLinesMatching(lines, ".*\\[SPNoncandidate.].*partitioninfo=BLAH\\.IVAL:0.*"));
+        assertEquals(0, countLinesMatching(lines, ".*\\[SPNoncandidate.].*partitioninfo=BLAH\\.IVAL:1.*"));
+
+        assertEquals(0, countLinesMatching(lines, ".*\\[ProcSPNoncandidate.\\.class].* parameter .*"));
+        assertEquals(0, countLinesMatching(lines, ".*\\[ProcSPNoncandidate.\\.class].* parameter .*"));
+
+        // test prettying-up of statements in feedback output. ("^[^ ].*") is used to confirm that the (symbol-prefixed) log statements contain the original ugliness.
+        // While ("^ .*") is used to confirm that the (space-prefixed) feedback to the user is cleaned up.
+        assertTrue(foundLineMatching(lines, "^[^ ].*values.*  .*")); // includes 2 embedded or trailing spaces.
+        assertFalse(foundLineMatching(lines, "^ .*values.*  .*")); // includes 2 embedded or trailing spaces.
+        assertTrue(foundLineMatching(lines, "^[^ ].*nsert.*  .*values.*")); // includes 2 embedded spaces.
+        assertFalse(foundLineMatching(lines, "^ .*nsert.*  .*values.*")); // includes 2 embedded spaces.
+        assertTrue(foundLineMatching(lines, "^[^ ].*values.*\u0009.*")); // that's an embedded or trailing unicode tab.
+        assertFalse(foundLineMatching(lines, "^ .*values.*\u0009.*")); // that's an embedded or trailing unicode tab.
+        assertTrue(foundLineMatching(lines, "^[^ ].*nsert.*\u0009.*values.*")); // that's an embedded unicode tab.
+        assertFalse(foundLineMatching(lines, "^ .*nsert.*\u0009.*values.*")); // that's an embedded unicode tab.
+        assertTrue(foundLineMatching(lines, "^[^ ].*values.*\\s\\s.*")); // includes 2 successive embedded or trailing whitespace of any kind
+        assertFalse(foundLineMatching(lines, "^ .*values.*\\s\\s.*")); // includes 2 successive embedded or trailing whitespace of any kind
+        assertTrue(foundLineMatching(lines, "^[^ ].*nsert.*\\s\\s.*values.*")); // includes 2 successive embedded whitespace of any kind
+        assertFalse(foundLineMatching(lines, "^ .*nsert.*\\s\\s.*values.*")); // includes 2 successive embedded whitespace of any kind
 
     }
 

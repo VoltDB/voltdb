@@ -31,6 +31,8 @@ import org.voltdb.fault.FaultDistributorInterface;
 
 import org.voltdb.licensetool.LicenseApi;
 
+import com.google.common.util.concurrent.ListeningExecutorService;
+
 public interface VoltDBInterface
 {
     public boolean recovering();
@@ -60,8 +62,9 @@ public interface VoltDBInterface
      * initialize again.
      * @param mainSiteThread The thread that m_inititalized the VoltDB or
      * null if called from that thread.
+     * @return
      */
-    public void shutdown(Thread mainSiteThread) throws InterruptedException;
+    public boolean shutdown(Thread mainSiteThread) throws InterruptedException;
 
     public void startSampler();
 
@@ -170,7 +173,7 @@ public interface VoltDBInterface
      * Return an executor service for running non-blocking but computationally expensive
      * tasks.
      */
-    public ExecutorService getComputationService();
+    public ListeningExecutorService getComputationService();
 
     /**
      * Return the license api. This may be null in community editions!

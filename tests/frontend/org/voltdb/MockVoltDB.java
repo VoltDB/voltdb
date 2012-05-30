@@ -32,7 +32,6 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
@@ -55,6 +54,9 @@ import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
 
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
+
 public class MockVoltDB implements VoltDBInterface
 {
     private Catalog m_catalog;
@@ -71,7 +73,7 @@ public class MockVoltDB implements VoltDBInterface
     OperationMode m_startMode = OperationMode.RUNNING;
     ReplicationRole m_replicationRole = ReplicationRole.NONE;
     VoltDB.Configuration voltconfig = null;
-    private final ExecutorService m_es = Executors.newSingleThreadExecutor();
+    private final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(Executors.newSingleThreadExecutor());
     public int m_hostId = 0;
     private SiteTracker m_siteTracker;
     private final Map<MailboxType, List<MailboxNodeContent>> m_mailboxMap =
@@ -349,7 +351,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void shutdown(Thread mainSiteThread) throws InterruptedException
+    public boolean shutdown(Thread mainSiteThread) throws InterruptedException
     {
         if (m_faultDistributor != null) {
             m_faultDistributor.shutDown();
@@ -361,6 +363,7 @@ public class MockVoltDB implements VoltDBInterface
         m_es.awaitTermination( 1, TimeUnit.DAYS);
         m_statsAgent.shutdown();
         m_hostMessenger.shutdown();
+        return true;
     }
 
     @Override
@@ -451,7 +454,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public ExecutorService getComputationService() {
+    public ListeningExecutorService getComputationService() {
         return m_es;
     }
 

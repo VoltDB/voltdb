@@ -34,7 +34,6 @@ import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -42,15 +41,19 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.agreement.AgreementSite;
 import org.voltcore.agreement.InterfaceToMessenger;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.utils.COWMap;
-import org.voltcore.utils.InstanceId;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.InstanceId;
+import org.voltcore.utils.PortGenerator;
 import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.VoltDB;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Host messenger contains all the code necessary to join a cluster mesh, and create mailboxes
@@ -90,6 +93,36 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         public Config() {
             this(null, 3021);
+        }
+
+        public Config(PortGenerator ports) {
+            this(null, 3021);
+            zkInterface = "127.0.0.1:" + ports.next();
+            internalPort = ports.next();
+        }
+
+        public int getZKPort() {
+            return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
+        }
+
+        public String toString() {
+            JSONStringer js = new JSONStringer();
+            try {
+                js.object();
+                js.key("coordinatorip").value(coordinatorIp.toString());
+                js.key("zkinterface").value(zkInterface);
+                js.key("internalinterface").value(internalInterface);
+                js.key("internalport").value(internalPort);
+                js.key("deadhosttimeout").value(deadHostTimeout);
+                js.key("backwardstimeforgivenesswindow").value(backwardsTimeForgivenessWindow);
+                js.key("networkThreads").value(networkThreads);
+                js.endObject();
+
+                return js.toString();
+            }
+            catch (Exception e) {
+                throw new RuntimeException(e);
+            }
         }
     }
 

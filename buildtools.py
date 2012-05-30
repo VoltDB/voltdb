@@ -171,7 +171,7 @@ def buildMakefile(CTX):
     if CTX.TARGET == "CLEAN":
         makefile.write(".PHONY: clean\n")
         makefile.write("clean: \n")
-        makefile.write("\trm -drf *\n")
+        makefile.write("\trm -rf *\n")
         makefile.close()
         return
 
@@ -212,7 +212,7 @@ def buildMakefile(CTX):
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
     makefile.write("prod/voltdbipc: $(SRC)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) %s -o $@ $^\n" % CTX.TEST_EXTRAFLAGS)
+    makefile.write("\t$(LINK.cpp) %s -o $@ $^ %s\n" % (CTX.TEST_EXTRAFLAGS, CTX.LASTLDFLAGS))
     makefile.write("\n")
 
 

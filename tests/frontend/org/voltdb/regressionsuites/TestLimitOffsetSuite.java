@@ -133,20 +133,14 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         project.addStmtProcedure("LimitAI", "SELECT * FROM A ORDER BY I LIMIT ? OFFSET ?;");
         project.addStmtProcedure("LimitBI", "SELECT * FROM B ORDER BY I LIMIT ? OFFSET ?;");
 
-        config = new LocalSingleProcessServer("testlimitoffset-onesite.jar",
-                                              1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
-        config = new LocalSingleProcessServer("testlimitoffset-threesites.jar",
-                                              3, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        // local
+        config = new LocalCluster("testlimitoffset-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("testlimitoffset-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("testlimitoffset-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         return builder;

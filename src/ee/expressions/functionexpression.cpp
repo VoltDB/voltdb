@@ -90,7 +90,7 @@ public:
     };
 
     virtual ~GeneralFunctionExpression() {
-        delete m_args;
+        delete &m_args;
     }
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
@@ -120,10 +120,12 @@ ExpressionUtil::functionFactory(ExpressionType et, const std::vector<AbstractExp
     AbstractExpression* ret = 0;
     if (arguments->size() == 0) {
         // ret = new ConstantFunctionExpression<???>();
+        delete arguments;
     } else if(arguments->size() == 1) {
         if (et == EXPRESSION_TYPE_FUNCTION_ABS) {
             ret = new UnaryFunctionExpression<EXPRESSION_TYPE_FUNCTION_ABS>((*arguments)[0]);
         }
+        delete arguments;
     } else {
         //ret = new GeneralFunctionExpression<???>(*arguments);
     }

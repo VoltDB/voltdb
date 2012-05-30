@@ -1234,32 +1234,19 @@ public class TestFixedSQLSuite extends RegressionSuite {
         project.addStmtProcedure("Eng1316Insert_P1", "insert into P1 values (?, ?, ?, ?);", "P1.ID: 0");
         project.addStmtProcedure("Eng1316Update_P1", "update P1 set num = num + 1 where id = ?", "P1.ID: 0");
 
-
-        // CONFIG #1: Local Site/Partitions running on IPC backend
-        // config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
-        // config.compile(project);
-        // builder.addServerConfig(config);
-
-        // JNI
-        config = new LocalSingleProcessServer("fixedsql-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        // CONFIG #1: JNI
+        config = new LocalCluster("fixedsql-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-
 
         // CONFIG #2: HSQL
-        config = new LocalSingleProcessServer("fixedsql-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
-        // CLUSTER?
-        // not sure the cluster test adds much for the time it takes here
-        /*config = new LocalCluster("fixedsql-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);*/
+        // no cluster tests for SQL fixes
 
         return builder;
     }

@@ -33,7 +33,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.aggregates.*;
+import org.voltdb_testprocs.regressionsuites.aggregates.Insert;
 
 /**
  * System tests for basic aggregate and DISTINCT functionality
@@ -423,24 +423,19 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         project.addPartitionInfo("P1", "ID");
         project.addProcedures(PROCEDURES);
 
-        config = new LocalSingleProcessServer("sqlaggregate-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("sqlaggregate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        //ADHOC sql still returns double the number of modified rows
-        //config = new LocalSingleProcessServer("sqlaggregate-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        //config.compile(project);
-        //builder.addServerConfig(config);
-
-        //config = new LocalSingleProcessServer("sqlaggregate-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        //config.compile(project);
-        //builder.addServerConfig(config);
-
-        // Cluster
-        config = new LocalCluster("sqlaggregate-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("sqlaggregate-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
+
+        config = new LocalCluster("sqlaggregate-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
+
+        // hsql isn't currently working. This is worrysome, but it hasn't been working for a while
 
         return builder;
     }

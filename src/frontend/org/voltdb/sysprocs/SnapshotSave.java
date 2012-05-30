@@ -22,11 +22,12 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotSaveAPI;
@@ -110,9 +111,11 @@ public class SnapshotSave extends VoltSystemProcedure
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
+            assert(params.toArray()[2] != null);
             String file_path = (String) params.toArray()[0];
             String file_nonce = (String) params.toArray()[1];
-            return saveTest(file_path, file_nonce, context, hostname);
+            boolean csv = ((Number)params.toArray()[2]).intValue() == 1 ? true  : false;
+            return saveTest(file_path, file_nonce, csv, context, hostname);
         }
         else if (fragmentId == SysProcFragmentId.PF_saveTestResults)
         {
@@ -124,12 +127,14 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
             assert(params.toArray()[3] != null);
+            assert(params.toArray()[4] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
             byte block = (Byte)params.toArray()[3];
+            boolean csv = ((Number)params.toArray()[4]).intValue() == 1 ? true  : false;
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
-            VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce, block, txnId, context, hostname);
+            VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce, csv, block, txnId, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -137,7 +142,7 @@ public class SnapshotSave extends VoltSystemProcedure
             return createSnapshotTargetsResults(dependencies);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesce) {
             // tell each site to quiesce
-            context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
+            context.getSiteProcedureConnection().quiesce();
             VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
             results.addRow(context.getSiteId());
             return new DependencyPair(DEP_snapshotSaveQuiesce, results);
@@ -184,17 +189,13 @@ public class SnapshotSave extends VoltSystemProcedure
         }
     }
 
-    private DependencyPair saveTest(String file_path, String file_nonce,
+    private DependencyPair saveTest(String file_path, String file_nonce, boolean csv,
             SystemProcedureExecutionContext context, String hostname) {
         {
             VoltTable result = constructNodeResultsTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Long lowest_site_id =
-                context.getSiteTracker().
-                getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
                                 + file_path + ", " + file_nonce);
@@ -212,7 +213,12 @@ public class SnapshotSave extends VoltSystemProcedure
                 for (Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
                     File saveFilePath =
-                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce, context.getHostId());
+                        SnapshotUtil.constructFileForTable(
+                                table,
+                                file_path,
+                                file_nonce,
+                                csv ? ".csv" : ".vpt",
+                                context.getHostId());
                     TRACE_LOG.trace("Host ID " + context.getHostId() +
                                     " table: " + table.getTypeName() +
                                     " to path: " + saveFilePath);
@@ -283,11 +289,21 @@ public class SnapshotSave extends VoltSystemProcedure
 
 
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String path, String nonce, long block) throws VoltAbortException
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String command) throws Exception
     {
         final long startTime = System.currentTimeMillis();
-        String async = (block == 0) ? "Asynchronously" : "Synchronously";
+
+        JSONObject jsObj = new JSONObject(command);
+        final boolean block = jsObj.optBoolean("block", false);
+        final String async = !block ? "Asynchronously" : "Synchronously";
+        final String path = jsObj.getString("path");
+        final String nonce = jsObj.getString("nonce");
+        final String format = jsObj.optString("format", "native");
+        boolean csv = false;
+        if (format.equals("csv")) {
+            csv = true;
+        }
+
         HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
 
         ColumnInfo[] error_result_columns = new ColumnInfo[2];
@@ -314,7 +330,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
         // See if we think the save will succeed
         VoltTable[] results;
-        results = performSaveFeasibilityWork(path, nonce);
+        results = performSaveFeasibilityWork(path, nonce, csv);
 
         // Test feasibility results for fail
         while (results[0].advanceRow())
@@ -330,7 +346,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
         performQuiesce();
 
-        results = performSnapshotCreationWork( path, nonce, ctx.getCurrentTxnId(), (byte)block);
+        results = performSnapshotCreationWork( path, nonce, ctx.getCurrentTxnId(), (byte)(block ? 1 : 0), csv);
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
@@ -348,7 +364,8 @@ public class SnapshotSave extends VoltSystemProcedure
     }
 
     private final VoltTable[] performSaveFeasibilityWork(String filePath,
-                                                         String fileNonce)
+                                                         String fileNonce,
+                                                         boolean csv)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -360,7 +377,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce);
+        params.setParameters(filePath, fileNonce, csv ? 1 : 0);
         pfs[0].parameters = params;
 
         // This fragment aggregates the save-to-disk sanity check results
@@ -379,7 +396,8 @@ public class SnapshotSave extends VoltSystemProcedure
     private final VoltTable[] performSnapshotCreationWork(String filePath,
             String fileNonce,
             long txnId,
-            byte block)
+            byte block,
+            boolean csv)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -391,7 +409,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, block);
+        params.setParameters(filePath, fileNonce, txnId, block, csv ? 1 : 0);
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files

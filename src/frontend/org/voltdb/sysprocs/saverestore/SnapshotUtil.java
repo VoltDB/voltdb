@@ -725,6 +725,7 @@ public class SnapshotUtil {
      */
     public static final String constructFilenameForTable(Table table,
                                                          String fileNonce,
+                                                         String extension,
                                                          int hostId)
     {
         StringBuilder filename_builder = new StringBuilder(fileNonce);
@@ -735,17 +736,18 @@ public class SnapshotUtil {
             filename_builder.append("-host_");
             filename_builder.append(hostId);
         }
-        filename_builder.append(".vpt");//Volt partitioned table
+        filename_builder.append(extension);//Volt partitioned table
         return filename_builder.toString();
     }
 
     public static final File constructFileForTable(Table table,
             String filePath,
             String fileNonce,
+            String extension,
             int hostId)
     {
         return new VoltFile(filePath, SnapshotUtil.constructFilenameForTable(
-            table, fileNonce, hostId));
+            table, fileNonce, extension, hostId));
     }
 
     /**

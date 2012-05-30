@@ -101,7 +101,6 @@ protected:
     TableTuple m_searchKey;
     // search_key_beforesubstitute_array_ptr[]
     AbstractExpression** m_searchKeyBeforeSubstituteArray;
-    int* m_searchKeyAllParamArray; // search_key_all_param_array_ptr[]
     bool* m_needsSubstituteProject; // needs_substitute_project_ptr[]
     bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
     bool m_needsSubstitutePostExpression;
@@ -130,7 +129,6 @@ protected:
     boost::shared_array<int> m_projectionAllTupleArrayPtr;
     boost::shared_array<AbstractExpression*>
         m_searchKeyBeforeSubstituteArrayPtr;
-    boost::shared_array<int> m_searchKeyAllParamArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
 };

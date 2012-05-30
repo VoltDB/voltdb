@@ -17,6 +17,7 @@
     <attribute name="srcdir"/>
     <attribute name="destdir" default="${build.prod.dir}"/>
     <attribute name="excludes" default=""/>
+    <attribute name="includes" default=""/>
     <sequential>
         <javac
             target="1.6"
@@ -24,14 +25,18 @@
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
+            includes="@{includes}"
             encoding='UTF-8'
-            debug='true'>
+            debug='true'
+            includeAntRuntime='false'>
             <classpath refid="project.classpath" />
         </javac>
     </sequential>
 </macrodef>
 
 <!-- PATHS AND PROPERTIES -->
+
+<tstamp/>
 
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
@@ -597,7 +602,7 @@ CLEANING
     <arg line="-c 'rm -rf voltdb/*.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf voltdb/*.so'"/>
+    <arg line="-c 'rm -rf voltdb/*.so voltdb/*.jnilib'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/ee/catalog/*'"/>
@@ -670,9 +675,9 @@ JAR BUILDING
             </section>
         </manifest>
     </jar>
-    <jar destfile="voltdb/voltdb-${dist.version}-javadoc.jar">
-        <fileset dir="${doc.dir}" defaultexcludes="no" >
-            <include name="javadoc/procedure-api/**"/>
+    <!--jar destfile="voltdb/voltdb-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}/javadoc/procedure-api" defaultexcludes="no" >
+            <include name="**"/>
         </fileset>
         <manifest>
             <section name="Credits">
@@ -688,8 +693,8 @@ JAR BUILDING
         </manifest>
     </jar>
     <jar destfile="voltdb/voltdbclient-${dist.version}-javadoc.jar">
-        <fileset dir="${doc.dir}" defaultexcludes="no" >
-            <include name="javadoc/java-client-api/**"/>
+        <fileset dir="${doc.dir}/javadoc/java-client-api" defaultexcludes="no" >
+            <include name="**"/>
         </fileset>
         <manifest>
             <section name="Credits">
@@ -703,13 +708,14 @@ JAR BUILDING
                 <attribute name="Date" value="${TODAY}" />
             </section>
         </manifest>
-    </jar>
+    </jar-->
 
 </target>
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">
     <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
+            <include name="org/voltcore/**" />
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
             <include name="org/apache/hadoop_voltpatches/**" />
@@ -861,9 +867,24 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
+    <!-- copy zmq to voltdb dir / would be nice to only copy the right one -->
+    <copy todir="voltdb" flatten="true" >
+        <fileset dir="." defaultexcludes="yes">
+            <include name="third_party/cpp/jnilib/libjzmq*" />
+        </fileset>
+    </copy>
+
     <!-- compile the individual source directories -->
+    <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
-    <invoke-javac srcdir="${src.gpl.dir}:${vendor.src.dir}"/>
+    <!-- voltcore and third-party java (including our zookeeper -->
+    <invoke-javac
+        srcdir="${src.gpl.dir}:${vendor.src.dir}"
+        includes="org/voltcore/**/*.java,org/apache/**/*.java
+                  au/**/*.java
+                  org/json_voltpatches/**/*.java" />
+    <!-- non-voltcore voltdb code -->
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
@@ -1546,7 +1567,7 @@ TEST CASES
 <!-- This target will run a junit suite. It will also run a single
      suite under valgrind with -Dbuild=memcheck.  NOTE: to use valgrind,
      you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
-<target name='junitclass'
+<target name="junitclass"
     description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
 
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
@@ -1559,7 +1580,15 @@ TEST CASES
 
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
         <formatters>
+            <!-- keep the per-case final summary -->
             <formatter usefile="false" type="plain"/>
+            <!-- Also log to obj/BUILD/testoutput -->
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>
@@ -1610,7 +1639,7 @@ TEST CASES
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
-    <property name="log4j.configuration" location="voltdb/log4j.properties" />
+    <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
     <property name="default_config" location="${test.example.dir}/config.py" />
     <property name="regression_config"
               location="${test.example.dir}/regression-config.py" />

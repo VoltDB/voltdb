@@ -55,6 +55,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
             builder.addProcedures(NonDeterministicSPProc.class);
 
             cluster = new LocalCluster("det1.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
+            cluster.overrideAnyRequestForValgrind();
             cluster.compile(builder);
 
             cluster.setHasLocalServer(false);
@@ -64,7 +65,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
             cluster.startUp();
 
             for (String s : cluster.getListenerAddresses()) {
-                client.createConnection(s, cluster.port(0));
+                client.createConnection(s);
             }
         }
         catch (Exception e) {

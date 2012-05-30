@@ -25,7 +25,7 @@ import java.util.Map;
 import java.util.Map.Entry;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltDB;
@@ -89,11 +89,7 @@ public class SystemInformation extends VoltSystemProcedure
             VoltTable result = null;
             // Choose the lowest site ID on this host to do the info gathering
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Long lowest_site_id =
-                context.getSiteTracker().
-                getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 result = populateOverviewTable(context);
             }
@@ -116,11 +112,7 @@ public class SystemInformation extends VoltSystemProcedure
             VoltTable result = null;
             // Choose the lowest site ID on this host to do the info gathering
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Long lowest_site_id =
-                context.getSiteTracker().
-                getLowestSiteForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 result = populateDeploymentProperties(context);
             }

@@ -45,6 +45,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
@@ -110,6 +111,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final ClientAcceptor m_acceptor;
     private ClientAcceptor m_adminAcceptor;
     private final TransactionInitiator m_initiator;
+
+    /*
+     * This lock must be held while checking and signaling a backpressure condition
+     * in order to avoid ensure that nothing misses the end of backpressure notification
+     */
+    private final ReentrantLock m_backpressureLock = new ReentrantLock();
     private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
@@ -150,7 +157,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public boolean queue(int queued) {
-            synchronized (m_connections) {
+            m_backpressureLock.lock();
+            try {
                 m_queued += queued;
                 if (m_queued > MAX_QUEABLE) {
                     if (m_hasGlobalClientBackPressure || m_hasDTXNBackPressure) {
@@ -189,6 +197,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                     m_hasGlobalClientBackPressure = false;
                 }
+            } finally {
+                m_backpressureLock.unlock();
             }
             return false;
         }
@@ -217,6 +227,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Wait until they receive data or have been booted.
      */
     private boolean m_hasGlobalClientBackPressure = false;
+    private final boolean m_isConfiguredForHSQL;
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -361,11 +372,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                                         if (handler instanceof ClientInputHandler) {
                                             Connection c = m_network.registerChannel(socket, handler, 0);
-                                            synchronized (m_connections){
+                                            m_backpressureLock.lock();
+                                            try {
                                                 if (!m_hasDTXNBackPressure) {
                                                     c.enableReadSelection();
                                                 }
                                                 m_connections.add(c);
+                                            } finally {
+                                                m_backpressureLock.unlock();
                                             }
                                         } else {
                                             m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
@@ -692,10 +706,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                      * and this attempt to reenable read selection (which should not occur
                      * if there is DTXN backpressure)
                      */
-                    synchronized (m_connections) {
+                    m_backpressureLock.lock();
+                    try {
                         if (!m_hasDTXNBackPressure) {
                             m_connection.enableReadSelection();
                         }
+                    } finally {
+                        m_backpressureLock.unlock();
                     }
                 }
             };
@@ -725,11 +742,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void onBackPressure() {
         log.trace("Had back pressure disabling read selection");
-        synchronized (m_connections) {
+        m_backpressureLock.lock();
+        try {
             m_hasDTXNBackPressure = true;
             for (final Connection c : m_connections) {
                 c.disableReadSelection();
             }
+        } finally {
+            m_backpressureLock.unlock();
         }
     }
 
@@ -739,7 +759,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void offBackPressure() {
         log.trace("No more back pressure attempting to enable read selection");
-        synchronized (m_connections) {
+        m_backpressureLock.lock();
+        try {
             m_hasDTXNBackPressure = false;
             if (m_hasGlobalClientBackPressure) {
                 return;
@@ -761,6 +782,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                 }
             }
+        } finally {
+            m_backpressureLock.unlock();
         }
     }
 
@@ -858,6 +881,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         registerMailbox(messenger.getZK());
         m_siteId = m_mailbox.getHSId();
+        m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
     /**
@@ -1349,20 +1373,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // pick the sysproc based on the presence of partition info
-        boolean isSinglePartition = (plannedStmt.partitionParam != null);
+        // HSQL does not specifically implement AdHocSP -- instead, use its always-SP implementation of AdHoc
+        boolean isSinglePartition = (plannedStmt.partitionParam != null) && ! m_isConfiguredForHSQL;
         int partitions[] = null;
 
         if (isSinglePartition) {
             task.procName = "@AdHocSP";
+            assert(plannedStmt.isReplicatedTableDML == false);
+            assert(plannedStmt.collectorFragment == null);
             partitions = new int[] { TheHashinator.hashToPartition(plannedStmt.partitionParam) };
+            task.setParams(plannedStmt.aggregatorFragment, null, plannedStmt.sql, 0);
         }
         else {
             task.procName = "@AdHoc";
             partitions = m_allPartitions;
+            task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                    plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         }
 
-        task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                       plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         task.clientHandle = plannedStmt.clientHandle;
 
         /*

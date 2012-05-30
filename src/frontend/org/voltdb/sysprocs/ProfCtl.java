@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltDB;
@@ -64,22 +64,18 @@ public class ProfCtl extends VoltSystemProcedure {
             }
             else if (command.equalsIgnoreCase("GPERF_ENABLE") || command.equalsIgnoreCase("GPERF_DISABLE")) {
                 // Choose the lowest site ID on this host to do the work.
-                int host_id = context.getExecutionSite().getCorrespondingHostId();
-                Long lowest_site_id =
-                    context.getSiteTracker().
-                    getLowestSiteForHost(host_id);
-                if (context.getExecutionSite().getSiteId() != lowest_site_id)
+                if (!context.isLowestSiteId())
                 {
                     table.addRow("GPERF_NOOP");
                     return new DependencyPair(DEP_ID, table);
                 }
                 if (command.equalsIgnoreCase("GPERF_ENABLE")) {
-                    context.getExecutionEngine().toggleProfiler(1);
+                    context.getSiteProcedureConnection().toggleProfiler(1);
                     table.addRow("GPERF_ENABLE");
                     return new DependencyPair(DEP_ID, table);
                 }
                 else {
-                    context.getExecutionEngine().toggleProfiler(0);
+                    context.getSiteProcedureConnection().toggleProfiler(0);
                     table.addRow("GPERF_DISABLE");
                     return new DependencyPair(DEP_ID, table);
                 }

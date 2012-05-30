@@ -15,29 +15,21 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.catalog.gui;
+package org.voltdb;
 
-import java.util.Enumeration;
-import java.util.Iterator;
+import java.util.Deque;
+import java.util.HashSet;
 
-import javax.swing.tree.TreeNode;
+import org.voltdb.SnapshotSiteProcessor;
 
-public class MapEnumerator implements Enumeration<TreeNode> {
+/**
+ * Defines the interface between a site and the snapshot
+ * top-half.
+ */
+public interface SiteSnapshotConnection
+{
 
-    Iterator<TreeNode> m_iterator;
-
-    MapEnumerator(Iterator<TreeNode> iterator) {
-        m_iterator = iterator;
-    }
-
-    @Override
-    public boolean hasMoreElements() {
-        return m_iterator.hasNext();
-    }
-
-    @Override
-    public TreeNode nextElement() {
-        return m_iterator.next();
-    }
+    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts);
+    public HashSet<Exception> completeSnapshotWork() throws InterruptedException;
 
 }

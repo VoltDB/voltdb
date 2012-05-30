@@ -87,7 +87,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, true);
-            cluster.setMaxHeap(64);
+            cluster.setMaxHeap(256);
             boolean success = cluster.compile(builder);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -159,18 +159,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
             ServerThread localServer = null;
             try {
-                VoltDB.Configuration config = new VoltDB.Configuration();
+                VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
                 config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
                 config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
                 config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
 
-                config.m_port = cluster.portGenerator.nextClient();
-                cluster.setPort(0, config.m_port);
-                config.m_adminPort = cluster.portGenerator.nextAdmin();
-                cluster.setAdminPort(0, config.m_adminPort);
-                config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
-
                 config.m_isRejoinTest = true;
+                cluster.setPortsFromConfig(0, config);
                 localServer = new ServerThread(config);
 
                 localServer.start();
@@ -273,7 +268,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster(
                 "rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         ServerThread localServer = null;
         try {
             boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note, this admin port is ignored
@@ -298,18 +293,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             cluster.shutDownSingleHost(0);
             Thread.sleep(1000);
 
-            VoltDB.Configuration config = new VoltDB.Configuration();
+            VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
             config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
             config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
             config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
 
-            config.m_port = cluster.portGenerator.nextClient();
-            cluster.setPort(0, config.m_port);
-            config.m_adminPort = cluster.portGenerator.nextAdmin();
-            cluster.setAdminPort(0, config.m_adminPort);
-            config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
-
             config.m_isRejoinTest = true;
+            cluster.setPortsFromConfig(0, config);
             localServer = new ServerThread(config);
 
             localServer.start();
@@ -349,7 +339,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -385,7 +375,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_FAILURE,
                 false, false);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -416,7 +406,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -475,7 +465,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -508,18 +498,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(100);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
 
-        config.m_port = cluster.portGenerator.nextClient();
-        cluster.setPort(0, config.m_port);
-        config.m_adminPort = cluster.portGenerator.nextAdmin();
-        cluster.setAdminPort(0, config.m_adminPort);
-        config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
-
         config.m_isRejoinTest = true;
+        cluster.setPortsFromConfig(0, config);
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -558,7 +543,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note this admin port is ignored
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -579,18 +564,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(100);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
 
-        config.m_port = cluster.portGenerator.nextClient();
-        cluster.setPort(0, config.m_port);
-        config.m_adminPort = cluster.portGenerator.nextAdmin();
-        cluster.setAdminPort(0, config.m_adminPort);
-        config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
-
         config.m_isRejoinTest = true;
+        cluster.setPortsFromConfig(0, config);
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -657,7 +637,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -702,18 +682,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(100);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
 
-        config.m_port = cluster.portGenerator.nextClient();
-        cluster.setPort(0, config.m_port);
-        config.m_adminPort = cluster.portGenerator.nextAdmin();
-        cluster.setAdminPort(0, config.m_adminPort);
-        config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
-
         config.m_isRejoinTest = true;
+        cluster.setPortsFromConfig(0, config);
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
@@ -765,7 +740,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -789,18 +764,13 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDownSingleHost(0);
         Thread.sleep(1000);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
         config.m_rejoinToHostAndPort = ":" + cluster.internalPort(1);
 
-        config.m_port = cluster.portGenerator.nextClient();
-        cluster.setPort(0, config.m_port);
-        config.m_adminPort = cluster.portGenerator.nextAdmin();
-        cluster.setAdminPort(0, config.m_adminPort);
-        config.m_zkInterface = "127.0.0.1:" + cluster.portGenerator.next();
-
         config.m_isRejoinTest = true;
+        cluster.setPortsFromConfig(0, config);
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();

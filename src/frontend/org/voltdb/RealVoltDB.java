@@ -45,7 +45,6 @@ import java.util.Set;
 import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
@@ -67,6 +66,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
@@ -95,7 +95,6 @@ import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
-import org.voltcore.utils.COWMap;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -106,6 +105,8 @@ import org.voltdb.utils.SystemStatsCollector;
 import org.voltdb.utils.VoltSampler;
 
 import com.google.common.collect.ImmutableList;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -142,7 +143,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.6";
+    private static final String m_defaultVersionString = "2.7";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -213,7 +214,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     volatile String m_localMetadata = "";
 
-    private ExecutorService m_computationService;
+    private ListeningExecutorService m_computationService;
 
     // methods accessed via the singleton
     @Override
@@ -289,18 +290,20 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_siteThreads = new HashMap<Long, Thread>();
             m_runners = new ArrayList<ExecutionSiteRunner>();
 
-            m_computationService = Executors.newFixedThreadPool(
-                    Runtime.getRuntime().availableProcessors(),
-                    new ThreadFactory() {
-                        private int threadIndex = 0;
-                        @Override
-                        public synchronized Thread  newThread(Runnable r) {
-                            Thread t = new Thread(null, r, "Computation service thread - " + threadIndex++, 131072);
-                            t.setDaemon(true);
-                            return t;
-                        }
+            m_computationService = MoreExecutors.listeningDecorator(
+                    Executors.newFixedThreadPool(
+                        Runtime.getRuntime().availableProcessors(),
+                        new ThreadFactory() {
+                            private int threadIndex = 0;
+                            @Override
+                            public synchronized Thread  newThread(Runnable r) {
+                                Thread t = new Thread(null, r, "Computation service thread - " + threadIndex++, 131072);
+                                t.setDaemon(true);
+                                return t;
+                            }
 
-                    });
+                        })
+                    );
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
@@ -658,7 +661,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // print out a bunch of useful system info
             logDebuggingInfo(m_config.m_adminPort, m_config.m_httpPort, m_httpPortExtraLogMessage, m_jsonEnabled);
 
-            if (clusterConfig.getReplicationFactor() == 1) {
+            if (clusterConfig.getReplicationFactor() == 0) {
                 hostLog.warn("Running without redundancy (k=0) is not recommended for production use.");
             }
 
@@ -1340,14 +1343,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         {
             m_currentThreadSite.run();
         }
-        catch (Throwable t)
+        catch (Throwable thrown)
         {
-            String errmsg = "ExecutionSite: " + org.voltcore.utils.CoreUtils.hsIdToString(m_currentThreadSite.m_siteId) +
-            " encountered an " +
-            "unexpected error and will die, taking this VoltDB node down.";
+            String errmsg = " encountered an unexpected error and will die, taking this VoltDB node down.";
             hostLog.error(errmsg);
-            t.printStackTrace();
-            VoltDB.crashLocalVoltDB(errmsg, true, t);
+            // It's too easy for stdout to get lost, especially if we are crashing, so log FATAL, instead.
+            // Logging also automatically prefixes lines with "ExecutionSite [X:Y] "
+            // thrown.printStackTrace();
+            hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
+            for (StackTraceElement ste : thrown.getStackTrace()) {
+                hostLog.fatal(ste.toString());
+            }
+            VoltDB.crashLocalVoltDB(errmsg, true, thrown);
         }
     }
 
@@ -1358,106 +1365,111 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * null if called from that thread.
      */
     @Override
-    public void shutdown(Thread mainSiteThread) throws InterruptedException {
+    public boolean shutdown(Thread mainSiteThread) throws InterruptedException {
         synchronized(m_startAndStopLock) {
-            m_mode = OperationMode.SHUTTINGDOWN;
-            m_mailboxTracker.shutdown();
-            // Things are going pear-shaped, tell the fault distributor to
-            // shut its fat mouth
-            m_faultManager.shutDown();
-            m_snapshotCompletionMonitor.shutdown();
-            m_periodicWorkThread.shutdown();
-            heartbeatThread.interrupt();
-            heartbeatThread.join();
+            boolean did_it = false;
+            if (m_mode != OperationMode.SHUTTINGDOWN) {
+                did_it = true;
+                m_mode = OperationMode.SHUTTINGDOWN;
+                m_mailboxTracker.shutdown();
+                // Things are going pear-shaped, tell the fault distributor to
+                // shut its fat mouth
+                m_faultManager.shutDown();
+                m_snapshotCompletionMonitor.shutdown();
+                m_periodicWorkThread.shutdown();
+                heartbeatThread.interrupt();
+                heartbeatThread.join();
 
-            if (m_hasStartedSampler.get()) {
-                m_sampler.setShouldStop();
-                m_sampler.join();
-            }
+                if (m_hasStartedSampler.get()) {
+                    m_sampler.setShouldStop();
+                    m_sampler.join();
+                }
 
-            // shutdown the web monitoring / json
-            if (m_adminListener != null)
-                m_adminListener.stop();
+                // shutdown the web monitoring / json
+                if (m_adminListener != null)
+                    m_adminListener.stop();
 
-            // shut down the client interface
-            for (ClientInterface ci : m_clientInterfaces) {
-                ci.shutdown();
-            }
+                // shut down the client interface
+                for (ClientInterface ci : m_clientInterfaces) {
+                    ci.shutdown();
+                }
 
-            // shut down Export and its connectors.
-            ExportManager.instance().shutdown();
+                // shut down Export and its connectors.
+                ExportManager.instance().shutdown();
 
-            // tell all m_sites to stop their runloops
-            if (m_localSites != null) {
-                for (ExecutionSite site : m_localSites.values())
-                    site.startShutdown();
-            }
+                // tell all m_sites to stop their runloops
+                if (m_localSites != null) {
+                    for (ExecutionSite site : m_localSites.values())
+                        site.startShutdown();
+                }
 
-            // try to join all threads but the main one
-            // probably want to check if one of these is the current thread
-            if (m_siteThreads != null) {
-                for (Thread siteThread : m_siteThreads.values()) {
-                    if (Thread.currentThread().equals(siteThread) == false) {
-                        // don't interrupt here. the site will start shutdown when
-                        // it sees the shutdown flag set.
-                        siteThread.join();
+                // try to join all threads but the main one
+                // probably want to check if one of these is the current thread
+                if (m_siteThreads != null) {
+                    for (Thread siteThread : m_siteThreads.values()) {
+                        if (Thread.currentThread().equals(siteThread) == false) {
+                            // don't interrupt here. the site will start shutdown when
+                            // it sees the shutdown flag set.
+                            siteThread.join();
+                        }
                     }
                 }
-            }
 
-            // try to join the main thread (possibly this one)
-            if (mainSiteThread != null) {
-                if (Thread.currentThread().equals(mainSiteThread) == false) {
-                    // don't interrupt here. the site will start shutdown when
-                    // it sees the shutdown flag set.
-                    mainSiteThread.join();
+                // try to join the main thread (possibly this one)
+                if (mainSiteThread != null) {
+                    if (Thread.currentThread().equals(mainSiteThread) == false) {
+                        // don't interrupt here. the site will start shutdown when
+                        // it sees the shutdown flag set.
+                        mainSiteThread.join();
+                    }
                 }
+
+                // After sites are terminated, shutdown the InvocationBufferServer.
+                // The IBS is shared by all sites; don't kill it while any site is active.
+                PartitionDRGateway.shutdown();
+
+                // help the gc along
+                m_localSites = null;
+                m_currentThreadSite = null;
+                m_siteThreads = null;
+                m_runners = null;
+
+                // shut down the network/messaging stuff
+                // Close the host messenger first, which should close down all of
+                // the ForeignHost sockets cleanly
+                if (m_messenger != null)
+                {
+                    m_messenger.shutdown();
+                }
+                m_messenger = null;
+
+                //Also for test code that expects a fresh stats agent
+                if (m_statsAgent != null) {
+                    m_statsAgent.shutdown();
+                    m_statsAgent = null;
+                }
+
+                if (m_asyncCompilerAgent != null) {
+                    m_asyncCompilerAgent.shutdown();
+                    m_asyncCompilerAgent = null;
+                }
+
+                // The network iterates this list. Clear it after network's done.
+                m_clientInterfaces.clear();
+
+                ExportManager.instance().shutdown();
+                m_computationService.shutdown();
+                m_computationService.awaitTermination(1, TimeUnit.DAYS);
+                m_computationService = null;
+                m_siteTracker = null;
+                m_catalogContext = null;
+                m_mailboxPublisher = null;
+
+                // probably unnecessary
+                System.gc();
+                m_isRunning = false;
             }
-
-            // After sites are terminated, shutdown the InvocationBufferServer.
-            // The IBS is shared by all sites; don't kill it while any site is active.
-            PartitionDRGateway.shutdown();
-
-            // help the gc along
-            m_localSites = null;
-            m_currentThreadSite = null;
-            m_siteThreads = null;
-            m_runners = null;
-
-            // shut down the network/messaging stuff
-            // Close the host messenger first, which should close down all of
-            // the ForeignHost sockets cleanly
-            if (m_messenger != null)
-            {
-                m_messenger.shutdown();
-            }
-            m_messenger = null;
-
-            //Also for test code that expects a fresh stats agent
-            if (m_statsAgent != null) {
-                m_statsAgent.shutdown();
-                m_statsAgent = null;
-            }
-
-            if (m_asyncCompilerAgent != null) {
-                m_asyncCompilerAgent.shutdown();
-                m_asyncCompilerAgent = null;
-            }
-
-            // The network iterates this list. Clear it after network's done.
-            m_clientInterfaces.clear();
-
-            ExportManager.instance().shutdown();
-            m_computationService.shutdown();
-            m_computationService.awaitTermination(1, TimeUnit.DAYS);
-            m_computationService = null;
-            m_siteTracker = null;
-            m_catalogContext = null;
-            m_mailboxPublisher = null;
-
-            // probably unnecessary
-            System.gc();
-            m_isRunning = false;
+            return did_it;
         }
     }
 
@@ -1466,22 +1478,21 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      * execution site threads */
     private static Long lastLogUpdate_txnId = 0L;
     @Override
-    public void logUpdate(String xmlConfig, long currentTxnId)
+    synchronized public void logUpdate(String xmlConfig, long currentTxnId)
     {
-        synchronized(lastLogUpdate_txnId)
-        {
-            // another site already did this work.
-            if (currentTxnId == lastLogUpdate_txnId) {
-                return;
-            }
-            else if (currentTxnId < lastLogUpdate_txnId) {
-                throw new RuntimeException("Trying to update logging config with an old transaction.");
-            }
-            hostLog.info("Updating RealVoltDB logging config from txnid: " +
-                    lastLogUpdate_txnId + " to " + currentTxnId);
-            lastLogUpdate_txnId = currentTxnId;
-            VoltLogger.configure(xmlConfig);
+        // another site already did this work.
+        if (currentTxnId == lastLogUpdate_txnId) {
+            return;
         }
+        else if (currentTxnId < lastLogUpdate_txnId) {
+            throw new RuntimeException(
+                    "Trying to update logging config at transaction " + lastLogUpdate_txnId
+                    + " with an older transaction: " + currentTxnId);
+        }
+        hostLog.info("Updating RealVoltDB logging config from txnid: " +
+                lastLogUpdate_txnId + " to " + currentTxnId);
+        lastLogUpdate_txnId = currentTxnId;
+        VoltLogger.configure(xmlConfig);
     }
 
     /** Struct to associate a context with a counter of served sites */
@@ -1819,7 +1830,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public ExecutorService getComputationService() {
+    public ListeningExecutorService getComputationService() {
         return m_computationService;
     }
 

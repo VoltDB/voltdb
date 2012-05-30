@@ -20,9 +20,8 @@ package org.voltdb.sysprocs;
 import java.util.List;
 import java.util.Map;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.OperationMode;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -55,11 +54,7 @@ public class Resume extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx)
     {
         // Choose the lowest site ID on this host to actually flip the bit
-        int host_id = ctx.getExecutionSite().getCorrespondingHostId();
-        Long lowest_site_id =
-            ctx.getSiteTracker().
-            getLowestSiteForHost(host_id);
-        if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
+        if (ctx.isLowestSiteId())
         {
             VoltDB.instance().setMode(OperationMode.RUNNING);
             try {

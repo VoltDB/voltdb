@@ -24,15 +24,15 @@ import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
-import java.util.concurrent.Future;
-import java.util.concurrent.ScheduledExecutorService;
+
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.CRC32;
 
 import org.voltcore.logging.VoltLogger;
@@ -40,6 +40,13 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.messaging.FastSerializer;
+
+import com.google.common.util.concurrent.Callables;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
 
@@ -78,30 +85,35 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final String m_tableName;
 
     private final AtomicInteger m_outstandingWriteTasks = new AtomicInteger(0);
+    private final ReentrantLock m_outstandingWriteTasksLock = new ReentrantLock();
+    private final Condition m_noMoreOutstandingWriteTasksCondition =
+            m_outstandingWriteTasksLock.newCondition();
 
-    private static final ExecutorService m_es = Executors.newSingleThreadExecutor(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
+    private static final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(
+            Executors.newSingleThreadExecutor(new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
 
-            return new Thread(
-                    Thread.currentThread().getThreadGroup(),
-                    r,
-                    "Snapshot write service ",
-                    131072);
-        }
-    });
+                    return new Thread(
+                            Thread.currentThread().getThreadGroup(),
+                            r,
+                            "Snapshot write service ",
+                            131072);
+                }
+            }));
 
-    private static final ScheduledExecutorService m_syncService = Executors.newSingleThreadScheduledExecutor(
-            new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
-            return new Thread(
-                    Thread.currentThread().getThreadGroup(),
-                    r,
-                    "Snapshot sync service ",
-                    131072);
-        }
-    });
+    private static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
+            Executors.newSingleThreadScheduledExecutor(
+                    new ThreadFactory() {
+                @Override
+                public Thread newThread(Runnable r) {
+                    return new Thread(
+                            Thread.currentThread().getThreadGroup(),
+                            r,
+                            "Snapshot sync service ",
+                            131072);
+                }
+            }));
 
     public DeprecatedDefaultSnapshotDataTarget(
             final File file,
@@ -198,7 +210,8 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
          * the disk is probably full or the path is bunk etc.
          */
         m_acceptOneWrite = true;
-        Future<?> writeFuture = write(DBBPool.wrapBB(aggregateBuffer), false);
+        ListenableFuture<?> writeFuture =
+                write(Callables.returning((BBContainer)DBBPool.wrapBB(aggregateBuffer)), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
@@ -234,10 +247,13 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public void close() throws IOException, InterruptedException {
         try {
-            synchronized (m_outstandingWriteTasks) {
+            m_outstandingWriteTasksLock.lock();
+            try {
                 while (m_outstandingWriteTasks.get() > 0) {
-                    m_outstandingWriteTasks.wait();
+                    m_noMoreOutstandingWriteTasksCondition.await();
                 }
+            } finally {
+                m_outstandingWriteTasksLock.unlock();
             }
             m_syncTask.cancel(false);
             m_channel.force(false);
@@ -264,7 +280,19 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         return 4;
     }
 
-    private Future<?> write(final BBContainer tupleData, final boolean prependLength) {
+    private ListenableFuture<?> write(final Callable<BBContainer> tupleDataC, final boolean prependLength) {
+        /*
+         * Unwrap the data to be written. For the traditional
+         * snapshot data target this should be a noop.
+         */
+        BBContainer tupleDataTemp;
+        try {
+            tupleDataTemp = tupleDataC.call();
+        } catch (Throwable t) {
+            return Futures.immediateFailedFuture(t);
+        }
+        final BBContainer tupleData = tupleDataTemp;
+
         if (m_writeFailed) {
             tupleData.discard();
             return null;
@@ -276,7 +304,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
         }
 
         m_outstandingWriteTasks.incrementAndGet();
-        Future<?> writeTask = m_es.submit(new Callable<Object>() {
+        ListenableFuture<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
                 try {
@@ -303,10 +331,13 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
                     throw e;
                 } finally {
                     tupleData.discard();
-                    synchronized (m_outstandingWriteTasks) {
+                    m_outstandingWriteTasksLock.lock();
+                    try {
                         if (m_outstandingWriteTasks.decrementAndGet() == 0) {
-                            m_outstandingWriteTasks.notify();
+                            m_noMoreOutstandingWriteTasksCondition.signalAll();
                         }
+                    } finally {
+                        m_outstandingWriteTasksLock.unlock();
                     }
                 }
                 return null;
@@ -316,7 +347,7 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public Future<?> write(final BBContainer tupleData) {
+    public ListenableFuture<?> write(final Callable<BBContainer> tupleData) {
         return write(tupleData, true);
     }
 
@@ -334,5 +365,4 @@ public class DeprecatedDefaultSnapshotDataTarget implements SnapshotDataTarget {
     public IOException getLastWriteException() {
         return m_writeException;
     }
-
 }

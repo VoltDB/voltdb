@@ -20,7 +20,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.ReplicationRole;
@@ -52,12 +52,7 @@ public class Promote extends VoltSystemProcedure {
     public VoltTable[] run(SystemProcedureExecutionContext ctx) throws Exception
     {
         // Choose the lowest site ID on this host to actually flip the bit
-        int host_id = ctx.getExecutionSite().getCorrespondingHostId();
-        Long lowest_site_id =
-            ctx.getSiteTracker().
-            getLowestSiteForHost(host_id);
-        if (ctx.getExecutionSite().getSiteId() == lowest_site_id)
-        {
+        if (ctx.isLowestSiteId()) {
             VoltDB.instance().getHostMessenger().getZK().setData(
                     VoltZK.replicationrole,
                     ReplicationRole.NONE.toString().getBytes("UTF-8"),

@@ -67,7 +67,7 @@ public class ParameterConverter {
             return null;
         }
 
-        if (param instanceof ExecutionSite.SystemProcedureExecutionContext) {
+        if (param instanceof SystemProcedureExecutionContext) {
             return param;
         }
 

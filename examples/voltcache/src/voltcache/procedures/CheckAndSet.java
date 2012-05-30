@@ -22,20 +22,22 @@
  */
 package voltcache.procedures;
 
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltTable;
+
 import voltcache.api.VoltCacheResult;
-import org.voltdb.*;
 
 @ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
 
-public class CheckAndSet extends VoltProcedure
+public class CheckAndSet extends VoltCacheProcBase
 {
-    private final SQLStmt clean  = Shared.CleanSQLStmt;
     private final SQLStmt check  = new SQLStmt("SELECT CASVersion FROM cache WHERE Key = ? AND Expires > ? AND CASVersion > -1;");
     private final SQLStmt update = new SQLStmt("UPDATE cache SET Expires = ?, Flags = ?, Value = ?, CASVersion = CASVersion+1 WHERE Key = ? AND CASVersion = ?;");
 
     public long run(String key, int flags, int expires, byte[] value, long casVersion)
     {
-        final int now = Shared.init(this, key);
+        final int now = baseInit(key);
 
         voltQueueSQL(check, key, now);
         VoltTable checkResult = voltExecuteSQL()[1];
@@ -45,7 +47,7 @@ public class CheckAndSet extends VoltProcedure
         if (checkResult.fetchRow(0).getLong(0) != casVersion)
             return VoltCacheResult.EXISTS;
 
-        voltQueueSQL(update, Shared.expires(this, expires), flags, value, key, casVersion);
+        voltQueueSQL(update, expirationTimestamp(expires), flags, value, key, casVersion);
         voltExecuteSQL(true);
         return VoltCacheResult.STORED;
     }

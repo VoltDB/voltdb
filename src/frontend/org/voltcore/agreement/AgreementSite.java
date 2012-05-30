@@ -23,11 +23,13 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -606,7 +608,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         Set<Long> newFailedSiteIds = Collections.unmodifiableSet(m_pendingFailedSites);
         m_recoveryLog.info("Agreement, handling site faults for newly failed sites " +
                 CoreUtils.hsIdCollectionToString(newFailedSiteIds) +
-                " initiatorSafeInitPoints " + initiatorSafeInitPoint);
+                " initiatorSafeInitPoints " + CoreUtils.hsIdKeyMapToString(initiatorSafeInitPoint));
+
         // Fix safe transaction scoreboard in transaction queue
         for (Long siteId : newFailedSiteIds) {
             m_safetyState.removeState(siteId);
@@ -687,10 +690,24 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     {
         HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
         survivorSet.removeAll(m_pendingFailedSites);
-        int responses = 0;
+
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
+        long blockedOnReceiveStart = System.currentTimeMillis();
+        long lastReportTime = 0;
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
+
+            /*
+             * If fault resolution takes longer then 10 seconds start logging
+             */
+            final long now = System.currentTimeMillis();
+            if (now - blockedOnReceiveStart > 10000) {
+                if (now - lastReportTime > 60000) {
+                    lastReportTime = System.currentTimeMillis();
+                    haveNecessaryFaultInfo(m_pendingFailedSites, true);
+                }
+            }
+
             if (m == null) {
                 //Don't need to do anything here?
                 continue;
@@ -718,33 +735,51 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 return false;
             }
 
-            m_recoveryLog.info("Agreement, Received failure message " + responses +
-                    " from " + CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
+            m_recoveryLog.info("Agreement, Received failure message from " +
+                    CoreUtils.hsIdToString(fm.m_sourceHSId) + " for failed sites " +
                     CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) +
                     " safe txn id " + fm.m_safeTxnId + " failed site " +
                     CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId));
-        } while(!haveNecessaryFaultInfo(survivorSet));
+        } while(!haveNecessaryFaultInfo(survivorSet, false));
         return true;
     }
 
     private boolean haveNecessaryFaultInfo(
-            Set<Long> survivors) {
+            Set<Long> survivors,
+            boolean log) {
+        List<Pair<Long, Long>> missingMessages = new ArrayList<Pair<Long, Long>>();
         for (long survivingSite : survivors) {
             for (Long failingSite : m_pendingFailedSites) {
                 Pair<Long, Long> key = Pair.of( survivingSite, failingSite);
                 if (!m_failureSiteUpdateLedger.containsKey(key)) {
-                    return false;
+                    missingMessages.add(key);
                 }
             }
         }
-        return true;
+        if (log) {
+            StringBuilder sb = new StringBuilder();
+            sb.append('[');
+            boolean first = true;
+            for (Pair<Long, Long> p : missingMessages) {
+                if (!first) sb.append(", ");
+                first = false;
+                sb.append(CoreUtils.hsIdToString(p.getFirst()));
+                sb.append('-');
+                sb.append(CoreUtils.hsIdToString(p.getSecond()));
+            }
+            sb.append(']');
+
+            m_recoveryLog.warn("Failure resolution stalled waiting for ( ExecutionSite, Initiator ) " +
+                                "information: " + sb.toString());
+        }
+        return missingMessages.isEmpty();
     }
 
     private void extractGlobalFaultData(
             HashMap<Long, Long> initiatorSafeInitPoint) {
         HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
         survivorSet.removeAll(m_pendingFailedSites);
-        if (!haveNecessaryFaultInfo(survivorSet)) {
+        if (!haveNecessaryFaultInfo(survivorSet, false)) {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
         }
 

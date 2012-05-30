@@ -65,6 +65,7 @@ public class ProcedureRunner {
     protected final ArrayList<QueuedSQL> m_batch = new ArrayList<QueuedSQL>(100);
     // cached fake SQLStmt array for single statement non-java procs
     QueuedSQL m_cachedSingleStmt = new QueuedSQL(); // never null
+    boolean m_seenFinalBatch = false;
 
     // reflected info
     //
@@ -90,8 +91,7 @@ public class ProcedureRunner {
     // hooks into other parts of voltdb
     //
     protected final SiteProcedureConnection m_site;
-    protected final HsqlBackend m_hsql;
-    protected final boolean m_isNative;
+    protected final SystemProcedureExecutionContext m_systemProcedureContext;
 
     // per procedure state and catalog info
     //
@@ -108,15 +108,14 @@ public class ProcedureRunner {
 
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
-                    Procedure catProc,
-                    HsqlBackend hsql) {
+                    SystemProcedureExecutionContext sysprocContext,
+                    Procedure catProc) {
         m_procedureName = procedure.getClass().getSimpleName();
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
-        m_hsql = hsql;
-        m_isNative = hsql == null;
         m_site = site;
+        m_systemProcedureContext = sysprocContext;
 
         m_procedure.init(this);
 
@@ -172,6 +171,15 @@ public class ProcedureRunner {
 
             byte status = ClientResponseImpl.SUCCESS;
             VoltTable[] results = null;
+
+            // inject sysproc execution context as the first parameter.
+            if (isSystemProcedure()) {
+                final Object[] combinedParams = new Object[paramList.length + 1];
+                combinedParams[0] = m_systemProcedureContext;
+                for (int i=0; i < paramList.length; ++i) combinedParams[i+1] = paramList[i];
+                // swap the lists.
+                paramList = combinedParams;
+            }
 
             if (paramList.length != m_paramTypes.length) {
                 m_statsCollector.endProcedure( false, true);
@@ -240,9 +248,10 @@ public class ProcedureRunner {
                 try {
                     m_cachedSingleStmt.params = getCleanParams(
                             m_cachedSingleStmt.stmt, paramList);
-                    if (!m_isNative) {
+                    if (getHsqlBackendIfExists() != null) {
                         // HSQL handling
-                        VoltTable table = m_hsql.runSQLWithSubstitutions(
+                        VoltTable table =
+                            getHsqlBackendIfExists().runSQLWithSubstitutions(
                                 m_cachedSingleStmt.stmt, m_cachedSingleStmt.params);
                         results = new VoltTable[] { table };
                     }
@@ -284,6 +293,7 @@ public class ProcedureRunner {
             m_cachedRNG = null;
             m_cachedSingleStmt.params = null;
             m_cachedSingleStmt.expectation = null;
+            m_seenFinalBatch = false;
         }
 
         return retval;
@@ -302,7 +312,7 @@ public class ProcedureRunner {
      * If returns non-null, then using hsql backend
      */
     public HsqlBackend getHsqlBackendIfExists() {
-        return m_hsql;
+        return m_site.getHsqlBackendIfExists();
     }
 
     public void setAppStatusCode(byte statusCode) {
@@ -336,6 +346,16 @@ public class ProcedureRunner {
     }
 
     public VoltTable[] voltExecuteSQL(boolean isFinalSQL) {
+        if (m_seenFinalBatch) {
+            throw new RuntimeException("Procedure " + m_procedureName +
+                                       " attempted to execute a batch " +
+                                       "after claiming a previous batch was final " +
+                                       "and will be aborted.\n  Examine calls to " +
+                                       "voltExecuteSQL() and verify that the call " +
+                                       "with the argument value 'true' is actually " +
+                                       "the final one");
+        }
+        m_seenFinalBatch = isFinalSQL;
         return executeQueriesInABatch(m_batch, isFinalSQL);
     }
 
@@ -356,11 +376,11 @@ public class ProcedureRunner {
         }
 
         // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
-        if (!m_isNative) {
+        if (getHsqlBackendIfExists() != null) {
             results = new VoltTable[batchSize];
             int i = 0;
             for (QueuedSQL qs : batch) {
-                results[i++] = m_hsql.runSQLWithSubstitutions(qs.stmt, qs.params);
+                results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(qs.stmt, qs.params);
             }
         }
 
@@ -424,12 +444,11 @@ public class ProcedureRunner {
     DependencyPair executePlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
-            ParameterSet params,
-            ExecutionSite.SystemProcedureExecutionContext context) {
+            ParameterSet params) {
         setupTransaction(txnState);
         assert (m_procedure instanceof VoltSystemProcedure);
         VoltSystemProcedure sysproc = (VoltSystemProcedure) m_procedure;
-        return sysproc.executePlanFragment(dependencies, fragmentId, params, context);
+        return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
     protected ParameterSet getCleanParams(SQLStmt stmt, Object[] args) {

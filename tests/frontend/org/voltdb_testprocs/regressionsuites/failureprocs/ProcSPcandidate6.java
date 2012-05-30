@@ -20,38 +20,30 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package voltcache.procedures;
 
-import org.voltdb.*;
+package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-public class Shared
-{
-    public static final SQLStmt CleanSQLStmt  = new SQLStmt("DELETE FROM cache WHERE Key = ? AND Expires <= ?;");
-    private static final int MaxExpires = 2592000;
-    public static int now(VoltProcedure procedure)
-    {
-        return (int)(procedure.getTransactionTime().getTime()/1000);
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+
+@ProcInfo (
+    singlePartition = false
+)
+public class ProcSPcandidate6 extends VoltProcedure {
+
+    // Parameterized WHERE clause enables SP processing
+    public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = 87654321");
+
+    // Addition of arbitrary query against replicated data should have no ill effect on SP processing.
+    public static final SQLStmt nonspoiler = new SQLStmt("select count(*) from indexed_blah order by ival");
+
+    public long run() {
+        voltQueueSQL(query);
+        voltQueueSQL(nonspoiler);
+        voltExecuteSQL();
+        // zero is a successful return
+        return 0;
     }
-    public static int expires(VoltProcedure procedure, int expires)
-    {
-        if (expires <= 0)
-            return now(procedure) + MaxExpires;
-        else if (expires <= MaxExpires)
-            return now(procedure) + expires;
-        return expires;
-    }
-    public static int init(VoltProcedure procedure, String key)
-    {
-        final int now = now(procedure);
-        procedure.voltQueueSQL(CleanSQLStmt, key, now);
-        return now;
-    }
-    public static int init(VoltProcedure procedure, String[] keys)
-    {
-        final int now = now(procedure);
-        for(String key : keys)
-            procedure.voltQueueSQL(CleanSQLStmt, key, now);
-        procedure.voltExecuteSQL();
-        return now;
-    }
+
 }
