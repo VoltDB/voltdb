@@ -70,6 +70,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCacheReader;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltZK.MailboxType;
@@ -148,7 +149,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * IV2 stuff
      */
-    private final MapCache m_iv2Masters;
+    private final MapCacheReader m_iv2Masters;
     private final AtomicLong m_sequence = new AtomicLong(0);
     private ConcurrentHashMap<Long, Iv2InFlight> m_sequenceToConnection =
         new ConcurrentHashMap<Long, Iv2InFlight>();

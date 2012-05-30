@@ -30,6 +30,7 @@ import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
@@ -99,7 +100,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     public void becomeLeader()
     {
         try {
-            MapCache iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
+            MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
 
             m_babySitter = new BabySitter(m_messenger.getZK(),
                     LeaderElector.electionDirForPartition(m_partitionId),
