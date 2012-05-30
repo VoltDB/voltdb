@@ -63,6 +63,10 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_coordinatorHSId;
     }
 
+    public void setTxnId(long txnId) {
+        m_txnId = txnId;
+    }
+
     public long getTxnId() {
         return m_txnId;
     }
