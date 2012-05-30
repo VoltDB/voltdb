@@ -31,6 +31,7 @@ import java.util.List;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.junit.After;
+import org.junit.Before;
 import org.junit.BeforeClass;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
@@ -60,11 +61,11 @@ import static org.mockito.Mockito.*;
 
 public class TestClientInterface {
     // mocked objects that CI requires
-    private static final VoltDBInterface m_volt = mock(VoltDBInterface.class);
-    private static final StatsAgent m_statsAgent = mock(StatsAgent.class);
-    private static final HostMessenger m_messenger = mock(HostMessenger.class);
-    private static final TransactionInitiator m_initiator = mock(TransactionInitiator.class);
-    private static final ClientInputHandler m_handler = mock(ClientInputHandler.class);
+    private VoltDBInterface m_volt;
+    private StatsAgent m_statsAgent;
+    private HostMessenger m_messenger;
+    private TransactionInitiator m_initiator;
+    private ClientInputHandler m_handler;
 
     // real context
     private static CatalogContext m_context = null;
@@ -80,6 +81,17 @@ public class TestClientInterface {
     public static void setUpOnce() throws Exception {
         buildCatalog();
 
+    }
+
+    @Before
+    public void setUp() throws Exception {
+        // Set up CI with the mock objects.
+        m_volt = mock(VoltDBInterface.class);
+        m_statsAgent = mock(StatsAgent.class);
+        m_messenger = mock(HostMessenger.class);
+        m_initiator = mock(TransactionInitiator.class);
+        m_handler = mock(ClientInputHandler.class);
+
         /*
          * Setup the mock objects so that they return expected objects in CI
          * construction
@@ -93,8 +105,6 @@ public class TestClientInterface {
         doReturn(mock(Configuration.class)).when(m_volt).getConfig();
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
-
-        // Set up CI with the mock objects.
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
                                        m_context, m_messenger, ReplicationRole.NONE, m_initiator, m_allPartitions));
 
@@ -220,8 +230,7 @@ public class TestClientInterface {
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_messenger).send(eq(32L),
-                                 captor.capture());
+        verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
 
@@ -230,8 +239,7 @@ public class TestClientInterface {
         msg = createMsg("@AdHoc", "select * from a where i = 3", 3);
         resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
-        verify(m_messenger).send(eq(32L),
-                                 captor.capture());
+        verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
         assertTrue(captor.getValue().payload.toString().contains("partition param: 3"));
     }
@@ -445,4 +453,5 @@ public class TestClientInterface {
         assertNotNull(resp);
         assertEquals(ClientResponseImpl.GRACEFUL_FAILURE, resp.getStatus());
     }
+
 }
