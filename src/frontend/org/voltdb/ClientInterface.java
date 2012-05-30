@@ -227,6 +227,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Wait until they receive data or have been booted.
      */
     private boolean m_hasGlobalClientBackPressure = false;
+    private final boolean m_isConfiguredForHSQL;
 
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
@@ -880,6 +881,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         registerMailbox(messenger.getZK());
         m_siteId = m_mailbox.getHSId();
+        m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
     /**
@@ -1357,20 +1359,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // pick the sysproc based on the presence of partition info
-        boolean isSinglePartition = (plannedStmt.partitionParam != null);
+        // HSQL does not specifically implement AdHocSP -- instead, use its always-SP implementation of AdHoc
+        boolean isSinglePartition = (plannedStmt.partitionParam != null) && ! m_isConfiguredForHSQL;
         int partitions[] = null;
 
         if (isSinglePartition) {
             task.procName = "@AdHocSP";
+            assert(plannedStmt.isReplicatedTableDML == false);
+            assert(plannedStmt.collectorFragment == null);
             partitions = new int[] { TheHashinator.hashToPartition(plannedStmt.partitionParam) };
+            task.setParams(plannedStmt.aggregatorFragment, null, plannedStmt.sql, 0);
         }
         else {
             task.procName = "@AdHoc";
             partitions = m_allPartitions;
+            task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
+                    plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         }
 
-        task.setParams(plannedStmt.aggregatorFragment, plannedStmt.collectorFragment,
-                       plannedStmt.sql, plannedStmt.isReplicatedTableDML ? 1 : 0);
         task.clientHandle = plannedStmt.clientHandle;
 
         /*
