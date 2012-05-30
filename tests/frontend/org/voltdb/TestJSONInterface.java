@@ -422,7 +422,7 @@ public class TestJSONInterface extends TestCase {
         responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, response.status);
 
         // check the JSON itself makes sense
         JSONObject jsonObj = new JSONObject(responseJSON);
@@ -438,7 +438,7 @@ public class TestJSONInterface extends TestCase {
 
         // try to pass a string as a date
         java.sql.Timestamp ts = new java.sql.Timestamp(System.currentTimeMillis());
-        ts.setNanos(123456789);
+        ts.setNanos(123456000);
         pset = new ParameterSet();
         pset.setParameters(1,
                 5,
@@ -451,7 +451,7 @@ public class TestJSONInterface extends TestCase {
         responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, response.status);
         response.results[3].advanceRow();
         System.out.println(response.results[3].getTimestampAsTimestamp(0).getTime());
         assertEquals(123456, response.results[3].getTimestampAsTimestamp(0).getTime() % 1000000);

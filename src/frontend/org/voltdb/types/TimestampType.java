@@ -43,18 +43,27 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
         m_date = (Date) date.clone();
     }
 
-    private static long defeatJava(String param) {
+    private static long microsFromJDBCformat(String param) {
         java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(param);
 
-        // get millis and then truncate to integral seconds.
-        long timeInMillis = sqlTS.getTime();
-        timeInMillis = timeInMillis - (timeInMillis % 1000);
+        final long timeInMillis = sqlTS.getTime();
+        final long fractionalSecondsInNanos = sqlTS.getNanos();
+        // Fractional microseconds would get truncated so flag them as an error.
+        if ((fractionalSecondsInNanos % 1000) != 0) {
+            throw new IllegalArgumentException("Can't convert from String to TimestampType with fractional microseconds");
+        }
+        // Milliseconds would be doubly counted as millions of nanos if they weren't truncated out via %.
+        return (timeInMillis * 1000) + ((fractionalSecondsInNanos % 1000000)/1000);
+    }
 
-        final long timeInMicros = timeInMillis * 1000;
-
-        // add back the fractional seconds and return nanos since epoch
-        final long fractionalSeconds = sqlTS.getNanos();
-        return (timeInMicros + fractionalSeconds/1000);
+    public static long millisFromJDBCformat(String param) {
+        java.sql.Timestamp sqlTS = java.sql.Timestamp.valueOf(param);
+        final long fractionalSecondsInNanos = sqlTS.getNanos();
+        // Fractional milliseconds would get truncated so flag them as an error.
+        if ((fractionalSecondsInNanos % 1000000) != 0) {
+            throw new IllegalArgumentException("Can't convert from String to Date with fractional milliseconds");
+        }
+        return sqlTS.getTime();
     }
 
     /**
@@ -65,7 +74,7 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
      * @param param A string in YYYY-MM-DD-SS.sss format.
      */
     public TimestampType(String param) {
-        this(defeatJava(param));
+        this(microsFromJDBCformat(param));
     }
 
     /**
@@ -155,6 +164,44 @@ public class TimestampType implements JSONString, Comparable<TimestampType> {
      */
     public Date asApproximateJavaDate() {
         return (Date) m_date.clone();
+    }
+
+    /**
+     * Retrieve a copy of the Java date for a TimeStamp with millisecond granularity.
+     * The returned date is a copy; this object will not be affected by
+     * modifications of the returned instance.
+     * @return Clone of underlying Date object.
+     */
+    public Date asExactJavaDate() {
+        if (m_usecs != 0) {
+            throw new RuntimeException("Can't convert to java Date from TimestampType with fractional milliseconds");
+        }
+        return (Date) m_date.clone();
+    }
+
+    /**
+     * Retrieve a properly typed copy of the Java date for a TimeStamp with millisecond granularity.
+     * The returned date is a copy; this object will not be affected by
+     * modifications of the returned instance.
+     * @return specifically typed copy of underlying Date object.
+     */
+    public java.sql.Date asExactJavaSqlDate() {
+        if (m_usecs != 0) {
+            throw new RuntimeException("Can't convert to sql Date from TimestampType with fractional milliseconds");
+        }
+        return new java.sql.Date(m_date.getTime());
+    }
+
+    /**
+     * Retrieve a properly typed copy of the Java Timestamp for the VoltDB TimeStamp.
+     * The returned Timestamp is a copy; this object will not be affected by
+     * modifications of the returned instance.
+     * @return reformatted Timestamp expressed internally as 1000s of nanoseconds.
+     */
+    public java.sql.Timestamp asJavaTimestamp() {
+        java.sql.Timestamp result = new java.sql.Timestamp(m_date.getTime());
+        result.setNanos(result.getNanos() + m_usecs * 1000);
+        return result;
     }
 
     @Override

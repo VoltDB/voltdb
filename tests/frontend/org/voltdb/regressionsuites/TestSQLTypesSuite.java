@@ -33,6 +33,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -326,6 +327,164 @@ public class TestSQLTypesSuite extends RegressionSuite {
         client.callProcedure("PassObjectNull", 0, 0, 0, 0, 0, 0.0, null, null,
                 null, null, null, null, null, null);
     }
+
+    public void testPassingDateAndTimeObjectsToStatements() throws Exception {
+        final Client client = this.getClient();
+
+        // Capture the same value within the supported millisecond granularity
+        // in each of the supported time formats to demonstrate that they are interchangeable.
+        long millisecondsSinceEpoch = 1001001001L;
+        TimestampType tst = new TimestampType(millisecondsSinceEpoch * 1000);
+        java.util.Date utild = new java.util.Date(millisecondsSinceEpoch);
+        java.sql.Date sqld = new java.sql.Date(millisecondsSinceEpoch);
+        java.sql.Timestamp ts = new java.sql.Timestamp(millisecondsSinceEpoch);
+
+        int lowerBound = pkey.incrementAndGet();
+        // system-defined CRUD inputs
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, utild,
+                null, null, null, null, null, null, null);
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, sqld,
+                null, null, null, null, null, null, null);
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts,
+                null, null, null, null, null, null, null);
+
+        // user-defined statement inputs
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, utild,
+                null, null, null, null, null, null, null);
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, sqld,
+                null, null, null, null, null, null, null);
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts,
+                null, null, null, null, null, null, null);
+
+        // stored procedure inputs into queued statement
+        // -- this doesn't exercise passing the java types into the stored procedure
+        // -- that's covered by TestSQLFeaturesSuite's testPassAllArgTypes
+        client.callProcedure("Insert", "ALLOW_NULLS", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("Insert", "ALLOW_NULLS and use sql.Timestamp", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("Insert", "ALLOW_NULLS and use sql.Date", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("Insert", "ALLOW_NULLS and use util.Date", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+
+        ClientResponse cr;
+        VoltTable[] result;
+        VoltTable vt;
+        cr = client.callProcedure("@AdHoc", "SELECT A_TIMESTAMP from ALLOW_NULLS where PKEY > " + lowerBound + ";");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults();
+        assertEquals(12, result[0].getRowCount());
+        vt = result[0];
+        while (vt.advanceRow()) {
+            // Within the millisecond granularity all formats should encapsulate the same value.
+            assertEquals(tst, vt.getTimestampAsTimestamp(0));
+            assertEquals(ts, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(sqld, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(utild, vt.getTimestampAsSqlTimestamp(0));
+        }
+
+        // Demonstrate that TimestampType and java.sql.Timestamp support microseconds while Dates truncate to milliseconds.
+        // Capture the same value within the supported millisecond granularity
+        // in each of the supported time formats to demonstrate that they are interchangeable.
+        long microsecondsSinceEpoch = 1001001001001L;
+        TimestampType tst_micro = new TimestampType(microsecondsSinceEpoch);
+        java.sql.Timestamp ts_micro = new java.sql.Timestamp(microsecondsSinceEpoch/1000);
+        // At this point, the additional 1 microsecond was truncated in the division, and so is still not reflected in ts_micro.
+        assertEquals(ts, ts_micro);
+        // Extract the 1000000 nanos (doubly-counted milliseconds)
+        assertEquals(1000000, ts_micro.getNanos());
+        // and explicitly add in the truncated 1000 nanos (1 microsecond)
+        ts_micro.setNanos(ts_micro.getNanos()+1000);
+
+        assertNotSame(tst, tst_micro);
+        assertNotSame(ts, ts_micro);
+
+        // A new round of inserts, just using the more accurate formats.
+        lowerBound = pkey.incrementAndGet();
+        // system-defined CRUD inputs
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst_micro,
+                null, null, null, null, null, null, null);
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_micro,
+                null, null, null, null, null, null, null);
+
+        // user-defined statement inputs
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst_micro,
+                null, null, null, null, null, null, null);
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_micro,
+                null, null, null, null, null, null, null);
+
+        // stored procedure inputs into queued statement
+        client.callProcedure("Insert", "ALLOW_NULLS", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst_micro,
+                null, null, null, null, null, null, null);
+        client.callProcedure("Insert", "ALLOW_NULLS and use sql.Timestamp", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst_micro,
+                null, null, null, null, null, null, null);
+
+        cr = client.callProcedure("@AdHoc", "SELECT A_TIMESTAMP from ALLOW_NULLS where PKEY > " + lowerBound + ";");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults();
+        assertEquals(6, result[0].getRowCount());
+        vt = result[0];
+        while (vt.advanceRow()) {
+            // Within the microsecond granularity only the detailed formats preserve the "full" accuracy.
+            assertNotSame(tst, vt.getTimestampAsTimestamp(0));
+            assertNotSame(ts, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(tst_micro, vt.getTimestampAsTimestamp(0));
+            assertEquals(ts_micro, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(sqld, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(utild, vt.getTimestampAsSqlTimestamp(0));
+        }
+
+        // Now, go overboard, trying to preserve nano accuracy.
+        // XXX: The following tests are a little controversial.
+        // Some would prefer a gentler response -- just truncating/rounding to the nearest microsecond.
+        // When these voices of reason prevail, this test should be replaced by a test that nano-noise
+        // gets filtered out but the result is still correct to microsecond granularity.
+        java.sql.Timestamp ts_nano = new java.sql.Timestamp(millisecondsSinceEpoch);
+        assertEquals(ts, ts_nano);
+        // Extract the 1000000 nanos (doubly-counted milliseconds)
+        assertEquals(1000000, ts_nano.getNanos());
+        // and explicitly add in 1001 nanos (1 microsecond + 1 nanosecond)
+        ts_nano.setNanos(ts_nano.getNanos()+1001);
+
+        // Should be off by 1 nano.
+        assertNotSame(ts_micro, ts_nano);
+
+        // A new round of inserts, trying to use the too accurate format.
+        lowerBound = pkey.incrementAndGet();
+
+        boolean caught;
+        try {
+            caught = false;
+            // system-defined CRUD inputs
+            cr = client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_nano,
+                    null, null, null, null, null, null, null);
+        } catch (RuntimeException e) {
+            caught = true;
+        }
+        assert(caught);
+
+        try {
+            caught = false;
+            // user-defined statement inputs
+            cr = client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_nano,
+                    null, null, null, null, null, null, null);
+        } catch (RuntimeException e) {
+            caught = true;
+        }
+        assert(caught);
+
+        // Smuggling nanos into a stored procedure is also already covered by TestSQLFeaturesSuite's testPassAllArgTypes
+
+        // Exceptions above should have pre-empted execution (and not just come after successful writes).
+        cr = client.callProcedure("@AdHoc", "SELECT A_TIMESTAMP from ALLOW_NULLS where PKEY > " + lowerBound + ";");
+        result = cr.getResults();
+        assertEquals(0, result[0].getRowCount());
+}
 
     // ENG-1276
     public void testPassingFloatToDoubleArg() throws Exception {

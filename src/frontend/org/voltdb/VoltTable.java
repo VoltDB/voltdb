@@ -702,16 +702,18 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                         }
 
                         case TIMESTAMP: {
-                            // Accept long and TimestampType
-                            if (value instanceof TimestampType) {
-                                m_buffer.putLong(((TimestampType)value).getTime());
-                            }
-                            else if (value instanceof BigDecimal) {
+                            if (value instanceof BigDecimal) {
                                 throw new ClassCastException();
                             }
-                            else {
-                                m_buffer.putLong(((Number) value).longValue());
+                            long micros;
+                            // Accept long and TimestampType and any kind of Date
+                            if (value instanceof java.util.Date ||
+                                    value instanceof TimestampType) {
+                                 micros = ParameterSet.timestampToMicroseconds(value);
+                            } else {
+                                micros = ((Number) value).longValue();
                             }
+                            m_buffer.putLong(micros);
                             break;
                         }
 
