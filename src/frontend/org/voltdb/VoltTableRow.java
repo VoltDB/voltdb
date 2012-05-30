@@ -570,7 +570,7 @@ public abstract class VoltTableRow {
     }
 
     /**
-     * Retrieve the {@link java.util.Date Date} value stored in the column
+     * Retrieve the {@link org.voltdb.types.TimestampType TimestampType} value stored in the column
      * specified by name. Note that VoltDB uses GMT universally within its
      * process space. Date objects sent over the wire from clients may seem
      * to be different times because of this, but it is just a time zone offset.
@@ -588,6 +588,101 @@ public abstract class VoltTableRow {
     }
 
     /**
+     * Retrieve the <tt>java.sql.Timestamp</tt> equivalent to the value stored in the column specified by index.
+     * Note that VoltDB uses GMT universally within its process space. Date objects sent over
+     * the wire from clients may seem to be different times because of this, but it is just
+     * a time zone offset. VoltDB Timestamps are stored as long integer microseconds from epoch.
+     * The resulting value is accurate to no finer than microsecond granularity.
+     * @param columnIndex Index of the column
+     * @return the <tt>java.sql.Timestamp</tt> equivalent to the value stored in the specified column
+     */
+    public final java.sql.Timestamp getTimestampAsSqlTimestamp(int columnIndex) {
+        final long timestamp = getTimestampAsLong(columnIndex);
+        if (m_wasNull) return null;
+        java.sql.Timestamp result = new java.sql.Timestamp(timestamp/1000);
+        // The lower 6 digits of the microsecond timestamp (including the "double-counted" millisecond digits)
+        // must be scaled up to get the 9-digit (rounded) nanosecond value.
+        result.setNanos(((int) (timestamp % 1000000))*1000);
+        return result;
+    }
+
+    /**
+     * Retrieve the <tt>java.sql.Timestamp</tt> equivalent to the value stored in the column specified by name.
+     * Note that VoltDB uses GMT universally within its process space. Date objects sent over
+     * the wire from clients may seem to be different times because of this, but it is just
+     * a time zone offset. VoltDB Timestamps are stored as long integer microseconds from epoch.
+     * The resulting value is accurate to no finer than microsecond granularity.
+     * Avoid retrieving via this method as it is slower than specifying the
+     * column by index. Use {@link #getTimestampAsSqlTimestamp(int)} instead.
+     * @param columnName name of the column
+     * @return the <tt>java.sql.Timestamp</tt> equivalent to the value stored in the specified column
+     */
+    public java.sql.Timestamp getTimestampAsSqlTimestamp(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getTimestampAsSqlTimestamp(colIndex);
+    }
+
+    /**
+     * Retrieve the <tt>java.sql.Date</tt> equivalent to the value stored in the column specified by index.
+     * Note that VoltDB uses GMT universally within its process space. Date objects sent over
+     * the wire from clients may seem to be different times because of this, but it is just a time zone offset.
+     * The resulting value is truncated to no finer than millisecond granularity.
+     * @param columnIndex Index of the column
+     * @return the <tt>java.sql.Date</tt> equivalent to the value stored in the specified column
+     */
+    public final java.sql.Date getTimestampAsSqlDate(int columnIndex) {
+        final long timestamp = getTimestampAsLong(columnIndex);
+        if (m_wasNull) return null;
+        return new java.sql.Date(timestamp/1000);
+    }
+
+    /**
+     * Retrieve the <tt>java.sql.Date</tt> equivalent to the value stored in the column specified by name.
+     * Note that VoltDB uses GMT universally within its process space. Date objects sent over
+     * the wire from clients may seem to be different times because of this, but it is just
+     * a time zone offset. VoltDB Timestamps are stored as long integer microseconds from epoch.
+     * The resulting value is truncated to no finer than millisecond granularity.
+     * Avoid retrieving via this method as it is slower than specifying the
+     * column by index. Use {@link #getTimestampAsSqlDate(int)} instead.
+     * @param tsColName name of the column
+     * @return the <tt>java.sql.Date</tt> equivalent to the value stored in the specified column
+     */
+    public java.sql.Date getTimestampAsSqlDate(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getTimestampAsSqlDate(colIndex);
+    }
+
+    /**
+     * Retrieve the <tt>java.util.Date</tt> equivalent to the value stored in the column specified by index.
+     * Note that VoltDB uses GMT universally within its process space. Date objects sent over
+     * the wire from clients may seem to be different times because of this, but it is just a time zone offset.
+     * The resulting value is truncated to no finer than millisecond granularity.
+     * @param columnIndex Index of the column
+     * @return the <tt>java.util.Date</tt> equivalent to the value stored in the specified column
+     */
+    public final java.util.Date getTimestampAsUtilDate(int columnIndex) {
+        final long timestamp = getTimestampAsLong(columnIndex);
+        if (m_wasNull) return null;
+        return new java.util.Date(timestamp/1000);
+    }
+
+    /**
+     * Retrieve the <tt>java.util.Date</tt> equivalent to the value stored in the column specified by name.
+     * Note that VoltDB uses GMT universally within its process space. Date objects sent over
+     * the wire from clients may seem to be different times because of this, but it is just
+     * a time zone offset. VoltDB Timestamps are stored as long integer microseconds from epoch.
+     * The resulting value is truncated to no finer than millisecond granularity.
+     * Avoid retrieving via this method as it is slower than specifying the
+     * column by index. Use {@link #getTimestampAsUtilDate(int)} instead.
+     * @param tsColName name of the column
+     * @return the <tt>java.util.Date</tt> equivalent to the value stored in the specified column
+     */
+    public java.util.Date getTimestampAsUtilDate(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getTimestampAsUtilDate(colIndex);
+    }
+
+    /*
      * Retrieve the BigDecimal value stored in the column
      * specified by the index. All DECIMAL types have a fixed
      * scale when represented as BigDecimals.
@@ -732,4 +827,5 @@ public abstract class VoltTableRow {
         }
         return retval;
     }
+
 }

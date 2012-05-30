@@ -1207,10 +1207,10 @@ public class VoltCompiler {
             compiler.summarizeErrors(System.out);
             System.exit(-1);
         }
-        compiler.summarizeSuccess(System.out);
+        compiler.summarizeSuccess(System.out, null);
     }
 
-    public void summarizeSuccess(PrintStream outputStream) {
+    public void summarizeSuccess(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
 
             Database database = m_catalog.getClusters().get("cluster").
@@ -1259,6 +1259,14 @@ public class VoltCompiler {
                 outputStream.println();
             }
             outputStream.println("------------------------------------------");
+        }
+        if (feedbackStream != null) {
+            for (Feedback fb : m_warnings) {
+                feedbackStream.println(fb.getLogString());
+            }
+            for (Feedback fb : m_infos) {
+                feedbackStream.println(fb.getLogString());
+            }
         }
     }
 
