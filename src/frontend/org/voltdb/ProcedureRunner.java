@@ -29,7 +29,6 @@ import java.lang.reflect.Modifier;
 import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
-import java.text.ParseException;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.List;
@@ -693,7 +692,7 @@ public class ProcedureRunner {
         else if (slot == java.sql.Timestamp.class) {
             if (param instanceof java.sql.Timestamp) return param;
             if (param instanceof java.util.Date) return new java.sql.Timestamp(((java.util.Date) param).getTime());
-            if (param instanceof TimestampType) return new java.sql.Timestamp(((TimestampType) param).getTime()/1000);
+            if (param instanceof TimestampType) return ((TimestampType) param).asJavaTimestamp();
             // If a string is given for a date, use java's JDBC parsing.
             if (pclass == String.class) {
                 try {
@@ -706,12 +705,12 @@ public class ProcedureRunner {
         }
         else if (slot == java.sql.Date.class) {
             if (param instanceof java.sql.Date) return param; // covers java.sql.Date and java.sql.Timestamp
-            if (param instanceof java.sql.Date) return param; // covers java.sql.Date and java.sql.Timestamp
-            if (param instanceof TimestampType) return new java.sql.Date(((TimestampType) param).getTime()/1000);
+            if (param instanceof java.util.Date) return new java.sql.Date(((java.util.Date) param).getTime());
+            if (param instanceof TimestampType) return ((TimestampType) param).asExactJavaSqlDate();
             // If a string is given for a date, use java's JDBC parsing.
             if (pclass == String.class) {
                 try {
-                    return java.sql.Date.valueOf((String) param);
+                    return new java.sql.Date(TimestampType.millisFromJDBCformat((String) param));
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
@@ -720,13 +719,13 @@ public class ProcedureRunner {
         }
         else if (slot == java.util.Date.class) {
             if (param instanceof java.util.Date) return param; // covers java.sql.Date and java.sql.Timestamp
-            if (param instanceof TimestampType) return new java.util.Date(((TimestampType) param).getTime()/1000);
+            if (param instanceof TimestampType) return ((TimestampType) param).asExactJavaDate();
             // If a string is given for a date, use the default format parser for the default locale.
             if (pclass == String.class) {
                 try {
-                    return java.text.DateFormat.getDateInstance().parse((String) param);
+                    return new java.util.Date(TimestampType.millisFromJDBCformat((String) param));
                 }
-                catch (ParseException e) {
+                catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
             }

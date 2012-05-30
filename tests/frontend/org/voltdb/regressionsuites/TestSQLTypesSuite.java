@@ -384,8 +384,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
             // Within the millisecond granularity all formats should encapsulate the same value.
             assertEquals(tst, vt.getTimestampAsTimestamp(0));
             assertEquals(ts, vt.getTimestampAsSqlTimestamp(0));
-            assertEquals(sqld, vt.getTimestampAsSqlDate(0));
-            assertEquals(utild, vt.getTimestampAsUtilDate(0));
+            assertEquals(sqld, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(utild, vt.getTimestampAsSqlTimestamp(0));
         }
 
         // Demonstrate that TimestampType and java.sql.Timestamp support microseconds while Dates truncate to milliseconds.
@@ -435,8 +435,8 @@ public class TestSQLTypesSuite extends RegressionSuite {
             assertNotSame(ts, vt.getTimestampAsSqlTimestamp(0));
             assertEquals(tst_micro, vt.getTimestampAsTimestamp(0));
             assertEquals(ts_micro, vt.getTimestampAsSqlTimestamp(0));
-            assertEquals(sqld, vt.getTimestampAsSqlDate(0));
-            assertEquals(utild, vt.getTimestampAsUtilDate(0));
+            assertEquals(sqld, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(utild, vt.getTimestampAsSqlTimestamp(0));
         }
 
         // Now, go overboard, trying to preserve nano accuracy.
