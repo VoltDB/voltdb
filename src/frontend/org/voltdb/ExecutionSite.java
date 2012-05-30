@@ -830,13 +830,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
         // just print error info an bail if we run into an error here
         catch (final Exception ex) {
-            // It's too easy for stdout to get lost, especially if we are crashing, so log FATAL, instead.
-            // Logging also automatically prefixes lines with "ExecutionSite [X:Y] "
-            // thrown.printStackTrace();
-            hostLog.fatal("Stack trace of thrown exception: " + ex.toString());
-            for (StackTraceElement ste : ex.getStackTrace()) {
-                hostLog.fatal(ste.toString());
-            }
             hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
                             new Object[] { getSiteId(), siteIndex }, ex);
             VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);

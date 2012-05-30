@@ -38,12 +38,15 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate1;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate2;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate3;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate4;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate5;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPNoncandidate6;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate1;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate2;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate3;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate4;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate5;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate6;
+import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate7;
 
 public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
     public void testSimple() throws Exception {
@@ -79,11 +82,14 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.addProcedures(ProcSPcandidate4.class);
         builder.addProcedures(ProcSPcandidate5.class);
         builder.addProcedures(ProcSPcandidate6.class);
+        builder.addProcedures(ProcSPcandidate7.class);
 
         builder.addProcedures(ProcSPNoncandidate1.class);
         builder.addProcedures(ProcSPNoncandidate2.class);
         builder.addProcedures(ProcSPNoncandidate3.class);
         builder.addProcedures(ProcSPNoncandidate4.class);
+        builder.addProcedures(ProcSPNoncandidate5.class);
+        builder.addProcedures(ProcSPNoncandidate6.class);
 
         builder.addStmtProcedure("StmtSPcandidate1", "select count(*) from blah where ival = ?", null);
         builder.addStmtProcedure("StmtSPcandidate2", "select count(*) from blah where ival = 12345678", null);
@@ -138,9 +144,9 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:1.*")); // 5, 6
 
         assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 0 .*")); // ProcSPcandidate 1
-        assertEquals(3, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*87654321.*")); // 2, 3, 5
+        assertEquals(4, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*87654321.*")); // 2, 3, 5, 6
         assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*ABS.*")); // just 4
-        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 1 .*")); // 6
+        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 1 .*")); // 7
 
         // Non-candidates disqualify themselves by various means.
         assertEquals(0, countLinesMatching(lines, ".*\\[SPNoncandidate.].*partitioninfo=BLAH\\.IVAL:0.*"));

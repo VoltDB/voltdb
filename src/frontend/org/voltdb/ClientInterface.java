@@ -1337,11 +1337,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // pick the sysproc based on the presence of partition info
-        boolean isSinglePartition = (plannedStmt.partitionParam != null);
+        // HSQL does not specifically implement AdHocSP -- instead, use its always-SP implementation of AdHoc
+        boolean isSinglePartition = (plannedStmt.partitionParam != null) && ! m_isConfiguredForHSQL;
         int partitions[] = null;
 
-        // HSQL does not specifically implement AdHocSP -- use its SP implementation of AdHoc
-        if (isSinglePartition &&  ! m_isConfiguredForHSQL) {
+        if (isSinglePartition) {
             task.procName = "@AdHocSP";
             assert(plannedStmt.isReplicatedTableDML == false);
             assert(plannedStmt.collectorFragment == null);
@@ -1377,7 +1377,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // initiate the transaction
         createTransaction(plannedStmt.connectionId, plannedStmt.hostname,
                 plannedStmt.adminConnection,
-                task, false, (isSinglePartition  &&  ! m_isConfiguredForHSQL), false, partitions,
+                task, false, isSinglePartition, false, partitions,
                 partitions.length, plannedStmt.clientData,
                 0, EstTime.currentTimeMillis());
 

@@ -30,17 +30,13 @@ import org.voltdb.VoltProcedure;
 @ProcInfo (
     singlePartition = false
 )
-public class ProcSPcandidate6 extends VoltProcedure {
+public class ProcSPcandidate7 extends VoltProcedure {
 
-    // Parameterized WHERE clause enables SP processing
-    public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = 87654321");
-
-    // Addition of arbitrary query against replicated data should have no ill effect on SP processing.
-    public static final SQLStmt nonspoiler = new SQLStmt("select count(*) from indexed_blah order by ival");
+    // Parameterized WHERE clause enables SP processing -- an extra parameter or a filter (on sval) should have no ill effect.
+    public static final SQLStmt query = new SQLStmt("select count(*) from blah where sval = ? and ival = ?");
 
     public long run() {
         voltQueueSQL(query);
-        voltQueueSQL(nonspoiler);
         voltExecuteSQL();
         // zero is a successful return
         return 0;

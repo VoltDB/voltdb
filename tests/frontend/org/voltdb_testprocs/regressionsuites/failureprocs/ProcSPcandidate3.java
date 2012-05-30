@@ -32,7 +32,7 @@ import org.voltdb.VoltProcedure;
 )
 public class ProcSPcandidate3 extends VoltProcedure {
 
-    // Meaningless where clause makes expected output easier to test for.
+    // Constant filtered WHERE clause enables SP processing, even when joining with replicated table.
     public static final SQLStmt query3 =
             new SQLStmt("select count(*) from blah, indexed_blah where indexed_blah.sval = blah.sval and blah.ival = 87654321");
 

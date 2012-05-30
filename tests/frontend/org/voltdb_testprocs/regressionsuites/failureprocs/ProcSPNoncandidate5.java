@@ -30,17 +30,17 @@ import org.voltdb.VoltProcedure;
 @ProcInfo (
     singlePartition = false
 )
-public class ProcSPcandidate6 extends VoltProcedure {
+public class ProcSPNoncandidate5 extends VoltProcedure {
 
-    // Parameterized WHERE clause enables SP processing
-    public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = 87654321");
+    // Where clause on non-partitioning column only does not allow SP processing
+    public static final SQLStmt query1 = new SQLStmt("select count(*) from blah where sval = ?");
 
-    // Addition of arbitrary query against replicated data should have no ill effect on SP processing.
-    public static final SQLStmt nonspoiler = new SQLStmt("select count(*) from indexed_blah order by ival");
+    // Additional innocuous query against a replicated table should have no effect.
+    public static final SQLStmt query2 = new SQLStmt("select count(*) from blah where ival = ?");
 
     public long run() {
-        voltQueueSQL(query);
-        voltQueueSQL(nonspoiler);
+        voltQueueSQL(query1, 1);
+        voltQueueSQL(query2, 1);
         voltExecuteSQL();
         // zero is a successful return
         return 0;

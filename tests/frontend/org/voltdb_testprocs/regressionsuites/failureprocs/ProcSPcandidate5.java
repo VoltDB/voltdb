@@ -32,7 +32,7 @@ import org.voltdb.VoltProcedure;
 )
 public class ProcSPcandidate5 extends VoltProcedure {
 
-    // Meaningless where clause makes expected output easier to test for.
+    // Constant-filtered WHERE clause enables SP processing -- an extra parameter or a filter (on sval) should have no ill effect.
     public static final SQLStmt query = new SQLStmt("select count(*) from blah where sval = ? and ival = 87654321");
 
     public long run() {

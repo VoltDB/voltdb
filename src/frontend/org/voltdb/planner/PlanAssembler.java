@@ -252,9 +252,10 @@ public class PlanAssembler {
                     "Illegal to delete from an export table.");
                 }
                 m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
-            } else
+            } else {
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");
+            }
             subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         }
     }

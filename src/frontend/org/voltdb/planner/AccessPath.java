@@ -47,8 +47,10 @@ public class AccessPath {
 
     /**
      * Given a specific join order and access path set for that join order, determine whether
-     * all join expressions involving distributed tables can be executed on a single partition.
-     * This is only the case when they include equality comparisons between partition columns.
+     * all joins involving partitioned tables can be executed locally on a single partition.
+     * This is only the case when they include equality comparisons between partition key columns.
+     * VoltDb will reject joins of multiple partitioned tables unless all their partition keys are
+     * constrained to be equal to each other.
      * Example: select * from T1, T2 where T1.ID = T2.ID
      * Additionally, in this case, there may be a constant equality filter on any of the columns,
      * which we want to extract as our SP partitioning parameter.

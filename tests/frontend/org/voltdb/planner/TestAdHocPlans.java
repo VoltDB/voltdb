@@ -24,78 +24,25 @@
 package org.voltdb.planner;
 
 import java.io.File;
+import java.io.IOException;
 
-import junit.framework.TestCase;
-
+import org.voltdb.AdHocQueryTester;
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltDB.Configuration;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.PlannerTool;
-import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.MiscUtils;
 
-public class TestAdHocPlans extends TestCase {
+public class TestAdHocPlans extends AdHocQueryTester {
 
     private PlannerTool m_pt;
 
-    private void compileAdHoc(String sql)
-    {
-        PlannerTool.Result result = m_pt.planSql(sql, null);
-        boolean spPlan = result.toString().contains("ALL: null");
-        if (! spPlan) {
-            System.out.println("Missed: "+ sql);
-            System.out.println(result);
-        }
-        assertTrue(spPlan);
-    }
-
     @Override
     protected void setUp() throws Exception {
-        String spSchema =
-                "create table PARTED1 (" +
-                "PARTVAL bigint not null, " +
-                "NONPART bigint not null," +
-                "PRIMARY KEY(PARTVAL));" +
-
-                "create table PARTED2 (" +
-                "PARTVAL bigint not null, " +
-                "NONPART bigint not null," +
-                "PRIMARY KEY(PARTVAL));" +
-
-                "create table PARTED3 (" +
-                "PARTVAL bigint not null, " +
-                "NONPART bigint not null," +
-                "PRIMARY KEY(NONPART));" +
-
-                "create table REPPED1 (" +
-                "REPPEDVAL bigint not null, " +
-                "NONPART bigint not null," +
-                "PRIMARY KEY(REPPEDVAL));" +
-
-                "create table REPPED2 (" +
-                "REPPEDVAL bigint not null, " +
-                "NONPART bigint not null," +
-                "PRIMARY KEY(REPPEDVAL));";
-
-        String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
-        String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(spSchema);
-        builder.addPartitionInfo("PARTED1", "PARTVAL");
-        builder.addPartitionInfo("PARTED2", "PARTVAL");
-        builder.addPartitionInfo("PARTED3", "PARTVAL");
-        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-        assertTrue(success);
-        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-
-        VoltDB.Configuration config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-
-        byte[] bytes = CatalogUtil.toBytes(new File(pathToCatalog));
+        VoltDB.Configuration config = setUpSPDB();
+        byte[] bytes = CatalogUtil.toBytes(new File(config.m_pathToCatalog));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
@@ -109,89 +56,48 @@ public class TestAdHocPlans extends TestCase {
     }
 
     public void testSP() throws Exception {
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1;");
-        compileAdHoc("SELECT * FROM PARTED1 WHERE PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED3 WHERE PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 WHERE REPPEDVAL = 0;");
+        runAllAdHocSPtests();
+    }
 
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL = 0;");
-
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;");
-        // compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.REPPEDVAL;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.REPPEDVAL;");
-
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;");
-        // compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and A.REPPEDVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and A.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = B.REPPEDVAL and A.REPPEDVAL = 0;");
-
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;");
-        // compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = A.REPPEDVAL;");
-        compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = A.PARTVAL;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL = A.REPPEDVAL;");
-
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;");
-        // compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and A.REPPEDVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and A.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and A.REPPEDVAL = 0;");
-
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;");
-        compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.REPPEDVAL = B.PARTVAL;");
-        // compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and A.PARTVAL = B.REPPEDVAL;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = 0 and A.REPPEDVAL = B.REPPEDVAL;");
-
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and B.PARTVAL = 0;");
-        // compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and B.REPPEDVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = B.REPPEDVAL and B.REPPEDVAL = 0;");
-
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;");
-        compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.REPPEDVAL;");
-        // compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.PARTVAL;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.REPPEDVAL;");
-
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL =0;");
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and B.PARTVAL = 0;");
-        // compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and B.REPPEDVAL = 0;");
-        compileAdHoc("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and B.REPPEDVAL = 0;");
-
-/* Not SP and not YET supported.
-        compileAdHoc("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;");
-
-        compileAdHoc("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;");
-
-        compileAdHoc("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL != A.PARTVAL;");
-*/
-/* NOT SP
+    void erk() {
+        /*
+/* Not SP and not YET supported by executor.
+* NOT SP
         compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;");
 */
+        /*
+        spPartialCount = runQueryTest("SELECT * FROM PARTED1;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
 
-        compileAdHoc("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL != A.PARTVAL;");
+        runQueryTest("SELECT * FROM PARTED1 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_SP_RESULT);
 
-        // TODO: Three-way join test cases are probably required to cover all code paths through AccessPaths.
+        spPartialCount = runQueryTest("SELECT * FROM PARTED3;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED3 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_SP_RESULT);
+
+        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
+
+        spPartialCount = runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 1, spPartialCount-1, 1, VALIDATING_SP_RESULT);
+        */
+    }
+
+    /**
+     * For planner-only testing, most of the args are ignored.
+     */
+    @Override
+    public int runQueryTest(String query, int hash, int spPartialSoFar,
+            int expected, int validatingSPresult) throws IOException,
+            NoConnectionsException, ProcCallException {
+        PlannerTool.Result result = m_pt.planSql(query, null);
+        boolean spPlan = result.toString().contains("ALL: null");
+        if ((validatingSPresult == VALIDATING_SP_RESULT) != spPlan) {
+            System.out.println("Missed: "+ query);
+            System.out.println(result);
+        }
+        assertEquals((validatingSPresult == VALIDATING_SP_RESULT), spPlan);
+        return 0;
     }
 
 }
