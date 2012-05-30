@@ -66,9 +66,11 @@ import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.MapCache;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
@@ -1248,27 +1250,53 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchStatistics(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
-        // DR uses the new StatsAgent. Other stats do not.
-        if ((params.toArray().length != 0) && (((String)params.toArray()[0]).equals("DR"))) {
-            try {
-                VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "DR");
-                return null;
-            } catch (Exception e) {
-                return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
-            }
+        // dispatch selectors that do not us the @Statistics system procedure
+        if ((params.toArray().length != 0)) {
+           if (((String)params.toArray()[0]).equals("DR")) {
+               try {
+                   VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "DR");
+                   return null;
+               } catch (Exception e) {
+                   return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+               }
+           }
+           else if (((String)params.toArray()[0]).equals("TOPO")) {
+               return dispatchTopology(sysProc, buf, task, handler, ccxn);
+           }
         }
-        else {
-            int[] involvedPartitions = m_allPartitions;
-            createTransaction(handler.connectionId(), handler.m_hostname,
-                    handler.isAdmin(),
-                    task,
-                    sysProc.getReadonly(),
-                    sysProc.getSinglepartition(),
-                    sysProc.getEverysite(),
-                    involvedPartitions, involvedPartitions.length,
-                    ccxn, buf.capacity(),
-                    System.currentTimeMillis());
-            return null;
+        int[] involvedPartitions = m_allPartitions;
+        createTransaction(handler.connectionId(), handler.m_hostname,
+                handler.isAdmin(),
+                task,
+                sysProc.getReadonly(),
+                sysProc.getSinglepartition(),
+                sysProc.getEverysite(),
+                involvedPartitions, involvedPartitions.length,
+                ccxn, buf.capacity(),
+                System.currentTimeMillis());
+        return null;
+    }
+
+    ClientResponseImpl dispatchTopology(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
+            ClientInputHandler handler, Connection ccxn) {
+        try {
+           ColumnInfo[] masterCols = new ColumnInfo[] {
+              new ColumnInfo("Partition", VoltType.STRING),
+              new ColumnInfo("Master", VoltType.BIGINT),
+              new ColumnInfo("Host", VoltType.INTEGER)};
+           VoltTable masterTable = new VoltTable(masterCols);
+           Map<String, JSONObject> masters = m_iv2Masters.pointInTimeCache();
+           for (Entry<String, JSONObject> entry : masters.entrySet()) {
+               long partitionId = Long.valueOf(entry.getValue().getLong("hsid"));
+               masterTable.addRow(entry.getKey(), partitionId,
+                       CoreUtils.getHostIdFromHSId(partitionId));
+           }
+           return new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                   new VoltTable[]{masterTable}, null, task.clientHandle);
+
+        } catch(Exception e) {
+            hostLog.error("Failed to create topology summary for @Statistics TOPO", e);
+            return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
         }
     }
 
