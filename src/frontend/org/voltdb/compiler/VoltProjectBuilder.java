@@ -639,7 +639,7 @@ public class VoltProjectBuilder {
         compiler.setProcInfoOverrides(m_procInfoOverrides);
         boolean success = compiler.compile(projectPath, jarPath);
         if (success && m_compilerDebugPrintStream != null) {
-            compiler.summarizeSuccess(m_compilerDebugPrintStream);
+            compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
         }
         if (deployment != null) {
             try {
