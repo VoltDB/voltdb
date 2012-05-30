@@ -39,6 +39,7 @@ import java.util.Random;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltProcedure.VoltAbortException;
+import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.PlanFragment;
 import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
@@ -255,9 +256,11 @@ public class ProcedureRunner {
                             m_cachedSingleStmt.stmt, paramList);
                     if (getHsqlBackendIfExists() != null) {
                         // HSQL handling
+                        CatalogMap<StmtParameter> sparamsMap = m_cachedSingleStmt.stmt.catStmt.getParameters();
+                        List<StmtParameter> sparams = CatalogUtil.getSortedCatalogItems(sparamsMap, "index");
                         VoltTable table =
                             getHsqlBackendIfExists().runSQLWithSubstitutions(
-                                m_cachedSingleStmt.stmt, m_cachedSingleStmt.params);
+                                m_cachedSingleStmt.stmt, m_cachedSingleStmt.params, sparams);
                         results = new VoltTable[] { table };
                     }
                     else {
@@ -388,7 +391,19 @@ public class ProcedureRunner {
             results = new VoltTable[batchSize];
             int i = 0;
             for (QueuedSQL qs : batch) {
-                results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(qs.stmt, qs.params);
+                List<StmtParameter> sparams;
+                if (qs.stmt.catStmt != null) {
+                    CatalogMap<StmtParameter> sparamsMap = qs.stmt.catStmt.getParameters();
+                    sparams = CatalogUtil.getSortedCatalogItems(sparamsMap, "index");
+                }
+                else {
+                    assert(qs.stmt.plan != null);
+                    //TODO: For now ad hoc SQL parameters aren't supported.
+                    assert(qs.params.toArray().length == 0);
+                    sparams = new ArrayList<StmtParameter>();
+                }
+                results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(
+                                                                qs.stmt, qs.params, sparams);
             }
         }
 

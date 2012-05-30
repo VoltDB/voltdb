@@ -255,12 +255,10 @@ public class HsqlBackend {
         }
     }
 
-    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params) {
+    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params, List<StmtParameter> sparams) {
         //HSQLProcedureWrapper does nothing smart. it just implements this interface with runStatement()
         StringBuilder sqlOut = new StringBuilder(stmt.getText().length() * 2);
 
-        CatalogMap<StmtParameter> sparamsMap = stmt.catStmt.getParameters();
-        List<StmtParameter> sparams = CatalogUtil.getSortedCatalogItems(sparamsMap, "index");
         assert(sparams != null);
 
         int lastIndex = 0;
