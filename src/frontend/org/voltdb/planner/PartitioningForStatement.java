@@ -26,13 +26,9 @@ import org.voltdb.expressions.AbstractExpression;
 
 /**
  * Represents the partitioning of the data underlying a statement.
- * In the simplest case, this is pre-determined by the single-partition context of the statement;
- * this can be from a stored procedure annotation or a single-statement procedure attribute,
- * or it can be implied in an ad hoc query by the presence of a partition key value.
- * Currently most of these cases are taken at face value -- the only case where such single partitioning is second-guessed
- * is in DML for replicated tables where a single-partition write would corrupt the replication.
- * This is flagged as an error.  Otherwise, no attempt is made to validate that a single partition statement would
- * have the same result as the same query run on all partitions. That is for the caller to decide.
+ * In the simplest case, this is pre-determined by the single-partition context of the statement
+ * from a stored procedure annotation or a single-statement procedure attribute,
+ * or implied by the presence of a partition key value for an ad hoc query.
  * In the more interesting case, a user can specify that a statement be run on all partitions,
  * but the semantics of the statement may indicate that the same result could be produced more optimally
  * by running it on a single partition based on some partition key, whether a statement parameter or a constant in the
@@ -47,6 +43,10 @@ public class PartitioningForStatement {
      * This value can be provided any non-null value to force single-partition statement planning and
      * (at least currently) disabling any kind of analysis of single-partition suitability
      * (except to forbid single-partition execution of replicated table DML.
+     * Currently most of these cases are taken at face value -- the only case where such single partitioning is second-guessed
+     * is in DML for replicated tables where a single-partition write would corrupt the replication.
+     * This is flagged as an error.  Otherwise, no attempt is made to validate that a single partition statement would
+     * have the same result as the same query run on all partitions. That is for the caller to decide.
      */
     private final Object m_specifiedValue;
     /**

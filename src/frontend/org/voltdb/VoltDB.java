@@ -444,11 +444,6 @@ public class VoltDB {
             return;
         }
 
-//        hostLog.fatal("Stack trace of thrown exception: " + thrown.toString());
-//        for (StackTraceElement ste : thrown.getStackTrace()) {
-//            hostLog.fatal(ste.toString());
-//        }
-
         List<String> throwerStacktrace = null;
         if (thrown != null) {
             throwerStacktrace = new ArrayList<String>();
