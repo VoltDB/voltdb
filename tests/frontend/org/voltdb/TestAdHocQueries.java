@@ -155,6 +155,9 @@ public class TestAdHocQueries extends TestCase {
             assertTrue(batchResults[1].getRowCount() == 2);
             assertTrue(batchResults[2].getRowCount() == 3);
         }
+        catch (Throwable t) {
+            t.printStackTrace();
+        }
         finally {
             if (client != null) client.close();
             client = null;

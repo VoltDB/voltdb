@@ -1275,6 +1275,7 @@ public class ProcedureRunner {
            final QueuedSQL qs = batch.get(iTo);
            if (qs.stmt.plan != null) {
                if (iTo > iFrom) {
+                   // Flush preceding pre-planned work before handling unplanned.
                    subResults = executor.onExecutePrePlanned(batch.subList(iFrom, iTo),
                                                              iTo == batch.size() - 1);
                    results.addAll(Arrays.asList(subResults));
@@ -1282,6 +1283,7 @@ public class ProcedureRunner {
                }
                subResults = executor.onExecuteUnplanned(batch.subList(iTo, iTo + 1),
                                                         iTo == batch.size() - 1);
+               iFrom++;
                results.addAll(Arrays.asList(subResults));
            }
        }
