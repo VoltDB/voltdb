@@ -43,6 +43,9 @@ import org.voltcore.utils.Pair;
 
 public class ZKUtil {
 
+     /** Prevents class from being inherited or instantiated **/
+     private ZKUtil() {}
+
     /**
      * Joins a path with a filename, if the path already ends with "/", it won't
      * add another "/" to the path.
