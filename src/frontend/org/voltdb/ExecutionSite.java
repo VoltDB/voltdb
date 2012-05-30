@@ -87,7 +87,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -1785,6 +1784,56 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
 
+    private FragmentResponseMessage processCustomFragmentTask(TransactionState txnState,
+            HashMap<Integer, List<VoltTable>> dependencies,
+            FragmentResponseMessage currentFragResponse, ParameterSet params,
+            String fragmentPlan, int outputDepId) {
+
+        assert(fragmentPlan != null);
+
+        // assume success. errors correct this assumption as they occur
+        currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
+
+        try {
+            int inputDepId = -1;
+
+            // make dependency ids available to the execution engine
+            if ((dependencies != null) && (dependencies.size() > 00)) {
+                assert(dependencies.size() <= 1);
+                for (int x : dependencies.keySet()) {
+                    inputDepId = x; break;
+                }
+                stashWorkUnitDependencies(dependencies);
+            }
+
+            VoltTable table = null;
+
+            table = executeCustomPlanFragment(fragmentPlan, inputDepId, txnState.txnId);
+
+            DependencyPair dep = new DependencyPair(outputDepId, table);
+
+            sendDependency(currentFragResponse, dep.depId, dep.dependency);
+        }
+        catch (final EEException e)
+        {
+            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), e);
+            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+        }
+        catch (final SQLException e)
+        {
+            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), e);
+            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
+        }
+        catch (final Exception e)
+        {
+            // Just indicate that we failed completely
+            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, new SerializableException(e));
+        }
+
+        return currentFragResponse;
+    }
+
+
     private void sendDependency(
             final FragmentResponseMessage currentFragResponse,
             final int dependencyId,
@@ -2059,7 +2108,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 params = new ParameterSet();
             }
 
-            if (ftask.isSysProcTask()) {
+            String fragmentPlan = ftask.getFragmentPlan(frag);
+            if (fragmentPlan != null) {
+                return processCustomFragmentTask(txnState, dependencies, currentFragResponse,
+                                                 params, fragmentPlan, outputDepId);
+            }
+            else if (ftask.isSysProcTask()) {
                 return processSysprocFragmentTask(txnState, dependencies, fragmentId,
                                                   currentFragResponse, params);
             }

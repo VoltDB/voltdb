@@ -30,7 +30,9 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Date;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
@@ -42,6 +44,7 @@ import org.voltdb.catalog.ProcParameter;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
@@ -101,6 +104,9 @@ public class ProcedureRunner {
     protected final Procedure m_catProc;
     protected final boolean m_isSysProc;
 
+    // dependency ids for ad hoc
+    protected final static int AGG_DEPID = 1;
+
     // Used to get around the "abstract" for StmtProcedures.
     // Path of least resistance?
     static class StmtProcedure extends VoltProcedure {
@@ -152,14 +158,17 @@ public class ProcedureRunner {
             m_cachedRNG = new Random(getTransactionId());
         }
         return m_cachedRNG;
-    };
+    }
 
-    ClientResponseImpl call(long txnId, Object... paramList) {
+    ClientResponseImpl call(long txnId, Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_txnId == -1);
         assert(m_statusCode == Byte.MIN_VALUE);
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
+
+        // Can be reassigned
+        Object[] paramList = paramListIn;
 
         m_txnId = txnId;
         assert(m_txnId > 0);
@@ -171,7 +180,7 @@ public class ProcedureRunner {
         try {
             m_statsCollector.beginProcedure();
 
-            byte status = ClientResponseImpl.SUCCESS;
+            byte status = ClientResponse.SUCCESS;
             VoltTable[] results = null;
 
             // inject sysproc execution context as the first parameter.
@@ -187,7 +196,7 @@ public class ProcedureRunner {
                 m_statsCollector.endProcedure( false, true);
                 String msg = "PROCEDURE " + m_procedureName + " EXPECTS " + String.valueOf(m_paramTypes.length) +
                     " PARAMS, BUT RECEIVED " + String.valueOf(paramList.length);
-                status = ClientResponseImpl.GRACEFUL_FAILURE;
+                status = ClientResponse.GRACEFUL_FAILURE;
                 return getErrorResponse(status, msg, null);
             }
 
@@ -198,7 +207,7 @@ public class ProcedureRunner {
                     m_statsCollector.endProcedure( false, true);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
                             ": " + e.getMessage();
-                    status = ClientResponseImpl.GRACEFUL_FAILURE;
+                    status = ClientResponse.GRACEFUL_FAILURE;
                     return getErrorResponse(status, msg, null);
                 }
             }
@@ -368,7 +377,10 @@ public class ProcedureRunner {
             final SQLStmt stmt = batch.get(i).stmt;
             // if any stmt is not single sited in this batch, the
             // full batch must take the slow path through the dtxn
-            slowPath = slowPath || !(stmt.catStmt.getSinglepartition());
+            if (!stmt.isSinglePartition()) {
+                slowPath = true;
+                break;
+            }
         }
 
         // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
@@ -387,24 +399,7 @@ public class ProcedureRunner {
 
         // FOR SP-TXNS (or all replicated read MPs)
         else {
-            ParameterSet[] params = new ParameterSet[batchSize];
-            long[] fragmentIds = new long[batchSize];
-
-            int i = 0;
-            for (final QueuedSQL qs : batch) {
-                assert(qs.stmt.numFragGUIDs == 1);
-                fragmentIds[i] = qs.stmt.fragGUIDs[0];
-                params[i] = qs.params;
-                i++;
-            }
-
-            results = m_site.executeQueryPlanFragmentsAndGetResults(
-                fragmentIds,
-                batchSize,   // 1 frag per stmt
-                params,      // 1 frag per stmt
-                batchSize,   // 1 frag per stmt
-                m_txnState.txnId,
-                m_catProc.getReadonly());
+            results = fastPath(batch);
         }
 
         // check expectations
@@ -447,7 +442,7 @@ public class ProcedureRunner {
         return sysproc.executePlanFragment(dependencies, fragmentId, params, m_systemProcedureContext);
     }
 
-    protected ParameterSet getCleanParams(SQLStmt stmt, Object[] args) {
+    protected ParameterSet getCleanParams(SQLStmt stmt, Object... args) {
         final int numParamTypes = stmt.numStatementParamJavaTypes;
         final byte stmtParamTypes[] = stmt.statementParamJavaTypes;
         if (args.length != numParamTypes) {
@@ -563,6 +558,7 @@ public class ProcedureRunner {
         } catch (Exception e1) {
             // shouldn't throw anything outside of the compiler
             e1.printStackTrace();
+            return;
         }
 
         Field[] fields = new Field[stmtMap.size()];
@@ -609,6 +605,8 @@ public class ProcedureRunner {
                 case BIGINT:
                 case FLOAT:
                     return type.getNullValue();
+                default:
+                    // other types return null below
                 }
             }
 
@@ -750,7 +748,9 @@ public class ProcedureRunner {
     * @param e
     * @return A ClientResponse containing error information
     */
-   protected ClientResponseImpl getErrorResponse(Throwable e) {
+   protected ClientResponseImpl getErrorResponse(Throwable eIn) {
+       // can be reassigned so use local variable
+       Throwable e = eIn;
        boolean expected_failure = true;
        StackTraceElement[] stack = e.getStackTrace();
        ArrayList<StackTraceElement> matches = new ArrayList<StackTraceElement>();
@@ -759,19 +759,19 @@ public class ProcedureRunner {
                matches.add(ste);
        }
 
-       byte status = ClientResponseImpl.UNEXPECTED_FAILURE;
+       byte status = ClientResponse.UNEXPECTED_FAILURE;
        StringBuilder msg = new StringBuilder();
 
        if (e.getClass() == VoltAbortException.class) {
-           status = ClientResponseImpl.USER_ABORT;
+           status = ClientResponse.USER_ABORT;
            msg.append("USER ABORT\n");
        }
        else if (e.getClass() == org.voltdb.exceptions.ConstraintFailureException.class) {
-           status = ClientResponseImpl.GRACEFUL_FAILURE;
+           status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("CONSTRAINT VIOLATION\n");
        }
        else if (e.getClass() == org.voltdb.exceptions.SQLException.class) {
-           status = ClientResponseImpl.GRACEFUL_FAILURE;
+           status = ClientResponse.GRACEFUL_FAILURE;
            msg.append("SQL ERROR\n");
        }
        else if (e.getClass() == org.voltdb.ExpectedProcedureException.class) {
@@ -855,14 +855,7 @@ public class ProcedureRunner {
        throw new RuntimeException("Procedure didn't return acceptable type.");
    }
 
-   /*
-    * Commented this out and nothing broke? It's cluttering up the javadoc AW 9/2/11
-    */
-//   public void checkExpectation(Expectation expectation, VoltTable table) {
-//       Expectation.check(m_procedureName, "NO STMT", 0, expectation, table);
-//   }
-
-   private VoltTable[] executeQueriesInIndividualBatches(List<QueuedSQL> batch, boolean finalTask) {
+   VoltTable[] executeQueriesInIndividualBatches(List<QueuedSQL> batch, boolean finalTask) {
        assert(batch.size() > 0);
 
        VoltTable[] retval = new VoltTable[batch.size()];
@@ -888,65 +881,210 @@ public class ProcedureRunner {
        return retval;
    }
 
-   private VoltTable[] slowPath(List<QueuedSQL> batch, boolean finalTask) {
-       /*
-        * Determine if reads and writes are mixed. Can't mix reads and writes
-        * because the order of execution is wrong when replicated tables are involved
-        * due to ENG-1232
-        */
-       boolean hasRead = false;
-       boolean hasWrite = false;
-       for (int i = 0; i < batch.size(); ++i) {
-           final SQLStmt stmt = batch.get(i).stmt;
-           if (stmt.catStmt.getReadonly()) {
-               hasRead = true;
-           } else {
-               hasWrite = true;
+   private VoltTable[] slowPath(List<QueuedSQL> batch, final boolean finalTask) {
+       // executeQueuedSQL() maintains order, but groups planned vs. unplanned.
+       return executeQueuedSQL(batch,
+           new FragmentExecutor() {
+               @Override
+               public VoltTable[] onExecutePrePlanned(final List<QueuedSQL> batch, final boolean last) {
+                   /*
+                    * Determine if reads and writes are mixed. Can't mix reads and writes
+                    * because the order of execution is wrong when replicated tables are
+                    * involved due to ENG-1232.
+                    */
+                   boolean hasRead = false;
+                   boolean hasWrite = false;
+                   for (int i = 0; i < batch.size(); ++i) {
+                       final SQLStmt stmt = batch.get(i).stmt;
+                       if (stmt.catStmt != null) {
+                           if (stmt.catStmt.getReadonly()) {
+                               hasRead = true;
+                           } else {
+                               hasWrite = true;
+                           }
+                       }
+                       /*
+                        * If they are all reads or all writes then we can use the batching
+                        * slow path Otherwise the order of execution will be interleaved
+                        * incorrectly so we have to do each statement individually.
+                        */
+                       if (hasRead && hasWrite) {
+                           return executeQueriesInIndividualBatches(batch, finalTask);
+                       }
+                   }
+
+                   return executeSlowHomogeneousBatch(batch, finalTask && last);
+               }
+
+               @Override
+               public VoltTable[] onExecuteUnplanned(final List<QueuedSQL> batch, final boolean last) {
+                   /*
+                    * Submit individual queries. Get smarter some day. This check breaks
+                    * the potentially infinite recursion.
+                    */
+                   if (batch.size() > 1) {
+                       return executeQueriesInIndividualBatches(batch, finalTask && last);
+                   }
+                   else {
+                       return executeSlowHomogeneousBatch(batch, finalTask && last);
+                   }
+               }
            }
-       }
-       /*
-        * If they are all reads or all writes then we can use the batching slow path
-        * Otherwise the order of execution will be interleaved incorrectly so we have to do
-        * each statement individually.
-        */
-       if (hasRead && hasWrite) {
-           return executeQueriesInIndividualBatches(batch, finalTask);
-       }
+       );
+   }
 
-       // assume all reads or all writes from this point
+   /**
+    * Used by executeSlowHomogeneousBatch() to build messages and keep track
+    * of other information as the batch is processed.
+    */
+   private static class BatchState {
 
-       VoltTable[] results = new VoltTable[batch.size()];
+       // needed to size arrays and check index arguments
+       final int m_batchSize;
+
+       // needed to get various IDs
+       private final TransactionState m_txnState;
 
        // the set of dependency ids for the expected results of the batch
        // one per sql statment
-       int[] depsToResume = new int[batch.size()];
+       final int[] m_depsToResume;
 
        // these dependencies need to be received before the local stuff can run
-       int[] depsForLocalTask = new int[batch.size()];
-
-       // the list of frag ids to run locally
-       long[] localFragIds = new long[batch.size()];
-
-       // the list of frag ids to run remotely
-       ArrayList<Long> distributedFragIds = new ArrayList<Long>();
-       ArrayList<Integer> distributedOutputDepIds = new ArrayList<Integer>();
-
-       // the set of parameters for the local tasks
-       ByteBuffer[] localParams = new ByteBuffer[batch.size()];
-
-       // the set of parameters for the distributed tasks
-       ArrayList<ByteBuffer> distributedParams = new ArrayList<ByteBuffer>();
+       final int[] m_depsForLocalTask;
 
        // check if all local fragment work is non-transactional
-       boolean localFragsAreNonTransactional = false;
+       boolean m_localFragsAreNonTransactional = false;
+
+       // the data and message for locally processed fragments
+       final FragmentTaskMessage m_localTask;
+
+       // the data and message for all sites in the transaction
+       final FragmentTaskMessage m_distributedTask;
+
+       // holds query results
+       final VoltTable[] m_results;
+
+       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
+           m_batchSize = batchSize;
+           m_txnState = txnState;
+
+           m_depsToResume = new int[batchSize];
+           m_depsForLocalTask = new int[batchSize];
+           m_results = new VoltTable[batchSize];
+
+           // the data and message for locally processed fragments
+           m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
+                                                 siteId,
+                                                 m_txnState.txnId,
+                                                 m_txnState.isReadOnly(),
+                                                 false);
+
+           // the data and message for all sites in the transaction
+           m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
+                                                       siteId,
+                                                       m_txnState.txnId,
+                                                       m_txnState.isReadOnly(),
+                                                       finalTask);
+       }
+
+       /*
+        * Replicated fragment.
+        */
+       void addFragment(int index, PlanFragment frag, ByteBuffer params) {
+           assert(index >= 0);
+           assert(index < m_batchSize);
+           assert(frag != null);
+           assert(frag.getHasdependencies() == false);
+
+           // if any frag is transactional, update this check
+           if (frag.getNontransactional() == true)
+               m_localFragsAreNonTransactional = true;
+
+           long localFragId = CatalogUtil.getUniqueIdForFragment(frag);
+           m_depsForLocalTask[index] = -1;
+           // Add the local fragment data.
+           m_localTask.addFragment(localFragId, m_depsToResume[index], params);
+
+       }
+
+       /*
+        * Multi-partition/non-replicated fragment with collector and aggregator.
+        */
+       void addFragmentPair(int index,
+                            PlanFragment collectorFragment,
+                            PlanFragment aggregatorFragment,
+                            ByteBuffer params) {
+           assert(index >= 0);
+           assert(index < m_batchSize);
+           assert(collectorFragment != null);
+           assert(aggregatorFragment != null);
+           assert(collectorFragment.getHasdependencies() == false);
+           assert(aggregatorFragment.getHasdependencies() == true);
+
+           // frags with no deps are usually collector frags that go to all partitions
+           long distributedFragId = CatalogUtil.getUniqueIdForFragment(collectorFragment);
+           long localFragId = CatalogUtil.getUniqueIdForFragment(aggregatorFragment);
+           // if any frag is transactional, update this check
+           if (aggregatorFragment.getNontransactional() == true) {
+               m_localFragsAreNonTransactional = true;
+           }
+           int outputDepId =
+                   m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+           m_depsForLocalTask[index] = outputDepId;
+           // Add local and distributed fragments.
+           m_localTask.addFragment(localFragId, m_depsToResume[index], params);
+           m_distributedTask.addFragment(distributedFragId, outputDepId, params);
+       }
+
+       /*
+        * Replicated custom fragment.
+        */
+       void addCustomFragment(int index, String aggregatorFragment, ByteBuffer params) {
+           assert(index >= 0);
+           assert(index < m_batchSize);
+           assert(aggregatorFragment != null);
+
+           m_depsForLocalTask[index] = -1;
+           m_localTask.addCustomFragment(m_depsToResume[index], params, aggregatorFragment);
+       }
+
+       /*
+        * Multi-partition/non-replicated custom fragment with collector and aggregator.
+        */
+       void addCustomFragmentPair(int index,
+                                  String collectorFragment,
+                                  String aggregatorFragment,
+                                  ByteBuffer params) {
+           assert(index >= 0);
+           assert(index < m_batchSize);
+           assert(collectorFragment != null);
+           assert(aggregatorFragment != null);
+
+           int outputDepId =
+                   m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+           m_depsForLocalTask[index] = outputDepId;
+           // Add the aggegator and collector fragments.
+           m_localTask.addCustomFragment(m_depsToResume[index], params, aggregatorFragment);
+           m_distributedTask.addCustomFragment(outputDepId, params, collectorFragment);
+       }
+   }
+
+   /*
+    * Execute a batch of homogeneous queries, i.e. all reads or all writes.
+    */
+   VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
+
+       BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {
            QueuedSQL queuedSQL = batch.get(i);
 
+           assert(queuedSQL.stmt != null);
+
            // Figure out what is needed to resume the proc
            int collectorOutputDepId = m_txnState.getNextDependencyId();
-           depsToResume[i] = collectorOutputDepId;
+           state.m_depsToResume[i] = collectorOutputDepId;
 
            // Build the set of params for the frags
            FastSerializer fs = new FastSerializer();
@@ -961,128 +1099,192 @@ public class ProcedureRunner {
            assert(params != null);
 
            // populate the actual lists of fragments and params
-           int numFrags = queuedSQL.stmt.catStmt.getFragments().size();
-           assert(numFrags > 0);
-           assert(numFrags <= 2);
+           if (queuedSQL.stmt.catStmt != null) {
+               // Pre-planned query.
 
-           /*
-            * This numfrags == 1 code is for routing multi-partition reads of a
-            * replicated table to the local site. This was a broken performance optimization.
-            * see https://issues.voltdb.com/browse/ENG-1232
-            * The problem is that the fragments for the replicated read are not correctly interleaved with the
-            * distributed writes to the replicated table that might be in the same batch of SQL statements.
-            * We do end up doing the replicated read locally but we break up the batches in the face of mixed
-            * reads and writes
-            */
-           if (numFrags == 1) {
-               for (PlanFragment frag : queuedSQL.stmt.catStmt.getFragments()) {
-                   assert(frag != null);
-                   assert(frag.getHasdependencies() == false);
+               int numFrags = queuedSQL.stmt.catStmt.getFragments().size();
+               assert(numFrags > 0);
+               assert(numFrags <= 2);
 
-                   localFragIds[i] = CatalogUtil.getUniqueIdForFragment(frag);
-                   localParams[i] = params;
-
-                   // if any frag is transactional, update this check
-                   if (frag.getNontransactional() == true)
-                       localFragsAreNonTransactional = true;
+                /*
+                 * This numfrags == 1 code is for routing multi-partition reads of a
+                 * replicated table to the local site. This was a broken performance
+                 * optimization. see https://issues.voltdb.com/browse/ENG-1232.
+                 *
+                 * The problem is that the fragments for the replicated read are not correctly
+                 * interleaved with the distributed writes to the replicated table that might
+                 * be in the same batch of SQL statements. We do end up doing the replicated
+                 * read locally but we break up the batches in the face of mixed reads and
+                 * writes
+                 */
+               Iterator<PlanFragment> fragmentIter = queuedSQL.stmt.catStmt.getFragments().iterator();
+               if (numFrags == 1) {
+                   PlanFragment frag = fragmentIter.next();
+                   state.addFragment(i, frag, params);
                }
-               depsForLocalTask[i] = -1;
+               else {
+                   // collector/aggregator pair (guaranteed above that numFrags==2 here)
+                   PlanFragment frag1 = fragmentIter.next();
+                   assert(frag1 != null);
+                   PlanFragment frag2 = fragmentIter.next();
+                   assert(frag2 != null);
+                   // frags with no deps are usually collector frags that go to all partitions
+                   // figure out which frag is which type
+                   if (frag1.getHasdependencies() == false) {
+                       state.addFragmentPair(i, frag1, frag2, params);
+                   }
+                   else {
+                       state.addFragmentPair(i, frag2, frag1, params);
+                   }
+               }
            }
            else {
-               for (PlanFragment frag : queuedSQL.stmt.catStmt.getFragments()) {
-                   assert(frag != null);
+               /*
+                * Unplanned custom query. Requires an attached plan.
+                * Set up collector and dependent aggregator fragments.
+                */
+               SQLStmtPlan plan = queuedSQL.stmt.getPlan();
+               assert(plan != null);
+               String collectorFragment  = plan.getCollectorFragment();
+               String aggregatorFragment = plan.getAggregatorFragment();
+               assert(aggregatorFragment != null);
 
-                   // frags with no deps are usually collector frags that go to all partitions
-                   if (frag.getHasdependencies() == false) {
-                       distributedFragIds.add(CatalogUtil.getUniqueIdForFragment(frag));
-                       distributedParams.add(params);
-                   }
-                   // frags with deps are usually aggregator frags
-                   else {
-                       localFragIds[i] = CatalogUtil.getUniqueIdForFragment(frag);
-                       localParams[i] = params;
-                       assert(frag.getHasdependencies());
-                       int outputDepId =
-                               m_txnState.getNextDependencyId() | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-                       depsForLocalTask[i] = outputDepId;
-                       distributedOutputDepIds.add(outputDepId);
-
-                       // if any frag is transactional, update this check
-                       if (frag.getNontransactional() == true)
-                           localFragsAreNonTransactional = true;
-                   }
+               if (collectorFragment == null) {
+                   // Multi-partition/non-replicated with collector and aggregator.
+                   state.addCustomFragment(i, aggregatorFragment, params);
+               }
+               else {
+                   // Multi-partition/replicated with just an aggregator fragment.
+                   state.addCustomFragmentPair(i, collectorFragment, aggregatorFragment, params);
                }
            }
-       }
-
-       // convert a bunch of arraylists into arrays
-       // this should be easier, but we also want little-i ints rather than Integers
-       long[] distributedFragIdArray = new long[distributedFragIds.size()];
-       int[] distributedOutputDepIdArray = new int[distributedFragIds.size()];
-       ByteBuffer[] distributedParamsArray = new ByteBuffer[distributedFragIds.size()];
-
-       assert(distributedFragIds.size() == distributedParams.size());
-
-       for (int i = 0; i < distributedFragIds.size(); i++) {
-           distributedFragIdArray[i] = distributedFragIds.get(i);
-           distributedOutputDepIdArray[i] = distributedOutputDepIds.get(i);
-           distributedParamsArray[i] = distributedParams.get(i);
        }
 
        // instruct the dtxn what's needed to resume the proc
-       m_txnState.setupProcedureResume(finalTask, depsToResume);
+       m_txnState.setupProcedureResume(finalTask, state.m_depsToResume);
 
        // create all the local work for the transaction
-       FragmentTaskMessage localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
-                                                 m_site.getCorrespondingSiteId(),
-                                                 m_txnState.txnId,
-                                                 m_txnState.isReadOnly(),
-                                                 localFragIds,
-                                                 depsToResume,
-                                                 localParams,
-                                                 false);
-       for (int i = 0; i < depsForLocalTask.length; i++) {
-           if (depsForLocalTask[i] < 0) continue;
-           localTask.addInputDepId(i, depsForLocalTask[i]);
+       for (int i = 0; i < state.m_depsForLocalTask.length; i++) {
+           if (state.m_depsForLocalTask[i] < 0) continue;
+           state.m_localTask.addInputDepId(i, state.m_depsForLocalTask[i]);
        }
 
        // note: non-transactional work only helps us if it's final work
-       m_txnState.createLocalFragmentWork(localTask, localFragsAreNonTransactional && finalTask);
+       m_txnState.createLocalFragmentWork(state.m_localTask,
+                                          state.m_localFragsAreNonTransactional && finalTask);
 
-       // create and distribute work for all sites in the transaction
-       FragmentTaskMessage distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
-                                                       m_site.getCorrespondingSiteId(),
-                                                       m_txnState.txnId,
-                                                       m_txnState.isReadOnly(),
-                                                       distributedFragIdArray,
-                                                       distributedOutputDepIdArray,
-                                                       distributedParamsArray,
-                                                       finalTask);
+       m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
 
-       m_txnState.createAllParticipatingFragmentWork(distributedTask);
-
-       // recursively call recurableRun and don't allow it to shutdown
+       // recursively call recursableRun and don't allow it to shutdown
        Map<Integer,List<VoltTable>> mapResults =
            m_site.recursableRun(m_txnState);
 
        assert(mapResults != null);
-       assert(depsToResume != null);
-       assert(depsToResume.length == batch.size());
+       assert(state.m_depsToResume != null);
+       assert(state.m_depsToResume.length == batch.size());
 
        // build an array of answers, assuming one result per expected id
        for (int i = 0; i < batch.size(); i++) {
-           List<VoltTable> matchingTablesForId = mapResults.get(depsToResume[i]);
+           List<VoltTable> matchingTablesForId = mapResults.get(state.m_depsToResume[i]);
            assert(matchingTablesForId != null);
            assert(matchingTablesForId.size() == 1);
-           results[i] = matchingTablesForId.get(0);
+           state.m_results[i] = matchingTablesForId.get(0);
 
-           if (batch.get(i).stmt.catStmt.getReplicatedtabledml()) {
-               long newVal = results[i].asScalarLong() / m_site.getReplicatedDMLDivisor();
-               results[i] = new VoltTable(new VoltTable.ColumnInfo("modified_tuples", VoltType.BIGINT));
-               results[i].addRow(newVal);
+           final SQLStmt stmt = batch.get(i).stmt;
+           boolean isReplicated;
+           if (stmt.catStmt != null) {
+               isReplicated = stmt.catStmt.getReplicatedtabledml();
+           }
+           else {
+               assert(stmt.plan != null);
+               isReplicated = stmt.plan.isReplicatedTableDML();
+           }
+           if (isReplicated) {
+               long newVal = state.m_results[i].asScalarLong() / m_site.getReplicatedDMLDivisor();
+               state.m_results[i] = new VoltTable(new VoltTable.ColumnInfo("modified_tuples", VoltType.BIGINT));
+               state.m_results[i].addRow(newVal);
            }
        }
 
-       return results;
+       return state.m_results;
+   }
+
+   // Batch up pre-planned fragments, but handle ad hoc independently.
+   private VoltTable[] fastPath(List<QueuedSQL> batch) {
+
+       return executeQueuedSQL(batch,
+           new FragmentExecutor() {
+               @Override
+               public VoltTable[] onExecutePrePlanned(final List<QueuedSQL> batch, final boolean last) {
+                   final int batchSize = batch.size();
+                   ParameterSet[] params = new ParameterSet[batchSize];
+                   long[] fragmentIds = new long[batchSize];
+
+                   int i = 0;
+                   for (final QueuedSQL qs : batch) {
+                       assert(qs.stmt.numFragGUIDs == 1);
+                       fragmentIds[i] = qs.stmt.fragGUIDs[0];
+                       params[i] = qs.params;
+                       i++;
+                   }
+                   return m_site.executeQueryPlanFragmentsAndGetResults(
+                       fragmentIds,
+                       batchSize,   // 1 frag per stmt
+                       params,      // 1 frag per stmt
+                       batchSize,   // 1 frag per stmt
+                       m_txnState.txnId,
+                       m_catProc.getReadonly());
+               }
+
+               @Override
+               public VoltTable[] onExecuteUnplanned(final List<QueuedSQL> batch, final boolean last) {
+                   VoltTable[] results = new VoltTable[batch.size()];
+                   for (int i = 0; i < batch.size(); i++) {
+                       results[i] = m_site.executeCustomPlanFragment(
+                               batch.get(i).stmt.getPlan().getAggregatorFragment(),
+                               AGG_DEPID, m_txnState.txnId);
+                   }
+                   return results;
+               }
+           }
+       );
+   }
+
+   private interface FragmentExecutor {
+       public abstract VoltTable[] onExecuteUnplanned(final List<QueuedSQL> batch, final boolean last);
+
+       public abstract VoltTable[] onExecutePrePlanned(final List<QueuedSQL> batch, final boolean last);
+   }
+
+   // Walk through the batch, process sub-batches, and collect results.
+   // For now the batch size for custom (ad hoc) SQL is 1 since that's
+   // how it's being handled anyway, plus it simplifies the logic here.
+   // This can change if we implement support for larger custom batches.
+   static private VoltTable[] executeQueuedSQL(final List<QueuedSQL> batch,
+                                               FragmentExecutor executor) {
+       int iFrom = 0;
+       int iTo = 0;
+       List<VoltTable> results = new ArrayList<VoltTable>();
+       VoltTable[] subResults;
+       for (; iTo < batch.size(); iTo++) {
+           final QueuedSQL qs = batch.get(iTo);
+           if (qs.stmt.plan != null) {
+               if (iTo > iFrom) {
+                   subResults = executor.onExecutePrePlanned(batch.subList(iFrom, iTo),
+                                                             iTo == batch.size() - 1);
+                   results.addAll(Arrays.asList(subResults));
+                   iFrom = iTo + 1;
+               }
+               subResults = executor.onExecuteUnplanned(batch.subList(iTo, iTo + 1),
+                                                        iTo == batch.size() - 1);
+               results.addAll(Arrays.asList(subResults));
+           }
+       }
+       if (iTo > iFrom) {
+           subResults = executor.onExecutePrePlanned(batch.subList(iFrom, iTo), true);
+           results.addAll(Arrays.asList(subResults));
+           iFrom = iTo + 1;
+       }
+       return results.toArray(new VoltTable[results.size()]);
    }
 }

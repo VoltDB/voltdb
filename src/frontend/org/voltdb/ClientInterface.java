@@ -1057,7 +1057,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
                 break;
             }
-            // make a copy for threadsafety
             planBatch.addStatement(sqlStatement,
                                    plannedStatement.aggregatorFragment,
                                    plannedStatement.collectorFragment,

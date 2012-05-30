@@ -17,23 +17,17 @@
 
 package org.voltdb.sysprocs;
 
-import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.List;
 import java.util.Map;
 
-import org.voltdb.BackendTarget;
 import org.voltdb.DependencyPair;
-import org.voltdb.HsqlBackend;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
 import org.voltdb.SystemProcedureExecutionContext;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.dtxn.DtxnConstants;
 
 /**
  * Execute a user-provided SQL statement. This code coordinates the execution of
@@ -43,9 +37,6 @@ import org.voltdb.dtxn.DtxnConstants;
 public class AdHoc extends VoltSystemProcedure {
 
     Database m_db = null;
-
-    final int AGG_DEPID = 1;
-    final int COLLECT_DEPID = 2 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
 
     @Override
     public void init()
@@ -58,39 +49,9 @@ public class AdHoc extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params, SystemProcedureExecutionContext context)
     {
-        // get the three params (depId, json plan, sql stmt)
-        int outputDepId = (Integer) params.toArray()[0];
-        String plan = (String) params.toArray()[1];
-        String sql = (String) params.toArray()[2];
-        int inputDepId = -1;
-
-        // make dependency ids available to the execution engine
-        if ((dependencies != null) && (dependencies.size() > 00)) {
-            assert(dependencies.size() <= 1);
-            for (int x : dependencies.keySet()) {
-                inputDepId = x; break;
-            }
-            context.getSiteProcedureConnection().stashWorkUnitDependencies(dependencies);
-        }
-
-        VoltTable table = null;
-
-        HsqlBackend hsql = m_runner.getHsqlBackendIfExists();
-        if (hsql != null) {
-            // Call HSQLDB
-            assert(sql != null);
-            table = hsql.runDML(sql);
-        }
-        else
-        {
-            assert(plan != null);
-            table =
-                context.getSiteProcedureConnection().
-                executeCustomPlanFragment(plan, inputDepId,
-                                          m_runner.getTxnState().txnId);
-        }
-
-        return new DependencyPair(outputDepId, table);
+        // This code should never be called.
+        assert(false);
+        return null;
     }
 
     /**
@@ -100,12 +61,12 @@ public class AdHoc extends VoltSystemProcedure {
      * execute.
      *
      * One ad hoc SQL string can contain multiple SQL statements separated by
-     * semi-colons. All per-query data is provided as collections.
+     * semi-colons. All per-query data is provided as arrays.
      *
      * @param ctx                         Internal.
      * @param aggregatorFragments         Internal.
      * @param collectorFragments          Internal.
-     * @param sqlStatements               User provided SQL statements.
+     * @param sqlStatements               User-provided SQL statements.
      * @param replicatedTableDMLFlags     Internal.
      * @return The result of the user's query. If the user's SQL statement was
      * a DML query, a table with a single untitled column is returned containing
@@ -121,83 +82,26 @@ public class AdHoc extends VoltSystemProcedure {
 
         // Collections must be the same size since they all contain slices of the same data.
         assert(sqlStatements != null);
-        assert(aggregatorFragments != null && aggregatorFragments.length == sqlStatements.length);
-        assert(collectorFragments != null && collectorFragments.length == sqlStatements.length);
-        assert(replicatedTableDMLFlags != null && replicatedTableDMLFlags.length == sqlStatements.length);
+        assert(aggregatorFragments != null);
+        assert(aggregatorFragments.length == sqlStatements.length);
+        assert(collectorFragments != null);
+        assert(collectorFragments.length == sqlStatements.length);
+        assert(replicatedTableDMLFlags != null);
+        assert(replicatedTableDMLFlags.length == sqlStatements.length);
 
-        List<VoltTable> results = new ArrayList<VoltTable>();
+        if (sqlStatements.length == 0) {
+            return new VoltTable[]{};
+        }
 
         for (int i = 0; i < sqlStatements.length; i++) {
-
-            boolean replicatedTableDML = replicatedTableDMLFlags[i] == 1;
-
-            SynthesizedPlanFragment[] pfs = null;
-            ParameterSet params = null;
-            if (VoltDB.getEEBackendType() == BackendTarget.HSQLDB_BACKEND) {
-                pfs = new SynthesizedPlanFragment[1];
-
-                // JUST SEND ONE FRAGMENT TO HSQL, IT'LL IGNORE EVERYTHING BUT SQL AND DEPID
-                pfs[0] = new SynthesizedPlanFragment();
-                pfs[0].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
-                pfs[0].outputDepId = AGG_DEPID;
-                pfs[0].multipartition = false;
-                params = new ParameterSet();
-                params.setParameters(AGG_DEPID, "", sqlStatements[i]);
-                pfs[0].parameters = params;
-            }
-            else {
-                if (collectorFragments[i] != null) {
-                    pfs = new SynthesizedPlanFragment[2];
-
-                    // COLLECTION FRAGMENT NEEDS TO RUN FIRST
-                    pfs[1] = new SynthesizedPlanFragment();
-                    pfs[1].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
-                    pfs[1].outputDepId = COLLECT_DEPID;
-                    pfs[1].multipartition = true;
-                    params = new ParameterSet();
-                    params.setParameters(COLLECT_DEPID, collectorFragments[i], sqlStatements[i]);
-                    pfs[1].parameters = params;
-                }
-                else {
-                    pfs = new SynthesizedPlanFragment[1];
-                }
-
-                // AGGREGATION FRAGMENT DEPENDS ON THE COLLECTION FRAGMENT
-                pfs[0] = new SynthesizedPlanFragment();
-                pfs[0].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
-                pfs[0].outputDepId = AGG_DEPID;
-                if (collectorFragments[i] != null)
-                    pfs[0].inputDepIds = new int[] { COLLECT_DEPID };
-                pfs[0].multipartition = false;
-                pfs[0].suppressDuplicates = true;
-                params = new ParameterSet();
-                params.setParameters(AGG_DEPID, aggregatorFragments[i], sqlStatements[i]);
-                pfs[0].parameters = params;
-            }
-
-            // distribute and execute these fragments providing pfs and id of the
-            // aggregator's output dependency table.
-            VoltTable[] partialResults = executeSysProcPlanFragments(pfs, AGG_DEPID);
-
-            // rather icky hack to handle how the number of modified tuples will always be
-            // inflated when changing replicated tables - the user really doesn't want to know
-            // the big number, just the small one
-            if (replicatedTableDML) {
-                assert(partialResults.length == 1);
-                long changedTuples = partialResults[0].asScalarLong();
-                assert((changedTuples % ctx.getNumberOfPartitions()) == 0);
-
-                VoltTable retval = new VoltTable(new VoltTable.ColumnInfo("", VoltType.BIGINT));
-                retval.addRow(changedTuples / ctx.getNumberOfPartitions());
-                partialResults[0] = retval;
-            }
-
-            results.addAll(Arrays.asList(partialResults));
+            SQLStmt stmt = SQLStmt.createWithPlan(sqlStatements[i],
+                                                  aggregatorFragments[i],
+                                                  collectorFragments[i],
+                                                  replicatedTableDMLFlags[i] == 1);
+            voltQueueSQL(stmt);
         }
 
-        if (results.isEmpty()) {
-            return null;
-        }
-        return results.toArray(new VoltTable[]{});
+        return voltExecuteSQL(true);
     }
+
 }

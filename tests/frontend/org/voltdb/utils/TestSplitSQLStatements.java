@@ -63,6 +63,7 @@ public class TestSplitSQLStatements {
         checkSplitter("a;;b;;c;;", "a", "b", "c");
         checkSplitter("abc --;def\n;ghi", "abc --;def", "ghi");
         checkSplitter("abc /*\";def\n;*/ghi", "abc /*\";def\n;*/ghi");
+        checkSplitter("a\r\nb;c\r\nd;", "a\r\nb", "c\r\nd");
     }
 
 }

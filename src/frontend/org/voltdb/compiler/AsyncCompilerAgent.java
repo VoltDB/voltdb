@@ -41,7 +41,7 @@ import org.voltdb.utils.Encoder;
 
 public class AsyncCompilerAgent {
 
-    static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
+    private static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
     // if more than this amount of work is queued, reject new work
     static final int MAX_QUEUE_DEPTH = 250;
@@ -149,18 +149,17 @@ public class AsyncCompilerAgent {
                                           work.clientData);
 
         List<String> errorMsgs = new ArrayList<String>();
-        if (work.sqlStatements != null) {
-            for (final String sqlStatement : work.sqlStatements) {
-                try {
-                    PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam != null);
-                    plannedStmtBatch.addStatement(sqlStatement,
-                                                  result.onePlan,
-                                                  result.allPlan,
-                                                  result.replicatedDML);
-                }
-                catch (Exception e) {
-                    errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
-                }
+        assert(work.sqlStatements != null);
+        for (final String sqlStatement : work.sqlStatements) {
+            try {
+                PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam != null);
+                plannedStmtBatch.addStatement(sqlStatement,
+                                              result.onePlan,
+                                              result.allPlan,
+                                              result.replicatedDML);
+            }
+            catch (Exception e) {
+                errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
             }
         }
         if (!errorMsgs.isEmpty()) {

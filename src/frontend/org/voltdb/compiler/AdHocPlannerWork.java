@@ -57,9 +57,8 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     public String toString() {
         String retval = super.toString();
         retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
-        if (sqlStatements == null) {
-            retval += "\n  sql: null";
-        } else if (sqlStatements == null || sqlStatements.length == 0) {
+        assert(sqlStatements != null);
+        if (sqlStatements.length == 0) {
             retval += "\n  sql: empty";
         } else {
             int i = 0;

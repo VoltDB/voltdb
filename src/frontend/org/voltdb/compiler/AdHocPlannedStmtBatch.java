@@ -30,9 +30,9 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     private static final long serialVersionUID = -8627490621430290801L;
 
     public final String sqlBatchText;
-    public Object partitionParam;
-    public int catalogVersion;
-    public List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
+    public final Object partitionParam;
+    public final int catalogVersion;
+    public final List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
 
     /**
      * Statement batch constructor.
