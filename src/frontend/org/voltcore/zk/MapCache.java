@@ -50,7 +50,7 @@ import com.google.common.util.concurrent.MoreExecutors;
  * Tracker monitors and provides snapshots of a single ZK node's
  * children. The children data objects must be JSONObjects.
  */
-public class MapCache {
+public class MapCache implements MapCacheReader, MapCacheWriter {
 
     //
     // API
@@ -63,6 +63,7 @@ public class MapCache {
     }
 
     /** Initialize and start watching the cache. */
+    @Override
     public void start(boolean block) throws InterruptedException, ExecutionException {
         Future<?> task = m_es.submit(new ParentEvent(null));
         if (block) {
@@ -71,6 +72,7 @@ public class MapCache {
     }
 
     /** Stop caring */
+    @Override
     public void shutdown() throws InterruptedException {
         m_shutdown.set(true);
         m_es.shutdown();
@@ -81,6 +83,7 @@ public class MapCache {
      * Get a current snapshot of the watched root node's children. This snapshot
      * promises no cross-children atomicity guarantees.
      */
+    @Override
     public ImmutableMap<String, JSONObject> pointInTimeCache() {
         if (m_shutdown.get()) {
             throw new RuntimeException("Requested cache from shutdown MapCache.");
@@ -91,6 +94,7 @@ public class MapCache {
     /**
      * Read a single key from the cache. Matches the semantics of put()
      */
+    @Override
     public JSONObject get(String key) {
         return m_publicCache.get().get(ZKUtil.joinZKPath(m_rootNode, key));
     }
@@ -98,6 +102,7 @@ public class MapCache {
     /**
      * Create or update a new rootNode child
      */
+    @Override
     public void put(String key, JSONObject value) throws KeeperException, InterruptedException {
         try {
             String createdNode = m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
