@@ -33,6 +33,9 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected long m_initiatorHSId;
     protected long m_coordinatorHSId;
     protected long m_txnId;
+    // IV2: within a partition, the primary initiator and its replicas
+    // use this for intra-partition ordering/lookup
+    protected long m_spHandle;
     protected boolean m_isReadOnly;
 
     /** Empty constructor for de-serialization */
@@ -49,6 +52,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_txnId = txnId;
         m_isReadOnly = isReadOnly;
         m_subject = Subject.DEFAULT.getId();
+        m_spHandle = Long.MIN_VALUE;
     }
 
     public long getInitiatorHSId() {
@@ -63,6 +67,14 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_txnId;
     }
 
+    public void setSpHandle(long spHandle) {
+        m_spHandle = spHandle;
+    }
+
+    public long getSpHandle() {
+        return m_spHandle;
+    }
+
     public boolean isReadOnly() {
         return m_isReadOnly;
     }
@@ -75,7 +87,11 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
-        msgsize += 8 + 8 + 8 + 1;
+        msgsize += 8   // m_initiatorHSId
+            + 8        // m_coordinatorHSId
+            + 8        // m_txnId
+            + 8        // m_spHandle
+            + 1;       // m_isReadOnly
         return msgsize;
     }
 
@@ -84,6 +100,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_initiatorHSId);
         buf.putLong(m_coordinatorHSId);
         buf.putLong(m_txnId);
+        buf.putLong(m_spHandle);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
     }
 
@@ -92,6 +109,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
         m_txnId = buf.getLong();
+        m_spHandle = buf.getLong();
         m_isReadOnly = buf.get() == 1;
     }
 }
