@@ -249,7 +249,14 @@ public abstract class ExportClientBase {
         return retval;
     }
 
-    public boolean connect() throws ExportClientException {
+    /**
+     * Attempt to connect to the complete mesh. Fail fast.
+     *
+     * @param foundSources A set that will be destroyed and used to return the set of discovered sources.
+     * @return True if any connections succeeded. False on a failure that isn't worth retying.
+     * @throws ExportClientException If the input is wrong.
+     */
+    private boolean tryToConnectToAllNodes(HashSet<AdvertisedDataSource> foundSources) throws ExportClientException {
         if (m_connected.get()) {
             m_logger.error("Export client already connected.");
             throw new ExportClientException(ExportClientException.Type.USER_ERROR,
@@ -341,6 +348,7 @@ public abstract class ExportClientBase {
             }
         }
 
+        // if not one server is connect-able, then don't bother retrying
         if (!foundOneActiveServer) {
             for (Pair<Exception, InetSocketAddress> p : connectErrors) {
                 m_logger.warn("Failed to connect to server " +
@@ -352,34 +360,50 @@ public abstract class ExportClientBase {
             return false;
         }
 
-        HashSet<AdvertisedDataSource> foundSources = new HashSet<AdvertisedDataSource>();
+        foundSources.clear();
         // connect to the rest of the servers
-        // try three rounds with a pause in the middle of each
-        for (int tryCount = 0; tryCount < 3; tryCount++) {
-            for (InetSocketAddress addr : m_servers) {
-                if (m_exportConnections.containsKey(addr)) continue;
-                ExportConnection connection;
-                try {
-                    connection = connectToServer(addr);
-                } catch (InterruptedException e) {
-                    disconnect();
-                    return false;
-                }
-                if (connection != null) {
-                    m_exportConnections.put(addr, connection);
-                    foundSources.addAll(connection.dataSources);
-                }
+        for (InetSocketAddress addr : m_servers) {
+            if (m_exportConnections.containsKey(addr)) continue;
+            ExportConnection connection;
+            try {
+                connection = connectToServer(addr);
+            } catch (InterruptedException e) {
+                disconnect();
+                return true; // this try didn't work
             }
-
-            // check for successful connection to all servers
-            if (m_servers.size() == m_exportConnections.size())
-                break;
-
-            // sleep for 1/4 second
-            try { Thread.sleep(250); } catch (InterruptedException e) {}
+            if (connection != null) {
+                m_exportConnections.put(addr, connection);
+                foundSources.addAll(connection.dataSources);
+            }
         }
 
-        // check for non-complete connection and roll back if so
+        return true;
+    }
+
+    public boolean connect() throws ExportClientException {
+        HashSet<AdvertisedDataSource> foundSources = new HashSet<AdvertisedDataSource>();
+
+        // try to connect three tiems
+        for (int attempt = 0; attempt < 3; attempt++) {
+            // try to connect to all nodes
+            // returns false on error cases that will always fail
+            // returning true doesn't mean full connections
+            if (!tryToConnectToAllNodes(foundSources)) {
+                return false;
+            }
+
+            if (m_servers.size() == m_exportConnections.size()) {
+                break; // successfully connected to all nodes
+            }
+            else {
+                disconnect();
+            }
+
+            // sleep before a retry
+            try { Thread.sleep(500); } catch (Exception e) {}
+        }
+
+        // check for non-complete connection after multiple attempts and roll back if so
         if (m_servers.size() != m_exportConnections.size()) {
             disconnect();
             return false;
