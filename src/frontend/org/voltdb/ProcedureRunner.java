@@ -685,11 +685,52 @@ public class ProcedureRunner {
                     return new TimestampType((String)param);
                 }
                 catch (IllegalArgumentException e) {
-                    // ignore errors if it's not the right format
+                    // Defer errors to the generic Exception throw below, if it's not the right format
                 }
             }
         }
-        if (slot == BigDecimal.class) {
+        else if (slot == java.sql.Timestamp.class) {
+            if (param instanceof java.sql.Timestamp) return param;
+            if (param instanceof java.util.Date) return new java.sql.Timestamp(((java.util.Date) param).getTime());
+            if (param instanceof TimestampType) return ((TimestampType) param).asJavaTimestamp();
+            // If a string is given for a date, use java's JDBC parsing.
+            if (pclass == String.class) {
+                try {
+                    return java.sql.Timestamp.valueOf((String) param);
+                }
+                catch (IllegalArgumentException e) {
+                    // Defer errors to the generic Exception throw below, if it's not the right format
+                }
+            }
+        }
+        else if (slot == java.sql.Date.class) {
+            if (param instanceof java.sql.Date) return param; // covers java.sql.Date and java.sql.Timestamp
+            if (param instanceof java.util.Date) return new java.sql.Date(((java.util.Date) param).getTime());
+            if (param instanceof TimestampType) return ((TimestampType) param).asExactJavaSqlDate();
+            // If a string is given for a date, use java's JDBC parsing.
+            if (pclass == String.class) {
+                try {
+                    return new java.sql.Date(TimestampType.millisFromJDBCformat((String) param));
+                }
+                catch (IllegalArgumentException e) {
+                    // Defer errors to the generic Exception throw below, if it's not the right format
+                }
+            }
+        }
+        else if (slot == java.util.Date.class) {
+            if (param instanceof java.util.Date) return param; // covers java.sql.Date and java.sql.Timestamp
+            if (param instanceof TimestampType) return ((TimestampType) param).asExactJavaDate();
+            // If a string is given for a date, use the default format parser for the default locale.
+            if (pclass == String.class) {
+                try {
+                    return new java.util.Date(TimestampType.millisFromJDBCformat((String) param));
+                }
+                catch (IllegalArgumentException e) {
+                    // Defer errors to the generic Exception throw below, if it's not the right format
+                }
+            }
+        }
+        else if (slot == BigDecimal.class) {
             if ((pclass == Long.class) || (pclass == Integer.class) ||
                 (pclass == Short.class) || (pclass == Byte.class)) {
                 BigInteger bi = new BigInteger(param.toString());
@@ -707,14 +748,14 @@ public class ProcedureRunner {
                 return bd;
             }
         }
-        if (slot == VoltTable.class && pclass == VoltTable.class) {
+        else if (slot == VoltTable.class && pclass == VoltTable.class) {
             return param;
         }
 
         // handle truncation for integers
 
         // Long targeting int parameter
-        if ((slot == int.class) && (pclass == Long.class)) {
+        else if ((slot == int.class) && (pclass == Long.class)) {
             long val = ((Number) param).longValue();
 
             // if it's in the right range, and not null (target null), crop the value and return
@@ -723,7 +764,7 @@ public class ProcedureRunner {
         }
 
         // Long or Integer targeting short parameter
-        if ((slot == short.class) && (pclass == Long.class || pclass == Integer.class)) {
+        else if ((slot == short.class) && (pclass == Long.class || pclass == Integer.class)) {
             long val = ((Number) param).longValue();
 
             // if it's in the right range, and not null (target null), crop the value and return
@@ -732,7 +773,7 @@ public class ProcedureRunner {
         }
 
         // Long, Integer or Short targeting byte parameter
-        if ((slot == byte.class) && (pclass == Long.class || pclass == Integer.class || pclass == Short.class)) {
+        else if ((slot == byte.class) && (pclass == Long.class || pclass == Integer.class || pclass == Short.class)) {
             long val = ((Number) param).longValue();
 
             // if it's in the right range, and not null (target null), crop the value and return
@@ -741,8 +782,8 @@ public class ProcedureRunner {
         }
 
         throw new Exception(
-                "tryToMakeCompatible: Unable to match parameters or out of range for taget param: "
-                + slot.getName() + " to provided " + pclass.getName());
+                "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + pclass.getName() +
+                "is not a match or is out of range for the target parameter type: " + slot.getName());
     }
 
     /**

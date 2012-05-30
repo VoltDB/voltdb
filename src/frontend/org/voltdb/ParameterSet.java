@@ -234,7 +234,9 @@ import org.voltdb.types.VoltDecimalHelper;
                     out.writeString((String) obj);
                     break;
                 case TIMESTAMP:
-                    out.writeTimestamp((TimestampType) obj);
+                    // FastSerializer does not need to distinguish time stamp types from long counts of microseconds.
+                    long micros = timestampToMicroseconds(obj);
+                    out.writeLong(micros);
                     break;
                 case DECIMAL:
                     VoltDecimalHelper.serializeBigDecimal((BigDecimal)obj, out);
@@ -427,7 +429,8 @@ import org.voltdb.types.VoltDecimalHelper;
                     }
                     return bin_val;
                 case TIMESTAMP:
-                    return in.readTimestamp();
+                    final long micros = in.readLong();
+                    return new TimestampType(micros);
                 case VOLTTABLE:
                     return in.readObject(VoltTable.class);
                 case DECIMAL: {
@@ -730,7 +733,7 @@ import org.voltdb.types.VoltDecimalHelper;
                     else if (cls == Double.class)
                         buf.putDouble(((Double) obj).doubleValue());
                     else
-                        throw new RuntimeException("Can't cast paramter type to Double");
+                        throw new RuntimeException("Can't cast parameter type to Double");
                     break;
                 case STRING:
                     if (!strIter.hasNext()) {
@@ -740,7 +743,8 @@ import org.voltdb.types.VoltDecimalHelper;
                     FastSerializer.writeString(strIter.next(), buf);
                     break;
                 case TIMESTAMP:
-                    buf.putLong(((TimestampType) obj).getTime());
+                    long micros = timestampToMicroseconds(obj);
+                    buf.putLong(micros);
                     break;
                 case DECIMAL:
                     VoltDecimalHelper.serializeBigDecimal((BigDecimal)obj, buf);
@@ -752,5 +756,29 @@ import org.voltdb.types.VoltDecimalHelper;
                     throw new RuntimeException("FIXME: Unsupported type " + type);
             }
         }
+    }
+
+    static long timestampToMicroseconds(Object obj) {
+        long micros = 0;
+        // Adapt the Java standard classes' millisecond count to TIMESTAMP's microseconds.
+        if (obj instanceof java.util.Date) {
+            micros = ((java.util.Date) obj).getTime()*1000;
+            // For Timestamp, also preserve exactly the right amount of fractional second precision.
+            if (obj instanceof java.sql.Timestamp) {
+                long nanos = ((java.sql.Timestamp) obj).getNanos();
+                // XXX: This may be slightly controversial, but...
+                // Throw a conversion error rather than silently rounding/dropping sub-microsecond precision.
+                if ((nanos % 1000) != 0) {
+                    throw new RuntimeException("Can't serialize TIMESTAMP value with fractional microseconds");
+                }
+                // Use MOD 1000000 to prevent double-counting of milliseconds which figure into BOTH getTime() and getNanos().
+                // DIVIDE nanoseconds by 1000 to get microseconds.
+                micros += ((nanos % 1000000)/1000);
+            }
+        } else if (obj instanceof TimestampType) {
+            // Let this throw a cast exception if obj is not actually a TimestampType instance.
+            micros = ((TimestampType) obj).getTime();
+        }
+        return micros;
     }
 }
