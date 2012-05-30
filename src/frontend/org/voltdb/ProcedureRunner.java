@@ -137,6 +137,13 @@ public class ProcedureRunner {
         return m_isSysProc;
     }
 
+    public boolean isEverySite() {
+        boolean retval = false;
+        if (isSystemProcedure()) {
+            retval = m_catProc.getEverysite();
+        }
+        return retval;
+    }
     /**
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
