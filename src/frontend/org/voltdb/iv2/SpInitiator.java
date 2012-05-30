@@ -98,6 +98,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     public void becomeLeader()
     {
         try {
+            m_scheduler.setLeaderState(true);
             MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
 
             m_babySitter = new BabySitter(m_messenger.getZK(),

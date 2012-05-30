@@ -54,6 +54,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected LoadedProcedureSet m_loadedProcs;
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
+    protected boolean m_isLeader = false;
 
     // hacky temp txnid
     protected AtomicLong m_txnId = new AtomicLong(0);
@@ -68,6 +69,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setMailbox(Mailbox mailbox)
     {
         m_mailbox = mailbox;
+    }
+
+    public void setLeaderState(boolean isLeader)
+    {
+        m_isLeader = isLeader;
     }
 
     void setProcedureSet(LoadedProcedureSet loadedProcs)

@@ -72,6 +72,7 @@ public class MpInitiator implements Initiator
             VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
         }
 
+        m_scheduler.setLeaderState(true); // Only one MPI right now, always the leader
         m_executionSite = new Site(m_scheduler.getQueue(),
                                    m_initiatorMailbox.getHSId(),
                                    backend, catalogContext,
