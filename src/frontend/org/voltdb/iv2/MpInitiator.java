@@ -46,7 +46,6 @@ public class MpInitiator implements Initiator
     private Site m_executionSite = null;
     private Scheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
-    private InitiatorMessageHandler m_msgHandler = null;
     private Thread m_siteThread = null;
     private MapCache m_iv2masters = null;
 
@@ -57,8 +56,7 @@ public class MpInitiator implements Initiator
         m_partitionId = -1;
         m_iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
         m_scheduler = new MpScheduler(m_iv2masters);
-        m_msgHandler = new MpInitiatorMessageHandler(m_scheduler);
-        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger);
+        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger);
     }
 
     @Override

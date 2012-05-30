@@ -21,6 +21,10 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
+
+import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.VoltTable;
@@ -32,12 +36,48 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class SpScheduler extends Scheduler
 {
+    long[] m_replicaHSIds = new long[] {};
     private Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
 
     SpScheduler()
     {
         super();
+    }
+
+    @Override
+    public void updateReplicas(long[] hsids)
+    {
+        m_replicaHSIds = hsids;
+    }
+
+    // SpInitiators will see every message type.  The Responses currently come
+    // from local work, but will come from replicas when replication is
+    // implemented
+    @Override
+    public void deliver(VoltMessage message)
+    {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
+        }
+        else if (message instanceof InitiateResponseMessage) {
+            handleInitiateResponseMessage((InitiateResponseMessage)message);
+        }
+        else if (message instanceof FragmentTaskMessage) {
+            handleFragmentTaskMessage((FragmentTaskMessage)message);
+        }
+        else if (message instanceof FragmentResponseMessage) {
+            handleFragmentResponseMessage((FragmentResponseMessage)message);
+        }
+        else if (message instanceof CompleteTransactionMessage) {
+            handleCompleteTransactionMessage((CompleteTransactionMessage)message);
+        }
+        else if (message instanceof BorrowTaskMessage) {
+            handleBorrowTaskMessage((BorrowTaskMessage)message);
+        }
+        else {
+            throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
+        }
     }
 
     // SpScheduler expects to see InitiateTaskMessages corresponding to single-partition
@@ -47,9 +87,28 @@ public class SpScheduler extends Scheduler
         final String procedureName = message.getStoredProcedureName();
         final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
         if (message.isSinglePartition()) {
+            long new_txnId = m_txnId.incrementAndGet();
+            if (m_replicaHSIds.length > 0) {
+                try {
+                    Iv2InitiateTaskMessage replmsg =
+                        new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
+                                m_mailbox.getHSId(),
+                                message.getTxnId(),
+                                message.isReadOnly(),
+                                message.isSinglePartition(),
+                                message.getStoredProcedureInvocation(),
+                                message.getClientInterfaceHandle()) ;
+                    m_mailbox.send(m_replicaHSIds, replmsg);
+                } catch (MessagingException e) {
+                    hostLog.error("Failed to deliver response from execution site.", e);
+                }
+                DuplicateCounter counter = new DuplicateCounter(
+                        message.getInitiatorHSId(), m_replicaHSIds.length + 1,
+                        new_txnId);
+            }
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, runner,
-                        m_txnId.incrementAndGet(), m_pendingTasks, message);
+                        new_txnId, m_pendingTasks, message);
             m_pendingTasks.offer(task);
             return;
         }
@@ -63,7 +122,25 @@ public class SpScheduler extends Scheduler
     // by SpInitiatorMessageHandler.  This may change when replication is added.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
     {
-        throw new RuntimeException("Should never have gotten here.");
+        // Send the message to the duplicate counter, if any
+        // ADD CODE HERE
+
+        if (message.getInitiatorHSId() != m_mailbox.getHSId()) {
+            try {
+                // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+                m_mailbox.send(message.getInitiatorHSId(), message);
+            }
+            catch (MessagingException e) {
+                // hostLog.error("Failed to deliver response from execution site.", e);
+            }
+        }
+    }
+
+    // BorrowTaskMessages just encapsulate a FragmentTaskMessage along with
+    // its input dependency tables.
+    private void handleBorrowTaskMessage(BorrowTaskMessage message) {
+        handleFragmentTaskMessage(message.getFragmentTaskMessage(),
+                message.getInputDepMap());
     }
 
     // SpSchedulers will see FragmentTaskMessage for:
@@ -76,6 +153,19 @@ public class SpScheduler extends Scheduler
     public void handleFragmentTaskMessage(FragmentTaskMessage message,
                                           Map<Integer, List<VoltTable>> inputDeps)
     {
+        // If we have input dependencies, it's borrow work, there's no way we
+        // can actually distribute it
+        if (m_replicaHSIds.length > 0 && inputDeps == null) {
+            try {
+                FragmentTaskMessage replmsg =
+                    new FragmentTaskMessage(m_mailbox.getHSId(),
+                            m_mailbox.getHSId(), message);
+                m_mailbox.send(m_replicaHSIds, replmsg);
+            } catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
+        }
+
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have
@@ -103,11 +193,29 @@ public class SpScheduler extends Scheduler
     // FragmentResponses from its replicas.
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
-        throw new RuntimeException("Partition masters don't yet handle fragment responses");
+        // Add duplicate counter code here
+        // ADD CODE HERE
+
+        if (message.getDestinationSiteId() != m_mailbox.getHSId()) {
+            try {
+                m_mailbox.send(message.getDestinationSiteId(), message);
+            }
+            catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
+        }
     }
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
+        if (m_replicaHSIds.length > 0) {
+            try {
+                CompleteTransactionMessage replmsg = message;
+                m_mailbox.send(m_replicaHSIds, replmsg);
+            } catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
+        }
         TransactionState txn = m_outstandingTxns.remove(message.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures
         // which only use the buddy site (replicated table read).  Ignore them for

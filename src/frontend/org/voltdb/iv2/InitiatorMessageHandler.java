@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 
@@ -27,29 +26,11 @@ import org.voltcore.messaging.VoltMessage;
  * class to provide routing appropriate to the role.
  * IZZY: I think this could merge with Scheduler pretty cleanly.
  */
-abstract public class InitiatorMessageHandler
+public interface InitiatorMessageHandler
 {
-    static VoltLogger hostLog = new VoltLogger("HOST");
+    void updateReplicas(long[] hsids);
 
-    final protected Scheduler m_scheduler;
-    protected Mailbox m_mailbox;
-
-    InitiatorMessageHandler(Scheduler scheduler)
-    {
-        m_scheduler = scheduler;
-    }
-
-    /** Inform the handler of the Initiator's Mailbox */
-    void setMailbox(Mailbox mailbox)
-    {
-        m_mailbox = mailbox;
-        m_scheduler.setMailbox(m_mailbox);
-    }
-
-    void updateReplicas(long[] hsids)
-    {
-    }
-
+    void setMailbox(Mailbox mailbox);
         /*
            if (replica):
                if (sp procedure):
@@ -95,5 +76,5 @@ abstract public class InitiatorMessageHandler
 
        */
 
-    abstract public void deliver(VoltMessage message);
+    void deliver(VoltMessage message);
 }

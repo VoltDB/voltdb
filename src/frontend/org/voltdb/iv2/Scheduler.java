@@ -23,6 +23,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.VoltTable;
@@ -50,7 +51,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
  * IZZY: This class maybe folds into InitiatorMessageHandler nicely; let's see
  * how it looks once partition replicas are implemented.
  */
-abstract public class Scheduler
+abstract public class Scheduler implements InitiatorMessageHandler
 {
     protected VoltLogger hostLog = new VoltLogger("HOST");
     // The queue which the Site's runloop is going to poll for new work.  This
@@ -71,7 +72,8 @@ abstract public class Scheduler
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
     }
 
-    void setMailbox(Mailbox mailbox)
+    @Override
+    public void setMailbox(Mailbox mailbox)
     {
         m_mailbox = mailbox;
     }
@@ -85,6 +87,12 @@ abstract public class Scheduler
     {
         return m_tasks;
     }
+
+    @Override
+    abstract public void updateReplicas(long[] hsids);
+
+    @Override
+    abstract public void deliver(VoltMessage message);
 
     abstract public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message);
 

@@ -58,7 +58,6 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     private Site m_executionSite = null;
     private Scheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
-    private InitiatorMessageHandler m_msgHandler = null;
     private LeaderElector m_leaderElector = null;
     // Only gets set non-null for the leader
     private BabySitter m_babySitter = null;
@@ -92,8 +91,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = new SpScheduler();
-        m_msgHandler = new SpInitiatorMessageHandler(m_scheduler);
-        m_initiatorMailbox = new InitiatorMailbox(m_msgHandler, m_messenger);
+        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger);
     }
 
     @Override

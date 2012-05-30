@@ -27,14 +27,17 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
 import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
+
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.iv2.EveryPartitionTask;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -79,6 +82,29 @@ public class MpScheduler extends Scheduler
         }
         throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
                                    CoreUtils.hsIdToString(hsId));
+    }
+
+    @Override
+    public void updateReplicas(long[] hsids)
+    {
+        // nothing to do for multi-part here yet.
+    }
+
+    @Override
+    public void deliver(VoltMessage message)
+    {
+        if (message instanceof Iv2InitiateTaskMessage) {
+            handleIv2InitiateTaskMessage((Iv2InitiateTaskMessage)message);
+        }
+        else if (message instanceof InitiateResponseMessage) {
+            handleInitiateResponseMessage((InitiateResponseMessage)message);
+        }
+        else if (message instanceof FragmentResponseMessage) {
+            handleFragmentResponseMessage((FragmentResponseMessage)message);
+        }
+        else {
+            throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
+        }
     }
 
     // MpScheduler expects to see initiations for multipartition procedures and
