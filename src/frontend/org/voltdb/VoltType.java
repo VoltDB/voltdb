@@ -92,7 +92,8 @@ public enum VoltType {
      * The epoch is Jan. 1 1970 00:00:00 GMT. Negative values represent
      * time before the epoch. This covers roughly 4000BC to 8000AD.
      */
-    TIMESTAMP ((byte)11, 8, "timestamp", new Class[] {TimestampType.class}, 'p'),
+    TIMESTAMP ((byte)11, 8, "timestamp",
+            new Class[] {TimestampType.class, java.util.Date.class, java.sql.Date.class, java.sql.Timestamp.class}, 'p'),
 
     /**
      * UTF-8 string with up to 32K chars.

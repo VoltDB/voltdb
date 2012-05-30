@@ -140,18 +140,6 @@ public class FastDeserializer implements DataInput {
     }
 
     /**
-     * Read a timestamp from the stream. Timestamps are stored as a long
-     * value representing microseconds since the epoch.
-     * @return The {@link org.voltdb.types.TimestampType TimestampType}
-     * object read from the stream.
-     * @throws IOException Rethrows any IOExceptions.
-     */
-    public TimestampType readTimestamp() throws IOException {
-        final long val = readLong();
-        return new TimestampType(val);
-    }
-
-    /**
      * Read a string in the standard VoltDB way without
      * wrapping the byte buffer[
      */

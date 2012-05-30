@@ -32,6 +32,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Column;
@@ -324,10 +325,17 @@ public abstract class ProcedureCompiler {
             try {
                 type = VoltType.typeFromClass(cls);
             }
-            catch (RuntimeException e) {
+            catch (VoltTypeException e) {
                 // handle the case where the type is invalid
                 String msg = "Procedure: " + shortName + " has a parameter with invalid type: ";
                 msg += cls.getSimpleName();
+                throw compiler.new VoltCompilerException(msg);
+            }
+            catch (RuntimeException e) {
+                String msg = "Procedure: " + shortName + " unexpectedly failed a check on a parameter of type: ";
+                msg += cls.getSimpleName();
+                msg += " with error: ";
+                msg += e.toString();
                 throw compiler.new VoltCompilerException(msg);
             }
 
