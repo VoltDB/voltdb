@@ -23,11 +23,17 @@
 
 package org.voltdb.compiler.procedures;
 
-import org.voltdb.*;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
-public class IntParam extends VoltProcedure {
+public class FloatParamToGetNiceComplaint extends VoltProcedure {
 
-    public long run(int isbn) {
-        return 1;
+    public VoltTable run(float shouldReallyBeDouble) {
+        ColumnInfo firstColumn = new ColumnInfo("floatie", VoltType.FLOAT);
+        VoltTable vt = new VoltTable(firstColumn);
+        vt.addRow(shouldReallyBeDouble);
+        return vt;
     }
 }
