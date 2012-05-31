@@ -1118,9 +1118,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // break out the Hashinator and calculate the appropriate partition
         try {
             CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
-            Object valueToHash = LoadSinglepartitionTable.partitionValueFromInvocation(
-                    tables, task);
-            involvedPartitions = new int[] { TheHashinator.hashToPartition(valueToHash) };
+            Object valueToHash =
+                LoadSinglepartitionTable.
+                    partitionValueFromInvocation(tables, task);
+            involvedPartitions =
+                new int[] { TheHashinator.hashToPartition(valueToHash) };
         }
         catch (Exception e) {
             authLog.warn(e.getMessage());
@@ -1318,7 +1320,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else {
                 // break out the Hashinator and calculate the appropriate partition
                 try {
-                    involvedPartitions = new int[] { getPartitionForProcedure(catProc.getPartitionparameter(), task) };
+                    involvedPartitions = new int[] {
+                                getPartitionForProcedure(
+                                        catProc.getPartitionparameter(),
+                                        catProc.getPartitioncolumn().getType(),
+                                        task)
+                            };
                 }
                 catch (RuntimeException e) {
                     // unable to hash to a site, return an error
@@ -1329,6 +1336,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new Object[] { task.procName }, null);
                     return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                             new VoltTable[0], errorMessage, task.clientHandle);
+                }
+                catch (Exception e) {
+                    authLog.l7dlog( Level.WARN,
+                            LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
+                            new Object[] { task.procName }, null);
+                    return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
+                            new VoltTable[0], e.getMessage(), task.clientHandle);
                 }
             }
             boolean success =
@@ -1613,9 +1627,29 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * Identify the partition for an execution site task.
      * @return The partition best set up to execute the procedure.
+     * @throws Exception
      */
-    int getPartitionForProcedure(int partitionIndex, StoredProcedureInvocation task) {
-        return TheHashinator.hashToPartition(task.getParameterAtIndex(partitionIndex));
+    int getPartitionForProcedure(int partitionIndex, int partitionType,
+            StoredProcedureInvocation task)
+    throws Exception
+    {
+        Object invocationParameter = task.getParameterAtIndex(partitionIndex);
+        final VoltType partitionParamType = VoltType.get((byte)partitionType);
+
+        // Special case: if the user supplied a string for a number column,
+        // try to do the conversion. This makes it substantially easier to
+        // load CSV data or other untyped inputs that match DDL without
+        // requiring the loader to know precise the schema.
+        if ((invocationParameter != null) &&
+            (invocationParameter.getClass() == String.class) &&
+            (partitionParamType.isNumber()))
+        {
+            invocationParameter = ParameterConverter.stringToLong(
+                    invocationParameter,
+                    partitionParamType.classFromType());
+        }
+
+        return TheHashinator.hashToPartition(invocationParameter);
     }
 
     @Override
