@@ -352,8 +352,6 @@ var IVoltDB = (function(){
                     // make the procedure callable.
                     connection.Procedures[procName] = {};
                     connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
-                 if (procName == "GetStateHeatmap")
-                    console.log(procName + " params: " + connection.Procedures[procName]);
                  }
                  
                 var childConnectionQueue = connection.getQueue();
