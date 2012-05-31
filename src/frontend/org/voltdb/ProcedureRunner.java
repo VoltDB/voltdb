@@ -1305,7 +1305,6 @@ public class ProcedureRunner {
        if (iTo > iFrom) {
            subResults = executor.onExecutePrePlanned(batch.subList(iFrom, iTo), true);
            results.addAll(Arrays.asList(subResults));
-           iFrom = iTo + 1;
        }
        return results.toArray(new VoltTable[results.size()]);
    }
