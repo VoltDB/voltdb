@@ -268,7 +268,8 @@ public abstract class ExportClientBase {
                                             "No servers provided for export client.");
         }
 
-        m_exportConnections.clear();
+        // to be safe
+        assert(m_exportConnections.size() == 0);
 
         // Connect to one of the specified servers.  This will open the sockets,
         // advance the Export protocol to the open state to each server, retrieve
@@ -388,6 +389,7 @@ public abstract class ExportClientBase {
             // try to connect to all nodes
             // returns false on error cases that will always fail
             // returning true doesn't mean full connections
+            foundSources.clear();
             if (!tryToConnectToAllNodes(foundSources)) {
                 return false;
             }
