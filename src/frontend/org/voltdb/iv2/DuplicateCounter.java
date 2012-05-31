@@ -19,7 +19,10 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
+
+import org.voltdb.utils.MiscUtils;
 
 /**
  * Track responses from each partition. This should be subsumed
@@ -44,11 +47,8 @@ public class DuplicateCounter
         m_destinationId = destinationHSId;
     }
 
-    int offer(InitiateResponseMessage message)
+    private int checkCommon(long hash)
     {
-        long hash = message.getClientResponseData().getHashOfTableResults();
-        System.out.println("Counter: " + this + " HASH from " + message.m_sourceHSId + " is: " + hash);
-        System.out.println("ClientResponseData: " + message.getClientResponseData().toJSONString());
         if (m_responseHash == null) {
             m_responseHash = Long.valueOf(hash);
         }
@@ -63,5 +63,20 @@ public class DuplicateCounter
         else {
             return WAITING;
         }
+    }
+
+    int offer(InitiateResponseMessage message)
+    {
+        long hash = message.getClientResponseData().getHashOfTableResults();
+        return checkCommon(hash);
+    }
+
+    int offer(FragmentResponseMessage message)
+    {
+        long hash = 0;
+        for (int i = 0; i < message.getTableCount(); i++) {
+            hash ^= MiscUtils.cheesyBufferCheckSum(message.getTableAtIndex(i).getBuffer());
+        }
+        return checkCommon(hash);
     }
 }
