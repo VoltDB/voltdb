@@ -101,6 +101,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     {
         super(initiatorHSId, coordinatorHSId, ftask.m_txnId, ftask.m_isReadOnly);
 
+        m_spHandle = ftask.m_spHandle;
         m_taskType = ftask.m_taskType;
         m_fragmentIds = ftask.m_fragmentIds;
         m_outputDepIds = ftask.m_outputDepIds;
