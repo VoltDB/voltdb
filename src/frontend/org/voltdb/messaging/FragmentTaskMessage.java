@@ -332,11 +332,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         boolean foundOutputDepId = false;
         boolean foundInputDepIds = false;
         for (FragmentData item : m_items) {
+            // Account for parameter sets
+            msgsize += 4 + item.m_parameterSet.remaining();
+
             // Account for the optional output dependency block, if needed.
             if (!foundOutputDepId && item.m_outputDepId != null) {
                 msgsize += 4 * m_items.size();
                 foundOutputDepId = true;
             }
+
             // Account for the optional input dependency block, if needed.
             if (item.m_inputDepIds != null) {
                 if (!foundInputDepIds) {
@@ -348,6 +352,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 // Account for the input dependency IDs themselves, if any.
                 msgsize += 4 * item.m_inputDepIds.size();
             }
+
             // Each unplanned item gets an index (2) and a size (4) and buffer for
             // the fragment plan string.
             if (item.m_fragmentPlan != null) {
