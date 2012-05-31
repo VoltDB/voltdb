@@ -505,7 +505,6 @@ this.AddConnection = function(connection, success)
             src += '<li class="folder closed"><span>Parameters</span>';
               src += '<ul>'
                 for (var p = 0; p < procParams.length; ++p) {
-                    connTypeParams[connTypeParams.length] = procParams[p].type;
                     src += '<li class="paramin"><span>Param' + (p+1) + ' (' + procParams[p].type + ')</span></li>';
                 }
                 src += '<li class="paramreturn"><span>Return Table[]</span></li>';
@@ -513,9 +512,6 @@ this.AddConnection = function(connection, success)
             src += '</li>'
           src += '</ul>'
         src += '</li>'
-        // make the procedure callable.
-        connection.Procedures[procName] = {};
-        connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
     }
 
     src += '</ul>'; // connection.Key_sp
