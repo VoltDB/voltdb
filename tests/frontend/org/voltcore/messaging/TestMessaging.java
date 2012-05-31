@@ -32,9 +32,14 @@ import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.locks.Lock;
 import java.util.concurrent.locks.ReentrantLock;
 
+import org.voltcore.utils.PortGenerator;
+
 import junit.framework.TestCase;
 
 public class TestMessaging extends TestCase {
+
+    static final PortGenerator m_portGenerator = new PortGenerator();
+
     public static class MsgTest extends VoltMessage {
         static byte[] globalValue;
         byte[] m_localValue;
@@ -145,8 +150,7 @@ public class TestMessaging extends TestCase {
                         System.out.printf("Host/Site %d/%d is initializing the HostMessenger class.\n", hostId, mySiteId);
                     }
                     System.out.printf("Host/Site %d/%d is creating a new HostMessenger.\n", hostId, mySiteId);
-                    HostMessenger.Config config = new HostMessenger.Config();
-                    config.internalPort += mySiteId;
+                    HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
                     final HostMessenger messenger = new HostMessenger(config);
                     currentMessenger = messenger;
                     messengers[hostId] = currentMessenger;
@@ -295,18 +299,16 @@ public class TestMessaging extends TestCase {
 //        assertTrue(false);
 //    }
 
-    private static HostMessenger.Config getConfig(int index) {
-        HostMessenger.Config config = new HostMessenger.Config();
+    private static HostMessenger.Config getConfig() {
+        HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
         config.factory = new MessageFactory();
-        config.internalPort += index;
-        config.zkInterface = "127.0.0.1:" + (2181 + index);
         return config;
     }
 
     public void testSimple() throws Exception {
-        HostMessenger msg1 = new HostMessenger(getConfig(0));
+        HostMessenger msg1 = new HostMessenger(getConfig());
         msg1.start();
-        HostMessenger msg2 = new HostMessenger(getConfig(1));
+        HostMessenger msg2 = new HostMessenger(getConfig());
         msg2.start();
 
         System.out.println("Waiting for socketjoiners...");
@@ -318,10 +320,8 @@ public class TestMessaging extends TestCase {
         assertEquals(msg1.getHostId(), 0);
         assertEquals(msg2.getHostId(), 1);
 
-
         Mailbox mb1 = msg1.createMailbox();
         Mailbox mb2 = msg2.createMailbox();
-
         long siteId2 = mb2.getHSId();
 
         MsgTest.initWithSize(16);
@@ -349,8 +349,6 @@ public class TestMessaging extends TestCase {
         // spin on a complete network message here - maybe better to write
         // the above cases this way too?
         for (int i=0; i < 3; ++i) {
-            System.out.println("running iteration: " + i);
-
             MsgTest.initWithSize(4280034);
             mt = new MsgTest();
             mt.setValues();
@@ -366,11 +364,11 @@ public class TestMessaging extends TestCase {
     }
 
     public void testMultiMailbox() throws Exception {
-        HostMessenger msg1 = new HostMessenger(getConfig(0));
+        HostMessenger msg1 = new HostMessenger(getConfig());
         msg1.start();
-        HostMessenger msg2 = new HostMessenger(getConfig(1));
+        HostMessenger msg2 = new HostMessenger(getConfig());
         msg2.start();
-        HostMessenger msg3 = new HostMessenger(getConfig(2));
+        HostMessenger msg3 = new HostMessenger(getConfig());
         msg3.start();
 
         System.out.println("Waiting for socketjoiners...");
@@ -500,9 +498,7 @@ public class TestMessaging extends TestCase {
         @Override
         public void run() {
             try {
-                HostMessenger.Config config = new HostMessenger.Config();
-                config.internalPort += 1;
-                config.zkInterface = "127.0.0.1:" + 2182;
+                HostMessenger.Config config = new HostMessenger.Config(m_portGenerator);
                 HostMessenger msg = new HostMessenger(config);
                 msg.start();
                 m_ready.set(true);
@@ -515,16 +511,16 @@ public class TestMessaging extends TestCase {
     }
 
     public void testFailAndRejoin() throws Exception {
+        /* Why is throwing away a selector interesting !? */
         try {
             Selector.open();
         } catch (IOException ex) {
             throw new RuntimeException(ex);
         }
 
-
-        HostMessenger msg1 = new HostMessenger(getConfig(0));
+        HostMessenger msg1 = new HostMessenger(getConfig());
         msg1.start();
-        HostMessenger msg2 = new HostMessenger(getConfig(1));
+        HostMessenger msg2 = new HostMessenger(getConfig());
         msg2.start();
         System.out.println("Waiting for socketjoiners...");
         msg1.waitForGroupJoin(2);
