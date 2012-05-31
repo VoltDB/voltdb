@@ -30,6 +30,7 @@ import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
+
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
@@ -170,6 +171,7 @@ public class TestPartitionDetection extends TestCase
             // choose a partitionable cluster: 2 sites / 2 hosts / k-factor 1.
             // use a separate process for each host.
             LocalCluster cluster = new LocalCluster("partition-detection1.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+            cluster.overrideAnyRequestForValgrind(); // valgrind and failure don't mix well atm
             cluster.setHasLocalServer(false);
             builder.setPartitionDetectionSettings(TMPDIR, TESTNONCE);
             boolean success = cluster.compile(builder);

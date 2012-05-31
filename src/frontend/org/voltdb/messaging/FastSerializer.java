@@ -26,7 +26,6 @@ import java.nio.ByteOrder;
 
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
@@ -221,19 +220,6 @@ public class FastSerializer implements DataOutput {
      */
     public void writeObject(FastSerializable obj) throws IOException {
         obj.writeExternal(this);
-    }
-
-    /**
-     * Write a timestamp to a FastSerializer. Store the value as a long
-     * representing microseconds from the epoch.
-     *
-     * @param timestamp The {@link org.voltdb.types.TimestampType TimestampType} to serialize.
-     * @throws IOException Rethrows any IOExceptions thrown.
-     */
-    public void writeTimestamp(TimestampType timestamp) throws IOException {
-        assert timestamp != null;
-        long val = timestamp.getTime();
-        writeLong(val);
     }
 
     /**

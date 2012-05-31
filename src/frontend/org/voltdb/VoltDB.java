@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -471,21 +472,30 @@ public class VoltDB {
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
-    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
             return;
         }
 
+        List<String> throwerStacktrace = null;
+        if (thrown != null) {
+            throwerStacktrace = new ArrayList<String>();
+            throwerStacktrace.add("Stack trace of thrown exception: " + thrown.toString());
+            for (StackTraceElement ste : thrown.getStackTrace()) {
+                throwerStacktrace.add(ste.toString());
+            }
+        }
+
         // Even if the logger is null, don't stop.  We want to log the stack trace and
         // any other pertinent information to a .dmp file for crash diagnosis
-        StringBuilder stacktrace_sb = new StringBuilder("Stack trace from crashVoltDB() method:\n");
-
+        List<String> currentStacktrace = new ArrayList<String>();
+        currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
         StackTraceElement[] myTrace = traces.get(Thread.currentThread());
         for (StackTraceElement ste : myTrace) {
-            stacktrace_sb.append(ste.toString()).append("\n");
+            currentStacktrace.add(ste.toString());
         }
 
         // Create a special dump file to hold the stack trace
@@ -506,9 +516,20 @@ public class VoltDB {
                 writer.println(line.trim());
             }
 
+            if (thrown != null) {
+                writer.println();
+                writer.println("****** Exception Thread ****** ");
+                for (String throwerStackElem : throwerStacktrace) {
+                    writer.println(throwerStackElem);
+                }
+            }
+
             writer.println();
             writer.println("****** Current Thread ****** ");
-            writer.println(stacktrace_sb);
+            for (String currentStackElem : currentStacktrace) {
+                writer.println(currentStackElem);
+            }
+
             writer.println("****** All Threads ******");
             Iterator<Thread> it = traces.keySet().iterator();
             while (it.hasNext())
@@ -538,13 +559,22 @@ public class VoltDB {
 
         if (log != null)
         {
-            if (t != null)
-                log.fatal(errMsg, t);
-            else
+            if (thrown != null) {
+                if (stackTrace) {
+                    for (String throwerStackElem : throwerStacktrace) {
+                        log.fatal(throwerStackElem);
+                    }
+                } else {
+                    log.fatal(thrown.toString());
+                }
+            } else {
                 log.fatal(errMsg);
-
-            if (stackTrace)
-                log.fatal(stacktrace_sb);
+                if (stackTrace) {
+                    for (String currentStackElem : currentStacktrace) {
+                        log.fatal(currentStackElem);
+                    }
+                }
+            }
         }
 
         System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");

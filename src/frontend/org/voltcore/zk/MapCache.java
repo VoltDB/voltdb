@@ -31,9 +31,11 @@ import java.util.concurrent.Executors;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.CoreUtils;
@@ -48,16 +50,20 @@ import com.google.common.util.concurrent.MoreExecutors;
  * Tracker monitors and provides snapshots of a single ZK node's
  * children. The children data objects must be JSONObjects.
  */
-public class MapCache {
+public class MapCache implements MapCacheReader, MapCacheWriter {
 
     //
     // API
     //
+
+    /** Instantiate a MapCache of parent rootNode. The rootNode must exist. */
     public MapCache(ZooKeeper zk, String rootNode) {
         m_zk = zk;
         m_rootNode = rootNode;
     }
 
+    /** Initialize and start watching the cache. */
+    @Override
     public void start(boolean block) throws InterruptedException, ExecutionException {
         Future<?> task = m_es.submit(new ParentEvent(null));
         if (block) {
@@ -65,17 +71,47 @@ public class MapCache {
         }
     }
 
+    /** Stop caring */
+    @Override
     public void shutdown() throws InterruptedException {
         m_shutdown.set(true);
         m_es.shutdown();
         m_es.awaitTermination(356, TimeUnit.DAYS);
     }
 
+    /**
+     * Get a current snapshot of the watched root node's children. This snapshot
+     * promises no cross-children atomicity guarantees.
+     */
+    @Override
     public ImmutableMap<String, JSONObject> pointInTimeCache() {
         if (m_shutdown.get()) {
             throw new RuntimeException("Requested cache from shutdown MapCache.");
         }
         return m_publicCache.get();
+    }
+
+    /**
+     * Read a single key from the cache. Matches the semantics of put()
+     */
+    @Override
+    public JSONObject get(String key) {
+        return m_publicCache.get().get(ZKUtil.joinZKPath(m_rootNode, key));
+    }
+
+    /**
+     * Create or update a new rootNode child
+     */
+    @Override
+    public void put(String key, JSONObject value) throws KeeperException, InterruptedException {
+        try {
+            String createdNode = m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
+                    Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+            System.out.println("\t\tCREATED MAPCACHE NODE path:" + createdNode + " key:" + key + " value:" + value.toString());
+        } catch (KeeperException.NodeExistsException e) {
+            m_zk.setData(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(), -1);
+            System.out.println("\t\tUPDATED MAPCACHE NODE. key:" + key + " val:" + value.toString());
+        }
     }
 
     //
@@ -96,9 +132,11 @@ public class MapCache {
     // previous children snapshot for internal use.
     private Set<String> m_lastChildren = new HashSet<String>();
 
-    // the cache exposed to the public. Start empty.
+    // the cache exposed to the public. Start empty. Love it.
     private AtomicReference<ImmutableMap<String, JSONObject>> m_publicCache =
-        new AtomicReference<ImmutableMap<String, JSONObject>>();
+        new AtomicReference<ImmutableMap<String, JSONObject>>(
+                ImmutableMap.copyOf(new HashMap<String, JSONObject>())
+                );
 
     // parent (root node) sees new or deleted child
     private class ParentEvent implements Runnable {

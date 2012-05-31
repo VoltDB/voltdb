@@ -240,4 +240,18 @@ public class CoreUtils {
         pw.flush();
         return sw.toString();
     }
+
+    public static String hsIdKeyMapToString(Map<Long, ?> m) {
+        StringBuilder sb = new StringBuilder();
+        sb.append('{');
+        boolean first = true;
+        for (Map.Entry<Long, ?> entry : m.entrySet()) {
+            if (!first) sb.append(", ");
+            first = false;
+            sb.append(CoreUtils.hsIdToString(entry.getKey()));
+            sb.append(entry.getValue());
+        }
+        sb.append('}');
+        return sb.toString();
+    }
 }

@@ -46,6 +46,8 @@ public class VoltDBFickleCluster extends LocalCluster {
 
     VoltDBFickleCluster() {
         super("fickle1.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        // fickle cluster doesn't yet work with valgrind
+        overrideAnyRequestForValgrind();
     }
 
     public static void killNode() throws Exception {
