@@ -638,8 +638,12 @@ public class VoltProjectBuilder {
         final String projectPath = projectFile.getPath();
         compiler.setProcInfoOverrides(m_procInfoOverrides);
         boolean success = compiler.compile(projectPath, jarPath);
-        if (success && m_compilerDebugPrintStream != null) {
-            compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
+        if (m_compilerDebugPrintStream != null) {
+            if (success) {
+                compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
+            } else {
+                compiler.summarizeErrors(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
+            }
         }
         if (deployment != null) {
             try {

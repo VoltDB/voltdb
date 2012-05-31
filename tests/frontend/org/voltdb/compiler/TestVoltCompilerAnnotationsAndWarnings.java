@@ -29,6 +29,7 @@ import java.io.PrintStream;
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.compiler.procedures.FloatParamToGetNiceComplaint;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRONonSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicROSeqProc;
 import org.voltdb_testprocs.regressionsuites.failureprocs.DeterministicRWProc;
@@ -49,6 +50,31 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate6;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ProcSPcandidate7;
 
 public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
+
+    public void testFloatParamComplaint() throws Exception {
+        String simpleSchema =
+            "create table floatie (" +
+            "ival bigint default 0 not null, " +
+            "fval float not null," +
+            "PRIMARY KEY(ival)" +
+            ");";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        ByteArrayOutputStream capturer = new ByteArrayOutputStream();
+        PrintStream capturing = new PrintStream(capturer);
+        builder.setCompilerDebugPrintStream(capturing);
+        builder.addLiteralSchema(simpleSchema);
+        builder.addPartitionInfo("floatie", "ival");
+        builder.addProcedures(FloatParamToGetNiceComplaint.class);
+
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("annotations.jar"));
+        assertFalse(success);
+        String captured = capturer.toString("UTF-8");
+        String[] lines = captured.split("\n");
+        // Output should include a line suggesting replacement of float with double.
+        assertTrue(foundLineMatching(lines, ".*FloatParamToGetNiceComplaint.* float.* double.*"));
+    }
+
     public void testSimple() throws Exception {
         String simpleSchema =
             "create table blah (" +
