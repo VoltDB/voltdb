@@ -24,6 +24,8 @@ import java.util.Map;
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltcore.utils.CoreUtils;
+
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
@@ -110,7 +112,7 @@ public class SpScheduler extends Scheduler
                                     message.getStoredProcedureInvocation(),
                                     message.getClientInterfaceHandle());
                         // Update the handle in the copy
-                        message.setSpHandle(newSpHandle);
+                        replmsg.setSpHandle(newSpHandle);
                         m_mailbox.send(m_replicaHSIds, replmsg);
                     } catch (MessagingException e) {
                         hostLog.error("Failed to deliver response from execution site.", e);
@@ -186,17 +188,29 @@ public class SpScheduler extends Scheduler
     public void handleFragmentTaskMessage(FragmentTaskMessage message,
                                           Map<Integer, List<VoltTable>> inputDeps)
     {
-        // If we have input dependencies, it's borrow work, there's no way we
-        // can actually distribute it
-        if (m_replicaHSIds.length > 0 && inputDeps == null) {
-            try {
-                FragmentTaskMessage replmsg =
-                    new FragmentTaskMessage(m_mailbox.getHSId(),
-                            m_mailbox.getHSId(), message);
-                m_mailbox.send(m_replicaHSIds, replmsg);
-            } catch (MessagingException e) {
-                hostLog.error("Failed to deliver response from execution site.", e);
+        long newSpHandle;
+        if (m_isLeader) {
+            newSpHandle = m_txnId.incrementAndGet();
+            message.setSpHandle(newSpHandle);
+            // If we have input dependencies, it's borrow work, there's no way we
+            // can actually distribute it
+            if (m_replicaHSIds.length > 0 && inputDeps == null) {
+                try {
+                    FragmentTaskMessage replmsg =
+                        new FragmentTaskMessage(m_mailbox.getHSId(),
+                                m_mailbox.getHSId(), message);
+                    m_mailbox.send(m_replicaHSIds, replmsg);
+                } catch (MessagingException e) {
+                    hostLog.error("Failed to deliver response from execution site.", e);
+                }
+                DuplicateCounter counter = new DuplicateCounter(
+                        message.getCoordinatorHSId(), m_replicaHSIds.length + 1,
+                        message.getTxnId());
+                m_duplicateCounters.put(newSpHandle, counter);
             }
+        }
+        else {
+            newSpHandle = message.getSpHandle();
         }
 
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
@@ -204,10 +218,10 @@ public class SpScheduler extends Scheduler
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            long localTxnId = m_txnId.incrementAndGet();
-            txn = new ParticipantTransactionState(localTxnId, message);
+            txn = new ParticipantTransactionState(newSpHandle, message);
             m_outstandingTxns.put(message.getTxnId(), txn);
         }
+
         if (message.isSysProcTask()) {
             final SysprocFragmentTask task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
@@ -226,16 +240,33 @@ public class SpScheduler extends Scheduler
     // FragmentResponses from its replicas.
     public void handleFragmentResponseMessage(FragmentResponseMessage message)
     {
-        // Add duplicate counter code here
-        // ADD CODE HERE
+        // Send the message to the duplicate counter, if any
+        DuplicateCounter counter = m_duplicateCounters.get(message.getSpHandle());
+        if (counter != null) {
+            int result = counter.offer(message);
+            if (result == DuplicateCounter.DONE) {
+                m_duplicateCounters.remove(message.getSpHandle());
+                // MPI is tracking deps per partition HSID.  We need to make
+                // sure we write ours into the message getting sent to the MPI
+                message.setExecutorSiteId(m_mailbox.getHSId());
+                try {
+                    m_mailbox.send(counter.m_destinationId, message);
+                } catch (MessagingException e) {
+                    VoltDB.crashLocalVoltDB("Failed to send every-site response.", true, e);
+                }
+            }
+            else if (result == DuplicateCounter.MISMATCH) {
+                VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
+            }
+            // doing duplicate suppresion: all done.
+            return;
+        }
 
-        if (message.getDestinationSiteId() != m_mailbox.getHSId()) {
-            try {
-                m_mailbox.send(message.getDestinationSiteId(), message);
-            }
-            catch (MessagingException e) {
-                hostLog.error("Failed to deliver response from execution site.", e);
-            }
+        try {
+            m_mailbox.send(message.getDestinationSiteId(), message);
+        }
+        catch (MessagingException e) {
+            hostLog.error("Failed to deliver response from execution site.", e);
         }
     }
 

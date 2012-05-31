@@ -94,6 +94,13 @@ public class FragmentResponseMessage extends VoltMessage {
         m_dependencyCount++;
     }
 
+    // IV2: need to be able to reset this for dep tracking
+    // until we change it to count partitions rather than
+    // initiator HSIds
+    public void setExecutorSiteId(long executorHSId) {
+        m_executorHSId = executorHSId;
+    }
+
     public long getExecutorSiteId() {
         return m_executorHSId;
     }
