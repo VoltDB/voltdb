@@ -1640,7 +1640,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // try to do the conversion. This makes it substantially easier to
         // load CSV data or other untyped inputs that match DDL without
         // requiring the loader to know precise the schema.
-        if (invocationParameter.getClass() == String.class && partitionParamType.isNumber()) {
+        if ((invocationParameter != null) &&
+            (invocationParameter.getClass() == String.class) &&
+            (partitionParamType.isNumber()))
+        {
             invocationParameter = ParameterConverter.stringToLong(
                     invocationParameter,
                     partitionParamType.classFromType());
