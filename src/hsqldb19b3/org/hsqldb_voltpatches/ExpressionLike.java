@@ -74,10 +74,12 @@ public final class ExpressionLike extends ExpressionLogical {
         this.likeObject = other.likeObject;
     }
 
+    @Override
     void collectObjectNames(Set set) {
         super.collectObjectNames(set);
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -91,6 +93,7 @@ public final class ExpressionLike extends ExpressionLogical {
         return unresolvedSet;
     }
 
+    @Override
     public Object getValue(Session session) {
 
         if (opType != OpTypes.LIKE) {
@@ -115,6 +118,7 @@ public final class ExpressionLike extends ExpressionLogical {
         return likeObject.compare(session, leftValue);
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -198,6 +202,14 @@ public final class ExpressionLike extends ExpressionLogical {
             throw Error.error(ErrorCode.X_42565);
         }
 
+        /*
+         * Remove the unused escape node
+         */
+        Expression oldNodes[] = nodes;
+        nodes = new Expression[BINARY];
+        nodes[LEFT] = oldNodes[LEFT];
+        nodes[RIGHT] = oldNodes[RIGHT];
+
         likeObject.dataType = nodes[LEFT].dataType;
 
         boolean isRightArgFixedConstant = nodes[RIGHT].opType == OpTypes.VALUE;
@@ -221,12 +233,12 @@ public final class ExpressionLike extends ExpressionLogical {
                          ? nodes[RIGHT].getConstantValue(session)
                          : null;
         boolean constantEscape = isEscapeFixedConstant
-                                 && nodes[ESCAPE] != null;
+                                 && (nodes.length > 2);
         Object escape = constantEscape
                         ? nodes[ESCAPE].getConstantValue(session)
                         : null;
 
-        likeObject.setPattern(session, pattern, escape, nodes[ESCAPE] != null);
+        likeObject.setPattern(session, pattern, escape, (nodes.length > 2));
 
         if (noOptimisation) {
             return;
@@ -325,6 +337,7 @@ public final class ExpressionLike extends ExpressionLogical {
         }
     }
 
+    @Override
     public String getSQL() {
 
         String       left  = getContextSQL(nodes[LEFT]);
@@ -344,6 +357,7 @@ public final class ExpressionLike extends ExpressionLogical {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();

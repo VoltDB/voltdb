@@ -251,6 +251,11 @@ class NValue {
     NValue op_add(const NValue rhs) const;
     NValue op_multiply(const NValue rhs) const;
     NValue op_divide(const NValue rhs) const;
+    /*
+     * This NValue must be VARCHAR and the rhs must be VARCHAR.
+     * This NValue is the value and the rhs is the pattern
+     */
+    NValue like(const NValue rhs) const;
 
     template <ExpressionType E> // template for SQL functions returning constants (like pi)
     static NValue callConstant();
@@ -2704,6 +2709,94 @@ inline NValue NValue::op_divide(const NValue rhs) const {
                getTypeName(rhs.getValueType()).c_str());
 }
 
+/*
+ * The LHS (this) should always be the string being compared
+ * and the RHS should always be the LIKE expression. The planner or EE
+ * needs to enforce this.
+ */
+inline NValue NValue::like(const NValue rhs) const {
+    const bool lhsIsNull = isNull();
+    const bool rhsIsNull = rhs.isNull();
+    if (lhsIsNull || rhsIsNull) {
+        return lhsIsNull == rhsIsNull ? getTrue() : getFalse();
+    }
+
+    /*
+     * Validate that all params are VARCHAR
+     */
+    const ValueType mType = getValueType();
+    if (mType != VALUE_TYPE_VARCHAR) {
+        throwFatalException("lhs of LIKE expression is %d not VALUE_TYPE_VARCHAR(%d)", mType, VALUE_TYPE_VARCHAR);
+    }
+
+    const ValueType rhsType = rhs.getValueType();
+    if (rhsType != VALUE_TYPE_VARCHAR) {
+        throwFatalException("rhs of LIKE expression is %d not VALUE_TYPE_VARCHAR(%d)", mType, VALUE_TYPE_VARCHAR);
+    }
+
+    const int32_t valueUTF8Length = getObjectLength();
+    const int32_t patternUTF8Length = rhs.getObjectLength();
+
+    char *valueChars = reinterpret_cast<char*>(getObjectValue());
+    char *patternChars = reinterpret_cast<char*>(rhs.getObjectValue());
+    assert(valueChars);
+    assert(patternChars);
+    /*
+     * Because lambdas are for poseurs.
+     */
+    class Liker {
+
+    public:
+        Liker(char *valueChars, char* patternChars, int32_t valueUTF8Length, int32_t patternUTF8Length) :
+            valueChars_(valueChars), patternChars_(patternChars),
+            valueUTF8Length_(valueUTF8Length), patternUTF8Length_(patternUTF8Length),
+            percentCount_(0) {}
+
+        bool compareAt(int ii, int jj) {
+            for (; ii < patternUTF8Length_; ii++) {
+                switch (patternChars_[ii]) {
+                case '%':
+                    percentCount_++;
+                    if ((++ii - percentCount_) >= valueUTF8Length_) {
+                        return true;
+                    }
+
+                    while (jj < valueUTF8Length_) {
+                        if ((patternChars_[ii] == valueChars_[jj]) &&
+                                compareAt(ii, jj)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                case '_':
+                    if (jj++ >= valueUTF8Length_) {
+                        return false;
+                    }
+                    break;
+                default:
+                    if ((jj >= valueUTF8Length_) || (patternChars_[ii] != valueChars_[jj++])) {
+                        return false;
+                    }
+                    break;
+                }
+            }
+            if (jj != valueUTF8Length_) {
+                return false;
+            }
+            return true;
+        }
+    private:
+        char *valueChars_;
+        char *patternChars_;
+        const int32_t valueUTF8Length_;
+        const int32_t patternUTF8Length_;
+        int32_t percentCount_;
+    };
+
+    Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
+
+    return liker.compareAt( 0, 0) ? getTrue() : getFalse();
+}
 
 template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const {
     const ValueType type = getValueType();
