@@ -120,6 +120,7 @@ class CSVLoader {
                 while (queued == false) {
                     String[] correctedLine = line;
                     if (colProjection != null) {
+                    	System.out.println(String.format("colProject:%s | correctedLine: %s", colProjection, correctedLine));
                         correctedLine = projectColumns(colProjection, correctedLine);
                     }
 

@@ -1,12 +1,17 @@
 package org.voltdb.utils;
 
+import java.io.FileReader;
+
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
+
+import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 import junit.framework.TestCase;
 
@@ -42,17 +47,31 @@ public class TestCSVLoader extends TestCase {
             localServer.start();
             localServer.waitForInitialization();
 
-            String []paras = {"/Users/xinjia/testdb.csv","Insert"};
-            CSVLoader.main(paras);
+            String []params = {"/Users/xinjia/testdb.csv","Insert"};
             
+            CSVLoader.main(params);
             
             // do the test
             client = ClientFactory.createClient();
             client.createConnection("localhost");
             
-          //VoltTable modCount = client.callProcedure("@AdHoc", "INSERT INTO BLAH VALUES (1, 1, 1, 1);").getResults()[0];
-            //assertTrue(modCount.getRowCount() == 1);
-            //assertTrue(modCount.asScalarLong() == 1);
+            final CSVReader reader = new CSVReader(new FileReader(params[0]));
+            int lineCount = 0;
+            while (reader.readNext() != null) {
+            	lineCount++;
+            }
+            
+            VoltTable modCount;
+            modCount = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;").getResults()[0];
+            int rowct = 0;
+            while(modCount.advanceRow()) {
+            	rowct = (Integer) modCount.get(0, VoltType.INTEGER);
+            }
+            System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
+            assertEquals(lineCount, rowct);
+            
+            modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+            System.out.println("data inserted to table BLAH:\n" + modCount);
             
         }
         finally {
