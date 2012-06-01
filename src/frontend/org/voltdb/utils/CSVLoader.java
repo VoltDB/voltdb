@@ -22,7 +22,10 @@ import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.util.ArrayList;
+import java.util.Collections;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
@@ -86,7 +89,8 @@ class CSVLoader {
                 System.err.println(response.getStatusString());
                 System.err.println("<xin>Stop at line " + (inCount.get()));
                 synchronized (invalidLines) {
-                	invalidLines.add(m_lineNum);
+                	if (!invalidLines.contains(m_lineNum))
+                		invalidLines.add(m_lineNum);
                 }
                 //System.exit(1);
             }
@@ -129,8 +133,8 @@ class CSVLoader {
 
         try {
             final CSVReader reader = new CSVReader(new FileReader(filename));
-            final ProcedureCallback oneCallbackFitsAll = new MyCallback(0);
-            ProcedureCallback cb = oneCallbackFitsAll;
+            //final ProcedureCallback oneCallbackFitsAll = new MyCallback(0);
+            ProcedureCallback cb = null;
 
             final Client client = ClientFactory.createClient();
             client.createConnection("localhost");
@@ -167,7 +171,7 @@ class CSVLoader {
                         System.err.println("----------");
                         cb = new MyCallback(counter);
                     } else {
-                        cb = oneCallbackFitsAll;
+                        cb = new MyCallback(outCount.get());
                     }
                     String msg = "<xin>params: ";
                     for (int i=0; i < correctedLine.length; i++) {
@@ -196,6 +200,9 @@ class CSVLoader {
             client.drain();
             client.close();
             
+            Collections.sort(invalidLines);
+            
+            System.out.println("All the invalid row numbers are:" + invalidLines);
             produceInvalidRowsFile(filename, "/Users/xinjia/invalidrows.csv");            
         } catch (Exception e) {
             e.printStackTrace();
@@ -228,6 +235,8 @@ class CSVLoader {
      */
     private static void produceInvalidRowsFile(String inputFile, String outputFile) {
     	//StringBuilder query = new StringBuilder();
+    	
+    	
     	File file = new File(outputFile);
         try {
         	// Create file if it does not exist
