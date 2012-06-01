@@ -70,10 +70,14 @@ class CSVLoader {
                     System.err.print("Line " + m_sentCount + ":");
                 }
                 System.err.println(response.getStatusString());
-                System.exit(1);
+                System.err.println("<xin>Stop at line " + (inCount.get()));
+                
+                //System.exit(1);
             }
-
+            
             long currentCount = inCount.incrementAndGet();
+            System.out.println("<xin> put line " + inCount.get() + " to databse");
+            
             if (currentCount % reportEveryNRows == 0) {
                 System.out.println("Inserted " + currentCount + " rows");
             }
@@ -137,7 +141,7 @@ class CSVLoader {
                     } else {
                         cb = oneCallbackFitsAll;
                     }
-
+                    System.out.println("<xin>params: " + correctedLine);
                     queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
 
                     if (queued == false) {

@@ -29,7 +29,6 @@ public class TestCSVLoader extends TestCase {
             "clm_decimal decimal default null, " +
             //"clm_float float default 1.0, " + // for later
             //"clm_timestamp timestamp default null, " + // for later
-           
             //"clm_varinary varbinary default null" + // for later
             "); ";
 
@@ -70,6 +69,10 @@ public class TestCSVLoader extends TestCase {
             }
             
             VoltTable modCount;
+            modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+            System.out.println("data inserted to table BLAH:\n" + modCount);
+            
+            
             modCount = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;").getResults()[0];
             int rowct = 0;
             while(modCount.advanceRow()) {
@@ -78,8 +81,7 @@ public class TestCSVLoader extends TestCase {
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
             
-            modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
-            System.out.println("data inserted to table BLAH:\n" + modCount);
+            
             
         }
         finally {
