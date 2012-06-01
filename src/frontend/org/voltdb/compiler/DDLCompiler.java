@@ -485,8 +485,10 @@ public class DDLCompiler {
         }
         if (defaultvalue != null && defaultvalue.equals("NULL"))
             defaultvalue = null;
-        if (defaulttype != null)
+        if (defaulttype != null) {
+            // fyi: Historically, VoltType class initialization errors get reported on this line (?).
             defaulttype = Integer.toString(VoltType.typeFromString(defaulttype).getValue());
+        }
 
         // replace newlines in default values
         if (defaultvalue != null) {
@@ -494,6 +496,7 @@ public class DDLCompiler {
             defaultvalue = defaultvalue.replace('\r', ' ');
         }
 
+        // fyi: Historically, VoltType class initialization errors get reported on this line (?).
         VoltType type = VoltType.typeFromString(typename);
         columnTypes.add(type);
         int size = Integer.parseInt(sizeString);
