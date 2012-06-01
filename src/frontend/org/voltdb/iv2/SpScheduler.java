@@ -127,8 +127,8 @@ public class SpScheduler extends Scheduler
                         hostLog.error("Failed to deliver response from execution site.", e);
                     }
                     DuplicateCounter counter = new DuplicateCounter(
-                            msg.getInitiatorHSId(), m_replicaHSIds.length + 1,
-                            msg.getTxnId());
+                            msg.getInitiatorHSId(),
+                            msg.getTxnId(), m_replicaHSIds);
                     m_duplicateCounters.put(newSpHandle, counter);
                 }
             }
@@ -223,13 +223,13 @@ public class SpScheduler extends Scheduler
                 DuplicateCounter counter;
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
-                            msg.getCoordinatorHSId(), m_replicaHSIds.length + 1,
-                            msg.getTxnId());
+                            msg.getCoordinatorHSId(),
+                            msg.getTxnId(), m_replicaHSIds);
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
-                            msg.getCoordinatorHSId(), m_replicaHSIds.length + 1,
-                            msg.getTxnId());
+                            msg.getCoordinatorHSId(),
+                            msg.getTxnId(), m_replicaHSIds);
                 }
                 m_duplicateCounters.put(newSpHandle, counter);
             }

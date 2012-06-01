@@ -43,10 +43,10 @@ public class SysProcDuplicateCounter extends DuplicateCounter
 
     SysProcDuplicateCounter(
             long destinationHSId,
-            int expectedResponses,
-            long realTxnId)
+            long realTxnId,
+            long[] expectedHSIds)
     {
-        super(destinationHSId, expectedResponses, realTxnId);
+        super(destinationHSId, realTxnId, expectedHSIds);
     }
 
     @Override
@@ -66,7 +66,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
             tables.add(dep);
         }
         m_lastResponse = message;
-        return checkCommon(hash);
+        return checkCommon(hash, message.m_sourceHSId);
     }
 
     @Override

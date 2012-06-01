@@ -17,7 +17,8 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.atomic.AtomicInteger;
+import java.util.HashSet;
+import java.util.Set;
 
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -34,21 +35,24 @@ public class DuplicateCounter
     static final int DONE = 1;
     static final int WAITING = 2;
 
-    final AtomicInteger m_expectedResponses;
     final long m_destinationId;
     Long m_responseHash = null;
     protected FragmentResponseMessage m_lastResponse;
+    final Set<Long> m_expectedHSIds;
 
     DuplicateCounter(
             long destinationHSId,
-            int expectedResponses,
-            long realTxnId)
+            long realTxnId,
+            long[] expectedHSIds)
     {
-        m_expectedResponses = new AtomicInteger(expectedResponses);
         m_destinationId = destinationHSId;
+        m_expectedHSIds = new HashSet<Long>();
+        for (int i = 0; i < expectedHSIds.length; i++) {
+            m_expectedHSIds.add(expectedHSIds[i]);
+        }
     }
 
-    protected int checkCommon(long hash)
+    protected int checkCommon(long hash, long srcHSId)
     {
         if (m_responseHash == null) {
             m_responseHash = Long.valueOf(hash);
@@ -58,7 +62,8 @@ public class DuplicateCounter
             return MISMATCH;
         }
 
-        if (m_expectedResponses.decrementAndGet() == 0) {
+        m_expectedHSIds.remove(srcHSId);
+        if (m_expectedHSIds.size() == 0) {
             return DONE;
         }
         else {
@@ -69,7 +74,7 @@ public class DuplicateCounter
     int offer(InitiateResponseMessage message)
     {
         long hash = message.getClientResponseData().getHashOfTableResults();
-        return checkCommon(hash);
+        return checkCommon(hash, message.m_sourceHSId);
     }
 
     int offer(FragmentResponseMessage message)
@@ -79,7 +84,7 @@ public class DuplicateCounter
             hash ^= MiscUtils.cheesyBufferCheckSum(message.getTableAtIndex(i).getBuffer());
         }
         m_lastResponse = message;
-        return checkCommon(hash);
+        return checkCommon(hash, message.m_sourceHSId);
     }
 
     FragmentResponseMessage getLastFragmentResponse()

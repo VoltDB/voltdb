@@ -135,7 +135,8 @@ public class MpScheduler extends Scheduler
                     message.getClientInterfaceHandle());
             DuplicateCounter counter = new DuplicateCounter(
                     message.getInitiatorHSId(),
-                    partitionInitiators.size(), mpTxnId);
+                    mpTxnId,
+                    com.google.common.primitives.Longs.toArray(partitionInitiators));
             m_duplicateCounters.put(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, mpTxnId, m_pendingTasks, sp,
