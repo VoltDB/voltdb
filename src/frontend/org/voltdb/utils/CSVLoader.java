@@ -17,12 +17,22 @@
 
 package org.voltdb.utils;
 
-import java.io.*;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-import org.voltdb.client.*;
+
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 /**
@@ -54,24 +64,30 @@ class CSVLoader {
     private static int waitSeconds = 10;
     private static boolean stripQuotes = false;
     private static int[] colProjection = null;
+    
+    private static List<Long> invalidLines = new ArrayList<Long>();
 
     private static final class MyCallback implements ProcedureCallback {
-        private final long m_sentCount;
-        MyCallback(long sent)
+        private final long m_lineNum;
+        MyCallback(long lineNumber)
         {
-            m_sentCount = sent;
+            m_lineNum = lineNumber;
         }
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
-                if (m_sentCount == 0) {
-                    System.err.print("Line ~" + inCount.get() + "-" + outCount.get() + ":");
-                } else {
-                    System.err.print("Line " + m_sentCount + ":");
-                }
+//                if (m_lineNum == 0) {
+//                    System.err.print("Line ~" + inCount.get() + "-" + outCount.get() + ":");
+//                } else {
+//                    System.err.print("Line " + m_lineNum + ":");
+//                }
+            	
+                
                 System.err.println(response.getStatusString());
                 System.err.println("<xin>Stop at line " + (inCount.get()));
-                
+                synchronized (invalidLines) {
+                	invalidLines.add(m_lineNum);
+                }
                 //System.exit(1);
             }
             
@@ -83,7 +99,18 @@ class CSVLoader {
             }
         }
     }
-
+    
+    /**
+     * TODO(xin): add line number data into the callback and add the invalid line number 
+     * into a list that will help us to produce a separate file to record the invalid line
+     * data in the csv file.
+     * 
+     * Asynchronously invoking procedures to response the actual wrong line number and 
+     * start from last wrong line in the csv file is not easy. You can not ensure the 
+     * FIFO order of the callback.
+     * @param args
+     */
+    
 
     public static void main(String[] args) {
         if (args.length < 2) {
@@ -108,6 +135,7 @@ class CSVLoader {
             final Client client = ClientFactory.createClient();
             client.createConnection("localhost");
 
+            
             boolean lastOK = true;
             String line[] = null;
 
@@ -141,8 +169,16 @@ class CSVLoader {
                     } else {
                         cb = oneCallbackFitsAll;
                     }
-                    System.out.println("<xin>params: " + correctedLine);
-                    checkLineFormat(correctedLine);
+                    String msg = "<xin>params: ";
+                    for (int i=0; i < correctedLine.length; i++) {
+                    	msg += correctedLine[i] + ",";
+                    }
+                    System.out.println(msg);
+                    
+                    if (!checkLineFormat(correctedLine)){
+                    	
+                    	System.err.println("Stop at line " + (outCount.get()));
+                    }
                     queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
 
                     if (queued == false) {
@@ -159,6 +195,8 @@ class CSVLoader {
             reader.close();
             client.drain();
             client.close();
+            
+            produceInvalidRowsFile(filename, "/Users/xinjia/invalidrows.csv");            
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -173,11 +211,48 @@ class CSVLoader {
     }
     /**
      * Check for each line
+     * TODO(zheng):
+     * Use the client handler to get the schema of the table, and then check the number of
+     * parameters it expects with the input line fragements and each range for each data type. 
+     * And does other pre-checks...(figure out it later) 
      * @param linefragement
      */
     private static boolean checkLineFormat(Object[] linefragement) {
     	
     	return true;
+    }
+    /**
+     * TODO(xin):
+     * produce the invalid row file from 
+     * @param inputFile
+     */
+    private static void produceInvalidRowsFile(String inputFile, String outputFile) {
+    	//StringBuilder query = new StringBuilder();
+    	File file = new File(outputFile);
+        try {
+        	// Create file if it does not exist
+            boolean success = file.createNewFile();
+            // Do the file name checking at beginning of the main function 
+            if (success) {
+                // File did not exist and was created
+            } else {
+                // File already exists
+            }
+        	
+			BufferedReader csvfile = new BufferedReader(new FileReader(inputFile));
+			String line;
+	        while ((line = csvfile.readLine()) != null) {
+	        	
+	        }
+	        
+		} catch (FileNotFoundException e) {
+			System.err.println("CSV file '" + inputFile + "' could not be found.");
+		} catch(Exception x) {
+            System.err.println(x.getMessage());
+        }
+        
+    	
+    	
     }
     
     private static void processCommandLineOptions(int argsUsed, String args[]) {
