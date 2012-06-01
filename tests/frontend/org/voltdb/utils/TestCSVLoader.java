@@ -22,8 +22,8 @@ public class TestCSVLoader extends TestCase {
             "IVAL bigint default 0 not null, " +
             //"TVAL timestamp default null," +
             "DVAL decimal default null," +
-            "VVAL varchar(10) default null, " +
-            "PRIMARY KEY(IVAL));";
+            "VVAL varchar(10) default null);";
+            //"PRIMARY KEY(IVAL));";
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
