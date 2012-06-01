@@ -19,16 +19,19 @@ public class TestCSVLoader extends TestCase {
 	public void testSimple() throws Exception {
         String simpleSchema =
             "create table BLAH (" +
-            "clm_tinyint tinyint default null, " +
-            "clm_smallint smallint default null, " +
-            "clm_integer integer default 0 not null, " +
-            "clm_bigint bigint default null, " +
+            "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+            "clm_tinyint tinyint default 0, " +
+            "clm_smallint smallint default 0, " +
+            "clm_bigint bigint default 0, " +
             
-            "clm_float float default null, " +
-            "clm_timestamp timestamp default null, " +
             "clm_string varchar(10) default null, " +
             "clm_decimal decimal default null, " +
-            "clm_varinary varbinary default null); ";
+            //"clm_float float default 1.0, " + // for later
+            //"clm_timestamp timestamp default null, " + // for later
+           
+            //"clm_varinary varbinary default null" + // for later
+            "); ";
 
         String pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
@@ -52,7 +55,7 @@ public class TestCSVLoader extends TestCase {
             localServer.start();
             localServer.waitForInitialization();
 
-            String []params = {"/Users/xinjia/testdb.csv","Insert","--columns", "0,2,1"};
+            String []params = {"/Users/xinjia/testdb.csv","BLAH.insert"};
             //String []params = {"/Users/xinjia/testdb.csv","Insert","--columns", "0,2,1"};
             CSVLoader.main(params);
             
