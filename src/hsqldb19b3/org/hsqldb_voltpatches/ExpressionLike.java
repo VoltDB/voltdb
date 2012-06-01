@@ -31,6 +31,7 @@
 
 package org.hsqldb_voltpatches;
 
+import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.types.BinaryData;
@@ -205,10 +206,12 @@ public final class ExpressionLike extends ExpressionLogical {
         /*
          * Remove the unused escape node
          */
-        Expression oldNodes[] = nodes;
-        nodes = new Expression[BINARY];
-        nodes[LEFT] = oldNodes[LEFT];
-        nodes[RIGHT] = oldNodes[RIGHT];
+        if (nodes[ESCAPE] == null) {
+            Expression oldNodes[] = nodes;
+            nodes = new Expression[BINARY];
+            nodes[LEFT] = oldNodes[LEFT];
+            nodes[RIGHT] = oldNodes[RIGHT];
+        }
 
         likeObject.dataType = nodes[LEFT].dataType;
 
@@ -226,6 +229,12 @@ public final class ExpressionLike extends ExpressionLogical {
         if (isRightArgFixedConstant && isEscapeFixedConstant) {
             likeObject.isVariable = false;
         } else {
+            /*
+             * Can guarantee this won't work with an escape in the EE
+             */
+            if (nodes.length > 2) {
+                throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
+            }
             return;
         }
 
@@ -290,6 +299,12 @@ public final class ExpressionLike extends ExpressionLogical {
             }
 
             if (!between && !larger) {
+                /*
+                 * Escape is not supported in the EE yet
+                 */
+                if (nodes.length > 2) {
+                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
+                }
                 return;
             }
 
@@ -318,6 +333,12 @@ public final class ExpressionLike extends ExpressionLogical {
                                                        rightBound);
                 ExpressionLike newLike = new ExpressionLike(this);
 
+                /*
+                 * Escape is not supported in the EE yet
+                 */
+                if (nodes.length > 2) {
+                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
+                }
                 nodes        = new Expression[BINARY];
                 likeObject   = null;
                 nodes[LEFT]  = new ExpressionLogical(OpTypes.AND, gte, lte);
@@ -333,6 +354,13 @@ public final class ExpressionLike extends ExpressionLogical {
                 nodes[LEFT]  = gte;
                 nodes[RIGHT] = newLike;
                 opType       = OpTypes.AND;
+            } else {
+                /*
+                 * Escape is not supported in the EE yet
+                 */
+                if (nodes.length > 2) {
+                    throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
+                }
             }
         }
     }

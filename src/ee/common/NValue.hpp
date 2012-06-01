@@ -2757,7 +2757,7 @@ inline NValue NValue::like(const NValue rhs) const {
                 switch (patternChars_[ii]) {
                 case '%':
                     percentCount_++;
-                    if ((++ii - percentCount_) >= valueUTF8Length_) {
+                    if (++ii  >= patternUTF8Length_) {
                         return true;
                     }
 
@@ -2766,6 +2766,7 @@ inline NValue NValue::like(const NValue rhs) const {
                                 compareAt(ii, jj)) {
                             return true;
                         }
+                        jj++;
                     }
                     return false;
                 case '_':

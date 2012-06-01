@@ -128,7 +128,6 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("ab_d_fg", 1),
             new LikeTest("%defg", 1),
             new LikeTest("%de%", 1),
-            new LikeTest("%de% ", 0),
             new NotLikeTest("aaa%", rowData.length - 1),
             new EscapeLikeTest("abcccc|%", 1, "|"),
             new EscapeLikeTest("abc%", 2, "|"),
@@ -193,13 +192,19 @@ public class TestLikeQueries extends TestCase {
 
             // Tests using PAT column for pattern data
             {
-                // Expact all PAT column patterns to produce a match with the VAL column string.
-                // We don't support non-literal likes yet. Remove the catch when we do.
+                //Without an escape this works
                 String query = "select * from strings where val like pat";
+                VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+                assertEquals(String.format("LIKE column test: bad row count:"),
+                            rowData.length, result.getRowCount());
+
+                //With an escape there is no way for the escape to propagate to the expression in EE
+                //So HSQL should reject it due to our modifications
+                query = "select * from strings where val like pat ESCAPE '?'";
                 try {
-                    VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+                    result = client.callProcedure("@AdHoc", query).getResults()[0];
                     assertEquals(String.format("LIKE column test: bad row count:"),
-                                 tests.length, result.getRowCount());
+                            rowData.length, result.getRowCount());
                 } catch (ProcCallException e) {
                     System.out.println("LIKE column test failed (expected for now)");
                 }
