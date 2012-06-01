@@ -73,9 +73,11 @@ public class LocalCluster implements VoltServerConfig {
     String m_callingClassName = "";
     String m_callingMethodName = "";
     boolean m_compiled = false;
-    int m_siteCount;
+    protected int m_siteCount;
     int m_hostCount;
     int m_kfactor = 0;
+    protected final BackendTarget m_target;
+    protected String m_jarFileName;
     boolean m_running = false;
     private final boolean m_debug;
     FailureState m_failureState;
@@ -164,9 +166,18 @@ public class LocalCluster implements VoltServerConfig {
         m_hostCount = hostCount;
         m_kfactor = kfactor;
         m_debug = debug;
+        m_jarFileName = jarFileName;
         m_failureState = kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<PipeToFile>();
         m_cmdLines = new ArrayList<CommandLine>();
+
+        // if the user wants valgrind and it makes sense, give it to 'em
+        if (isMemcheckDefined() && (target == BackendTarget.NATIVE_EE_JNI)) {
+            m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
+        }
+        else {
+            m_target = target;
+        }
 
         String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
         if (buildDir == null) {
@@ -183,7 +194,7 @@ public class LocalCluster implements VoltServerConfig {
         java_library_path = System.getProperty("java.library.path", java_library_path);
 
         String classPath = System.getProperty("java.class.path") + ":" + buildDir
-            + File.separator + jarFileName + ":" + buildDir + File.separator + "prod";
+            + File.separator + m_jarFileName + ":" + buildDir + File.separator + "prod";
 
         // First try 'ant' syntax and then 'eclipse' syntax...
         String log4j = System.getProperty("log4j.configuration");
@@ -204,14 +215,25 @@ public class LocalCluster implements VoltServerConfig {
         this.templateCmdLine.
             addTestOptions(true).
             leader("").
-            target(target).
+            target(m_target).
             startCommand("create").
-            jarFileName(VoltDB.Configuration.getPathToCatalogForTest(jarFileName)).
+            jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
             javaLibraryPath(java_library_path).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
+        this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
+    }
+
+    /**
+     * Override the Valgrind backend with a JNI backend.
+     * Called after a constructor but before startup.
+     */
+    public void overrideAnyRequestForValgrind() {
+        if (templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+            templateCmdLine.m_backend = BackendTarget.NATIVE_EE_JNI;
+        }
     }
 
     @Override
@@ -294,14 +316,8 @@ public class LocalCluster implements VoltServerConfig {
         portGenerator.next();
         for (EEProcess proc : m_eeProcs.get(0)) {
             assert(proc != null);
-            cmdln.ipcPort(portGenerator.next());
+            cmdln.ipcPort(proc.port());
         }
-
-        // rtb: why is this? this flag short-circuits an Inits worker
-        // but can only be set on the local in-process server (there is no
-        // command line version of it.) Consequently, in-process and out-of-
-        // process VoltDBs initialize differently when this flag is set.
-        // cmdln.rejoinTest(true);
 
         // for debug, dump the command line to a unique file.
         // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
@@ -1034,8 +1050,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_leaderPort = config.m_leaderPort;
     }
 
-    @Override
-    public boolean isValgrind() {
+    protected boolean isMemcheckDefined() {
         final String buildType = System.getenv().get("BUILD");
         if (buildType == null) {
             return false;
@@ -1043,6 +1058,10 @@ public class LocalCluster implements VoltServerConfig {
         return buildType.startsWith("memcheck");
     }
 
+    @Override
+    public boolean isValgrind() {
+        return templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC;
+    }
 
     @Override
     public void createDirectory(File path) throws IOException {

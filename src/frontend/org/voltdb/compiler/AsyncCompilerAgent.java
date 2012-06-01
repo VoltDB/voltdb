@@ -97,7 +97,7 @@ public class AsyncCompilerAgent {
                         // XXX: need client interface mailbox id.
                         m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
                     } catch (MessagingException ex) {
-                        ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
+                        getAhpLog().error("Error replying to Ad Hoc planner request: " + ex.getMessage());
                     }
                 }
             }
@@ -150,9 +150,17 @@ public class AsyncCompilerAgent {
 
         List<String> errorMsgs = new ArrayList<String>();
         assert(work.sqlStatements != null);
-        for (final String sqlStatement : work.sqlStatements) {
+        // Take advantage of the planner optimization for inferring single partition work
+        // when the batch has one statement.
+        if (work.sqlStatements.length == 1) {
+            // Single statement batch.
             try {
-                PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam != null);
+                String sqlStatement = work.sqlStatements[0];
+                PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam,
+                                                            true);
+                // The planning tool may have optimized for the single partition case
+                // and generated a partition parameter.
+                plannedStmtBatch.partitionParam = result.partitionParam;
                 plannedStmtBatch.addStatement(sqlStatement,
                                               result.onePlan,
                                               result.allPlan,
@@ -160,6 +168,23 @@ public class AsyncCompilerAgent {
             }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+            }
+        }
+        else {
+            // Multi-statement batch.
+            for (final String sqlStatement : work.sqlStatements) {
+                try {
+                    PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam,
+                                                                false);
+
+                    plannedStmtBatch.addStatement(sqlStatement,
+                                                  result.onePlan,
+                                                  result.allPlan,
+                                                  result.replicatedDML);
+                }
+                catch (Exception e) {
+                    errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+                }
             }
         }
         if (!errorMsgs.isEmpty()) {
@@ -233,6 +258,10 @@ public class AsyncCompilerAgent {
         }
 
         return retval;
+    }
+
+    public static VoltLogger getAhpLog() {
+        return ahpLog;
     }
 
 }

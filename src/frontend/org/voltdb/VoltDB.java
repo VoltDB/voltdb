@@ -18,8 +18,10 @@
 package org.voltdb;
 
 import java.io.File;
+import java.io.PrintStream;
 import java.io.PrintWriter;
 import java.nio.charset.Charset;
+import java.util.ArrayList;
 import java.util.Collections;
 import java.util.Iterator;
 import java.util.LinkedList;
@@ -191,6 +193,13 @@ public class VoltDB {
                 {
                     continue;
                 }
+
+                // Handle request for help/usage
+                if (arg.equalsIgnoreCase("-h") || arg.equalsIgnoreCase("--help")) {
+                    usage(System.out);
+                    System.exit(-1);
+                }
+
                 if (arg.equals("noloadlib")) {
                     m_noLoadLibVOLTDB = true;
                 }
@@ -369,19 +378,32 @@ public class VoltDB {
         }
 
         /**
-         * Prints a usage message as a fatal error.
+         * Prints a usage message on stderr.
          */
-        public void usage() {
+        public void usage() { usage(System.err); }
+
+        /**
+         * Prints a usage message on the designated output stream.
+         */
+        public void usage(PrintStream os) {
             // N.B: this text is user visible. It intentionally does NOT reveal options not interesting to, say, the
             // casual VoltDB operator. Please do not reveal options not documented in the VoltDB documentation set. (See
             // GettingStarted.pdf).
+            String message = "";
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover|replica) [leader <hostname> [deployment <deployment.xml>]] license <license.xml> catalog <catalog.jar>");
+                message = "Usage: voltdb [create|recover|replica] [leader <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>";
+                os.println(message);
+                // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
+                hostLog.info(message);
             } else {
-                hostLog.fatal("Usage: org.voltdb.VoltDB (create|recover) [leader <hostname> [deployment <deployment.xml>]] catalog <catalog.jar>");
+                message = "Usage: voltdb [create|recover] [leader <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>";
+                os.println(message);
+                // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
+                hostLog.info(message);
             }
-            hostLog.fatal("Defaults will be used if no deployment is specified.");
-            hostLog.fatal("The _Getting Started With VoltDB_ book explains how to run VoltDB from the command line.");
+            // Don't bother logging these for log4j, only dump them to the designated stream.
+            os.println("If action is not specified the default is to 'recover' the database if a snapshot is present otherwise 'create'.");
+            os.println("If no deployment is specified, a default 1 node cluster deployment will be configured.");
         }
 
         /**
@@ -450,21 +472,30 @@ public class VoltDB {
     /**
      * Exit the process with an error message, optionally with a stack trace.
      */
-    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable t) {
+    public static void crashLocalVoltDB(String errMsg, boolean stackTrace, Throwable thrown) {
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
             return;
         }
 
+        List<String> throwerStacktrace = null;
+        if (thrown != null) {
+            throwerStacktrace = new ArrayList<String>();
+            throwerStacktrace.add("Stack trace of thrown exception: " + thrown.toString());
+            for (StackTraceElement ste : thrown.getStackTrace()) {
+                throwerStacktrace.add(ste.toString());
+            }
+        }
+
         // Even if the logger is null, don't stop.  We want to log the stack trace and
         // any other pertinent information to a .dmp file for crash diagnosis
-        StringBuilder stacktrace_sb = new StringBuilder("Stack trace from crashVoltDB() method:\n");
-
+        List<String> currentStacktrace = new ArrayList<String>();
+        currentStacktrace.add("Stack trace from crashLocalVoltDB() method:");
         Map<Thread, StackTraceElement[]> traces = Thread.getAllStackTraces();
         StackTraceElement[] myTrace = traces.get(Thread.currentThread());
         for (StackTraceElement ste : myTrace) {
-            stacktrace_sb.append(ste.toString()).append("\n");
+            currentStacktrace.add(ste.toString());
         }
 
         // Create a special dump file to hold the stack trace
@@ -485,9 +516,20 @@ public class VoltDB {
                 writer.println(line.trim());
             }
 
+            if (thrown != null) {
+                writer.println();
+                writer.println("****** Exception Thread ****** ");
+                for (String throwerStackElem : throwerStacktrace) {
+                    writer.println(throwerStackElem);
+                }
+            }
+
             writer.println();
             writer.println("****** Current Thread ****** ");
-            writer.println(stacktrace_sb);
+            for (String currentStackElem : currentStacktrace) {
+                writer.println(currentStackElem);
+            }
+
             writer.println("****** All Threads ******");
             Iterator<Thread> it = traces.keySet().iterator();
             while (it.hasNext())
@@ -517,13 +559,22 @@ public class VoltDB {
 
         if (log != null)
         {
-            if (t != null)
-                log.fatal(errMsg, t);
-            else
+            if (thrown != null) {
+                if (stackTrace) {
+                    for (String throwerStackElem : throwerStacktrace) {
+                        log.fatal(throwerStackElem);
+                    }
+                } else {
+                    log.fatal(thrown.toString());
+                }
+            } else {
                 log.fatal(errMsg);
-
-            if (stackTrace)
-                log.fatal(stacktrace_sb);
+                if (stackTrace) {
+                    for (String currentStackElem : currentStacktrace) {
+                        log.fatal(currentStackElem);
+                    }
+                }
+            }
         }
 
         System.err.println("VoltDB has encountered an unrecoverable error and is exiting.");

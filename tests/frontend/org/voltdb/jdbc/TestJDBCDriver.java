@@ -366,6 +366,9 @@ public class TestJDBCDriver {
         cs.setInt(3, 77);
         cs.execute();
         try {
+            cs.setInt(1, 55);
+            cs.setInt(2, 66);
+            cs.setInt(3, 77);
             cs.execute();
         } catch (SQLException e) {
             // Since it's a GENERAL_ERROR we need to look for a string by pattern.

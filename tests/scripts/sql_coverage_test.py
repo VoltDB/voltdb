@@ -54,6 +54,14 @@ class Config:
         return self.__config[config_name]
 
 def run_once(name, command, statements_path, results_path):
+
+    print "Running \"run_once\":"
+    print "  name: %s" % (name)
+    print "  command: %s" % (command)
+    print "  statements_path: %s" % (statements_path)
+    print "  results_path: %s" % (results_path)
+    sys.stdout.flush()
+
     global normalize
     server = subprocess.Popen(command + " backend=" + name, shell = True)
     client = None
@@ -68,6 +76,8 @@ def run_once(name, command, statements_path, results_path):
             time.sleep(1)
 
     if client == None:
+        print >> sys.stderr, "Unable to connect/create client"
+        sys.stderr.flush()
         return -1
 
     statements_file = open(statements_path, "rb")
@@ -103,6 +113,9 @@ def run_once(name, command, statements_path, results_path):
 
     client.onecmd("shutdown")
     server.communicate()
+
+    sys.stdout.flush()
+    sys.stderr.flush()
 
     return server.returncode
 
@@ -141,6 +154,8 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
 
     if run_once("jni", command, statements_path, jni_path) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
+        print >> sys.stderr, "  jni_path: %s" % (jni_path)
+        sys.stderr.flush()
         exit(1)
 
     random.seed(random_seed)

@@ -48,6 +48,8 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
@@ -73,8 +75,6 @@ import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -442,8 +442,6 @@ public class VoltCompiler {
             compileXMLRootNode(project);
         } catch (final VoltCompilerException e) {
             compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
-            compilerLog.error(e.getMessage());
-            // e.printStackTrace();
             return null;
         }
         assert(m_catalog != null);
@@ -1194,8 +1192,7 @@ public class VoltCompiler {
     public static void main(final String[] args) {
         // Parse arguments
         if (args.length != 2) {
-            System.err.println("USAGE (1): voltcompiler [classpath] [project file] [output JAR]");
-            System.err.println("USAGE (2): java -cp $CLASSPATH org.voltdb.compiler.VoltCompiler [project file] [output JAR]");
+            System.err.println("Usage: voltcompiler <classpath> <project-file> <output-JAR>");
             System.exit(1);
         }
         final String projectPath = args[0];
@@ -1205,13 +1202,13 @@ public class VoltCompiler {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compile(projectPath, outputJar);
         if (!success) {
-            compiler.summarizeErrors(System.out);
+            compiler.summarizeErrors(System.out, null);
             System.exit(-1);
         }
-        compiler.summarizeSuccess(System.out);
+        compiler.summarizeSuccess(System.out, null);
     }
 
-    public void summarizeSuccess(PrintStream outputStream) {
+    public void summarizeSuccess(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
 
             Database database = m_catalog.getClusters().get("cluster").
@@ -1261,6 +1258,14 @@ public class VoltCompiler {
             }
             outputStream.println("------------------------------------------");
         }
+        if (feedbackStream != null) {
+            for (Feedback fb : m_warnings) {
+                feedbackStream.println(fb.getLogString());
+            }
+            for (Feedback fb : m_infos) {
+                feedbackStream.println(fb.getLogString());
+            }
+        }
     }
 
     /**
@@ -1274,11 +1279,16 @@ public class VoltCompiler {
         return compact;
     }
 
-    private void summarizeErrors(PrintStream outputStream) {
+    public void summarizeErrors(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
             outputStream.println("------------------------------------------");
             outputStream.println("Project compilation failed. See log for errors.");
             outputStream.println("------------------------------------------");
+        }
+        if (feedbackStream != null) {
+            for (Feedback fb : m_errors) {
+                feedbackStream.println(fb.getLogString());
+            }
         }
     }
 

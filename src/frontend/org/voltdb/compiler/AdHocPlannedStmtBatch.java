@@ -30,7 +30,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     private static final long serialVersionUID = -8627490621430290801L;
 
     public final String sqlBatchText;
-    public final Object partitionParam;
+    // May be reassigned if the planner infers single partition work.
+    public Object partitionParam;
     public final int catalogVersion;
     public final List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
 
@@ -169,6 +170,19 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         plannedStmt.adminConnection = adminConnection;
         plannedStmt.clientData = clientData;
         plannedStatements.add(plannedStmt);
+    }
+
+    /**
+     * Detect if batch is compatible with single partition optimizations
+     * @return true if nothing is replicated and nothing has a collector.
+     */
+    public boolean isSinglePartitionCompatible() {
+        for (AdHocPlannedStatement plannedStmt : plannedStatements) {
+            if (plannedStmt.isReplicatedTableDML || plannedStmt.collectorFragment != null) {
+                return false;
+            }
+        }
+        return true;
     }
 
 }
