@@ -167,23 +167,27 @@ namespace detail {
     {
         NestLoopExecutorState(AbstractExpression* predicate, TempTable* outputTable,
             AbstractExecutor* outerExecutor, AbstractExecutor* innerExecutor,
-            int outerCols, int innerCols) :
-            m_iterator(outputTable->iterator()),
+            const TupleSchema* outerSchema, int outerCols, int innerCols) :
             m_predicate(predicate),
             m_outerExecutor(outerExecutor),
             m_innerExecutor(innerExecutor),
             m_outputTable(outputTable),
+            m_outerSchema(outerSchema),
+            m_outerTuple(outerSchema),
             m_outerCols(outerCols),
-            m_innerCols(innerCols)
+            m_innerCols(innerCols),
+            m_needNextOuter(true)
         {}
 
-        TableIterator m_iterator;
         AbstractExpression* m_predicate;
         AbstractExecutor* m_outerExecutor;
         AbstractExecutor* m_innerExecutor;
         TempTable* m_outputTable;
+        const TupleSchema* m_outerSchema;
+        TableTuple m_outerTuple;
         int m_outerCols;
         int m_innerCols;
+        bool m_needNextOuter;
 
     };
 
@@ -296,66 +300,53 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     return (true);
 }
 
-
 //@TODO pullexec prototype
 TableTuple NestLoopExecutor::p_next_pull() {
-
-    // To minimize number of p_next_pull calls a "bounded batch" protocol is implemented
-    // that has a p_next_pull variant returning/caching multiple tuples
-    // from 1 call -- not to exceed some limit of temp space allocation per call.
-    // The limit might start at some fixed system maximum and
-    // get scaled down as query complexity (executor stack depth) scaled up.
-    // Depending on how much temp space (total or per tuple or per tuple-in-current-batch)
-    // each particular executor typically used, it could adjust the limit for its child
-    // (even dynamically for each call) for optimal throughput within the memory constraints.
-    // Current implementation simply pull all tuplse from the joining tables -
-    // -the simpliest version
-    if (m_state->m_outputTable->activeTupleCount() == 0)
+    bool hasNext = false;
+    TableTuple joinedTuple = m_state->m_outputTable->tempTuple();
+    while (!hasNext)
     {
-        // Fill up output table
-        while (true)
+        if (m_state->m_needNextOuter)
         {
-            TableTuple outerTuple = m_state->m_outerExecutor->p_next_pull();
-            if (outerTuple.isNullTuple())
+            m_state->m_outerTuple = m_state->m_outerExecutor->p_next_pull();
+            if (m_state->m_outerTuple.isNullTuple())
             {
+                joinedTuple = TableTuple(m_state->m_outerSchema);
                 break;
             }
-            // populate output table's temp tuple with outer table's values
-            // probably have to do this at least once - avoid doing it many
-            // times per outer tuple
-            TableTuple joinedTuple = m_state->m_outputTable->tempTuple();
-            for (int col_ctr = 0; col_ctr < m_state->m_outerCols; col_ctr++) {
-                joinedTuple.setNValue(col_ctr, outerTuple.getNValue(col_ctr));
-            }
-
-            // Inner table is empty. Need to pull tuplse from inner executor
-            while (true)
-            {
-                TableTuple innerTuple = m_state->m_innerExecutor->p_next_pull();
-                if (innerTuple.isNullTuple())
-                {
-                    break;
-                }
-                if (m_state->m_predicate == NULL ||
-                    m_state->m_predicate->eval(&outerTuple, &innerTuple).isTrue()) {
-                    // Matched! Complete the joined tuple with the inner column values.
-                    for (int col_ctr = 0; col_ctr < m_state->m_innerCols; col_ctr++) {
-                        joinedTuple.setNValue(col_ctr + m_state->m_outerCols, innerTuple.getNValue(col_ctr));
-                    }
-                    m_state->m_outputTable->insertTupleNonVirtual(joinedTuple);
-                }
-            }
-            // Reset the inner table
-            boost::function<void(AbstractExecutor*)> freset = &AbstractExecutor::reset_state_pull;
-            m_state->m_innerExecutor->depth_first_iterate_pull(freset, false);
+            m_state->m_needNextOuter = false;
         }
-        // Reset the output table's iterator
-        m_state->m_iterator = m_state->m_outputTable->iterator();
+
+        // populate output table's temp tuple with outer table's values
+        // probably have to do this at least once - avoid doing it many
+        // times per outer tuple
+        for (int col_ctr = 0; col_ctr < m_state->m_outerCols; col_ctr++) {
+            joinedTuple.setNValue(col_ctr, m_state->m_outerTuple.getNValue(col_ctr));
+        }
+
+        while (true)
+        {
+            TableTuple innerTuple = m_state->m_innerExecutor->p_next_pull();
+            if (innerTuple.isNullTuple())
+            {
+                m_state->m_needNextOuter = true;
+                // Reset the inner table
+                reset_inner_state();
+                break;
+            }
+            if (m_state->m_predicate == NULL ||
+                m_state->m_predicate->eval(&m_state->m_outerTuple, &innerTuple).isTrue()) {
+                // Matched! Complete the joined tuple with the inner column values.
+                for (int col_ctr = 0; col_ctr < m_state->m_innerCols; col_ctr++) {
+                    joinedTuple.setNValue(col_ctr + m_state->m_outerCols, innerTuple.getNValue(col_ctr));
+                }
+                hasNext = true;
+                break;
+            }
+        }
     }
 
-    TableTuple joined(m_state->m_outputTable->schema());
-    m_state->m_iterator.next(joined);
-    return joined;
+    return joinedTuple;
 }
 
 void NestLoopExecutor::p_pre_execute_pull(const NValueArray &params) {
@@ -400,9 +391,14 @@ void NestLoopExecutor::p_pre_execute_pull(const NValueArray &params) {
     }
 
     m_state.reset(new detail::NestLoopExecutorState(predicate, output_table,
-        outer_executor, inner_executor, outer_cols, inner_cols));
+        outer_executor, inner_executor, outer_table->schema(), outer_cols, inner_cols));
 }
 
 bool NestLoopExecutor::support_pull() const {
     return true;
+}
+
+void NestLoopExecutor::reset_inner_state() {
+    boost::function<void(AbstractExecutor*)> freset = &AbstractExecutor::reset_state_pull;
+    m_state->m_innerExecutor->depth_first_iterate_pull(freset, false);
 }

@@ -74,7 +74,6 @@ class ReceiveExecutor : public AbstractExecutor {
 
         bool needsPostExecuteClear() { return true; }
         bool support_pull() const;
-        void reset_state_pull();
 
     protected:
         bool p_init(AbstractPlanNode*,
@@ -83,6 +82,7 @@ class ReceiveExecutor : public AbstractExecutor {
     private:
         TableTuple p_next_pull();
         void p_pre_execute_pull(const NValueArray& params);
+        void p_reset_state_pull();
 
         VoltDBEngine *m_engine;
         boost::scoped_ptr<detail::ReceiveExecutorState> m_state;

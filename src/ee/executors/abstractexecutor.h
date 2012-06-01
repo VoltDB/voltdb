@@ -102,7 +102,7 @@ class AbstractExecutor {
     void post_execute_pull();
 
     /** Reset executor's pull state */
-    virtual void reset_state_pull();
+    void reset_state_pull();
 
     // Clean up the output table of the executor tree as needed
     // Generic behavior wrapping the custom p_pre_execute_pull.
@@ -168,6 +168,9 @@ class AbstractExecutor {
 
     // Saves processed tuple
     virtual void p_insert_output_table_pull(TableTuple& tuple);
+
+    /** Reset executor's pull state */
+    virtual void p_reset_state_pull();
 
     // Helps clean up output tables of an executor and its dependencies.
     void clearOutputTable_pull();
@@ -236,6 +239,7 @@ inline void AbstractExecutor::post_execute_pull() {
 }
 
 inline void AbstractExecutor::reset_state_pull() {
+    this->p_reset_state_pull();
 }
 
 template <typename Functor>
@@ -287,6 +291,9 @@ inline void AbstractExecutor::clearOutputTable_pull()
 
 inline bool AbstractExecutor::support_pull() const {
     return false;
+}
+
+inline void AbstractExecutor::p_reset_state_pull() {
 }
 
 inline void AbstractExecutor::clearOutputTables()

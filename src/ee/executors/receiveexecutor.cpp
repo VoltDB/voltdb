@@ -127,7 +127,8 @@ ReceiveExecutor::~ReceiveExecutor() {
 //@TODO pullexec prototype
 TableTuple ReceiveExecutor::p_next_pull() {
     TableTuple tuple(m_state->m_targetTableSchema);
-    m_state->m_iterator.next(tuple);
+    if (!m_state->m_iterator.next(tuple))
+        tuple = TableTuple(m_state->m_targetTableSchema);
     return tuple;
 }
 
@@ -152,7 +153,7 @@ bool ReceiveExecutor::support_pull() const {
     return true;
 }
 
-void ReceiveExecutor::reset_state_pull() {
+void ReceiveExecutor::p_reset_state_pull() {
     m_state->m_iterator = m_state->m_outputTable->iterator();
 }
 

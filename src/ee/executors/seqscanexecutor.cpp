@@ -348,6 +348,6 @@ bool SeqScanExecutor::support_pull() const {
     return true;
 }
 
-void SeqScanExecutor::reset_state_pull() {
+void SeqScanExecutor::p_reset_state_pull() {
     m_state->m_iterator = m_state->m_targetTable->iterator();
 }

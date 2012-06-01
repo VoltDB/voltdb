@@ -77,7 +77,7 @@ class NestLoopExecutor : public AbstractExecutor {
         bool support_pull() const;
 
     private:
-
+        void reset_inner_state();
         TableTuple p_next_pull();
         void p_pre_execute_pull(const NValueArray& params);
 
