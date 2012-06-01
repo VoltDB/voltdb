@@ -17,14 +17,14 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.atomic.AtomicLong;
+
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
-
-import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -44,6 +44,7 @@ public class SpScheduler extends Scheduler
         new HashMap<Long, TransactionState>();
     private Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
+    private AtomicLong m_txnId = new AtomicLong(0);
 
     SpScheduler()
     {

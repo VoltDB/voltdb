@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.atomic.AtomicLong;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
@@ -55,9 +53,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
-
-    // hacky temp txnid
-    protected AtomicLong m_txnId = new AtomicLong(0);
 
     Scheduler()
     {
