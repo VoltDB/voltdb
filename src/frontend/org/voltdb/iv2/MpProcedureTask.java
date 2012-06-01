@@ -77,10 +77,6 @@ public class MpProcedureTask extends ProcedureTask
     @Override
     void completeInitiateTask(SiteProcedureConnection siteConnection)
     {
-        // we need to handle the undo log for the local site
-        siteConnection.truncateUndoLog(m_txn.needsRollback(),
-                                       m_txn.getBeginUndoToken(),
-                                       m_txn.txnId);
         CompleteTransactionMessage complete = new CompleteTransactionMessage(
                 m_initiator.getHSId(), // who is the "initiator" now??
                 m_initiator.getHSId(),
