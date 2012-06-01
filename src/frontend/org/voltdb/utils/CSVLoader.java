@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -135,6 +136,16 @@ class CSVLoader {
             final Client client = ClientFactory.createClient();
             client.createConnection("localhost");
 
+            VoltTable[] results = null;
+            try {
+            results = client.callProcedure("@SystemCatalog",
+            "TABLES").getResults();
+            System.out.println("Information about the database schema:");
+            for (VoltTable node : results) System.out.println(node.toString());
+            }
+            catch (Exception e) {
+            e.printStackTrace();
+            }   
             
             boolean lastOK = true;
             String line[] = null;
