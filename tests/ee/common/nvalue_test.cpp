@@ -2052,6 +2052,9 @@ TEST_F(NValueTest, TestLike)
             testString.free();
         }
         pattern.free();
+        if (foundMatches != testMatch) {
+            printf("Pattern %s failed to match %d\n", testExpression, testMatch);
+        }
         EXPECT_EQ( foundMatches, testMatch);
     }
 }

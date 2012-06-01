@@ -43,6 +43,7 @@
 #include "common/serializeio.h"
 #include "common/types.h"
 #include "common/value_defs.h"
+#include "utf8.h"
 
 #define CHECK_FPE( x ) ( std::isinf(x) || std::isnan(x) )
 namespace voltdb {
@@ -2737,10 +2738,21 @@ inline NValue NValue::like(const NValue rhs) const {
     const int32_t valueUTF8Length = getObjectLength();
     const int32_t patternUTF8Length = rhs.getObjectLength();
 
+    if (0 == patternUTF8Length) {
+        if (0 == valueUTF8Length) {
+            return getTrue();
+        } else {
+            return getFalse();
+        }
+    } else if (0 == valueUTF8Length) {
+        return getFalse();
+    }
+
     char *valueChars = reinterpret_cast<char*>(getObjectValue());
     char *patternChars = reinterpret_cast<char*>(rhs.getObjectValue());
     assert(valueChars);
     assert(patternChars);
+
     /*
      * Because lambdas are for poseurs.
      */
@@ -2749,54 +2761,96 @@ inline NValue NValue::like(const NValue rhs) const {
     public:
         Liker(char *valueChars, char* patternChars, int32_t valueUTF8Length, int32_t patternUTF8Length) :
             valueChars_(valueChars), patternChars_(patternChars),
-            valueUTF8Length_(valueUTF8Length), patternUTF8Length_(patternUTF8Length),
-            percentCount_(0) {}
+            valueCharsEnd_(valueChars + valueUTF8Length), patternCharsEnd_(patternChars + patternUTF8Length)
+             {}
 
-        bool compareAt(int ii, int jj) {
-            for (; ii < patternUTF8Length_; ii++) {
-                switch (patternChars_[ii]) {
-                case '%':
-                    percentCount_++;
-                    if (++ii  >= patternUTF8Length_) {
+        bool like() {
+            return compareAt( patternChars_, valueChars_);
+        }
+
+        /*
+         * Go through a lot of trouble to make sure that corrupt
+         * utf8 data doesn't result in touching uninitialized memory
+         * by copying the character data onto the stack.
+         */
+        uint32_t extractCodePoint( const char *&iterator, const char *endIterator) {
+            /*
+             * Copy the next 4 bytes to a temp buffer and retrieve
+             */
+            char nextPotentialCodePoint[] = { 0, 0, 0, 0 };
+            char *nextPotentialCodePointIter = nextPotentialCodePoint;
+            //Copy 4 bytes or until the end
+            ::memcpy( nextPotentialCodePoint, iterator, std::min( 4L, endIterator - iterator));
+
+            /*
+             * Extract the code point, find out how many bytes it was
+             */
+            uint32_t codePoint = utf8::unchecked::next(nextPotentialCodePointIter);
+            long int delta = nextPotentialCodePointIter - nextPotentialCodePoint;
+
+            /*
+             * Increment the iterator that was passed in by ref, by the delta
+             */
+            iterator += delta;
+            return codePoint;
+        }
+
+        bool compareAt(const char *patternIterator, const char *valueIterator) {
+            while (patternIterator < patternCharsEnd_) {
+                const uint32_t nextPatternCodePoint = extractCodePoint(patternIterator, patternCharsEnd_);
+                switch (nextPatternCodePoint) {
+                case '%': {
+                    if (patternIterator  >= patternCharsEnd_) {
                         return true;
                     }
 
-                    while (jj < valueUTF8Length_) {
-                        if ((patternChars_[ii] == valueChars_[jj]) &&
-                                compareAt(ii, jj)) {
+                    const char *postPercentPatternIterator = patternIterator;
+                    const uint32_t nextPatternCodePointAfterPercent = extractCodePoint( patternIterator, patternCharsEnd_);
+                    while (valueIterator < valueCharsEnd_) {
+                        const char *preExtractionValueIterator = valueIterator;
+                        const uint32_t nextValueCodePoint = extractCodePoint( valueIterator, valueCharsEnd_);
+                        if ((nextPatternCodePointAfterPercent == nextValueCodePoint) &&
+                                compareAt( postPercentPatternIterator, preExtractionValueIterator)) {
                             return true;
                         }
-                        jj++;
                     }
                     return false;
-                case '_':
-                    if (jj++ >= valueUTF8Length_) {
+                }
+                case '_': {
+                    if (valueIterator >= valueCharsEnd_) {
                         return false;
                     }
+                    //Extract a code point to consume a character
+                    extractCodePoint( valueIterator, valueCharsEnd_);
                     break;
-                default:
-                    if ((jj >= valueUTF8Length_) || (patternChars_[ii] != valueChars_[jj++])) {
+                }
+                default: {
+                    if ((valueIterator >= valueCharsEnd_)) {
+                        return false;
+                    }
+                    const int nextValueCodePoint = extractCodePoint( valueIterator, valueCharsEnd_);
+                    if (nextPatternCodePoint != nextValueCodePoint) {
                         return false;
                     }
                     break;
                 }
+                }
             }
-            if (jj != valueUTF8Length_) {
+            if (valueIterator < valueCharsEnd_) {
                 return false;
             }
             return true;
         }
     private:
-        char *valueChars_;
-        char *patternChars_;
-        const int32_t valueUTF8Length_;
-        const int32_t patternUTF8Length_;
-        int32_t percentCount_;
+        const char *valueChars_;
+        const char *patternChars_;
+        const char *valueCharsEnd_;
+        const char *patternCharsEnd_;
     };
 
     Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
 
-    return liker.compareAt( 0, 0) ? getTrue() : getFalse();
+    return liker.like() ? getTrue() : getFalse();
 }
 
 template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const {
