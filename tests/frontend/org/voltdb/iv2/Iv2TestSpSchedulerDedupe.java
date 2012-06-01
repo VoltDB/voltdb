@@ -220,7 +220,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         replresp.setResults(cr);
         dut.deliver(resp);
         dut.deliver(replresp);
-        verify(mbox, times(1)).send(eq(primary_hsid), eq(replresp));
+        verify(mbox, times(1)).send(eq(primary_hsid), eq(resp));
     }
 
     @Test
@@ -243,6 +243,6 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         dut.deliver(resp);
         FragmentResponseMessage replresp = new FragmentResponseMessage(replmsg.getValue(), 0l);
         dut.deliver(replresp);
-        verify(mbox, times(1)).send(eq(primary_hsid), eq(replresp));
+        verify(mbox, times(1)).send(eq(primary_hsid), eq(resp));
     }
 }

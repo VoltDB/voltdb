@@ -93,25 +93,33 @@ public class SpScheduler extends Scheduler
         final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
         if (message.isSinglePartition()) {
             long newSpHandle;
+            Iv2InitiateTaskMessage msg = message;
             if (m_isLeader) {
                 // Need to set the SP handle on the received message
+                msg = new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
+                        message.getCoordinatorHSId(),
+                        message.getTxnId(),
+                        message.isReadOnly(),
+                        message.isSinglePartition(),
+                        message.getStoredProcedureInvocation(),
+                        message.getClientInterfaceHandle());
                 newSpHandle = m_txnId.incrementAndGet();
-                message.setSpHandle(newSpHandle);
+                msg.setSpHandle(newSpHandle);
                 // Also, if this is a vanilla single-part procedure, make the TXNID
                 // be the SpHandle (for now)
                 if (!runner.isEverySite()) {
-                    message.setTxnId(newSpHandle);
+                    msg.setTxnId(newSpHandle);
                 }
                 if (m_replicaHSIds.length > 0) {
                     try {
                         Iv2InitiateTaskMessage replmsg =
                             new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                     m_mailbox.getHSId(),
-                                    message.getTxnId(),
-                                    message.isReadOnly(),
-                                    message.isSinglePartition(),
-                                    message.getStoredProcedureInvocation(),
-                                    message.getClientInterfaceHandle());
+                                    msg.getTxnId(),
+                                    msg.isReadOnly(),
+                                    msg.isSinglePartition(),
+                                    msg.getStoredProcedureInvocation(),
+                                    msg.getClientInterfaceHandle());
                         // Update the handle in the copy
                         replmsg.setSpHandle(newSpHandle);
                         m_mailbox.send(m_replicaHSIds, replmsg);
@@ -119,18 +127,18 @@ public class SpScheduler extends Scheduler
                         hostLog.error("Failed to deliver response from execution site.", e);
                     }
                     DuplicateCounter counter = new DuplicateCounter(
-                            message.getInitiatorHSId(), m_replicaHSIds.length + 1,
-                            message.getTxnId());
+                            msg.getInitiatorHSId(), m_replicaHSIds.length + 1,
+                            msg.getTxnId());
                     m_duplicateCounters.put(newSpHandle, counter);
                 }
             }
             else {
-                newSpHandle = message.getSpHandle();
+                newSpHandle = msg.getSpHandle();
                 // FUTURE: update SP handle state on replicas based on value from primary
             }
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, runner,
-                        newSpHandle, m_pendingTasks, message);
+                        newSpHandle, m_pendingTasks, msg);
             m_pendingTasks.offer(task);
             return;
         }
@@ -189,50 +197,58 @@ public class SpScheduler extends Scheduler
     public void handleFragmentTaskMessage(FragmentTaskMessage message,
                                           Map<Integer, List<VoltTable>> inputDeps)
     {
+        // See SUCKS comment below
+        FragmentTaskMessage msg = message;
         long newSpHandle;
         if (m_isLeader) {
+            // XXX SUCKS
+            // Quick hack to make progress...we need to copy the FragmentTaskMessage
+            // before we start mucking with its state (SPHANDLE).  We need to revisit
+            // all the messaging mess at some point.
+            msg = new FragmentTaskMessage(message.getInitiatorHSId(),
+                    message.getCoordinatorHSId(), message);
             newSpHandle = m_txnId.incrementAndGet();
-            message.setSpHandle(newSpHandle);
+            msg.setSpHandle(newSpHandle);
             // If we have input dependencies, it's borrow work, there's no way we
             // can actually distribute it
             if (m_replicaHSIds.length > 0 && inputDeps == null) {
                 try {
                     FragmentTaskMessage replmsg =
                         new FragmentTaskMessage(m_mailbox.getHSId(),
-                                m_mailbox.getHSId(), message);
+                                m_mailbox.getHSId(), msg);
                     m_mailbox.send(m_replicaHSIds, replmsg);
                 } catch (MessagingException e) {
                     hostLog.error("Failed to deliver response from execution site.", e);
                 }
                 DuplicateCounter counter = new DuplicateCounter(
-                        message.getCoordinatorHSId(), m_replicaHSIds.length + 1,
-                        message.getTxnId());
+                        msg.getCoordinatorHSId(), m_replicaHSIds.length + 1,
+                        msg.getTxnId());
                 m_duplicateCounters.put(newSpHandle, counter);
             }
         }
         else {
-            newSpHandle = message.getSpHandle();
+            newSpHandle = msg.getSpHandle();
         }
 
-        TransactionState txn = m_outstandingTxns.get(message.getTxnId());
+        TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
         if (txn == null) {
-            txn = new ParticipantTransactionState(newSpHandle, message);
-            m_outstandingTxns.put(message.getTxnId(), txn);
+            txn = new ParticipantTransactionState(newSpHandle, msg);
+            m_outstandingTxns.put(msg.getTxnId(), txn);
         }
 
-        if (message.isSysProcTask()) {
+        if (msg.isSysProcTask()) {
             final SysprocFragmentTask task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                        m_pendingTasks, message, inputDeps);
+                                        m_pendingTasks, msg, inputDeps);
             m_pendingTasks.offer(task);
         }
         else {
             final FragmentTask task =
                 new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                 m_pendingTasks, message, inputDeps);
+                                 m_pendingTasks, msg, inputDeps);
             m_pendingTasks.offer(task);
         }
     }
