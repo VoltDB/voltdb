@@ -18,9 +18,11 @@
 package org.voltdb.utils;
 
 import java.io.BufferedReader;
+import java.io.BufferedWriter;
 import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.HashSet;
@@ -200,9 +202,6 @@ class CSVLoader {
             client.drain();
             client.close();
             
-            Collections.sort(invalidLines);
-            
-            System.out.println("All the invalid row numbers are:" + invalidLines);
             produceInvalidRowsFile(filename, "/Users/xinjia/invalidrows.csv");            
         } catch (Exception e) {
             e.printStackTrace();
@@ -228,40 +227,44 @@ class CSVLoader {
     	
     	return true;
     }
-    /**
-     * TODO(xin):
-     * produce the invalid row file from 
-     * @param inputFile
-     */
-    private static void produceInvalidRowsFile(String inputFile, String outputFile) {
-    	//StringBuilder query = new StringBuilder();
-    	
-    	
-    	File file = new File(outputFile);
-        try {
-        	// Create file if it does not exist
-            boolean success = file.createNewFile();
-            // Do the file name checking at beginning of the main function 
-            if (success) {
-                // File did not exist and was created
-            } else {
-                // File already exists
-            }
-        	
+    
+	/**
+	 * TODO(xin): produce the invalid row file from
+	 * 
+	 * @param inputFile
+	 */
+	private static void produceInvalidRowsFile(String inputFile,
+			String outputFile) {
+		Collections.sort(invalidLines);
+		System.out.println("All the invalid row numbers are:" + invalidLines);
+		String line = "";
+		try {
+			FileWriter fstream = new FileWriter(outputFile);
+			BufferedWriter out = new BufferedWriter(fstream);
 			BufferedReader csvfile = new BufferedReader(new FileReader(inputFile));
-			String line;
-	        while ((line = csvfile.readLine()) != null) {
-	        	
-	        }
-	        
+
+			long linect = 0;
+			for (Long irow : invalidLines) {
+				while ((line = csvfile.readLine()) != null) {
+					if (++linect == irow) {
+						out.write(line);
+						out.write("\n");
+						System.err.println("invalid row:" + line);
+						break;
+					}
+				}
+
+			}
+			out.flush();
+			out.close();
+
 		} catch (FileNotFoundException e) {
-			System.err.println("CSV file '" + inputFile + "' could not be found.");
-		} catch(Exception x) {
-            System.err.println(x.getMessage());
-        }
-        
-    	
-    	
+			System.err.println("CSV file '" + inputFile
+					+ "' could not be found.");
+		} catch (Exception x) {
+			System.err.println(x.getMessage());
+		}
+
     }
     
     private static void processCommandLineOptions(int argsUsed, String args[]) {
