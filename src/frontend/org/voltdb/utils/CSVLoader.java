@@ -142,6 +142,7 @@ class CSVLoader {
                         cb = oneCallbackFitsAll;
                     }
                     System.out.println("<xin>params: " + correctedLine);
+                    checkLineFormat(correctedLine);
                     queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
 
                     if (queued == false) {
@@ -170,7 +171,15 @@ class CSVLoader {
             }
         }
     }
-
+    /**
+     * Check for each line
+     * @param linefragement
+     */
+    private static boolean checkLineFormat(Object[] linefragement) {
+    	
+    	return true;
+    }
+    
     private static void processCommandLineOptions(int argsUsed, String args[]) {
         final String columnsMatch = "--columns";
         final String stripMatch = "--stripquotes";
