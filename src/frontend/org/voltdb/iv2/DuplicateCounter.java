@@ -37,8 +37,9 @@ public class DuplicateCounter
     final AtomicInteger m_expectedResponses;
     final long m_destinationId;
     Long m_responseHash = null;
+    protected FragmentResponseMessage m_lastResponse;
 
-    protected DuplicateCounter(
+    DuplicateCounter(
             long destinationHSId,
             int expectedResponses,
             long realTxnId)
@@ -47,7 +48,7 @@ public class DuplicateCounter
         m_destinationId = destinationHSId;
     }
 
-    private int checkCommon(long hash)
+    protected int checkCommon(long hash)
     {
         if (m_responseHash == null) {
             m_responseHash = Long.valueOf(hash);
@@ -77,6 +78,12 @@ public class DuplicateCounter
         for (int i = 0; i < message.getTableCount(); i++) {
             hash ^= MiscUtils.cheesyBufferCheckSum(message.getTableAtIndex(i).getBuffer());
         }
+        m_lastResponse = message;
         return checkCommon(hash);
+    }
+
+    FragmentResponseMessage getLastFragmentResponse()
+    {
+        return m_lastResponse;
     }
 }

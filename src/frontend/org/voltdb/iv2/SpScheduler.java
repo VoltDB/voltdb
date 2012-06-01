@@ -220,9 +220,17 @@ public class SpScheduler extends Scheduler
                 } catch (MessagingException e) {
                     hostLog.error("Failed to deliver response from execution site.", e);
                 }
-                DuplicateCounter counter = new DuplicateCounter(
-                        msg.getCoordinatorHSId(), m_replicaHSIds.length + 1,
-                        msg.getTxnId());
+                DuplicateCounter counter;
+                if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
+                    counter = new DuplicateCounter(
+                            msg.getCoordinatorHSId(), m_replicaHSIds.length + 1,
+                            msg.getTxnId());
+                }
+                else {
+                    counter = new SysProcDuplicateCounter(
+                            msg.getCoordinatorHSId(), m_replicaHSIds.length + 1,
+                            msg.getTxnId());
+                }
                 m_duplicateCounters.put(newSpHandle, counter);
             }
         }
@@ -263,11 +271,12 @@ public class SpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getSpHandle());
+                FragmentResponseMessage resp = counter.getLastFragmentResponse();
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
-                message.setExecutorSiteId(m_mailbox.getHSId());
+                resp.setExecutorSiteId(m_mailbox.getHSId());
                 try {
-                    m_mailbox.send(counter.m_destinationId, message);
+                    m_mailbox.send(counter.m_destinationId, resp);
                 } catch (MessagingException e) {
                     VoltDB.crashLocalVoltDB("Failed to send every-site response.", true, e);
                 }

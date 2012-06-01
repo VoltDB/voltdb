@@ -70,6 +70,24 @@ public class FragmentResponseMessage extends VoltMessage {
         m_subject = Subject.DEFAULT.getId();
     }
 
+    // IV2 hacky constructor
+    // We need to be able to create a new FragmentResponseMessage
+    // with unioned dependency table for sysprocs.  Let us build a
+    // FragmentResponse from a prior one.  Don't copy the tables
+    // and dependencies because we'll fill those in later.
+    public FragmentResponseMessage(FragmentResponseMessage resp)
+    {
+        m_executorHSId = resp.m_executorHSId;
+        m_destinationHSId = resp.m_destinationHSId;
+        m_txnId = resp.m_txnId;
+        m_spHandle = resp.m_spHandle;
+        m_status = resp.m_status;
+        m_dirty = resp.m_dirty;
+        m_recovering = resp.m_recovering;
+        m_exception = resp.m_exception;
+        m_subject = Subject.DEFAULT.getId();
+    }
+
     /**
      * If the status code is failure then an exception may be included.
      * @param status

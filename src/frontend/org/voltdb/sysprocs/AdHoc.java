@@ -140,6 +140,7 @@ public class AdHoc extends VoltSystemProcedure {
                 pfs[1].fragmentId = SysProcFragmentId.PF_runAdHocFragment;
                 pfs[1].outputDepId = COLLECT_DEPID;
                 pfs[1].multipartition = true;
+                pfs[1].suppressDuplicates = true;
                 params = new ParameterSet();
                 params.setParameters(COLLECT_DEPID, collectorFragment, sql);
                 pfs[1].parameters = params;
