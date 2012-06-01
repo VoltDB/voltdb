@@ -38,11 +38,13 @@ import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.NullCallback;
+import org.voltdb.client.ProcedureCallback;
 
 /**
  * Class providing the entire benchmark implementation and command line main().
@@ -67,6 +69,20 @@ public class Benchmark {
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
+
+    private static final class CallProcedureCallback implements ProcedureCallback {
+        int errorStatus = ClientResponse.SUCCESS;
+        String errorString = null;
+        public CallProcedureCallback() {
+        }
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                this.errorStatus = clientResponse.getStatus();
+                this.errorString = clientResponse.getStatusString();
+            }
+        }
+    }
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -147,6 +163,8 @@ public class Benchmark {
         this.cliConfig = cliConfig;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        // Throttle so that ad hoc queries don't get rejected with "planner not available".
+        clientConfig.setMaxOutstandingTxns(200);
         this.client = ClientFactory.createClient(clientConfig);
 
         this.periodicStatsContext = this.client.createStatsContext();
@@ -457,9 +475,15 @@ public class Benchmark {
 
         // Run the benchmark for the requested duration.
         System.out.printf("\nRunning '%s' benchmark...\n", this.cliConfig.test);
+        CallProcedureCallback cb = new CallProcedureCallback();
         for (String query : new QueryGenerator(tests, this.cliConfig.duration)) {
             long startTS = System.currentTimeMillis();
-            this.client.callProcedure(new NullCallback(), "@AdHoc", query);
+            this.client.callProcedure(cb, "@AdHoc", query);
+            if (cb.errorStatus != ClientResponse.SUCCESS) {
+                throw new RuntimeException(String.format(
+                        "callProcedure() failed with status=%d:\n%s",
+                        cb.errorStatus, cb.errorString));
+            }
             queryElapsedMS += (System.currentTimeMillis() - startTS);
             this.queriesProcessed++;
         }
