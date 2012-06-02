@@ -442,8 +442,6 @@ public class VoltCompiler {
             compileXMLRootNode(project);
         } catch (final VoltCompilerException e) {
             compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
-            compilerLog.error(e.getMessage());
-            // e.printStackTrace();
             return null;
         }
         assert(m_catalog != null);
@@ -1204,7 +1202,7 @@ public class VoltCompiler {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compile(projectPath, outputJar);
         if (!success) {
-            compiler.summarizeErrors(System.out);
+            compiler.summarizeErrors(System.out, null);
             System.exit(-1);
         }
         compiler.summarizeSuccess(System.out, null);
@@ -1281,11 +1279,16 @@ public class VoltCompiler {
         return compact;
     }
 
-    private void summarizeErrors(PrintStream outputStream) {
+    public void summarizeErrors(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
             outputStream.println("------------------------------------------");
             outputStream.println("Project compilation failed. See log for errors.");
             outputStream.println("------------------------------------------");
+        }
+        if (feedbackStream != null) {
+            for (Feedback fb : m_errors) {
+                feedbackStream.println(fb.getLogString());
+            }
         }
     }
 
