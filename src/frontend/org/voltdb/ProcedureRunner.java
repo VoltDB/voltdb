@@ -21,13 +21,10 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
-import java.lang.reflect.Array;
 import java.lang.reflect.Field;
 import java.lang.reflect.InvocationTargetException;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
-import java.math.BigDecimal;
-import java.math.BigInteger;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Date;
@@ -50,9 +47,8 @@ import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
-import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.Encoder;
+import org.voltdb.utils.MiscUtils;
 
 public class ProcedureRunner {
 
@@ -60,8 +56,8 @@ public class ProcedureRunner {
 
     // SQL statement queue info
     //
-    // This must match MAX_BATCH_COUNT in src/ee/execution/VoltDBEngine.h
-    final static int MAX_BATCH_SIZE = 1000;
+    // This must be less than or equal to MAX_BATCH_COUNT in src/ee/execution/VoltDBEngine.h
+    final static int MAX_BATCH_SIZE = 200;
     static class QueuedSQL {
         SQLStmt stmt;
         ParameterSet params;
@@ -78,6 +74,9 @@ public class ProcedureRunner {
     protected final VoltProcedure m_procedure;
     protected Method m_procMethod;
     protected Class<?>[] m_paramTypes;
+    protected boolean m_paramTypeIsPrimitive[];
+    protected boolean m_paramTypeIsArray[];
+    protected Class<?> m_paramTypeComponentType[];
 
     // per txn state (are reset after call)
     //
@@ -200,7 +199,13 @@ public class ProcedureRunner {
 
             for (int i = 0; i < m_paramTypes.length; i++) {
                 try {
-                    paramList[i] = tryToMakeCompatible( i, paramList[i]);
+                    paramList[i] =
+                        ParameterConverter.tryToMakeCompatible(
+                            m_paramTypeIsPrimitive[i],
+                            m_paramTypeIsArray[i],
+                            m_paramTypes[i],
+                            m_paramTypeComponentType[i],
+                            paramList[i]);
                 } catch (Exception e) {
                     m_statsCollector.endProcedure( false, true);
                     String msg = "PROCEDURE " + m_procedureName + " TYPE ERROR FOR PARAMETER " + i +
@@ -332,10 +337,8 @@ public class ProcedureRunner {
     }
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
-        if (m_batch.size() >= MAX_BATCH_SIZE) {
-            throw new RuntimeException("Procedure attempted to queue more than " + MAX_BATCH_SIZE +
-                    "statements in a single batch.\n  You may use multiple batches of up to 1000 statements," +
-                    "each,\n  but you may also want to consider dividing this work into multiple procedures.");
+        if (stmt == null) {
+            throw new IllegalArgumentException("SQLStmt paramter to voltQueueSQL(..) was null.");
         }
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
@@ -359,7 +362,42 @@ public class ProcedureRunner {
                                        "the final one");
         }
         m_seenFinalBatch = isFinalSQL;
-        return executeQueriesInABatch(m_batch, isFinalSQL);
+
+        // memo-ize the original batch size here
+        int batchSize = m_batch.size();
+
+        // if batch is small (or reasonable size), do it in one go
+        if (batchSize <= MAX_BATCH_SIZE) {
+            return executeQueriesInABatch(m_batch, isFinalSQL);
+        }
+        // otherwise, break it into sub-batches
+        else {
+            List<VoltTable[]> results = new ArrayList<VoltTable[]>();
+
+            while (m_batch.size() > 0) {
+                int subSize = Math.min(MAX_BATCH_SIZE, m_batch.size());
+
+                // get the beginning of the batch (or all if small enough)
+                // note: this is a view into the larger list and changes to it
+                //  will mutate the larger m_batch.
+                List<QueuedSQL> subBatch = m_batch.subList(0, subSize);
+
+                // decide if this sub-batch should be marked final
+                boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
+
+                // run the sub-batch and copy the sub-results into the list of lists of results
+                // note: executeQueriesInABatch removes items from the batch as it runs.
+                //  this means subBatch will be empty after running and since subBatch is a
+                //  view on the larger batch, it removes subBatch.size() elements from m_batch.
+                results.add(executeQueriesInABatch(subBatch, finalSubBatch));
+            }
+
+            // merge the list of lists into something returnable
+            VoltTable[] retval = MiscUtils.concatAll(new VoltTable[0], results);
+            assert(retval.length == batchSize);
+
+            return retval;
+        }
     }
 
     protected VoltTable[] executeQueriesInABatch(List<QueuedSQL> batch, boolean isFinalSQL) {
@@ -530,6 +568,9 @@ public class ProcedureRunner {
 
                 int numParams = m_catProc.getParameters().size();
                 m_paramTypes = new Class<?>[numParams];
+                m_paramTypeIsPrimitive = new boolean[numParams];
+                m_paramTypeIsArray = new boolean[numParams];
+                m_paramTypeComponentType = new Class<?>[numParams];
 
                 for (ProcParameter param : m_catProc.getParameters()) {
                     VoltType type = VoltType.get((byte) param.getType());
@@ -538,6 +579,17 @@ public class ProcedureRunner {
                     if (type == VoltType.TINYINT) type = VoltType.BIGINT;
 
                     m_paramTypes[param.getIndex()] = type.classFromType();
+                    m_paramTypeIsPrimitive[param.getIndex()] = m_paramTypes[param.getIndex()].isPrimitive();
+                    m_paramTypeIsArray[param.getIndex()] = param.getIsarray();
+                    assert(m_paramTypeIsArray[param.getIndex()] == false);
+                    m_paramTypeComponentType[param.getIndex()] = null;
+
+                    // rtb: what is broken (ambiguous?) that is being patched here?
+                    // hack to fixup varbinary support for statement procedures
+                    if (m_paramTypes[param.getIndex()] == byte[].class) {
+                        m_paramTypeComponentType[param.getIndex()] = byte.class;
+                        m_paramTypeIsArray[param.getIndex()] = true;
+                    }
                 }
             } catch (Exception e) {
                 // shouldn't throw anything outside of the compiler
@@ -555,6 +607,16 @@ public class ProcedureRunner {
                         continue;
                     m_procMethod = m;
                     m_paramTypes = m.getParameterTypes();
+                    int tempParamTypesLength = m_paramTypes.length;
+
+                    m_paramTypeIsPrimitive = new boolean[tempParamTypesLength];
+                    m_paramTypeIsArray = new boolean[tempParamTypesLength];
+                    m_paramTypeComponentType = new Class<?>[tempParamTypesLength];
+                    for (int ii = 0; ii < tempParamTypesLength; ii++) {
+                        m_paramTypeIsPrimitive[ii] = m_paramTypes[ii].isPrimitive();
+                        m_paramTypeIsArray[ii] = m_paramTypes[ii].isArray();
+                        m_paramTypeComponentType[ii] = m_paramTypes[ii].getComponentType();
+                    }
                 }
             }
 
@@ -600,156 +662,6 @@ public class ProcedureRunner {
                 //LOG.fine("Found statement " + name);
             }
         }
-    }
-
-    /** @throws Exception with a message describing why the types are incompatible. */
-    final protected Object tryToMakeCompatible(int paramTypeIndex, Object param) throws Exception {
-        if (param == null || param == VoltType.NULL_STRING_OR_VARBINARY ||
-            param == VoltType.NULL_DECIMAL)
-        {
-            if (m_paramTypes[paramTypeIndex].isPrimitive()) {
-                VoltType type = VoltType.typeFromClass(m_paramTypes[paramTypeIndex]);
-                switch (type) {
-                case TINYINT:
-                case SMALLINT:
-                case INTEGER:
-                case BIGINT:
-                case FLOAT:
-                    return type.getNullValue();
-                }
-            }
-
-            // Pass null reference to the procedure run() method. These null values will be
-            // converted to a serialize-able NULL representation for the EE in getCleanParams()
-            // when the parameters are serialized for the plan fragment.
-            return null;
-        }
-
-        if (param instanceof SystemProcedureExecutionContext) {
-            return param;
-        }
-
-        Class<?> pclass = param.getClass();
-
-        // hack to make strings work with input as byte[]
-        if ((m_paramTypes[paramTypeIndex] == String.class) && (pclass == byte[].class)) {
-            String sparam = null;
-            sparam = new String((byte[]) param, "UTF-8");
-            return sparam;
-        }
-
-        // hack to make varbinary work with input as string
-        if ((m_paramTypes[paramTypeIndex] == byte[].class) && (pclass == String.class)) {
-            return Encoder.hexDecode((String) param);
-        }
-
-        boolean slotIsArray = m_paramTypes[paramTypeIndex].isArray();
-        if (slotIsArray != pclass.isArray())
-            throw new Exception("Array / Scalar parameter mismatch");
-
-        if (slotIsArray) {
-            Class<?> pSubCls = pclass.getComponentType();
-            Class<?> sSubCls = m_paramTypes[paramTypeIndex].getComponentType();
-            if (pSubCls == sSubCls) {
-                return param;
-            }
-            // if it's an empty array, let it through
-            // this is a bit ugly as it might hide passing
-            //  arrays of the wrong type, but it "does the right thing"
-            //  more often that not I guess...
-            else if (Array.getLength(param) == 0) {
-                return Array.newInstance(sSubCls, 0);
-            }
-            else {
-                /*
-                 * Arrays can be quite large so it doesn't make sense to silently do the conversion
-                 * and incur the performance hit. The client should serialize the correct invocation
-                 * parameters
-                 */
-                throw new Exception(
-                        "tryScalarMakeCompatible: Unable to match parameter array:"
-                        + sSubCls.getName() + " to provided " + pSubCls.getName());
-            }
-        }
-
-        /*
-         * inline tryScalarMakeCompatible so we can save on reflection
-         */
-        final Class<?> slot = m_paramTypes[paramTypeIndex];
-        if ((slot == long.class) && (pclass == Long.class || pclass == Integer.class || pclass == Short.class || pclass == Byte.class)) return param;
-        if ((slot == int.class) && (pclass == Integer.class || pclass == Short.class || pclass == Byte.class)) return param;
-        if ((slot == short.class) && (pclass == Short.class || pclass == Byte.class)) return param;
-        if ((slot == byte.class) && (pclass == Byte.class)) return param;
-        if ((slot == double.class) && (param instanceof Number)) return ((Number)param).doubleValue();
-        if ((slot == String.class) && (pclass == String.class)) return param;
-        if (slot == TimestampType.class) {
-            if (pclass == Long.class) return new TimestampType((Long)param);
-            if (pclass == TimestampType.class) return param;
-            if (pclass == Date.class) return new TimestampType((Date) param);
-            // if a string is given for a date, use java's JDBC parsing
-            if (pclass == String.class) {
-                try {
-                    return new TimestampType((String)param);
-                }
-                catch (IllegalArgumentException e) {
-                    // ignore errors if it's not the right format
-                }
-            }
-        }
-        if (slot == BigDecimal.class) {
-            if ((pclass == Long.class) || (pclass == Integer.class) ||
-                (pclass == Short.class) || (pclass == Byte.class)) {
-                BigInteger bi = new BigInteger(param.toString());
-                BigDecimal bd = new BigDecimal(bi);
-                bd = bd.setScale(VoltDecimalHelper.kDefaultScale, BigDecimal.ROUND_HALF_EVEN);
-                return bd;
-            }
-            if (pclass == BigDecimal.class) {
-                BigDecimal bd = (BigDecimal) param;
-                bd = bd.setScale(VoltDecimalHelper.kDefaultScale, BigDecimal.ROUND_HALF_EVEN);
-                return bd;
-            }
-            if (pclass == String.class) {
-                BigDecimal bd = VoltDecimalHelper.deserializeBigDecimalFromString((String) param);
-                return bd;
-            }
-        }
-        if (slot == VoltTable.class && pclass == VoltTable.class) {
-            return param;
-        }
-
-        // handle truncation for integers
-
-        // Long targeting int parameter
-        if ((slot == int.class) && (pclass == Long.class)) {
-            long val = ((Number) param).longValue();
-
-            // if it's in the right range, and not null (target null), crop the value and return
-            if ((val <= Integer.MAX_VALUE) && (val >= Integer.MIN_VALUE) && (val != VoltType.NULL_INTEGER))
-                return ((Number) param).intValue();
-        }
-
-        // Long or Integer targeting short parameter
-        if ((slot == short.class) && (pclass == Long.class || pclass == Integer.class)) {
-            long val = ((Number) param).longValue();
-
-            // if it's in the right range, and not null (target null), crop the value and return
-            if ((val <= Short.MAX_VALUE) && (val >= Short.MIN_VALUE) && (val != VoltType.NULL_SMALLINT))
-                return ((Number) param).shortValue();
-        }
-
-        // Long, Integer or Short targeting byte parameter
-        if ((slot == byte.class) && (pclass == Long.class || pclass == Integer.class || pclass == Short.class)) {
-            long val = ((Number) param).longValue();
-
-            // if it's in the right range, and not null (target null), crop the value and return
-            if ((val <= Byte.MAX_VALUE) && (val >= Byte.MIN_VALUE) && (val != VoltType.NULL_TINYINT))
-                return ((Number) param).byteValue();
-        }
-
-        throw new Exception(
-                "tryToMakeCompatible: Unable to match parameters or out of range for taget param: "
-                + slot.getName() + " to provided " + pclass.getName());
     }
 
     /**

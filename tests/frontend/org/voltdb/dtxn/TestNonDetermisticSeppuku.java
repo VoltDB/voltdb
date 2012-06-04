@@ -55,6 +55,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
             builder.addProcedures(NonDeterministicSPProc.class);
 
             cluster = new LocalCluster("det1.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
+            cluster.overrideAnyRequestForValgrind();
             cluster.compile(builder);
 
             cluster.setHasLocalServer(false);

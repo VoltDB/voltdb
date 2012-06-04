@@ -94,6 +94,7 @@ public class TestExportToFileClient extends TestCase {
 
         LocalCluster cluster = new LocalCluster("exportAuto.jar",
                 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        cluster.overrideAnyRequestForValgrind();
         cluster.setHasLocalServer(true);
         boolean success = cluster.compile(builder);
         assertTrue(success);

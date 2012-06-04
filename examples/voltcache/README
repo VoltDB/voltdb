@@ -1,7 +1,7 @@
 Volt Cache application
 ===========================
 
-This example application demonstrates how to create a Memcache-like cache in VoltDB.
+This example application demonstrates how to create a Memcache-like cache in VoltDB. It provides a sample protocol transalation between VoltCache and Memcached, allowing client applications using a Memcached client to run on VoltCache without any code change (Text Protocol only).
 
 Many attributes of the application are customizable through arguments passed to the client, including:
 

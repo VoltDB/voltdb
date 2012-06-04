@@ -101,10 +101,7 @@
             plot = $.jqplot('chartUSMap1', data, chartParams);
 
             con = VoltDB.AddConnection('localhost', 8080, false, null, null, false, (function(connection, success)
-            {
-                connection.Procedures['GetStateHeatmap'] = [];
-                //connection.DeclareProcedure({ name:'GetStateHeatmap', params:[]});
-            }));
+            {}));
             SetRefreshInterval(1);
         });
         </script>

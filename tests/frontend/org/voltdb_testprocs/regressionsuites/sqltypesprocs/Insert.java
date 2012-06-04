@@ -91,6 +91,25 @@ public class Insert extends InsertBase {
                          a_bigint, a_float, a_timestamp, a_inline_s1, a_inline_s2,
                          a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
         }
+        else if (tablename.equals("ALLOW_NULLS and use sql.Timestamp")) {
+            java.sql.Timestamp v_sqltimestamp = new java.sql.Timestamp(a_timestamp.getTime()/1000);
+            v_sqltimestamp.setNanos(((int) (a_timestamp.getTime() % 1000000)) * 1000);
+            voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
+                         a_bigint, a_float, v_sqltimestamp, a_inline_s1, a_inline_s2,
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
+        }
+        else if (tablename.equals("ALLOW_NULLS and use sql.Date")) {
+            java.sql.Date v_sqldate = new java.sql.Date(a_timestamp.getTime()/1000);
+            voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
+                         a_bigint, a_float, v_sqldate, a_inline_s1, a_inline_s2,
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
+        }
+        else if (tablename.equals("ALLOW_NULLS and use util.Date")) {
+            java.util.Date v_utildate = new java.util.Date(a_timestamp.getTime()/1000);
+            voltQueueSQL(i_allow_nulls, pkey, v_tinyint, v_smallint, v_integer,
+                         a_bigint, a_float, v_utildate, a_inline_s1, a_inline_s2,
+                         a_pool_s, a_pool_max_s, b_inline, b_pool, a_decimal);
+        }
         else if (tablename.equals("WITH_DEFAULTS")) {
             voltQueueSQL(i_with_defaults, pkey);
         }

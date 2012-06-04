@@ -6,6 +6,7 @@
 /last_junit_suite.log
 *.pyc
 *.swp
+*~
 buildstring.txt
 /plannerlog.txt
 obj/

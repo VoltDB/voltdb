@@ -38,11 +38,11 @@ import java.util.Map;
 import java.util.Set;
 import java.util.concurrent.Future;
 
+import org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -51,10 +51,10 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.ProcInfo;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
@@ -782,14 +782,6 @@ public class SnapshotRestore extends VoltSystemProcedure
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
             String path, String nonce) throws Exception
             {
-        try {
-            VoltDB.instance().getHostMessenger().
-                    getZK().create(VoltZK.restoreMarker, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException e) {
-            throw new VoltAbortException("Cluster has already been restored or has failed a restore." +
-                " Restart the cluster before doing another restore.");
-        }
-
         final long startTime = System.currentTimeMillis();
         CONSOLE_LOG.info("Restoring from path: " + path + " with nonce: " + nonce);
 
@@ -896,6 +888,23 @@ public class SnapshotRestore extends VoltSystemProcedure
         }
         if (results != null) {
             return results;
+        }
+
+        // Post a notice that a restore has started OR notice a prior post that one has started
+        // and exit rather than attempt to start another.
+        // Ideally this happens only just before any serious restore work begins.
+        // If it comes too soon, a first attempt at restore that fails early sanity checks
+        // wastes the one shot for a successful restore until the next cluster restart.
+        // If it comes too late, a second attempt to restore could needlessly spin its wheels or even
+        // start significant work before being called off by the detection of the prior notice.
+        // A possible alternative would be to do this earlier, but then "undo" the post in cases where the
+        // restore failed but left the database in a state that could reasonable be restored by a later attempt.
+        try {
+            VoltDB.instance().getHostMessenger().
+                    getZK().create(VoltZK.restoreMarker, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            throw new VoltAbortException("Cluster has already been restored or has failed a restore." +
+                " Restart the cluster before doing another restore.");
         }
 
         /*

@@ -23,6 +23,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -87,7 +88,6 @@ import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -1423,7 +1423,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private Long extractGlobalFaultData(
             SiteTracker newTracker,
             HashMap<Long, Long> initiatorSafeInitPoint) {
-        if (!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites)) {
+        if (!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false)) {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
         }
 
@@ -1524,8 +1524,23 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             SiteTracker newTracker)
     {
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
+        long blockedOnReceiveStart = System.currentTimeMillis();
+        long lastReportTime = 0;
+
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
+
+            /*
+             * If fault resolution takes longer then 10 seconds start logging
+             */
+            final long now = System.currentTimeMillis();
+            if (now - blockedOnReceiveStart > 10000) {
+                if (now - lastReportTime > 60000) {
+                    lastReportTime = System.currentTimeMillis();
+                    haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, true);
+                }
+            }
+
             //Invoke tick periodically to ensure that the last snapshot continues in the event that the failure
             //process does not complete
             if (m == null) {
@@ -1562,7 +1577,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
                     CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
                     " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
-        } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites));
+        } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false));
 
         return true;
     }
@@ -1570,18 +1585,36 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     private boolean haveNecessaryFaultInfo(
             SiteTracker newTracker,
-            Set<Long> sitesBeingFailed) {
+            Set<Long> sitesBeingFailed,
+            boolean log) {
         Set<Long> failingInitiators = new HashSet<Long>(sitesBeingFailed);
         failingInitiators.retainAll(m_tracker.getAllInitiators());
+        List<Pair<Long, Long>> missingMessages = new ArrayList<Pair<Long, Long>>();
         for (long otherSite : newTracker.getAllSites()) {
             for (Long failingInitiator : failingInitiators) {
                 Pair<Long, Long> key = Pair.of( otherSite, failingInitiator);
                 if (!m_failureSiteUpdateLedger.containsKey(key)) {
-                    return false;
+                    missingMessages.add(key);
                 }
             }
         }
-        return true;
+        if (log) {
+            StringBuilder sb = new StringBuilder();
+            sb.append('[');
+            boolean first = true;
+            for (Pair<Long, Long> p : missingMessages) {
+                if (!first) sb.append(", ");
+                first = false;
+                sb.append(CoreUtils.hsIdToString(p.getFirst()));
+                sb.append('-');
+                sb.append(CoreUtils.hsIdToString(p.getSecond()));
+            }
+            sb.append(']');
+
+            m_recoveryLog.warn("Failure resolution stalled waiting for ( ExecutionSite, Initiator ) " +
+                                "information: " + sb.toString());
+        }
+        return missingMessages.isEmpty();
     }
 
     /**
@@ -1613,15 +1646,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         for (Integer hostId : failedHosts) {
             sb.append(hostId).append(' ');
         }
+        final String failedHostsString = sb.toString();
         if (m_txnlog.isTraceEnabled())
         {
-            m_txnlog.trace("FUZZTEST handleNodeFault " + sb.toString() +
+            m_txnlog.trace("FUZZTEST handleNodeFault " + failedHostsString +
                     " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and safeInitiationPoints "
                     + initiatorSafeInitiationPoint);
         } else {
-            m_recoveryLog.info("Handling node faults " + sb.toString() +
+            m_recoveryLog.info("Handling node faults " + failedHostsString +
                     " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and safeInitiationPoints "
-                    + initiatorSafeInitiationPoint);
+                    + CoreUtils.hsIdKeyMapToString(initiatorSafeInitiationPoint));
         }
         lastKnownGloballyCommitedMultiPartTxnId = globalMultiPartCommitPoint;
 
