@@ -162,7 +162,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                 // This block-on-all-the-replicas-at-startup thing sucks.  Hopefully this can
                 // go away when we get rejoin working.
                 List<String> children = m_babySitter.lastSeenChildren();
-                while (children.size() < kfactor) {
+                while (children.size() < kfactor + 1) {
                     try {
                         Thread.sleep(5);
                     } catch (InterruptedException e) {
