@@ -166,8 +166,8 @@ public class HsqlBackend {
                         columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.FLOAT);
                     else if (type.equals("TIMESTAMP"))
                         columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.TIMESTAMP);
-                    else if (type.equals("VARBINARY")) // ???
-                        columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.VARBINARY); // ???
+                    else if (type.equals("VARBINARY"))
+                        columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.VARBINARY);
                     else
                         throw new ExpectedProcedureException("Trying to create a column in Backend with a (currently) unsupported type: " + type);
                 }

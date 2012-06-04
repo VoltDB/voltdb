@@ -686,12 +686,12 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         boolean success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-//* for now (no varbinary support in hsql?)
+
         config = new LocalCluster("plansgroupby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
-//*/
+
         // Cluster
         config = new LocalCluster("plansgroupby-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
