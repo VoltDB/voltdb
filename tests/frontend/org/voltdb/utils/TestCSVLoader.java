@@ -56,17 +56,17 @@ public class TestCSVLoader extends TestCase {
 
             String []params = {"/Users/xinjia/testdb.csv","BLAH.insert"};
             //String []params = {"/Users/xinjia/testdb.csv","Insert","--columns", "0,2,1"};
-            CSVLoader.main(params);
+            long lineCount = CSVLoader.main(params);
             
             // do the test
             client = ClientFactory.createClient();
             client.createConnection("localhost");
             
-            final CSVReader reader = new CSVReader(new FileReader(params[0]));
-            int lineCount = 0;
-            while (reader.readNext() != null) {
-            	lineCount++;
-            }
+//            final CSVReader reader = new CSVReader(new FileReader(params[0]));
+//            int lineCount = 0;
+//            while (reader.readNext() != null) {
+//            	lineCount++;
+//            }
             
             VoltTable modCount;
             modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
@@ -79,7 +79,7 @@ public class TestCSVLoader extends TestCase {
             	rowct = (Integer) modCount.get(0, VoltType.INTEGER);
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
-            //assertEquals(lineCount, rowct);
+            assertEquals(lineCount, rowct);
             
         }
         finally {

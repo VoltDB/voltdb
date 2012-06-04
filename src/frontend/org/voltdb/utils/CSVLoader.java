@@ -96,6 +96,7 @@ class CSVLoader {
                 		invalidLines.add(m_lineNum);
                 }
                 //System.exit(1);
+                return;
             }
             
             long currentCount = inCount.incrementAndGet();
@@ -116,10 +117,11 @@ class CSVLoader {
      * start from last wrong line in the csv file is not easy. You can not ensure the 
      * FIFO order of the callback.
      * @param args
+     * @return long number of the actual rows acknowledged by the database server
      */
     
 
-    public static void main(String[] args) {
+    public static long main(String[] args) {
         if (args.length < 2) {
             System.err.println("Two arguments, csv filename and insert procedure name, required");
             System.exit(1);
@@ -190,8 +192,7 @@ class CSVLoader {
                     			invalidLines.add(outCount.get());
                     		}
                     	}
-                    	queued = true;
-                    	continue;
+                    	break;
                     }
                     queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
                     	
@@ -222,6 +223,8 @@ class CSVLoader {
                 System.out.println("Waited too briefly? " + shortWaits + " times");
             }
         }
+        
+        return inCount.get() - skipRows;
     }
     /**
      * Check for each line
