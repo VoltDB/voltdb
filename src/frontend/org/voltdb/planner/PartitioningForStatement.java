@@ -247,7 +247,9 @@ public class PartitioningForStatement {
      * @param partitioncolumn
      */
     public void setPartitioningColumn(Column partitioncolumn) {
-        m_partitionCol = partitioncolumn; // Not used in SELECT plans.
+        if (m_inferSP) {
+            m_partitionCol = partitioncolumn; // Not used in SELECT plans.
+        }
 
     }
 

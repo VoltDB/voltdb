@@ -25,7 +25,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.net.UnknownHostException;
-import junit.framework.TestCase;
+
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -178,8 +178,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             runSimpleQueries(client);
         }
-        catch (Throwable t) {
-            t.printStackTrace();
+        catch (UnknownHostException e) {
+            e.printStackTrace();
         }
         finally {
             if (client != null) client.close();
@@ -221,8 +221,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             runSimpleQueries(client);
         }
-        catch (Throwable t) {
-            t.printStackTrace();
+        catch (UnknownHostException e) {
+            e.printStackTrace();
         }
         finally {
             if (client != null) client.close();
@@ -335,8 +335,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         batchResults = client.callProcedure("@AdHoc",
                 "SELECT * FROM BLAH WHERE IVAL = 102;" +
                 "SELECT * FROM BLAH WHERE DVAL >= 1001 AND DVAL <= 1002;" +
-                "SELECT * FROM BLAH WHERE DVAL >= 1002 AND DVAL <= 1004;"
-                ).getResults();
+                "SELECT * FROM BLAH WHERE DVAL >= 1002 AND DVAL <= 1004;").getResults();
         assertEquals(3, batchResults.length);
         assertTrue(batchResults[0].getRowCount() == 1);
         assertTrue(batchResults[1].getRowCount() == 2);
