@@ -44,7 +44,7 @@ public class SysProcDuplicateCounter extends DuplicateCounter
     SysProcDuplicateCounter(
             long destinationHSId,
             long realTxnId,
-            long[] expectedHSIds)
+            List<Long> expectedHSIds)
     {
         super(destinationHSId, realTxnId, expectedHSIds);
     }

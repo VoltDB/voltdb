@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.List;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
@@ -82,7 +84,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     }
 
     @Override
-    abstract public void updateReplicas(long[] hsids);
+    abstract public void updateReplicas(List<Long> replicas);
 
     @Override
     abstract public void deliver(VoltMessage message);

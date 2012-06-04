@@ -19,6 +19,8 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import java.util.List;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -26,12 +28,17 @@ import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltcore.utils.CoreUtils;
+
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
  * configured InitiationRole.
  */
 public class InitiatorMailbox implements Mailbox
 {
+    static boolean LOG_TX = false;
+    static boolean LOG_RX = false;
+
     VoltLogger hostLog = new VoltLogger("HOST");
     private final InitiatorMessageHandler m_msgHandler;
     private final HostMessenger m_messenger;
@@ -48,14 +55,15 @@ public class InitiatorMailbox implements Mailbox
         m_msgHandler.setMailbox(this);
     }
 
-    public synchronized void updateReplicas(long[] hsids)
+    public synchronized void updateReplicas(List<Long> replicas)
     {
-        m_msgHandler.updateReplicas(hsids);
+        m_msgHandler.updateReplicas(replicas);
     }
 
     @Override
     public void send(long destHSId, VoltMessage message) throws MessagingException
     {
+        logTxMessage(message);
         message.m_sourceHSId = this.m_hsId;
         m_messenger.send(destHSId, message);
     }
@@ -63,6 +71,7 @@ public class InitiatorMailbox implements Mailbox
     @Override
     public void send(long[] destHSIds, VoltMessage message) throws MessagingException
     {
+        logTxMessage(message);
         message.m_sourceHSId = this.m_hsId;
         m_messenger.send(destHSIds, message);
     }
@@ -70,6 +79,7 @@ public class InitiatorMailbox implements Mailbox
     @Override
     public synchronized void deliver(VoltMessage message)
     {
+        logRxMessage(message);
         m_msgHandler.deliver(message);
     }
 
@@ -125,5 +135,21 @@ public class InitiatorMailbox implements Mailbox
     public void setHSId(long hsId)
     {
         this.m_hsId = hsId;
+    }
+
+    void logRxMessage(VoltMessage message)
+    {
+        if (LOG_RX) {
+            hostLog.info("RX HSID: " + CoreUtils.hsIdToString(m_hsId) +
+                    ": " + message);
+        }
+    }
+
+    void logTxMessage(VoltMessage message)
+    {
+        if (LOG_TX) {
+            hostLog.info("TX HSID: " + CoreUtils.hsIdToString(m_hsId) +
+                    ": " + message);
+        }
     }
 }

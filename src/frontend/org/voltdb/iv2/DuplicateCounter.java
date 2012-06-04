@@ -18,6 +18,7 @@
 package org.voltdb.iv2;
 
 import java.util.HashSet;
+import java.util.List;
 import java.util.Set;
 
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -43,13 +44,10 @@ public class DuplicateCounter
     DuplicateCounter(
             long destinationHSId,
             long realTxnId,
-            long[] expectedHSIds)
+            List<Long> expectedHSIds)
     {
         m_destinationId = destinationHSId;
-        m_expectedHSIds = new HashSet<Long>();
-        for (int i = 0; i < expectedHSIds.length; i++) {
-            m_expectedHSIds.add(expectedHSIds[i]);
-        }
+        m_expectedHSIds = new HashSet<Long>(expectedHSIds);
     }
 
     protected int checkCommon(long hash, long srcHSId)

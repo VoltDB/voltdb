@@ -23,6 +23,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
+import java.util.List;
+
 import org.json_voltpatches.JSONException;
 
 import org.mockito.ArgumentCaptor;
@@ -166,7 +169,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new long[] {});
+        dut.updateReplicas(new ArrayList<Long>());
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -185,7 +188,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new long[] {});
+        dut.updateReplicas(new ArrayList<Long>());
         FragmentTaskMessage sptask = createFrag(txnid, true, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet
@@ -204,7 +207,9 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new long[] {2});
+        List<Long> replicas = new ArrayList<Long>();
+        replicas.add(2l);
+        dut.updateReplicas(replicas);
         Iv2InitiateTaskMessage sptask = createMsg(txnid, true, true, primary_hsid);
         dut.deliver(sptask);
         verify(mbox, times(0)).send(anyLong(), (VoltMessage)anyObject());
@@ -231,7 +236,9 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
 
         createObjs();
         dut.setLeaderState(true);
-        dut.updateReplicas(new long[] {2});
+        List<Long> replicas = new ArrayList<Long>();
+        replicas.add(2l);
+        dut.updateReplicas(replicas);
         FragmentTaskMessage sptask = createFrag(txnid, true, primary_hsid);
         dut.deliver(sptask);
         // verify no response sent yet

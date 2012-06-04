@@ -64,6 +64,7 @@ public class FragmentTask extends TransactionTask
         }
         final FragmentResponseMessage response = processFragmentTask(siteConnection);
         // completion?
+        response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
         hostLog.debug("COMPLETE: " + this);
     }

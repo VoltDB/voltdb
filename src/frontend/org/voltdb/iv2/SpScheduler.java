@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
+
 import java.util.concurrent.atomic.AtomicLong;
 
 import java.util.HashMap;
@@ -39,7 +41,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class SpScheduler extends Scheduler
 {
-    long[] m_replicaHSIds = new long[] {};
+    List<Long> m_replicaHSIds = new ArrayList<Long>();
     private Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private Map<Long, DuplicateCounter> m_duplicateCounters =
@@ -51,9 +53,9 @@ public class SpScheduler extends Scheduler
     }
 
     @Override
-    public void updateReplicas(long[] hsids)
+    public void updateReplicas(List<Long> replicas)
     {
-        m_replicaHSIds = hsids;
+        m_replicaHSIds = replicas;
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -110,7 +112,7 @@ public class SpScheduler extends Scheduler
                 if (!runner.isEverySite()) {
                     msg.setTxnId(newSpHandle);
                 }
-                if (m_replicaHSIds.length > 0) {
+                if (m_replicaHSIds.size() > 0) {
                     try {
                         Iv2InitiateTaskMessage replmsg =
                             new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
@@ -122,13 +124,16 @@ public class SpScheduler extends Scheduler
                                     msg.getClientInterfaceHandle());
                         // Update the handle in the copy
                         replmsg.setSpHandle(newSpHandle);
-                        m_mailbox.send(m_replicaHSIds, replmsg);
+                        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                                replmsg);
                     } catch (MessagingException e) {
                         hostLog.error("Failed to deliver response from execution site.", e);
                     }
+                    List<Long> expectedHSIds = new ArrayList<Long>(m_replicaHSIds);
+                    expectedHSIds.add(m_mailbox.getHSId());
                     DuplicateCounter counter = new DuplicateCounter(
                             msg.getInitiatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds);
+                            msg.getTxnId(), expectedHSIds);
                     m_duplicateCounters.put(newSpHandle, counter);
                 }
             }
@@ -201,7 +206,6 @@ public class SpScheduler extends Scheduler
         FragmentTaskMessage msg = message;
         long newSpHandle;
         if (m_isLeader) {
-            // XXX SUCKS
             // Quick hack to make progress...we need to copy the FragmentTaskMessage
             // before we start mucking with its state (SPHANDLE).  We need to revisit
             // all the messaging mess at some point.
@@ -211,25 +215,28 @@ public class SpScheduler extends Scheduler
             msg.setSpHandle(newSpHandle);
             // If we have input dependencies, it's borrow work, there's no way we
             // can actually distribute it
-            if (m_replicaHSIds.length > 0 && inputDeps == null) {
+            if (m_replicaHSIds.size() > 0 && inputDeps == null) {
                 try {
                     FragmentTaskMessage replmsg =
                         new FragmentTaskMessage(m_mailbox.getHSId(),
                                 m_mailbox.getHSId(), msg);
-                    m_mailbox.send(m_replicaHSIds, replmsg);
+                    m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                            replmsg);
                 } catch (MessagingException e) {
                     hostLog.error("Failed to deliver response from execution site.", e);
                 }
+                List<Long> expectedHSIds = new ArrayList<Long>(m_replicaHSIds);
+                expectedHSIds.add(m_mailbox.getHSId());
                 DuplicateCounter counter;
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds);
+                            msg.getTxnId(), expectedHSIds);
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), m_replicaHSIds);
+                            msg.getTxnId(), expectedHSIds);
                 }
                 m_duplicateCounters.put(newSpHandle, counter);
             }
@@ -298,10 +305,11 @@ public class SpScheduler extends Scheduler
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        if (m_replicaHSIds.length > 0) {
+        if (m_replicaHSIds.size() > 0) {
             try {
                 CompleteTransactionMessage replmsg = message;
-                m_mailbox.send(m_replicaHSIds, replmsg);
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                        replmsg);
             } catch (MessagingException e) {
                 hostLog.error("Failed to deliver response from execution site.", e);
             }

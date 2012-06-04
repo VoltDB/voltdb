@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.List;
+
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 
@@ -28,7 +30,7 @@ import org.voltcore.messaging.VoltMessage;
  */
 public interface InitiatorMessageHandler
 {
-    void updateReplicas(long[] hsids);
+    void updateReplicas(List<Long> replicas);
 
     void setMailbox(Mailbox mailbox);
         /*

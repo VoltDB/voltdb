@@ -87,7 +87,7 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void updateReplicas(long[] hsids)
+    public void updateReplicas(List<Long> replicas)
     {
         // nothing to do for multi-part here yet.
     }
@@ -136,7 +136,7 @@ public class MpScheduler extends Scheduler
             DuplicateCounter counter = new DuplicateCounter(
                     message.getInitiatorHSId(),
                     mpTxnId,
-                    com.google.common.primitives.Longs.toArray(partitionInitiators));
+                    partitionInitiators);
             m_duplicateCounters.put(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, mpTxnId, m_pendingTasks, sp,

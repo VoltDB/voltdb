@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
+
 import java.util.concurrent.ExecutionException;
 import java.util.List;
 
@@ -69,20 +71,20 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         @Override
         public void run(List<String> children) {
             hostLog.info("Babysitter for zkLeaderNode: " +
-                    LeaderElector.electionDirForPartition(m_partitionId) + ":" +
-                    "children: " + children);
-            // make an HSId array out of the children, skipping the leader.
-            long[] tmpArray = new long[children.size() -1];
-            int i = 0;
+                    LeaderElector.electionDirForPartition(m_partitionId) + ":");
+            hostLog.info("children: " + children);
+            // make an HSId array out of the children
+            // The list contains the leader, skip it
+            List<Long> replicas = new ArrayList<Long>(children.size() - 1);
             for (String child : children) {
                 long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
                 if (HSId != getInitiatorHSId())
                 {
-                    tmpArray[i++] = HSId;
-                    hostLog.info("Child: " + i + ", HSID: " + HSId);
+                    replicas.add(HSId);
                 }
             }
-            m_initiatorMailbox.updateReplicas(tmpArray);
+            hostLog.info("Updated replicas: " + replicas);
+            m_initiatorMailbox.updateReplicas(replicas);
         }
     };
 

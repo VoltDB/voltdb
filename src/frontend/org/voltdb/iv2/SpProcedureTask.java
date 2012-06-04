@@ -55,6 +55,7 @@ public class SpProcedureTask extends ProcedureTask
         SpTransactionState txn = (SpTransactionState)m_txn;
         final InitiateResponseMessage response = processInitiateTask(txn.m_task);
         completeInitiateTask(siteConnection);
+        response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
