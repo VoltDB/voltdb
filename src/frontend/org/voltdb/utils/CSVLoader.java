@@ -90,7 +90,7 @@ class CSVLoader {
             	
                 
                 System.err.println(response.getStatusString());
-                System.err.println("<xin>Stop at line " + (inCount.get()));
+                System.err.println("Stop at line " + (inCount.get()));
                 synchronized (invalidLines) {
                 	if (!invalidLines.contains(m_lineNum))
                 		invalidLines.add(m_lineNum);
@@ -175,27 +175,25 @@ class CSVLoader {
                     } else {
                         cb = new MyCallback(outCount.get());
                     }
+                    // This message will be removed later
+                    // print out the parameters right now
                     String msg = "<xin>params: ";
                     for (int i=0; i < correctedLine.length; i++) {
                     	msg += correctedLine[i] + ",";
                     }
                     System.out.println(msg);
                
-                    VoltTable[] results = null;
-                    int columnCnt = -1;
-                    try {
-                    	results = client.callProcedure("@SystemCatalog",
-                    			"COLUMNS").getResults();
-                    	columnCnt = results[0].getRowCount();
-                    }
-                    catch (Exception e) {
-                    	e.printStackTrace();
-                    }   
-                    if(!checkLineFormat(correctedLine, columnCnt)){
+                    if(!checkLineFormat(correctedLine, client)){
                     	System.err.println("Stop at line " + (outCount.get()));
-                    	
+                    	synchronized (invalidLines) {
+                    		if (!invalidLines.contains(outCount.get())) {
+                    			invalidLines.add(outCount.get());
+                    		}
+                    	}
+                    	queued = true;
+                    	continue;
                     }
-                    	queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
                     	
                     if (queued == false) {
                         ++waits;
@@ -236,8 +234,19 @@ class CSVLoader {
      * And does other pre-checks...(figure out it later) 
      * @param linefragement
      */
-    private static boolean checkLineFormat(Object[] linefragement, int attrCnt ) {
-    	if( linefragement.length != attrCnt )//# attributes not match including blank line
+    private static boolean checkLineFormat(Object[] linefragement, Client client ) {
+    	VoltTable[] results = null;
+        int columnCnt = -1;
+        try {
+        	results = client.callProcedure("@SystemCatalog",
+        			"COLUMNS").getResults();
+        	columnCnt = results[0].getRowCount();
+        }
+        catch (Exception e) {
+        	e.printStackTrace();
+        }  
+    	
+    	if( linefragement.length != columnCnt )//# attributes not match including blank line
     		return false;
     	else 
     		return true;
