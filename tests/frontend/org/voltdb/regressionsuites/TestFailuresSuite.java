@@ -43,7 +43,6 @@ import org.voltdb_testprocs.regressionsuites.failureprocs.DivideByZero;
 import org.voltdb_testprocs.regressionsuites.failureprocs.FetchTooMuch;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertBigString;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
-import org.voltdb_testprocs.regressionsuites.failureprocs.LastBatchLie;
 import org.voltdb_testprocs.regressionsuites.failureprocs.ReturnAppStatus;
 import org.voltdb_testprocs.regressionsuites.failureprocs.SelectBigString;
 import org.voltdb_testprocs.regressionsuites.failureprocs.TooFewParams;
@@ -60,8 +59,7 @@ public class TestFailuresSuite extends RegressionSuite {
         ViolateUniqueness.class, ViolateUniquenessAndCatchException.class,
         DivideByZero.class, WorkWithBigString.class, InsertBigString.class,
         InsertLotsOfData.class, FetchTooMuch.class, CleanupFail.class, TooFewParams.class,
-        ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class,
-        LastBatchLie.class
+        ReturnAppStatus.class, BatchTooBig.class, SelectBigString.class
     };
 
     /**
@@ -70,32 +68,6 @@ public class TestFailuresSuite extends RegressionSuite {
      */
     public TestFailuresSuite(String name) {
         super(name);
-    }
-
-    // This was the root cause of the defect reported in ENG-2875.
-    // Rather than deadlock, we'll abort the procedure if we see
-    // two voltExecuteSQL() calls with final batch as true.
-    public void testLastBatchLie() throws IOException
-    {
-        System.out.println("STARTING testLastBatchLie");
-        Client client = getClient();
-
-        boolean threw = false;
-        try
-        {
-            client.callProcedure("LastBatchLie").getResults();
-            fail();
-        }
-        catch (ProcCallException e)
-        {
-            if (e.getMessage().contains("claiming a previous batch was final")) {
-                threw = true;
-            }
-            else {
-                e.printStackTrace();
-            }
-        }
-        assertTrue(threw);
     }
 
     // Subcase of ENG-800
@@ -499,29 +471,9 @@ public class TestFailuresSuite extends RegressionSuite {
         assertEquals(response.getAppStatus(), 4);
     }
 
-    public void testBatchTooBig() throws Exception {
-        // HSQL has a different error... skip it
-        if (isHSQL()) return;
-
-        System.out.println("STARTING testAppStatus");
-        Client client = getClient();
-
-        try {
-            client.callProcedure( "BatchTooBig", 0, 0, (byte)0);
-            fail();
-        }
-        catch (ProcCallException e) {
-            String msg = e.getMessage();
-            System.out.println(msg);
-            assertTrue(msg.contains("attempted to queue"));
-        }
-    }
-
     /**
-     * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
+     * Build a list of the tests that will be run when TestFailuresSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
-     * This particular class runs all tests on the the local JNI backend with both
-     * one and two partition configurations, as well as on the hsql backend.
      *
      * @return The TestSuite containing all the tests to be run.
      */
