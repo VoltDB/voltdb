@@ -371,12 +371,17 @@ public class ProcedureRunner {
                 int subSize = Math.min(MAX_BATCH_SIZE, m_batch.size());
 
                 // get the beginning of the batch (or all if small enough)
+                // note: this is a view into the larger list and changes to it
+                //  will mutate the larger m_batch.
                 List<QueuedSQL> subBatch = m_batch.subList(0, subSize);
 
                 // decide if this sub-batch should be marked final
                 boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
 
                 // run the sub-batch and copy the sub-results into the list of lists of results
+                // note: executeQueriesInABatch removes items from the batch as it runs.
+                //  this means subBatch will be empty after running and since subBatch is a
+                //  view on the larger batch, it removes subBatch.size() elements from m_batch.
                 results.add(executeQueriesInABatch(subBatch, finalSubBatch));
             }
 
