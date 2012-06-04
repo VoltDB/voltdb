@@ -40,12 +40,16 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
 
     boolean m_isSinglePartition;
     StoredProcedureInvocation m_invocation;
-    long m_clientInterfaceHandle; // this is the largest txn acked by all partitions running the java for it
+    // this is the largest txn acked by all partitions running the java for it
+    long m_clientInterfaceHandle;
+    // allow PI to signal RI repair log truncation with a new task.
+    private final long m_truncationHandle;
     AtomicBoolean m_isDurable;
 
     /** Empty constructor for de-serialization */
     Iv2InitiateTaskMessage() {
         super();
+        m_truncationHandle = Long.MIN_VALUE;
     }
 
     public Iv2InitiateTaskMessage(long initiatorHSId,
@@ -58,6 +62,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
+        m_truncationHandle = Long.MIN_VALUE;
         m_clientInterfaceHandle = clientInterfaceHandle;
     }
 
@@ -101,6 +106,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             m_isDurable = new AtomicBoolean();
         }
         return m_isDurable;
+    }
+
+    public long getTruncationHandle() {
+        return m_truncationHandle;
     }
 
     public AtomicBoolean getDurabilityFlagIfItExists() {
