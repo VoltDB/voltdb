@@ -135,17 +135,6 @@ class CSVLoader {
 
             final Client client = ClientFactory.createClient();
             client.createConnection("localhost");
-
-            VoltTable[] results = null;
-            try {
-            results = client.callProcedure("@SystemCatalog",
-            "TABLES").getResults();
-            System.out.println("Information about the database schema:");
-            for (VoltTable node : results) System.out.println(node.toString());
-            }
-            catch (Exception e) {
-            e.printStackTrace();
-            }   
             
             boolean lastOK = true;
             String line[] = null;
@@ -185,13 +174,23 @@ class CSVLoader {
                     	msg += correctedLine[i] + ",";
                     }
                     System.out.println(msg);
-                    
-                    if (!checkLineFormat(correctedLine)){
-                    	
-                    	System.err.println("Stop at line " + (outCount.get()));
+               
+                    VoltTable[] results = null;
+                    int columnCnt = -1;
+                    try {
+                    	results = client.callProcedure("@SystemCatalog",
+                    			"COLUMNS").getResults();
+                    	columnCnt = results[0].getRowCount();
                     }
-                    queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
-
+                    catch (Exception e) {
+                    	e.printStackTrace();
+                    }   
+                    if(!checkLineFormat(correctedLine, columnCnt)){
+                    	System.err.println("Stop at line " + (outCount.get()));
+                    	
+                    }
+                    	queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    	
                     if (queued == false) {
                         ++waits;
                         if (lastOK == false) {
@@ -224,13 +223,18 @@ class CSVLoader {
      * Check for each line
      * TODO(zheng):
      * Use the client handler to get the schema of the table, and then check the number of
-     * parameters it expects with the input line fragements and each range for each data type. 
+     * parameters it expects with the input line fragements.
+     * Check the following:
+     * 1.blank line
+     * 2.# of attributes in the insertion procedure
      * And does other pre-checks...(figure out it later) 
      * @param linefragement
      */
-    private static boolean checkLineFormat(Object[] linefragement) {
-    	
-    	return true;
+    private static boolean checkLineFormat(Object[] linefragement, int attrCnt ) {
+    	if( linefragement.length != attrCnt )//# attributes not match including blank line
+    		return false;
+    	else 
+    		return true;
     }
     /**
      * TODO(xin):
