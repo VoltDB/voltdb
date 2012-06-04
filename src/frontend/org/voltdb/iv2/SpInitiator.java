@@ -68,10 +68,9 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         @Override
         public void run(List<String> children) {
             hostLog.info("Babysitter for zkLeaderNode: " +
-                    LeaderElector.electionDirForPartition(m_partitionId) + ":");
-            hostLog.info("children: " + children);
-            // make an HSId array out of the children
-            // The list contains the leader, skip it
+                    LeaderElector.electionDirForPartition(m_partitionId) + ":" +
+                    "children: " + children);
+            // make an HSId array out of the children, skipping the leader.
             long[] tmpArray = new long[children.size() -1];
             int i = 0;
             for (String child : children) {
@@ -107,7 +106,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
 
             // with leadership election complete, update the master list
             // for non-initiator components that care.
-            hostLog.info("Registering " + m_partitionId + " to mapcache.");
+            hostLog.info("Registering " +  m_partitionId + " as new master.");
             iv2masters.put(Integer.toString(m_partitionId),
                     new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
         } catch (Exception e) {
