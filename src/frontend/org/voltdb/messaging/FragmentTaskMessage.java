@@ -54,7 +54,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         @SuppressWarnings("null")
         public String toString() {
             StringBuilder sb = new StringBuilder();
-            sb.append(String.format("FRAGMENT ID: %ld\n", m_fragmentId));
+            sb.append(String.format("FRAGMENT ID: %d\n", m_fragmentId));
             if (m_parameterSet != null) {
                 FastDeserializer fds = new FastDeserializer(m_parameterSet.asReadOnlyBuffer());
                 ParameterSet pset = null;
