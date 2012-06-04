@@ -22,6 +22,7 @@ import java.util.List;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -98,19 +99,32 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         try {
             m_scheduler.setLeaderState(true);
-            MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
 
             m_babySitter = new BabySitter(m_messenger.getZK(),
                     LeaderElector.electionDirForPartition(m_partitionId),
                     m_replicasChangeHandler);
 
-            // with leadership election complete, update the master list
-            // for non-initiator components that care.
-            hostLog.info("Registering " +  m_partitionId + " as new master.");
-            iv2masters.put(Integer.toString(m_partitionId),
-                    new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
+            declareReadyAsLeader();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Bad news.", true, e);
+        }
+    }
+
+    // with leadership election complete, update the master list
+    // for non-initiator components that care.
+    void declareReadyAsLeader()
+    {
+        hostLog.info("Registering " +  m_partitionId + " as new master.");
+        try {
+            MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
+            iv2masters.put(Integer.toString(m_partitionId),
+                    new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
+        } catch (KeeperException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
+        } catch (JSONException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
         }
     }
 
