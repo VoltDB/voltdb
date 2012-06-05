@@ -109,16 +109,16 @@ class CSVLoader {
     	String[] csvoptions = null;
     	
     	@Option(desc = ".")
-    	boolean setSkipEmptyRecords = false;
+    	boolean setSkipEmptyRecords = true;
     	
     	@Option(desc = ".")
-    	boolean setTrimWhitespace = false;
+    	boolean setTrimWhiteSpace = true;
     	
     	@Option(desc = "Maximum rows to be read of the csv file.")
     	int limitRows = Integer.MAX_VALUE;
     	
     	@Option(desc = "directory path to produce report files.")
-    	String reportDir = "/Users/xinjia/progs/invalid.csv";
+    	String reportDir ="";
     	
     	@Option(desc = "")
     	int abortfailurecount =  100;
@@ -173,6 +173,7 @@ class CSVLoader {
                     	msg += correctedLine[i] + ",";
                     }
                     System.out.println(msg);
+
 
                     String lineCheckResult;
                     if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
@@ -261,9 +262,9 @@ class CSVLoader {
      * And does other pre-checks...(figure out it later) 
      * @param linefragement
      */
+
     private static String checkLineFormat(Object[] linefragement, Client client ) {
     	String msg = "";
-    	VoltTable[] results = null;
         int columnCnt = 0;
         VoltTable colInfo = null;
         
@@ -280,7 +281,6 @@ class CSVLoader {
         			columnCnt++;
            		}
         	}
-        	
         }
         catch (Exception e) {
         	e.printStackTrace();
@@ -347,5 +347,4 @@ class CSVLoader {
 			System.err.println(x.getMessage());
 		}
     }
-    
 }
