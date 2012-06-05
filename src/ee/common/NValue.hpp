@@ -1820,6 +1820,8 @@ inline int NValue::compare(const NValue rhs) const {
         return compareDoubleValue(rhs);
       case VALUE_TYPE_VARCHAR:
         return compareStringValue(rhs);
+      case VALUE_TYPE_VARBINARY:
+        return compareBinaryValue(rhs);
       case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
       default: {
