@@ -58,14 +58,14 @@ public class RepairLog
 
     // Offer a new message to the repair log. This will truncate
     // the repairLog if the message includes a truncation hint.
-	public void deliver(VoltMessage msg)
+    public void deliver(VoltMessage msg)
     {
         if (msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
             truncate(m.getTruncationHandle());
             m_log.offer(new Item(m, m.getSpHandle()));
         }
-	}
+    }
 
     // trim unnecessary log messages.
     private void truncate(long spHandle)

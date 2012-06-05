@@ -52,13 +52,13 @@ public class TestRepairLog extends TestCase
 
     private static class FooMessage extends VoltMessage
     {
-		@Override
-		protected void initFromBuffer(ByteBuffer buf) throws IOException {
-		}
+        @Override
+        protected void initFromBuffer(ByteBuffer buf) throws IOException {
+        }
 
-		@Override
-		public void flattenToBuffer(ByteBuffer buf) throws IOException {
-		}
+        @Override
+        public void flattenToBuffer(ByteBuffer buf) throws IOException {
+        }
     }
 
     @Test
