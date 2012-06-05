@@ -1241,7 +1241,7 @@ TEST CASES
                 <exclude name="**/TestCatalogUpdateSuite.class" />
 <!--                <exclude name="**/TestCRUDSuite.class" /> -->
                 <exclude name="**/TestExecutionSiteDeath.class" />
-                <exclude name="**/TestFailureDetectSuite.class" />
+<!--                <exclude name="**/TestFailureDetectSuite.class" /> -->
 <!--                <exclude name="**/TestFailuresSuite.class" /> -->
 <!--                <exclude name="**/TestFixedSQLSuite.class" /> -->
 <!--                <exclude name="**/TestFunctionsSuite.class" /> -->
