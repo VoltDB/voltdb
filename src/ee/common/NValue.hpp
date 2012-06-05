@@ -2719,7 +2719,7 @@ inline NValue NValue::like(const NValue rhs) const {
     const bool lhsIsNull = isNull();
     const bool rhsIsNull = rhs.isNull();
     if (lhsIsNull || rhsIsNull) {
-        return lhsIsNull == rhsIsNull ? getTrue() : getFalse();
+        return getFalse();
     }
 
     /*
@@ -2744,8 +2744,6 @@ inline NValue NValue::like(const NValue rhs) const {
         } else {
             return getFalse();
         }
-    } else if (0 == valueUTF8Length) {
-        return getFalse();
     }
 
     char *valueChars = reinterpret_cast<char*>(getObjectValue());
@@ -2768,6 +2766,7 @@ inline NValue NValue::like(const NValue rhs) const {
             return compareAt( patternChars_, valueChars_);
         }
 
+    private:
         /*
          * Go through a lot of trouble to make sure that corrupt
          * utf8 data doesn't result in touching uninitialized memory
@@ -2841,7 +2840,6 @@ inline NValue NValue::like(const NValue rhs) const {
             }
             return true;
         }
-    private:
         const char *valueChars_;
         const char *patternChars_;
         const char *valueCharsEnd_;
