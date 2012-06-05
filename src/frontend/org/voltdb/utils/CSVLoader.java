@@ -33,6 +33,7 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
+import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -56,52 +57,41 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  */
 class CSVLoader {
 
-    public synchronized static void setDefaultTimezone() {
-        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
-    }
+//    public synchronized static void setDefaultTimezone() {
+//        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
+//    }
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
-
-    private static int reportEveryNRows = 10000;
-    private static int limitRows = Integer.MAX_VALUE;
-    private static int skipRows = 0;
-    private static int auditRows = 0;
-    private static int waitSeconds = 10;
-    private static boolean stripQuotes = false;
-    private static int[] colProjection = null;
     
-    private static String reportdir = ".";
-    private static int abortfailurecount = 100; // by default right now
+    private static int reportEveryNRows = 10000;
+    private static int waitSeconds = 10;
+    
+    final CSVConfig config;
+    //private static int abortfailurecount = 100; // by default right now
     private static List<Long> invalidLines = new ArrayList<Long>();
 
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;
-        MyCallback(long lineNumber)
+        private final CSVConfig mycfg;
+        MyCallback(long lineNumber, CSVConfig cfg)
         {
             m_lineNum = lineNumber;
+            mycfg = cfg;
         }
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
-//                if (m_lineNum == 0) {
-//                    System.err.print("Line ~" + inCount.get() + "-" + outCount.get() + ":");
-//                } else {
-//                    System.err.print("Line " + m_lineNum + ":");
-//                }
-            	
-                
                 System.err.println(response.getStatusString());
-                System.err.println("Stop at line " + (inCount.get()));
+                System.err.println("<xin>Stop at line " + m_lineNum);
                 synchronized (invalidLines) {
                 	if (!invalidLines.contains(m_lineNum))
                 		invalidLines.add(m_lineNum);
-                	if (invalidLines.size() >= abortfailurecount) {
-                		System.err.println("The number of Failure row data exceeds " + abortfailurecount);
+                	if (invalidLines.size() >= mycfg.abortfailurecount) {
+                		System.err.println("The number of Failure row data exceeds " + mycfg.abortfailurecount);
                 		System.exit(1);
                 	}
                 }
-                //System.exit(1);
                 return;
             }
             
@@ -114,37 +104,92 @@ class CSVLoader {
         }
     }
     
-    /**
-     * TODO(xin): add line number data into the callback and add the invalid line number 
-     * into a list that will help us to produce a separate file to record the invalid line
-     * data in the csv file.
-     * 
-     * Asynchronously invoking procedures to response the actual wrong line number and 
-     * start from last wrong line in the csv file is not easy. You can not ensure the 
-     * FIFO order of the callback.
-     * @param args
-     * @return long number of the actual rows acknowledged by the database server
-     */
+    private static class CSVConfig extends CLIConfig {
+    	@Option(desc = "directory path to produce report files.")
+    	String inputfile = "";
+    	
+    	@Option(desc = "procedure name to insert the data into the database.")
+    	String procedurename = "";
+    	
+    	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
+    	String tablename = "";
+    	
+    	@Option(desc = ".")
+    	boolean setSkipEmptyRecords = false;
+    	
+    	@Option(desc = ".")
+    	boolean setTrimWhitespace = false;
+    	
+    	@Option(desc = "Maximum rows to be read of the csv file.")
+    	int limitRows = Integer.MAX_VALUE;
+    	
+    	@Option(desc = "directory path to produce report files.")
+    	String reportDir = "/Users/xinjia/progs/invalid.csv";
+    	
+    	@Option(desc = "")
+    	int abortfailurecount =  100;
+    	
+    	
+    	@Override
+    	public void validate() {
+    		if (abortfailurecount <= 0) exitWithMessageAndUsage("");
+    		// add more checking
+    		if (procedurename.equals("") && tablename.equals("") )
+    			exitWithMessageAndUsage("procedure name or a table name required");
+    		if (!procedurename.equals("") && !tablename.equals("") )
+    			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
+    	}
+    }
     
+    public CSVLoader (CSVConfig cfg) {
+    	this.config = cfg;
+    	
+    }
+    
+    /**
+	 * TODO(xin): produce the invalid row file from
+	 * 
+	 * @param inputFile
+	 */
+	private void produceInvalidRowsFile() {
+		Collections.sort(invalidLines);
+		System.out.println("All the invalid row numbers are:" + invalidLines);
+		String line = "";
+		try {
+			FileWriter fstream = new FileWriter(config.reportDir);
+			BufferedWriter out = new BufferedWriter(fstream);
+			BufferedReader csvfile = new BufferedReader(new FileReader(config.inputfile));
 
-    public static long main(String[] args) {
-        if (args.length < 2) {
-            System.err.println("Two arguments, csv filename and insert procedure name, required");
-            System.exit(1);
-        }
+			long linect = 0;
+			for (Long irow : invalidLines) {
+				while ((line = csvfile.readLine()) != null) {
+					if (++linect == irow) {
+						out.write(line);
+						out.write("\n");
+						System.err.println("invalid row:" + line);
+						break;
+					}
+				}
 
-        final String filename = args[0];
-        final String insertProcedure = args[1];
-        int argsUsed = 2;
+			}
+			out.flush();
+			out.close();
 
-        processCommandLineOptions(argsUsed, args);
+		} catch (FileNotFoundException e) {
+			System.err.println("CSV file '" + config.inputfile
+					+ "' could not be found.");
+		} catch (Exception x) {
+			System.err.println(x.getMessage());
+		}
 
-        int waits = 0;
+    }
+    
+    public long run() {
+    	int waits = 0;
         int shortWaits = 0;
-
-        try {
-            final CSVReader reader = new CSVReader(new FileReader(filename));
-            //final ProcedureCallback oneCallbackFitsAll = new MyCallback(0);
+        
+    	try {
+            final CSVReader reader = new CSVReader(new FileReader(config.inputfile));
             ProcedureCallback cb = null;
 
             final Client client = ClientFactory.createClient();
@@ -153,36 +198,13 @@ class CSVLoader {
             boolean lastOK = true;
             String line[] = null;
 
-            for (int i = 0; i < skipRows; ++i) {
-                reader.readNext();
-                // Keep these sync'ed with line numbers.
-                outCount.incrementAndGet();
-                inCount.incrementAndGet();
-            }
-
-            while ((limitRows-- > 0) && (line = reader.readNext()) != null) {
-                long counter = outCount.incrementAndGet();
+            while ((config.limitRows-- > 0) && (line = reader.readNext()) != null) {
+            	long counter = outCount.incrementAndGet();
                 boolean queued = false;
                 while (queued == false) {
                     String[] correctedLine = line;
-                    if (colProjection != null) {
-                    	System.out.println(String.format("colProject:%s | correctedLine: %s", colProjection, correctedLine));
-                        correctedLine = projectColumns(colProjection, correctedLine);
-                    }
-
-                    if (stripQuotes) {
-                        correctedLine = stripMatchingColumnQuotes(correctedLine);
-                    }
-
-                    if (auditRows > 0) {
-                        --auditRows;
-                        System.err.println(joinIntoString(", ", line));
-                        System.err.println(joinIntoString(", ", correctedLine));
-                        System.err.println("----------");
-                        cb = new MyCallback(counter);
-                    } else {
-                        cb = new MyCallback(outCount.get());
-                    }
+                    cb = new MyCallback(outCount.get(), config);
+                    
                     // This message will be removed later
                     // print out the parameters right now
                     String msg = "<xin>params: ";
@@ -197,14 +219,14 @@ class CSVLoader {
                     		if (!invalidLines.contains(outCount.get())) {
                     			invalidLines.add(outCount.get());
                     		}
-                    		if (invalidLines.size() >= abortfailurecount) {
-                    			System.err.println("The number of Failure row data exceeds " + abortfailurecount);
+                    		if (invalidLines.size() >= config.abortfailurecount) {
+                    			System.err.println("The number of Failure row data exceeds " + config.abortfailurecount);
                         		System.exit(1);
                     		}
                     	}
                     	break;
                     }
-                    queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    queued = client.callProcedure(cb, config.procedurename, (Object[])correctedLine);
                     	
                     if (queued == false) {
                         ++waits;
@@ -221,20 +243,51 @@ class CSVLoader {
             client.drain();
             client.close();
             
-            produceInvalidRowsFile(filename);            
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        System.out.println("Inserted " + (outCount.get() - skipRows) + " and acknowledged " + (inCount.get() - skipRows) + " rows (final)");
+        System.out.println("Inserted " + outCount.get() + " and acknowledged " + inCount.get() + " rows (final)");
         if (waits > 0) {
             System.out.println("Waited " + waits + " times");
             if (shortWaits > 0) {
                 System.out.println("Waited too briefly? " + shortWaits + " times");
             }
         }
+        return inCount.get();
+    	
+    }
+    
+    
+    
+    /**
+     * TODO(xin): add line number data into the callback and add the invalid line number 
+     * into a list that will help us to produce a separate file to record the invalid line
+     * data in the csv file.
+     * 
+     * Asynchronously invoking procedures to response the actual wrong line number and 
+     * start from last wrong line in the csv file is not easy. You can not ensure the 
+     * FIFO order of the callback.
+     * @param args
+     * @return long number of the actual rows acknowledged by the database server
+     */
+    
+
+    public static long main(String[] args) {
+    	//CSVLoader.config.abortfailurecount = 100;
+        if (args.length < 1) {
+            System.err.println("csv filename required");
+            System.exit(1);
+        }
         
-        return inCount.get() - skipRows;
+    	CSVConfig cfg = new CSVConfig();
+    	cfg.inputfile = args[0];
+    	cfg.parse(CSVLoader.class.getName(), args);
+    	
+    	CSVLoader loader = new CSVLoader(cfg);
+    	long result = loader.run();
+    	loader.produceInvalidRowsFile();
+        return result;
     }
     /**
      * Check for each line
@@ -265,207 +318,4 @@ class CSVLoader {
     		return true;
     }
     
-	/**
-	 * TODO(xin): produce the invalid row file from
-	 * 
-	 * @param inputFile
-	 */
-	private static void produceInvalidRowsFile(String inputFile) {
-		Collections.sort(invalidLines);
-		System.out.println("All the invalid row numbers are:" + invalidLines);
-		String line = "";
-		try {
-			FileWriter fstream = new FileWriter(reportdir);
-			BufferedWriter out = new BufferedWriter(fstream);
-			BufferedReader csvfile = new BufferedReader(new FileReader(inputFile));
-
-			long linect = 0;
-			for (Long irow : invalidLines) {
-				while ((line = csvfile.readLine()) != null) {
-					if (++linect == irow) {
-						out.write(line);
-						out.write("\n");
-						System.err.println("invalid row:" + line);
-						break;
-					}
-				}
-
-			}
-			out.flush();
-			out.close();
-
-		} catch (FileNotFoundException e) {
-			System.err.println("CSV file '" + inputFile
-					+ "' could not be found.");
-		} catch (Exception x) {
-			System.err.println(x.getMessage());
-		}
-
-    }
-    
-    private static void processCommandLineOptions(int argsUsed, String args[]) {
-        final String columnsMatch = "--columns";
-        final String failuerCountMatch = "--abortfailurecount";
-        final String reportDirMatch = "--reportdir";
-        final String stripMatch = "--stripquotes";
-        final String waitMatch = "--wait";
-        final String auditMatch = "--audit";
-        final String limitMatch = "--limit";
-        final String skipMatch = "--skip";
-        final String reportMatch = "--report";
-        final String columnsStyle = "comma-separated-zero-based-column-numbers";
-
-        while (argsUsed < args.length) {
-
-            final String optionPrefix = args[argsUsed++];
-
-            if (optionPrefix.equalsIgnoreCase(columnsMatch)) {
-                if (argsUsed < args.length) {
-                    final String colsListed = args[argsUsed++];
-                    final String[] cols = colsListed.split(",");
-                    if (cols != null && cols.length > 0) {
-                        colProjection = new int[cols.length];
-                        for (int i = 0; i < cols.length; i++) {
-                            try {
-                                colProjection[i] = Integer.parseInt(cols[i]);
-                                continue;
-                            } catch (NumberFormatException e) {
-                            }
-                        }
-                        if (colProjection.length == cols.length) {
-                            continue;
-                        }
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(failuerCountMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                    	abortfailurecount = Integer.parseInt(args[argsUsed++]);
-                        continue;
-                    } catch (NumberFormatException e) {
-                    	System.err.println("Invalid input integer parameter of abortfailurecount");
-                    }
-                    continue;
-                }
-            } else if (optionPrefix.equalsIgnoreCase(reportDirMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        reportdir = (args[argsUsed++]);
-                    } catch (NumberFormatException e) {
-                    }
-                    continue;
-                }
-            } else if (optionPrefix.equalsIgnoreCase(waitMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        waitSeconds = Integer.parseInt(args[argsUsed++]);
-                        if (waitSeconds >= 0) {
-                            continue;
-                        }
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(auditMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        auditRows = Integer.parseInt(args[argsUsed++]);
-                        continue;
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(limitMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        limitRows = Integer.parseInt(args[argsUsed++]);
-                        continue;
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(skipMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        skipRows = Integer.parseInt(args[argsUsed++]);
-                        continue;
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(reportMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        reportEveryNRows = Integer.parseInt(args[argsUsed++]);
-                        if (reportEveryNRows > 0) {
-                            continue;
-                        }
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(stripMatch)) {
-                stripQuotes = true;
-                continue;
-            }
-            // Fall through means an error.
-            System.err.println("Option arguments are invalid, expected csv filename and insert procedure name (required) and optionally" +
-                    " '" + columnsMatch + " " + columnsStyle + "'," +
-                    " '" + waitMatch + " s (default=10 seconds)'," +
-                    " '" + auditMatch + " n (default=0 rows)'," +
-                    " '" + limitMatch + " n (default=all rows)'," +
-                    " '" + skipMatch + " n (default=0 rows)'," +
-                    " '" + reportMatch + " n (default=10000)'," +
-                    " and/or '" + stripMatch + " (disabled by default)'");
-            System.exit(2);
-        }
-    }
-
-    private static String[] stripMatchingColumnQuotes(String[] line) {
-        final String[] strippedLine = new String[line.length];
-        Pattern pattern = Pattern.compile("^([\"'])(.*)\\1$");
-        for (int i = 0; i < line.length; i++) {
-            Matcher matcher = pattern.matcher(line[i]);
-            if (matcher.find()) {
-                strippedLine[i] = matcher.group(2);
-            } else {
-                strippedLine[i] = line[i];
-            }
-        }
-        return strippedLine;
-    }
-
-    private static String[] projectColumns(int[] colSelection, String[] line) {
-        final String[] projectedLine = new String[colSelection.length];
-        for (int i = 0; i < projectedLine.length; i++) {
-            projectedLine[i] = line[colSelection[i]];
-        }
-        return projectedLine;
-    }
-
-    // This function borrowed/mutated from http:/stackoverflow.com/questions/1515437
-    static String joinIntoString(String glue, Object... elements)
-    {
-        int k = elements.length;
-        if (k == 0) {
-            return null;
-        }
-        StringBuilder out = new StringBuilder();
-        out.append(elements[0].toString());
-        for (int i = 1; i < k; ++i) {
-            out.append(glue).append(elements[i]);
-        }
-        return out.toString();
-    }
-
-    // This function borrowed/mutated from http:/stackoverflow.com/questions/1515437
-    static String joinIntoString(String glue, String... elements)
-    {
-        int k = elements.length;
-        if (k == 0) {
-            return null;
-        }
-        StringBuilder out = new StringBuilder();
-        out.append(elements[0]);
-        for (int i = 1; i < k; ++i) {
-            out.append(glue).append(elements[i]);
-        }
-        return out.toString();
-    }
-
 }
