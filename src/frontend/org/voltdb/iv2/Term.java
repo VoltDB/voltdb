@@ -140,15 +140,25 @@ public class Term
 
     /**
      * Start a new Term. Returns a future that is done when the leadership has
-     * been full assumed and all surviving replicas have been fully repaired.
+     * been fully assumed and all surviving replicas have been repaired.
+     *
+     * @param kfactorForStartup If running for startup and not for fault
+     * recovery, pass the kfactor required to proceed. For fault recovery,
+     * pass any negative value as kfactorForStartup.
      */
-    public Future<?> start()
+    public Future<?> start(int kfactorForStartup)
     {
         InaugurationFuture result = new InaugurationFuture();
         try {
             m_babySitter = new BabySitter(m_zk,
                     LeaderElector.electionDirForPartition(m_partitionId),
                     m_replicasChangeHandler, true);
+            if (kfactorForStartup >= 0) {
+                prepareForStartup(kfactorForStartup);
+            }
+            else {
+                prepareForFaultRecovery();
+            }
             declareReadyAsLeader();
         } catch (Exception e) {
             result.setException(e);
@@ -173,6 +183,24 @@ public class Term
     public List<String> lastSeenChildren()
     {
         return m_babySitter.lastSeenChildren();
+    }
+
+    void prepareForStartup(int kfactor)
+    {
+        // This block-on-all-the-replicas-at-startup thing sucks.  Hopefully this can
+        // go away when we get rejoin working.
+        List<String> children = m_babySitter.lastSeenChildren();
+        while (children.size() < kfactor + 1) {
+            try {
+                Thread.sleep(5);
+            } catch (InterruptedException e) {
+            }
+            children = m_babySitter.lastSeenChildren();
+        }
+    }
+
+    void prepareForFaultRecovery()
+    {
     }
 
     // with leadership election complete, update the master list

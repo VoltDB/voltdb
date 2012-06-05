@@ -67,6 +67,9 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     // Only gets set non-null for the leader
     private Thread m_siteThread = null;
 
+    // need a flag to distinguish first-time-startup from fault recovery.
+    private int m_kfactorForStartup = -1;
+
 
     public SpInitiator(HostMessenger messenger, Integer partition)
     {
@@ -82,7 +85,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         try {
             m_term = new Term(m_messenger.getZK(), m_partitionId,
                     getInitiatorHSId(), m_initiatorMailbox);
-            Future<?> inaugurated = m_term.start();
+            Future<?> inaugurated = m_term.start(m_kfactorForStartup);
             inaugurated.get();
             m_scheduler.setLeaderState(true);
         } catch (Exception e) {
@@ -117,23 +120,17 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                           SiteTracker siteTracker, int kfactor)
     {
         try {
+            m_kfactorForStartup = kfactor;
             boolean isLeader = joinElectoralCollege();
             if (isLeader) {
                 hostLog.info("Chosen as leader for partition " + m_partitionId);
-                // This block-on-all-the-replicas-at-startup thing sucks.  Hopefully this can
-                // go away when we get rejoin working.
-                List<String> children = m_term.lastSeenChildren();
-                while (children.size() < kfactor + 1) {
-                    try {
-                        Thread.sleep(5);
-                    } catch (InterruptedException e) {
-                    }
-                    children = m_term.lastSeenChildren();
-                }
             }
             else {
                 hostLog.info("Chosen as replica for partition " + m_partitionId);
             }
+
+            // Done tracking startup vs. recovery special case.
+            m_kfactorForStartup = -1;
 
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
