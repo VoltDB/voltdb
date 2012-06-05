@@ -32,12 +32,15 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.MessagingException;
+import org.voltcore.messaging.VoltMessage;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
 
+import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -67,19 +70,27 @@ public class Term
             hostLog.info("children: " + children);
             // make an HSId array out of the children
             // The list contains the leader, skip it
-            List<Long> replicas = new ArrayList<Long>(children.size() - 1);
-            for (String child : children) {
-                long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
-                if (HSId != m_initiatorHSId)
-                {
-                    replicas.add(HSId);
-                }
-            }
+            List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, children);
             hostLog.info("Updated replicas: " + replicas);
             m_mailbox.updateReplicas(replicas);
         }
     };
 
+    // conversion helper.
+    static List<Long> childrenToReplicaHSIds(long initiatorHSId, List<String> children)
+    {
+        List<Long> replicas = new ArrayList<Long>(children.size() - 1);
+        for (String child : children) {
+            long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
+            if (HSId != initiatorHSId)
+            {
+                replicas.add(HSId);
+            }
+        }
+        return replicas;
+    }
+
+    // future that represents completion of transition to leader.
     public static class InaugurationFuture implements Future<Boolean>
     {
         private CountDownLatch m_doneLatch = new CountDownLatch(1);
@@ -180,9 +191,7 @@ public class Term
         }
     }
 
-    /**
-     *  Block until all replica's are present.
-     */
+    /** Block until all replica's are present. */
     void prepareForStartup(int kfactor)
     {
         List<String> children = m_babySitter.lastSeenChildren();
@@ -195,8 +204,18 @@ public class Term
         }
     }
 
+    /** Fix all the replicas */
     void prepareForFaultRecovery()
     {
+        List<String> survivorsNames = m_babySitter.lastSeenChildren();
+        List<Long> survivors =  childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
+
+        // TODO: need a better unique id.... than 0.
+        VoltMessage logRequest = new Iv2RepairLogRequestMessage(0);
+        try {
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
+        } catch (MessagingException impossible) {
+        }
 
     }
 

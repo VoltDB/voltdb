@@ -48,6 +48,7 @@ public class MpInitiator implements Initiator
     private LoadedProcedureSet m_procSet = null;
     private Thread m_siteThread = null;
     private MapCache m_iv2masters = null;
+    private RepairLog m_repairLog = new RepairLog();
 
     public MpInitiator(HostMessenger messenger)
     {
@@ -56,7 +57,7 @@ public class MpInitiator implements Initiator
         m_partitionId = -1;
         m_iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
         m_scheduler = new MpScheduler(m_iv2masters);
-        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger);
+        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog);
     }
 
     @Override

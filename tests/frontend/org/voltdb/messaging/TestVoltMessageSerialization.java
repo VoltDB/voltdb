@@ -282,4 +282,11 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(ctrm.getExecutionSiteId(), ctrm.getExecutionSiteId());
         assertEquals(ctrm.getTxnId(), ctrm2.getTxnId());
     }
+
+    public void testIv2RepairLogRequestMessage() throws IOException
+    {
+        Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100);
+        Iv2RepairLogRequestMessage rlm2 = (Iv2RepairLogRequestMessage) checkVoltMessage(rlm);
+        assertEquals(rlm.getRequestId(), rlm2.getRequestId());
+    }
 }

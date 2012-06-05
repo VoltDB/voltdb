@@ -66,6 +66,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     private LeaderElector m_leaderElector = null;
     // Only gets set non-null for the leader
     private Thread m_siteThread = null;
+    private RepairLog m_repairLog = new RepairLog();
 
     // need a flag to distinguish first-time-startup from fault recovery.
     private int m_kfactorForStartup = -1;
@@ -76,7 +77,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = new SpScheduler();
-        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger);
+        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog);
     }
 
     @Override

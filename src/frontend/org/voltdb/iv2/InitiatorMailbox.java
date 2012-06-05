@@ -30,6 +30,8 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.utils.CoreUtils;
 
+import org.voltdb.messaging.Iv2RepairLogRequestMessage;
+
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
  * configured InitiationRole.
@@ -42,15 +44,18 @@ public class InitiatorMailbox implements Mailbox
     VoltLogger hostLog = new VoltLogger("HOST");
     private final InitiatorMessageHandler m_msgHandler;
     private final HostMessenger m_messenger;
+    private final RepairLog m_repairLog;
     private long m_hsId;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
 
-    public InitiatorMailbox(InitiatorMessageHandler msgHandler, HostMessenger messenger)
+    public InitiatorMailbox(InitiatorMessageHandler msgHandler,
+            HostMessenger messenger, RepairLog repairLog)
     {
         m_msgHandler = msgHandler;
         m_messenger = messenger;
+        m_repairLog = repairLog;
         m_messenger.createMailbox(null, this);
         m_msgHandler.setMailbox(this);
     }
@@ -80,7 +85,15 @@ public class InitiatorMailbox implements Mailbox
     public synchronized void deliver(VoltMessage message)
     {
         logRxMessage(message);
-        // m_repairLog.deliver(message);
+        if (message instanceof Iv2RepairLogRequestMessage) {
+            List<VoltMessage> logs = m_repairLog.contents();
+            for (VoltMessage log : logs) {
+                // encapsulate.
+                // send
+            }
+            return;
+        }
+        m_repairLog.deliver(message);
         m_msgHandler.deliver(message);
     }
 
