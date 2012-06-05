@@ -111,6 +111,8 @@ public class TestLikeQueries extends TestCase {
             new LikeTestData("abcccc%", "abc%"),
             new LikeTestData("abcdefg", "abcdefg"),
             new LikeTestData("âxxxéyy", "âxxx%"),
+            new LikeTestData("â🀲x一xxéyyԱ", "â🀲x一%"),
+            new LikeTestData("â🀲x", "â🀲%"),
         };
 
         final LikeTest[] tests = {
@@ -128,7 +130,15 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("ab_d_fg", 1),
             new LikeTest("%defg", 1),
             new LikeTest("%de%", 1),
+            new LikeTest("â🀲x", 1),
+            new LikeTest("â🀲x一xxéyyԱ", 1),
+            new LikeTest("â_x一xxéyyԱ", 1),
+            new LikeTest("â🀲x_xxéyyԱ", 1),
+            new LikeTest("â🀲x一xxéyy_", 1),
+            new LikeTest("â🀲x一xéyyԱ", 0),
             new NotLikeTest("aaa%", rowData.length - 1),
+            new EscapeLikeTest("ââ🀲x一xxéyyԱ", 1, "â"),
+            new EscapeLikeTest("abccccâ%", 1, "â"),
             new EscapeLikeTest("abcccc|%", 1, "|"),
             new EscapeLikeTest("abc%", 2, "|"),
             new EscapeLikeTest("aaa", 0, "|"),

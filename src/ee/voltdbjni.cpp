@@ -563,7 +563,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
     JNIEnv *env,
     jobject obj,
     jlong engine_ptr,
-    jstring plan,
+    jbyteArray plan,
     jint outputDependencyId,
     jint inputDependencyId,
     jlong txnId,
@@ -586,11 +586,11 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
     Pool *stringPool = engine->getStringPool();
 
     // convert java plan string to stdc++ string plan
-    const char *str = static_cast<const char*>(env->GetStringUTFChars(plan,
-                                                                      NULL));
+    jbyte *str = env->GetByteArrayElements(plan, NULL);
+
     assert(str);
-    string cppplan = str;
-    env->ReleaseStringUTFChars(plan, str);
+    string cppplan = reinterpret_cast<const char*>(str);
+    env->ReleaseByteArrayElements(plan, str, JNI_ABORT);
 
     // execute
     engine->setUsedParamcnt(0);

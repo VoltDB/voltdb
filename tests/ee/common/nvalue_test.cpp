@@ -2018,6 +2018,7 @@ TEST_F(NValueTest, TestLike)
     testData.push_back("abcccc%");
     testData.push_back("abcdefg");
     testData.push_back("âxxxéyy");
+    testData.push_back("â🀲x一xxéyyԱ");
 
     std::vector<const char *> testExpressions;
     std::vector<int> testMatches;
@@ -2035,6 +2036,12 @@ TEST_F(NValueTest, TestLike)
     testExpressions.push_back("ab_d_fg"); testMatches.push_back(1);
     testExpressions.push_back("%defg"); testMatches.push_back(1);
     testExpressions.push_back("%de%"); testMatches.push_back(1);
+    //Take me down like i'm a domino
+    testExpressions.push_back("â🀲x一xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â_x一xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x_xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x一xxéyy_"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x一xéyyԱ"); testMatches.push_back(0);
 
     for (int ii = 0; ii < testExpressions.size(); ii++) {
         const char *testExpression = testExpressions[ii];
