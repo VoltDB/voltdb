@@ -33,6 +33,7 @@ import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 import java.lang.String;
 
+import org.voltcore.messaging.HostMessenger.Config;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -112,11 +113,11 @@ class CSVLoader {
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
     	
-    	@Option(desc = ".")
-    	boolean setSkipEmptyRecords = true;
+    	@Option(desc = "Skip empty records in the csv file if this parameter is set.")
+    	boolean skipEmptyRecords = false;
     	
-    	@Option(desc = ".")
-    	boolean setTrimWhiteSpace = true;
+    	@Option(desc = "Trim whitespace in each line of the csv file if this parameter is set.")
+    	boolean trimWhiteSpace = false;
     	
     	@Option(desc = "Maximum rows to be read of the csv file.")
     	int limitRows = Integer.MAX_VALUE;
@@ -267,33 +268,50 @@ class CSVLoader {
      * @param linefragement
      */
 
-    private static String checkLineFormat(Object[] linefragement, Client client ) {
+    private String checkLineFormat(Object[] linefragement, Client client ) {
     	String msg = "";
         int columnCnt = 0;
-        VoltTable colInfo = null;
+        VoltTable procInfo = null;
         
-        int posOfDot = insertProcedure.indexOf(".");
-        String tableName = insertProcedure.substring( 0, posOfDot );
         try {
-        	colInfo = client.callProcedure("@SystemCatalog",
-        			"COLUMNS").getResults()[0];
-        	
-        	while( colInfo.advanceRow() )
+             procInfo = client.callProcedure("@SystemCatalog",
+            "PROCEDURECOLUMNS").getResults()[0];
+           
+            while( procInfo.advanceRow() )
+            {
+            	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
+            	{
+            		columnCnt++;
+            	}
+            }
+         }
+         catch (Exception e) {
+            e.printStackTrace();
+         }
+       
+         if( linefragement.length == 0 && !config.skipEmptyRecords )
+         {
+            for( int i = 0; i < columnCnt; i++)
+            	linefragement[ i ] = "";
+            return null;
+         }
+           
+        if( linefragement.length != columnCnt )//# attributes not match
+        {
+        	msg = "checkLineFormat Error: # of attributes do not match, # of attributes needed: "+columnCnt;
+        	return msg;
+        }
+        
+        else if( config.trimWhiteSpace )
+        {//trim white space in this line.
+        	for(int i=0; i<linefragement.length;i++) 
         	{
-        		if( tableName.matches( (String) colInfo.get("TABLE_NAME", VoltType.STRING) ) )
-        		{
-        			columnCnt++;
-           		}
+        		
+        			linefragement[i] = ((String)linefragement[i]).replaceAll( "\\s+", "" );
         	}
         }
-        catch (Exception e) {
-        	e.printStackTrace();
-        }  
-    	
-    	if( linefragement.length != columnCnt )//# attributes not match including blank line
-    		return msg;
-    	else 
-    		return null;
+        
+        return null;
     }
     
     /**

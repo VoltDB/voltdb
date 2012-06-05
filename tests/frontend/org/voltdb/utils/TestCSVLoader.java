@@ -59,7 +59,9 @@ public class TestCSVLoader extends TestCase {
             		//"--procedurename=BLAH.insert",
             		"--reportDir=" + userHome + "/",
             		"--tablename=BLAH",
-            		"--abortfailurecount=50"
+            		"--abortfailurecount=50",
+            		"--skipEmptyRecords=true",
+            		"--trimWhiteSpace=true"
             		};
             long lineCount = CSVLoader.main(params);
             // do the test
