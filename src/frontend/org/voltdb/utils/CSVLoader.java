@@ -19,19 +19,13 @@ package org.voltdb.utils;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.util.ArrayList;
 import java.util.Collections;
-import java.util.HashSet;
 import java.util.List;
-import java.util.Set;
-import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -39,6 +33,7 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.plannodes.InsertPlanNode;
 
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
@@ -68,7 +63,7 @@ class CSVLoader {
     private static int waitSeconds = 10;
     
     final CSVConfig config;
-    //private static int abortfailurecount = 100; // by default right now
+    private static String inserProcedure = "";
     private static List<Long> invalidLines = new ArrayList<Long>();
 
     private static final class MyCallback implements ProcedureCallback {
@@ -144,11 +139,17 @@ class CSVLoader {
     public CSVLoader (CSVConfig cfg) {
     	this.config = cfg;
     	
+    	if (!config.tablename.equals("")) {
+    		inserProcedure = config.tablename + ".insert";
+    	} else {
+    		inserProcedure = config.procedurename;
+    	}
+    	
     }
     
     /**
 	 * TODO(xin): produce the invalid row file from
-	 * 
+	 * Bulk the flush later...
 	 * @param inputFile
 	 */
 	private void produceInvalidRowsFile() {
@@ -170,7 +171,6 @@ class CSVLoader {
 						break;
 					}
 				}
-
 			}
 			out.flush();
 			out.close();
@@ -226,7 +226,7 @@ class CSVLoader {
                     	}
                     	break;
                     }
-                    queued = client.callProcedure(cb, config.procedurename, (Object[])correctedLine);
+                    queued = client.callProcedure(cb, inserProcedure, (Object[])correctedLine);
                     	
                     if (queued == false) {
                         ++waits;
