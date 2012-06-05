@@ -104,7 +104,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
 
             m_babySitter = new BabySitter(m_messenger.getZK(),
                     LeaderElector.electionDirForPartition(m_partitionId),
-                    m_replicasChangeHandler);
+                    m_replicasChangeHandler, true);
 
             declareReadyAsLeader();
         } catch (Exception e) {

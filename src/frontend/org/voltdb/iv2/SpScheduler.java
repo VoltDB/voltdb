@@ -98,6 +98,10 @@ public class SpScheduler extends Scheduler
             Iv2InitiateTaskMessage msg = message;
             if (m_isLeader) {
                 // Need to set the SP handle on the received message
+                // Need to copy this or the other local sites handling
+                // the same initiate task message will overwrite each
+                // other's memory -- the message isn't copied on delivery
+                // to other local mailboxes.
                 msg = new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                         message.getCoordinatorHSId(),
                         message.getTxnId(),
@@ -163,6 +167,8 @@ public class SpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getSpHandle());
+                // TODO: advance commit point
+                // m_repairLogTruncationHandle = message.getSpHandle();
                 try {
                     m_mailbox.send(counter.m_destinationId, message);
                 } catch (MessagingException e) {

@@ -20,8 +20,10 @@ package org.voltcore.zk;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Future;
 import java.util.List;
 
 import org.apache.zookeeper_voltpatches.data.Stat;
@@ -90,13 +92,21 @@ public class BabySitter
      * Create a new BabySitter and fetch the current child list.
      * This ctor performs a blocking ZK transaction.
      */
-    public BabySitter(ZooKeeper zk, String dir, Callback cb)
+    public BabySitter(ZooKeeper zk, String dir, Callback cb, boolean blockOnInitialization)
+        throws InterruptedException, ExecutionException
     {
         this.zk = zk;
         this.dir = dir;
         this.cb = cb;
         this.es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Babysitter-" + dir));
-        es.submit(eventHandler);
+        Future<?> task = es.submit(eventHandler);
+        if (blockOnInitialization) {
+            try {
+                task.get();
+            } catch (ExecutionException e) {
+                org.voltdb.VoltDB.crashLocalVoltDB("Failed to initialize the babysitter watch.", true, e);
+            }
+        }
     }
 
     // eventHandler fetches the new children and resets the watch.
@@ -117,7 +127,7 @@ public class BabySitter
                     cb.run(children);
                 }
             } catch (KeeperException e) {
-                org.voltdb.VoltDB.crashLocalVoltDB("Failed to reset babysitter watch", true, e);
+                org.voltdb.VoltDB.crashLocalVoltDB("KeeperException resetting babysitter watch", true, e);
             } catch (InterruptedException e) {
                 org.voltdb.VoltDB.crashLocalVoltDB("Interrupted resetting babysitter watch", true, e);
             }
