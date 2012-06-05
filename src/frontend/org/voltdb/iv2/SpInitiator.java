@@ -85,29 +85,11 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             Future<?> inaugurated = m_term.start();
             inaugurated.get();
             m_scheduler.setLeaderState(true);
-            declareReadyAsLeader();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Bad news.", true, e);
         }
     }
 
-    // with leadership election complete, update the master list
-    // for non-initiator components that care.
-    void declareReadyAsLeader()
-    {
-        hostLog.info("Registering " +  m_partitionId + " as new master.");
-        try {
-            MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
-            iv2masters.put(Integer.toString(m_partitionId),
-                    new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
-        } catch (KeeperException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        } catch (JSONException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        }
-    }
 
     /** Register with m_partition's leader elector node */
     public boolean joinElectoralCollege()

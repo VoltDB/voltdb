@@ -28,10 +28,18 @@ import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCacheWriter;
+
+import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
 /**
  * Term encapsulates the process/algorithm of becoming
@@ -141,13 +149,14 @@ public class Term
             m_babySitter = new BabySitter(m_zk,
                     LeaderElector.electionDirForPartition(m_partitionId),
                     m_replicasChangeHandler, true);
+            declareReadyAsLeader();
         } catch (Exception e) {
             result.setException(e);
         }
-
         result.m_doneLatch.countDown();
         return result;
     }
+
 
     public Future<?> cancel()
     {
@@ -165,4 +174,24 @@ public class Term
     {
         return m_babySitter.lastSeenChildren();
     }
+
+    // with leadership election complete, update the master list
+    // for non-initiator components that care.
+    void declareReadyAsLeader()
+    {
+        hostLog.info("Registering " +  m_partitionId + " as new master.");
+        try {
+            MapCacheWriter iv2masters = new MapCache(m_zk, VoltZK.iv2masters);
+            iv2masters.put(Integer.toString(m_partitionId),
+                    new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
+        } catch (KeeperException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
+        } catch (JSONException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
+        }
+    }
+
+
 }
