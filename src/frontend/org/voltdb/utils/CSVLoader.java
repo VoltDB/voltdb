@@ -282,11 +282,19 @@ class CSVLoader {
             e.printStackTrace();
          }
        
-         if( linefragement.length == 0 && !config.skipEmptyRecords )
+         if( linefragement.length == 0  )
          {
-            for( int i = 0; i < columnCnt; i++)
-            	linefragement[ i ] = "";
-            return null;
+        	if( config.skipEmptyRecords )
+        	{
+        		msg = "checkLineFormat Error: blank line";
+        		return msg;
+        	}
+        	else
+        	{
+        		for( int i = 0; i < columnCnt; i++)
+        			linefragement[ i ] = "";
+        		return null;
+        	}
          }
            
         if( linefragement.length != columnCnt )//# attributes not match

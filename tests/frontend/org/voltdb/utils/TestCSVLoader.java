@@ -56,13 +56,12 @@ public class TestCSVLoader extends TestCase {
             localServer.waitForInitialization();
             String userHome = System.getProperty("user.home");
             String []params = {"--inputfile=" + userHome + "/testdb.csv", 
-            		"--procedurename=BLAH.insert",
+            		//"--procedurename=BLAH.insert",
             		"--reportDir=" + userHome + "/",
             		"--tablename=BLAH",
             		"--abortfailurecount=50",
             		"--skipEmptyRecords=true",
             		"--trimWhiteSpace=true"
-
             		};
             long lineCount = CSVLoader.main(params);
             // do the test
