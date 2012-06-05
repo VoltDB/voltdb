@@ -22,16 +22,9 @@ import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.lang.String;
 
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
@@ -111,6 +104,9 @@ class CSVLoader {
     	
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
+    	
+    	@Option(desc = "a placeholder for several options that will deal with delimiters, charsets, etc..")
+    	String[] csvoptions = null;
     	
     	@Option(desc = ".")
     	boolean setSkipEmptyRecords = false;
