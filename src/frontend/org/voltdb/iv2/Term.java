@@ -180,15 +180,11 @@ public class Term
         }
     }
 
-    public List<String> lastSeenChildren()
-    {
-        return m_babySitter.lastSeenChildren();
-    }
-
+    /**
+     *  Block until all replica's are present.
+     */
     void prepareForStartup(int kfactor)
     {
-        // This block-on-all-the-replicas-at-startup thing sucks.  Hopefully this can
-        // go away when we get rejoin working.
         List<String> children = m_babySitter.lastSeenChildren();
         while (children.size() < kfactor + 1) {
             try {
@@ -201,6 +197,7 @@ public class Term
 
     void prepareForFaultRecovery()
     {
+
     }
 
     // with leadership election complete, update the master list
