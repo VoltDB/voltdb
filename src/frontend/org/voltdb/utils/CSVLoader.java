@@ -32,8 +32,10 @@ import java.util.TimeZone;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
+import java.lang.String;
 
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
@@ -101,7 +103,7 @@ class CSVLoader {
             
             long currentCount = inCount.incrementAndGet();
             System.out.println("<xin> put line " + inCount.get() + " to databse");
-            
+             
             if (currentCount % reportEveryNRows == 0) {
                 System.out.println("Inserted " + currentCount + " rows");
             }
@@ -184,8 +186,9 @@ class CSVLoader {
                     	msg += correctedLine[i] + ",";
                     }
                     System.out.println(msg);
-               
-                    if(!checkLineFormat(correctedLine, client)){
+                    boolean setTrimWhiteSpace = true;
+                    boolean setSkipEmptyRecords = true;
+                    if(!checkLineFormat(correctedLine, client, insertProcedure, setSkipEmptyRecords, setTrimWhiteSpace )){
                     	System.err.println("Stop at line " + (outCount.get()));
                     	synchronized (invalidLines) {
                     		if (!invalidLines.contains(outCount.get())) {
@@ -211,7 +214,7 @@ class CSVLoader {
             client.drain();
             client.close();
             
-            produceInvalidRowsFile(filename, "/Users/xinjia/invalidrows.csv");            
+            produceInvalidRowsFile(filename, "/home/zhengli/invalidrows.csv");            
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -237,22 +240,51 @@ class CSVLoader {
      * And does other pre-checks...(figure out it later) 
      * @param linefragement
      */
-    private static boolean checkLineFormat(Object[] linefragement, Client client ) {
-    	VoltTable[] results = null;
-        int columnCnt = -1;
+    private static boolean checkLineFormat(Object[] linefragement, 
+    									   Client client,
+    									   final String insertProcedure,
+    									   boolean setSkipEmptyRecords,
+    									   boolean setTrimWhitespace ) {
+      	VoltTable colInfo = null;
+        int columnCnt = 0;
+        
+        int posOfDot = insertProcedure.indexOf(".");
+        String tableName = insertProcedure.substring( 0, posOfDot );
+        
         try {
-        	results = client.callProcedure("@SystemCatalog",
-        			"COLUMNS").getResults();
-        	columnCnt = results[0].getRowCount();
+        	colInfo = client.callProcedure("@SystemCatalog",
+        			"COLUMNS").getResults()[0];
+        	
+        	while( colInfo.advanceRow() )
+        	{
+        		if( tableName.matches( (String) colInfo.get("TABLE_NAME", VoltType.STRING) ) )
+        		{
+        			columnCnt++;
+           		}
+        	}
+        	
         }
         catch (Exception e) {
         	e.printStackTrace();
         }  
     	
-    	if( linefragement.length != columnCnt )//# attributes not match including blank line
+        if( linefragement.length == 0 && !setSkipEmptyRecords )
+  		{
+        	for( int i = 0; i < columnCnt; i++)
+        		linefragement[ i ] = "";
+        	return true;
+  		}
+        
+    	if( linefragement.length != columnCnt )//# attributes not match
     		return false;
-    	else 
-    		return true;
+    	
+    	else if( setTrimWhitespace )
+    	{//trim white space for non in this line.
+    		for(int i=0; i<linefragement.length;i++) {
+    			linefragement[i] = ((String)linefragement[i]).replaceAll( "\\s+", "" );
+    		}
+    	} 
+    	return true;
     }
     
 	/**
