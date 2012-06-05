@@ -2036,6 +2036,10 @@ TEST_F(NValueTest, TestLike)
     testExpressions.push_back("ab_d_fg"); testMatches.push_back(1);
     testExpressions.push_back("%defg"); testMatches.push_back(1);
     testExpressions.push_back("%de%"); testMatches.push_back(1);
+    testExpressions.push_back("%%g"); testMatches.push_back(1);
+    testExpressions.push_back("%_a%"); testMatches.push_back(1);
+    testExpressions.push_back("%__c%"); testMatches.push_back(2);
+    testExpressions.push_back("a_%c%"); testMatches.push_back(2);
     //Take me down like i'm a domino
     testExpressions.push_back("â🀲x一xxéyyԱ"); testMatches.push_back(1);
     testExpressions.push_back("â_x一xxéyyԱ"); testMatches.push_back(1);
@@ -2060,10 +2064,20 @@ TEST_F(NValueTest, TestLike)
         }
         pattern.free();
         if (foundMatches != testMatch) {
-            printf("Pattern %s failed to match %d\n", testExpression, testMatch);
+            printf("Pattern %s failed to match %d, matched %d instead\n", testExpression, testMatch, foundMatches);
         }
         EXPECT_EQ( foundMatches, testMatch);
     }
+
+    /*
+     * Test an edge case Paul noticed during his review
+     * https://github.com/VoltDB/voltdb/pull/33#discussion_r926110
+     */
+    NValue value = voltdb::ValueFactory::getStringValue("XY");
+    NValue pattern1 = voltdb::ValueFactory::getStringValue("X%_");
+    NValue pattern2 = voltdb::ValueFactory::getStringValue("X%%");
+    EXPECT_TRUE(value.like(pattern1).isTrue());
+    EXPECT_TRUE(value.like(pattern2).isTrue());
 }
 int main() {
     return TestSuite::globalInstance()->runAll();

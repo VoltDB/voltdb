@@ -2774,12 +2774,15 @@ inline NValue NValue::like(const NValue rhs) const {
          */
         uint32_t extractCodePoint( const char *&iterator, const char *endIterator) {
             /*
-             * Copy the next 4 bytes to a temp buffer and retrieve
+             * Copy the next 6 bytes to a temp buffer and retrieve.
+             * We should only get 4 byte code points, and the library
+             * should only accept 4 byte code points, but once upon a time there
+             * were 6 byte code points in UTF-8 so be careful here.
              */
-            char nextPotentialCodePoint[] = { 0, 0, 0, 0 };
+            char nextPotentialCodePoint[] = { 0, 0, 0, 0, 0, 0 };
             char *nextPotentialCodePointIter = nextPotentialCodePoint;
-            //Copy 4 bytes or until the end
-            ::memcpy( nextPotentialCodePoint, iterator, std::min( 4L, endIterator - iterator));
+            //Copy 6 bytes or until the end
+            ::memcpy( nextPotentialCodePoint, iterator, std::min( 6L, endIterator - iterator));
 
             /*
              * Extract the code point, find out how many bytes it was
@@ -2804,11 +2807,33 @@ inline NValue NValue::like(const NValue rhs) const {
                     }
 
                     const char *postPercentPatternIterator = patternIterator;
-                    const uint32_t nextPatternCodePointAfterPercent = extractCodePoint( patternIterator, patternCharsEnd_);
+                    const uint32_t nextPatternCodePointAfterPercent =
+                            extractCodePoint( patternIterator, patternCharsEnd_);
+                    const bool nextPatternCodePointAfterPercentIsSpecial =
+                            (nextPatternCodePointAfterPercent == '_') ||
+                            (nextPatternCodePointAfterPercent == '%');
+
+                    /*
+                     * This loop tries to skip as many characters as possible with the % by checking
+                     * if the next value character matches the pattern character after the %.
+                     *
+                     * If the next pattern character is special then we always have to recurse to
+                     * match that character. For stacked %s this just skips to the last one.
+                     * For stacked _ it will recurse and demand the correct number of characters.
+                     *
+                     * For a regular character it will recurse if the value character matches the pattern character.
+                     * This saves doing a function call per character and allows us to skip if there is no match.
+                     */
                     while (valueIterator < valueCharsEnd_) {
+
                         const char *preExtractionValueIterator = valueIterator;
                         const uint32_t nextValueCodePoint = extractCodePoint( valueIterator, valueCharsEnd_);
-                        if ((nextPatternCodePointAfterPercent == nextValueCodePoint) &&
+
+                        const bool nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint =
+                                (nextPatternCodePointAfterPercentIsSpecial ||
+                                        (nextPatternCodePointAfterPercent == nextValueCodePoint));
+
+                        if ( nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint &&
                                 compareAt( postPercentPatternIterator, preExtractionValueIterator)) {
                             return true;
                         }
