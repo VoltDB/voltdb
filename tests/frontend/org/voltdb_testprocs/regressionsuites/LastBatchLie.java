@@ -21,7 +21,7 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.failureprocs;
+package org.voltdb_testprocs.regressionsuites;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
@@ -32,17 +32,17 @@ import org.voltdb.VoltTable;
     singlePartition = false
 )
 public class LastBatchLie extends VoltProcedure {
-    public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
+    public final SQLStmt insert = new SQLStmt("INSERT INTO P1 VALUES (?);");
 
     public VoltTable[] run() {
         // Do some multi-batch just to show it's not broken
         for (int j = 0; j < 10; j++) {
-            voltQueueSQL(insert, j, j, j);
+            voltQueueSQL(insert, j);
             voltExecuteSQL(false);
         }
-        voltQueueSQL(insert, 10, 10, 10);
+        voltQueueSQL(insert, 10);
         voltExecuteSQL(true);
-        voltQueueSQL(insert, 11, 11, 11);
+        voltQueueSQL(insert, 11);
         // This should cause a VoltAbortException
         voltExecuteSQL(true);
         return null;

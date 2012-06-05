@@ -21,13 +21,21 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.compiler.procedures;
+package org.voltdb_testprocs.regressionsuites;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
 
-public class IntParam extends VoltProcedure {
+@ProcInfo (
+    singlePartition = true,
+    partitionInfo = "P1.ID:0"
+)
+public class VariableBatchSizeSP extends VariableBatchSizeMP {
+    // override the replicated write so this will compile
+    final SQLStmt rWrite = new SQLStmt("update P1 set id = 1 where id = 1;");
 
-    public long run(int isbn) {
-        return 1;
+    @Override
+    public long run(long partitionParam, int[] opsForBatch1, int[] opsForBatch2) {
+        return super.run(partitionParam, opsForBatch1, opsForBatch2);
     }
 }

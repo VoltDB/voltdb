@@ -76,6 +76,29 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         return pkey;
     }
 
+    /** Load 1 1's, 2 2's, 3 3's .. 10 10's and 1 11 */
+    private int loaderNxNb(Client client, int pkey) throws ProcCallException,
+    IOException, NoConnectionsException {
+        VoltTable vt;
+        //String qs;
+        // Insert some known data. Insert {1, 2, 2, 3, 3, 3, ... }
+        for (byte i = 1; i <= 10; i++) {
+            for (byte j = 0; j < i; j++) {
+                // "INSERT INTO B VALUES (" + pkey++ + ", " + [i,i,0,0,i,i] + ");";
+                byte b[] = { i, i, 0, 0, i, i };
+                vt = client.callProcedure("BInsert", pkey++, b).getResults()[0];
+                assertTrue(vt.getRowCount() == 1);
+            }
+        }
+        // also add a single "11" to make verification a bit saner
+        // (so that the table results of "count" and "group by" can be
+        // distinguished)
+        vt = client.callProcedure("@AdHoc", "insert into B values (" + pkey++
+                + ",'0B0B00000B0B');").getResults()[0];
+        assertTrue(vt.getRowCount() == 1);
+        return pkey;
+    }
+
     /** load known data to F without loading the Dimension tables
      * @throws InterruptedException */
     private int loadF(Client client, int pkey) throws NoConnectionsException,
@@ -151,6 +174,41 @@ public class TestPlansGroupBySuite extends RegressionSuite {
             assertTrue(A1 <= 11);
             assertTrue(A1 > 0);
             found[A1.intValue()] += 1;
+        }
+        assertEquals(0, found[0]);
+        for (int i = 1; i < 12; i++) {
+            assertEquals(1, found[i]);
+        }
+    }
+
+    /** select B_VAL1 from B group by B_VAL1 */
+    public void testSelectGroubyVarbinary() throws IOException, ProcCallException {
+        Client client = this.getClient();
+        VoltTable vt;
+
+        loaderNxNb(client, 0);
+
+        vt = client.callProcedure("@AdHoc", "Select * from B").getResults()[0];
+        System.out.println("B-*:" + vt);
+
+        // execute the query
+        vt = client.callProcedure("@AdHoc", "SELECT B_VAL1 from B group by B_VAL1").getResults()[0];
+
+        // one row per unique value of A1
+        System.out.println("testSelectGroubyVarbinary: " + vt);
+        assertTrue(vt.getRowCount() == 11);
+
+        // Selecting B_VAL1 - should get byte values "1,1,1,1,1,1" through "11,11,11,11,11,11"
+        // once each. These results aren't necessarily ordered.
+        byte found[] = { 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0, 0 };
+        while (vt.advanceRow()) {
+            byte[] b_val1 = vt.getVarbinary(0);
+            assertTrue(b_val1.length == 6);
+            assertTrue(b_val1[0] <= 11);
+            assertTrue(b_val1[5] <= 11);
+            assertTrue(b_val1[0] > 0);
+            assertTrue(b_val1[5] > 0);
+            found[b_val1[0]] += 1;
         }
         assertEquals(0, found[0]);
         for (int i = 1; i < 12; i++) {
@@ -618,6 +676,7 @@ public class TestPlansGroupBySuite extends RegressionSuite {
         project.addPartitionInfo("F", "F_PKEY");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("T1Insert", "INSERT INTO T1 VALUES (?, ?);");
+        project.addStmtProcedure("BInsert", "INSERT INTO B VALUES (?, ?);");
 
         // config = new LocalSingleProcessServer("plansgroupby-ipc.jar", 1, BackendTarget.NATIVE_EE_IPC);
         // config.compile(project);
