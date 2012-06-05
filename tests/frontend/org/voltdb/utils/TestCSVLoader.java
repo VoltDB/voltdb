@@ -16,6 +16,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
 import junit.framework.TestCase;
 
 public class TestCSVLoader extends TestCase {
+
 	public void testSimple() throws Exception {
         String simpleSchema =
             "create table BLAH (" +
@@ -53,27 +54,21 @@ public class TestCSVLoader extends TestCase {
         try {
             localServer.start();
             localServer.waitForInitialization();
-
-            String []params = {"/Users/xinjia/testdb.csv","BLAH.insert", 
-            		"--reportDir", "/Users/xinjia/invalidrows.csv",
-            		"--abortfailurecount", "100"};
-            //String []params = {"/Users/xinjia/testdb.csv","Insert","--columns", "0,2,1"};
+            String userHome = System.getProperty("user.home");
+            String []params = {userHome + "/testdb.csv", 
+            		//"--procedurename=BLAH.insert",
+            		"--reportDir=" + userHome + "/invalidrows.csv",
+            		"--tablename=BLAH",
+            		"--abortfailurecount=50"
+            		};
             long lineCount = CSVLoader.main(params);
-            
             // do the test
             client = ClientFactory.createClient();
             client.createConnection("localhost");
             
-//            final CSVReader reader = new CSVReader(new FileReader(params[0]));
-//            int lineCount = 0;
-//            while (reader.readNext() != null) {
-//            	lineCount++;
-//            }
-            
             VoltTable modCount;
             modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
             System.out.println("data inserted to table BLAH:\n" + modCount);
-            
             
             modCount = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;").getResults()[0];
             int rowct = 0;
@@ -81,6 +76,7 @@ public class TestCSVLoader extends TestCase {
             	rowct = (Integer) modCount.get(0, VoltType.INTEGER);
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
+            
             assertEquals(lineCount, rowct);
             
         }
