@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.List;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -58,35 +59,14 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
 
     // Encapsulated objects
     private InitiatorMailbox m_initiatorMailbox = null;
+    private Term m_term = null;
     private Site m_executionSite = null;
     private Scheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
     private LeaderElector m_leaderElector = null;
     // Only gets set non-null for the leader
-    private BabySitter m_babySitter = null;
     private Thread m_siteThread = null;
 
-    Callback m_replicasChangeHandler = new Callback()
-    {
-        @Override
-        public void run(List<String> children) {
-            hostLog.info("Babysitter for zkLeaderNode: " +
-                    LeaderElector.electionDirForPartition(m_partitionId) + ":");
-            hostLog.info("children: " + children);
-            // make an HSId array out of the children
-            // The list contains the leader, skip it
-            List<Long> replicas = new ArrayList<Long>(children.size() - 1);
-            for (String child : children) {
-                long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
-                if (HSId != getInitiatorHSId())
-                {
-                    replicas.add(HSId);
-                }
-            }
-            hostLog.info("Updated replicas: " + replicas);
-            m_initiatorMailbox.updateReplicas(replicas);
-        }
-    };
 
     public SpInitiator(HostMessenger messenger, Integer partition)
     {
@@ -100,12 +80,11 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     public void becomeLeader()
     {
         try {
+            m_term = new Term(m_messenger.getZK(), m_partitionId,
+                    getInitiatorHSId(), m_initiatorMailbox);
+            Future<?> inaugurated = m_term.start();
+            inaugurated.get();
             m_scheduler.setLeaderState(true);
-
-            m_babySitter = new BabySitter(m_messenger.getZK(),
-                    LeaderElector.electionDirForPartition(m_partitionId),
-                    m_replicasChangeHandler, true);
-
             declareReadyAsLeader();
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Bad news.", true, e);
@@ -161,13 +140,13 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                 hostLog.info("Chosen as leader for partition " + m_partitionId);
                 // This block-on-all-the-replicas-at-startup thing sucks.  Hopefully this can
                 // go away when we get rejoin working.
-                List<String> children = m_babySitter.lastSeenChildren();
+                List<String> children = m_term.lastSeenChildren();
                 while (children.size() < kfactor + 1) {
                     try {
                         Thread.sleep(5);
                     } catch (InterruptedException e) {
                     }
-                    children = m_babySitter.lastSeenChildren();
+                    children = m_term.lastSeenChildren();
                 }
             }
             else {
@@ -214,8 +193,8 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             if (m_leaderElector != null) {
                 m_leaderElector.shutdown();
             }
-            if (m_babySitter != null) {
-                m_babySitter.shutdown();
+            if (m_term != null) {
+                m_term.shutdown();
             }
         } catch (InterruptedException e) {
             // what to do here?
