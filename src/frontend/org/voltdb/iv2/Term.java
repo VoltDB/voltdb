@@ -90,40 +90,40 @@ public class Term
             m_exception = new ExecutionException(e);
         }
 
-		@Override
-		public boolean cancel(boolean mayInterruptIfRunning) {
-			return false;
-		}
+        @Override
+        public boolean cancel(boolean mayInterruptIfRunning) {
+            return false;
+        }
 
-		@Override
-		public boolean isCancelled() {
-			return false;
-		}
+        @Override
+        public boolean isCancelled() {
+            return false;
+        }
 
-		@Override
-		public boolean isDone() {
-			return false;
-		}
+        @Override
+        public boolean isDone() {
+            return false;
+        }
 
-		@Override
-		public Boolean get() throws InterruptedException, ExecutionException {
-			m_doneLatch.await();
+        @Override
+        public Boolean get() throws InterruptedException, ExecutionException {
+            m_doneLatch.await();
             if (m_exception != null) {
                 throw m_exception;
             }
             return true;
-		}
+        }
 
-		@Override
-		public Boolean get(long timeout, TimeUnit unit)
-				throws InterruptedException, ExecutionException,
-				TimeoutException {
-			m_doneLatch.await(timeout, unit);
+        @Override
+        public Boolean get(long timeout, TimeUnit unit)
+                throws InterruptedException, ExecutionException,
+                TimeoutException {
+            m_doneLatch.await(timeout, unit);
             if (m_exception != null) {
                 throw m_exception;
             }
             return true;
-		}
+        }
     }
 
     /**
