@@ -59,30 +59,6 @@ public class TestAdHocPlans extends AdHocQueryTester {
         runAllAdHocSPtests();
     }
 
-    void erk() {
-        /*
-/* Not SP and not YET supported by executor.
-* NOT SP
-        compileAdHoc("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;");
-*/
-        /*
-        spPartialCount = runQueryTest("SELECT * FROM PARTED1;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-
-        runQueryTest("SELECT * FROM PARTED1 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_SP_RESULT);
-
-        spPartialCount = runQueryTest("SELECT * FROM PARTED3;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED3 WHERE PARTVAL != 0;", 1, spPartialCount-1, 1, VALIDATING_SP_RESULT);
-
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-
-        spPartialCount = runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 0, 0, 1, NOT_VALIDATING_SP_RESULT);
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL != A.REPPEDVAL;", 1, spPartialCount-1, 1, VALIDATING_SP_RESULT);
-        */
-    }
-
     /**
      * For planner-only testing, most of the args are ignored.
      */
