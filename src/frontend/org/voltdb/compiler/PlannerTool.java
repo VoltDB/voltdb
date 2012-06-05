@@ -154,12 +154,6 @@ public class PlannerTool {
         for (Fragment frag : plan.fragments) {
             PlanNodeList planList = new PlanNodeList(frag.planGraph);
             String serializedPlan = planList.toJSONString();
-            try {
-                System.out.println(new JSONObject(serializedPlan).toString(4));
-            } catch (JSONException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
             String encodedPlan = serializedPlan; //Encoder.compressAndBase64Encode(serializedPlan);
             if (frag.multiPartition) {
                 assert(retval.allPlan == null);
