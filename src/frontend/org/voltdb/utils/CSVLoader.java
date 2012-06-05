@@ -22,16 +22,9 @@ import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.util.ArrayList;
-import java.util.Collections;
-import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import java.lang.String;
 
 import org.voltcore.messaging.HostMessenger.Config;
 import org.voltdb.CLIConfig;
@@ -248,7 +241,7 @@ class CSVLoader {
         }
         
     	CSVConfig cfg = new CSVConfig();
-    	cfg.inputfile = args[0];
+    	//cfg.inputfile = args[0];
     	cfg.parse(CSVLoader.class.getName(), args);
     	
     	CSVLoader loader = new CSVLoader(cfg);
@@ -340,9 +333,9 @@ class CSVLoader {
 			for (Long irow : errorMsg.keySet()) {
 				while ((line = csvfile.readLine()) != null) {
 					if (++linect == irow) {
-						String message = "invalid line " + irow + ":" + line + "\n";
+						String message = "invalid line " + irow + ":  " + line + "\n";
 						System.err.print(message);
-						out_invaliderowfile.write(message);
+						out_invaliderowfile.write(line + "\n");
 						out_logfile.write(message + errorMsg.get(irow).toString() + "\n"); 
 						break;
 					}
@@ -354,6 +347,8 @@ class CSVLoader {
 			}
 			out_reportfile.write("Number of failed tuples:" + errorMsg.size() + "\n");
 			out_reportfile.write("Number of loaded tuples:" + (outCount.get() - errorMsg.size()) + "\n");
+			// TODO(xin): Add more report message
+			
 			
 			out_invaliderowfile.flush();
 			out_logfile.flush();
