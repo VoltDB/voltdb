@@ -105,9 +105,6 @@ class CSVLoader {
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
     	
-    	@Option(desc = "a placeholder for several options that will deal with delimiters, charsets, etc..")
-    	String[] csvoptions = null;
-    	
     	@Option(desc = ".")
     	boolean setSkipEmptyRecords = true;
     	
@@ -243,7 +240,7 @@ class CSVLoader {
         }
         
     	CSVConfig cfg = new CSVConfig();
-    	cfg.inputfile = args[0];
+    	//cfg.inputfile = args[0];
     	cfg.parse(CSVLoader.class.getName(), args);
     	
     	CSVLoader loader = new CSVLoader(cfg);
@@ -318,9 +315,9 @@ class CSVLoader {
 			for (Long irow : errorMsg.keySet()) {
 				while ((line = csvfile.readLine()) != null) {
 					if (++linect == irow) {
-						String message = "invalid line " + irow + ":" + line + "\n";
+						String message = "invalid line " + irow + ":  " + line + "\n";
 						System.err.print(message);
-						out_invaliderowfile.write(message);
+						out_invaliderowfile.write(line + "\n");
 						out_logfile.write(message + errorMsg.get(irow).toString() + "\n"); 
 						break;
 					}
@@ -332,6 +329,8 @@ class CSVLoader {
 			}
 			out_reportfile.write("Number of failed tuples:" + errorMsg.size() + "\n");
 			out_reportfile.write("Number of loaded tuples:" + (outCount.get() - errorMsg.size()) + "\n");
+			// TODO(xin): Add more report message
+			
 			
 			out_invaliderowfile.flush();
 			out_logfile.flush();
