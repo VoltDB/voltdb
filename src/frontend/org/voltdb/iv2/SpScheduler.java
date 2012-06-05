@@ -116,30 +116,8 @@ public class SpScheduler extends Scheduler
                 if (!runner.isEverySite()) {
                     msg.setTxnId(newSpHandle);
                 }
-                if (m_replicaHSIds.size() > 0) {
-                    try {
-                        Iv2InitiateTaskMessage replmsg =
-                            new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
-                                    m_mailbox.getHSId(),
-                                    msg.getTxnId(),
-                                    msg.isReadOnly(),
-                                    msg.isSinglePartition(),
-                                    msg.getStoredProcedureInvocation(),
-                                    msg.getClientInterfaceHandle());
-                        // Update the handle in the copy
-                        replmsg.setSpHandle(newSpHandle);
-                        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
-                                replmsg);
-                    } catch (MessagingException e) {
-                        hostLog.error("Failed to deliver response from execution site.", e);
-                    }
-                    List<Long> expectedHSIds = new ArrayList<Long>(m_replicaHSIds);
-                    expectedHSIds.add(m_mailbox.getHSId());
-                    DuplicateCounter counter = new DuplicateCounter(
-                            msg.getInitiatorHSId(),
-                            msg.getTxnId(), expectedHSIds);
-                    m_duplicateCounters.put(newSpHandle, counter);
-                }
+
+                replicateIv2InitiateTaskMessage(msg, newSpHandle, m_replicaHSIds);
             }
             else {
                 newSpHandle = msg.getSpHandle();
@@ -156,6 +134,35 @@ public class SpScheduler extends Scheduler
                     "should never receive multi-partition initiations.");
         }
     }
+
+    public void replicateIv2InitiateTaskMessage(Iv2InitiateTaskMessage msg, long newSpHandle, List<Long> replicaHSIds)
+    {
+        if (replicaHSIds.size() > 0) {
+            try {
+                Iv2InitiateTaskMessage replmsg =
+                    new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
+                            m_mailbox.getHSId(),
+                            msg.getTxnId(),
+                            msg.isReadOnly(),
+                            msg.isSinglePartition(),
+                            msg.getStoredProcedureInvocation(),
+                            msg.getClientInterfaceHandle());
+                // Update the handle in the copy
+                replmsg.setSpHandle(newSpHandle);
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                        replmsg);
+            } catch (MessagingException e) {
+                hostLog.error("Failed to deliver response from execution site.", e);
+            }
+            List<Long> expectedHSIds = new ArrayList<Long>(replicaHSIds);
+            expectedHSIds.add(m_mailbox.getHSId());
+            DuplicateCounter counter = new DuplicateCounter(
+                    msg.getInitiatorHSId(),
+                    msg.getTxnId(), expectedHSIds);
+            m_duplicateCounters.put(newSpHandle, counter);
+        }
+    }
+
 
     // InitiateResponses for single-partition initiators currently get completely handled
     // by SpInitiatorMessageHandler.  This may change when replication is added.

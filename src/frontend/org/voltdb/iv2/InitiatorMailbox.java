@@ -80,6 +80,7 @@ public class InitiatorMailbox implements Mailbox
     public synchronized void deliver(VoltMessage message)
     {
         logRxMessage(message);
+        // m_repairLog.deliver(message);
         m_msgHandler.deliver(message);
     }
 
