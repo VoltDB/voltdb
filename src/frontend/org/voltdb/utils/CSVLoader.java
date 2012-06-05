@@ -76,6 +76,9 @@ class CSVLoader {
     private static String reportdir = ".";
     private static int abortfailurecount = 100; // by default right now
     private static List<Long> invalidLines = new ArrayList<Long>();
+    
+    private static boolean setSkipEmptyRecords = false;
+    private static boolean setTrimWhiteSpace = false;
 
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;
@@ -192,9 +195,7 @@ class CSVLoader {
                     	msg += correctedLine[i] + ",";
                     }
                     System.out.println(msg);
-                    boolean setTrimWhiteSpace = true;
-                    boolean setSkipEmptyRecords = true;
-                    if(!checkLineFormat(correctedLine, client, insertProcedure, setSkipEmptyRecords, setTrimWhiteSpace )){
+                    if(!checkLineFormat(correctedLine, client, insertProcedure )){
                     	System.err.println("Stop at line " + (outCount.get()));
                     	synchronized (invalidLines) {
                     		if (!invalidLines.contains(outCount.get())) {
@@ -254,9 +255,8 @@ class CSVLoader {
      */
     private static boolean checkLineFormat(Object[] linefragement, 
     									   Client client,
-    									   final String insertProcedure,
-    									   boolean setSkipEmptyRecords,
-    									   boolean setTrimWhitespace ) {
+    									   final String insertProcedure
+    									   ) {
       	VoltTable colInfo = null;
         int columnCnt = 0;
         
@@ -290,7 +290,7 @@ class CSVLoader {
     	if( linefragement.length != columnCnt )//# attributes not match
     		return false;
     	
-    	else if( setTrimWhitespace )
+    	else if( setTrimWhiteSpace )
     	{//trim white space for non in this line.
     		for(int i=0; i<linefragement.length;i++) {
     			linefragement[i] = ((String)linefragement[i]).replaceAll( "\\s+", "" );
@@ -341,6 +341,8 @@ class CSVLoader {
         final String columnsMatch = "--columns";
         final String failuerCountMatch = "--abortfailurecount";
         final String reportDirMatch = "--reportdir";
+        final String setSkipEmptyRecordsMatch = "--setskipemptyrecords";
+        final String setTrimWhiteSpaceMatch = "--settrimwhitespace";
         final String stripMatch = "--stripquotes";
         final String waitMatch = "--wait";
         final String auditMatch = "--audit";
@@ -389,6 +391,27 @@ class CSVLoader {
                     }
                     continue;
                 }
+                
+                else if (optionPrefix.equalsIgnoreCase(setSkipEmptyRecordsMatch)) {
+                    if (argsUsed < args.length) {
+                        try {
+                        	setSkipEmptyRecords = true;
+                        } catch (NumberFormatException e) {
+                        }
+                        continue;
+                    }
+                }
+                
+                else if (optionPrefix.equalsIgnoreCase(setTrimWhiteSpaceMatch)) {
+                    if (argsUsed < args.length) {
+                        try {
+                        	setTrimWhiteSpace = true;
+                        } catch (NumberFormatException e) {
+                        }
+                        continue;
+                    }
+                }
+                
             } else if (optionPrefix.equalsIgnoreCase(waitMatch)) {
                 if (argsUsed < args.length) {
                     try {
