@@ -122,18 +122,17 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("%", rowData.length),
             new LikeTest("a%", 3),
             new LikeTest("âxxx%", 1),
+            new LikeTest("aaaaaaa", 1),
+            new LikeTest("aaa", 0),
+            new LikeTest("abcdef_", 1),
+            new LikeTest("ab_d_fg", 1),
+            new LikeTest("%defg", 1),
+            new LikeTest("%de%", 1),
             new NotLikeTest("aaa%", rowData.length - 1),
             new EscapeLikeTest("abcccc|%", 1, "|"),
             new EscapeLikeTest("abc%", 2, "|"),
             new EscapeLikeTest("aaa", 0, "|"),
             // Patterns that fail (unsupported until we fix the parser)
-            new UnsupportedLikeTest("aaaaaaa", 0),
-            new UnsupportedLikeTest("aaa", 0),
-            new UnsupportedLikeTest("abcdef_", 1),
-            new UnsupportedLikeTest("ab_d_fg", 1),
-            new UnsupportedLikeTest("%defg", 1),
-            new UnsupportedLikeTest("%de%", 1),
-            new UnsupportedLikeTest("%de% ", 0),
             new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
         };
 
@@ -193,13 +192,19 @@ public class TestLikeQueries extends TestCase {
 
             // Tests using PAT column for pattern data
             {
-                // Expact all PAT column patterns to produce a match with the VAL column string.
-                // We don't support non-literal likes yet. Remove the catch when we do.
+                //Without an escape this works
                 String query = "select * from strings where val like pat";
+                VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+                assertEquals(String.format("LIKE column test: bad row count:"),
+                            rowData.length, result.getRowCount());
+
+                //With an escape there is no way for the escape to propagate to the expression in EE
+                //So HSQL should reject it due to our modifications
+                query = "select * from strings where val like pat ESCAPE '?'";
                 try {
-                    VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+                    result = client.callProcedure("@AdHoc", query).getResults()[0];
                     assertEquals(String.format("LIKE column test: bad row count:"),
-                                 tests.length, result.getRowCount());
+                            rowData.length, result.getRowCount());
                 } catch (ProcCallException e) {
                     System.out.println("LIKE column test failed (expected for now)");
                 }
