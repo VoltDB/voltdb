@@ -30,7 +30,6 @@ import org.json_voltpatches.JSONObject;
 
 import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -52,11 +51,17 @@ public class MpScheduler extends Scheduler
         new HashMap<Long, DuplicateCounter>();
     private final MapCache m_iv2Masters;
     private AtomicLong m_txnId = new AtomicLong(1l << 40);
+    private long m_buddyHSId;
 
     MpScheduler(MapCache iv2masters)
     {
         super();
         m_iv2Masters = iv2masters;
+    }
+
+    void setBuddyHSId(long buddyHSId)
+    {
+        m_buddyHSId = buddyHSId;
     }
 
     List<Long> getHSIdsForPartitionInitiators()
@@ -71,19 +76,6 @@ public class MpScheduler extends Scheduler
             }
         }
         return results;
-    }
-
-    long getBuddySiteForMPI(long hsId)
-    {
-        int host = CoreUtils.getHostIdFromHSId(hsId);
-
-        for (long pHsId : getHSIdsForPartitionInitiators()) {
-            if (host == CoreUtils.getHostIdFromHSId(pHsId)) {
-                return pHsId;
-            }
-        }
-        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
-                                   CoreUtils.hsIdToString(hsId));
     }
 
     @Override
@@ -149,11 +141,10 @@ public class MpScheduler extends Scheduler
         // Figure out the local partition initiator that we can use to do BorrowTask work
         // on our behalf.
         // HACK: grab the current sitetracker until we write leader notices.
-        long buddy_hsid = getBuddySiteForMPI(m_mailbox.getHSId());
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
                     m_txnId.incrementAndGet(), m_pendingTasks, message, partitionInitiators,
-                    buddy_hsid);
+                    m_buddyHSId);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);
     }

@@ -73,6 +73,8 @@ public class MpInitiator implements Initiator
         }
 
         m_scheduler.setLeaderState(true); // Only one MPI right now, always the leader
+        // ugh
+        ((MpScheduler)m_scheduler).setBuddyHSId(siteTracker.getBuddySiteForMPI(m_initiatorMailbox.getHSId()));
         m_executionSite = new Site(m_scheduler.getQueue(),
                                    m_initiatorMailbox.getHSId(),
                                    backend, catalogContext,

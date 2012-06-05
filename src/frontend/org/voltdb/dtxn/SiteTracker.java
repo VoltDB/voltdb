@@ -533,4 +533,17 @@ public class SiteTracker {
         // some leader election/master business when we replicate the MPI
         return m_allIv2MpInitiatorsImmutable.iterator().next();
     }
+
+    public long getBuddySiteForMPI(long hsId)
+    {
+        int host = CoreUtils.getHostIdFromHSId(hsId);
+
+        for (long pHsId : m_allIv2InitiatorsImmutable) {
+            if (host == CoreUtils.getHostIdFromHSId(pHsId)) {
+                return pHsId;
+            }
+        }
+        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
+                                   CoreUtils.hsIdToString(hsId));
+    }
 }
