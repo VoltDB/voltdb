@@ -32,6 +32,7 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte COALESCED_HEARTBEAT_ID = VOLTCORE_MESSAGE_ID_MAX + 8;
     final public static byte IV2_INITIATE_TASK_ID = VOLTCORE_MESSAGE_ID_MAX + 9;
     final public static byte IV2_REPAIR_LOG_REQUEST = VOLTCORE_MESSAGE_ID_MAX + 10;
+    final public static byte IV2_REPAIR_LOG_RESPONSE = VOLTCORE_MESSAGE_ID_MAX + 11;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
@@ -73,6 +74,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case IV2_REPAIR_LOG_REQUEST:
             message = new Iv2RepairLogRequestMessage();
+            break;
+        case IV2_REPAIR_LOG_RESPONSE:
+            message = new Iv2RepairLogResponseMessage();
             break;
         default:
             message = null;
