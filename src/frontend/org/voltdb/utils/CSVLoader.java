@@ -73,6 +73,8 @@ class CSVLoader {
     private static boolean stripQuotes = false;
     private static int[] colProjection = null;
     
+    private static String reportdir = ".";
+    private static int abortfailurecount = 100; // by default right now
     private static List<Long> invalidLines = new ArrayList<Long>();
 
     private static final class MyCallback implements ProcedureCallback {
@@ -96,14 +98,18 @@ class CSVLoader {
                 synchronized (invalidLines) {
                 	if (!invalidLines.contains(m_lineNum))
                 		invalidLines.add(m_lineNum);
+                	if (invalidLines.size() >= abortfailurecount) {
+                		System.err.println("The number of Failure row data exceeds " + abortfailurecount);
+                		System.exit(1);
+                	}
                 }
                 //System.exit(1);
                 return;
             }
             
             long currentCount = inCount.incrementAndGet();
-            System.out.println("<xin> put line " + inCount.get() + " to databse");
-             
+
+            System.out.println("Put line " + inCount.get() + " to databse");
             if (currentCount % reportEveryNRows == 0) {
                 System.out.println("Inserted " + currentCount + " rows");
             }
@@ -194,6 +200,10 @@ class CSVLoader {
                     		if (!invalidLines.contains(outCount.get())) {
                     			invalidLines.add(outCount.get());
                     		}
+                    		if (invalidLines.size() >= abortfailurecount) {
+                    			System.err.println("The number of Failure row data exceeds " + abortfailurecount);
+                        		System.exit(1);
+                    		}
                     	}
                     	break;
                     }
@@ -214,7 +224,9 @@ class CSVLoader {
             client.drain();
             client.close();
             
-            produceInvalidRowsFile(filename, "/home/zhengli/invalidrows.csv");            
+         
+            produceInvalidRowsFile(filename);            
+
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -292,13 +304,12 @@ class CSVLoader {
 	 * 
 	 * @param inputFile
 	 */
-	private static void produceInvalidRowsFile(String inputFile,
-			String outputFile) {
+	private static void produceInvalidRowsFile(String inputFile) {
 		Collections.sort(invalidLines);
 		System.out.println("All the invalid row numbers are:" + invalidLines);
 		String line = "";
 		try {
-			FileWriter fstream = new FileWriter(outputFile);
+			FileWriter fstream = new FileWriter(reportdir);
 			BufferedWriter out = new BufferedWriter(fstream);
 			BufferedReader csvfile = new BufferedReader(new FileReader(inputFile));
 
@@ -328,6 +339,8 @@ class CSVLoader {
     
     private static void processCommandLineOptions(int argsUsed, String args[]) {
         final String columnsMatch = "--columns";
+        final String failuerCountMatch = "--abortfailurecount";
+        final String reportDirMatch = "--reportdir";
         final String stripMatch = "--stripquotes";
         final String waitMatch = "--wait";
         final String auditMatch = "--audit";
@@ -357,6 +370,24 @@ class CSVLoader {
                             continue;
                         }
                     }
+                }
+            } else if (optionPrefix.equalsIgnoreCase(failuerCountMatch)) {
+                if (argsUsed < args.length) {
+                    try {
+                    	abortfailurecount = Integer.parseInt(args[argsUsed++]);
+                        continue;
+                    } catch (NumberFormatException e) {
+                    	System.err.println("Invalid input integer parameter of abortfailurecount");
+                    }
+                    continue;
+                }
+            } else if (optionPrefix.equalsIgnoreCase(reportDirMatch)) {
+                if (argsUsed < args.length) {
+                    try {
+                        reportdir = (args[argsUsed++]);
+                    } catch (NumberFormatException e) {
+                    }
+                    continue;
                 }
             } else if (optionPrefix.equalsIgnoreCase(waitMatch)) {
                 if (argsUsed < args.length) {

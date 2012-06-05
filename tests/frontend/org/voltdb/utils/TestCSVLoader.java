@@ -54,7 +54,9 @@ public class TestCSVLoader extends TestCase {
             localServer.start();
             localServer.waitForInitialization();
 
-            String []params = {"/Users/xinjia/testdb.csv","BLAH.insert"};
+            String []params = {"/Users/xinjia/testdb.csv","BLAH.insert", 
+            		"--reportDir", "/Users/xinjia/invalidrows.csv",
+            		"--abortfailurecount", "100"};
             //String []params = {"/Users/xinjia/testdb.csv","Insert","--columns", "0,2,1"};
             long lineCount = CSVLoader.main(params);
             
