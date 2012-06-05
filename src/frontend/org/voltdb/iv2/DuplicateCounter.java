@@ -21,6 +21,10 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
 
+import org.voltcore.logging.VoltLogger;
+
+import org.voltcore.messaging.VoltMessage;
+
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 
@@ -36,10 +40,12 @@ public class DuplicateCounter
     static final int DONE = 1;
     static final int WAITING = 2;
 
+    protected VoltLogger hostLog = new VoltLogger("HOST");
     final long m_destinationId;
     Long m_responseHash = null;
-    protected FragmentResponseMessage m_lastResponse;
+    protected VoltMessage m_lastResponse = null;
     final Set<Long> m_expectedHSIds;
+    final long m_txnId;
 
     DuplicateCounter(
             long destinationHSId,
@@ -47,7 +53,24 @@ public class DuplicateCounter
             List<Long> expectedHSIds)
     {
         m_destinationId = destinationHSId;
+        m_txnId = realTxnId;
         m_expectedHSIds = new HashSet<Long>(expectedHSIds);
+    }
+
+    long getTxnId()
+    {
+        return m_txnId;
+    }
+
+    int updateReplicas(List<Long> replicas) {
+        Set<Long> newSet = new HashSet<Long>(replicas);
+        m_expectedHSIds.retainAll(newSet);
+        if (m_expectedHSIds.size() == 0) {
+            return DONE;
+        }
+        else {
+            return WAITING;
+        }
     }
 
     protected int checkCommon(long hash, long srcHSId)
@@ -72,6 +95,7 @@ public class DuplicateCounter
     int offer(InitiateResponseMessage message)
     {
         long hash = message.getClientResponseData().getHashOfTableResults();
+        m_lastResponse = message;
         return checkCommon(hash, message.m_sourceHSId);
     }
 
@@ -85,7 +109,7 @@ public class DuplicateCounter
         return checkCommon(hash, message.m_sourceHSId);
     }
 
-    FragmentResponseMessage getLastFragmentResponse()
+    VoltMessage getLastResponse()
     {
         return m_lastResponse;
     }

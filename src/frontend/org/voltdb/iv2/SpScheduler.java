@@ -22,6 +22,7 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicLong;
 
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
@@ -52,10 +53,33 @@ public class SpScheduler extends Scheduler
     {
     }
 
+    // This is going to run in the BabySitter's thread.  This and deliver are synchronized by
+    // virtue of both being called on InitiatorMailbox and not directly called.
     @Override
     public void updateReplicas(List<Long> replicas)
     {
         m_replicaHSIds = replicas;
+        Iterator<DuplicateCounter> iter = m_duplicateCounters.values().iterator();
+        while (iter.hasNext()) {
+            DuplicateCounter counter = iter.next();
+            int result = counter.updateReplicas(m_replicaHSIds);
+            if (result == DuplicateCounter.DONE) {
+                m_duplicateCounters.remove(counter);
+                VoltMessage resp = counter.getLastResponse();
+                if (resp != null) {
+                    try {
+                        m_mailbox.send(counter.m_destinationId, resp);
+                    } catch (MessagingException e) {
+                        // Maybe should crash here?
+                        hostLog.error("Failed to send response while updating replicas", e);
+                    }
+                }
+                else {
+                    hostLog.warn("TXN " + counter.getTxnId() + " lost all replicas and " +
+                            "had no responses.  This should be impossible?");
+                }
+            }
+        }
     }
 
     // SpInitiators will see every message type.  The Responses currently come
@@ -116,8 +140,30 @@ public class SpScheduler extends Scheduler
                 if (!runner.isEverySite()) {
                     msg.setTxnId(newSpHandle);
                 }
-
-                replicateIv2InitiateTaskMessage(msg, newSpHandle, m_replicaHSIds);
+                if (m_replicaHSIds.size() > 0) {
+                    try {
+                        Iv2InitiateTaskMessage replmsg =
+                            new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
+                                    m_mailbox.getHSId(),
+                                    msg.getTxnId(),
+                                    msg.isReadOnly(),
+                                    msg.isSinglePartition(),
+                                    msg.getStoredProcedureInvocation(),
+                                    msg.getClientInterfaceHandle());
+                        // Update the handle in the copy
+                        replmsg.setSpHandle(newSpHandle);
+                        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                                replmsg);
+                    } catch (MessagingException e) {
+                        hostLog.error("Failed to send Iv2InitiateTaskMessage to replica", e);
+                    }
+                    List<Long> expectedHSIds = new ArrayList<Long>(m_replicaHSIds);
+                    expectedHSIds.add(m_mailbox.getHSId());
+                    DuplicateCounter counter = new DuplicateCounter(
+                            msg.getInitiatorHSId(),
+                            msg.getTxnId(), expectedHSIds);
+                    m_duplicateCounters.put(newSpHandle, counter);
+                }
             }
             else {
                 newSpHandle = msg.getSpHandle();
@@ -135,35 +181,6 @@ public class SpScheduler extends Scheduler
         }
     }
 
-    public void replicateIv2InitiateTaskMessage(Iv2InitiateTaskMessage msg, long newSpHandle, List<Long> replicaHSIds)
-    {
-        if (replicaHSIds.size() > 0) {
-            try {
-                Iv2InitiateTaskMessage replmsg =
-                    new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
-                            m_mailbox.getHSId(),
-                            msg.getTxnId(),
-                            msg.isReadOnly(),
-                            msg.isSinglePartition(),
-                            msg.getStoredProcedureInvocation(),
-                            msg.getClientInterfaceHandle());
-                // Update the handle in the copy
-                replmsg.setSpHandle(newSpHandle);
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
-                        replmsg);
-            } catch (MessagingException e) {
-                hostLog.error("Failed to deliver response from execution site.", e);
-            }
-            List<Long> expectedHSIds = new ArrayList<Long>(replicaHSIds);
-            expectedHSIds.add(m_mailbox.getHSId());
-            DuplicateCounter counter = new DuplicateCounter(
-                    msg.getInitiatorHSId(),
-                    msg.getTxnId(), expectedHSIds);
-            m_duplicateCounters.put(newSpHandle, counter);
-        }
-    }
-
-
     // InitiateResponses for single-partition initiators currently get completely handled
     // by SpInitiatorMessageHandler.  This may change when replication is added.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)
@@ -174,8 +191,6 @@ public class SpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getSpHandle());
-                // TODO: advance commit point
-                // m_repairLogTruncationHandle = message.getSpHandle();
                 try {
                     m_mailbox.send(counter.m_destinationId, message);
                 } catch (MessagingException e) {
@@ -291,7 +306,7 @@ public class SpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getSpHandle());
-                FragmentResponseMessage resp = counter.getLastFragmentResponse();
+                FragmentResponseMessage resp = (FragmentResponseMessage)counter.getLastResponse();
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
                 resp.setExecutorSiteId(m_mailbox.getHSId());

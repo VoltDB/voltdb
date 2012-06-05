@@ -70,10 +70,10 @@ public class SysProcDuplicateCounter extends DuplicateCounter
     }
 
     @Override
-    FragmentResponseMessage getLastFragmentResponse()
+    FragmentResponseMessage getLastResponse()
     {
         FragmentResponseMessage unioned =
-            new FragmentResponseMessage(m_lastResponse);
+            new FragmentResponseMessage((FragmentResponseMessage)m_lastResponse);
         // union up all the deps we've collected and jam them in
         for (Entry<Integer, List<VoltTable>> dep : m_alldeps.entrySet()) {
             VoltTable grouped = unionTables(dep.getValue());
