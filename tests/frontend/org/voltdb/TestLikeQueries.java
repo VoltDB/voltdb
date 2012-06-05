@@ -153,6 +153,8 @@ public class TestLikeQueries extends TestCase {
         builder.addLiteralSchema(schema);
         builder.addPartitionInfo("STRINGS", "ID");
         builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);", null);
+        builder.addStmtProcedure("SelectLike", "select * from strings where  val like ?;");
+        builder.addStmtProcedure("SelectNotLike", "select * from strings where  val not like ?;");
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Insert compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -182,6 +184,32 @@ public class TestLikeQueries extends TestCase {
             }
 
             // Tests based on LikeTest list
+            for (LikeTest test : tests) {
+                String procName = null;
+                if (test.getClass() == LikeTest.class) {
+                    procName = "SelectLike";
+                } else if (test instanceof NotLikeTest) {
+                    procName = "NotLike";
+                } else if (test instanceof EscapeLikeTest) {
+                    continue;
+                }
+                if (test.getClass() == LikeTest.class) {
+                    System.out.printf("SelectLike pattern \"%s\"\n", test.pattern);
+                    try {
+                        VoltTable result = client.callProcedure(procName, test.pattern).getResults()[0];
+                        assertEquals(String.format("\"%s\": bad row count:", test.pattern),
+                                     test.matches, result.getRowCount());
+                        System.out.println(result.toString());
+                        assertFalse(String.format("Expected to crash on \"%s\", but didn't", test.pattern), test.crashes);
+                    } catch (ProcCallException e) {
+                        System.out.printf("LIKE pattern \"%s\" failed\n", test.pattern);
+                        System.out.println(e.toString());
+                        assertTrue("This failure was unexpected", test.crashes);
+                        System.out.println("(This failure was expected)");
+                    }
+                }
+            }
+
             for (LikeTest test : tests) {
                 String clause = test.getClause();
                 String query = String.format("select * from strings where val %s", clause);
