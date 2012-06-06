@@ -114,7 +114,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     siteId,
                     partitionId,
                     hostId,
-                    hostname,
+                    getStringBytes(hostname),
                     tempTableMemory * 1024 * 1024,
                     totalPartitions);
         checkErrorCode(errorCode);
@@ -185,7 +185,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeLoadCatalog(pointer, txnId, serializedCatalog);
+            errorCode = nativeLoadCatalog(pointer, txnId, getStringBytes(serializedCatalog));
         }
         checkErrorCode(errorCode);
         //LOG.info("Loaded Catalog.");
@@ -201,7 +201,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeUpdateCatalog(pointer, txnId, catalogDiffs);
+            errorCode = nativeUpdateCatalog(pointer, txnId, getStringBytes(catalogDiffs));
         }
         checkErrorCode(errorCode);
     }
@@ -306,7 +306,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-    private  byte[] getStringBytes(String string) {
+    private static byte[] getStringBytes(String string) {
         try {
             return string.getBytes("UTF-8");
         } catch (UnsupportedEncodingException e) {
@@ -537,7 +537,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializer.clear();
         ExportProtoMessage result = null;
         long retval = nativeExportAction(pointer,
-                                         syncAction, ackTxnId, seqNo, tableSignature);
+                                         syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
             result = new ExportProtoMessage( 0, partitionId, tableSignature);
             result.error();
@@ -547,7 +547,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long[] getUSOForExportTable(String tableSignature) {
-        return nativeGetUSOForExportTable(pointer, tableSignature);
+        return nativeGetUSOForExportTable(pointer, getStringBytes(tableSignature));
     }
 
     @Override
