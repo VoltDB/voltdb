@@ -74,9 +74,9 @@ class CSVLoader {
 
 	private static boolean standin = false;
     
-    public static final String invaliderowsfile = "CSVinvalidrows.csv";
-    public static final String reportfile = "CSVLoaderReport.log";
-    public static final String logfile = "CSVLoaderLog.log";
+    public static final String invaliderowsfile = "csvinvalidrows.csv";
+    public static final String reportfile = "csvLoaderReport.log";
+    public static final String logfile = "csvLoaderLog.log";
 
     private static String insertProcedure = "";
     private static Map <Long,String[]> errorInfo = new TreeMap<Long, String[]>();
@@ -383,13 +383,14 @@ class CSVLoader {
 					out_logfile.flush();
 				}
 			}
-			out_reportfile.write("Number of lines:" + outCount.get() + "\n");
-			out_reportfile.write("Number of failed tuples:" + errorInfo.size() + "\n");
-			out_reportfile.write("Number of acknowledged tuples:" + inCount.get() + "\n");
 			// Get elapsed time in seconds
 			float elapsedTimeSec = this.getLatency()/1000F;
-			out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds");
-			;
+			out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds\n");
+			out_reportfile.write("Number of tuples tring to insert:" + outCount.get() + "\n");
+			out_reportfile.write("Number of failed tuples:" + errorInfo.size() + "\n");
+			out_reportfile.write("Number of acknowledged tuples:     " + inCount.get() + "\n");
+			out_reportfile.write("CSVLoader rate: " + outCount.get() / elapsedTimeSec + " row/s\n");
+			
 			// TODO(xin): Add more report message
 			out_invaliderowfile.flush();
 			out_logfile.flush();

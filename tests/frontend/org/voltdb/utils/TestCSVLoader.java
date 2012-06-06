@@ -88,9 +88,11 @@ public class TestCSVLoader extends TestCase {
             int lineCount = 0;
             String line = "";
             String promptMsg = "Number of acknowledged tuples:";
+            
             while ((line = csvreport.readLine()) != null) {
             	if (line.startsWith(promptMsg)) {
-            		lineCount = Integer.parseInt(line.substring(promptMsg.length()));
+            		String num = line.substring(promptMsg.length());
+            		lineCount = Integer.parseInt(num.replaceAll("\\s",""));
             		break;
             	}
             }
