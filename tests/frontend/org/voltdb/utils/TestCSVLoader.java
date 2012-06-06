@@ -65,8 +65,8 @@ public class TestCSVLoader extends TestCase {
             		"--reportdir=" + reportdir,
             		"--tablename=BLAH",
             		"--abortfailurecount=50",
-            		"--skipEmptyRecords=true",
-            		"--trimWhiteSpace=true"
+            		"--skipemptyrecords=true",
+            		"--trimwhitespace=true"
             		};
             CSVLoader.main(params);
             // do the test
