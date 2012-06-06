@@ -49,6 +49,7 @@ class ProjectionTest extends QueryTestBase {
         // Complete the query.
         query.append(" FROM ")
              .append(this.tablePrefix)
+             .append("_1")
              .append(" WHERE ")
              .append(helper.columnName(helper.getShuffledNumber(0)))
              .append(" = 'abc'");

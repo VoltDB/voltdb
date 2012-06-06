@@ -44,7 +44,7 @@ public class AsyncCompilerAgent {
     private static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
     // if more than this amount of work is queued, reject new work
-    static final int MAX_QUEUE_DEPTH = 250;
+    static public final int MAX_QUEUE_DEPTH = 250;
 
     // accept work via this mailbox
     Mailbox m_mailbox;
