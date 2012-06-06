@@ -22,6 +22,8 @@ import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.InputStreamReader;
+import java.io.Reader;
 import java.sql.Time;
 import java.util.Map;
 import java.util.TimeZone;
@@ -66,6 +68,8 @@ class CSVLoader {
     private static int waitSeconds = 10;
     
     final CSVConfig config;
+    private static boolean standin = false;
+    
     public static final String invaliderowsfile = "invalidrows.csv";
     public static final String reportfile = "CSVLoaderReport.log";
     public static final String logfile = "CSVLoaderLog.log";
@@ -134,12 +138,16 @@ class CSVLoader {
     	
     	@Override
     	public void validate() {
+    		
     		if (abortfailurecount <= 0) exitWithMessageAndUsage("");
     		// add more checking
     		if (procedurename.equals("") && tablename.equals("") )
     			exitWithMessageAndUsage("procedure name or a table name required");
     		if (!procedurename.equals("") && !tablename.equals("") )
     			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
+    		
+    		if (inputfile.equals("")) 
+    			standin = true;
     	}
     }
     
@@ -158,7 +166,11 @@ class CSVLoader {
         int shortWaits = 0;
         
     	try {
-            final CSVReader reader = new CSVReader(new FileReader(config.inputfile));
+    		final CSVReader reader;
+    		if (CSVLoader.standin)
+    			reader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)));
+    		else 
+    			reader = new CSVReader(new FileReader(config.inputfile));
             ProcedureCallback cb = null;
 
             final Client client = ClientFactory.createClient();
@@ -181,7 +193,6 @@ class CSVLoader {
 //                    	msg += correctedLine[i] + ",";
 //                    }
 //                    System.out.println(msg);
-
 
                     String lineCheckResult;
                     if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
@@ -244,18 +255,11 @@ class CSVLoader {
     
 
     public static void main(String[] args) {
-        if (args.length < 1) {
-            System.err.println("csv filename required");
-            System.exit(1);
-        }
         long start = System.currentTimeMillis();
         
     	CSVConfig cfg = new CSVConfig();
     	cfg.parse(CSVLoader.class.getName(), args);
-    	// TODO: talk about this feature with John later
-    	if(cfg.inputfile.equals("")) {
-    		cfg.inputfile = args[0];
-    	}
+    	
     	
     	CSVLoader loader = new CSVLoader(cfg);
     	loader.run();
@@ -348,7 +352,13 @@ class CSVLoader {
     	
 		int bulkflush = 100; // by default right now
 		try {
-			BufferedReader csvfile = new BufferedReader(new FileReader(config.inputfile));
+			BufferedReader csvfile;
+    		if (CSVLoader.standin)
+    			csvfile = new BufferedReader(new InputStreamReader(System.in));
+    		else 
+    			csvfile = new BufferedReader(new FileReader(config.inputfile));
+    		
+			//BufferedReader csvfile = new BufferedReader(new FileReader(config.inputfile));
 			
 			BufferedWriter out_invaliderowfile = new BufferedWriter(new FileWriter(path_invaliderowsfile));
 
