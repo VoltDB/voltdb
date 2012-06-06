@@ -88,7 +88,7 @@ def verifyGetStringChars(f, content):
     num = content.count('GetStringChars')
     num += content.count('GetStringUTFChars')
     if num > 0:
-        print("ERROR: \"%s\" contains %d calls to GetStringChars/GetStringUTFChars." % (f, num))
+        print("ERROR: \"%s\" contains %d calls to GetStringChars/GetStringUTFChars. These methods return invalid UTF-8 code points for some characters. You should do the encoding in Java and pass the string to native code as a byte array." % (f, num))
         return 1
     return 0
 
