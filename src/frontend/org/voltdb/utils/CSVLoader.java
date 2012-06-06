@@ -25,6 +25,8 @@ import java.io.FileWriter;
 import java.io.InputStreamReader;
 import java.io.Reader;
 import java.sql.Time;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.Timer;
@@ -68,33 +70,38 @@ class CSVLoader {
     private static int waitSeconds = 10;
     
     final CSVConfig config;
-    private static boolean standin = false;
+    private long latency = -1;
+
+	private static boolean standin = false;
     
-    public static final String invaliderowsfile = "invalidrows.csv";
+    public static final String invaliderowsfile = "CSVinvalidrows.csv";
     public static final String reportfile = "CSVLoaderReport.log";
     public static final String logfile = "CSVLoaderLog.log";
 
     private static String insertProcedure = "";
-    private static Map <Long,String> errorLines = new TreeMap<Long,String>();
+    private static Map <Long,String[]> errorInfo = new TreeMap<Long, String[]>();
     private static final class MyCallback implements ProcedureCallback {
     	private final long m_lineNum;
-    	private final CSVConfig mycfg;
-    	MyCallback(long lineNumber, CSVConfig cfg)
+    	private final CSVConfig m_config;
+    	private final String m_rowdata;
+    	MyCallback(long lineNumber, CSVConfig cfg, String rowdata)
     	{
     		m_lineNum = lineNumber;
-    		mycfg = cfg;
+    		m_config = cfg;
+    		m_rowdata = rowdata;
     	}
     	@Override
     	public void clientCallback(ClientResponse response) throws Exception {
     		if (response.getStatus() != ClientResponse.SUCCESS) {
     			System.err.println(response.getStatusString());
     			System.err.println("<xin>Stop at line " + m_lineNum);
-    			synchronized (errorLines) {
-    				if (!errorLines.containsKey(m_lineNum)) {
-    					errorLines.put(m_lineNum, response.getStatusString());
+    			synchronized (errorInfo) {
+    				if (!errorInfo.containsKey(m_lineNum)) {
+    					String[] info = {m_rowdata, response.getStatusString()};
+    					errorInfo.put(m_lineNum, info);
     				}
-    				if (errorLines.size() >= mycfg.abortfailurecount) {
-    					System.err.println("The number of Failure row data exceeds " + mycfg.abortfailurecount);
+    				if (errorInfo.size() >= m_config.abortfailurecount) {
+    					System.err.println("The number of Failure row data exceeds " + m_config.abortfailurecount);
     					System.exit(1);
     				}
     			}
@@ -183,8 +190,14 @@ class CSVLoader {
             	outCount.incrementAndGet();
                 boolean queued = false;
                 while (queued == false) {
-                    String[] correctedLine = line;
-                    cb = new MyCallback(outCount.get(), config);
+                	StringBuilder linedata = new StringBuilder();
+                    for(String s : line) 
+                    	linedata.append(s);
+                	
+                	String[] correctedLine = line;
+                    // TODO(): correct the line here
+                    
+                    cb = new MyCallback(outCount.get(), config, linedata.toString());
                     
                     // This message will be removed later
                     // print out the parameters right now
@@ -197,11 +210,12 @@ class CSVLoader {
                     String lineCheckResult;
                     if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
                     	System.err.println("Stop at line " + (outCount.get()));
-                    	synchronized (errorLines) {
-                    		if (!errorLines.containsKey(outCount.get())) {
-                    			errorLines.put(outCount.get(),lineCheckResult);
+                    	synchronized (errorInfo) {
+                    		if (!errorInfo.containsKey(outCount.get())) {
+                    			String[] info = {linedata.toString(), lineCheckResult};
+                    			errorInfo.put(outCount.get(), info);
                     		}
-                    		if (errorLines.size() >= config.abortfailurecount) {
+                    		if (errorInfo.size() >= config.abortfailurecount) {
                     			System.err.println("The number of Failure row data exceeds " + config.abortfailurecount);
                         		System.exit(1);
                     		}
@@ -263,12 +277,10 @@ class CSVLoader {
     	
     	CSVLoader loader = new CSVLoader(cfg);
     	loader.run();
+    	loader.setLatency(System.currentTimeMillis()-start);
     	loader.produceInvalidRowsFile();
-    	long elapsedTimeMillis = System.currentTimeMillis()-start;
-    	// Get elapsed time in seconds
-    	float elapsedTimeSec = elapsedTimeMillis/1000F;
     	
-    	System.out.println("CSVLoader elaspsed: " + elapsedTimeSec + " seconds");
+    	System.out.println("CSVLoader elaspsed: " + loader.getLatency()/1000F + " seconds");
     }
     /**
      * Check for each line
@@ -342,49 +354,43 @@ class CSVLoader {
 	 * @param inputFile
 	 */
 	private void produceInvalidRowsFile() {
-		System.out.println("All the invalid row numbers are:" + errorLines.keySet());
-		String line = "";
+		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
 		// TODO: add the inputFileName to the outputFileName
 		
 		String path_invaliderowsfile = config.reportdir + CSVLoader.invaliderowsfile;
 		String path_logfile =  config.reportdir + CSVLoader.logfile;
     	String path_reportfile = config.reportdir  + CSVLoader.reportfile;
     	
-		int bulkflush = 100; // by default right now
+		int bulkflush = 3; // by default right now
 		try {
-			BufferedReader csvfile;
-    		if (CSVLoader.standin)
-    			csvfile = new BufferedReader(new InputStreamReader(System.in));
-    		else 
-    			csvfile = new BufferedReader(new FileReader(config.inputfile));
-    		
-			//BufferedReader csvfile = new BufferedReader(new FileReader(config.inputfile));
-			
 			BufferedWriter out_invaliderowfile = new BufferedWriter(new FileWriter(path_invaliderowsfile));
 
 			BufferedWriter out_logfile = new BufferedWriter(new FileWriter(path_logfile));
 			BufferedWriter out_reportfile = new BufferedWriter(new FileWriter(path_reportfile));
 			long linect = 0;
-			for (Long irow : errorLines.keySet()) {
-				while ((line = csvfile.readLine()) != null) {
-					if (++linect == irow) {
-						String message = "invalid line " + irow + ":  " + line + "\n";
-						System.err.print(message);
-						out_invaliderowfile.write(line + "\n");
-						out_logfile.write(message + errorLines.get(irow).toString() + "\n"); 
-						break;
-					}
-				}
+			
+			for (Long irow : errorInfo.keySet()) {
+				String info[] = errorInfo.get(irow);
+				if (info.length != 2)
+					System.out.println("internal error, infomation is not enough");
+				out_invaliderowfile.write(info[0] + "\n");
+				
+				String message = "invalid line " + irow + ":  " + info[0] + "\n";
+				System.err.print(message);
+				out_logfile.write(message + info[1] + "\n"); 
 				if (linect % bulkflush == 0) {
 					out_invaliderowfile.flush();
 					out_logfile.flush();
 				}
 			}
-			out_reportfile.write("Number of failed tuples:" + errorLines.size() + "\n");
+			out_reportfile.write("Number of lines:" + outCount.get() + "\n");
+			out_reportfile.write("Number of failed tuples:" + errorInfo.size() + "\n");
 			out_reportfile.write("Number of acknowledged tuples:" + inCount.get() + "\n");
-			out_reportfile.write("Number of loaded tuples:" + (outCount.get() - errorLines.size()) + "\n");
+			// Get elapsed time in seconds
+			float elapsedTimeSec = this.getLatency()/1000F;
+			out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds");
+			;
 			// TODO(xin): Add more report message
-			
 			out_invaliderowfile.flush();
 			out_logfile.flush();
 			out_reportfile.flush();
@@ -399,4 +405,12 @@ class CSVLoader {
 			System.err.println(x.getMessage());
 		}
     }
+	
+	public float getLatency() {
+		return latency;
+	}
+
+	public void setLatency(long latency) {
+		this.latency = latency;
+	}
 }
