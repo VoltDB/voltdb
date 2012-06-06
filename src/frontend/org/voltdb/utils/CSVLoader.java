@@ -284,14 +284,16 @@ class CSVLoader {
         VoltTable procInfo = null;
         
         try {
-             procInfo = client.callProcedure("@SystemCatalog",
+        	 procInfo = client.callProcedure("@SystemCatalog",
             "PROCEDURECOLUMNS").getResults()[0];
            
+            //VoltTable thisProcInfo = (VoltTable)procInfo.cloneRow();
             while( procInfo.advanceRow() )
             {
             	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
             	{
             		columnCnt++;
+            		//thisProcInfo.add( procInfo.cloneRow() );
             	}
             }
          }
