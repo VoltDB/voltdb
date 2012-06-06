@@ -306,7 +306,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         }
     }
 
-
     private static byte[] getStringBytes(String string) {
         try {
             return string.getBytes("UTF-8");
