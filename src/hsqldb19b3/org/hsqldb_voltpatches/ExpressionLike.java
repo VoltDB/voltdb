@@ -233,7 +233,7 @@ public final class ExpressionLike extends ExpressionLogical {
              * Can guarantee this won't work with an escape in the EE
              */
             if (nodes.length > 2) {
-                throw new RuntimeException("Like with an escape is not supported unless it is prefix like");
+                throw new RuntimeException("Like with an escape is not supported in parameterized queries");
             }
             return;
         }

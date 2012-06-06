@@ -210,6 +210,7 @@ public class TestLikeQueries extends TestCase {
                 }
             }
 
+            //Test parameter values used as like expression
             for (LikeTest test : tests) {
                 String clause = test.getClause();
                 String query = String.format("select * from strings where val %s", clause);
