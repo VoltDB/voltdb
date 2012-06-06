@@ -1728,8 +1728,7 @@ public class ExpressionLogical extends Expression {
         case OpTypes.SQL_FUNCTION:      element = "function"; break;
         case OpTypes.IS_NULL:           element = "is_null"; break;
         case OpTypes.NOT:               element = "not"; break;
-        case OpTypes.LIKE:
-            throw new HSQLParseException("Unsupported LIKE clause argument");
+        case OpTypes.LIKE:              element = "like"; break;
         // Handle some of the unsupported OpTypes with slightly more informative messages.
         default:
             throw new HSQLParseException("Unsupported Logical Operation: #" +

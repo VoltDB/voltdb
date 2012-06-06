@@ -18,6 +18,7 @@
 package org.voltdb.jni;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.logging.VoltLogger;
@@ -276,7 +277,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //C++ JSON deserializer is not thread safe, must synchronize
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeExecuteCustomPlanFragment(pointer, plan, 0, inputDepId,
+            errorCode = nativeExecuteCustomPlanFragment(pointer, getStringBytes(plan), 0, inputDepId,
                                                         txnId, lastCommittedTxnId, undoQuantumToken);
         }
         try {
@@ -302,6 +303,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         } finally {
             fallbackBuffer = null;
+        }
+    }
+
+    private  byte[] getStringBytes(String string) {
+        try {
+            return string.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+           throw new AssertionError(e);
         }
     }
 

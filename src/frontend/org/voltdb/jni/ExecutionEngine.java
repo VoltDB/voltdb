@@ -488,7 +488,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int outputDepId, // outputDepId is unused, can set to 0
             int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
 
-    protected native int nativeExecuteCustomPlanFragment(long pointer, String plan,
+    protected native int nativeExecuteCustomPlanFragment(long pointer, byte plan[],
             int outputDepId, // outputDepId is unused, can set to 0
             int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
 

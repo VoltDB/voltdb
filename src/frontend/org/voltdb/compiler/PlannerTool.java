@@ -19,6 +19,8 @@ package org.voltdb.compiler;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.CatalogContext;
 import org.voltdb.planner.CompiledPlan;
