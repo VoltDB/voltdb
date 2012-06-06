@@ -92,7 +92,7 @@ public class Term
     private BabySitter m_babySitter;
 
     // scoreboard for responding replica repair log responses (hsid -> response count)
-    private static class ReplicaRepairStruct {
+    static class ReplicaRepairStruct {
         int m_receivedResponses = 0;
         int m_expectedResponses = -1;
         long m_maxSpHandleSeen = Long.MIN_VALUE;
@@ -134,8 +134,11 @@ public class Term
 
     // Union of repair responses.
     TreeSet<Iv2RepairLogResponseMessage> m_repairLogUnion =
-        new TreeSet<Iv2RepairLogResponseMessage>();
+        new TreeSet<Iv2RepairLogResponseMessage>(m_unionComparator);
 
+    // runs on the babysitter thread when a replica changes.
+    // simply forward the notice to the initiator mailbox; it controls
+    // the Term processing.
     Callback m_replicasChangeHandler = new Callback()
     {
         @Override
@@ -216,7 +219,6 @@ public class Term
      * Setup a new Term but don't take any action to take responsibility.
      */
     public Term(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox)
-        throws ExecutionException, InterruptedException, KeeperException
     {
         m_zk = zk;
         m_partitionId = partitionId;
@@ -282,11 +284,12 @@ public class Term
         declareReadyAsLeader();
     }
 
-    /** Start fixing replicas: setup scoreboard and request repair logs. */
+    /** Start fixing survivors: setup scoreboard and request repair logs. */
     void prepareForFaultRecovery()
     {
         List<String> survivorsNames = m_babySitter.lastSeenChildren();
         List<Long> survivors =  childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
+        survivors.add(m_initiatorHSId);
 
         for (Long hsid : survivors) {
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
