@@ -29,11 +29,13 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.Timer;
 import java.util.TreeMap;
+import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.messaging.HostMessenger.Config;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -286,18 +288,21 @@ class CSVLoader {
     	String msg = "";
         int columnCnt = 0;
         VoltTable procInfo = null;
+        Vector<Integer> strColIndex = new Vector<Integer>();
         
         try {
-        	 procInfo = client.callProcedure("@SystemCatalog",
+        	procInfo = client.callProcedure("@SystemCatalog",
             "PROCEDURECOLUMNS").getResults()[0];
-           
-            //VoltTable thisProcInfo = (VoltTable)procInfo.cloneRow();
+        	
             while( procInfo.advanceRow() )
             {
             	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
             	{
+            			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
+            				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
+            			
             		columnCnt++;
-            		//thisProcInfo.add( procInfo.cloneRow() );
+            		
             	}
             }
          }
@@ -330,11 +335,10 @@ class CSVLoader {
         {//trim white space in this line.
         	for(int i=0; i<linefragement.length;i++) 
         	{
-        		
+        		if( !strColIndex.contains( i ) )//do not trim white space for string(varchar)
         			linefragement[i] = ((String)linefragement[i]).replaceAll( "\\s+", "" );
         	}
         }
-        
         return null;
     }
     
