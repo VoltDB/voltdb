@@ -113,10 +113,10 @@ class CSVLoader {
     	boolean trimWhiteSpace = false;
     	
     	@Option(desc = "Maximum rows to be read of the csv file.")
-    	int limitRows = Integer.MAX_VALUE;
+    	int limitrows = Integer.MAX_VALUE;
     	
     	@Option(desc = "directory path to produce report files.")
-    	String reportDir ="";
+    	String reportdir ="";
     	
     	@Option(desc = "")
     	int abortfailurecount =  100;
@@ -157,7 +157,7 @@ class CSVLoader {
             boolean lastOK = true;
             String line[] = null;
 
-            while ((config.limitRows-- > 0) && (line = reader.readNext()) != null) {
+            while ((config.limitrows-- > 0) && (line = reader.readNext()) != null) {
             	long counter = outCount.incrementAndGet();
                 boolean queued = false;
                 while (queued == false) {
@@ -325,9 +325,9 @@ class CSVLoader {
 		String line = "";
 		// TODO: add the inputFileName to the outputFileName
 		
-		String invaliderowsfile = config.reportDir + "invalidrows.csv";
-		String logfile =  config.reportDir +"csvLoaderLogMessage.log";
-    	String reportfile = config.reportDir  + "csvLoaderReport.log";
+		String invaliderowsfile = config.reportdir + "invalidrows.csv";
+		String logfile =  config.reportdir +"csvLoaderLogMessage.log";
+    	String reportfile = config.reportdir  + "csvLoaderReport.log";
     	
 		int bulkflush = 100; // by default right now
 		try {

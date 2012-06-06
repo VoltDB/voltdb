@@ -57,7 +57,7 @@ public class TestCSVLoader extends TestCase {
             String userHome = System.getProperty("user.home");
             String []params = {"--inputfile=" + userHome + "/testdb.csv", 
             		//"--procedurename=BLAH.insert",
-            		"--reportDir=" + userHome + "/",
+            		"--reportdir=" + userHome + "/",
             		"--tablename=BLAH",
             		"--abortfailurecount=50",
             		"--skipEmptyRecords=true",
