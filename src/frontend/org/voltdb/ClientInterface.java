@@ -91,7 +91,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
@@ -150,9 +149,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * IV2 stuff
      */
     private final MapCacheReader m_iv2Masters;
-    private final AtomicLong m_sequence = new AtomicLong(0);
-    private ConcurrentHashMap<Long, Iv2InFlight> m_sequenceToConnection =
-        new ConcurrentHashMap<Long, Iv2InFlight>();
+    private ClientInterfaceHandleManager m_ciHandles =
+        new ClientInterfaceHandleManager();
 
     /**
      * Policies used to determine if we can accept an invocation.
@@ -806,35 +804,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    /** Return a map of ConnectionId::(adminmode, txn count) */
-    Map<Long, long[]> getIv2OutstandingTxnStats()
-    {
-        HashMap<Long, long[]> retval = new HashMap<Long, long[]>();
-        for (Iv2InFlight inFlight : m_sequenceToConnection.values())
-        {
-            long connId = inFlight.m_connection.connectionId();
-            if (!retval.containsKey(connId)) {
-                retval.put(connId, new long[]{0,0});
-            }
-            retval.get(connId)[0] = (inFlight.m_isAdmin ? 1 : 0);
-            retval.get(connId)[1]++;
-        }
-        return retval;
-    }
-
-    private static class Iv2InFlight
-    {
-        final long m_clientHandle;
-        final Connection m_connection;
-        final boolean m_isAdmin;
-        Iv2InFlight(long handle, Connection conn, boolean admin)
-        {
-            m_clientHandle = handle;
-            m_connection = conn;
-            m_isAdmin = admin;
-        }
-    }
-
     // Wrap API to SimpleDtxnInitiator - mostly for the future
     public  boolean createTransaction(
             final long connectionId,
@@ -851,10 +820,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final long now)
     {
         if (VoltDB.instance().isIV2Enabled()) {
-            long handle = m_sequence.incrementAndGet();
-            Iv2InFlight inFlight = new Iv2InFlight(invocation.getClientHandle(),
+            long handle = m_ciHandles.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
                     (Connection)clientData, adminConnection);
-            m_sequenceToConnection.put(handle, inFlight);
 
             try {
                 long initiatorHSId;
@@ -863,7 +830,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (master == null) {
                         hostLog.error("Failed to find master initiator for partition: "
                                 + Integer.toString(partitions[0]) + ". Transaction not initiated.");
-                        m_sequenceToConnection.remove(handle);
+                        m_ciHandles.removeHandle(handle);
                         return false;
                     }
                     initiatorHSId = master.getLong("hsid");
@@ -883,10 +850,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         m_mailbox.send(initiatorHSId, workRequest);
             } catch (MessagingException e) {
-                m_sequenceToConnection.remove(handle);
                 throw new RuntimeException(e);
             } catch (JSONException e) {
-                m_sequenceToConnection.remove(handle);
+                m_ciHandles.removeHandle(handle);
                 throw new RuntimeException(e);
             }
             return true;
@@ -962,7 +928,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (message instanceof InitiateResponseMessage) {
                         // forward response; copy is annoying. want slice of response.
                         InitiateResponseMessage response = (InitiateResponseMessage)message;
-                        Iv2InFlight clientData = m_sequenceToConnection.remove(response.getClientInterfaceHandle());
+                        ClientInterfaceHandleManager.Iv2InFlight clientData =
+                            m_ciHandles.findHandle(response.getClientInterfaceHandle());
                         response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
 
                         ByteBuffer results = ByteBuffer.allocate(response.getClientResponseData().getSerializedSize() + 4);
@@ -1927,7 +1894,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             new HashMap<Long, Pair<String, long[]>>();
 
         Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
-        Map<Long, long[]> inflight_iv2_stats = getIv2OutstandingTxnStats();
+        Map<Long, long[]> inflight_iv2_stats = m_ciHandles.getIv2OutstandingTxnStats();
         inflight_txn_stats.putAll(inflight_iv2_stats);
 
         // put all the live connections in the stats map, then fill in admin and
