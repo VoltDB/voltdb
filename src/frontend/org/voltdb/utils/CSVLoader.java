@@ -22,8 +22,10 @@ import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.sql.Time;
 import java.util.Map;
 import java.util.TimeZone;
+import java.util.Timer;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
@@ -124,7 +126,7 @@ class CSVLoader {
     	int limitrows = Integer.MAX_VALUE;
     	
     	@Option(desc = "directory path to produce report files.")
-    	String reportdir ="";
+    	String reportdir ="./";
     	
     	@Option(desc = "")
     	int abortfailurecount =  100;
@@ -174,11 +176,11 @@ class CSVLoader {
                     
                     // This message will be removed later
                     // print out the parameters right now
-                    String msg = "<xin>params: ";
-                    for (int i=0; i < correctedLine.length; i++) {
-                    	msg += correctedLine[i] + ",";
-                    }
-                    System.out.println(msg);
+//                    String msg = "<xin>params: ";
+//                    for (int i=0; i < correctedLine.length; i++) {
+//                    	msg += correctedLine[i] + ",";
+//                    }
+//                    System.out.println(msg);
 
 
                     String lineCheckResult;
@@ -246,6 +248,7 @@ class CSVLoader {
             System.err.println("csv filename required");
             System.exit(1);
         }
+        long start = System.currentTimeMillis();
         
     	CSVConfig cfg = new CSVConfig();
     	cfg.parse(CSVLoader.class.getName(), args);
@@ -257,7 +260,11 @@ class CSVLoader {
     	CSVLoader loader = new CSVLoader(cfg);
     	loader.run();
     	loader.produceInvalidRowsFile();
-        
+    	long elapsedTimeMillis = System.currentTimeMillis()-start;
+    	// Get elapsed time in seconds
+    	float elapsedTimeSec = elapsedTimeMillis/1000F;
+    	
+    	System.out.println("CSVLoader elaspsed: " + elapsedTimeSec + " seconds");
     }
     /**
      * Check for each line
