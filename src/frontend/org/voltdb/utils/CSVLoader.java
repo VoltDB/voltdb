@@ -31,11 +31,13 @@ import java.util.Map;
 import java.util.TimeZone;
 import java.util.Timer;
 import java.util.TreeMap;
+import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.messaging.HostMessenger.Config;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -128,10 +130,10 @@ class CSVLoader {
     	String tablename = "";
     	
     	@Option(desc = "Skip empty records in the csv file if this parameter is set.")
-    	boolean skipEmptyRecords = false;
+    	boolean skipemptyrecords = false;
     	
     	@Option(desc = "Trim whitespace in each line of the csv file if this parameter is set.")
-    	boolean trimWhiteSpace = false;
+    	boolean trimwhitespace = false;
     	
     	@Option(desc = "Maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
@@ -298,16 +300,21 @@ class CSVLoader {
     	String msg = "";
         int columnCnt = 0;
         VoltTable procInfo = null;
+        Vector<Integer> strColIndex = new Vector<Integer>();
         
         try {
-             procInfo = client.callProcedure("@SystemCatalog",
+        	procInfo = client.callProcedure("@SystemCatalog",
             "PROCEDURECOLUMNS").getResults()[0];
-           
+        	
             while( procInfo.advanceRow() )
             {
             	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
             	{
+            			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
+            				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
+            			
             		columnCnt++;
+            		
             	}
             }
          }
@@ -317,7 +324,7 @@ class CSVLoader {
        
          if( linefragement.length == 0  )
          {
-        	if( config.skipEmptyRecords )
+        	if( config.skipemptyrecords )
         	{
         		msg = "checkLineFormat Error: blank line";
         		return msg;
@@ -336,15 +343,14 @@ class CSVLoader {
         	return msg;
         }
         
-        else if( config.trimWhiteSpace )
+        else if( config.trimwhitespace )
         {//trim white space in this line.
         	for(int i=0; i<linefragement.length;i++) 
         	{
-        		
+        		if( !strColIndex.contains( i ) )//do not trim white space for string(varchar)
         			linefragement[i] = ((String)linefragement[i]).replaceAll( "\\s+", "" );
         	}
         }
-        
         return null;
     }
     
