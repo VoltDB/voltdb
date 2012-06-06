@@ -12,8 +12,6 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-import au.com.bytecode.opencsv_voltpatches.CSVReader;
-
 import junit.framework.TestCase;
 
 public class TestCSVLoader extends TestCase {
