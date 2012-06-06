@@ -18,12 +18,17 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Comparator;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
 import java.util.concurrent.TimeoutException;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
+import java.util.Map.Entry;
+import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -41,12 +46,36 @@ import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
 
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
+import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
+// Some comments on threading and organization.
+//   start() returns a future. Block on this future to get the final answer.
+//
+//   deliver() runs in the initiator mailbox deliver() context and triggers
+//   all repair work.
+//
+//   replica change handler runs in the babysitter thread context.
+//   replica change handler invokes a method in init.mbox that also
+//   takes the init.mbox deliver lock
+//
+//   it is important that repair work happens with the deliver lock held
+//   and that updatereplicas also holds this lock -- replica failure during
+//   repair must happen unambigously before or after each local repair action.
+//
+//   A Term can be cancelled by initiator mailbox while the deliver lock is
+//   held. Repair work must check for cancellation before producing repair
+//   actions to the mailbox.
+//
+//   Note that a term can not prevent messages being delivered post cancellation.
+//   RepairLog requests therefore use a requestId to dis-ambiguate responses
+//   for cancelled requests that are filtering in late.
+
+
 /**
  * Term encapsulates the process/algorithm of becoming
- * a new PI and the leadership responsibilities while performing that
+ * a new PI and the consequent ZK observers for performing that
  * role.
  */
 public class Term
@@ -56,10 +85,56 @@ public class Term
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
     private final long m_initiatorHSId;
+    private final int m_requestId = 0; // System.currentTimeMillis();
     private final ZooKeeper m_zk;
 
     // Initialized in start() -- when the term begins.
     private BabySitter m_babySitter;
+
+    // scoreboard for responding replica repair log responses (hsid -> response count)
+    private static class ReplicaRepairStruct {
+        int m_receivedResponses = 0;
+        int m_expectedResponses = -1;
+        long m_maxSpHandleSeen = Long.MIN_VALUE;
+
+        // update counters and return the number of outstanding messages.
+        int update(Iv2RepairLogResponseMessage response)
+        {
+            m_receivedResponses++;
+            m_expectedResponses = response.getOfTotal();
+            m_maxSpHandleSeen = Math.max(m_maxSpHandleSeen, response.getSpHandle());
+            return logsComplete();
+        }
+
+        // return 0 if all expected logs have been received.
+        int logsComplete()
+        {
+            return m_expectedResponses - m_receivedResponses;
+        }
+
+        // return true if this replica needs the message for spHandle.
+        boolean needs(long spHandle)
+        {
+            return m_maxSpHandleSeen < spHandle;
+        }
+    }
+
+    // replicas being processed and repaired.
+    Map<Long, ReplicaRepairStruct> m_replicaRepairStructs =
+        new HashMap<Long, ReplicaRepairStruct>();
+
+    // Determine equal repair responses by the SpHandle of the response.
+    Comparator<Iv2RepairLogResponseMessage> m_unionComparator = new Comparator<Iv2RepairLogResponseMessage>() {
+        @Override
+        public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
+        {
+            return (int)(o1.getSpHandle() - o2.getSpHandle());
+        }
+    };
+
+    // Union of repair responses.
+    TreeSet<Iv2RepairLogResponseMessage> m_repairLogUnion =
+        new TreeSet<Iv2RepairLogResponseMessage>();
 
     Callback m_replicasChangeHandler = new Callback()
     {
@@ -166,21 +241,22 @@ public class Term
                     m_replicasChangeHandler, true);
             if (kfactorForStartup >= 0) {
                 prepareForStartup(kfactorForStartup);
+                result.m_doneLatch.countDown();
             }
             else {
                 prepareForFaultRecovery();
             }
-            declareReadyAsLeader();
         } catch (Exception e) {
             result.setException(e);
+            result.m_doneLatch.countDown();
         }
-        result.m_doneLatch.countDown();
         return result;
     }
 
 
     public Future<?> cancel()
     {
+        // TODO: make this do something
         return null;
     }
 
@@ -190,6 +266,7 @@ public class Term
             m_babySitter.shutdown();
         }
     }
+
 
     /** Block until all replica's are present. */
     void prepareForStartup(int kfactor)
@@ -202,22 +279,68 @@ public class Term
             }
             children = m_babySitter.lastSeenChildren();
         }
+        declareReadyAsLeader();
     }
 
-    /** Fix all the replicas */
+    /** Start fixing replicas: setup scoreboard and request repair logs. */
     void prepareForFaultRecovery()
     {
         List<String> survivorsNames = m_babySitter.lastSeenChildren();
         List<Long> survivors =  childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
 
-        // TODO: need a better unique id.... than 0.
-        VoltMessage logRequest = new Iv2RepairLogRequestMessage(0);
-        try {
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
-        } catch (MessagingException impossible) {
+        for (Long hsid : survivors) {
+            m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
 
+        VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
+        try {
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
+        }
+        catch (MessagingException ignored) {
+        }
     }
+
+    /** Process a new repair log response */
+    public void deliver(VoltMessage message)
+    {
+        if (message instanceof Iv2RepairLogResponseMessage) {
+            Iv2RepairLogResponseMessage response = (Iv2RepairLogResponseMessage)message;
+            if (response.getRequestId() != m_requestId) {
+                return;
+            }
+            ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
+            m_repairLogUnion.add(response);
+            int waitingFor = rrs.update(response);
+            // if a replica finished, see if they're all done...
+            if (waitingFor == 0 && repairLogsAreComplete()) {
+                repairSurvivors();
+            }
+        }
+    }
+
+    /** Have all survivors supplied a full repair log? */
+    public boolean repairLogsAreComplete()
+    {
+        for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
+            if (entry.getValue().logsComplete() != 0) {
+                return false;
+            }
+        }
+        return true;
+    }
+
+    /** Send missed-messages to survivors. Exciting! */
+    public void repairSurvivors()
+    {
+        for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
+            for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
+                if  (entry.getValue().needs(li.getSpHandle())) {
+                    m_mailbox.repairReplicaWith(entry.getKey(), li);
+                }
+            }
+        }
+    }
+
 
     // with leadership election complete, update the master list
     // for non-initiator components that care.

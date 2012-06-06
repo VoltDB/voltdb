@@ -34,6 +34,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private int m_requestId = 0;
     private int m_sequence = 0;
     private int m_ofTotal = 0;
+    private long m_spHandle = Long.MIN_VALUE;
     private VoltMessage m_payload = null;
 
     /** Empty constructor for de-serialization */
@@ -41,12 +42,14 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         super();
     }
 
-    public Iv2RepairLogResponseMessage(int requestId, int sequence, int ofTotal, VoltMessage payload)
+    public Iv2RepairLogResponseMessage(int requestId, int sequence,
+            int ofTotal, long spHandle, VoltMessage payload)
     {
         super();
         m_requestId = requestId;
         m_sequence = sequence;
         m_ofTotal = ofTotal;
+        m_spHandle = spHandle;
         m_payload = payload;
     }
 
@@ -65,6 +68,11 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         return m_ofTotal;
     }
 
+    public long getSpHandle()
+    {
+        return m_spHandle;
+    }
+
     public VoltMessage getPayload()
     {
         return m_payload;
@@ -77,6 +85,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // requestId
         msgsize += 4; // sequence
         msgsize += 4; // ofTotal
+        msgsize += 8; // spHandle
         msgsize += m_payload.getSerializedSize();
         return msgsize;
     }
@@ -88,6 +97,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putInt(m_requestId);
         buf.putInt(m_sequence);
         buf.putInt(m_ofTotal);
+        buf.putLong(m_spHandle);
 
         ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
         m_payload.flattenToBuffer(paybuf);
@@ -105,6 +115,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_requestId = buf.getInt();
         m_sequence = buf.getInt();
         m_ofTotal = buf.getInt();
+        m_spHandle = buf.getLong();
 
         // going inception.
         VoltDbMessageFactory messageFactory = new VoltDbMessageFactory();
@@ -114,7 +125,6 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
-
         sb.append("IV2 REPAIR_LOG_REQUEST (FROM ");
         sb.append(CoreUtils.hsIdToString(m_sourceHSId));
         sb.append(" REQID: ");
@@ -123,6 +133,8 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         sb.append(m_sequence);
         sb.append(" OF TOTAL: ");
         sb.append(m_ofTotal);
+        sb.append(" SP HANDLE: ");
+        sb.append(m_spHandle);
         sb.append(" PAYLOAD: ");
         sb.append(m_payload.toString());
         return sb.toString();

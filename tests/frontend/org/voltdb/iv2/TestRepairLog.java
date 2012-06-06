@@ -73,10 +73,10 @@ public class TestRepairLog extends TestCase
         rl.deliver(m1);
         rl.deliver(m2);
 
-        List<VoltMessage> contents = rl.contents();
+        List<RepairLog.Item> contents = rl.contents();
         assertEquals(2, contents.size());
-        assertEquals(m1, contents.get(0));
-        assertEquals(m2, contents.get(1));
+        assertEquals(m1, contents.get(0).getMessage());
+        assertEquals(m2, contents.get(1).getMessage());
     }
 
     @Test
@@ -98,8 +98,11 @@ public class TestRepairLog extends TestCase
         VoltMessage m3 = truncInitMsg(1L, 3L);
         rl.deliver(m3);
         assertEquals(2, rl.contents().size());
-        assertEquals(m2, rl.contents().get(0));
-        assertEquals(m3, rl.contents().get(1));
+        assertEquals(m2, rl.contents().get(0).getMessage());
+        assertEquals(2L, rl.contents().get(0).getSpHandle());
+        assertEquals(m3, rl.contents().get(1).getMessage());
+        assertEquals(3L, rl.contents().get(1).getSpHandle());
+
     }
 
     @Test
@@ -113,8 +116,8 @@ public class TestRepairLog extends TestCase
         VoltMessage m2 = truncInitMsg(0L, 2L);
         rl.deliver(m2);
         assertEquals(2, rl.contents().size());
-        assertEquals(m1, rl.contents().get(0));
-        assertEquals(m2, rl.contents().get(1));
+        assertEquals(m1, rl.contents().get(0).getMessage());
+        assertEquals(m2, rl.contents().get(1).getMessage());
     }
 
 }

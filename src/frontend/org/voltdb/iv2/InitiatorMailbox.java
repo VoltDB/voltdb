@@ -31,6 +31,7 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
+import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -46,9 +47,15 @@ public class InitiatorMailbox implements Mailbox
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
     private long m_hsId;
+    private Term m_term;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
+
+    synchronized public void setTerm(Term term)
+    {
+        m_term = term;
+    }
 
     public InitiatorMailbox(InitiatorMessageHandler msgHandler,
             HostMessenger messenger, RepairLog repairLog)
@@ -62,6 +69,11 @@ public class InitiatorMailbox implements Mailbox
 
     public synchronized void updateReplicas(List<Long> replicas)
     {
+        // first cancel any ongoing repair work. must do this with
+        // the deliver lock held.
+        if (m_term != null) {
+            m_term.cancel();
+        }
         m_msgHandler.updateReplicas(replicas);
     }
 
@@ -86,11 +98,11 @@ public class InitiatorMailbox implements Mailbox
     {
         logRxMessage(message);
         if (message instanceof Iv2RepairLogRequestMessage) {
-            List<VoltMessage> logs = m_repairLog.contents();
-            for (VoltMessage log : logs) {
-                // encapsulate.
-                // send
-            }
+            handleLogRequest(message);
+            return;
+        }
+        else if (message instanceof Iv2RepairLogResponseMessage) {
+            m_term.deliver(message);
             return;
         }
         m_repairLog.deliver(message);
@@ -149,6 +161,32 @@ public class InitiatorMailbox implements Mailbox
     public void setHSId(long hsId)
     {
         this.m_hsId = hsId;
+    }
+
+    void handleLogRequest(VoltMessage message)
+    {
+        List<RepairLog.Item> logs = m_repairLog.contents();
+        int ofTotal = logs.size();
+        int seq = 0;
+        Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
+        for (RepairLog.Item log : logs) {
+            Iv2RepairLogResponseMessage response =
+                new Iv2RepairLogResponseMessage(
+                        req.getRequestId(),
+                        seq,
+                        ofTotal,
+                        log.getSpHandle(),
+                        log.getMessage());
+            try {
+                send(message.m_sourceHSId, response);
+            } catch (MessagingException neverhappensreally) {}
+            seq++;
+        }
+        return;
+    }
+
+    void repairReplicaWith(long replicaHSId, Iv2RepairLogResponseMessage msg)
+    {
     }
 
     void logRxMessage(VoltMessage message)

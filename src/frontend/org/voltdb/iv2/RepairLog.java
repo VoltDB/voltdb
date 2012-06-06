@@ -36,7 +36,7 @@ public class RepairLog
     long m_truncationPoint;
 
     // want voltmessage as payload with message-independent metadata.
-    private static class Item
+    static class Item
     {
         final VoltMessage m_msg;
         final long m_handle;
@@ -45,6 +45,16 @@ public class RepairLog
         {
             m_msg = msg;
             m_handle = handle;
+        }
+
+        long getSpHandle()
+        {
+            return m_handle;
+        }
+
+        VoltMessage getMessage()
+        {
+            return m_msg;
         }
     }
 
@@ -86,12 +96,12 @@ public class RepairLog
     }
 
     // produce the contents of the repair log.
-    public List<VoltMessage> contents()
+    public List<Item> contents()
     {
-        List<VoltMessage> response = new LinkedList<VoltMessage>();
+        List<Item> response = new LinkedList<Item>();
         Iterator<Item> it = m_log.iterator();
         while (it.hasNext()) {
-            response.add(it.next().m_msg);
+            response.add(it.next());
         }
         return response;
     }

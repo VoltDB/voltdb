@@ -301,9 +301,10 @@ public class TestVoltMessageSerialization extends TestCase {
         Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
         itask.setSpHandle(31337);
 
-        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, itask);
+        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, itask);
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
+        assertEquals(r1.getSpHandle(), r2.getSpHandle());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
 
