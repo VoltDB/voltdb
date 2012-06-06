@@ -117,10 +117,10 @@ class CSVLoader {
     	String tablename = "";
     	
     	@Option(desc = "Skip empty records in the csv file if this parameter is set.")
-    	boolean skipEmptyRecords = false;
+    	boolean skipemptyrecords = false;
     	
     	@Option(desc = "Trim whitespace in each line of the csv file if this parameter is set.")
-    	boolean trimWhiteSpace = false;
+    	boolean trimwhitespace = false;
     	
     	@Option(desc = "Maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
