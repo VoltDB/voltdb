@@ -1,5 +1,6 @@
 package org.voltdb.utils;
 
+import java.io.BufferedReader;
 import java.io.FileReader;
 
 import org.voltdb.ServerThread;
@@ -55,15 +56,19 @@ public class TestCSVLoader extends TestCase {
             localServer.start();
             localServer.waitForInitialization();
             String userHome = System.getProperty("user.home");
-            String []params = {"--inputfile=" + userHome + "/testdb.csv", 
+            
+            String reportdir = userHome + "/";
+            String []params = {
+            		//userHome + "/testdb.csv",
+            		"--inputfile=" + userHome + "/testdb.csv", 
             		//"--procedurename=BLAH.insert",
-            		"--reportdir=" + userHome + "/",
+            		"--reportdir=" + reportdir,
             		"--tablename=BLAH",
             		"--abortfailurecount=50",
             		"--skipEmptyRecords=true",
             		"--trimWhiteSpace=true"
             		};
-            long lineCount = CSVLoader.main(params);
+            CSVLoader.main(params);
             // do the test
             client = ClientFactory.createClient();
             client.createConnection("localhost");
@@ -77,8 +82,19 @@ public class TestCSVLoader extends TestCase {
             while(modCount.advanceRow()) {
             	rowct = (Integer) modCount.get(0, VoltType.INTEGER);
             }
-            System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             
+            
+            BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
+            int lineCount = 0;
+            String line = "";
+            String promptMsg = "Number of acknowledged tuples:";
+            while ((line = csvreport.readLine()) != null) {
+            	if (line.startsWith(promptMsg)) {
+            		lineCount = Integer.parseInt(line.substring(promptMsg.length()));
+            		break;
+            	}
+            }
+            System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
             
         }
