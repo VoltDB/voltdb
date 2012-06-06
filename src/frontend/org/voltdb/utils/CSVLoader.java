@@ -301,7 +301,7 @@ class CSVLoader {
        
          if( linefragement.length == 0  )
          {
-        	if( config.skipEmptyRecords )
+        	if( config.skipemptyrecords )
         	{
         		msg = "checkLineFormat Error: blank line";
         		return msg;
@@ -320,7 +320,7 @@ class CSVLoader {
         	return msg;
         }
         
-        else if( config.trimWhiteSpace )
+        else if( config.trimwhitespace )
         {//trim white space in this line.
         	for(int i=0; i<linefragement.length;i++) 
         	{
