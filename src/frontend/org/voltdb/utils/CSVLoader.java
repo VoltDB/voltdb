@@ -134,6 +134,21 @@ class CSVLoader {
     	@Option(desc = "directory path to produce report files.")
     	String reportdir ="./";
     	
+    	@Option(desc = "the delimiter to use for separating entries.")
+    	char separator;
+    	
+    	@Option(desc = "the character to use for quoted elements.")
+    	char quotechar;
+    	
+    	@Option(desc = "sets if characters outside the quotes are ignored.")
+    	boolean strictQuotes;
+    	
+    	@Option(desc = "the character to use for escaping a separator or quote.")
+    	char escape;
+    	
+    	@Option(desc = "the line number to skip for start reading.")
+    	int skipline;
+    	
     	@Option(desc = "")
     	int abortfailurecount =  100;
     	
