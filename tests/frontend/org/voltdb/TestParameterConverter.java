@@ -97,5 +97,21 @@ public class TestParameterConverter extends TestCase
         assertEquals(new Double(2301100.23), ((Double)r).doubleValue());
     }
     
+    public void testNULLToInt() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, int.class, null, null);
+        assertTrue("expect null integer", r.getClass() == Integer.class);
+        assertEquals(VoltType.NULL_INTEGER, r);
+    }
+    
+    public void testNULLToString() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, int.class, null, null);
+        assertTrue("expect integer", r.getClass() == String.class);
+        assertEquals( VoltType.NULL_STRING_OR_VARBINARY, r);
+    }
+    
     
 }
