@@ -333,7 +333,7 @@ class CSVLoader {
             e.printStackTrace();
          }
        
-         if( linefragement.length == 0  )
+         if( linefragement.length == 1 && linefragement[0].equals( "" ) )
          {
         		msg = "checkLineFormat Error: blank line";
         		return msg;

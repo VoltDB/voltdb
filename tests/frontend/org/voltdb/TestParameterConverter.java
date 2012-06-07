@@ -23,6 +23,8 @@
 
 
 package org.voltdb;
+import java.math.BigDecimal;
+
 import junit.framework.TestCase;
 
 
@@ -53,5 +55,21 @@ public class TestParameterConverter extends TestCase
             tryToMakeCompatible(true, false, int.class, null, "1000");
         assertTrue("exepct integer", r.getClass() == Integer.class);
         assertEquals(1000, ((Integer)r).intValue());
+    }
+    
+    public void testStringToDecimal() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(false, false, BigDecimal.class, null, "111.1");
+        assertTrue("exepct decimal", r.getClass() == BigDecimal.class);
+        assertEquals("111.1", ((BigDecimal)r).toString());
+    }
+    
+    public void testStringToFloat() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, float.class, null, "111.1");
+        assertTrue("exepct float", r.getClass() == float.class);
+        assertEquals("111.1", r.toString() );
     }
 }
