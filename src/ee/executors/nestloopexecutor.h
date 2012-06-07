@@ -69,12 +69,12 @@ class ReadWriteSet;
 class NestLoopExecutor : public AbstractExecutor {
     public:
         NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        bool support_pull() const;
 
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
-        bool support_pull() const;
 
     private:
         void reset_inner_state();

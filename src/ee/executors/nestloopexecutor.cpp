@@ -308,7 +308,7 @@ TableTuple NestLoopExecutor::p_next_pull() {
     {
         if (m_state->m_needNextOuter)
         {
-            m_state->m_outerTuple = m_state->m_outerExecutor->p_next_pull();
+            m_state->m_outerTuple = m_state->m_outerExecutor->next_pull();
             if (m_state->m_outerTuple.isNullTuple())
             {
                 joinedTuple = TableTuple(m_state->m_outerSchema);
@@ -326,7 +326,7 @@ TableTuple NestLoopExecutor::p_next_pull() {
 
         while (true)
         {
-            TableTuple innerTuple = m_state->m_innerExecutor->p_next_pull();
+            TableTuple innerTuple = m_state->m_innerExecutor->next_pull();
             if (innerTuple.isNullTuple())
             {
                 m_state->m_needNextOuter = true;

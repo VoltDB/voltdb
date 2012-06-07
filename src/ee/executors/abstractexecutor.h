@@ -83,15 +83,9 @@ class AbstractExecutor {
     /** Returns true if executor supports pull mode */
     virtual bool support_pull() const;
 
-    // @TODO: Eventually, every executor class will have its own p_next_pull implementation
-    // that operates within the pull protocol as best it can.
-    // Then this function will be made abstract (pure virtual).
-    // For now, AbstractExecutor provides this sub-optimal implementation that
-    // relies on the executor class implementation of the older push protocol.
-    // In particular, it pulls tuples from the output table that was populated by p_execute.
     /** Gets next available tuple(s) from input table as needed
      * and applies executor specific logic to produce its next tuple. */
-    virtual TableTuple p_next_pull();
+    TableTuple next_pull();
 
     /** Generic behavior wrapping the custom p_pre_execute_pull. */
     // @TODO: Does the need to prep m_tmpOutputTable really cut across executor classes?
@@ -172,6 +166,16 @@ class AbstractExecutor {
     /** Reset executor's pull state */
     virtual void p_reset_state_pull();
 
+    // @TODO: Eventually, every executor class will have its own p_next_pull implementation
+    // that operates within the pull protocol as best it can.
+    // Then this function will be made abstract (pure virtual).
+    // For now, AbstractExecutor provides this sub-optimal implementation that
+    // relies on the executor class implementation of the older push protocol.
+    // In particular, it pulls tuples from the output table that was populated by p_execute.
+    /** Gets next available tuple(s) from input table as needed
+     * and applies executor specific logic to produce its next tuple. */
+    virtual TableTuple p_next_pull();
+
     // Helps clean up output tables of an executor and its dependencies.
     void clearOutputTable_pull();
 
@@ -217,6 +221,11 @@ inline void AbstractExecutor::p_execute_pull()
         // Insert processed tuple into the output table
         p_insert_output_table_pull(tuple);
     }
+}
+
+inline TableTuple AbstractExecutor::next_pull()
+{
+    return this->p_next_pull();
 }
 
 inline void AbstractExecutor::pre_execute_pull(const NValueArray& params) {

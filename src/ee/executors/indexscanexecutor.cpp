@@ -74,12 +74,15 @@ namespace detail {
             AbstractExpression* postExpression) :
             m_targetTableSchema(schema),
             m_endExpression(endExpression),
-            m_postExpression(postExpression)
+            m_postExpression(postExpression),
+            m_joinTuple(NULL)
         {}
 
         const TupleSchema* m_targetTableSchema;
         AbstractExpression* m_endExpression;
         AbstractExpression* m_postExpression;
+        const TableTuple *m_joinTuple;
+
     };
 
 } // namespace detail
@@ -515,7 +518,6 @@ bool IndexScanExecutor::support_pull() const {
 
 TableTuple IndexScanExecutor::p_next_pull() {
 
-    TableTuple tuple(m_state->m_targetTableSchema);
     while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
             !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
            ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || m_numOfSearchkeys == 0) &&
@@ -526,7 +528,7 @@ TableTuple IndexScanExecutor::p_next_pull() {
         // First check whether the end_expression is now false
         //
         if (m_state->m_endExpression != NULL &&
-            m_state->m_endExpression->eval(&m_tuple, NULL).isFalse())
+            m_state->m_endExpression->eval(&m_tuple, m_state->m_joinTuple).isFalse())
         {
             VOLT_TRACE("End Expression evaluated to false, stopping scan");
             m_tuple = TableTuple(m_state->m_targetTableSchema);
@@ -536,7 +538,7 @@ TableTuple IndexScanExecutor::p_next_pull() {
         // Then apply our post-predicate to do further filtering
         //
         if (m_state->m_postExpression != NULL &&
-            m_state->m_postExpression->eval(&m_tuple, NULL).isFalse())
+            m_state->m_postExpression->eval(&m_tuple, m_state->m_joinTuple).isFalse())
         {
             continue;
         }
@@ -589,7 +591,17 @@ void IndexScanExecutor::p_pre_execute_pull(const NValueArray &params)
     assert(m_searchKey.getSchema()->columnCount() > 0);
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
+    assert (m_index);
+    assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
+    set_expressions_pull(params);
+    set_search_key_pull(m_searchKey, NULL);
+}
+
+void IndexScanExecutor::set_expressions_pull(const NValueArray &params)
+{
+    // Need to set it if this method is called from nestloop executor
+    m_tuple = TableTuple(m_targetTable->schema());
     //
     // END EXPRESSION
     //
@@ -613,9 +625,15 @@ void IndexScanExecutor::p_pre_execute_pull(const NValueArray &params)
         }
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
+    
+    m_state.reset(new detail::IndexScanExecutorState(m_targetTable->schema(), end_expression, post_expression));
+}
 
-    assert (m_index);
-    assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
+//@TODO
+void IndexScanExecutor::set_search_key_pull(const TableTuple& searchKey, const TableTuple* otherTuple)
+{
+    m_searchKey = searchKey;
+    m_state->m_joinTuple = otherTuple;
 
     //
     // An index scan has three parts:
@@ -669,8 +687,6 @@ void IndexScanExecutor::p_pre_execute_pull(const NValueArray &params)
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           "Invalid sort direction");
     }
-
-    m_state.reset(new detail::IndexScanExecutorState(m_targetTable->schema(), end_expression, post_expression));
 }
 
 

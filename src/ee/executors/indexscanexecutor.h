@@ -80,6 +80,10 @@ class IndexScanExecutor : public AbstractExecutor
 public:
     IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode);
     ~IndexScanExecutor();
+
+    void set_search_key_pull(const TableTuple& searchKey, const TableTuple* other);
+    void set_expressions_pull(const NValueArray &params);
+
     bool support_pull() const;
 
 protected:
