@@ -310,7 +310,7 @@ class CSVLoader {
      * @param linefragement
      */
 
-    private String checkLineFormat(Object[] linefragement, Client client ) {
+    private String checkLineFormat(String[] linefragement, Client client ) {
     	String msg = "";
         int columnCnt = 0;
         VoltTable procInfo = null;
@@ -336,7 +336,7 @@ class CSVLoader {
             e.printStackTrace();
          }
        
-         if( linefragement.length == 0  )
+         if( linefragement.length == 1 && linefragement[0].equals( "" ) )
          {
         		msg = "checkLineFormat Error: blank line";
         		return msg;
@@ -353,7 +353,8 @@ class CSVLoader {
         	for(int i=0; i<linefragement.length;i++) 
         	{
         		if( !strColIndex.contains( i ) && linefragement[i] != null)//do not trim white space for string(varchar)
-        			linefragement[i] = ((String)linefragement[i]).replaceAll( "\\s+", "" );
+        			linefragement[i] = (linefragement[i]).replaceAll( "\\s+", "" );
+
         	}
         }
         return null;
@@ -432,5 +433,10 @@ class CSVLoader {
 
 	public void setLatency(long latency) {
 		this.latency = latency;
+	}
+	
+	public static void flush() {
+		inCount.set( 0 );
+		outCount.set( 0 );
 	}
 }
