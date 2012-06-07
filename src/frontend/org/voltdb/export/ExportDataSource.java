@@ -38,7 +38,6 @@ import org.voltdb.export.processors.RawProcessor.ExportInternalMessage;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltcore.messaging.MessagingException;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -217,7 +216,7 @@ public class ExportDataSource implements Comparable<ExportDataSource> {
      * Obtain next block of data from source
      * @throws MessagingException
      */
-    public void exportAction(RawProcessor.ExportInternalMessage m) throws MessagingException {
+    public void exportAction(RawProcessor.ExportInternalMessage m) {
         assert(m.m_m.getGeneration() == m_generation);
         ExportProtoMessage message = m.m_m;
         ExportProtoMessage result =

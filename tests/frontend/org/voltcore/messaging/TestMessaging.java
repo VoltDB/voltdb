@@ -199,11 +199,7 @@ public class TestMessaging extends TestCase {
                             hostId, mySiteId, msgIndex, msgCount, siteId, mailboxId);
                     MsgTest mt = new MsgTest();
                     mt.setValues();
-                    try {
-                        (currentMessenger).send((mailboxCount << 32) + siteId, mt);
-                    } catch (MessagingException e) {
-                        e.printStackTrace();
-                    }
+                    (currentMessenger).send((mailboxCount << 32) + siteId, mt);
                 }
 
                 // try to recv a message

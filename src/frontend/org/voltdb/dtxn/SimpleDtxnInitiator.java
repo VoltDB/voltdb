@@ -51,7 +51,6 @@ import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HostMessenger;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
 import org.voltdb.ClientInterface;
@@ -265,35 +264,31 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         long remoteHeartbeatTargets[][] = st.getRemoteSites();
         long localHeartbeatTargets[] = st.getLocalSites();
 
-        try {
-            /*
-             * For each host, create an array containing the safe txn ids for each
-             * site. Then coalesce them into a single heartbeat message to send to the
-             * initiator on that host who will then demux the heartbeats
-             */
-            for (long hostTargets[] : remoteHeartbeatTargets) {
-                final long initiatorSiteId = st.getInitiatorsForHost(SiteTracker.getHostForSite(hostTargets[0])).get(0);
-                assert(initiatorSiteId != 1L);//uninitialized value
-                long safeTxnIds[] = new long[hostTargets.length];
-                for (int ii = 0; ii < safeTxnIds.length; ii++) {
-                    safeTxnIds[ii] = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(hostTargets[ii]);
-                }
-
-                CoalescedHeartbeatMessage heartbeat =
-                    new CoalescedHeartbeatMessage(m_siteId, txnId, hostTargets,safeTxnIds);
-                m_mailbox.send(initiatorSiteId, heartbeat);
+        /*
+         * For each host, create an array containing the safe txn ids for each
+         * site. Then coalesce them into a single heartbeat message to send to the
+         * initiator on that host who will then demux the heartbeats
+         */
+        for (long hostTargets[] : remoteHeartbeatTargets) {
+            final long initiatorSiteId = st.getInitiatorsForHost(SiteTracker.getHostForSite(hostTargets[0])).get(0);
+            assert(initiatorSiteId != 1L);//uninitialized value
+            long safeTxnIds[] = new long[hostTargets.length];
+            for (int ii = 0; ii < safeTxnIds.length; ii++) {
+                safeTxnIds[ii] = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(hostTargets[ii]);
             }
 
-            // loop over all the local sites that need a heartbeat and send each a message
-            // no coalescing here
-            for (long siteId : localHeartbeatTargets) {
-                // tack on the last confirmed seen txn id for all sites with a particular partition
-                long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(siteId);
-                HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, newestSafeTxnId);
-                m_mailbox.send(siteId, tickNotice);
-            }
-        } catch (MessagingException e) {
-            throw new RuntimeException(e);
+            CoalescedHeartbeatMessage heartbeat =
+                new CoalescedHeartbeatMessage(m_siteId, txnId, hostTargets,safeTxnIds);
+            m_mailbox.send(initiatorSiteId, heartbeat);
+        }
+
+        // loop over all the local sites that need a heartbeat and send each a message
+        // no coalescing here
+        for (long siteId : localHeartbeatTargets) {
+            // tack on the last confirmed seen txn id for all sites with a particular partition
+            long newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(siteId);
+            HeartbeatMessage tickNotice = new HeartbeatMessage(m_siteId, txnId, newestSafeTxnId);
+            m_mailbox.send(siteId, tickNotice);
         }
     }
 
@@ -373,11 +368,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
                 m_siteId, txn.firstCoordinatorId, txn.txnId, txn.isReadOnly);
-        try {
-            m_mailbox.send(txn.otherSiteIds, notice);
-        } catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
+        m_mailbox.send(txn.otherSiteIds, notice);
 
         // figure out what the safely replicated txnid is for this execution site/partition id
         // in the multi-part case where we send this initiate task message to replicas of the coordinator,
@@ -399,22 +390,18 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
          * as the coordinator in the work request will treat it as
          * a participant notice
          */
-        try {
-            m_mailbox.send(txn.firstCoordinatorId, workRequest);
-            for (Long replica : txn.coordinatorReplicas) {
-                newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(replica);
-                workRequest = new InitiateTaskMessage(
-                        m_siteId,
-                        txn.firstCoordinatorId,
-                        txn.txnId,
-                        txn.isReadOnly,
-                        txn.isSinglePartition,
-                        txn.invocation,
-                        newestSafeTxnId); // this will allow all transactions to run for now
-                m_mailbox.send(replica, workRequest);
-            }
-        } catch (MessagingException e) {
-            throw new RuntimeException(e);
+        m_mailbox.send(txn.firstCoordinatorId, workRequest);
+        for (Long replica : txn.coordinatorReplicas) {
+            newestSafeTxnId = m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(replica);
+            workRequest = new InitiateTaskMessage(
+                    m_siteId,
+                    txn.firstCoordinatorId,
+                    txn.txnId,
+                    txn.isReadOnly,
+                    txn.isSinglePartition,
+                    txn.invocation,
+                    newestSafeTxnId); // this will allow all transactions to run for now
+            m_mailbox.send(replica, workRequest);
         }
     }
 
@@ -441,11 +428,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 txn.invocation,
                 newestSafeTxnId); // this will allow all transactions to run for now
 
-        try {
-            m_mailbox.send(coordinatorId, workRequest);
-        } catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
+        m_mailbox.send(coordinatorId, workRequest);
     }
 
     @Override
