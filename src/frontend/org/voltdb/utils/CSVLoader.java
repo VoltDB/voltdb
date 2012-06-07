@@ -37,6 +37,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 /**
@@ -132,21 +133,24 @@ class CSVLoader {
     	String reportdir ="./";
     	
     	@Option(desc = "the delimiter to use for separating entries.")
-    	char separator;
+    	char separator = CSVParser.DEFAULT_SEPARATOR;
     	
     	@Option(desc = "the character to use for quoted elements.")
-    	char quotechar;
-    	
-    	@Option(desc = "sets if characters outside the quotes are ignored.")
-    	boolean strictQuotes;
+    	char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;
     	
     	@Option(desc = "the character to use for escaping a separator or quote.")
-    	char escape;
+    	char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
+    	
+    	@Option(desc = "sets if characters outside the quotes are ignored.")
+    	boolean strictQuotes = CSVParser.DEFAULT_STRICT_QUOTES;
     	
     	@Option(desc = "the line number to skip for start reading.")
-    	int skipline;
+    	int skipline = CSVReader.DEFAULT_SKIP_LINES;
     	
-    	@Option(desc = "")
+    	@Option(desc = "The default leading whitespace behavior to use if none is supplied.")
+    	boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+    	
+    	@Option(desc = "Stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
     	int abortfailurecount =  100;
     	
     	
@@ -182,9 +186,13 @@ class CSVLoader {
     	try {
     		final CSVReader reader;
     		if (CSVLoader.standin)
-    			reader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)));
+    			reader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)),
+    					config.separator, config.quotechar, config.escape, config.skipline,
+    					config.strictQuotes, config.ignoreLeadingWhiteSpace);
     		else 
-    			reader = new CSVReader(new FileReader(config.inputfile));
+    			reader = new CSVReader(new FileReader(config.inputfile),
+    					config.separator, config.quotechar, config.escape, config.skipline,
+    					config.strictQuotes, config.ignoreLeadingWhiteSpace);
             ProcedureCallback cb = null;
 
             final Client client = ClientFactory.createClient();
