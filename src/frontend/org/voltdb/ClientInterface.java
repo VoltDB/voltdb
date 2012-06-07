@@ -31,7 +31,6 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ConcurrentHashMap;
 import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
@@ -150,6 +149,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final MapCacheReader m_iv2Masters;
     private ClientInterfaceHandleManager m_ciHandles =
         new ClientInterfaceHandleManager();
+    private final BackpressureTracker m_backpressure;
 
     /**
      * Policies used to determine if we can accept an invocation.
@@ -821,7 +821,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (VoltDB.instance().isIV2Enabled()) {
             long handle = m_ciHandles.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
                     (Connection)clientData, adminConnection, messageSize);
-
             try {
                 long initiatorHSId;
                 if (isSinglePartition) {
@@ -852,6 +851,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_ciHandles.removeHandle(handle);
                 throw new RuntimeException(e);
             }
+            //m_backpressure.increaseBackpressure(messageSize);
             return true;
         } else {
             return m_initiator.createTransaction(connectionId,
@@ -934,6 +934,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         response.getClientResponseData().flattenToBuffer(results);
                         results.flip();
                         clientData.m_connection.writeStream().enqueue(results);
+                        //m_backpressure.reduceBackpressure(clientData.m_messageSize);
                     } else {
                         m_d.offer(message);
                     }
@@ -952,6 +953,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_siteId = m_mailbox.getHSId();
         m_iv2Masters = new MapCache(messenger.getZK(), VoltZK.iv2masters);
         m_iv2Masters.start(true);
+        m_backpressure = new BackpressureTracker(this);
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
