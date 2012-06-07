@@ -2,21 +2,18 @@ package org.voltdb.utils;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
-import java.util.Random;
+
+import junit.framework.TestCase;
 
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.VoltDB.Configuration;
-import org.voltdb.VoltType;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
-
-import junit.framework.TestCase;
 
 public class TestCSVLoader extends TestCase {
 	
@@ -32,7 +29,7 @@ public class TestCSVLoader extends TestCase {
     private String reportdir = userHome + "/";
     String path_csv = userHome + "/" + "test.csv";
     
-    private String []params = {
+    private String []options = {
     		//userHome + "/testdb.csv",
     		"--inputfile=" + userHome + "/test.csv", 
     		//"--procedurename=BLAH.insert",
@@ -45,7 +42,23 @@ public class TestCSVLoader extends TestCase {
     @Override
     protected void setUp() throws Exception
     {
-        super.setUp();     
+        super.setUp();
+        
+        simpleSchema =
+                "create table BLAH (" +
+                "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
+                "clm_bigint bigint default 0, " +
+                
+               	"clm_string varchar(10) default null, " +
+                "clm_decimal decimal default null, " +
+                //"clm_float float default 1.0, "+ // for later
+                //"clm_timestamp timestamp default null, " + // for later
+                //"clm_varinary varbinary default null" + // for later
+                "); ";
+   
         pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
         pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
         builder = new VoltProjectBuilder();
@@ -95,7 +108,7 @@ public class TestCSVLoader extends TestCase {
 	    String []myData = { "1",
 	    					"",
 	    					"2"};
-		test_Interface( this.params, myData );
+		test_Interface( this.options, myData );
 	}
 	
 	public void testDelimeters () throws Exception

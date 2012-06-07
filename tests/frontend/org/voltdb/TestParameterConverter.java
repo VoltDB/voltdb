@@ -57,23 +57,6 @@ public class TestParameterConverter extends TestCase
         assertEquals(1000, ((Integer)r).intValue());
     }
     
-<<<<<<< HEAD
-    public void testStringToDecimal() throws Exception
-    {
-        Object r = ParameterConverter.
-            tryToMakeCompatible(false, false, BigDecimal.class, null, "111.1");
-        assertTrue("exepct decimal", r.getClass() == BigDecimal.class);
-        assertEquals("111.1", ((BigDecimal)r).toString());
-    }
-    
-    public void testStringToFloat() throws Exception
-    {
-        Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, float.class, null, "111.1");
-        assertTrue("exepct float", r.getClass() == float.class);
-        assertEquals("111.1", r.toString() );
-    }
-=======
     public void testStringToDouble() throws Exception
     {
         Object r = ParameterConverter.
@@ -116,6 +99,19 @@ public class TestParameterConverter extends TestCase
         assertEquals(new Double(2301100.23), ((Double)r).doubleValue());
     }
     
+    public void testNULLToInt() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, int.class, null, null);
+        assertTrue("expect null integer", r.getClass() == Integer.class);
+        assertEquals(VoltType.NULL_INTEGER, r);
+    }
     
->>>>>>> b54cc97e8419f7b8f1a63cf9951066525fa3345c
+    public void testNULLToString() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, int.class, null, null);
+        assertTrue("expect integer", r.getClass() == String.class);
+        assertEquals( VoltType.NULL_STRING_OR_VARBINARY, r);
+    }
 }
