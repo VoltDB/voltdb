@@ -214,12 +214,15 @@ class CSVLoader {
                     
                     // This message will be removed later
                     // print out the parameters right now
-//                    String msg = "<xin>params: ";
-//                    for (int i=0; i < correctedLine.length; i++) {
-//                    	msg += correctedLine[i] + ",";
-//                    }
-//                    System.out.println(msg);
-
+                    String msg = "<xin>params: ";
+                    for (int i=0; i < correctedLine.length; i++) {
+                    	if (correctedLine != null)
+                    		msg += correctedLine[i] + ",";
+                    }
+                    System.out.println(msg);
+                    
+                    NullparametersChecking(correctedLine);
+                    
                     String lineCheckResult;
                     if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
                     	System.err.println("<zheng>Stop at line " + (outCount.get()));
@@ -349,11 +352,19 @@ class CSVLoader {
         {//trim white space in this line.
         	for(int i=0; i<linefragement.length;i++) 
         	{
-        		if( !strColIndex.contains( i ) )//do not trim white space for string(varchar)
+        		if( !strColIndex.contains( i ) && linefragement[i] != null)//do not trim white space for string(varchar)
         			linefragement[i] = ((String)linefragement[i]).replaceAll( "\\s+", "" );
         	}
         }
         return null;
+    }
+    
+    private void NullparametersChecking(String[] linefragement) {
+         for (int i=0; i < linefragement.length; i++) {
+        	 linefragement[i] = (linefragement[i]).replaceAll( "\\s+", ""  );
+        	 if (linefragement[i].equals("NULL"))
+        		 linefragement[i] = null;
+         }
     }
     
     /**
