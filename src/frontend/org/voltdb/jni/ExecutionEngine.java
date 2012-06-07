@@ -425,7 +425,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             long siteId,
             int partitionId,
             int hostId,
-            String hostname,
+            byte hostname[],
             long tempTableMemory,
             int totalPartitions);
 
@@ -453,7 +453,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * human-readable text strings separated by line feeds.
      * @return error code
      */
-    protected native int nativeLoadCatalog(long pointer, long txnId, String serialized_catalog);
+    protected native int nativeLoadCatalog(long pointer, long txnId, byte serialized_catalog[]);
 
     /**
      * Update the EE's catalog.
@@ -463,7 +463,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, long txnId, String diff_commands);
+    protected native int nativeUpdateCatalog(long pointer, long txnId, byte diff_commands[]);
 
     /**
      * This method is called to initially load table data.
@@ -638,7 +638,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean syncAction,
             long mAckOffset,
             long seqNo,
-            String mTableSignature);
+            byte mTableSignature[]);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.
@@ -647,7 +647,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param tableId The table in question
      * @return The USO for the export table.
      */
-    public native long[] nativeGetUSOForExportTable(long pointer, String mTableSignature);
+    public native long[] nativeGetUSOForExportTable(long pointer, byte mTableSignature[]);
 
     /**
      * This code only does anything useful on MACOSX.
