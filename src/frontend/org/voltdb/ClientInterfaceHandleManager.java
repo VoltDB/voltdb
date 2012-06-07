@@ -81,14 +81,16 @@ public class ClientInterfaceHandleManager
         final Connection m_connection;
         final boolean m_isAdmin;
         final int m_messageSize;
+        final long m_creationTime;
         Iv2InFlight(long ciHandle, long clientHandle, Connection conn, boolean admin,
-                int messageSize)
+                int messageSize, long creationTime)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
             m_connection = conn;
             m_isAdmin = admin;
             m_messageSize = messageSize;
+            m_creationTime = creationTime;
         }
     }
 
@@ -110,7 +112,7 @@ public class ClientInterfaceHandleManager
      */
     synchronized long getHandle(boolean isSinglePartition, int partitionId,
             long clientHandle, Connection clientConnection, boolean adminConnection,
-            int messageSize)
+            int messageSize, long creationTime)
     {
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
@@ -124,7 +126,7 @@ public class ClientInterfaceHandleManager
         }
         long ciHandle = generator.getNextHandle();
         Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle,
-               clientConnection, adminConnection, messageSize);
+               clientConnection, adminConnection, messageSize, creationTime);
         Deque<Iv2InFlight> perPartDeque = m_partitionTxns.get(partitionId);
         if (perPartDeque == null) {
             perPartDeque = new ArrayDeque<Iv2InFlight>();

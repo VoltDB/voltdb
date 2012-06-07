@@ -820,7 +820,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         if (VoltDB.instance().isIV2Enabled()) {
             long handle = m_ciHandles.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    (Connection)clientData, adminConnection, messageSize);
+                    (Connection)clientData, adminConnection, messageSize, now);
             try {
                 long initiatorHSId;
                 if (isSinglePartition) {
@@ -851,7 +851,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_ciHandles.removeHandle(handle);
                 throw new RuntimeException(e);
             }
-            //m_backpressure.increaseBackpressure(messageSize);
+            m_backpressure.increaseBackpressure(messageSize);
             return true;
         } else {
             return m_initiator.createTransaction(connectionId,
@@ -928,13 +928,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         ClientInterfaceHandleManager.Iv2InFlight clientData =
                             m_ciHandles.findHandle(response.getClientInterfaceHandle());
                         response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
+                        final long now = System.currentTimeMillis();
+                        final int delta = (int)(now - clientData.m_creationTime);
+                        response.getClientResponseData().setClusterRoundtrip(delta);
 
                         ByteBuffer results = ByteBuffer.allocate(response.getClientResponseData().getSerializedSize() + 4);
                         results.putInt(results.capacity() - 4);
                         response.getClientResponseData().flattenToBuffer(results);
                         results.flip();
                         clientData.m_connection.writeStream().enqueue(results);
-                        //m_backpressure.reduceBackpressure(clientData.m_messageSize);
+                        m_backpressure.reduceBackpressure(clientData.m_messageSize);
                     } else {
                         m_d.offer(message);
                     }
