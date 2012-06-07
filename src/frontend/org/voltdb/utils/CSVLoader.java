@@ -122,10 +122,7 @@ class CSVLoader {
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
     	
-    	@Option(desc = "Skip empty records in the csv file if this parameter is set.")
-    	boolean skipemptyrecords = false;
-    	
-    	@Option(desc = "Trim whitespace in each line of the csv file if this parameter is set.")
+    	@Option(desc = "Trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
     	boolean trimwhitespace = false;
     	
     	@Option(desc = "Maximum rows to be read of the csv file.")
@@ -219,7 +216,7 @@ class CSVLoader {
 
                     String lineCheckResult;
                     if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
-                    	System.err.println("Stop at line " + (outCount.get()));
+                    	System.err.println("<zheng>Stop at line " + (outCount.get()));
                     	synchronized (errorInfo) {
                     		if (!errorInfo.containsKey(outCount.get())) {
                     			String[] info = {linedata.toString(), lineCheckResult};
@@ -332,17 +329,8 @@ class CSVLoader {
        
          if( linefragement.length == 0  )
          {
-        	if( config.skipemptyrecords )
-        	{
         		msg = "checkLineFormat Error: blank line";
         		return msg;
-        	}
-        	else
-        	{
-        		for( int i = 0; i < columnCnt; i++)
-        			linefragement[ i ] = "";
-        		return null;
-        	}
          }
            
         if( linefragement.length != columnCnt )//# attributes not match

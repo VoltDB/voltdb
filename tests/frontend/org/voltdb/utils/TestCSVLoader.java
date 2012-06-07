@@ -21,13 +21,13 @@ public class TestCSVLoader extends TestCase {
             "create table BLAH (" +
             "clm_integer integer default 0 not null, " + // column that is partitioned on
 
-            "clm_tinyint tinyint default 0, " +
-            "clm_smallint smallint default 0, " +
-            "clm_bigint bigint default 0, " +
+            //"clm_tinyint tinyint default 0, " +
+            //"clm_smallint smallint default 0, " +
+            //"clm_bigint bigint default 0, " +
             
-            "clm_string varchar(10) default null, " +
-            "clm_decimal decimal default null, " +
-            //"clm_float float default 1.0, " + // for later
+            //"clm_string varchar(10) default null, " +
+            //"clm_decimal decimal default null, " +
+            //"clm_float float default 1.0, "+ // for later
             //"clm_timestamp timestamp default null, " + // for later
             //"clm_varinary varbinary default null" + // for later
             "); ";
@@ -63,7 +63,7 @@ public class TestCSVLoader extends TestCase {
             		"--reportdir=" + reportdir,
             		"--tablename=BLAH",
             		"--abortfailurecount=50",
-            		"--skipemptyrecords=true",
+            		//"--skipemptyrecords=false",
             		"--trimwhitespace=true"
             		};
             CSVLoader.main(params);
