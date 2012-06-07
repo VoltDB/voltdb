@@ -63,6 +63,7 @@ public class TestParameterConverter extends TestCase
         assertEquals(new Double(34.56), ((Double)r).doubleValue());
     }
     
+    
     public void testStringToFloat() throws Exception
     {
         Object r = ParameterConverter.
@@ -72,6 +73,21 @@ public class TestParameterConverter extends TestCase
     }
     
     // Add more test unit cases
+    public void testStringWithWhitespaceToDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, double.class, null, "  34.56  ");
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(34.56), ((Double)r).doubleValue());
+    }
+    
+    public void testCommasStringIntegerToInt() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, int.class, null, "1100");
+        assertTrue("expect integer", r.getClass() == Integer.class);
+        assertEquals(1100, ((Integer)r).intValue());
+    }
     
     
 }

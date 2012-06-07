@@ -234,22 +234,22 @@ public class ParameterConverter {
         else if (pclass == String.class) {
             try {
                 if (slot == byte.class) {
-                    return Byte.parseByte((String) param);
+                    return Byte.parseByte(((String) param).replaceAll("\\s",""));
                 }
                 if (slot == short.class) {
-                    return Short.parseShort((String) param);
+                    return Short.parseShort(((String) param).replaceAll("\\s",""));
                 }
                 if (slot == int.class) {
-                    return Integer.parseInt((String) param);
+                    return Integer.parseInt(((String) param).replaceAll("\\s",""));
                 }
                 if (slot == long.class) {
-                    return Long.parseLong((String) param);
+                    return Long.parseLong(((String) param).replaceAll("\\s",""));
                 }
                 if (slot == double.class) {
-                	return Double.parseDouble((String) param);
+                	return Double.parseDouble(((String) param).replaceAll("\\s",""));
                 }
                 if (slot == float.class) {
-                	return Float.parseFloat((String) param);
+                	return Float.parseFloat(((String) param).replaceAll("\\s",""));
                 }
             }
             catch (NumberFormatException nfe) {
