@@ -47,8 +47,7 @@ public class ParameterConverter {
     {
         if (param == null ||
             param == VoltType.NULL_STRING_OR_VARBINARY ||
-            param == VoltType.NULL_DECIMAL)
-        {
+            param == VoltType.NULL_DECIMAL) {
             if (isPrimitive) {
                 VoltType type = VoltType.typeFromClass(paramType);
                 switch (type) {
@@ -123,6 +122,7 @@ public class ParameterConverter {
         if ((slot == short.class) && (pclass == Short.class || pclass == Byte.class)) return param;
         if ((slot == byte.class) && (pclass == Byte.class)) return param;
         if ((slot == double.class) && (param instanceof Number)) return ((Number)param).doubleValue();
+        if ((slot == float.class) && (param instanceof Number)) return ((Number)param).floatValue();
         if ((slot == String.class) && (pclass == String.class)) return param;
         if (slot == TimestampType.class) {
             if (pclass == Long.class) return new TimestampType((Long)param);
@@ -244,6 +244,12 @@ public class ParameterConverter {
                 }
                 if (slot == long.class) {
                     return Long.parseLong((String) param);
+                }
+                if (slot == double.class) {
+                	return Double.parseDouble((String) param);
+                }
+                if (slot == float.class) {
+                	return Float.parseFloat((String) param);
                 }
             }
             catch (NumberFormatException nfe) {

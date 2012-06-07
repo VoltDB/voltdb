@@ -51,7 +51,27 @@ public class TestParameterConverter extends TestCase
     {
         Object r = ParameterConverter.
             tryToMakeCompatible(true, false, int.class, null, "1000");
-        assertTrue("exepct integer", r.getClass() == Integer.class);
+        assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1000, ((Integer)r).intValue());
     }
+    
+    public void testStringToDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, double.class, null, "34.56");
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(34.56), ((Double)r).doubleValue());
+    }
+    
+    public void testStringToFloat() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, float.class, null, "34.56");
+        assertTrue("expect float", r.getClass() == Float.class);
+        assertEquals(new Float(34.56), ((Float)r).floatValue());
+    }
+    
+    // Add more test unit cases
+    
+    
 }
