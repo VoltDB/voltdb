@@ -123,8 +123,8 @@ class CSVLoader {
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
     	
-    	@Option(desc = "trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
-    	boolean trimwhitespace = false;
+//    	@Option(desc = "trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
+//    	boolean trimwhitespace = false;
     	
     	@Option(desc = "maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
@@ -220,8 +220,6 @@ class CSVLoader {
                     		msg += correctedLine[i] + ",";
                     }
                     System.out.println(msg);
-                    
-                    NullparametersChecking(correctedLine);
                     
                     String lineCheckResult;
                     if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
@@ -348,24 +346,15 @@ class CSVLoader {
         	return msg;
         }
         
-        else if( config.trimwhitespace )
+        else
         {//trim white space in this line.
         	for(int i=0; i<linefragement.length;i++) 
         	{
-        		if( !strColIndex.contains( i ) && linefragement[i] != null)//do not trim white space for string(varchar)
-        			linefragement[i] = (linefragement[i]).replaceAll( "\\s+", "" );
-
+        		if ((linefragement[i]).indexOf("NULL") != -1)
+        			linefragement[i] = null;
         	}
-        }
+        } 
         return null;
-    }
-    
-    private void NullparametersChecking(String[] linefragement) {
-         for (int i=0; i < linefragement.length; i++) {
-        	 linefragement[i] = (linefragement[i]).replaceAll( "\\s+", ""  );
-        	 if (linefragement[i].equals("NULL"))
-        		 linefragement[i] = null;
-         }
     }
     
     /**

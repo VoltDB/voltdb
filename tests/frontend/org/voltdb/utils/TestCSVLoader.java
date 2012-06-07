@@ -37,7 +37,6 @@ public class TestCSVLoader extends TestCase {
     		"--tablename=BLAH",
     		"--abortfailurecount=50",
     		//"--skipemptyrecords=false",
-    		"--trimwhitespace=true"
     		};
 
     @Override
@@ -93,10 +92,10 @@ public class TestCSVLoader extends TestCase {
     
 //    public void testBlank() throws Exception 
 //	{
-//	    String []myData = {" 1","2","  NULL ",   "NUL L", "NULL" ,"NULL"};
+//	    String []myData = {" 1,2,  NULL ,   NUL L, NU  LL ,NULL "};
 //		test_Interface( this.options, myData );
 //	}
-	
+//	
 //	public void testDelimeters () throws Exception
 //	{
 //		 String []params = {
@@ -107,7 +106,6 @@ public class TestCSVLoader extends TestCase {
 //		    		"--tablename=BLAH",
 //		    		"--abortfailurecount=50",
 //		    		//"--skipemptyrecords=false",
-//		    		"--trimwhitespace=true",
 //		    		"--separator=",""
 //		    		};
 //		 String []myData = {"1","","2"};
@@ -123,7 +121,7 @@ public class TestCSVLoader extends TestCase {
 	    		"--tablename=BLAH",
 	    		"--abortfailurecount=50",
 	    		//"--skipemptyrecords=false",
-	    		"--trimwhitespace=true"
+	    		
 	    		};
         try {
             CSVLoader.main(params_simple);
