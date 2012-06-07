@@ -233,23 +233,25 @@ public class ParameterConverter {
         // Coerce strings to primitive numbers.
         else if (pclass == String.class) {
             try {
+            	String value = ((String) param).replaceAll("\\s","");
                 if (slot == byte.class) {
-                    return Byte.parseByte(((String) param).replaceAll("\\s",""));
+                    return Byte.parseByte(value);
                 }
+                value = value.replaceAll("\\,","");
                 if (slot == short.class) {
-                    return Short.parseShort(((String) param).replaceAll("\\s",""));
+                    return Short.parseShort(value);
                 }
                 if (slot == int.class) {
-                    return Integer.parseInt(((String) param).replaceAll("\\s",""));
+                    return Integer.parseInt(value);
                 }
                 if (slot == long.class) {
-                    return Long.parseLong(((String) param).replaceAll("\\s",""));
+                    return Long.parseLong(value);
                 }
                 if (slot == double.class) {
-                	return Double.parseDouble(((String) param).replaceAll("\\s",""));
+                	return Double.parseDouble(value);
                 }
                 if (slot == float.class) {
-                	return Float.parseFloat(((String) param).replaceAll("\\s",""));
+                	return Float.parseFloat(value);
                 }
             }
             catch (NumberFormatException nfe) {

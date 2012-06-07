@@ -84,9 +84,17 @@ public class TestParameterConverter extends TestCase
     public void testCommasStringIntegerToInt() throws Exception
     {
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, int.class, null, "1100");
+            tryToMakeCompatible(true, false, int.class, null, "1,100");
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1100, ((Integer)r).intValue());
+    }
+    
+    public void testCommasStringIntegerToDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, double.class, null, "2,301,100.23");
+        assertTrue("expect integer", r.getClass() == Double.class);
+        assertEquals(new Double(2301100.23), ((Double)r).doubleValue());
     }
     
     
