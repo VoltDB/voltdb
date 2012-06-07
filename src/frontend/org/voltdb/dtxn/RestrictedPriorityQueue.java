@@ -25,7 +25,6 @@ import java.util.PriorityQueue;
 
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.logging.VoltLogger;
@@ -418,12 +417,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
 
         HeartbeatResponseMessage hbr =
             new HeartbeatResponseMessage(m_siteId, lid.m_lastSeenTxnId, true);
-        try {
-            m_mailbox.send(ts.initiatorHSId, hbr);
-        } catch (MessagingException e) {
-            // I really hope this doesn't happen
-            throw new RuntimeException(e);
-        }
+        m_mailbox.send(ts.initiatorHSId, hbr);
     }
 
     /**

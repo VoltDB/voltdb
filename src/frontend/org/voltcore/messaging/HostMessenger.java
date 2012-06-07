@@ -648,7 +648,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      * @throws MessagingException
      */
     ForeignHost presend(long hsId, VoltMessage message)
-    throws MessagingException {
+    {
         int hostId = (int)hsId;
 
         // the local machine case
@@ -702,11 +702,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         final long hsId = mailboxId == null ? getHSIdForLocalSite(m_nextSiteId.getAndIncrement()) : mailboxId;
         m_siteMailboxes.put(hsId, new Mailbox() {
             @Override
-            public void send(long hsId, VoltMessage message)
-            throws MessagingException {}
+            public void send(long hsId, VoltMessage message) {}
             @Override
-            public void send(long[] hsIds, VoltMessage message)
-            throws MessagingException {}
+            public void send(long[] hsIds, VoltMessage message) {}
             @Override
             public void deliver(VoltMessage message) {
                 hostLog.warn("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
@@ -746,7 +744,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void send(final long destinationHSId, final VoltMessage message)
-    throws MessagingException
     {
         assert(message != null);
 
@@ -758,8 +755,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     }
 
     public void send(long[] destinationHSIds, final VoltMessage message)
-    throws MessagingException {
-
+    {
         assert(message != null);
         assert(destinationHSIds != null);
         final HashMap<ForeignHost, ArrayList<Long>> foreignHosts =

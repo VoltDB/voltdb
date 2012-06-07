@@ -125,7 +125,7 @@ public class SiteMailbox implements Mailbox {
 
     @Override
     public void send(long hsId, VoltMessage message)
-            throws MessagingException {
+    {
         assert(message != null);
         message.m_sourceHSId = m_hsId;
         m_hostMessenger.send(hsId, message);
@@ -133,7 +133,7 @@ public class SiteMailbox implements Mailbox {
 
     @Override
     public void send(long[] hsIds, VoltMessage message)
-            throws MessagingException {
+    {
         assert(message != null);
         assert(hsIds != null);
         message.m_sourceHSId = m_hsId;

@@ -45,7 +45,6 @@ import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -150,7 +149,7 @@ public class TestExecutionSite extends TestCase {
         }
 
         @Override
-        public void send(long siteId, VoltMessage message) throws MessagingException {
+        public void send(long siteId, VoltMessage message) {
             message.m_sourceHSId = m_siteId;
             m_totalSends++;
             if (message instanceof HeartbeatResponseMessage) {
@@ -169,7 +168,7 @@ public class TestExecutionSite extends TestCase {
         }
 
         @Override
-        public void send(long[] siteIds, VoltMessage message) throws MessagingException {
+        public void send(long[] siteIds, VoltMessage message) {
             message.m_sourceHSId = m_siteId;
             if (message instanceof HeartbeatResponseMessage) {
                 m_heartBeatSends += siteIds.length;
