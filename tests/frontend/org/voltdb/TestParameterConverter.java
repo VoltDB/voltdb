@@ -53,10 +53,11 @@ public class TestParameterConverter extends TestCase
     {
         Object r = ParameterConverter.
             tryToMakeCompatible(true, false, int.class, null, "1000");
-        assertTrue("exepct integer", r.getClass() == Integer.class);
+        assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1000, ((Integer)r).intValue());
     }
     
+<<<<<<< HEAD
     public void testStringToDecimal() throws Exception
     {
         Object r = ParameterConverter.
@@ -72,4 +73,49 @@ public class TestParameterConverter extends TestCase
         assertTrue("exepct float", r.getClass() == float.class);
         assertEquals("111.1", r.toString() );
     }
+=======
+    public void testStringToDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, double.class, null, "34.56");
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(34.56), ((Double)r).doubleValue());
+    }
+    
+    
+    public void testStringToFloat() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, float.class, null, "34.56");
+        assertTrue("expect float", r.getClass() == Float.class);
+        assertEquals(new Float(34.56), ((Float)r).floatValue());
+    }
+    
+    // Add more test unit cases
+    public void testStringWithWhitespaceToDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, double.class, null, "  34.56  ");
+        assertTrue("expect double", r.getClass() == Double.class);
+        assertEquals(new Double(34.56), ((Double)r).doubleValue());
+    }
+    
+    public void testCommasStringIntegerToInt() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, int.class, null, "1,100");
+        assertTrue("expect integer", r.getClass() == Integer.class);
+        assertEquals(1100, ((Integer)r).intValue());
+    }
+    
+    public void testCommasStringIntegerToDouble() throws Exception
+    {
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, double.class, null, "2,301,100.23");
+        assertTrue("expect integer", r.getClass() == Double.class);
+        assertEquals(new Double(2301100.23), ((Double)r).doubleValue());
+    }
+    
+    
+>>>>>>> b54cc97e8419f7b8f1a63cf9951066525fa3345c
 }
