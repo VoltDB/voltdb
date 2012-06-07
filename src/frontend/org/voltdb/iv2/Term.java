@@ -315,14 +315,14 @@ public class Term
             m_repairLogUnion.add(response);
             int waitingFor = rrs.update(response);
             // if a replica finished, see if they're all done...
-            if (waitingFor == 0 && repairLogsAreComplete()) {
+            if (waitingFor == 0 && areRepairLogsComplete()) {
                 repairSurvivors();
             }
         }
     }
 
     /** Have all survivors supplied a full repair log? */
-    public boolean repairLogsAreComplete()
+    public boolean areRepairLogsComplete()
     {
         for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
             if (entry.getValue().logsComplete() != 0) {
