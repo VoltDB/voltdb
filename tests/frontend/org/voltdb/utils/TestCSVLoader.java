@@ -5,6 +5,7 @@ import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.util.Random;
 
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
@@ -29,10 +30,7 @@ public class TestCSVLoader extends TestCase {
     
     private String userHome = System.getProperty("user.home"); 
     private String reportdir = userHome + "/";
-    String path_csv = userHome + "test.csv";
-        
-    private String []myData_Blank = {"1","","2"};
-    private String []myData;
+    String path_csv = userHome + "/" + "test.csv";
     
     private String []params = {
     		//userHome + "/testdb.csv",
@@ -81,7 +79,43 @@ public class TestCSVLoader extends TestCase {
         config.m_pathToDeployment = pathToDeployment;
         localServer = new ServerThread(config);
         client = null;
+        
+        try{
+        	localServer.start();
+        	localServer.waitForInitialization();
+        
+        	client = ClientFactory.createClient();
+        	client.createConnection("localhost");
+        }
+        catch(Exception e )
+        {
+        	System.err.println(e.getMessage());
+        };
+        
     }
+    
+    public void testBlank() throws Exception 
+	{
+	    String []myData = {"1","","2"};
+		test_Interface( this.params, myData );
+	}
+	
+	public void testDelimeters () throws Exception
+	{
+		 String []params = {
+		    		//userHome + "/testdb.csv",
+		    		"--inputfile=" + userHome + "/test.csv", 
+		    		//"--procedurename=BLAH.insert",
+		    		"--reportdir=" + reportdir,
+		    		"--tablename=BLAH",
+		    		"--abortfailurecount=50",
+		    		//"--skipemptyrecords=false",
+		    		"--trimwhitespace=true",
+		    		"--separator=",""
+		    		};
+		 String []myData = {"1","","2"};
+		 test_Interface( params, myData );
+	}
 
 	public void testSimple() throws Exception {
 		 String []params_simple = {
@@ -95,19 +129,11 @@ public class TestCSVLoader extends TestCase {
 	    		"--trimwhitespace=true"
 	    		};
         try {
-            localServer.start();
-            localServer.waitForInitialization();
-           
             CSVLoader.main(params_simple);
             // do the test
-            client = ClientFactory.createClient();
-            client.createConnection("localhost");
-            
             VoltTable modCount;
             modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
             System.out.println("data inserted to table BLAH:\n" + modCount);
-            
-            modCount = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;").getResults()[0];
             int rowct = modCount.getRowCount();
                         
             BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
@@ -124,6 +150,7 @@ public class TestCSVLoader extends TestCase {
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
+            CSVLoader.flush();
         }
         finally {
             if (client != null) client.close();
@@ -140,29 +167,25 @@ public class TestCSVLoader extends TestCase {
         }
 	}
 	
-	public void testBlankLine() throws Exception {
+	public void test_Interface( String[] my_params, String[] my_data ) throws Exception {
 		try{
 			BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
-			for( int i = 0; i < myData_Blank.length; i++ )
-				out_csv.write( myData_Blank[ i ]+"\n" );
+			for( int i = 0; i < my_data.length; i++ )
+				out_csv.write( my_data[ i ]+"\n" );
+			out_csv.flush();
+			out_csv.close();
 		}
 		catch( Exception e) {
+			System.err.print( e.getMessage() );
 		}
 		
 		try {
-            localServer.start();
-            localServer.waitForInitialization();
-           
-            CSVLoader.main(params);
+            CSVLoader.main(my_params);
             // do the test
-            client = ClientFactory.createClient();
-            client.createConnection("localhost");
             
             VoltTable modCount;
             modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
             System.out.println("data inserted to table BLAH:\n" + modCount);
-            
-            modCount = client.callProcedure("@AdHoc", "SELECT COUNT(*) FROM BLAH;").getResults()[0];
             int rowct = modCount.getRowCount();
                         
             BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
@@ -179,6 +202,7 @@ public class TestCSVLoader extends TestCase {
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
+            CSVLoader.flush();
         }
         finally {
             if (client != null) client.close();
@@ -194,4 +218,5 @@ public class TestCSVLoader extends TestCase {
             System.gc();
         }
 	}
+
 }
