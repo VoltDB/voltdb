@@ -123,14 +123,17 @@ class CSVLoader {
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
     	
-    	@Option(desc = "Trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
+    	@Option(desc = "trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
     	boolean trimwhitespace = false;
     	
-    	@Option(desc = "Maximum rows to be read of the csv file.")
+    	@Option(desc = "maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
     	
     	@Option(desc = "directory path to produce report files.")
     	String reportdir ="./";
+    	
+    	@Option(desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
+    	int abortfailurecount =  100;
     	
     	@Option(desc = "the delimiter to use for separating entries.")
     	char separator = CSVParser.DEFAULT_SEPARATOR;
@@ -147,25 +150,20 @@ class CSVLoader {
     	@Option(desc = "the line number to skip for start reading.")
     	int skipline = CSVReader.DEFAULT_SKIP_LINES;
     	
-    	@Option(desc = "The default leading whitespace behavior to use if none is supplied.")
+    	@Option(desc = "the default leading whitespace behavior to use if none is supplied.")
     	boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
-    	
-    	@Option(desc = "Stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
-    	int abortfailurecount =  100;
-    	
     	
     	@Override
     	public void validate() {
-    		
-    		if (abortfailurecount <= 0) exitWithMessageAndUsage("");
-    		// add more checking
+    		if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
     		if (procedurename.equals("") && tablename.equals("") )
     			exitWithMessageAndUsage("procedure name or a table name required");
     		if (!procedurename.equals("") && !tablename.equals("") )
     			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-    		
     		if (inputfile.equals("")) 
     			standin = true;
+    		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
+    		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
     	}
     }
     
