@@ -35,7 +35,6 @@ import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.Semaphore;
 
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.RecoveryMessageType;
 import org.voltcore.messaging.VoltMessage;
@@ -534,11 +533,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
         recoveryLog.trace(
                 "Sending recovery initiate request before txnid " + txnId +
                 " from site " + CoreUtils.hsIdToString(m_HSId) + " to " + CoreUtils.hsIdToString(m_sourceHSId));
-        try {
-            m_mailbox.send( m_sourceHSId, recoveryMessage);
-        } catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
+        m_mailbox.send( m_sourceHSId, recoveryMessage);
 
         final long startTime = System.currentTimeMillis();
         while (System.currentTimeMillis() - startTime < 5000) {

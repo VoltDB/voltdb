@@ -37,7 +37,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
@@ -296,11 +295,7 @@ public class Term
         }
 
         VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
-        try {
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
-        }
-        catch (MessagingException ignored) {
-        }
+        m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
     }
 
     /** Process a new repair log response */

@@ -180,6 +180,9 @@ public class VoltDB {
             }
         }
 
+        /** Behavior-less arg used to differentiate command lines from "ps" */
+        public String m_tag;
+
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
@@ -324,6 +327,14 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("timestampsalt ")) {
                     m_timestampTestingSalt = Long.parseLong(arg.substring("timestampsalt ".length()));
+                }
+
+                // handle behaviorless tag field
+                else if (arg.equals("tag")) {
+                    m_tag = args[++i];
+                }
+                else if (arg.startsWith("tag ")) {
+                    m_tag = arg.substring("tag ".length());
                 }
 
                 else if (arg.equals("catalog")) {

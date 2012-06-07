@@ -111,6 +111,8 @@ public class TestLikeQueries extends TestCase {
             new LikeTestData("abcccc%", "abc%"),
             new LikeTestData("abcdefg", "abcdefg"),
             new LikeTestData("âxxxéyy", "âxxx%"),
+            new LikeTestData("â🀲x一xxéyyԱ", "â🀲x一%"),
+            new LikeTestData("â🀲x", "â🀲%"),
         };
 
         final LikeTest[] tests = {
@@ -122,18 +124,25 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("%", rowData.length),
             new LikeTest("a%", 3),
             new LikeTest("âxxx%", 1),
+            new LikeTest("aaaaaaa", 1),
+            new LikeTest("aaa", 0),
+            new LikeTest("abcdef_", 1),
+            new LikeTest("ab_d_fg", 1),
+            new LikeTest("%defg", 1),
+            new LikeTest("%de%", 1),
+            new LikeTest("â🀲x", 1),
+            new LikeTest("â🀲x一xxéyyԱ", 1),
+            new LikeTest("â_x一xxéyyԱ", 1),
+            new LikeTest("â🀲x_xxéyyԱ", 1),
+            new LikeTest("â🀲x一xxéyy_", 1),
+            new LikeTest("â🀲x一xéyyԱ", 0),
             new NotLikeTest("aaa%", rowData.length - 1),
+            new EscapeLikeTest("ââ🀲x一xxéyyԱ", 1, "â"),
+            new EscapeLikeTest("abccccâ%", 1, "â"),
             new EscapeLikeTest("abcccc|%", 1, "|"),
             new EscapeLikeTest("abc%", 2, "|"),
             new EscapeLikeTest("aaa", 0, "|"),
             // Patterns that fail (unsupported until we fix the parser)
-            new UnsupportedLikeTest("aaaaaaa", 0),
-            new UnsupportedLikeTest("aaa", 0),
-            new UnsupportedLikeTest("abcdef_", 1),
-            new UnsupportedLikeTest("ab_d_fg", 1),
-            new UnsupportedLikeTest("%defg", 1),
-            new UnsupportedLikeTest("%de%", 1),
-            new UnsupportedLikeTest("%de% ", 0),
             new UnsupportedEscapeLikeTest("abcd!%%", 0, "!"),
         };
 
@@ -144,6 +153,8 @@ public class TestLikeQueries extends TestCase {
         builder.addLiteralSchema(schema);
         builder.addPartitionInfo("STRINGS", "ID");
         builder.addStmtProcedure("Insert", "insert into strings values (?, ?, ?);", null);
+        builder.addStmtProcedure("SelectLike", "select * from strings where  val like ?;");
+        builder.addStmtProcedure("SelectNotLike", "select * from strings where  val not like ?;");
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue("Insert compilation failed", success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
@@ -174,6 +185,33 @@ public class TestLikeQueries extends TestCase {
 
             // Tests based on LikeTest list
             for (LikeTest test : tests) {
+                String procName = null;
+                if (test.getClass() == LikeTest.class) {
+                    procName = "SelectLike";
+                } else if (test instanceof NotLikeTest) {
+                    procName = "NotLike";
+                } else if (test instanceof EscapeLikeTest) {
+                    continue;
+                }
+                if (test.getClass() == LikeTest.class) {
+                    System.out.printf("SelectLike pattern \"%s\"\n", test.pattern);
+                    try {
+                        VoltTable result = client.callProcedure(procName, test.pattern).getResults()[0];
+                        assertEquals(String.format("\"%s\": bad row count:", test.pattern),
+                                     test.matches, result.getRowCount());
+                        System.out.println(result.toString());
+                        assertFalse(String.format("Expected to crash on \"%s\", but didn't", test.pattern), test.crashes);
+                    } catch (ProcCallException e) {
+                        System.out.printf("LIKE pattern \"%s\" failed\n", test.pattern);
+                        System.out.println(e.toString());
+                        assertTrue("This failure was unexpected", test.crashes);
+                        System.out.println("(This failure was expected)");
+                    }
+                }
+            }
+
+            //Test parameter values used as like expression
+            for (LikeTest test : tests) {
                 String clause = test.getClause();
                 String query = String.format("select * from strings where val %s", clause);
                 System.out.printf("LIKE clause \"%s\"\n", clause);
@@ -193,13 +231,19 @@ public class TestLikeQueries extends TestCase {
 
             // Tests using PAT column for pattern data
             {
-                // Expact all PAT column patterns to produce a match with the VAL column string.
-                // We don't support non-literal likes yet. Remove the catch when we do.
+                //Without an escape this works
                 String query = "select * from strings where val like pat";
+                VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+                assertEquals(String.format("LIKE column test: bad row count:"),
+                            rowData.length, result.getRowCount());
+
+                //With an escape there is no way for the escape to propagate to the expression in EE
+                //So HSQL should reject it due to our modifications
+                query = "select * from strings where val like pat ESCAPE '?'";
                 try {
-                    VoltTable result = client.callProcedure("@AdHoc", query).getResults()[0];
+                    result = client.callProcedure("@AdHoc", query).getResults()[0];
                     assertEquals(String.format("LIKE column test: bad row count:"),
-                                 tests.length, result.getRowCount());
+                            rowData.length, result.getRowCount());
                 } catch (ProcCallException e) {
                     System.out.println("LIKE column test failed (expected for now)");
                 }

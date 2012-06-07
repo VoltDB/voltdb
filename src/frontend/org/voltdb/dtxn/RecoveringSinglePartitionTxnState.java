@@ -18,7 +18,6 @@
 package org.voltdb.dtxn;
 
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
@@ -45,13 +44,7 @@ public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
 
             // this tells the initiator that the response is a dummy
             response.setRecovering(true);
-
-            try {
-                m_mbox.send(initiatorHSId, response);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
-
+            m_mbox.send(initiatorHSId, response);
             m_done = true;
         }
         return m_done;

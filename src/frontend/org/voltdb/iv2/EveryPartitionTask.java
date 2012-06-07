@@ -21,7 +21,6 @@ import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -56,12 +55,7 @@ public class EveryPartitionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        try {
-            m_mailbox.send(m_initiatorHSIds, m_msg);
-        } catch (MessagingException e) {
-            VoltDB.crashLocalVoltDB("Failed to serialize initiation for " +
-                    m_msg.getStoredProcedureName(), true, e);
-        }
+        m_mailbox.send(m_initiatorHSIds, m_msg);
         m_queue.flush();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);

@@ -26,7 +26,6 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltdb.messaging.BorrowTaskMessage;
@@ -70,12 +69,7 @@ public class SpScheduler extends Scheduler
                 m_duplicateCounters.remove(counter);
                 VoltMessage resp = counter.getLastResponse();
                 if (resp != null) {
-                    try {
-                        m_mailbox.send(counter.m_destinationId, resp);
-                    } catch (MessagingException e) {
-                        // Maybe should crash here?
-                        hostLog.error("Failed to send response while updating replicas", e);
-                    }
+                    m_mailbox.send(counter.m_destinationId, resp);
                 }
                 else {
                     hostLog.warn("TXN " + counter.getTxnId() + " lost all replicas and " +
@@ -145,23 +139,19 @@ public class SpScheduler extends Scheduler
                     msg.setTxnId(newSpHandle);
                 }
                 if (m_replicaHSIds.size() > 0) {
-                    try {
-                        Iv2InitiateTaskMessage replmsg =
-                            new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
-                                    m_mailbox.getHSId(),
-                                    m_repairLogTruncationHandle,
-                                    msg.getTxnId(),
-                                    msg.isReadOnly(),
-                                    msg.isSinglePartition(),
-                                    msg.getStoredProcedureInvocation(),
-                                    msg.getClientInterfaceHandle());
-                        // Update the handle in the copy
-                        replmsg.setSpHandle(newSpHandle);
-                        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
-                                replmsg);
-                    } catch (MessagingException e) {
-                        hostLog.error("Failed to send Iv2InitiateTaskMessage to replica", e);
-                    }
+                    Iv2InitiateTaskMessage replmsg =
+                        new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
+                                m_mailbox.getHSId(),
+                                m_repairLogTruncationHandle,
+                                msg.getTxnId(),
+                                msg.isReadOnly(),
+                                msg.isSinglePartition(),
+                                msg.getStoredProcedureInvocation(),
+                                msg.getClientInterfaceHandle());
+                    // Update the handle in the copy
+                    replmsg.setSpHandle(newSpHandle);
+                    m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                            replmsg);
                     List<Long> expectedHSIds = new ArrayList<Long>(m_replicaHSIds);
                     expectedHSIds.add(m_mailbox.getHSId());
                     DuplicateCounter counter = new DuplicateCounter(
@@ -197,11 +187,7 @@ public class SpScheduler extends Scheduler
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getSpHandle());
                 m_repairLogTruncationHandle = message.getSpHandle();
-                try {
-                    m_mailbox.send(counter.m_destinationId, message);
-                } catch (MessagingException e) {
-                    VoltDB.crashLocalVoltDB("Failed to send every-site response.", true, e);
-                }
+                m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
@@ -210,13 +196,8 @@ public class SpScheduler extends Scheduler
             return;
         }
 
-        try {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            m_mailbox.send(message.getInitiatorHSId(), message);
-        }
-        catch (MessagingException e) {
-            // hostLog.error("Failed to deliver response from execution site.", e);
-        }
+        // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+        m_mailbox.send(message.getInitiatorHSId(), message);
     }
 
     // BorrowTaskMessages just encapsulate a FragmentTaskMessage along with
@@ -250,15 +231,11 @@ public class SpScheduler extends Scheduler
             // If we have input dependencies, it's borrow work, there's no way we
             // can actually distribute it
             if (m_replicaHSIds.size() > 0 && inputDeps == null) {
-                try {
-                    FragmentTaskMessage replmsg =
-                        new FragmentTaskMessage(m_mailbox.getHSId(),
-                                m_mailbox.getHSId(), msg);
-                    m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
-                            replmsg);
-                } catch (MessagingException e) {
-                    hostLog.error("Failed to deliver response from execution site.", e);
-                }
+                FragmentTaskMessage replmsg =
+                    new FragmentTaskMessage(m_mailbox.getHSId(),
+                            m_mailbox.getHSId(), msg);
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                        replmsg);
                 List<Long> expectedHSIds = new ArrayList<Long>(m_replicaHSIds);
                 expectedHSIds.add(m_mailbox.getHSId());
                 DuplicateCounter counter;
@@ -317,11 +294,7 @@ public class SpScheduler extends Scheduler
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI
                 resp.setExecutorSiteId(m_mailbox.getHSId());
-                try {
-                    m_mailbox.send(counter.m_destinationId, resp);
-                } catch (MessagingException e) {
-                    VoltDB.crashLocalVoltDB("Failed to send every-site response.", true, e);
-                }
+                m_mailbox.send(counter.m_destinationId, resp);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
@@ -330,24 +303,15 @@ public class SpScheduler extends Scheduler
             return;
         }
 
-        try {
-            m_mailbox.send(message.getDestinationSiteId(), message);
-        }
-        catch (MessagingException e) {
-            hostLog.error("Failed to deliver response from execution site.", e);
-        }
+        m_mailbox.send(message.getDestinationSiteId(), message);
     }
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
         if (m_replicaHSIds.size() > 0) {
-            try {
-                CompleteTransactionMessage replmsg = message;
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
-                        replmsg);
-            } catch (MessagingException e) {
-                hostLog.error("Failed to deliver response from execution site.", e);
-            }
+            CompleteTransactionMessage replmsg = message;
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                    replmsg);
         }
         TransactionState txn = m_outstandingTxns.remove(message.getTxnId());
         // We can currently receive CompleteTransactionMessages for multipart procedures

@@ -24,7 +24,6 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 
@@ -79,7 +78,7 @@ public class InitiatorMailbox implements Mailbox
     }
 
     @Override
-    public void send(long destHSId, VoltMessage message) throws MessagingException
+    public void send(long destHSId, VoltMessage message)
     {
         logTxMessage(message);
         message.m_sourceHSId = this.m_hsId;
@@ -87,7 +86,7 @@ public class InitiatorMailbox implements Mailbox
     }
 
     @Override
-    public void send(long[] destHSIds, VoltMessage message) throws MessagingException
+    public void send(long[] destHSIds, VoltMessage message)
     {
         logTxMessage(message);
         message.m_sourceHSId = this.m_hsId;
@@ -179,9 +178,7 @@ public class InitiatorMailbox implements Mailbox
                         ofTotal,
                         log.getSpHandle(),
                         log.getMessage());
-            try {
-                send(message.m_sourceHSId, response);
-            } catch (MessagingException neverhappensreally) {}
+            send(message.m_sourceHSId, response);
             seq++;
         }
         return;
@@ -195,10 +192,7 @@ public class InitiatorMailbox implements Mailbox
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work =
                 new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
-            try {
-                send(replicaHSId, work);
-            } catch (MessagingException ex) {
-            }
+            send(replicaHSId, work);
         }
     }
 

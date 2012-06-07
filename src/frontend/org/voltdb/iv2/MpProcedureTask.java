@@ -21,7 +21,6 @@ import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.messaging.CompleteTransactionMessage;
@@ -85,11 +84,7 @@ public class MpProcedureTask extends ProcedureTask
                 m_txn.needsRollback(),
                 false);  // really don't want to have ack the ack.
 
-        try {
-            m_initiator.send(m_initiatorHSIds, complete);
-        } catch (MessagingException fatal) {
-            org.voltdb.VoltDB.crashLocalVoltDB("Messaging exception", true, fatal);
-        }
+        m_initiator.send(m_initiatorHSIds, complete);
         m_txn.setDone();
         m_queue.flush();
     }

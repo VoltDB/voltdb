@@ -28,7 +28,6 @@ import java.util.Map.Entry;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.zk.MapCache;
 
@@ -161,11 +160,7 @@ public class MpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
-                try {
-                    m_mailbox.send(counter.m_destinationId, message);
-                } catch (MessagingException e) {
-                    VoltDB.crashLocalVoltDB("Failed to send every-site response.", true, e);
-                }
+                m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
                 VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
@@ -174,13 +169,8 @@ public class MpScheduler extends Scheduler
             return;
         }
 
-        try {
-            // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
-            m_mailbox.send(message.getInitiatorHSId(), message);
-        }
-        catch (MessagingException e) {
-            hostLog.error("Failed to deliver response from execution site.", e);
-        }
+        // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+        m_mailbox.send(message.getInitiatorHSId(), message);
     }
 
     public void handleFragmentTaskMessage(FragmentTaskMessage message,

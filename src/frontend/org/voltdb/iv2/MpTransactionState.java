@@ -27,7 +27,6 @@ import java.util.concurrent.LinkedBlockingDeque;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
@@ -151,16 +150,11 @@ public class MpTransactionState extends TransactionState
             for (int i = 0; i < m_useHSIds.size(); i++) {
                 non_local_hsids[i] = m_useHSIds.get(i);
             }
-            try {
-                // send to all non-local sites
-                // IZZY: This needs to go through mailbox.deliver()
-                // so that fragments could get replicated for k>0
-                if (non_local_hsids.length > 0) {
-                    m_mbox.send(non_local_hsids, m_remoteWork);
-                }
-            }
-            catch (MessagingException e) {
-                throw new RuntimeException(e);
+            // send to all non-local sites
+            // IZZY: This needs to go through mailbox.deliver()
+            // so that fragments could get replicated for k>0
+            if (non_local_hsids.length > 0) {
+                m_mbox.send(non_local_hsids, m_remoteWork);
             }
         }
         else {
@@ -211,12 +205,7 @@ public class MpTransactionState extends TransactionState
 
         BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
         borrowmsg.addInputDepMap(m_remoteDepTables);
-        try {
-            m_mbox.send(m_buddyHSId, borrowmsg);
-        }
-        catch (MessagingException me) {
-            throw new RuntimeException(me);
-        }
+        m_mbox.send(m_buddyHSId, borrowmsg);
 
         FragmentResponseMessage msg = null;
         try {

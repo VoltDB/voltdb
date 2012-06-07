@@ -35,7 +35,6 @@ import junit.framework.TestCase;
 
 import org.junit.Test;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.ParameterSet;
 import org.voltdb.SiteProcedureConnection;
@@ -207,7 +206,7 @@ public class Iv2TestMpTransactionState extends TestCase
     }
 
     @Test
-    public void testOneSitePartitionedRead() throws IOException, MessagingException
+    public void testOneSitePartitionedRead() throws IOException
     {
         long txnId = 1234l;
         int batch_size = 3;
@@ -252,7 +251,7 @@ public class Iv2TestMpTransactionState extends TestCase
     }
 
     @Test
-    public void testMultiSitePartitionedRead() throws IOException, MessagingException
+    public void testMultiSitePartitionedRead() throws IOException
     {
         long txnId = 1234l;
         int batch_size = 3;
@@ -294,7 +293,7 @@ public class Iv2TestMpTransactionState extends TestCase
     }
 
     @Test
-    public void testSingleReplicatedReadFragment() throws IOException, MessagingException
+    public void testSingleReplicatedReadFragment() throws IOException
     {
         long txnId = 1234l;
         int batch_size = 3;
@@ -338,7 +337,7 @@ public class Iv2TestMpTransactionState extends TestCase
     }
 
     @Test
-    public void testOneSitePartitionedReadWithRollback() throws IOException, MessagingException
+    public void testOneSitePartitionedReadWithRollback() throws IOException
     {
         long txnId = 1234l;
         int batch_size = 3;
@@ -387,7 +386,7 @@ public class Iv2TestMpTransactionState extends TestCase
     }
 
     @Test
-    public void testOneSitePartitionedReadWithBuddyRollback() throws IOException, MessagingException
+    public void testOneSitePartitionedReadWithBuddyRollback() throws IOException
     {
         long txnId = 1234l;
         int batch_size = 3;

@@ -61,6 +61,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_isRejoinTest = m_isRejoinTest;
         cl.m_leaderPort = m_leaderPort;
         cl.m_enableIV2 = m_enableIV2;
+        cl.m_tag = m_tag;
 
         // second, copy the derived class fields
         cl.includeTestOpts = includeTestOpts;
@@ -484,6 +485,10 @@ public class CommandLine extends VoltDB.Configuration
         if (customCmdLn != null && !customCmdLn.isEmpty())
         {
             cmdline.add(customCmdLn);
+        }
+
+        if (m_tag != null) {
+            cmdline.add("tag"); cmdline.add(m_tag);
         }
 
         return cmdline;
