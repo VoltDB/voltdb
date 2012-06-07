@@ -30,6 +30,7 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.utils.CoreUtils;
 
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
@@ -163,6 +164,7 @@ public class InitiatorMailbox implements Mailbox
         this.m_hsId = hsId;
     }
 
+    /** Produce the repair log. This is idempotent. */
     void handleLogRequest(VoltMessage message)
     {
         List<RepairLog.Item> logs = m_repairLog.contents();
@@ -185,8 +187,19 @@ public class InitiatorMailbox implements Mailbox
         return;
     }
 
+    /** Make and send a repair message upon request. */
     void repairReplicaWith(long replicaHSId, Iv2RepairLogResponseMessage msg)
     {
+        VoltMessage repairWork = msg.getPayload();
+        if (repairWork instanceof Iv2InitiateTaskMessage) {
+            Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
+            Iv2InitiateTaskMessage work =
+                new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
+            try {
+                send(replicaHSId, work);
+            } catch (MessagingException ex) {
+            }
+        }
     }
 
     void logRxMessage(VoltMessage message)

@@ -66,6 +66,17 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_clientInterfaceHandle = clientInterfaceHandle;
     }
 
+    /** Copy constructor for repair. */
+    public Iv2InitiateTaskMessage(long initiatorHSId,
+            long coordinatorHSId, Iv2InitiateTaskMessage rhs)
+    {
+        super(initiatorHSId, coordinatorHSId, rhs.m_txnId, rhs.isReadOnly());
+        m_isSinglePartition = rhs.m_isSinglePartition;
+        m_invocation = rhs.m_invocation;
+        m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
+        m_truncationHandle = Long.MIN_VALUE;
+    }
+
     @Override
     public boolean isReadOnly() {
         return m_isReadOnly;
