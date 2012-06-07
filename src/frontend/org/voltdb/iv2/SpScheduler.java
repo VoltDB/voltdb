@@ -49,6 +49,9 @@ public class SpScheduler extends Scheduler
         new HashMap<Long, DuplicateCounter>();
     private AtomicLong m_txnId = new AtomicLong(0);
 
+    // the current not-needed-any-more point of the repair log.
+    long m_repairLogTruncationHandle = Long.MIN_VALUE;
+
     SpScheduler()
     {
     }
@@ -128,6 +131,7 @@ public class SpScheduler extends Scheduler
                 // to other local mailboxes.
                 msg = new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                         message.getCoordinatorHSId(),
+                        m_repairLogTruncationHandle,
                         message.getTxnId(),
                         message.isReadOnly(),
                         message.isSinglePartition(),
@@ -145,6 +149,7 @@ public class SpScheduler extends Scheduler
                         Iv2InitiateTaskMessage replmsg =
                             new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                     m_mailbox.getHSId(),
+                                    m_repairLogTruncationHandle,
                                     msg.getTxnId(),
                                     msg.isReadOnly(),
                                     msg.isSinglePartition(),
@@ -191,6 +196,7 @@ public class SpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getSpHandle());
+                m_repairLogTruncationHandle = message.getSpHandle();
                 try {
                     m_mailbox.send(counter.m_destinationId, message);
                 } catch (MessagingException e) {
@@ -306,6 +312,7 @@ public class SpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getSpHandle());
+                m_repairLogTruncationHandle = message.getSpHandle();
                 FragmentResponseMessage resp = (FragmentResponseMessage)counter.getLastResponse();
                 // MPI is tracking deps per partition HSID.  We need to make
                 // sure we write ours into the message getting sent to the MPI

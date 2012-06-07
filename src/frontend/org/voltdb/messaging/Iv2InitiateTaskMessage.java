@@ -52,17 +52,34 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_truncationHandle = Long.MIN_VALUE;
     }
 
+    // MpScheduler creates msgs w/o truncation handles.
     public Iv2InitiateTaskMessage(long initiatorHSId,
                         long coordinatorHSId,
                         long txnId,
                         boolean isReadOnly,
                         boolean isSinglePartition,
                         StoredProcedureInvocation invocation,
-                        long clientInterfaceHandle) {
+                        long clientInterfaceHandle)
+    {
+        this(initiatorHSId, coordinatorHSId, Long.MIN_VALUE,
+            txnId, isReadOnly, isSinglePartition, invocation,
+            clientInterfaceHandle);
+    }
+
+    // SpScheduler creates messages with truncation handles.
+    public Iv2InitiateTaskMessage(long initiatorHSId,
+                        long coordinatorHSId,
+                        long truncationHandle,
+                        long txnId,
+                        boolean isReadOnly,
+                        boolean isSinglePartition,
+                        StoredProcedureInvocation invocation,
+                        long clientInterfaceHandle)
+    {
         super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
-        m_truncationHandle = Long.MIN_VALUE;
+        m_truncationHandle = truncationHandle;
         m_clientInterfaceHandle = clientInterfaceHandle;
     }
 
@@ -74,6 +91,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_isSinglePartition = rhs.m_isSinglePartition;
         m_invocation = rhs.m_invocation;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
+        // should repair advance truncation?
         m_truncationHandle = Long.MIN_VALUE;
     }
 
