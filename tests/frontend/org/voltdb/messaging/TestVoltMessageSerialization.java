@@ -83,11 +83,13 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
-        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, true, false, spi, 2101);
         itask.setSpHandle(31337);
         Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltMessage(itask);
 
+        assertEquals(10L, itask.getTruncationHandle());
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
+        assertEquals(itask.getTruncationHandle(), itask2.getTruncationHandle());
         assertEquals(itask.getTxnId(), itask2.getTxnId());
         assertEquals(itask.isReadOnly(), itask2.isReadOnly());
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
