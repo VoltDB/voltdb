@@ -80,12 +80,15 @@ public class ClientInterfaceHandleManager
         final long m_clientHandle;
         final Connection m_connection;
         final boolean m_isAdmin;
-        Iv2InFlight(long ciHandle, long clientHandle, Connection conn, boolean admin)
+        final int m_messageSize;
+        Iv2InFlight(long ciHandle, long clientHandle, Connection conn, boolean admin,
+                int messageSize)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
             m_connection = conn;
             m_isAdmin = admin;
+            m_messageSize = messageSize;
         }
     }
 
@@ -106,7 +109,8 @@ public class ClientInterfaceHandleManager
      * and a 53 bit sequence number in the low 53 bits.
      */
     synchronized long getHandle(boolean isSinglePartition, int partitionId,
-            long clientHandle, Connection clientConnection, boolean adminConnection)
+            long clientHandle, Connection clientConnection, boolean adminConnection,
+            int messageSize)
     {
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
@@ -120,7 +124,7 @@ public class ClientInterfaceHandleManager
         }
         long ciHandle = generator.getNextHandle();
         Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle,
-               clientConnection, adminConnection);
+               clientConnection, adminConnection, messageSize);
         Deque<Iv2InFlight> perPartDeque = m_partitionTxns.get(partitionId);
         if (perPartDeque == null) {
             perPartDeque = new ArrayDeque<Iv2InFlight>();

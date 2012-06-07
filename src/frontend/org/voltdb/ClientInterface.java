@@ -820,7 +820,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     {
         if (VoltDB.instance().isIV2Enabled()) {
             long handle = m_ciHandles.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    (Connection)clientData, adminConnection);
+                    (Connection)clientData, adminConnection, messageSize);
 
             try {
                 long initiatorHSId;
