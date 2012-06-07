@@ -149,12 +149,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_truncationHandle
+        msgsize += 8; // m_clientInterfaceHandle
         msgsize += 1; // is single partition flag
-
         msgsize += m_invocation.getSerializedSize();
-
         return msgsize;
     }
 

@@ -35,6 +35,9 @@ public class RepairLog
     // last seen truncation point.
     long m_truncationPoint;
 
+    // is this a partition leader?
+    boolean m_isLeader = false;
+
     // want voltmessage as payload with message-independent metadata.
     static class Item
     {
@@ -66,11 +69,17 @@ public class RepairLog
         m_log = new LinkedList<Item>();
     }
 
+    // leaders log differently
+    void setLeaderState(boolean isLeader)
+    {
+        m_isLeader = isLeader;
+    }
+
     // Offer a new message to the repair log. This will truncate
     // the repairLog if the message includes a truncation hint.
     public void deliver(VoltMessage msg)
     {
-        if (msg instanceof Iv2InitiateTaskMessage) {
+        if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
             truncate(m.getTruncationHandle());
             m_log.offer(new Item(m, m.getSpHandle()));

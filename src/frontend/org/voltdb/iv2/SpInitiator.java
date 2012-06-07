@@ -88,6 +88,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                     getInitiatorHSId(), m_initiatorMailbox);
             Future<?> inaugurated = m_term.start(m_kfactorForStartup);
             inaugurated.get();
+            m_repairLog.setLeaderState(true);
             m_scheduler.setLeaderState(true);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Bad news.", true, e);

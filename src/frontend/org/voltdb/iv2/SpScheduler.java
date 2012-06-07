@@ -197,6 +197,7 @@ public class SpScheduler extends Scheduler
         }
 
         // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+        m_repairLogTruncationHandle = message.getSpHandle();
         m_mailbox.send(message.getInitiatorHSId(), message);
     }
 
