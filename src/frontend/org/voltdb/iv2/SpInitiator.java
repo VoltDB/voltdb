@@ -90,9 +90,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         try {
             long startTime = System.currentTimeMillis();
-            tmLog.info(m_whoami
-                    + m_partitionId + " starting leader promotion at time "
-                    + startTime);
+            tmLog.info(m_whoami + " starting leader promotion");
             m_term = new Term(m_messenger.getZK(), m_partitionId,
                     getInitiatorHSId(), m_initiatorMailbox);
             Future<?> inaugurated = m_term.start(m_kfactorForStartup);
@@ -137,10 +135,10 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             m_kfactorForStartup = kfactor;
             boolean isLeader = joinElectoralCollege();
             if (isLeader) {
-                tmLog.info(m_whoami + "chosen as leader.");
+                tmLog.info(m_whoami + "published as leader.");
             }
             else {
-                tmLog.info(m_whoami + "chosen as replica.");
+                tmLog.info(m_whoami + "running as replica.");
             }
 
             // Done tracking startup vs. recovery special case.

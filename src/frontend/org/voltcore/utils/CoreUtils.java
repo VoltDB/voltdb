@@ -176,8 +176,9 @@ public class CoreUtils {
         String result = "";
         boolean first = true;
         for (long hsId : hsIds) {
+            if (!first) result += ", ";
+            first = false;
             result += hsIdToString(hsId);
-            if (!first) result += ",";
         }
         return result;
     }

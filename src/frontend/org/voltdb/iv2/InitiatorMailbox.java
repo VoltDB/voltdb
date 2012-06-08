@@ -174,7 +174,7 @@ public class InitiatorMailbox implements Mailbox
 
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
         tmLog.info(CoreUtils.hsIdToString(getHSId())
-                + " handling log request id " + req.getRequestId()
+                + " handling repair log request id " + req.getRequestId()
                 + ". Responding with " + ofTotal + " repair log parts.");
 
         for (RepairLog.Item log : logs) {
