@@ -89,13 +89,13 @@ public class TestCSVLoader extends TestCase {
                 "create table BLAH (" +
                 "clm_integer integer default 0 not null, " + // column that is partitioned on
 
-                //"clm_tinyint tinyint default 0, " +
-                //"clm_smallint smallint default 0, " +
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
                 "clm_bigint bigint default 0, " +
                 
-               // "clm_string varchar(10) default null, " +
-                //"clm_decimal decimal default null, " +
-                //"clm_float float default 1.0, "+ // for later
+                "clm_string varchar(10) default null, " +
+                "clm_decimal decimal default null, " +
+                "clm_float float default null "+ // for later
                 //"clm_timestamp timestamp default null, " + // for later
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
@@ -105,22 +105,23 @@ public class TestCSVLoader extends TestCase {
      		"--reportdir=" + reportdir,
      		"--tablename=BLAH",
      		"--abortfailurecount=50",
+     		//"--separator=','"
      		};
-	    String []myData = { "1,111111",
-	    		  			"10,1 000",
-	    					"2,null",
-	    					"3,NULL",
-	    					"4,Null",
-	    					"5, null",
-	    	 			    "6,null ",
-	    					"7, null ",
+	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
+	    		  			"10,10,10,10 101 010,second,2.20,2.22",
+	    					"2,2,2,222222,second,3.30,null",
+	    					"3,3,3,333333, third ,NULL, 3.33",
+	    					"4,4,4,444444, null ,4.40 ,4.44",
+	    					"5,5,5,5555555, fifth, 5.50, 5.55",
+	    	 			    "6,6,null,666666, sixth, 6.60, 6.66",
+	    					"7,null,7,7777777, seventh, 7.70, 7.77 ",
+	    					"11, 1,1,\"1,000\",first,1.10,1.11",
 	    					
-	    					"8, ",
+	    					"8, 8",
 	    					"",
-	    					"11,1,000",
-	    					"12,n ull"
+	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
 	    					};
-	    int invalidLineCnt = 4;
+	    int invalidLineCnt = 3;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	}
 	
