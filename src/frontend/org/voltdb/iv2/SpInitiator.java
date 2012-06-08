@@ -90,9 +90,10 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         try {
             long startTime = System.currentTimeMillis();
-            tmLog.info(m_whoami + " starting leader promotion");
+            tmLog.info(m_whoami + "starting leader promotion");
             m_term = new Term(m_messenger.getZK(), m_partitionId,
                     getInitiatorHSId(), m_initiatorMailbox);
+            m_initiatorMailbox.setTerm(m_term);
             Future<?> inaugurated = m_term.start(m_kfactorForStartup);
             inaugurated.get();
             m_repairLog.setLeaderState(true);

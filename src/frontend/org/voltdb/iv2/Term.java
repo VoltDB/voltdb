@@ -111,6 +111,13 @@ public class Term
         // return 0 if all expected logs have been received.
         int logsComplete()
         {
+            // expected responses is really a count of remote
+            // messages. if there aren't any, the sequence will be
+            // 1 (the count of responses) while expected will be 0
+            // (the length of the remote log)
+            if (m_expectedResponses == 0) {
+               return 0;
+            }
             return m_expectedResponses - m_receivedResponses;
         }
 
@@ -170,7 +177,7 @@ public class Term
     }
 
     // future that represents completion of transition to leader.
-    public static class InaugurationFuture implements Future<Boolean>
+    private static class InaugurationFuture implements Future<Boolean>
     {
         private CountDownLatch m_doneLatch = new CountDownLatch(1);
         private ExecutionException m_exception = null;
@@ -181,22 +188,26 @@ public class Term
         }
 
         @Override
-        public boolean cancel(boolean mayInterruptIfRunning) {
+        public boolean cancel(boolean mayInterruptIfRunning)
+        {
             return false;
         }
 
         @Override
-        public boolean isCancelled() {
+        public boolean isCancelled()
+        {
             return false;
         }
 
         @Override
-        public boolean isDone() {
-            return false;
+        public boolean isDone()
+        {
+            return m_doneLatch.getCount() == 0;
         }
 
         @Override
-        public Boolean get() throws InterruptedException, ExecutionException {
+        public Boolean get() throws InterruptedException, ExecutionException
+        {
             m_doneLatch.await();
             if (m_exception != null) {
                 throw m_exception;
@@ -206,8 +217,8 @@ public class Term
 
         @Override
         public Boolean get(long timeout, TimeUnit unit)
-                throws InterruptedException, ExecutionException,
-                TimeoutException {
+            throws InterruptedException, ExecutionException, TimeoutException
+        {
             m_doneLatch.await(timeout, unit);
             if (m_exception != null) {
                 throw m_exception;
@@ -215,6 +226,10 @@ public class Term
             return true;
         }
     }
+
+    // Each Term can process at most one promotion; if promotion fails, make
+    // a new Term and try again (if that's your big plan...)
+    private final InaugurationFuture m_promotionResult = new InaugurationFuture();
 
     /**
      * Setup a new Term but don't take any action to take responsibility.
@@ -239,30 +254,29 @@ public class Term
      */
     public Future<?> start(int kfactorForStartup)
     {
-        InaugurationFuture result = new InaugurationFuture();
         try {
             m_babySitter = new BabySitter(m_zk,
                     LeaderElector.electionDirForPartition(m_partitionId),
                     m_replicasChangeHandler, true);
             if (kfactorForStartup >= 0) {
                 prepareForStartup(kfactorForStartup);
-                result.m_doneLatch.countDown();
+                m_promotionResult.m_doneLatch.countDown();
             }
             else {
                 prepareForFaultRecovery();
             }
         } catch (Exception e) {
-            result.setException(e);
-            result.m_doneLatch.countDown();
+            tmLog.error(m_whoami + "failed leader promotion:", e);
+            m_promotionResult.setException(e);
+            m_promotionResult.m_doneLatch.countDown();
         }
-        return result;
+        return m_promotionResult;
     }
 
 
-    public Future<?> cancel()
+    public boolean cancel()
     {
-        // TODO: make this do something
-        return null;
+        return m_promotionResult.cancel(false);
     }
 
     public void shutdown()
@@ -299,8 +313,9 @@ public class Term
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
 
-        tmLog.info(m_whoami + "found " + survivors.size() + " surviving replicas to repair. " +
-                " Survivors: " + CoreUtils.hsIdListToString(survivors));
+        tmLog.info(m_whoami + "found (including self) " + survivors.size()
+                + " surviving replicas to repair. "
+                + " Survivors: " + CoreUtils.hsIdListToString(survivors));
         VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
     }
@@ -318,12 +333,14 @@ public class Term
             }
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
             if (rrs.m_expectedResponses < 0) {
-                tmLog.info(m_whoami + "collecting " + response.getOfTotal() + " repair log entries from " +
-                        response.m_sourceHSId);
+                tmLog.info(m_whoami + "collecting " + response.getOfTotal()
+                        + " repair log entries from "
+                        + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
             m_repairLogUnion.add(response);
             if (rrs.update(response) == 0) {
-                tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses + "/" + rrs.m_expectedResponses +
+                tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
+                        + " responses for " + rrs.m_expectedResponses +
                         " repair log entries from " + response.m_sourceHSId);
                 if (areRepairLogsComplete()) {
                     repairSurvivors();
@@ -361,6 +378,9 @@ public class Term
         }
         tmLog.info(m_whoami + "finished queuing " + queued
                 + " replica repair messages.");
+
+        // done
+        m_promotionResult.m_doneLatch.countDown();
     }
 
 
