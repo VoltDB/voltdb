@@ -153,17 +153,26 @@ class CSVLoader {
     	@Option(desc = "the default leading whitespace behavior to use if none is supplied.")
     	boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     	
+    	//@Option(desc = "get help information")
+    	//boolean help = true;
+    	
     	@Override
     	public void validate() {
-    		if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
-    		if (procedurename.equals("") && tablename.equals("") )
+    	//	if( help = true )
+    			//;
+    	//	else
+    		//{
+    			if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
+    			if (procedurename.equals("") && tablename.equals("") )
     			exitWithMessageAndUsage("procedure name or a table name required");
-    		if (!procedurename.equals("") && !tablename.equals("") )
+    			if (!procedurename.equals("") && !tablename.equals("") )
     			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-    		if (inputfile.equals("")) 
+    			if (inputfile.equals("")) 
     			standin = true;
-    		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
-    		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
+    			if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
+    			if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
+    	
+    		//}
     	}
     }
     
