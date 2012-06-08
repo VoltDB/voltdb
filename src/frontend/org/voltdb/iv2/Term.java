@@ -38,6 +38,8 @@ import org.json_voltpatches.JSONObject;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
+
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
@@ -224,7 +226,8 @@ public class Term
         m_partitionId = partitionId;
         m_initiatorHSId = initiatorHSId;
         m_mailbox = mailbox;
-        m_whoami = "SP " + m_initiatorHSId + " for partition " + m_partitionId + " ";
+        m_whoami = "SP " +  CoreUtils.hsIdToString(m_initiatorHSId)
+            + " for partition " + m_partitionId + " ";
     }
 
     /**
@@ -361,7 +364,7 @@ public class Term
     // for non-initiator components that care.
     void declareReadyAsLeader()
     {
-        tmLog.info("Registering " +  m_partitionId + " as active leader.");
+        tmLog.info(m_whoami + "registering as active leader.");
         try {
             MapCacheWriter iv2masters = new MapCache(m_zk, VoltZK.iv2masters);
             iv2masters.put(Integer.toString(m_partitionId),

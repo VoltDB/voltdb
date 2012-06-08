@@ -29,6 +29,8 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
+
+import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
@@ -71,6 +73,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     // need a flag to distinguish first-time-startup from fault recovery.
     private int m_kfactorForStartup = -1;
 
+    private final String m_whoami;
 
     public SpInitiator(HostMessenger messenger, Integer partition)
     {
@@ -78,22 +81,27 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         m_partitionId = partition;
         m_scheduler = new SpScheduler();
         m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog);
+        m_whoami = "SP " +  CoreUtils.hsIdToString(getInitiatorHSId())
+            + " for partition " + m_partitionId + " ";
     }
 
     @Override
     public void becomeLeader()
     {
         try {
-            tmLog.info("SP " + m_initiatorMailbox.getHSId() +
-                   " becoming leader for partition " + m_partitionId);
+            long startTime = System.currentTimeMillis();
+            tmLog.info(m_whoami
+                    + m_partitionId + " starting leader promotion at time "
+                    + startTime);
             m_term = new Term(m_messenger.getZK(), m_partitionId,
                     getInitiatorHSId(), m_initiatorMailbox);
             Future<?> inaugurated = m_term.start(m_kfactorForStartup);
             inaugurated.get();
-            tmLog.info("SP " + m_initiatorMailbox.getHSId() +
-                    " is successfully the leader for partition " + m_partitionId);
             m_repairLog.setLeaderState(true);
             m_scheduler.setLeaderState(true);
+            tmLog.info(m_whoami
+                    + " finished leader promotion. Took "
+                    + (System.currentTimeMillis() - startTime) + " ms.");
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Bad news.", true, e);
         }
@@ -129,10 +137,10 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             m_kfactorForStartup = kfactor;
             boolean isLeader = joinElectoralCollege();
             if (isLeader) {
-                tmLog.info("Chosen as leader for partition " + m_partitionId);
+                tmLog.info(m_whoami + "chosen as leader.");
             }
             else {
-                tmLog.info("Chosen as replica for partition " + m_partitionId);
+                tmLog.info(m_whoami + "chosen as replica.");
             }
 
             // Done tracking startup vs. recovery special case.
