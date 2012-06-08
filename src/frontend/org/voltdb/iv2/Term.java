@@ -79,13 +79,14 @@ import org.voltdb.VoltZK;
  */
 public class Term
 {
-    VoltLogger hostLog = new VoltLogger("HOST");
+    VoltLogger tmLog = new VoltLogger("TM");
 
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
     private final long m_initiatorHSId;
     private final int m_requestId = 0; // System.currentTimeMillis();
     private final ZooKeeper m_zk;
+    private final String m_whoami;
 
     // Initialized in start() -- when the term begins.
     private BabySitter m_babySitter;
@@ -93,7 +94,7 @@ public class Term
     // scoreboard for responding replica repair log responses (hsid -> response count)
     static class ReplicaRepairStruct {
         int m_receivedResponses = 0;
-        int m_expectedResponses = -1;
+        int m_expectedResponses = -1; // (a log msg cares about this init. value)
         long m_maxSpHandleSeen = Long.MIN_VALUE;
 
         // update counters and return the number of outstanding messages.
@@ -142,13 +143,13 @@ public class Term
     {
         @Override
         public void run(List<String> children) {
-            hostLog.info("Babysitter for zkLeaderNode: " +
+            tmLog.info("Babysitter for zkLeaderNode: " +
                     LeaderElector.electionDirForPartition(m_partitionId) + ":");
-            hostLog.info("children: " + children);
+            tmLog.info("children: " + children);
             // make an HSId array out of the children
             // The list contains the leader, skip it
             List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, children);
-            hostLog.info("Updated replicas: " + replicas);
+            tmLog.info("Updated replicas: " + replicas);
             m_mailbox.updateReplicas(replicas);
         }
     };
@@ -223,6 +224,7 @@ public class Term
         m_partitionId = partitionId;
         m_initiatorHSId = initiatorHSId;
         m_mailbox = mailbox;
+        m_whoami = "SP " + m_initiatorHSId + " for partition " + m_partitionId + " ";
     }
 
     /**
@@ -272,6 +274,7 @@ public class Term
     /** Block until all replica's are present. */
     void prepareForStartup(int kfactor)
     {
+        tmLog.info(m_whoami + "starting with " + kfactor + " replicas.");
         List<String> children = m_babySitter.lastSeenChildren();
         while (children.size() < kfactor + 1) {
             try {
@@ -290,10 +293,14 @@ public class Term
         List<Long> survivors =  childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
         survivors.add(m_initiatorHSId);
 
+        String survivorsForLogMsg = "";
         for (Long hsid : survivors) {
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
+            survivorsForLogMsg += hsid + " ";
         }
 
+        tmLog.info(m_whoami + "found " + survivors.size() + " surviving replicas to repair. " +
+                " Survivors: " + survivorsForLogMsg);
         VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
     }
@@ -307,11 +314,17 @@ public class Term
                 return;
             }
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
+            if (rrs.m_expectedResponses < 0) {
+                tmLog.info(m_whoami + "collecting " + response.getOfTotal() + " repair log entries from " +
+                        response.m_sourceHSId);
+            }
             m_repairLogUnion.add(response);
-            int waitingFor = rrs.update(response);
-            // if a replica finished, see if they're all done...
-            if (waitingFor == 0 && areRepairLogsComplete()) {
-                repairSurvivors();
+            if (rrs.update(response) == 0) {
+                tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses + "/" + rrs.m_expectedResponses +
+                        " repair log entries from " + response.m_sourceHSId);
+                if (areRepairLogsComplete()) {
+                    repairSurvivors();
+                }
             }
         }
     }
@@ -330,9 +343,13 @@ public class Term
     /** Send missed-messages to survivors. Exciting! */
     public void repairSurvivors()
     {
+        tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
                 if  (entry.getValue().needs(li.getSpHandle())) {
+                    tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
+                            entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
+                            li.getSpHandle());
                     m_mailbox.repairReplicaWith(entry.getKey(), li);
                 }
             }
@@ -344,7 +361,7 @@ public class Term
     // for non-initiator components that care.
     void declareReadyAsLeader()
     {
-        hostLog.info("Registering " +  m_partitionId + " as new master.");
+        tmLog.info("Registering " +  m_partitionId + " as active leader.");
         try {
             MapCacheWriter iv2masters = new MapCache(m_zk, VoltZK.iv2masters);
             iv2masters.put(Integer.toString(m_partitionId),

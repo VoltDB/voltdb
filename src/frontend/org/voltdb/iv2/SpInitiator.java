@@ -51,7 +51,7 @@ import org.voltdb.VoltZK;
  */
 public class SpInitiator implements Initiator, LeaderNoticeHandler
 {
-    VoltLogger hostLog = new VoltLogger("HOST");
+    VoltLogger tmLog = new VoltLogger("TM");
 
     // External references/config
     private HostMessenger m_messenger = null;
@@ -84,10 +84,14 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     public void becomeLeader()
     {
         try {
+            tmLog.info("SP " + m_initiatorMailbox.getHSId() +
+                   " becoming leader for partition " + m_partitionId);
             m_term = new Term(m_messenger.getZK(), m_partitionId,
                     getInitiatorHSId(), m_initiatorMailbox);
             Future<?> inaugurated = m_term.start(m_kfactorForStartup);
             inaugurated.get();
+            tmLog.info("SP " + m_initiatorMailbox.getHSId() +
+                    " is successfully the leader for partition " + m_partitionId);
             m_repairLog.setLeaderState(true);
             m_scheduler.setLeaderState(true);
         } catch (Exception e) {
@@ -125,10 +129,10 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             m_kfactorForStartup = kfactor;
             boolean isLeader = joinElectoralCollege();
             if (isLeader) {
-                hostLog.info("Chosen as leader for partition " + m_partitionId);
+                tmLog.info("Chosen as leader for partition " + m_partitionId);
             }
             else {
-                hostLog.info("Chosen as replica for partition " + m_partitionId);
+                tmLog.info("Chosen as replica for partition " + m_partitionId);
             }
 
             // Done tracking startup vs. recovery special case.
