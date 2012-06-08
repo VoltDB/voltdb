@@ -123,9 +123,6 @@ class CSVLoader {
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
     	
-//    	@Option(desc = "trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
-//    	boolean trimwhitespace = false;
-    	
     	@Option(desc = "maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
     	
@@ -168,7 +165,6 @@ class CSVLoader {
     		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
     		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
     	}
-    	
     }
     
     public CSVLoader (CSVConfig cfg) {
@@ -218,13 +214,13 @@ class CSVLoader {
                     
                     // This message will be removed later
                     // print out the parameters right now
-                    String msg = "<xin>params: ";
-                    for (int i=0; i < correctedLine.length; i++) {
-                    	if (correctedLine != null)
-                    		msg += correctedLine[i] + ",";
-                    }
-                    System.out.println(msg);
-                    
+//                    String msg = "<xin>params: ";
+//                    for (int i=0; i < correctedLine.length; i++) {
+//                    	if (correctedLine != null)
+//                    		msg += correctedLine[i] + ",";
+//                    }
+//                    System.out.println(msg);
+//                    
                     //get procedure information from the server using @SystemCatalog
                     int columnCnt=0;
                     VoltTable procInfo = null;
@@ -434,5 +430,6 @@ class CSVLoader {
 	public static void flush() {
 		inCount.set( 0 );
 		outCount.set( 0 );
+		errorInfo.clear();
 	}
 }

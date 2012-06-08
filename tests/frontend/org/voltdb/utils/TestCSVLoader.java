@@ -18,8 +18,8 @@ import org.voltdb.compiler.VoltProjectBuilder;
 public class TestCSVLoader extends TestCase {
 	
 	private String simpleSchema;
-	private String pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
-    private String pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
+	private String pathToCatalog;
+    private String pathToDeployment;
     private ServerThread localServer;
     private VoltDB.Configuration config;
     private VoltProjectBuilder builder;
@@ -41,47 +41,41 @@ public class TestCSVLoader extends TestCase {
     protected void setUp() throws Exception
     {
         super.setUp();
-        
-        simpleSchema =
-                "create table BLAH (" +
-                "clm_integer integer default 0 not null, " + // column that is partitioned on
 
-                "clm_tinyint tinyint default 0, " +
-                //"clm_smallint smallint default 0, " +
-                //"clm_bigint bigint default 0, " +
-                
-               	//"clm_string varchar(10) default null, " +
-                //"clm_decimal decimal default null, " +
-                //"clm_float float default 1.0, "+ // for later
-                //"clm_timestamp timestamp default null, " + // for later
-                //"clm_varinary varbinary default null" + // for later
-                "); ";
-   
-        pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
-        pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
-        builder = new VoltProjectBuilder();
-        //builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
-        //builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, 5, 'nullchar');");
         
-
-        config = new VoltDB.Configuration();
-        config.m_pathToCatalog = pathToCatalog;
-        config.m_pathToDeployment = pathToDeployment;
-        localServer = new ServerThread(config);
-        client = null;
-        
-        try{
-        	localServer.start();
-        	localServer.waitForInitialization();
-        
-        	client = ClientFactory.createClient();
-        	client.createConnection("localhost");
-        }
-        catch(Exception e )
-        {
-        	System.err.println(e.getMessage());
-        };
     }
+    
+    public void testNew() throws Exception 
+   	{
+        String mySchema =
+                   "create table BLAH (" +
+                   "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+//                   "clm_tinyint tinyint default 0, " +
+//                   "clm_smallint smallint default 0, " +
+//                   "clm_bigint bigint default 0, " +
+//                   
+//                   "clm_string varchar(10) default null, " +
+//                   "clm_decimal decimal default null, " +
+//                   "clm_float float default null "+ // for later
+                   "clm_timestamp timestamp default null, " + // for later
+                   //"clm_varinary varbinary default null" + // for later
+                   "); ";
+        String []myOptions = {
+        		"--inputfile=" + userHome + "/test.csv", 
+        		//"--procedurename=BLAH.insert",
+        		"--reportdir=" + reportdir,
+        		"--tablename=BLAH",
+        		"--abortfailurecount=50",
+        		//"--separator=','"
+        		};
+        
+   	    String []myData = { "1,1111111111",
+   	    					"2,12131231231"
+   	    					};
+   	    int invalidLineCnt = 0;
+   		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+   	}
     
     public void testCommon() throws Exception 
 	{
@@ -107,6 +101,7 @@ public class TestCSVLoader extends TestCase {
      		"--abortfailurecount=50",
      		//"--separator=','"
      		};
+     
 	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
 	    		  			"10,10,10,10 101 010,second,2.20,2.22",
 	    					"2,2,2,222222,second,3.30,null",
@@ -124,6 +119,40 @@ public class TestCSVLoader extends TestCase {
 	    int invalidLineCnt = 3;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	}
+    //csvloader --inputfile=/tmp/ --tablename=VOTES --abortfailurecount=50 
+//    public void testOptions() throws Exception 
+//	{
+//     String mySchema =
+//                "create table BLAH (" +
+//                "clm_integer integer default 0 not null, " + // column that is partitioned on
+//
+//                "clm_tinyint tinyint default 0, " +
+//                "); ";
+//     String []myOptions = {
+//     		"--inputfile=" + userHome + "/test.csv", 
+//     		//"--procedurename=BLAH.insert",
+//     		"--reportdir=" + reportdir,
+//     		"--tablename=BLAH",
+//     		"--abortfailurecount=50",
+//     		//"--separator=','"
+//     		};
+//	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
+//	    		  			"10,10,10,10 101 010,second,2.20,2.22",
+//	    					"2,2,2,222222,second,3.30,null",
+//	    					"3,3,3,333333, third ,NULL, 3.33",
+//	    					"4,4,4,444444, null ,4.40 ,4.44",
+//	    					"5,5,5,5555555, fifth, 5.50, 5.55",
+//	    	 			    "6,6,null,666666, sixth, 6.60, 6.66",
+//	    					"7,null,7,7777777, seventh, 7.70, 7.77 ",
+//	    					"11, 1,1,\"1,000\",first,1.10,1.11",
+//	    					
+//	    					"8, 8",
+//	    					"",
+//	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
+//	    					};
+//	    int invalidLineCnt = 3;
+//		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+//	}
 	
 //	public void testDelimeters () throws Exception
 //	{
@@ -156,6 +185,21 @@ public class TestCSVLoader extends TestCase {
 //	}
 /*
 	public void testSimple() throws Exception {
+	 simpleSchema =
+                "create table BLAH (" +
+                "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_tinyint tinyint default 0, " +
+                //"clm_smallint smallint default 0, " +
+                //"clm_bigint bigint default 0, " +
+                
+               	//"clm_string varchar(10) default null, " +
+                //"clm_decimal decimal default null, " +
+                //"clm_float float default 1.0, "+ // for later
+                //"clm_timestamp timestamp default null, " + // for later
+                //"clm_varinary varbinary default null" + // for later
+                "); ";
+	
 		 String []params_simple = {
 	    		//"--inputfile=" + userHome + "/testdb.csv", 
 	    		//"--procedurename=BLAH.insert",
@@ -216,14 +260,31 @@ public class TestCSVLoader extends TestCase {
 			System.err.print( e.getMessage() );
 		}
 		
-		try {
+		try{
+			pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
+			pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
+			builder = new VoltProjectBuilder();
+			//builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
+			//builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, 5, 'nullchar');");
+        
 			builder.addLiteralSchema(my_schema);
-	        builder.addPartitionInfo("BLAH", "clm_integer");
-	        boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-	        assertTrue(success);
-	        MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-	        
-            CSVLoader.main(my_options);
+			builder.addPartitionInfo("BLAH", "clm_integer");
+			boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+			assertTrue(success);
+			MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+			config = new VoltDB.Configuration();
+			config.m_pathToCatalog = pathToCatalog;
+			config.m_pathToDeployment = pathToDeployment;
+			localServer = new ServerThread(config);
+			client = null;
+        
+          	localServer.start();
+        	localServer.waitForInitialization();
+        
+        	client = ClientFactory.createClient();
+        	client.createConnection("localhost");
+        	
+        	CSVLoader.main(my_options);
             // do the test
             
             VoltTable modCount;
@@ -250,9 +311,10 @@ public class TestCSVLoader extends TestCase {
             	}	
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
+            CSVLoader.flush();
             assertEquals(lineCount, rowct);
             assertEquals(invalidlinecnt, invalidLineCnt);
-            CSVLoader.flush();
+            
         }
         finally {
             if (client != null) client.close();
