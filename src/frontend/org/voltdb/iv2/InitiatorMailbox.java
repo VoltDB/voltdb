@@ -172,11 +172,11 @@ public class InitiatorMailbox implements Mailbox
         int ofTotal = logs.size();
         int seq = 0;
 
-        tmLog.info(CoreUtils.hsIdToString(getHSId()) +
-                " handling log request. Responding with " +
-                ofTotal + " repair log parts.");
-
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
+        tmLog.info(CoreUtils.hsIdToString(getHSId())
+                + " handling log request id " + req.getRequestId()
+                + ". Responding with " + ofTotal + " repair log parts.");
+
         for (RepairLog.Item log : logs) {
             Iv2RepairLogResponseMessage response =
                 new Iv2RepairLogResponseMessage(
