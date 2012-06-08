@@ -27,7 +27,6 @@ import java.util.Set;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.messaging.HostMessenger;
@@ -255,12 +254,8 @@ public class DtxnInitiatorMailbox implements Mailbox
         final HeartbeatMessage heartbeats[] = message.getHeartbeatsToDeliver();
         assert(destinations.length == heartbeats.length);
 
-        try {
-            for (int ii = 0; ii < destinations.length; ii++) {
-                m_hostMessenger.send(destinations[ii], heartbeats[ii]);
-            }
-        } catch (MessagingException e) {
-            VoltDB.crashLocalVoltDB("Error attempting to demux and deliver coalesced heartbeat messages", true, e);
+        for (int ii = 0; ii < destinations.length; ii++) {
+            m_hostMessenger.send(destinations[ii], heartbeats[ii]);
         }
     }
 
@@ -290,13 +285,13 @@ public class DtxnInitiatorMailbox implements Mailbox
     }
 
     @Override
-    public void send(long hsId, VoltMessage message) throws MessagingException {
+    public void send(long hsId, VoltMessage message) {
         message.m_sourceHSId = m_hsId;
         m_hostMessenger.send(hsId, message);
     }
 
     @Override
-    public void send(long[] hsIds, VoltMessage message) throws MessagingException {
+    public void send(long[] hsIds, VoltMessage message) {
         assert(message != null);
         assert(hsIds != null);
         message.m_sourceHSId = m_hsId;

@@ -35,7 +35,7 @@ public interface Mailbox {
      * mailbox cannot be reached (maybe) or if an exception is thrown during
      * serialization.
      */
-    public void send(long hsId, VoltMessage message) throws MessagingException;
+    public void send(long hsId, VoltMessage message);
 
     /**
      * Send a serializable object to a specific mailbox at a list of sites.
@@ -50,8 +50,7 @@ public interface Mailbox {
      * mailbox cannot be reached (maybe) or if an exception is thrown during
      * serialization.
      */
-    public void send(long[] hsIds, VoltMessage message)
-        throws MessagingException;
+    public void send(long[] hsIds, VoltMessage message);
 
     /**
      * Allow message delivery to this mailbox.

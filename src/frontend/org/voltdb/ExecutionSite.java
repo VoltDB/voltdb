@@ -42,7 +42,6 @@ import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -396,13 +395,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         CompleteTransactionMessage complete = (CompleteTransactionMessage)message;
                         CompleteTransactionResponseMessage ctrm =
                             new CompleteTransactionResponseMessage(complete, m_siteId);
-                        try
-                        {
-                            m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
-                        }
-                        catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
+                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
                     } else if (message instanceof FragmentTaskMessage) {
                         FragmentTaskMessage ftask = (FragmentTaskMessage)message;
                         FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_siteId);
@@ -415,12 +408,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                     new VoltTable(new VoltTable.ColumnInfo("DUMMY", VoltType.BIGINT)));
                         }
 
-                        try {
-                            m_mailbox.send(response.getDestinationSiteId(), response);
-                        } catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
-
+                        m_mailbox.send(response.getDestinationSiteId(), response);
                     } else {
                         handleMailboxMessageNonRecursable(message);
                     }
@@ -1063,12 +1051,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 HeartbeatResponseMessage response = new HeartbeatResponseMessage(
                         m_siteId, lastSeenTxnFromInitiator,
                         m_transactionQueue.getQueueState() == QueueState.BLOCKED_SAFETY);
-                try {
-                    m_mailbox.send(info.getInitiatorHSId(), response);
-                } catch (MessagingException e) {
-                    // hope this never happens... it doesn't right?
-                    throw new RuntimeException(e);
-                }
+                m_mailbox.send(info.getInitiatorHSId(), response);
                 // we're done here (in the case of heartbeats)
                 return;
             }
@@ -1108,13 +1091,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     {
                         CompleteTransactionResponseMessage ctrm =
                             new CompleteTransactionResponseMessage(complete, m_siteId);
-                        try
-                        {
-                            m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
-                        }
-                        catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
+                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
                     }
                 }
                 return;
@@ -1158,11 +1135,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         "recovery request from site " +
                         CoreUtils.hsIdToString(rm.sourceSite()));
                 RecoveryMessage recoveryResponse = new RecoveryMessage(false);
-                try {
-                    m_mailbox.send(rm.sourceSite(), recoveryResponse);
-                } catch (MessagingException e) {
-                    throw new RuntimeException(e);
-                }
+                m_mailbox.send(rm.sourceSite(), recoveryResponse);
                 return;
             }
 
@@ -1476,26 +1449,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 " survivors with lastKnownGloballyCommitedMultiPartTxnId "
                 + lastKnownGloballyCommitedMultiPartTxnId);
 
-        try {
-            for (Long site : m_pendingFailedSites) {
-                /*
-                 * Check the queue for the data and get it from the ledger if necessary.\
-                 * It might not even be in the ledger if the site has been failed
-                 * since recovery of this node began.
-                 */
-                Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
-                FailureSiteUpdateMessage srcmsg =
-                    new FailureSiteUpdateMessage(
-                                                 m_pendingFailedSites,
-                                                 site,
-                                                 txnId != null ? txnId : Long.MIN_VALUE,
-                                                 lastKnownGloballyCommitedMultiPartTxnId);
+        for (Long site : m_pendingFailedSites) {
+            /*
+             * Check the queue for the data and get it from the ledger if necessary.\
+             * It might not even be in the ledger if the site has been failed
+             * since recovery of this node began.
+             */
+            Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
+            FailureSiteUpdateMessage srcmsg =
+                new FailureSiteUpdateMessage(
+                        m_pendingFailedSites,
+                        site,
+                        txnId != null ? txnId : Long.MIN_VALUE,
+                        lastKnownGloballyCommitedMultiPartTxnId);
 
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), srcmsg);
-            }
-        }
-        catch (MessagingException e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), srcmsg);
         }
     }
 

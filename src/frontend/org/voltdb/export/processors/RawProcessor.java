@@ -43,7 +43,6 @@ import org.voltdb.export.ExportProtoMessage;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
@@ -148,12 +147,7 @@ public class RawProcessor implements ExportDataProcessor {
             for (ExportDataSource ds : m_sourcesArray) {
                 ExportProtoMessage m =
                     new ExportProtoMessage( ds.getGeneration(), ds.getPartitionId(), ds.getSignature()).close();
-                try {
-                    ds.exportAction(new ExportInternalMessage(this, m));
-                } catch (Exception e) {
-                    //
-                    throw new RuntimeException(e);
-                }
+                ds.exportAction(new ExportInternalMessage(this, m));
             }
         }
 
@@ -284,13 +278,8 @@ public class RawProcessor implements ExportDataProcessor {
                                   m.getSignature() + ") pair.");
                     return;
                 }
-                try {
-                    source.exportAction(new ExportInternalMessage(this, m));
-                    return;
-                } catch (MessagingException e) {
-                    protocolError(m, e.getMessage());
-                    return;
-                }
+                source.exportAction(new ExportInternalMessage(this, m));
+                return;
             }
 
             else if (m.isClose()) {

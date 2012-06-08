@@ -39,7 +39,6 @@ import org.voltdb.export.ExportGeneration;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.processors.RawProcessor.ProtoStateBlock;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.CoreUtils;
@@ -113,7 +112,7 @@ public class TestRawProcessor extends TestCase {
         }
 
         @Override
-        public void exportAction(RawProcessor.ExportInternalMessage m) throws MessagingException {
+        public void exportAction(RawProcessor.ExportInternalMessage m) {
             // Simulate what ExecutionEngineJNI and ExecutionSite do.
             if (m.m_m.isPoll()) {
                 ExportProtoMessage r =
