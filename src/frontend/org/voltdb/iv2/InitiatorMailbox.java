@@ -177,16 +177,29 @@ public class InitiatorMailbox implements Mailbox
                 + " handling repair log request id " + req.getRequestId()
                 + ". Responding with " + ofTotal + " repair log parts.");
 
-        for (RepairLog.Item log : logs) {
+        if (logs.isEmpty()) {
+            // respond with an ack that the log is empty.
             Iv2RepairLogResponseMessage response =
                 new Iv2RepairLogResponseMessage(
                         req.getRequestId(),
-                        seq,
-                        ofTotal,
-                        log.getSpHandle(),
-                        log.getMessage());
+                        0, // sequence
+                        0, // total expected
+                        Long.MIN_VALUE, // spHandle
+                        null); // no payload. just an ack.
             send(message.m_sourceHSId, response);
-            seq++;
+        }
+        else {
+            for (RepairLog.Item log : logs) {
+                Iv2RepairLogResponseMessage response =
+                    new Iv2RepairLogResponseMessage(
+                            req.getRequestId(),
+                            seq,
+                            ofTotal,
+                            log.getSpHandle(),
+                            log.getMessage());
+                send(message.m_sourceHSId, response);
+                seq++;
+            }
         }
         return;
     }

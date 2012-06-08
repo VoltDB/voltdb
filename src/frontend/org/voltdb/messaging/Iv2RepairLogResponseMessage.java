@@ -35,6 +35,13 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private int m_sequence = 0;
     private int m_ofTotal = 0;
     private long m_spHandle = Long.MIN_VALUE;
+
+    // The original task that is must be replicated for
+    // repair. Note: if the destination repair log is
+    // empty, a repair log response message is returned
+    // that has sequence = 0; ofTotal = 0 and a null
+    // payload (because the requester must know that the
+    // log request was processed and that no logs exist.)
     private VoltMessage m_payload = null;
 
     /** Empty constructor for de-serialization */
@@ -86,7 +93,9 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         msgsize += 4; // sequence
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
-        msgsize += m_payload.getSerializedSize();
+        if (m_payload != null) {
+            msgsize += m_payload.getSerializedSize();
+        }
         return msgsize;
     }
 
@@ -99,12 +108,14 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putInt(m_ofTotal);
         buf.putLong(m_spHandle);
 
-        ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
-        m_payload.flattenToBuffer(paybuf);
-        if (paybuf.position() != 0) {
-            paybuf.flip();
+        if (m_payload != null) {
+            ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
+            m_payload.flattenToBuffer(paybuf);
+            if (paybuf.position() != 0) {
+                paybuf.flip();
+            }
+            buf.put(paybuf);
         }
-        buf.put(paybuf);
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -118,8 +129,13 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_spHandle = buf.getLong();
 
         // going inception.
-        VoltDbMessageFactory messageFactory = new VoltDbMessageFactory();
-        m_payload = messageFactory.createMessageFromBuffer(buf, m_sourceHSId);
+        if (m_ofTotal != 0) {
+            VoltDbMessageFactory messageFactory = new VoltDbMessageFactory();
+            m_payload = messageFactory.createMessageFromBuffer(buf, m_sourceHSId);
+        }
+        else {
+            m_payload = null;
+        }
     }
 
     @Override
@@ -136,7 +152,12 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         sb.append(" SP HANDLE: ");
         sb.append(m_spHandle);
         sb.append(" PAYLOAD: ");
-        sb.append(m_payload.toString());
+        if (m_payload == null) {
+            sb.append("null");
+        }
+        else {
+            sb.append(m_payload.toString());
+        }
         return sb.toString();
     }
 }
