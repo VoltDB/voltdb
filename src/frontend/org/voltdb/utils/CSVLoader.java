@@ -221,8 +221,32 @@ class CSVLoader {
                     }
                     System.out.println(msg);
                     
+                    //get procedure information from the server using @SystemCatalog
+                    int columnCnt=0;
+                    VoltTable procInfo = null;
                     String lineCheckResult;
-                    if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
+                    Vector<Integer> strColIndex = new Vector<Integer>();
+                    try {
+                    	procInfo = client.callProcedure("@SystemCatalog",
+                        "PROCEDURECOLUMNS").getResults()[0];
+                    	
+                        while( procInfo.advanceRow() )
+                        {
+                        	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
+                        	{
+                        			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
+                        				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
+                        			
+                        		columnCnt++;
+                        		
+                        	}
+                        }
+                     }
+                     catch (Exception e) {
+                        e.printStackTrace();
+                     }
+                    //
+                    if( (lineCheckResult = checkLineFormat(correctedLine, columnCnt))!= null){
                     	System.err.println("<zheng>Stop at line " + (outCount.get()));
                     	synchronized (errorInfo) {
                     		if (!errorInfo.containsKey(outCount.get())) {
@@ -308,32 +332,9 @@ class CSVLoader {
      * @param linefragement
      */
 
-    private String checkLineFormat(String[] linefragement, Client client ) {
+    private String checkLineFormat(String[] linefragement, int columnCnt ) {
     	String msg = "";
-        int columnCnt = 0;
-        VoltTable procInfo = null;
-        Vector<Integer> strColIndex = new Vector<Integer>();
-        
-        try {
-        	procInfo = client.callProcedure("@SystemCatalog",
-            "PROCEDURECOLUMNS").getResults()[0];
-        	
-            while( procInfo.advanceRow() )
-            {
-            	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
-            	{
-            			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
-            				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
-            			
-            		columnCnt++;
-            		
-            	}
-            }
-         }
-         catch (Exception e) {
-            e.printStackTrace();
-         }
-       
+         
          if( linefragement.length == 1 && linefragement[0].equals( "" ) )
          {
         		msg = "checkLineFormat Error: blank line";
@@ -350,7 +351,9 @@ class CSVLoader {
         {//trim white space in this line.
         	for(int i=0; i<linefragement.length;i++) 
         	{
-        		if ((linefragement[i]).indexOf("NULL") != -1)
+        		linefragement[i] = linefragement[i].trim();
+        		//if ((linefragement[i]).indexOf("NULL") != -1)
+        		if( linefragement[i].equalsIgnoreCase( "null" ))
         			linefragement[i] = null;
         	}
         } 

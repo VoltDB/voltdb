@@ -36,7 +36,6 @@ public class TestCSVLoader extends TestCase {
     		"--reportdir=" + reportdir,
     		"--tablename=BLAH",
     		"--abortfailurecount=50",
-    		//"--skipemptyrecords=false",
     		};
 
     @Override
@@ -49,11 +48,11 @@ public class TestCSVLoader extends TestCase {
                 "clm_integer integer default 0 not null, " + // column that is partitioned on
 
                 "clm_tinyint tinyint default 0, " +
-                "clm_smallint smallint default 0, " +
-                "clm_bigint bigint default 0, " +
+                //"clm_smallint smallint default 0, " +
+                //"clm_bigint bigint default 0, " +
                 
-               	"clm_string varchar(10) default null, " +
-                "clm_decimal decimal default null, " +
+               	//"clm_string varchar(10) default null, " +
+                //"clm_decimal decimal default null, " +
                 //"clm_float float default 1.0, "+ // for later
                 //"clm_timestamp timestamp default null, " + // for later
                 //"clm_varinary varbinary default null" + // for later
@@ -89,106 +88,105 @@ public class TestCSVLoader extends TestCase {
         };
     }
     
-    public void testBlank() throws Exception 
-	{
-    	simpleSchema =
-                "create table BLAH (" +
-                "clm_integer integer default 0 not null, " + // column that is partitioned on
-
-                //"clm_tinyint tinyint default 0, " +
-                //"clm_smallint smallint default 0, " +
-                //"clm_bigint bigint default 0, " +
-                
-               // "clm_string varchar(10) default null, " +
-                //"clm_decimal decimal default null, " +
-                //"clm_float float default 1.0, "+ // for later
-                //"clm_timestamp timestamp default null, " + // for later
-                //"clm_varinary varbinary default null" + // for later
-                "); ";
-	    String []myData = { "1",
-	    					"",
-	    					"2"};
-		test_Interface( this.options, myData );
-	}
-	
-	public void testDelimeters () throws Exception
-	{
-		simpleSchema =
-                "create table BLAH (" +
-                "clm_integer integer default 0 not null, " + // column that is partitioned on
-
-                "clm_tinyint tinyint default 0, " +
-                //"clm_smallint smallint default 0, " +
-                //"clm_bigint bigint default 0, " +
-                
-               // "clm_string varchar(10) default null, " +
-                //"clm_decimal decimal default null, " +
-                //"clm_float float default 1.0, "+ // for later
-                //"clm_timestamp timestamp default null, " + // for later
-                //"clm_varinary varbinary default null" + // for later
-                "); ";
-		 String []params = {
-		    		//userHome + "/testdb.csv",
-		    		"--inputfile=" + userHome + "/test.csv", 
-		    		//"--procedurename=BLAH.insert",
-		    		"--reportdir=" + reportdir,
-		    		"--tablename=BLAH",
-		    		"--abortfailurecount=50",
-		    		//"--skipemptyrecords=false",
-		    		"--separator='.'"
-		    		};
-		 String []myData = {"1.1","","2.2"};
-		 test_Interface( params, myData );
-	}
-
-//	public void testSimple() throws Exception {
-//		 String []params_simple = {
-//	    		//userHome + "/testdb.csv",
-//	    		"--inputfile=" + userHome + "/testdb.csv", 
-//	    		//"--procedurename=BLAH.insert",
-//	    		"--reportdir=" + reportdir,
-//	    		"--tablename=BLAH",
-//	    		"--abortfailurecount=50",
-//	    		//"--skipemptyrecords=false",
-//	    		};
-//        try {
-//            CSVLoader.main(params_simple);
-//            // do the test
-//            VoltTable modCount;
-//            modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
-//            System.out.println("data inserted to table BLAH:\n" + modCount);
-//            int rowct = modCount.getRowCount();
-//                        
-//            BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
-//            int lineCount = 0;
-//            String line = "";
-//            String promptMsg = "Number of acknowledged tuples:";
-//            
-//            while ((line = csvreport.readLine()) != null) {
-//            	if (line.startsWith(promptMsg)) {
-//            		String num = line.substring(promptMsg.length());
-//            		lineCount = Integer.parseInt(num.replaceAll("\\s",""));
-//            		break;
-//            	}
-//            }
-//            System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
-//            assertEquals(lineCount, rowct);
-//            CSVLoader.flush();
-//        }
-//        finally {
-//            if (client != null) client.close();
-//            client = null;
+//    public void testBlank() throws Exception 
+//	{
+//    	simpleSchema =
+//                "create table BLAH (" +
+//                "clm_integer integer default 0 not null, " + // column that is partitioned on
 //
-//            if (localServer != null) {
-//                localServer.shutdown();
-//                localServer.join();
-//            }
-//            localServer = null;
-//
-//            // no clue how helpful this is
-//            System.gc();
-//        }
+//                //"clm_tinyint tinyint default 0, " +
+//                //"clm_smallint smallint default 0, " +
+//                //"clm_bigint bigint default 0, " +
+//                
+//               // "clm_string varchar(10) default null, " +
+//                //"clm_decimal decimal default null, " +
+//                //"clm_float float default 1.0, "+ // for later
+//                //"clm_timestamp timestamp default null, " + // for later
+//                //"clm_varinary varbinary default null" + // for later
+//                "); ";
+//	    String []myData = { "1",
+//	    					"",
+//	    					"2"};
+//		test_Interface( this.options, myData );
 //	}
+	
+//	public void testDelimeters () throws Exception
+//	{
+//		simpleSchema =
+//                "create table BLAH (" +
+//                "clm_integer integer default 0 not null, " + // column that is partitioned on
+//
+//                "clm_tinyint tinyint default 0, " +
+//                //"clm_smallint smallint default 0, " +
+//                //"clm_bigint bigint default 0, " +
+//                
+//               // "clm_string varchar(10) default null, " +
+//                //"clm_decimal decimal default null, " +
+//                //"clm_float float default 1.0, "+ // for later
+//                //"clm_timestamp timestamp default null, " + // for later
+//                //"clm_varinary varbinary default null" + // for later
+//                "); ";
+//		char str = '.';
+//		 String []params = {
+//		    		//userHome + "/testdb.csv",
+//		    		"--inputfile=" + userHome + "/test.csv", 
+//		    		//"--procedurename=BLAH.insert",
+//		    		"--reportdir=" + reportdir,
+//		    		"--tablename=BLAH",
+//		    		"--abortfailurecount=50",
+//		    		"--separator=",""
+//		    		};
+//		 String []myData = {"1, 1","","2, 2"};
+//		 test_Interface( params, myData );
+//	}
+
+	public void testSimple() throws Exception {
+		 String []params_simple = {
+	    		//userHome + "/testdb.csv",
+	    		"--inputfile=" + userHome + "/testdb.csv", 
+	    		//"--procedurename=BLAH.insert",
+	    		"--reportdir=" + reportdir,
+	    		"--tablename=BLAH",
+	    		"--abortfailurecount=50",
+	    		};
+        try {
+            CSVLoader.main(params_simple);
+            // do the test
+            VoltTable modCount;
+            modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+            System.out.println("data inserted to table BLAH:\n" + modCount);
+            int rowct = modCount.getRowCount();
+                        
+            BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
+            int lineCount = 0;
+            String line = "";
+            String promptMsg = "Number of acknowledged tuples:";
+            
+            while ((line = csvreport.readLine()) != null) {
+            	if (line.startsWith(promptMsg)) {
+            		String num = line.substring(promptMsg.length());
+            		lineCount = Integer.parseInt(num.replaceAll("\\s",""));
+            		break;
+            	}
+            }
+            System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
+            assertEquals(lineCount, rowct);
+            CSVLoader.flush();
+        }
+        finally {
+            if (client != null) client.close();
+            client = null;
+
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+	}
 	
 	public void test_Interface( String[] my_params, String[] my_data ) throws Exception {
 		try{
