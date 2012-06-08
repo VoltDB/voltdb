@@ -43,6 +43,8 @@ public class InitiatorMailbox implements Mailbox
     static boolean LOG_RX = false;
 
     VoltLogger hostLog = new VoltLogger("HOST");
+    VoltLogger tmLog = new VoltLogger("TM");
+
     private final InitiatorMessageHandler m_msgHandler;
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
@@ -169,6 +171,11 @@ public class InitiatorMailbox implements Mailbox
         List<RepairLog.Item> logs = m_repairLog.contents();
         int ofTotal = logs.size();
         int seq = 0;
+
+        tmLog.info(CoreUtils.hsIdToString(getHSId()) +
+                " handling log request. Responding with " +
+                ofTotal + " repair log parts.");
+
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
         for (RepairLog.Item log : logs) {
             Iv2RepairLogResponseMessage response =

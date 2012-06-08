@@ -100,7 +100,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             m_repairLog.setLeaderState(true);
             m_scheduler.setLeaderState(true);
             tmLog.info(m_whoami
-                    + " finished leader promotion. Took "
+                    + "finished leader promotion. Took "
                     + (System.currentTimeMillis() - startTime) + " ms.");
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Bad news.", true, e);

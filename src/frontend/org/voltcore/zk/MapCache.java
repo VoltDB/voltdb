@@ -107,10 +107,8 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
         try {
             String createdNode = m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
                     Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            System.out.println("\t\tCREATED MAPCACHE NODE path:" + createdNode + " key:" + key + " value:" + value.toString());
         } catch (KeeperException.NodeExistsException e) {
             m_zk.setData(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(), -1);
-            System.out.println("\t\tUPDATED MAPCACHE NODE. key:" + key + " val:" + value.toString());
         }
     }
 

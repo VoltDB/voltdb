@@ -346,10 +346,12 @@ public class Term
     /** Send missed-messages to survivors. Exciting! */
     public void repairSurvivors()
     {
+        int queued = 0;
         tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
                 if  (entry.getValue().needs(li.getSpHandle())) {
+                    ++queued;
                     tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
                             entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
                             li.getSpHandle());
@@ -357,6 +359,8 @@ public class Term
                 }
             }
         }
+        tmLog.info(m_whoami + "finished queuing " + queued
+                + " replica repair messages.");
     }
 
 
@@ -364,7 +368,6 @@ public class Term
     // for non-initiator components that care.
     void declareReadyAsLeader()
     {
-        tmLog.info(m_whoami + "registering as active leader.");
         try {
             MapCacheWriter iv2masters = new MapCache(m_zk, VoltZK.iv2masters);
             iv2masters.put(Integer.toString(m_partitionId),
