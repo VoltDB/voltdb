@@ -153,27 +153,22 @@ class CSVLoader {
     	@Option(desc = "the default leading whitespace behavior to use if none is supplied.")
     	boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     	
-    	//@Option(desc = "get help information")
-    	//boolean help = true;
+    	@Option(desc = "get help information")
+    	int help;
     	
     	@Override
-    	public void validate() {
-    	//	if( help = true )
-    			//;
-    	//	else
-    		//{
-    			if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
-    			if (procedurename.equals("") && tablename.equals("") )
-    			exitWithMessageAndUsage("procedure name or a table name required");
-    			if (!procedurename.equals("") && !tablename.equals("") )
-    			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-    			if (inputfile.equals("")) 
-    			standin = true;
-    			if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
-    			if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
-    	
-    		//}
+    	public void validate() {		
+    	    if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
+    		if (procedurename.equals("") && tablename.equals("") )
+    		exitWithMessageAndUsage("procedure name or a table name required");
+    		if (!procedurename.equals("") && !tablename.equals("") )
+    		exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
+    		if (inputfile.equals("")) 
+    		standin = true;
+    		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
+    		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
     	}
+    	
     }
     
     public CSVLoader (CSVConfig cfg) {
@@ -256,7 +251,7 @@ class CSVLoader {
                      }
                     //
                     if( (lineCheckResult = checkLineFormat(correctedLine, columnCnt))!= null){
-                    	System.err.println("<zheng>Stop at line " + (outCount.get()));
+                    	System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );
                     	synchronized (errorInfo) {
                     		if (!errorInfo.containsKey(outCount.get())) {
                     			String[] info = {linedata.toString(), lineCheckResult};
@@ -312,15 +307,15 @@ class CSVLoader {
      * FIFO order of the callback.
      * @param args
      * @return long number of the actual rows acknowledged by the database server
+     * @throws org.apache.commons.cli.ParseException 
      */
     
 
-    public static void main(String[] args) {
-        long start = System.currentTimeMillis();
-        
+    public static void main(String[] args) throws org.apache.commons.cli.ParseException {
     	CSVConfig cfg = new CSVConfig();
-    	cfg.parse(CSVLoader.class.getName(), args);
+        long start = System.currentTimeMillis();
     	
+    	cfg.parse(CSVLoader.class.getName(), args);
     	
     	CSVLoader loader = new CSVLoader(cfg);
     	loader.run();
