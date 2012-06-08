@@ -145,13 +145,12 @@ public class Term
     {
         @Override
         public void run(List<String> children) {
-            tmLog.info("Babysitter for zkLeaderNode: " +
-                    LeaderElector.electionDirForPartition(m_partitionId) + ":");
-            tmLog.info("children: " + children);
             // make an HSId array out of the children
             // The list contains the leader, skip it
             List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, children);
-            tmLog.info("Updated replicas: " + replicas);
+            tmLog.info(m_whoami
+                    + "replica change handler updating replica list to: "
+                    + CoreUtils.hsIdListToString(replicas));
             m_mailbox.updateReplicas(replicas);
         }
     };
@@ -296,14 +295,12 @@ public class Term
         List<Long> survivors =  childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
         survivors.add(m_initiatorHSId);
 
-        String survivorsForLogMsg = "";
         for (Long hsid : survivors) {
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
-            survivorsForLogMsg += hsid + " ";
         }
 
         tmLog.info(m_whoami + "found " + survivors.size() + " surviving replicas to repair. " +
-                " Survivors: " + survivorsForLogMsg);
+                " Survivors: " + CoreUtils.hsIdListToString(survivors));
         VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
     }
