@@ -260,7 +260,6 @@ public class Term
                     m_replicasChangeHandler, true);
             if (kfactorForStartup >= 0) {
                 prepareForStartup(kfactorForStartup);
-                m_promotionResult.m_doneLatch.countDown();
             }
             else {
                 prepareForFaultRecovery();
@@ -299,7 +298,6 @@ public class Term
             }
             children = m_babySitter.lastSeenChildren();
         }
-        declareReadyAsLeader();
     }
 
     /** Start fixing survivors: setup scoreboard and request repair logs. */
@@ -378,9 +376,7 @@ public class Term
         }
         tmLog.info(m_whoami + "finished queuing " + queued
                 + " replica repair messages.");
-
-        // done
-        m_promotionResult.m_doneLatch.countDown();
+        declareReadyAsLeader();
     }
 
 
@@ -392,6 +388,7 @@ public class Term
             MapCacheWriter iv2masters = new MapCache(m_zk, VoltZK.iv2masters);
             iv2masters.put(Integer.toString(m_partitionId),
                     new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
+            m_promotionResult.m_doneLatch.countDown();
         } catch (KeeperException e) {
             VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
         } catch (InterruptedException e) {
