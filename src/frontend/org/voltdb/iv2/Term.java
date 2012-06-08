@@ -298,6 +298,7 @@ public class Term
             }
             children = m_babySitter.lastSeenChildren();
         }
+        declareReadyAsLeader();
     }
 
     /** Start fixing survivors: setup scoreboard and request repair logs. */
