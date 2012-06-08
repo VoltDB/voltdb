@@ -53,7 +53,6 @@ package org.voltcore.messaging;
 import java.util.*;
 
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 
 public class MockMailbox implements Mailbox {
 
@@ -71,7 +70,7 @@ public class MockMailbox implements Mailbox {
     }
 
     @Override
-    public void send(long HSId, VoltMessage message) throws MessagingException {
+    public void send(long HSId, VoltMessage message) {
         outgoingMessages.add(new Message(HSId, message));
 
         Mailbox dest = postoffice.get(HSId);
@@ -81,7 +80,7 @@ public class MockMailbox implements Mailbox {
     }
 
     @Override
-    public void send(long[] HSIds, VoltMessage message) throws MessagingException {
+    public void send(long[] HSIds, VoltMessage message) {
         for (int i=0; HSIds != null && i < HSIds.length; ++i) {
             Mailbox dest = postoffice.get(HSIds[i]);
             if (dest != null) {
