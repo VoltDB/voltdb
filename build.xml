@@ -1103,6 +1103,9 @@ TEST CASES
     <condition property="junit.printsummary" value="${junit.printsummary}" else='yes'>
         <isset property="junit.printsummary"/>
     </condition>
+    <condition property="junit.showoutput" value="${junit.showoutput}" else="false">
+        <isset property="junit.showoutput"/>
+    </condition>
     <!-- select which set of regression suite configuration types to run -->
     <condition property="regressions" value="${regressions}" else="all">
         <isset property="regressions"/>
@@ -1128,7 +1131,7 @@ TEST CASES
             printsummary="false"
             timeout="${junit.timeout}"
             maxmemory='1024M'
-            showoutput="false"
+            showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
             <jvmarg value="-Djava.library.path=${build.dir}/nativelibs:${base.dir}/third_party/cpp/jnilib" />
@@ -1173,6 +1176,10 @@ TEST CASES
 
             <assertions><enable/></assertions>
         </junit>
+
+        <move file="${build.testoutput.dir}/volt-junit-fulllog.txt"
+              tofile="${build.testoutput.dir}/junit.log.${testname}.txt"
+              failonerror="false" />
 
         <!-- per-test post processing script
              1. ensure a result xml file got written
@@ -1271,12 +1278,12 @@ TEST CASES
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
-                <!--<include name='org/voltcore/**/Test*.class' />
+                <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/network/**/Test*.class'/>
                 <include name='org/voltdb/messaging/**/*Test.class'/>
                 <include name='org/voltdb/network/**/*Test.class'/>
-                <include name='org/voltdb/utils/**/*Test.class'/>-->
+                <include name='org/voltdb/utils/**/*Test.class'/>
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
@@ -1472,23 +1479,11 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
     </condition>
-    <!-- select which set of regression suite configuration types to run -->
-    <condition property="regressions" value="${regressions}" else="all">
-        <isset property="regressions"/>
+    <condition property="junit.showoutput" value="${junit.showoutput}" else="true">
+        <isset property="junit.showoutput"/>
     </condition>
 
-    <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
-        <formatters>
-            <!-- keep the per-case final summary -->
-            <formatter usefile="false" type="plain"/>
-            <!-- Also log to obj/BUILD/testoutput -->
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-        </formatters>
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
               <include name="**/${junitclass}.class"/>

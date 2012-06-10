@@ -24,7 +24,7 @@ if __name__ == "__main__":
     (options, args) = parser.parse_args()
 
     outdir = os.path.abspath(options.outputpath)
-    now = datetime.datetime.now().strftime("%y-%m-%d_%H-%M-%s")
+    now = datetime.datetime.now().strftime("%y-%m-%d_%H-%M-%S")
     filename = "archive-%s.tgz" % (now)
     archive = os.path.join(options.archivepath, filename)
     if len(os.listdir(outdir)) > 0:
