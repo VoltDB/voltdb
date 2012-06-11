@@ -45,38 +45,6 @@ public class TestCSVLoader extends TestCase {
         
     }
     
-    public void testNew() throws Exception 
-   	{
-        String mySchema =
-                   "create table BLAH (" +
-                   "clm_integer integer default 0 not null, " + // column that is partitioned on
-
-//                   "clm_tinyint tinyint default 0, " +
-//                   "clm_smallint smallint default 0, " +
-//                   "clm_bigint bigint default 0, " +
-//                   
-//                   "clm_string varchar(10) default null, " +
-//                   "clm_decimal decimal default null, " +
-//                   "clm_float float default null "+ // for later
-                   "clm_timestamp timestamp default null, " + // for later
-                   //"clm_varinary varbinary default null" + // for later
-                   "); ";
-        String []myOptions = {
-        		"--inputfile=" + userHome + "/test.csv", 
-        		//"--procedurename=BLAH.insert",
-        		"--reportdir=" + reportdir,
-        		"--tablename=BLAH",
-        		"--abortfailurecount=50",
-        		//"--separator=','"
-        		};
-        
-   	    String []myData = { "1,1111111111",
-   	    					"2,12131231231"
-   	    					};
-   	    int invalidLineCnt = 0;
-   		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
-   	}
-    
     public void testCommon() throws Exception 
 	{
      String mySchema =
@@ -119,6 +87,39 @@ public class TestCSVLoader extends TestCase {
 	    int invalidLineCnt = 3;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	}
+    
+    public void testNew() throws Exception 
+   	{
+        String mySchema =
+                   "create table BLAH (" +
+                   "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+//                   "clm_tinyint tinyint default 0, " +
+//                   "clm_smallint smallint default 0, " +
+//                   "clm_bigint bigint default 0, " +
+//                   
+//                   "clm_string varchar(10) default null, " +
+//                   "clm_decimal decimal default null, " +
+//                   "clm_float float default null "+ // for later
+                   "clm_timestamp timestamp default null, " + // for later
+                   //"clm_varinary varbinary default null" + // for later
+                   "); ";
+        String []myOptions = {
+        		"--inputfile=" + userHome + "/test.csv", 
+        		//"--procedurename=BLAH.insert",
+        		"--reportdir=" + reportdir,
+        		"--tablename=BLAH",
+        		"--abortfailurecount=50",
+        		//"--separator=','"
+        		};
+        
+   	    String []myData = { "1,1111111111",
+   	    					"2,12131231231"
+   	    					};
+   	    int invalidLineCnt = 0;
+   		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+   	}
+    
     //csvloader --inputfile=/tmp/ --tablename=VOTES --abortfailurecount=50 
 //    public void testOptions() throws Exception 
 //	{
@@ -285,6 +286,94 @@ public class TestCSVLoader extends TestCase {
         	client.createConnection("localhost");
         	
         	CSVLoader.main(my_options);
+            // do the test
+            
+            VoltTable modCount;
+            modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
+            System.out.println("data inserted to table BLAH:\n" + modCount);
+            int rowct = modCount.getRowCount();
+                        
+            BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
+            int lineCount = 0;
+            String line = "";
+            String promptMsg = "Number of acknowledged tuples:";
+            
+            String promptFailMsg = "Number of failed tuples:";
+            int invalidlinecnt = 0;
+            
+            while ((line = csvreport.readLine()) != null) {
+            	if (line.startsWith(promptMsg)) {
+            		String num = line.substring(promptMsg.length());
+            		lineCount = Integer.parseInt(num.replaceAll("\\s",""));
+                    }
+            	if( line.startsWith(promptFailMsg)){
+            		String num = line.substring(promptFailMsg.length());
+            		invalidlinecnt = Integer.parseInt(num.replaceAll("\\s",""));
+            	}	
+            }
+            System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
+            CSVLoader.flush();
+            assertEquals(lineCount, rowct);
+            assertEquals(invalidlinecnt, invalidLineCnt);
+            
+        }
+        finally {
+            if (client != null) client.close();
+            client = null;
+
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+	}
+	
+	public void test_Interface_lineByLine( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
+		try{
+			BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
+			for( int i = 0; i < my_data.length; i++ )
+				out_csv.write( my_data[ i ]+"\n" );
+			out_csv.flush();
+			out_csv.close();
+		}
+		catch( Exception e) {
+			System.err.print( e.getMessage() );
+		}
+		
+		try{
+			pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
+			pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
+			builder = new VoltProjectBuilder();
+			//builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
+			//builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, 5, 'nullchar');");
+        
+			builder.addLiteralSchema(my_schema);
+			builder.addPartitionInfo("BLAH", "clm_integer");
+			boolean success = builder.compile(pathToCatalog, 2, 1, 0);
+			assertTrue(success);
+			MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
+			config = new VoltDB.Configuration();
+			config.m_pathToCatalog = pathToCatalog;
+			config.m_pathToDeployment = pathToDeployment;
+			localServer = new ServerThread(config);
+			client = null;
+        
+          	localServer.start();
+        	localServer.waitForInitialization();
+        
+        	client = ClientFactory.createClient();
+        	client.createConnection("localhost");
+        	
+        	CSVLoader loader = new CSVLoader( my_options );
+        	while( loader.hasNext() )
+        	{
+        		String [] addStr= {"1","1"};
+        		loader.insertLine( addStr );
+        	}
             // do the test
             
             VoltTable modCount;

@@ -22,6 +22,7 @@ import java.io.BufferedWriter;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
+import java.io.IOException;
 import java.io.InputStreamReader;
 import java.util.Map;
 import java.util.TimeZone;
@@ -29,13 +30,16 @@ import java.util.TreeMap;
 import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
+
 
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
@@ -76,6 +80,40 @@ class CSVLoader {
 
     private static String insertProcedure = "";
     private static Map <Long,String[]> errorInfo = new TreeMap<Long, String[]>();
+    
+    private static CSVReader csvReader;
+    private static Client csvClient;
+    private static String [] csvLine;
+    
+    public CSVLoader( String[] options ) {
+    	CSVConfig cfg = new CSVConfig();
+    	cfg.parse(CSVLoader.class.getName(), options);
+    	
+    	this.config = cfg;
+    	if(!config.tablename.equals("")) {
+    		insertProcedure = config.tablename + ".insert";
+    	} else {
+    		insertProcedure = config.procedurename;
+    	}
+    	try {
+    		final CSVReader reader;
+    		if (CSVLoader.standin)
+    			csvReader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)),
+    					config.separator, config.quotechar, config.escape, config.skipline,
+    					config.strictQuotes, config.ignoreLeadingWhiteSpace);
+    		else 
+    			csvReader = new CSVReader(new FileReader(config.inputfile),
+    					config.separator, config.quotechar, config.escape, config.skipline,
+    					config.strictQuotes, config.ignoreLeadingWhiteSpace);
+            ProcedureCallback cb = null;
+
+            csvClient = ClientFactory.createClient();
+            csvClient.createConnection("localhost");
+    	} catch (Exception e) {
+            e.printStackTrace();
+        }
+    }
+    
     private static final class MyCallback implements ProcedureCallback {
     	private final long m_lineNum;
     	private final CSVConfig m_config;
@@ -220,33 +258,9 @@ class CSVLoader {
 //                    		msg += correctedLine[i] + ",";
 //                    }
 //                    System.out.println(msg);
-//                    
-                    //get procedure information from the server using @SystemCatalog
-                    int columnCnt=0;
-                    VoltTable procInfo = null;
+                    
                     String lineCheckResult;
-                    Vector<Integer> strColIndex = new Vector<Integer>();
-                    try {
-                    	procInfo = client.callProcedure("@SystemCatalog",
-                        "PROCEDURECOLUMNS").getResults()[0];
-                    	
-                        while( procInfo.advanceRow() )
-                        {
-                        	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
-                        	{
-                        			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
-                        				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
-                        			
-                        		columnCnt++;
-                        		
-                        	}
-                        }
-                     }
-                     catch (Exception e) {
-                        e.printStackTrace();
-                     }
-                    //
-                    if( (lineCheckResult = checkLineFormat(correctedLine, columnCnt))!= null){
+                    if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
                     	System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );
                     	synchronized (errorInfo) {
                     		if (!errorInfo.containsKey(outCount.get())) {
@@ -279,6 +293,81 @@ class CSVLoader {
         } catch (Exception e) {
             e.printStackTrace();
         }
+
+        System.out.println("Inserted " + outCount.get() + " and acknowledged " + inCount.get() + " rows (final)");
+        if (waits > 0) {
+            System.out.println("Waited " + waits + " times");
+            if (shortWaits > 0) {
+                System.out.println("Waited too briefly? " + shortWaits + " times");
+            }
+        }
+        //return inCount.get();
+    	
+    }
+    
+    public boolean hasNext() throws IOException {
+    	if ( (config.limitrows-- > 0) && (csvLine = csvReader.readNext()) != null )
+    		return true;
+    	else
+    		return false;
+    }
+    
+    public void insertLine( String[] additionalStr ) throws NoConnectionsException, IOException, InterruptedException {
+    	int waits = 0;
+        int shortWaits = 0;
+
+            boolean lastOK = true;
+
+              	outCount.incrementAndGet();
+                boolean queued = false;
+                while (queued == false) {
+                	StringBuilder linedata = new StringBuilder();
+                	
+                	csvLine = ArrayUtils.addAll(csvLine, additionalStr);
+                	
+                    for(String s : csvLine) 
+                    	linedata.append(s);
+                	
+                	String[] correctedLine = csvLine;
+                    // TODO(): correct the line here
+                    
+                    MyCallback cb = new MyCallback(outCount.get(), config, linedata.toString());
+                    
+                    // This message will be removed later
+                    // print out the parameters right now
+//                    String msg = "<xin>params: ";
+//                    for (int i=0; i < correctedLine.length; i++) {
+//                    	if (correctedLine != null)
+//                    		msg += correctedLine[i] + ",";
+//                    }
+//                    System.out.println(msg);                 
+                    String lineCheckResult;
+
+
+                    if( (lineCheckResult = checkLineFormat(correctedLine, csvClient))!= null){
+                    	System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );
+                    	synchronized (errorInfo) {
+                    		if (!errorInfo.containsKey(outCount.get())) {
+                    			String[] info = {linedata.toString(), lineCheckResult};
+                    			errorInfo.put(outCount.get(), info);
+                    		}
+                    		if (errorInfo.size() >= config.abortfailurecount) {
+                    			System.err.println("The number of Failure row data exceeds " + config.abortfailurecount);
+                        		System.exit(1);
+                    		}
+                    	}
+                    	break;
+                    }
+                    queued = csvClient.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    if (queued == false) {
+                        ++waits;
+                        if (lastOK == false) {
+                            ++shortWaits;
+                        }
+                        Thread.sleep(waitSeconds);
+                    }
+                    lastOK = queued;
+            }
 
         System.out.println("Inserted " + outCount.get() + " and acknowledged " + inCount.get() + " rows (final)");
         if (waits > 0) {
@@ -332,8 +421,31 @@ class CSVLoader {
      * @param linefragement
      */
 
-    private String checkLineFormat(String[] linefragement, int columnCnt ) {
+    private String checkLineFormat(String[] linefragement, Client client ) {
     	String msg = "";
+    	
+    	Vector<Integer> strColIndex = new Vector<Integer>();
+    	//get procedure information from the server using @SystemCatalog
+        int columnCnt=0;
+        VoltTable procInfo = null;
+        try {
+        	procInfo = client.callProcedure("@SystemCatalog",
+            "PROCEDURECOLUMNS").getResults()[0];
+        	
+            while( procInfo.advanceRow() )
+            {
+            	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
+            	{
+            			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
+            				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
+            			
+            		columnCnt++;
+            	}
+            }
+         }
+         catch (Exception e) {
+            e.printStackTrace();
+         }
          
          if( linefragement.length == 1 && linefragement[0].equals( "" ) )
          {
@@ -427,9 +539,12 @@ class CSVLoader {
 		this.latency = latency;
 	}
 	
-	public static void flush() {
+	public static void flush() throws IOException, InterruptedException {
 		inCount.set( 0 );
 		outCount.set( 0 );
 		errorInfo.clear();
+		csvReader.close();
+        csvClient.drain();
+        csvClient.close();
 	}
 }

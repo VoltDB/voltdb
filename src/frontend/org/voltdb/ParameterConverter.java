@@ -20,6 +20,7 @@ package org.voltdb;
 import java.lang.reflect.Array;
 import java.math.BigDecimal;
 import java.math.BigInteger;
+import java.security.Timestamp;
 import java.util.Date;
 
 import org.voltdb.types.TimestampType;

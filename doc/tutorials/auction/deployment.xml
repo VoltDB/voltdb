@@ -4,5 +4,5 @@
     <httpd enabled="true">
         <jsonapi enabled="true" />
     </httpd>
-    <export enabled="false"/>
+    <export enabled="true"/>
 </deployment>
