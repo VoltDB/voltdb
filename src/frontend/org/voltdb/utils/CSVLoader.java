@@ -33,6 +33,7 @@ import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
@@ -150,6 +151,18 @@ class CSVLoader {
     	@Option(desc = "the default leading whitespace behavior to use if none is supplied.")
     	boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     	
+    	@Option(desc = "the servers to be connected")
+    	String servers = "localhost";
+    	
+    	@Option(desc = "user name that is used to connect to the servers,by defalut null")
+    	String user = "";
+    	
+    	@Option(desc = "password for this user to use to connect the servers,by defalut null")
+    	String password = "";
+    	
+    	@Option(desc = "port to be used for the servers right now")
+    	int port = Client.VOLTDB_SERVER_PORT;
+    	
     	@Override
     	public void validate() {
     		if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
@@ -190,8 +203,13 @@ class CSVLoader {
     					config.strictQuotes, config.ignoreLeadingWhiteSpace);
             ProcedureCallback cb = null;
 
-            final Client client = ClientFactory.createClient();
-            client.createConnection("localhost");
+            // Split server list
+            String[] serverlist = config.servers.split(",");
+            
+            // Create connection
+            ClientConfig c_config = new ClientConfig(config.user,config.password);
+            c_config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
+            final Client client = CSVLoader.getClient(c_config, serverlist, config.port);
             
             boolean lastOK = true;
             String line[] = null;
@@ -297,6 +315,16 @@ class CSVLoader {
     	
     	System.out.println("CSVLoader elaspsed: " + loader.getLatency()/1000F + " seconds");
     }
+    
+    public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
+    {
+        final Client client = ClientFactory.createClient(config);
+
+        for (String server : servers)
+            client.createConnection(server.trim(), port);
+        return client;
+    }
+    
     /**
      * Check for each line
      * TODO(zheng):
