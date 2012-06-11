@@ -166,11 +166,18 @@ public class LocalCluster implements VoltServerConfig {
         m_hostCount = hostCount;
         m_kfactor = kfactor;
         m_debug = debug;
-        m_target = target;
         m_jarFileName = jarFileName;
         m_failureState = kfactor < 1 ? FailureState.ALL_RUNNING : failureState;
         m_pipes = new ArrayList<PipeToFile>();
         m_cmdLines = new ArrayList<CommandLine>();
+
+        // if the user wants valgrind and it makes sense, give it to 'em
+        if (isMemcheckDefined() && (target == BackendTarget.NATIVE_EE_JNI)) {
+            m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
+        }
+        else {
+            m_target = target;
+        }
 
         String buildDir = System.getenv("VOLTDB_BUILD_DIR");  // via build.xml
         if (buildDir == null) {
@@ -208,7 +215,7 @@ public class LocalCluster implements VoltServerConfig {
         this.templateCmdLine.
             addTestOptions(true).
             leader("").
-            target(target).
+            target(m_target).
             startCommand("create").
             jarFileName(VoltDB.Configuration.getPathToCatalogForTest(m_jarFileName)).
             buildDir(buildDir).
@@ -216,6 +223,19 @@ public class LocalCluster implements VoltServerConfig {
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
+        this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
+        // "tag" this command line so it's clear which test started it
+        this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
+    }
+
+    /**
+     * Override the Valgrind backend with a JNI backend.
+     * Called after a constructor but before startup.
+     */
+    public void overrideAnyRequestForValgrind() {
+        if (templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+            templateCmdLine.m_backend = BackendTarget.NATIVE_EE_JNI;
+        }
     }
 
     public void setCustomCmdLn(String customCmdLn) {
@@ -302,14 +322,8 @@ public class LocalCluster implements VoltServerConfig {
         portGenerator.next();
         for (EEProcess proc : m_eeProcs.get(0)) {
             assert(proc != null);
-            cmdln.ipcPort(portGenerator.next());
+            cmdln.ipcPort(proc.port());
         }
-
-        // rtb: why is this? this flag short-circuits an Inits worker
-        // but can only be set on the local in-process server (there is no
-        // command line version of it.) Consequently, in-process and out-of-
-        // process VoltDBs initialize differently when this flag is set.
-        // cmdln.rejoinTest(true);
 
         // for debug, dump the command line to a unique file.
         // cmdln.dumpToFile("/Users/rbetts/cmd_" + Integer.toString(portGenerator.next()));
@@ -1042,8 +1056,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_leaderPort = config.m_leaderPort;
     }
 
-    @Override
-    public boolean isValgrind() {
+    protected boolean isMemcheckDefined() {
         final String buildType = System.getenv().get("BUILD");
         if (buildType == null) {
             return false;
@@ -1051,6 +1064,10 @@ public class LocalCluster implements VoltServerConfig {
         return buildType.startsWith("memcheck");
     }
 
+    @Override
+    public boolean isValgrind() {
+        return templateCmdLine.m_backend == BackendTarget.NATIVE_EE_VALGRIND_IPC;
+    }
 
     @Override
     public void createDirectory(File path) throws IOException {

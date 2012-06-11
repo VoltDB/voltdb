@@ -26,25 +26,24 @@ package org.voltdb_testprocs.regressionsuites.failureprocs;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
 @ProcInfo (
     singlePartition = false
 )
-public class LastBatchLie extends VoltProcedure {
-    public final SQLStmt insert = new SQLStmt("INSERT INTO NEW_ORDER VALUES (?, ?, ?);");
+public class ProcSPcandidate6 extends VoltProcedure {
 
-    public VoltTable[] run() {
-        // Do some multi-batch just to show it's not broken
-        for (int j = 0; j < 10; j++) {
-            voltQueueSQL(insert, j, j, j);
-            voltExecuteSQL(false);
-        }
-        voltQueueSQL(insert, 10, 10, 10);
-        voltExecuteSQL(true);
-        voltQueueSQL(insert, 11, 11, 11);
-        // This should cause a VoltAbortException
-        voltExecuteSQL(true);
-        return null;
+    // Parameterized WHERE clause enables SP processing
+    public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = 87654321");
+
+    // Addition of arbitrary query against replicated data should have no ill effect on SP processing.
+    public static final SQLStmt nonspoiler = new SQLStmt("select count(*) from indexed_blah order by ival");
+
+    public long run() {
+        voltQueueSQL(query);
+        voltQueueSQL(nonspoiler);
+        voltExecuteSQL();
+        // zero is a successful return
+        return 0;
     }
+
 }

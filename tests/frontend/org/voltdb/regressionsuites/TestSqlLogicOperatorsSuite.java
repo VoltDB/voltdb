@@ -209,11 +209,11 @@ public class TestSqlLogicOperatorsSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        config = new LocalCluster("sqllogic-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqllogic-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        config = new LocalCluster("sqllogic-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("sqllogic-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 

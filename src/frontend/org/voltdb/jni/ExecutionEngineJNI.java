@@ -18,6 +18,7 @@
 package org.voltdb.jni;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
 import org.voltcore.logging.VoltLogger;
@@ -113,7 +114,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                     siteId,
                     partitionId,
                     hostId,
-                    hostname,
+                    getStringBytes(hostname),
                     tempTableMemory * 1024 * 1024,
                     totalPartitions);
         checkErrorCode(errorCode);
@@ -184,7 +185,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeLoadCatalog(pointer, txnId, serializedCatalog);
+            errorCode = nativeLoadCatalog(pointer, txnId, getStringBytes(serializedCatalog));
         }
         checkErrorCode(errorCode);
         //LOG.info("Loaded Catalog.");
@@ -200,7 +201,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         LOG.trace("Loading Application Catalog...");
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeUpdateCatalog(pointer, txnId, catalogDiffs);
+            errorCode = nativeUpdateCatalog(pointer, txnId, getStringBytes(catalogDiffs));
         }
         checkErrorCode(errorCode);
     }
@@ -276,7 +277,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         //C++ JSON deserializer is not thread safe, must synchronize
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeExecuteCustomPlanFragment(pointer, plan, 0, inputDepId,
+            errorCode = nativeExecuteCustomPlanFragment(pointer, getStringBytes(plan), 0, inputDepId,
                                                         txnId, lastCommittedTxnId, undoQuantumToken);
         }
         try {
@@ -302,6 +303,14 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             }
         } finally {
             fallbackBuffer = null;
+        }
+    }
+
+    private static byte[] getStringBytes(String string) {
+        try {
+            return string.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+           throw new AssertionError(e);
         }
     }
 
@@ -528,7 +537,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         deserializer.clear();
         ExportProtoMessage result = null;
         long retval = nativeExportAction(pointer,
-                                         syncAction, ackTxnId, seqNo, tableSignature);
+                                         syncAction, ackTxnId, seqNo, getStringBytes(tableSignature));
         if (retval < 0) {
             result = new ExportProtoMessage( 0, partitionId, tableSignature);
             result.error();
@@ -538,7 +547,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public long[] getUSOForExportTable(String tableSignature) {
-        return nativeGetUSOForExportTable(pointer, tableSignature);
+        return nativeGetUSOForExportTable(pointer, getStringBytes(tableSignature));
     }
 
     @Override

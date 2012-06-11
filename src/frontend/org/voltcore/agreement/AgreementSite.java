@@ -23,11 +23,13 @@ import java.io.DataOutputStream;
 import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.Random;
 import java.util.Set;
@@ -53,7 +55,6 @@ import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -339,11 +340,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         for (long initiatorId : m_hsIds) {
             HeartbeatMessage heartbeat =
                 new HeartbeatMessage( m_hsId, txnId, m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorId));
-            try {
-                m_mailbox.send( initiatorId, heartbeat);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
+            m_mailbox.send( initiatorId, heartbeat);
         }
     }
 
@@ -366,12 +363,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 HeartbeatResponseMessage response = new HeartbeatResponseMessage(
                         m_hsId, lastSeenTxnFromInitiator,
                         m_txnQueue.getQueueState() == RestrictedPriorityQueue.QueueState.BLOCKED_SAFETY);
-                try {
-                    m_mailbox.send(info.getInitiatorHSId(), response);
-                } catch (MessagingException e) {
-                    // hope this never happens... it doesn't right?
-                    throw new RuntimeException(e);
-                }
+                m_mailbox.send(info.getInitiatorHSId(), response);
                 // we're done here (in the case of heartbeats)
                 return;
             }
@@ -402,11 +394,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                                 txnId,
                                 m_hsId,
                                 m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorHSId));
-                    try {
-                        m_mailbox.send( initiatorHSId, atm);
-                    } catch (MessagingException e) {
-                        throw new RuntimeException(e);
-                    }
+                    m_mailbox.send( initiatorHSId, atm);
                 }
                 //Process the ATM eagerly locally to aid
                 //in having a complete set of stuff to ship
@@ -555,11 +543,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         metadata.put(BINARY_PAYLOAD_SNAPSHOT);
         metadata.putLong(txnId);
         BinaryPayloadMessage bpm = new BinaryPayloadMessage( metadata.array(), databaseBytes);
-        try {
-            m_mailbox.send( joiningAgreementSite, bpm);
-        } catch (MessagingException e) {
-            throw new IOException(e);
-        }
+        m_mailbox.send( joiningAgreementSite, bpm);
         m_siteRequestingRecovery = null;
         m_recoverBeforeTxn = null;
     }
@@ -606,7 +590,8 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         Set<Long> newFailedSiteIds = Collections.unmodifiableSet(m_pendingFailedSites);
         m_recoveryLog.info("Agreement, handling site faults for newly failed sites " +
                 CoreUtils.hsIdCollectionToString(newFailedSiteIds) +
-                " initiatorSafeInitPoints " + initiatorSafeInitPoint);
+                " initiatorSafeInitPoints " + CoreUtils.hsIdKeyMapToString(initiatorSafeInitPoint));
+
         // Fix safe transaction scoreboard in transaction queue
         for (Long siteId : newFailedSiteIds) {
             m_safetyState.removeState(siteId);
@@ -651,25 +636,20 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_recoveryLog.info("Agreement, Sending fault data " + CoreUtils.hsIdCollectionToString(m_pendingFailedSites)
                 + " to "
                 + CoreUtils.hsIdCollectionToString(survivorSet) + " survivors");
-        try {
-            for (Long site : m_pendingFailedSites) {
-                /*
-                 * Check the queue for the data and get it from the ledger if necessary.\
-                 * It might not even be in the ledger if the site has been failed
-                 * since recovery of this node began.
-                 */
-                Long txnId = m_txnQueue.getNewestSafeTransactionForInitiator(site);
-                FailureSiteUpdateMessage srcmsg =
-                    new FailureSiteUpdateMessage(m_pendingFailedSites,
-                                                 site,
-                                                 txnId != null ? txnId : Long.MIN_VALUE,
-                                                 site);
+        for (Long site : m_pendingFailedSites) {
+            /*
+             * Check the queue for the data and get it from the ledger if necessary.\
+             * It might not even be in the ledger if the site has been failed
+             * since recovery of this node began.
+             */
+            Long txnId = m_txnQueue.getNewestSafeTransactionForInitiator(site);
+            FailureSiteUpdateMessage srcmsg =
+                new FailureSiteUpdateMessage(m_pendingFailedSites,
+                        site,
+                        txnId != null ? txnId : Long.MIN_VALUE,
+                        site);
 
-                m_mailbox.send(survivors, srcmsg);
-            }
-        }
-        catch (MessagingException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
+            m_mailbox.send(survivors, srcmsg);
         }
         m_recoveryLog.info("Agreement, Sent fault data. Expecting " + (survivors.length * m_pendingFailedSites.size()) + " responses.");
         return (survivors.length * m_pendingFailedSites.size());
@@ -689,8 +669,22 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         survivorSet.removeAll(m_pendingFailedSites);
 
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
+        long blockedOnReceiveStart = System.currentTimeMillis();
+        long lastReportTime = 0;
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
+
+            /*
+             * If fault resolution takes longer then 10 seconds start logging
+             */
+            final long now = System.currentTimeMillis();
+            if (now - blockedOnReceiveStart > 10000) {
+                if (now - lastReportTime > 60000) {
+                    lastReportTime = System.currentTimeMillis();
+                    haveNecessaryFaultInfo(m_pendingFailedSites, true);
+                }
+            }
+
             if (m == null) {
                 //Don't need to do anything here?
                 continue;
@@ -723,28 +717,46 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                     CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) +
                     " safe txn id " + fm.m_safeTxnId + " failed site " +
                     CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId));
-        } while(!haveNecessaryFaultInfo(survivorSet));
+        } while(!haveNecessaryFaultInfo(survivorSet, false));
         return true;
     }
 
     private boolean haveNecessaryFaultInfo(
-            Set<Long> survivors) {
+            Set<Long> survivors,
+            boolean log) {
+        List<Pair<Long, Long>> missingMessages = new ArrayList<Pair<Long, Long>>();
         for (long survivingSite : survivors) {
             for (Long failingSite : m_pendingFailedSites) {
                 Pair<Long, Long> key = Pair.of( survivingSite, failingSite);
                 if (!m_failureSiteUpdateLedger.containsKey(key)) {
-                    return false;
+                    missingMessages.add(key);
                 }
             }
         }
-        return true;
+        if (log) {
+            StringBuilder sb = new StringBuilder();
+            sb.append('[');
+            boolean first = true;
+            for (Pair<Long, Long> p : missingMessages) {
+                if (!first) sb.append(", ");
+                first = false;
+                sb.append(CoreUtils.hsIdToString(p.getFirst()));
+                sb.append('-');
+                sb.append(CoreUtils.hsIdToString(p.getSecond()));
+            }
+            sb.append(']');
+
+            m_recoveryLog.warn("Failure resolution stalled waiting for ( ExecutionSite, Initiator ) " +
+                                "information: " + sb.toString());
+        }
+        return missingMessages.isEmpty();
     }
 
     private void extractGlobalFaultData(
             HashMap<Long, Long> initiatorSafeInitPoint) {
         HashSet<Long> survivorSet = new HashSet<Long>(m_hsIds);
         survivorSet.removeAll(m_pendingFailedSites);
-        if (!haveNecessaryFaultInfo(survivorSet)) {
+        if (!haveNecessaryFaultInfo(survivorSet, false)) {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
         }
 
@@ -876,11 +888,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         ByteBuffer metadata = ByteBuffer.allocate(1);
                         metadata.put(BINARY_PAYLOAD_JOIN_REQUEST);
                         BinaryPayloadMessage bpm = new BinaryPayloadMessage(metadata.array(), payload);
-                        try {
-                            m_mailbox.send( initiatorHSId, bpm);
-                        } catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
+                        m_mailbox.send( initiatorHSId, bpm);
                     }
 
                     m_txnQueue.noteTransactionRecievedAndReturnLastSeen(m_hsId,

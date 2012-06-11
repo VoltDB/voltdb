@@ -25,100 +25,39 @@ package org.voltdb.quarantine;
 
 import java.net.InetSocketAddress;
 
-import junit.framework.TestCase;
-
-import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.exportclient.ExportClientBase;
+import org.voltdb.VoltDB;
 import org.voltdb.exportclient.ExportClientException;
-import org.voltdb.exportclient.ExportDecoderBase;
+import org.voltdb.exportclient.TestExportOpsEvents;
 import org.voltdb.exportclient.VoltDBFickleCluster;
 
-public class TestExportOpsEventsTestConnectingToFailingCluster extends TestCase {
-
-    @Override
-    protected void setUp() throws Exception {
-        VoltDBFickleCluster.compile();
-    }
-
-    class NullExportClient extends ExportClientBase {
-        public class TrivialDecoder extends ExportDecoderBase {
-            public TrivialDecoder(AdvertisedDataSource source) {
-                super(source);
-            }
-            @Override
-            public boolean processRow(int rowSize, byte[] rowData) {
-                return true;
-            }
-            @Override
-            public void sourceNoLongerAdvertised(AdvertisedDataSource source) {
-                // TODO Auto-generated method stub
-
-            }
-        }
-        @Override
-        public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
-            return new TrivialDecoder(source);
-        }
-    }
-
-    public void testConnectingToNothing() throws ExportClientException {
-        System.out.println("testConnectToNothing");
-        NullExportClient client = new NullExportClient();
-        client.addServerInfo(new InetSocketAddress("localhost", 21212));
-
-        // the first connect should return false, but shouldn't
-        // throw and exception
-        assertFalse(client.connect());
-
-        // now run for a while...
-        // it should run for 1.5 seconds without failing, but also without connecting
-        client.run(1500);
-    }
+public class TestExportOpsEventsTestConnectingToFailingCluster extends TestExportOpsEvents {
 
     public void testConnectingToFailingCluster() throws Exception {
         System.out.println("testConnectingToFailingCluster");
         NullExportClient client = new NullExportClient();
-        client.addServerInfo(new InetSocketAddress("localhost", 21212));
+        client.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
 
         VoltDBFickleCluster.start();
 
+        client.addServerInfo(new InetSocketAddress(VoltDBFickleCluster.getPort(0)));
         assertTrue(client.connect());
 
         VoltDBFickleCluster.killNode();
 
         // work for 10 seconds, or until the connection is dropped
         long now = System.currentTimeMillis();
-        boolean success = false;
         while ((System.currentTimeMillis() - now) < 10000) {
             try {
                 client.work();
+                fail(); // this is supposed to throw
             }
             catch (ExportClientException e) {
                 // this is supposed to happen
-                success = true;
                 break;
             }
         }
-        assertTrue(success);
 
         client.disconnect();
-
-        // Debug code added to make sure the server is listening on the client port.
-        // On the mini we were seeing that the export client couldn't reconnect
-        // and got connection refused which doesn't make any sense. Adding this
-        // debug output changed the timing so it wouldn't show up. Leave it in to make
-        // the test pass more consistently, and give us more info if it does end up failing again.
-        {
-            Process p = Runtime.getRuntime().exec("lsof -i");
-            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
-            java.io.BufferedReader br = new java.io.BufferedReader(reader);
-            String str = null;
-            while ((str = br.readLine()) != null) {
-                if (str.contains("LISTEN")) {
-                    System.out.println(str);
-                }
-            }
-        }
 
         boolean connected = client.connect();
         if (!connected) {

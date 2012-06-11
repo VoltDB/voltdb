@@ -21,13 +21,25 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb.compiler.procedures;
+package org.voltdb_testprocs.regressionsuites.failureprocs;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
 
-public class IntParam extends VoltProcedure {
+@ProcInfo (
+    singlePartition = false
+)
+public class ProcSPcandidate2 extends VoltProcedure {
 
-    public long run(int isbn) {
-        return 1;
+    // Constant filtered WHERE clause enables SP processing
+    public static final SQLStmt query1 = new SQLStmt("select count(*) from blah where ival = 87654321");
+
+    public long run() {
+        voltQueueSQL(query1);
+        voltExecuteSQL();
+        // zero is a successful return
+        return 0;
     }
+
 }

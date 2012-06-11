@@ -1,6 +1,7 @@
 <?xml version="1.0" encoding="UTF-8" ?>
 <!DOCTYPE log4j:configuration SYSTEM "log4j.dtd">
 <log4j:configuration xmlns:log4j="http://jakarta.apache.org/log4j/">
+    <!-- file appender captures all loggers messages. -->
     <!-- console is a special appender for the logger CONSOLE
       that allows selectively logging INFO level messages to the console.
       Appender console and appender consolefiltered must have non-intersecting
@@ -8,26 +9,9 @@
       overlapping appender. -->
     <appender name="console" class="org.apache.log4j.ConsoleAppender">
         <layout class="org.apache.log4j.PatternLayout">
-            <param name="ConversionPattern"
-            value="%m%n"/>
+            <param name="ConversionPattern" value="%d   %-5p [%t] %c: %m%n"/>
         </layout>
-        <filter class="org.apache.log4j.varia.LevelRangeFilter">
-            <param name="levelMin" value="TRACE"/>
-            <param name="levelMax" value="DEBUG"/>
-        </filter>
     </appender>
-    <!-- console appender displays log messages with priority >= INFO. -->
-    <appender name="consolefiltered" class="org.apache.log4j.ConsoleAppender">
-        <layout class="org.apache.log4j.PatternLayout">
-            <param name="ConversionPattern"
-            value="%p: %m%n"/>
-        </layout>
-        <filter class="org.apache.log4j.varia.LevelRangeFilter">
-            <param name="levelMin" value="INFO"/>
-            <param name="levelMax" value="FATAL"/>
-        </filter>
-    </appender>
-    <!-- file appender captures all loggers messages. -->
     <appender name="file" class="org.apache.log4j.DailyRollingFileAppender">
         <param name="file" value="obj/release/testoutput/volt-junit-fulllog.txt"/>
         <param name="DatePattern" value="'.'yyyy-MM-dd" />
@@ -68,27 +52,9 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- Always let dragent to write to the console. -->
-    <logger name="DRAGENT">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-
-    <!-- Always let dragent to write to the console. -->
-    <logger name="DRSTATS">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-
-    <!-- logger to route specific informational messages to the console. -->
-    <logger name="CONSOLE">
-        <level value="INFO"/>
-        <appender-ref ref="console"/>
-    </logger>
-
     <root>
         <priority value="info" />
         <appender-ref ref="file" />
-        <appender-ref ref="consolefiltered" />
+        <appender-ref ref="console" />
     </root>
 </log4j:configuration>

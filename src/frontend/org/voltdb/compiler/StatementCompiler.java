@@ -32,6 +32,7 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParameterInfo;
+import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -56,7 +57,7 @@ public abstract class StatementCompiler {
 
     static void compile(VoltCompiler compiler, HSQLInterface hsql,
             Catalog catalog, Database db, DatabaseEstimates estimates,
-            Statement catalogStmt, String stmt, String joinOrder, boolean singlePartition)
+            Statement catalogStmt, String stmt, String joinOrder, PartitioningForStatement partitioning)
     throws VoltCompiler.VoltCompilerException {
 
         boolean compilerDebug = System.getProperties().contains("compilerdebug");
@@ -92,16 +93,15 @@ public abstract class StatementCompiler {
 
         // put the data in the catalog that we have
         catalogStmt.setSqltext(stmt);
-        catalogStmt.setSinglepartition(singlePartition);
+        catalogStmt.setSinglepartition(partitioning.wasSpecifiedAsSingle());
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(0);
 
         String name = catalogStmt.getParent().getTypeName() + "-" + catalogStmt.getTypeName();
         PlanNodeList node_list = null;
         TrivialCostModel costModel = new TrivialCostModel();
-
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, catalogStmt.getSinglepartition(), hsql, estimates, true, false);
+                catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, true, false);
 
         CompiledPlan plan = null;
         try {
@@ -134,7 +134,6 @@ public abstract class StatementCompiler {
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
-        // If this is an adhoc query then there won't be any parameters
         for (ParameterInfo param : plan.parameters) {
             StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(param.index));
             catalogParam.setJavatype(param.type.getValue());
@@ -161,6 +160,7 @@ public abstract class StatementCompiler {
             index++;
         }
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
+        partitioning.setIsReplicatedTableDML(plan.replicatedTableDML);
 
         // output the explained plan to disk for debugging
         PrintStream plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(

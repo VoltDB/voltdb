@@ -88,6 +88,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, true);
             cluster.setMaxHeap(256);
+            cluster.overrideAnyRequestForValgrind();
             boolean success = cluster.compile(builder);
             assertTrue(success);
             MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -269,6 +270,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster(
                 "rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, false);
         cluster.setMaxHeap(256);
+        cluster.overrideAnyRequestForValgrind();
         ServerThread localServer = null;
         try {
             boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note, this admin port is ignored
@@ -340,6 +342,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI);
         cluster.setMaxHeap(256);
+        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -375,6 +378,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_FAILURE,
                 false, false);
+        cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -390,6 +394,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_RECOVERING,
                 false, true);
+        cluster.setMaxHeap(256);
+        cluster.overrideAnyRequestForValgrind();
         success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -407,6 +413,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
         cluster.setMaxHeap(256);
+        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -466,6 +473,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
         cluster.setMaxHeap(256);
+        cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("rejoin.xml"));
@@ -543,6 +551,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
+        cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note this admin port is ignored
         assertTrue(success);
@@ -637,6 +646,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
+        cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -740,6 +750,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI, false);
+        cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
         assertTrue(success);

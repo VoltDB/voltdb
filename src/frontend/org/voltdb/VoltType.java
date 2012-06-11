@@ -92,15 +92,15 @@ public enum VoltType {
      * The epoch is Jan. 1 1970 00:00:00 GMT. Negative values represent
      * time before the epoch. This covers roughly 4000BC to 8000AD.
      */
-    TIMESTAMP ((byte)11, 8, "timestamp", new Class[] {TimestampType.class}, 'p'),
+    TIMESTAMP ((byte)11, 8, "timestamp",
+            new Class[] {TimestampType.class, java.util.Date.class, java.sql.Date.class, java.sql.Timestamp.class}, 'p'),
 
     /**
      * UTF-8 string with up to 32K chars.
      * The database supports char arrays and varchars
      * but the API uses strings.
      */
-    STRING    ((byte)9, -1, "varchar",
-               new Class[] {String.class, byte[].class, Byte[].class}, 'v'),
+    STRING    ((byte)9, -1, "varchar", new Class[] {String.class}, 'v'),
 
     /**
      * VoltTable type for Procedure parameters
@@ -136,7 +136,7 @@ public enum VoltType {
     private final int m_lengthInBytes;
     private final String m_sqlString;
     private final Class<?>[] m_classes;
-    private char m_signatureChar;
+    private final char m_signatureChar;
 
     private VoltType(byte val, int lengthInBytes,
             String sqlString, Class<?>[] classes,
@@ -148,11 +148,24 @@ public enum VoltType {
         m_signatureChar = signatureChar;
     }
 
-    private static Map<Class<?>, VoltType> s_classes;
+    private final static Map<Class<?>, VoltType> s_classes;
     static {
         s_classes = new HashMap<Class<?>, VoltType>();
         for (VoltType type : values()) {
             for (Class<?> cls : type.m_classes) {
+                // Avoid subtle effects when VoltTypes have duplicate m_classes entries (java classes),
+                // so that the association of a java class with the earlier VoltType gets obliterated
+                // by its association with the later VoltType.
+                // The effects of an assert in the middle of class initialization is surprisingly cryptic,
+                // at least when exercised by the "ant junit" suite, so for a SLIGHTLY less cryptic response,
+                // throw a generic runtime exception.
+                // Unfortunately, either response gets associated with the source lines of the first call to
+                // VoltType (like in DDLCompiler), rather than here.
+                // assert(s_classes.get(cls) == null);
+                if (s_classes.get(cls) != null) {
+                    // This message seems to just get buried by the java runtime.
+                    throw new RuntimeException("Associate each java class with at most one VoltType.");
+                }
                 s_classes.put(cls, type);
             }
         }
@@ -210,10 +223,8 @@ public enum VoltType {
                 return type;
             }
         }
-        if (str.equals("DECIMAL")) return DECIMAL;
         if (str.equals("DOUBLE")) return FLOAT;
         if (str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
-        if (str.equals("VARBINARY")) return VARBINARY;
 
         throw new RuntimeException("Can't find type: " + str);
     }
@@ -471,6 +482,19 @@ public enum VoltType {
             return true;
         default:
             return false;
+        }
+    }
+
+    public boolean isNumber() {
+        switch (this) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+                return true;
+            default:
+                return false;
         }
     }
 

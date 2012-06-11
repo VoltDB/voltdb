@@ -15,23 +15,16 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltcore.messaging;
+package org.voltcore.zk;
 
-import java.io.IOException;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.json_voltpatches.JSONObject;
 
 /**
- * Generic exception subclass for all messaging problems. This will
- * be extended as needed.
- *
+ * A write-only interface to MapCache for consumers that do not
+ * perform reads.
  */
-public class MessagingException extends Exception {
-    private static final long serialVersionUID = 8398009568760763414L;
-
-    public MessagingException(String string) {
-        super(string);
-    }
-
-    public MessagingException(IOException e) {
-        super(e);
-    }
+public interface MapCacheWriter {
+    public void put(String key, JSONObject value) throws KeeperException, InterruptedException;
 }
+

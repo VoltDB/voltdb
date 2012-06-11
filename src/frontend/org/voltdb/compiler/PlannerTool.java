@@ -19,10 +19,13 @@ package org.voltdb.compiler;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-import org.voltdb.CatalogContext;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.CatalogContext;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CompiledPlan.Fragment;
+import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.PlanNodeList;
@@ -45,6 +48,7 @@ public class PlannerTool {
         String onePlan = null;
         String allPlan = null;
         boolean replicatedDML = false;
+        Object partitionParam;
 
         @Override
         public String toString() {
@@ -53,6 +57,7 @@ public class PlannerTool {
             sb.append("  ONE: ").append(onePlan == null ? "null" : onePlan).append("\n");
             sb.append("  ALL: ").append(allPlan == null ? "null" : allPlan).append("\n");
             sb.append("  RTD: ").append(replicatedDML ? "true" : "false").append("\n");
+            sb.append("  PARAM: ").append(partitionParam == null ? "null" : partitionParam.toString()).append("\n");
             sb.append("}");
             return sb.toString();
         }
@@ -90,9 +95,7 @@ public class PlannerTool {
         m_hsql.close();
     }
 
-    public Result planSql(String sql, boolean singlePartition) {
-        Result retval = new Result();
-
+    public Result planSql(String sql, Object partitionParam) {
         if ((sql == null) || (sql.length() == 0)) {
             throw new RuntimeException("Can't plan empty or null SQL.");
         }
@@ -106,8 +109,9 @@ public class PlannerTool {
         //////////////////////
 
         TrivialCostModel costModel = new TrivialCostModel();
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, true);
         QueryPlanner planner = new QueryPlanner(
-                m_context.cluster, m_context.database, singlePartition, m_hsql, new DatabaseEstimates(), false, true);
+                m_context.cluster, m_context.database, partitioning, m_hsql, new DatabaseEstimates(), false, true);
         CompiledPlan plan = null;
         try {
             plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
@@ -146,22 +150,23 @@ public class PlannerTool {
         //////////////////////
         // OUTPUT THE RESULT
         //////////////////////
-
-        // print out the run-at-every-partition fragment
-        for (int i = 0; i < plan.fragments.size(); i++) {
-            Fragment frag = plan.fragments.get(i);
+        Result retval = new Result();
+        for (Fragment frag : plan.fragments) {
             PlanNodeList planList = new PlanNodeList(frag.planGraph);
             String serializedPlan = planList.toJSONString();
             String encodedPlan = serializedPlan; //Encoder.compressAndBase64Encode(serializedPlan);
             if (frag.multiPartition) {
+                assert(retval.allPlan == null);
                 retval.allPlan = encodedPlan;
             }
             else {
+                assert(retval.onePlan == null);
                 retval.onePlan = encodedPlan;
             }
         }
 
         retval.replicatedDML = plan.replicatedTableDML;
+        retval.partitionParam = partitioning.effectivePartitioningValue();
         return retval;
     }
 }

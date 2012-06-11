@@ -1580,14 +1580,15 @@ TEST CASES
 
     <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
         <formatters>
-            <formatter type="plain" unless="hudson"/>
+            <!-- keep the per-case final summary -->
+            <formatter usefile="false" type="plain"/>
+            <!-- Also log to obj/BUILD/testoutput -->
             <formatter
                 type='xml'
                 classname="org.voltdb.VoltJUnitFormatter"
                 usefile='false'
                 extension="none"
             />
-            <formatter type="xml" />
         </formatters>
         <tests>
             <fileset dir='${build.test.dir}'>

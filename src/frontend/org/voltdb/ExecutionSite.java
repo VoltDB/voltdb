@@ -47,7 +47,6 @@ import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -415,13 +414,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         CompleteTransactionMessage complete = (CompleteTransactionMessage)message;
                         CompleteTransactionResponseMessage ctrm =
                             new CompleteTransactionResponseMessage(complete, m_siteId);
-                        try
-                        {
-                            m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
-                        }
-                        catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
+                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
                     } else if (message instanceof FragmentTaskMessage) {
                         FragmentTaskMessage ftask = (FragmentTaskMessage)message;
                         FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_siteId);
@@ -434,12 +427,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                     new VoltTable(new VoltTable.ColumnInfo("DUMMY", VoltType.BIGINT)));
                         }
 
-                        try {
-                            m_mailbox.send(response.getDestinationSiteId(), response);
-                        } catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
-
+                        m_mailbox.send(response.getDestinationSiteId(), response);
                     } else {
                         handleMailboxMessageNonRecursable(message);
                     }
@@ -503,12 +491,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         if (m_rejoinCoordinatorHSId != -1) {
                             RejoinMessage msg =
                                     new RejoinMessage(getSiteId(), RejoinMessage.Type.REPLAY_FINISHED);
-                            try {
-                                m_mailbox.send(m_rejoinCoordinatorHSId, msg);
-                            } catch (MessagingException e) {
-                                VoltDB.crashLocalVoltDB("Unable to send message to rejoin " +
-                                        "coordinator", true, e);
-                            }
+                            m_mailbox.send(m_rejoinCoordinatorHSId, msg);
                         }
                         m_rejoinCoordinatorHSId = -1;
                     }
@@ -1075,12 +1058,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (m_rejoinCoordinatorHSId != -1) {
                 RejoinMessage msg =
                         new RejoinMessage(getSiteId(), RejoinMessage.Type.SNAPSHOT_FINISHED);
-                try {
-                    m_mailbox.send(m_rejoinCoordinatorHSId, msg);
-                } catch (MessagingException e) {
-                    VoltDB.crashLocalVoltDB("Unable to send message to rejoin " +
-                            "coordinator", true, e);
-                }
+                m_mailbox.send(m_rejoinCoordinatorHSId, msg);
             }
         }
 
@@ -1272,12 +1250,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                     // Send a message to self to avoid synchronization
                     RejoinMessage msg = new RejoinMessage(txnId);
-                    try {
-                        m_mailbox.send(getSiteId(), msg);
-                    } catch (MessagingException e) {
-                        VoltDB.crashLocalVoltDB("Fail to send rejoin snapshot txnId",
-                                                true, e);
-                    }
+                    m_mailbox.send(getSiteId(), msg);
                 } else {
                     VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
                                             false, null);
@@ -1440,12 +1413,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 HeartbeatResponseMessage response = new HeartbeatResponseMessage(
                         m_siteId, lastSeenTxnFromInitiator,
                         m_transactionQueue.getQueueState() == QueueState.BLOCKED_SAFETY);
-                try {
-                    m_mailbox.send(info.getInitiatorHSId(), response);
-                } catch (MessagingException e) {
-                    // hope this never happens... it doesn't right?
-                    throw new RuntimeException(e);
-                }
+                m_mailbox.send(info.getInitiatorHSId(), response);
                 // we're done here (in the case of heartbeats)
                 return;
             }
@@ -1485,13 +1453,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     {
                         CompleteTransactionResponseMessage ctrm =
                             new CompleteTransactionResponseMessage(complete, m_siteId);
-                        try
-                        {
-                            m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
-                        }
-                        catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
+                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
                     }
                 }
                 return;
@@ -1535,11 +1497,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         "recovery request from site " +
                         CoreUtils.hsIdToString(rm.sourceSite()));
                 RecoveryMessage recoveryResponse = new RecoveryMessage(false);
-                try {
-                    m_mailbox.send(rm.sourceSite(), recoveryResponse);
-                } catch (MessagingException e) {
-                    throw new RuntimeException(e);
-                }
+                m_mailbox.send(rm.sourceSite(), recoveryResponse);
                 return;
             }
 
@@ -1741,10 +1699,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         HashSet<Long> delta = new HashSet<Long>(m_tracker.m_allSitesImmutable);
         delta.removeAll(newTracker.m_allSitesImmutable);
 
-        System.out.println("Failure delta is " +
-                CoreUtils.hsIdCollectionToString(delta) + " with failures " +
-                CoreUtils.hsIdCollectionToString(m_pendingFailedSites));
-
         /*
          * In this case there were concurrent failures and the necessary matching site trackers
          * are not available for this set of failures bail out and wait for the next fault report
@@ -1800,7 +1754,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private Long extractGlobalFaultData(
             SiteTracker newTracker,
             HashMap<Long, Long> initiatorSafeInitPoint) {
-        if (!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites)) {
+        if (!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false)) {
             VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
         }
 
@@ -1859,26 +1813,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 " survivors with lastKnownGloballyCommitedMultiPartTxnId "
                 + lastKnownGloballyCommitedMultiPartTxnId);
 
-        try {
-            for (Long site : m_pendingFailedSites) {
-                /*
-                 * Check the queue for the data and get it from the ledger if necessary.\
-                 * It might not even be in the ledger if the site has been failed
-                 * since recovery of this node began.
-                 */
-                Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
-                FailureSiteUpdateMessage srcmsg =
-                    new FailureSiteUpdateMessage(
-                                                 m_pendingFailedSites,
-                                                 site,
-                                                 txnId != null ? txnId : Long.MIN_VALUE,
-                                                 lastKnownGloballyCommitedMultiPartTxnId);
+        for (Long site : m_pendingFailedSites) {
+            /*
+             * Check the queue for the data and get it from the ledger if necessary.\
+             * It might not even be in the ledger if the site has been failed
+             * since recovery of this node began.
+             */
+            Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
+            FailureSiteUpdateMessage srcmsg =
+                new FailureSiteUpdateMessage(
+                        m_pendingFailedSites,
+                        site,
+                        txnId != null ? txnId : Long.MIN_VALUE,
+                        lastKnownGloballyCommitedMultiPartTxnId);
 
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), srcmsg);
-            }
-        }
-        catch (MessagingException e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), srcmsg);
         }
     }
 
@@ -1901,8 +1850,23 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             SiteTracker newTracker)
     {
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
+        long blockedOnReceiveStart = System.currentTimeMillis();
+        long lastReportTime = 0;
+
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
+
+            /*
+             * If fault resolution takes longer then 10 seconds start logging
+             */
+            final long now = System.currentTimeMillis();
+            if (now - blockedOnReceiveStart > 10000) {
+                if (now - lastReportTime > 60000) {
+                    lastReportTime = System.currentTimeMillis();
+                    haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, true);
+                }
+            }
+
             //Invoke tick periodically to ensure that the last snapshot continues in the event that the failure
             //process does not complete
             if (m == null) {
@@ -1939,7 +1903,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
                     CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
                     " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
-        } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites));
+        } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false));
 
         return true;
     }
@@ -1947,18 +1911,36 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     private boolean haveNecessaryFaultInfo(
             SiteTracker newTracker,
-            Set<Long> sitesBeingFailed) {
+            Set<Long> sitesBeingFailed,
+            boolean log) {
         Set<Long> failingInitiators = new HashSet<Long>(sitesBeingFailed);
         failingInitiators.retainAll(m_tracker.getAllInitiators());
+        List<Pair<Long, Long>> missingMessages = new ArrayList<Pair<Long, Long>>();
         for (long otherSite : newTracker.getAllSites()) {
             for (Long failingInitiator : failingInitiators) {
                 Pair<Long, Long> key = Pair.of( otherSite, failingInitiator);
                 if (!m_failureSiteUpdateLedger.containsKey(key)) {
-                    return false;
+                    missingMessages.add(key);
                 }
             }
         }
-        return true;
+        if (log) {
+            StringBuilder sb = new StringBuilder();
+            sb.append('[');
+            boolean first = true;
+            for (Pair<Long, Long> p : missingMessages) {
+                if (!first) sb.append(", ");
+                first = false;
+                sb.append(CoreUtils.hsIdToString(p.getFirst()));
+                sb.append('-');
+                sb.append(CoreUtils.hsIdToString(p.getSecond()));
+            }
+            sb.append(']');
+
+            m_recoveryLog.warn("Failure resolution stalled waiting for ( ExecutionSite, Initiator ) " +
+                                "information: " + sb.toString());
+        }
+        return missingMessages.isEmpty();
     }
 
     /**
@@ -1990,15 +1972,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         for (Integer hostId : failedHosts) {
             sb.append(hostId).append(' ');
         }
+        final String failedHostsString = sb.toString();
         if (m_txnlog.isTraceEnabled())
         {
-            m_txnlog.trace("FUZZTEST handleNodeFault " + sb.toString() +
+            m_txnlog.trace("FUZZTEST handleNodeFault " + failedHostsString +
                     " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and safeInitiationPoints "
                     + initiatorSafeInitiationPoint);
         } else {
-            m_recoveryLog.info("Handling node faults " + sb.toString() +
+            m_recoveryLog.info("Handling node faults " + failedHostsString +
                     " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and safeInitiationPoints "
-                    + initiatorSafeInitiationPoint);
+                    + CoreUtils.hsIdKeyMapToString(initiatorSafeInitiationPoint));
         }
         lastKnownGloballyCommitedMultiPartTxnId = globalMultiPartCommitPoint;
 

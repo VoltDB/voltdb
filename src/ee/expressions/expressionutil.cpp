@@ -82,6 +82,8 @@ getGeneral(ExpressionType c,
         return new ComparisonExpression<CmpLte>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
         return new ComparisonExpression<CmpGte>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_LIKE):
+        return new ComparisonExpression<CmpLike>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called"
@@ -111,6 +113,8 @@ getMoreSpecialized(ExpressionType c, L* l, R* r)
         return new InlinedComparisonExpression<CmpLte, L, R>(c, l, r);
     case (EXPRESSION_TYPE_COMPARE_GREATERTHANOREQUALTO):
         return new InlinedComparisonExpression<CmpGte, L, R>(c, l, r);
+    case (EXPRESSION_TYPE_COMPARE_LIKE):
+        return new InlinedComparisonExpression<CmpLike, L, R>(c, l, r);
     default:
         char message[256];
         snprintf(message, 256, "Invalid ExpressionType '%s' called for"

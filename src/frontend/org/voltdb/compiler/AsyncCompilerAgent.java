@@ -17,25 +17,21 @@
 
 package org.voltdb.compiler;
 
-import java.lang.Runnable;
-
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.CatalogContext;
-import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltcore.logging.VoltLogger;
+import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
@@ -69,7 +65,7 @@ public class AsyncCompilerAgent {
         m_mailbox = new LocalMailbox(hostMessenger) {
 
             @Override
-            public void send(long destinationHSId, VoltMessage message) throws MessagingException {
+            public void send(long destinationHSId, VoltMessage message) {
                 message.m_sourceHSId = hsId;
                 hostMessenger.send(destinationHSId, message);
             }
@@ -93,12 +89,8 @@ public class AsyncCompilerAgent {
                     retval.hostname = work.hostname;
                     retval.adminConnection = work.adminConnection;
                     retval.clientData = work.clientData;
-                    try {
-                        // XXX: need client interface mailbox id.
-                        m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
-                    } catch (MessagingException ex) {
-                        ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
-                    }
+                    // XXX: need client interface mailbox id.
+                    m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
                 }
             }
         };
@@ -107,21 +99,17 @@ public class AsyncCompilerAgent {
 
     private void handleMailboxMessage(final VoltMessage message) {
         final LocalObjectMessage wrapper = (LocalObjectMessage)message;
-        try {
-            if (wrapper.payload instanceof AdHocPlannerWork) {
-                final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
-                final AsyncCompilerResult result = compileAdHocPlan(w);
-                // XXX: need client interface mailbox id.
-                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
-            }
-            else if (wrapper.payload instanceof CatalogChangeWork) {
-                final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
-                final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
-                // XXX: need client interface mailbox id.
-                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
-            }
-        } catch (MessagingException ex) {
-            ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
+        if (wrapper.payload instanceof AdHocPlannerWork) {
+            final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
+            final AsyncCompilerResult result = compileAdHocPlan(w);
+            // XXX: need client interface mailbox id.
+            m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+        }
+        else if (wrapper.payload instanceof CatalogChangeWork) {
+            final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
+            final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
+            // XXX: need client interface mailbox id.
+            m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
         }
     }
 
@@ -146,12 +134,12 @@ public class AsyncCompilerAgent {
         plannedStmt.catalogVersion = context.catalogVersion;
 
         try {
-            PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam != null);
+            PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam);
             plannedStmt.aggregatorFragment = result.onePlan;
             plannedStmt.collectorFragment = result.allPlan;
             plannedStmt.isReplicatedTableDML = result.replicatedDML;
             plannedStmt.sql = work.sql;
-            plannedStmt.partitionParam = work.partitionParam;
+            plannedStmt.partitionParam = result.partitionParam;
         }
         catch (Exception e) {
             plannedStmt.errorMsg = "Unexpected Ad Hoc Planning Error: " + e.getMessage();

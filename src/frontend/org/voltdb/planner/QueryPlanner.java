@@ -56,10 +56,11 @@ public class QueryPlanner {
      *
      * @param catalogCluster Catalog info about the physical layout of the cluster.
      * @param catalogDb Catalog info about schema, metadata and procedures.
+     * @param partitioning Describes the specified and inferred partition context.
      * @param HSQL HSQLInterface pointer used for parsing SQL into XML.
      * @param useGlobalIds
      */
-    public QueryPlanner(Cluster catalogCluster, Database catalogDb, boolean singlePartition,
+    public QueryPlanner(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning,
                         HSQLInterface HSQL, DatabaseEstimates estimates,
                         boolean useGlobalIds, boolean suppressDebugOutput) {
         assert(HSQL != null);
@@ -67,7 +68,7 @@ public class QueryPlanner {
         assert(catalogDb != null);
 
         m_HSQL = HSQL;
-        m_assembler = new PlanAssembler(catalogCluster, catalogDb, singlePartition);
+        m_assembler = new PlanAssembler(catalogCluster, catalogDb, partitioning);
         m_db = catalogDb;
         m_cluster = catalogCluster;
         m_estimates = estimates;
@@ -144,6 +145,7 @@ public class QueryPlanner {
         // get ready to find the plan with minimal cost
         CompiledPlan rawplan = null;
         CompiledPlan bestPlan = null;
+        Object bestPartitioningKey = null;
         String bestFilename = null;
         double minCost = Double.MAX_VALUE;
 
@@ -204,6 +206,7 @@ public class QueryPlanner {
                         // free the PlanColumns held by the previous best plan
                         bestPlan = plan;
                         bestFilename = filename;
+                        bestPartitioningKey = plan.getPartitioningKey();
                     }
 
                     if (!m_quietPlanner) {
@@ -246,7 +249,9 @@ public class QueryPlanner {
                 "This is statement not supported at this time.";
             return null;
         }
-
+        // Restore the result partitioning key to correspond to its setting for the best plan.
+        // This writable state is shared by m_assembler and the caller.
+        m_assembler.resetPartitioningKey(bestPartitioningKey);
         return bestPlan;
     }
 

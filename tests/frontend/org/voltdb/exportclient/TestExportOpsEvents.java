@@ -27,6 +27,7 @@ import java.net.InetSocketAddress;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.PortGenerator;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
@@ -41,7 +42,7 @@ public class TestExportOpsEvents extends TestCase {
         VoltDBFickleCluster.compile();
     }
 
-    class NullExportClient extends ExportClientBase {
+    protected class NullExportClient extends ExportClientBase {
         public class TrivialDecoder extends ExportDecoderBase {
             public TrivialDecoder(AdvertisedDataSource source) {
                 super(source);
@@ -56,6 +57,11 @@ public class TestExportOpsEvents extends TestCase {
 
             }
         }
+
+        public NullExportClient() {
+            super();
+        }
+
         @Override
         public ExportDecoderBase constructExportDecoder(AdvertisedDataSource source) {
             return new TrivialDecoder(source);
@@ -88,7 +94,7 @@ public class TestExportOpsEvents extends TestCase {
         MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("disabled-export.xml"));
 
         // start voltdb server (no export)
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(new PortGenerator());
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("disabled-export.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("disabled-export.xml");
         ServerThread localServer = new ServerThread(config);
@@ -96,7 +102,7 @@ public class TestExportOpsEvents extends TestCase {
         localServer.waitForInitialization();
 
         NullExportClient client = new NullExportClient();
-        client.addServerInfo(new InetSocketAddress("localhost", 21212));
+        client.addServerInfo(new InetSocketAddress("localhost", config.m_port));
 
         // the first connect should return false, but shouldn't
         // throw and exception
