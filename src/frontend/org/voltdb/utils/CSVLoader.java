@@ -318,10 +318,8 @@ class CSVLoader {
         	procInfo = client.callProcedure("@SystemCatalog",
             "PROCEDURECOLUMNS").getResults()[0];
         	
-            while( procInfo.advanceRow() )
-            {
-            	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
-            	{
+            while( procInfo.advanceRow() ) {
+            	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
             			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
             				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
             			
@@ -334,22 +332,20 @@ class CSVLoader {
             e.printStackTrace();
          }
        
-         if( linefragement.length == 1 && linefragement[0].equals( "" ) )
-         {
+         if( linefragement.length == 1 && linefragement[0].equals( "" ) ) {
         		msg = "checkLineFormat Error: blank line";
         		return msg;
          }
            
-        if( linefragement.length != columnCnt )//# attributes not match
-        {
+         //# attributes not match
+        if( linefragement.length != columnCnt ){
         	msg = "checkLineFormat Error: # of attributes do not match, # of attributes needed: "+columnCnt;
         	return msg;
         }
-        
-        else
-        {//trim white space in this line.
-        	for(int i=0; i<linefragement.length;i++) 
-        	{
+        else {
+        	for(int i=0; i<linefragement.length;i++) {
+        		//trim white space in this line.
+        		linefragement[i] = linefragement[i].trim();
         		if ((linefragement[i]).indexOf("NULL") != -1)
         			linefragement[i] = null;
         	}
