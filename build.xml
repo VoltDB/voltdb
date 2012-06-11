@@ -1112,8 +1112,10 @@ TEST CASES
             <!-- junit log4j settings, generates log output of last suite -->
             <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml" />
 
-            <!-- write text output to testoutput folder-->
-            <formatter type="plain" unless="hudson"/>
+            <!-- write per-testcase output to console if verbose mode -->
+            <formatter type="plain" usefile="false" if="verbosereport"/>
+            <!-- write per-testcase output to testoutput folder -->
+            <formatter type="plain" usefile="true" />
             <!-- write all kinds of fun voltdb output to testoutput folder -->
             <formatter
                 type='xml'
@@ -1434,6 +1436,10 @@ TEST CASES
     </condition>
     <condition property="junit.showoutput" value="${junit.showoutput}" else="true">
         <isset property="junit.showoutput"/>
+    </condition>
+    <!-- output per-testcase stats at the end of each suite -->
+    <condition property="verbosereport" value="${verbosereport}" else="true">
+        <isset property="verbosereport"/>
     </condition>
 
     <run_junit>
