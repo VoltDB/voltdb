@@ -54,11 +54,11 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  *   - Requires canonical JDBC SQL timestamp format
  */
 class CSVLoader {
-	
+
 	public synchronized static void setDefaultTimezone() {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
     }
-	
+
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
     
@@ -336,17 +336,17 @@ class CSVLoader {
         		msg = "checkLineFormat Error: blank line";
         		return msg;
          }
-           
-         //# attributes not match
+       //# attributes not match
         if( linefragement.length != columnCnt ){
         	msg = "checkLineFormat Error: # of attributes do not match, # of attributes needed: "+columnCnt;
         	return msg;
         }
+        
         else {
         	for(int i=0; i<linefragement.length;i++) {
         		//trim white space in this line.
         		linefragement[i] = linefragement[i].trim();
-        		if ((linefragement[i]).indexOf("NULL") != -1)
+        		if ((linefragement[i]).indexOf("NULL") != -1 && (linefragement[i]).indexOf("null") != -1)
         			linefragement[i] = null;
         	}
         } 
@@ -361,7 +361,7 @@ class CSVLoader {
 	private void produceInvalidRowsFile() {
 		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
 		// TODO: add the inputFileName to the outputFileName
-		
+
 		String path_invaliderowsfile = config.reportdir + CSVLoader.invaliderowsfile;
 		String path_logfile =  config.reportdir + CSVLoader.logfile;
     	String path_reportfile = config.reportdir  + CSVLoader.reportfile;
@@ -373,13 +373,13 @@ class CSVLoader {
 			BufferedWriter out_logfile = new BufferedWriter(new FileWriter(path_logfile));
 			BufferedWriter out_reportfile = new BufferedWriter(new FileWriter(path_reportfile));
 			long linect = 0;
-			
+
 			for (Long irow : errorInfo.keySet()) {
 				String info[] = errorInfo.get(irow);
 				if (info.length != 2)
 					System.out.println("internal error, infomation is not enough");
 				out_invaliderowfile.write(info[0] + "\n");
-				
+
 				String message = "invalid line " + irow + ":  " + info[0] + "\n";
 				System.err.print(message);
 				out_logfile.write(message + info[1] + "\n"); 
@@ -395,7 +395,7 @@ class CSVLoader {
 			out_reportfile.write("Number of failed tuples:" + errorInfo.size() + "\n");
 			out_reportfile.write("Number of acknowledged tuples:     " + inCount.get() + "\n");
 			out_reportfile.write("CSVLoader rate: " + outCount.get() / elapsedTimeSec + " row/s\n");
-			
+
 			// TODO(xin): Add more report message
 			out_invaliderowfile.flush();
 			out_logfile.flush();
@@ -411,7 +411,7 @@ class CSVLoader {
 			System.err.println(x.getMessage());
 		}
     }
-	
+
 	public float getLatency() {
 		return latency;
 	}
@@ -419,9 +419,10 @@ class CSVLoader {
 	public void setLatency(long latency) {
 		this.latency = latency;
 	}
-	
+
 	public static void flush() {
 		inCount.set( 0 );
 		outCount.set( 0 );
+		errorInfo.clear();
 	}
 }
