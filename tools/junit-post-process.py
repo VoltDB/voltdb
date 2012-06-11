@@ -3,7 +3,7 @@
 # 1. make sure all test cases leave junit results
 # 2. make sure no processes are stranded (fail and kill if so)
 
-import sys,os,re,logging,time
+import sys,os,re,logging,time,shutil
 from optparse import OptionParser
 
 def cmd(cmd):
@@ -169,5 +169,12 @@ if __name__ == "__main__":
             testout = "JUnitRunner failed to write XML results file for suite"
             result = Result(options.testname, "testPlaceholder", testout)
             writeJUnitXml(f, options.testname, 1, testout, "", [result])
+
+    # truncate the global log file file with this tests name
+    junitlogfile = os.path.join(os.path.abspath(options.outputpath), "volt-junit-fulllog.txt")
+    newlogpath = os.path.join(os.path.abspath(options.outputpath), "junit.log." + options.testname + ".txt")
+    if os.path.exists(junitlogfile):
+        shutil.move(junitlogfile, newlogpath)
+        logging.info("Truncated and renamed log file")
 
     logging.info("Finished post processing for test %s" % (options.testname))
