@@ -48,7 +48,8 @@ public class ParameterConverter {
     {
         if (param == null ||
             param == VoltType.NULL_STRING_OR_VARBINARY ||
-            param == VoltType.NULL_DECIMAL) {
+            param == VoltType.NULL_DECIMAL || 
+            param instanceof String && ((String)param).equals("/N")) {
             if (isPrimitive) {
                 VoltType type = VoltType.typeFromClass(paramType);
                 switch (type) {
@@ -247,7 +248,8 @@ public class ParameterConverter {
         // Coerce strings to primitive numbers.
         else if (pclass == String.class) {
             try {
-            	String value = ((String) param).trim();
+            	//String value = ((String) param).trim();
+            	String value = ((String) param).replaceAll("\\s","");
             	value = value.replaceAll("\\,","");
             	if (slot == byte.class) {
                     return Byte.parseByte(value);
