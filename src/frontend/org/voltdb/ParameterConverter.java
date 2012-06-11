@@ -246,7 +246,8 @@ public class ParameterConverter {
         // Coerce strings to primitive numbers.
         else if (pclass == String.class) {
             try {
-            	String value = ((String) param).trim();
+            	//String value = ((String) param).trim();
+            	String value = ((String) param).replaceAll("\\s","");
             	value = value.replaceAll("\\,","");
             	if (slot == byte.class) {
                     return Byte.parseByte(value);

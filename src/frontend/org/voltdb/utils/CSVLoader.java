@@ -346,7 +346,7 @@ class CSVLoader {
         	for(int i=0; i<linefragement.length;i++) {
         		//trim white space in this line.
         		linefragement[i] = linefragement[i].trim();
-        		if ((linefragement[i]).indexOf("NULL") != -1 && (linefragement[i]).indexOf("null") != -1)
+        		if ((linefragement[i]).indexOf("NULL") != -1 || (linefragement[i]).indexOf("null") != -1)
         			linefragement[i] = null;
         	}
         } 
