@@ -131,8 +131,14 @@ public class ParameterConverter {
             if (pclass == Date.class) return new TimestampType((Date) param);
             // if a string is given for a date, use java's JDBC parsing
             if (pclass == String.class) {
+            	String longtime = ((String) param).trim();
                 try {
-                    return new TimestampType((String)param);
+                	return new java.sql.Timestamp(Long.parseLong(longtime));
+                } catch (IllegalArgumentException e) {
+                	// Defer errors to the generic Exception throw below, if it's not the right format
+                }
+                try {
+                    return new TimestampType(longtime);
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
@@ -145,12 +151,19 @@ public class ParameterConverter {
             if (param instanceof TimestampType) return ((TimestampType) param).asJavaTimestamp();
             // If a string is given for a date, use java's JDBC parsing.
             if (pclass == String.class) {
+            	String longtime = ((String) param).trim();
                 try {
-                    return java.sql.Timestamp.valueOf((String) param);
+                	return new java.sql.Timestamp(Long.parseLong(longtime));
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
+                try {
+                	return java.sql.Timestamp.valueOf(longtime);
+                } catch (IllegalArgumentException e) {
+                	// Defer errors to the generic Exception throw below, if it's not the right format
+                }
+                
             }
         }
         else if (slot == java.sql.Date.class) {
@@ -234,11 +247,11 @@ public class ParameterConverter {
         // Coerce strings to primitive numbers.
         else if (pclass == String.class) {
             try {
-            	String value = ((String) param).replaceAll("\\s","");
-                if (slot == byte.class) {
+            	String value = ((String) param).trim();
+            	value = value.replaceAll("\\,","");
+            	if (slot == byte.class) {
                     return Byte.parseByte(value);
                 }
-                value = value.replaceAll("\\,","");
                 if (slot == short.class) {
                     return Short.parseShort(value);
                 }
@@ -265,7 +278,7 @@ public class ParameterConverter {
 
         throw new Exception(
                 "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + pclass.getName() +
-                "is not a match or is out of range for the target parameter type: " + slot.getName());
+                " is not a match or is out of range for the target parameter type: " + slot.getName());
     }
 
 

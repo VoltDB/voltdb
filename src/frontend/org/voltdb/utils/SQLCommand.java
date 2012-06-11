@@ -561,7 +561,7 @@ public class SQLCommand
                             throw new Exception("Invalid Meta-Data Selector: " + param);
                         objectParams[i] = p;
                     }
-                    else if (paramType.equals("varbinary"))
+                    else if (paramType.equals("varbinary") || paramType.equals("tinyint_array"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
@@ -984,13 +984,25 @@ public class SQLCommand
             }
             procedures.put(procs.getString("PROCEDURE_NAME"), argLists);
         }
+
+        // Retrieve the parameter types.  Note we have to do some special checking
+        // for array types.  ENG-3101
+        params.resetRowPosition();
         while (params.advanceRow())
         {
             Map<Integer, List<String>> argLists = procedures.get(params.getString("PROCEDURE_NAME"));
             assert(argLists.size() == 1);
             List<String> this_params = argLists.values().iterator().next();
-            this_params.set((int)params.getLong("ORDINAL_POSITION") - 1,
-                            params.getString("TYPE_NAME").toLowerCase());
+            int idx = (int)params.getLong("ORDINAL_POSITION") - 1;
+            String param_type = params.getString("TYPE_NAME").toLowerCase();
+            // Detect if this parameter is supposed to be an array.  It's kind of clunky, we have to
+            // look in the remarks column...
+            String param_remarks = params.getString("REMARKS");
+            if (null != param_remarks)
+            {
+                param_type += (param_remarks.equalsIgnoreCase("ARRAY_PARAMETER") ? "_array" : "");
+            }
+            this_params.set(idx, param_type);
         }
     }
 

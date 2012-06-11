@@ -58,11 +58,11 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  *   - Requires canonical JDBC SQL timestamp format
  */
 class CSVLoader {
-	
+
 	public synchronized static void setDefaultTimezone() {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
     }
-	
+
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
     
@@ -161,6 +161,9 @@ class CSVLoader {
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
     	
+//    	@Option(desc = "trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
+//    	boolean trimwhitespace = false;
+    	
     	@Option(desc = "maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
     	
@@ -188,18 +191,15 @@ class CSVLoader {
     	@Option(desc = "the default leading whitespace behavior to use if none is supplied.")
     	boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     	
-    	@Option(desc = "get help information")
-    	int help;
-    	
     	@Override
-    	public void validate() {		
-    	    if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
+    	public void validate() {
+    		if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
     		if (procedurename.equals("") && tablename.equals("") )
-    		exitWithMessageAndUsage("procedure name or a table name required");
+    			exitWithMessageAndUsage("procedure name or a table name required");
     		if (!procedurename.equals("") && !tablename.equals("") )
-    		exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
+    			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
     		if (inputfile.equals("")) 
-    		standin = true;
+    			standin = true;
     		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
     		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
     	}
@@ -249,15 +249,6 @@ class CSVLoader {
                     // TODO(): correct the line here
                     
                     cb = new MyCallback(outCount.get(), config, linedata.toString());
-                    
-                    // This message will be removed later
-                    // print out the parameters right now
-//                    String msg = "<xin>params: ";
-//                    for (int i=0; i < correctedLine.length; i++) {
-//                    	if (correctedLine != null)
-//                    		msg += correctedLine[i] + ",";
-//                    }
-//                    System.out.println(msg);
                     
                     String lineCheckResult;
                     if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
@@ -392,15 +383,15 @@ class CSVLoader {
      * FIFO order of the callback.
      * @param args
      * @return long number of the actual rows acknowledged by the database server
-     * @throws org.apache.commons.cli.ParseException 
      */
     
 
-    public static void main(String[] args) throws org.apache.commons.cli.ParseException {
-    	CSVConfig cfg = new CSVConfig();
+    public static void main(String[] args) {
         long start = System.currentTimeMillis();
-    	
+        
+    	CSVConfig cfg = new CSVConfig();
     	cfg.parse(CSVLoader.class.getName(), args);
+    	
     	
     	CSVLoader loader = new CSVLoader(cfg);
     	loader.run();
@@ -423,19 +414,15 @@ class CSVLoader {
 
     private String checkLineFormat(String[] linefragement, Client client ) {
     	String msg = "";
-    	
-    	Vector<Integer> strColIndex = new Vector<Integer>();
-    	//get procedure information from the server using @SystemCatalog
-        int columnCnt=0;
+        int columnCnt = 0;
         VoltTable procInfo = null;
+        Vector<Integer> strColIndex = new Vector<Integer>();
+        
         try {
         	procInfo = client.callProcedure("@SystemCatalog",
             "PROCEDURECOLUMNS").getResults()[0];
-        	
-            while( procInfo.advanceRow() )
-            {
-            	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) )
-            	{
+            while( procInfo.advanceRow() ) {
+            	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
             			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
             				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
             			
@@ -446,26 +433,21 @@ class CSVLoader {
          catch (Exception e) {
             e.printStackTrace();
          }
-         
-         if( linefragement.length == 1 && linefragement[0].equals( "" ) )
-         {
+         if( linefragement.length == 1 && linefragement[0].equals( "" ) ) {
         		msg = "checkLineFormat Error: blank line";
         		return msg;
          }
-           
-        if( linefragement.length != columnCnt )//# attributes not match
-        {
+       //# attributes not match
+        if( linefragement.length != columnCnt ){
         	msg = "checkLineFormat Error: # of attributes do not match, # of attributes needed: "+columnCnt;
         	return msg;
         }
         
-        else
-        {//trim white space in this line.
-        	for(int i=0; i<linefragement.length;i++) 
-        	{
+        else {
+        	for(int i=0; i<linefragement.length;i++) {
+        		//trim white space in this line.
         		linefragement[i] = linefragement[i].trim();
-        		//if ((linefragement[i]).indexOf("NULL") != -1)
-        		if( linefragement[i].equalsIgnoreCase( "null" ))
+        		if ((linefragement[i]).indexOf("NULL") != -1 && (linefragement[i]).indexOf("null") != -1)
         			linefragement[i] = null;
         	}
         } 
@@ -480,7 +462,7 @@ class CSVLoader {
 	private void produceInvalidRowsFile() {
 		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
 		// TODO: add the inputFileName to the outputFileName
-		
+
 		String path_invaliderowsfile = config.reportdir + CSVLoader.invaliderowsfile;
 		String path_logfile =  config.reportdir + CSVLoader.logfile;
     	String path_reportfile = config.reportdir  + CSVLoader.reportfile;
@@ -492,13 +474,13 @@ class CSVLoader {
 			BufferedWriter out_logfile = new BufferedWriter(new FileWriter(path_logfile));
 			BufferedWriter out_reportfile = new BufferedWriter(new FileWriter(path_reportfile));
 			long linect = 0;
-			
+
 			for (Long irow : errorInfo.keySet()) {
 				String info[] = errorInfo.get(irow);
 				if (info.length != 2)
 					System.out.println("internal error, infomation is not enough");
 				out_invaliderowfile.write(info[0] + "\n");
-				
+
 				String message = "invalid line " + irow + ":  " + info[0] + "\n";
 				System.err.print(message);
 				out_logfile.write(message + info[1] + "\n"); 
@@ -514,7 +496,7 @@ class CSVLoader {
 			out_reportfile.write("Number of failed tuples:" + errorInfo.size() + "\n");
 			out_reportfile.write("Number of acknowledged tuples:     " + inCount.get() + "\n");
 			out_reportfile.write("CSVLoader rate: " + outCount.get() / elapsedTimeSec + " row/s\n");
-			
+
 			// TODO(xin): Add more report message
 			out_invaliderowfile.flush();
 			out_logfile.flush();
@@ -530,7 +512,7 @@ class CSVLoader {
 			System.err.println(x.getMessage());
 		}
     }
-	
+
 	public float getLatency() {
 		return latency;
 	}

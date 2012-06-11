@@ -1331,10 +1331,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         HashSet<Long> delta = new HashSet<Long>(m_tracker.m_allSitesImmutable);
         delta.removeAll(newTracker.m_allSitesImmutable);
 
-        System.out.println("Failure delta is " +
-                CoreUtils.hsIdCollectionToString(delta) + " with failures " +
-                CoreUtils.hsIdCollectionToString(m_pendingFailedSites));
-
         /*
          * In this case there were concurrent failures and the necessary matching site trackers
          * are not available for this set of failures bail out and wait for the next fault report

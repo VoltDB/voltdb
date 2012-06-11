@@ -72,16 +72,6 @@ class Loader {
      * @return An ArrayList of ids of newly inserted objects.
      * @throws Exception Rethrows any exceptions thrown from within.
        */
-    
-    String []myOptions = {
-     		"--inputfile=" + userHome + "/test.csv", 
-     		//"--procedurename=BLAH.insert",
-     		"--reportdir=" + reportdir,
-     		"--tablename=BLAH",
-     		"--abortfailurecount=50",
-     		//"--separator=','"
-     		};
-    
     static ArrayList<Integer> loadItems(org.voltdb.client.Client client) throws Exception {
         System.out.printf("Loading ITEM Table\n");
         ArrayList<Integer> itemIds = new ArrayList<Integer>();
