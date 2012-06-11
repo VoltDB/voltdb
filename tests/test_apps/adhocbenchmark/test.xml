@@ -1,0 +1,123 @@
+<?xml version="1.0"?>
+<project>
+    <info>
+        <name>Ad Hoc Benchmark</name>
+        <version>1.0</version>
+        <description>Analyzes ad hoc query overhead.</description>
+    </info>
+    <database>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <partitions>
+            <partition table='join_1' column='id' />
+            <partition table='join_2' column='id' />
+            <partition table='join_3' column='id' />
+            <partition table='join_4' column='id' />
+            <partition table='join_5' column='id' />
+            <partition table='join_6' column='id' />
+            <partition table='join_7' column='id' />
+            <partition table='join_8' column='id' />
+            <partition table='join_9' column='id' />
+            <partition table='join_10' column='id' />
+            <partition table='join_11' column='id' />
+            <partition table='join_12' column='id' />
+            <partition table='join_13' column='id' />
+            <partition table='join_14' column='id' />
+            <partition table='join_15' column='id' />
+            <partition table='join_16' column='id' />
+            <partition table='join_17' column='id' />
+            <partition table='join_18' column='id' />
+            <partition table='join_19' column='id' />
+            <partition table='join_20' column='id' />
+            <partition table='join_21' column='id' />
+            <partition table='join_22' column='id' />
+            <partition table='join_23' column='id' />
+            <partition table='join_24' column='id' />
+            <partition table='join_25' column='id' />
+            <partition table='join_26' column='id' />
+            <partition table='join_27' column='id' />
+            <partition table='join_28' column='id' />
+            <partition table='join_29' column='id' />
+            <partition table='join_30' column='id' />
+            <partition table='join_31' column='id' />
+            <partition table='join_32' column='id' />
+            <partition table='join_33' column='id' />
+            <partition table='join_34' column='id' />
+            <partition table='join_35' column='id' />
+            <partition table='join_36' column='id' />
+            <partition table='join_37' column='id' />
+            <partition table='join_38' column='id' />
+            <partition table='join_39' column='id' />
+            <partition table='join_40' column='id' />
+            <partition table='join_41' column='id' />
+            <partition table='join_42' column='id' />
+            <partition table='join_43' column='id' />
+            <partition table='join_44' column='id' />
+            <partition table='join_45' column='id' />
+            <partition table='join_46' column='id' />
+            <partition table='join_47' column='id' />
+            <partition table='join_48' column='id' />
+            <partition table='join_49' column='id' />
+            <partition table='join_50' column='id' />
+            <partition table='join_51' column='id' />
+            <partition table='join_52' column='id' />
+            <partition table='join_53' column='id' />
+            <partition table='join_54' column='id' />
+            <partition table='join_55' column='id' />
+            <partition table='join_56' column='id' />
+            <partition table='join_57' column='id' />
+            <partition table='join_58' column='id' />
+            <partition table='join_59' column='id' />
+            <partition table='join_60' column='id' />
+            <partition table='join_61' column='id' />
+            <partition table='join_62' column='id' />
+            <partition table='join_63' column='id' />
+            <partition table='join_64' column='id' />
+            <partition table='join_65' column='id' />
+            <partition table='join_66' column='id' />
+            <partition table='join_67' column='id' />
+            <partition table='join_68' column='id' />
+            <partition table='join_69' column='id' />
+            <partition table='join_70' column='id' />
+            <partition table='join_71' column='id' />
+            <partition table='join_72' column='id' />
+            <partition table='join_73' column='id' />
+            <partition table='join_74' column='id' />
+            <partition table='join_75' column='id' />
+            <partition table='join_76' column='id' />
+            <partition table='join_77' column='id' />
+            <partition table='join_78' column='id' />
+            <partition table='join_79' column='id' />
+            <partition table='join_80' column='id' />
+            <partition table='join_81' column='id' />
+            <partition table='join_82' column='id' />
+            <partition table='join_83' column='id' />
+            <partition table='join_84' column='id' />
+            <partition table='join_85' column='id' />
+            <partition table='join_86' column='id' />
+            <partition table='join_87' column='id' />
+            <partition table='join_88' column='id' />
+            <partition table='join_89' column='id' />
+            <partition table='join_90' column='id' />
+            <partition table='join_91' column='id' />
+            <partition table='join_92' column='id' />
+            <partition table='join_93' column='id' />
+            <partition table='join_94' column='id' />
+            <partition table='join_95' column='id' />
+            <partition table='join_96' column='id' />
+            <partition table='join_97' column='id' />
+            <partition table='join_98' column='id' />
+            <partition table='join_99' column='id' />
+            <partition table='join_100' column='id' />
+            <partition table='projection_1' column='id' />
+        </partitions>
+        <procedures>
+            <procedure class="test">
+                <sql>
+SELECT * FROM join_36, join_55, join_10, join_13 WHERE join_55.col_2 = join_36.col_1 AND join_10.col_2 = join_55.col_1 AND join_13.col_2 = join_10.col_1
+                </sql>
+            </procedure>
+        </procedures>
+    </database>
+</project>

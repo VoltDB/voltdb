@@ -68,11 +68,10 @@ public class SQLStmt {
      *
      * @return SQLStmt object with plan added
      */
-    //TODO: factory method instead of public constructor
-    public static SQLStmt createWithPlan(String sqlText,
-                                         String aggregatorFragment,
-                                         String collectorFragment,
-                                         boolean isReplicatedTableDML) {
+    static SQLStmt createWithPlan(String sqlText,
+                                  String aggregatorFragment,
+                                  String collectorFragment,
+                                  boolean isReplicatedTableDML) {
         SQLStmt stmt = new SQLStmt(sqlText, null);
         stmt.plan = new SQLStmtPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML);
         return stmt;
@@ -92,7 +91,7 @@ public class SQLStmt {
      *
      * @return pre-compiled plan object or null
      */
-    public SQLStmtPlan getPlan() {
+    SQLStmtPlan getPlan() {
         return plan;
     }
 
@@ -110,7 +109,7 @@ public class SQLStmt {
      *
      * @return true if it is single partition
      */
-    public boolean isSinglePartition() {
+    boolean isSinglePartition() {
         // Check the catalog or the plan, depending on which (if any) is available.
         return (   (this.catStmt != null && this.catStmt.getSinglepartition())
                 || (this.plan != null && this.plan.getCollectorFragment() == null));

@@ -107,7 +107,7 @@ public class PlannerTool {
         //////////////////////
 
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, true, inferSP);
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
         QueryPlanner planner = new QueryPlanner(
                 m_context.cluster, m_context.database, partitioning, m_hsql, new DatabaseEstimates(), false, true);
         CompiledPlan plan = null;

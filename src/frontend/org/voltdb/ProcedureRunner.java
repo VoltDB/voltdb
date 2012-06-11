@@ -166,7 +166,7 @@ public class ProcedureRunner {
         assert(m_statusString == null);
         assert(m_cachedRNG == null);
 
-        // Can be reassigned
+        // use local var to avoid warnings about reassigning method argument
         Object[] paramList = paramListIn;
 
         m_txnId = txnId;
@@ -590,7 +590,7 @@ public class ProcedureRunner {
             }
 
             if (m_procMethod == null) {
-                log.debug("No good method found in: " + m_procedure.getClass().getName());
+                throw new RuntimeException("No \"run\" method found in: " + m_procedure.getClass().getName());
             }
         }
 
@@ -640,7 +640,7 @@ public class ProcedureRunner {
     * @return A ClientResponse containing error information
     */
    protected ClientResponseImpl getErrorResponse(Throwable eIn) {
-       // can be reassigned so use local variable
+       // use local var to avoid warnings about reassigning method argument
        Throwable e = eIn;
        boolean expected_failure = true;
        StackTraceElement[] stack = e.getStackTrace();
@@ -1064,7 +1064,9 @@ public class ProcedureRunner {
        m_txnState.createLocalFragmentWork(state.m_localTask,
                                           state.m_localFragsAreNonTransactional && finalTask);
 
-       m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
+       if (!state.m_distributedTask.isEmpty()) {
+           m_txnState.createAllParticipatingFragmentWork(state.m_distributedTask);
+       }
 
        // recursively call recursableRun and don't allow it to shutdown
        Map<Integer,List<VoltTable>> mapResults =
@@ -1136,9 +1138,10 @@ public class ProcedureRunner {
                public VoltTable[] onExecuteUnplanned(final List<QueuedSQL> batch, final boolean last) {
                    VoltTable[] results = new VoltTable[batch.size()];
                    for (int i = 0; i < batch.size(); i++) {
-                       results[i] = m_site.executeCustomPlanFragment(
-                               batch.get(i).stmt.getPlan().getAggregatorFragment(),
-                               AGG_DEPID, m_txnState.txnId);
+                       String aggregatorFragment = batch.get(i).stmt.getPlan().getAggregatorFragment();
+                       assert(aggregatorFragment != null);
+                       results[i] = m_site.executeCustomPlanFragment(aggregatorFragment,
+                                                                     AGG_DEPID, m_txnState.txnId);
                    }
                    return results;
                }

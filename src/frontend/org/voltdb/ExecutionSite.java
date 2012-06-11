@@ -1833,10 +1833,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             int inputDepId = -1;
 
             // make dependency ids available to the execution engine
-            if ((dependencies != null) && (dependencies.size() > 00)) {
+            if ((dependencies != null) && (dependencies.size() > 0)) {
                 assert(dependencies.size() <= 1);
-                for (int x : dependencies.keySet()) {
-                    inputDepId = x; break;
+                if (dependencies.size() == 1) {
+                    inputDepId = dependencies.keySet().iterator().next();
                 }
                 stashWorkUnitDependencies(dependencies);
             }

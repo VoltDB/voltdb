@@ -41,7 +41,7 @@ import org.voltdb.utils.Encoder;
 
 public class AsyncCompilerAgent {
 
-    private static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
+    static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
     // if more than this amount of work is queued, reject new work
     static public final int MAX_QUEUE_DEPTH = 250;
@@ -97,7 +97,7 @@ public class AsyncCompilerAgent {
                         // XXX: need client interface mailbox id.
                         m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
                     } catch (MessagingException ex) {
-                        getAhpLog().error("Error replying to Ad Hoc planner request: " + ex.getMessage());
+                        ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
                     }
                 }
             }
@@ -258,10 +258,6 @@ public class AsyncCompilerAgent {
         }
 
         return retval;
-    }
-
-    public static VoltLogger getAhpLog() {
-        return ahpLog;
     }
 
 }

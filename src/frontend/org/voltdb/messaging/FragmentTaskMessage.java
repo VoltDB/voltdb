@@ -317,7 +317,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     @Override
     public int getSerializedSize()
     {
-        assert(m_items != null && !m_items.isEmpty());
+        assert(m_items != null);
+        assert(!m_items.isEmpty());
 
         int msgsize = super.getSerializedSize();
 
@@ -368,7 +369,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     {
         // See Serialization Format comment above getSerializedSize().
 
-        assert(m_items != null && !m_items.isEmpty());
+        assert(m_items != null);
+        assert(!m_items.isEmpty());
 
         buf.put(VoltDbMessageFactory.FRAGMENT_TASK_ID);
         super.flattenToBuffer(buf);
@@ -570,5 +572,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             sb.append("\n  THIS IS AN UNDO REQUEST");
 
         return sb.toString();
+    }
+
+    public boolean isEmpty() {
+        return m_items.isEmpty();
     }
 }
