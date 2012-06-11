@@ -65,6 +65,8 @@ class CSVLoader {
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
+    private static final AtomicLong callBackCount = new AtomicLong(0);
+    private static final AtomicLong callProcCount = new AtomicLong(0);
     
     private static int reportEveryNRows = 10000;
     private static int waitSeconds = 10;
@@ -85,6 +87,10 @@ class CSVLoader {
     private static Client csvClient;
     private static String [] csvLine;
     
+    private static BufferedWriter out_invaliderowfile;
+    private static BufferedWriter out_logfile;
+	private static BufferedWriter out_reportfile;
+	
     public CSVLoader( String[] options ) {
     	CSVConfig cfg = new CSVConfig();
     	cfg.parse(CSVLoader.class.getName(), options);
@@ -112,6 +118,22 @@ class CSVLoader {
     	} catch (Exception e) {
             e.printStackTrace();
         }
+    	
+    	String path_invaliderowsfile = config.reportdir + CSVLoader.invaliderowsfile;
+		String path_logfile =  config.reportdir + CSVLoader.logfile;
+    	String path_reportfile = config.reportdir  + CSVLoader.reportfile;
+		try {
+			 out_invaliderowfile = new BufferedWriter(new FileWriter(path_invaliderowsfile));
+			 out_logfile = new BufferedWriter(new FileWriter(path_logfile));
+			 out_reportfile = new BufferedWriter(new FileWriter(path_reportfile)); 
+		}catch (FileNotFoundException e) {
+			System.err.println("CSV file '" + config.inputfile
+					+ "' could not be found.");
+		} catch (Exception x) {
+			System.err.println(x.getMessage());
+		}
+		
+    	
     }
     
     private static final class MyCallback implements ProcedureCallback {
@@ -126,6 +148,7 @@ class CSVLoader {
     	}
     	@Override
     	public void clientCallback(ClientResponse response) throws Exception {
+    		callBackCount.incrementAndGet();
     		if (response.getStatus() != ClientResponse.SUCCESS) {
     			System.err.println(response.getStatusString());
     			System.err.println("<xin>Stop at line " + m_lineNum);
@@ -276,10 +299,6 @@ class CSVLoader {
                     lastOK = queued;
                 }
             }
-
-            reader.close();
-            client.drain();
-            client.close();
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -296,11 +315,15 @@ class CSVLoader {
     	
     }
     
+    //works with insertLine
+    //return true if next line of csv file is not null, load the line into this.csvLine.
+    //else produceInvalid 
     public boolean hasNext() throws IOException {
     	if ( (config.limitrows-- > 0) && (csvLine = csvReader.readNext()) != null )
     		return true;
-    	else
+    	else{
     		return false;
+    	}
     }
     
     public void insertLine( String[] additionalStr ) throws NoConnectionsException, IOException, InterruptedException {
@@ -350,6 +373,7 @@ class CSVLoader {
                     	break;
                     }
                     queued = csvClient.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    callProcCount.incrementAndGet();
                     if (queued == false) {
                         ++waits;
                         if (lastOK == false) {
@@ -368,7 +392,6 @@ class CSVLoader {
             }
         }
         //return inCount.get();
-    	
     }
     
     
@@ -383,10 +406,11 @@ class CSVLoader {
      * FIFO order of the callback.
      * @param args
      * @return long number of the actual rows acknowledged by the database server
+     * @throws InterruptedException 
      */
     
 
-    public static void main(String[] args) {
+    public static void main(String[] args) throws InterruptedException {
         long start = System.currentTimeMillis();
         
     	CSVConfig cfg = new CSVConfig();
@@ -453,32 +477,34 @@ class CSVLoader {
         } 
         return null;
     }
+   
+    public long getSleepTime(){
+    	return this.waitSeconds;
+    }
     
     /**
 	 * TODO(xin): produce the invalid row file from
 	 * Bulk the flush later...
 	 * @param inputFile
+     * @throws InterruptedException 
 	 */
-	private void produceInvalidRowsFile() {
+	public void produceInvalidRowsFile() throws InterruptedException {
 		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
 		// TODO: add the inputFileName to the outputFileName
-
-		String path_invaliderowsfile = config.reportdir + CSVLoader.invaliderowsfile;
-		String path_logfile =  config.reportdir + CSVLoader.logfile;
-    	String path_reportfile = config.reportdir  + CSVLoader.reportfile;
+    	while( this.callProcCount.get() != this.callBackCount.get() )
+    	{
+    		Thread.sleep( this.getSleepTime() );
+    	}
     	
 		int bulkflush = 3; // by default right now
 		try {
-			BufferedWriter out_invaliderowfile = new BufferedWriter(new FileWriter(path_invaliderowsfile));
-
-			BufferedWriter out_logfile = new BufferedWriter(new FileWriter(path_logfile));
-			BufferedWriter out_reportfile = new BufferedWriter(new FileWriter(path_reportfile));
 			long linect = 0;
 
 			for (Long irow : errorInfo.keySet()) {
 				String info[] = errorInfo.get(irow);
 				if (info.length != 2)
 					System.out.println("internal error, infomation is not enough");
+				linect++;
 				out_invaliderowfile.write(info[0] + "\n");
 
 				String message = "invalid line " + irow + ":  " + info[0] + "\n";
@@ -498,12 +524,6 @@ class CSVLoader {
 			out_reportfile.write("CSVLoader rate: " + outCount.get() / elapsedTimeSec + " row/s\n");
 
 			// TODO(xin): Add more report message
-			out_invaliderowfile.flush();
-			out_logfile.flush();
-			out_reportfile.flush();
-			out_invaliderowfile.close();
-			out_logfile.close();
-			out_reportfile.close();
 
 		} catch (FileNotFoundException e) {
 			System.err.println("CSV file '" + config.inputfile
@@ -524,9 +544,18 @@ class CSVLoader {
 	public static void flush() throws IOException, InterruptedException {
 		inCount.set( 0 );
 		outCount.set( 0 );
+		callBackCount.set(0);
+		callProcCount.set(0);
 		errorInfo.clear();
 		csvReader.close();
         csvClient.drain();
         csvClient.close();
+		out_invaliderowfile.flush();
+		out_logfile.flush();
+		out_reportfile.flush();
+		out_invaliderowfile.close();
+		out_logfile.close();
+		out_reportfile.close();
 	}
+	
 }
