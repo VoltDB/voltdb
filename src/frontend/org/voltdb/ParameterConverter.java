@@ -247,10 +247,10 @@ public class ParameterConverter {
         else if (pclass == String.class) {
             try {
             	String value = ((String) param).trim();
-                if (slot == byte.class) {
+            	value = value.replaceAll("\\,","");
+            	if (slot == byte.class) {
                     return Byte.parseByte(value);
                 }
-                value = value.replaceAll("\\,","");
                 if (slot == short.class) {
                     return Short.parseShort(value);
                 }
