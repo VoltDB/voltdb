@@ -123,9 +123,6 @@ class CSVLoader {
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
     	
-//    	@Option(desc = "trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
-//    	boolean trimwhitespace = false;
-    	
     	@Option(desc = "maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
     	
@@ -204,8 +201,11 @@ class CSVLoader {
                 boolean queued = false;
                 while (queued == false) {
                 	StringBuilder linedata = new StringBuilder();
-                    for(String s : line) 
-                    	linedata.append(s);
+                    for(int i = 0; i < line.length; i++) {
+                    	linedata.append(line[i]);
+                    	if (i != line.length -1)
+                    		linedata.append(",");
+                    }
                 	
                 	String[] correctedLine = line;
                     // TODO(): correct the line here
@@ -237,6 +237,7 @@ class CSVLoader {
                     	break;
                     }
                     queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    
                     if (queued == false) {
                         ++waits;
                         if (lastOK == false) {
@@ -292,7 +293,7 @@ class CSVLoader {
     	CSVLoader loader = new CSVLoader(cfg);
     	loader.run();
     	loader.setLatency(System.currentTimeMillis()-start);
-    	loader.produceInvalidRowsFile();
+    	loader.produceFiles();
     	
     	System.out.println("CSVLoader elaspsed: " + loader.getLatency()/1000F + " seconds");
     }
@@ -346,7 +347,10 @@ class CSVLoader {
         	for(int i=0; i<linefragement.length;i++) {
         		//trim white space in this line.
         		linefragement[i] = linefragement[i].trim();
-        		if ((linefragement[i]).indexOf("NULL") != -1 || (linefragement[i]).indexOf("null") != -1)
+        		
+        		// treat "\N", \N and NULL as actual null value for each data type later
+        		// CSVReader will trim \ by default
+        		if ((linefragement[i]).equals("NULL"))
         			linefragement[i] = null;
         	}
         } 
@@ -358,7 +362,7 @@ class CSVLoader {
 	 * Bulk the flush later...
 	 * @param inputFile
 	 */
-	private void produceInvalidRowsFile() {
+	private void produceFiles() {
 		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
 		// TODO: add the inputFileName to the outputFileName
 
@@ -378,8 +382,8 @@ class CSVLoader {
 				String info[] = errorInfo.get(irow);
 				if (info.length != 2)
 					System.out.println("internal error, infomation is not enough");
+				linect++;
 				out_invaliderowfile.write(info[0] + "\n");
-
 				String message = "invalid line " + irow + ":  " + info[0] + "\n";
 				System.err.print(message);
 				out_logfile.write(message + info[1] + "\n"); 
