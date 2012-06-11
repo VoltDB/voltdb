@@ -26,7 +26,6 @@ import java.util.Map;
 import java.util.Set;
 
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
@@ -277,22 +276,11 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             createCompleteTransactionMessage(m_response.shouldCommit() == false,
                                              !isReadOnly());
 
-        try
-        {
-            m_mbox.send(m_nonCoordinatingSites, complete_msg);
-        }
-        catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
+        m_mbox.send(m_nonCoordinatingSites, complete_msg);
 
         if (m_outstandingAcks.size() == 0)
         {
-            try {
-                m_mbox.send(initiatorHSId, m_response);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
-
+            m_mbox.send(initiatorHSId, m_response);
             m_done = true;
         }
     }
@@ -332,11 +320,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         }
         else
         {
-            try {
-                m_mbox.send(response.getDestinationSiteId(), response);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
+            m_mbox.send(response.getDestinationSiteId(), response);
             // If we're not the coordinator, the transaction is read-only,
             // and this was the final task, then we can try to move on after
             // we've finished this work.
@@ -360,11 +344,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                     new VoltTable(new VoltTable.ColumnInfo("DUMMY", VoltType.BIGINT)));
         }
 
-        try {
-            m_mbox.send(response.getDestinationSiteId(), response);
-        } catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
+        m_mbox.send(response.getDestinationSiteId(), response);
     }
 
     @Override
@@ -403,15 +383,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     @Override
     public void createAllParticipatingFragmentWork(FragmentTaskMessage task) {
         assert(m_isCoordinator); // Participant can't set m_nonCoordinatingSites
-        try {
-            // send to all non-coordinating sites
-            m_mbox.send(m_nonCoordinatingSites, task);
-            // send to this site
-            createLocalFragmentWork(task, false);
-        }
-        catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
+        // send to all non-coordinating sites
+        m_mbox.send(m_nonCoordinatingSites, task);
+        // send to this site
+        createLocalFragmentWork(task, false);
     }
 
     @Override
@@ -534,13 +509,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         {
             CompleteTransactionResponseMessage ctrm =
                 new CompleteTransactionResponseMessage(complete, m_hsId);
-            try
-            {
-                m_mbox.send(complete.getCoordinatorHSId(), ctrm);
-            }
-            catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
+            m_mbox.send(complete.getCoordinatorHSId(), ctrm);
         }
     }
 
@@ -552,11 +521,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         m_outstandingAcks.remove(response.getExecutionSiteId());
         if (m_outstandingAcks.size() == 0)
         {
-            try {
-                m_mbox.send(initiatorHSId, m_response);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
+            m_mbox.send(initiatorHSId, m_response);
             m_done = true;
         }
     }
@@ -615,11 +580,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         {
             if (m_outstandingAcks.size() == 0)
             {
-                try {
-                    m_mbox.send(initiatorHSId, m_response);
-                } catch (MessagingException e) {
-                    throw new RuntimeException(e);
-                }
+                m_mbox.send(initiatorHSId, m_response);
                 m_done = true;
             }
         }
@@ -696,13 +657,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     @Override
     public void createFragmentWork(long[] partitions, FragmentTaskMessage task) {
-        try {
-            // send to all specified sites (possibly including this one)
-            m_mbox.send(partitions, task);
-        }
-        catch (MessagingException e) {
-            throw new RuntimeException(e);
-        }
+        // send to all specified sites (possibly including this one)
+        m_mbox.send(partitions, task);
     }
 
     @Override

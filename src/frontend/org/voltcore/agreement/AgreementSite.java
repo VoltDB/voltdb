@@ -55,7 +55,6 @@ import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.RecoveryMessage;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
@@ -341,11 +340,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         for (long initiatorId : m_hsIds) {
             HeartbeatMessage heartbeat =
                 new HeartbeatMessage( m_hsId, txnId, m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorId));
-            try {
-                m_mailbox.send( initiatorId, heartbeat);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
+            m_mailbox.send( initiatorId, heartbeat);
         }
     }
 
@@ -368,12 +363,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                 HeartbeatResponseMessage response = new HeartbeatResponseMessage(
                         m_hsId, lastSeenTxnFromInitiator,
                         m_txnQueue.getQueueState() == RestrictedPriorityQueue.QueueState.BLOCKED_SAFETY);
-                try {
-                    m_mailbox.send(info.getInitiatorHSId(), response);
-                } catch (MessagingException e) {
-                    // hope this never happens... it doesn't right?
-                    throw new RuntimeException(e);
-                }
+                m_mailbox.send(info.getInitiatorHSId(), response);
                 // we're done here (in the case of heartbeats)
                 return;
             }
@@ -404,11 +394,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                                 txnId,
                                 m_hsId,
                                 m_safetyState.getNewestSafeTxnIdForExecutorBySiteId(initiatorHSId));
-                    try {
-                        m_mailbox.send( initiatorHSId, atm);
-                    } catch (MessagingException e) {
-                        throw new RuntimeException(e);
-                    }
+                    m_mailbox.send( initiatorHSId, atm);
                 }
                 //Process the ATM eagerly locally to aid
                 //in having a complete set of stuff to ship
@@ -557,11 +543,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         metadata.put(BINARY_PAYLOAD_SNAPSHOT);
         metadata.putLong(txnId);
         BinaryPayloadMessage bpm = new BinaryPayloadMessage( metadata.array(), databaseBytes);
-        try {
-            m_mailbox.send( joiningAgreementSite, bpm);
-        } catch (MessagingException e) {
-            throw new IOException(e);
-        }
+        m_mailbox.send( joiningAgreementSite, bpm);
         m_siteRequestingRecovery = null;
         m_recoverBeforeTxn = null;
     }
@@ -654,25 +636,20 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
         m_recoveryLog.info("Agreement, Sending fault data " + CoreUtils.hsIdCollectionToString(m_pendingFailedSites)
                 + " to "
                 + CoreUtils.hsIdCollectionToString(survivorSet) + " survivors");
-        try {
-            for (Long site : m_pendingFailedSites) {
-                /*
-                 * Check the queue for the data and get it from the ledger if necessary.\
-                 * It might not even be in the ledger if the site has been failed
-                 * since recovery of this node began.
-                 */
-                Long txnId = m_txnQueue.getNewestSafeTransactionForInitiator(site);
-                FailureSiteUpdateMessage srcmsg =
-                    new FailureSiteUpdateMessage(m_pendingFailedSites,
-                                                 site,
-                                                 txnId != null ? txnId : Long.MIN_VALUE,
-                                                 site);
+        for (Long site : m_pendingFailedSites) {
+            /*
+             * Check the queue for the data and get it from the ledger if necessary.\
+             * It might not even be in the ledger if the site has been failed
+             * since recovery of this node began.
+             */
+            Long txnId = m_txnQueue.getNewestSafeTransactionForInitiator(site);
+            FailureSiteUpdateMessage srcmsg =
+                new FailureSiteUpdateMessage(m_pendingFailedSites,
+                        site,
+                        txnId != null ? txnId : Long.MIN_VALUE,
+                        site);
 
-                m_mailbox.send(survivors, srcmsg);
-            }
-        }
-        catch (MessagingException e) {
-            org.voltdb.VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
+            m_mailbox.send(survivors, srcmsg);
         }
         m_recoveryLog.info("Agreement, Sent fault data. Expecting " + (survivors.length * m_pendingFailedSites.size()) + " responses.");
         return (survivors.length * m_pendingFailedSites.size());
@@ -911,11 +888,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         ByteBuffer metadata = ByteBuffer.allocate(1);
                         metadata.put(BINARY_PAYLOAD_JOIN_REQUEST);
                         BinaryPayloadMessage bpm = new BinaryPayloadMessage(metadata.array(), payload);
-                        try {
-                            m_mailbox.send( initiatorHSId, bpm);
-                        } catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
+                        m_mailbox.send( initiatorHSId, bpm);
                     }
 
                     m_txnQueue.noteTransactionRecievedAndReturnLastSeen(m_hsId,

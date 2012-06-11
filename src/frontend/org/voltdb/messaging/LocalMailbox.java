@@ -19,7 +19,6 @@ package org.voltdb.messaging;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 
@@ -43,7 +42,7 @@ public abstract class LocalMailbox implements Mailbox {
 
     @Override
     public void send(long hsId, VoltMessage message)
-        throws MessagingException {
+    {
         assert(message != null);
         message.m_sourceHSId = this.hsId;
         hostMessenger.send(hsId, message);
@@ -51,7 +50,7 @@ public abstract class LocalMailbox implements Mailbox {
 
     @Override
     public void send(long[] hsIds, VoltMessage message)
-        throws MessagingException {
+    {
         assert(message != null);
         assert(hsIds != null);
         message.m_sourceHSId = this.hsId;
