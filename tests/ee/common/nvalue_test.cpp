@@ -2078,6 +2078,9 @@ TEST_F(NValueTest, TestLike)
     NValue pattern2 = voltdb::ValueFactory::getStringValue("X%%");
     EXPECT_TRUE(value.like(pattern1).isTrue());
     EXPECT_TRUE(value.like(pattern2).isTrue());
+    pattern2.free();
+    pattern1.free();
+    value.free();
 }
 int main() {
     return TestSuite::globalInstance()->runAll();
