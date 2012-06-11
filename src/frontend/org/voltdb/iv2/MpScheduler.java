@@ -148,6 +148,11 @@ public class MpScheduler extends Scheduler
         m_pendingTasks.offer(task);
     }
 
+    @Override
+    public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
+        // not yet implemented.
+    }
+
     // The MpScheduler will see InitiateResponseMessages from the Partition masters when
     // performing an every-partition system procedure.  A consequence of this deduping
     // is that the MpScheduler will also need to forward the final InitiateResponseMessage

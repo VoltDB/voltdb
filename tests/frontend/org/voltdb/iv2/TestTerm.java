@@ -24,10 +24,15 @@
 package org.voltdb.iv2;
 
 import java.io.IOException;
+
+import java.lang.reflect.Array;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.List;
 import java.util.Map.Entry;
 import java.util.TreeSet;
+
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.mockito.InOrder;
 import static org.mockito.Mockito.*;
@@ -115,11 +120,12 @@ public class TestTerm extends TestCase
     }
 
     // verify that Term asks initMailbox to send the expected repair messages.
-    @Test
+    @SuppressWarnings("unchecked")
+	@Test
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        Term term = new Term(null, 0, 0L, mailbox);
+        Term term = new Term(mock(ZooKeeper.class), 0, 0L, mailbox);
 
         // missing 4, 5
         Term.ReplicaRepairStruct r1 = new Term.ReplicaRepairStruct();
@@ -148,29 +154,31 @@ public class TestTerm extends TestCase
         // call the function being tested...
         term.repairSurvivors();
 
-        // verify that r1 saw 4 and 5
-        verify(mailbox).repairReplicaWith(1L, msgs[4]);
-        verify(mailbox).repairReplicaWith(1L, msgs[5]);
+        List<Long> repair3 = new ArrayList<Long>();
+        repair3.add(3L);
+        verify(mailbox).repairReplicasWith(repair3, msgs[3]);
 
-        // verify that r3 saw 3, 4, 5
-        verify(mailbox).repairReplicaWith(3L, msgs[3]);
-        verify(mailbox).repairReplicaWith(3L, msgs[4]);
-        verify(mailbox).repairReplicaWith(3L, msgs[5]);
+        List<Long> repair4And5 = new ArrayList<Long>();
+        repair4And5.add(1L);
+        repair4And5.add(3L);
+        verify(mailbox).repairReplicasWith(repair4And5, msgs[4]);
+        verify(mailbox).repairReplicasWith(repair4And5, msgs[5]);
 
-        // verify exactly 5 repairs happened.
-        verify(mailbox, times(5)).repairReplicaWith(anyLong(), any(Iv2RepairLogResponseMessage.class));
+        // verify exactly 3 repairs happened.
+        verify(mailbox, times(3)).repairReplicasWith(any(repair3.getClass()), any(Iv2RepairLogResponseMessage.class));
     }
 
     // be a little a paranoid about order. note that the union test also verifies
     // order; unsure this is interesting... This test is on one replica because
     // I'm not sure that we guarentee the orer of iteration across replicas.
-    @Test
+    @SuppressWarnings("unchecked")
+	@Test
     public void testRepairSurvivorOrder()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        Term term = new Term(null, 0, 0L, mailbox);
+        Term term = new Term(mock(ZooKeeper.class), 0, 0L, mailbox);
 
         // missing 3, 4, 5
         Term.ReplicaRepairStruct r3 = new Term.ReplicaRepairStruct();
@@ -189,13 +197,16 @@ public class TestTerm extends TestCase
         // call the function being tested...
         term.repairSurvivors();
 
+        List<Long> repair3 = new ArrayList<Long>();
+        repair3.add(3L);
+
         // verify that r3 saw 3, 4, 5
-        inOrder.verify(mailbox).repairReplicaWith(3L, msgs[3]);
-        inOrder.verify(mailbox).repairReplicaWith(3L, msgs[4]);
-        inOrder.verify(mailbox).repairReplicaWith(3L, msgs[5]);
+        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[3]);
+        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[4]);
+        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[5]);
 
         // verify exactly 3 repairs happened.
-        verify(mailbox, times(3)).repairReplicaWith(anyLong(), any(Iv2RepairLogResponseMessage.class));
+        verify(mailbox, times(3)).repairReplicasWith(any(repair3.getClass()), any(Iv2RepairLogResponseMessage.class));
     }
 
 

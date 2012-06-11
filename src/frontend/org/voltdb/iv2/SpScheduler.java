@@ -176,6 +176,43 @@ public class SpScheduler extends Scheduler
         }
     }
 
+    @Override
+    public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
+        final String procedureName = message.getStoredProcedureName();
+        final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
+        if (!message.isSinglePartition()) {
+            throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessageRepair " +
+                    "should never receive multi-partition initiations.");
+        }
+
+        // set up duplicate counter. expect exactly the responses corresponding
+        // to needsRepair. These may, or may not, include the local site.
+        List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
+        DuplicateCounter counter = new DuplicateCounter(
+                message.getInitiatorHSId(),
+                message.getTxnId(), expectedHSIds);
+        m_duplicateCounters.put(message.getSpHandle(), counter);
+
+        // is local repair necessary?
+        if (needsRepair.contains(m_mailbox.getHSId())) {
+            needsRepair.remove(m_mailbox.getHSId());
+            // make a copy because handleIv2 non-repair case does?
+            Iv2InitiateTaskMessage localWork =
+                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+
+            final SpProcedureTask task = new SpProcedureTask(m_mailbox, runner,
+                    localWork.getSpHandle(), m_pendingTasks, localWork);
+            m_pendingTasks.offer(task);
+        }
+
+        // is remote repair necessary?
+        if (!needsRepair.isEmpty()) {
+            Iv2InitiateTaskMessage replmsg =
+                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(needsRepair), replmsg);
+        }
+    }
+
     // InitiateResponses for single-partition initiators currently get completely handled
     // by SpInitiatorMessageHandler.  This may change when replication is added.
     public void handleInitiateResponseMessage(InitiateResponseMessage message)

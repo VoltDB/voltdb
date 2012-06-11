@@ -22,6 +22,8 @@ import java.util.List;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
+
 /**
  * InitiatorMessageHandler delivers messages to internal Initiator components.
  * Different roles (multi/single-part initiator/replica) should extend this
@@ -78,5 +80,9 @@ public interface InitiatorMessageHandler
 
        */
 
+    // deliver a message for handling in normal operation.
     void deliver(VoltMessage message);
+
+    // deliver a repair request to a leader starting a new Term.
+    void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message);
 }

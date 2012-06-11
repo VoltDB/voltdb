@@ -170,7 +170,7 @@ public class InitiatorMailbox implements Mailbox
     {
         List<RepairLog.Item> logs = m_repairLog.contents();
         int ofTotal = logs.size();
-        int seq = 0;
+        int seq = 1;
 
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
         tmLog.info(CoreUtils.hsIdToString(getHSId())
@@ -179,6 +179,7 @@ public class InitiatorMailbox implements Mailbox
 
         if (logs.isEmpty()) {
             // respond with an ack that the log is empty.
+            // maybe better if seq 0 is always the ack with null payload?
             Iv2RepairLogResponseMessage response =
                 new Iv2RepairLogResponseMessage(
                         req.getRequestId(),
@@ -204,15 +205,17 @@ public class InitiatorMailbox implements Mailbox
         return;
     }
 
-    /** Make and send a repair message upon request. */
-    void repairReplicaWith(long replicaHSId, Iv2RepairLogResponseMessage msg)
+    /**
+     * Create a real repair message from the msg repair log contents and
+     * instruct the message handler to execute a repair.
+     */
+    void repairReplicasWith(List<Long> needsRepair, Iv2RepairLogResponseMessage msg)
     {
         VoltMessage repairWork = msg.getPayload();
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
-            Iv2InitiateTaskMessage work =
-                new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
-            send(replicaHSId, work);
+            Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
+            m_msgHandler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
         }
     }
 
