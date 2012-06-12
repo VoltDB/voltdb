@@ -625,7 +625,7 @@ void IndexScanExecutor::set_expressions_pull(const NValueArray &params)
         }
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
-    
+
     m_state.reset(new detail::IndexScanExecutorState(m_targetTable->schema(), end_expression, post_expression));
 }
 

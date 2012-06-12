@@ -32,6 +32,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.IndexLookupType;
 
@@ -95,8 +96,9 @@ public class TestCoveringIndexPlans extends TestCase {
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
-        assertTrue(pn instanceof IndexScanPlanNode);
-        IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
+        assertTrue(pn instanceof ProjectionPlanNode);
+        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode)pn.getChild(0);
         assertEquals("COVER2_TREE", ispn.getTargetIndexName());
         assertEquals(IndexLookupType.GTE, ispn.getLookupType());
         assertEquals(1, ispn.getSearchKeyExpressions().size());
@@ -113,8 +115,9 @@ public class TestCoveringIndexPlans extends TestCase {
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
-        assertTrue(pn instanceof IndexScanPlanNode);
-        IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
+        assertTrue(pn instanceof ProjectionPlanNode);
+        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode)pn.getChild(0);
         assertEquals("COVER2_TREE", ispn.getTargetIndexName());
         assertEquals(IndexLookupType.EQ, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
@@ -131,8 +134,9 @@ public class TestCoveringIndexPlans extends TestCase {
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
-        assertTrue(pn instanceof IndexScanPlanNode);
-        IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
+        assertTrue(pn instanceof ProjectionPlanNode);
+        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode)pn.getChild(0);
         assertEquals("COVER3_TREE", ispn.getTargetIndexName());
         assertEquals(IndexLookupType.GTE, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
@@ -167,8 +171,9 @@ public class TestCoveringIndexPlans extends TestCase {
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
-        assertTrue(pn instanceof IndexScanPlanNode);
-        IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
+        assertTrue(pn instanceof ProjectionPlanNode);
+        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode)pn.getChild(0);
         assertEquals("COVER2_TREE", ispn.getTargetIndexName());
         assertEquals(IndexLookupType.EQ, ispn.getLookupType());
         assertEquals(2, ispn.getSearchKeyExpressions().size());
@@ -185,6 +190,7 @@ public class TestCoveringIndexPlans extends TestCase {
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
-        assertTrue(pn instanceof SeqScanPlanNode);
+        assertTrue(pn instanceof ProjectionPlanNode);
+        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof SeqScanPlanNode);
     }
 }

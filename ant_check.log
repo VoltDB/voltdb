@@ -34,7 +34,7 @@ uptodate_jni_h.check:
 jnicompile:
 
 buildinfo:
-     [exec] Version:  2.5 voltdb-2.5-48-g2df76c6-dirty-local
+     [exec] Version:  2.5 voltdb-2.5-50-g31cd210-dirty-local
 
 ee:
      [exec] make: Entering directory `/home/mike/voltdb/fork/voltdb/obj/release'
@@ -46,140 +46,8 @@ voltdbipc:
      [exec] make: Nothing to be done for `main'.
      [exec] make: Leaving directory `/home/mike/voltdb/fork/voltdb/obj/release'
      [exec] make: Entering directory `/home/mike/voltdb/fork/voltdb/obj/release'
-     [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -o objects/harness.o ../../tests/ee/harness.cpp
-     [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -o objects/execution/IPCTopend.o ../../src/ee/execution/IPCTopend.cpp
-     [exec] ar rv objects/volt.a objects//voltdbjni.co objects/stats/StatsAgent.co objects/stats/StatsSource.co objects/executors/abstractexecutor.co objects/executors/deleteexecutor.co objects/executors/distinctexecutor.co objects/executors/executorutil.co objects/executors/indexscanexecutor.co objects/executors/insertexecutor.co objects/executors/limitexecutor.co objects/executors/materializeexecutor.co objects/executors/nestloopexecutor.co objects/executors/nestloopindexexecutor.co objects/executors/orderbyexecutor.co objects/executors/projectionexecutor.co objects/executors/receiveexecutor.co objects/executors/sendexecutor.co objects/executors/seqscanexecutor.co objects/executors/unionexecutor.co objects/executors/updateexecutor.co objects/storage/constraintutil.co objects/storage/CopyOnWriteContext.co objects/storage/CopyOnWriteIterator.co objects/storage/ConstraintFailureException.co objects/storage/MaterializedViewMetadata.co objects/storage/persistenttable.co objects/storage/PersistentTableStats.co objects/storage/PersistentTableUndoDeleteAction.co objects/storage/PersistentTableUndoInsertAction.co objects/storage/PersistentTableUndoUpdateAction.co objects/storage/StreamedTableStats.co objects/storage/streamedtable.co objects/storage/table.co objects/storage/TableCatalogDelegate.co objects/storage/tablefactory.co objects/storage/TableStats.co objects/storage/tableutil.co objects/storage/temptable.co objects/storage/TempTableLimits.co objects/storage/TupleStreamWrapper.co objects/storage/RecoveryContext.co objects/storage/TupleBlock.co objects/indexes/tableindex.co objects/indexes/tableindexfactory.co objects/indexes/IndexStats.co objects/catalog/authprogram.co objects/catalog/catalog.co objects/catalog/cataloginteger.co objects/catalog/catalogtype.co objects/catalog/cluster.co objects/catalog/column.co objects/catalog/columnref.co objects/catalog/connector.co objects/catalog/connectortableinfo.co objects/catalog/constraint.co objects/catalog/constraintref.co objects/catalog/database.co objects/catalog/deployment.co objects/catalog/group.co objects/catalog/groupref.co objects/catalog/host.co objects/catalog/index.co objects/catalog/materializedviewinfo.co objects/catalog/partition.co objects/catalog/planfragment.co objects/catalog/procedure.co objects/catalog/procparameter.co objects/catalog/program.co objects/catalog/site.co objects/catalog/statement.co objects/catalog/stmtparameter.co objects/catalog/systemsettings.co objects/catalog/table.co objects/catalog/user.co objects/catalog/userref.co objects/catalog/snapshotschedule.co objects/catalog/commandlog.co objects/common/CompactingStringPool.co objects/common/CompactingStringStorage.co objects/common/ThreadLocalPool.co objects/common/SegvException.co objects/common/SerializableEEException.co objects/common/SQLException.co objects/common/StringRef.co objects/common/tabletuple.co objects/common/TupleSchema.co objects/common/types.co objects/common/UndoLog.co objects/common/NValue.co objects/common/RecoveryProtoMessage.co objects/common/RecoveryProtoMessageBuilder.co objects/common/DefaultTupleSerializer.co objects/common/executorcontext.co objects/common/serializeio.co objects/logging/JNILogProxy.co objects/logging/LogManager.co objects/plannodes/abstractjoinnode.co objects/plannodes/abstractoperationnode.co objects/plannodes/abstractplannode.co objects/plannodes/abstractscannode.co objects/plannodes/aggregatenode.co objects/plannodes/deletenode.co objects/plannodes/distinctnode.co objects/plannodes/indexscannode.co objects/plannodes/insertnode.co objects/plannodes/limitnode.co objects/plannodes/materializenode.co objects/plannodes/nestloopindexnode.co objects/plannodes/nestloopnode.co objects/plannodes/orderbynode.co objects/plannodes/plannodefragment.co objects/plannodes/plannodeutil.co objects/plannodes/projectionnode.co objects/plannodes/receivenode.co objects/plannodes/SchemaColumn.co objects/plannodes/sendnode.co objects/plannodes/seqscannode.co objects/plannodes/unionnode.co objects/plannodes/updatenode.co objects/expressions/abstractexpression.co objects/expressions/expressionutil.co objects/expressions/tupleaddressexpression.co objects/execution/JNITopend.co objects/execution/VoltDBEngine.co objects/structures/CompactingPool.co objects/structures/ContiguousAllocator.co objects/json_spirit/json_spirit_reader.co objects/json_spirit/json_spirit_value.co objects/harness.o objects/execution/IPCTopend.o
-     [exec] ar: creating objects/volt.a
-     [exec] a - objects//voltdbjni.co
-     [exec] a - objects/stats/StatsAgent.co
-     [exec] a - objects/stats/StatsSource.co
-     [exec] a - objects/executors/abstractexecutor.co
-     [exec] a - objects/executors/deleteexecutor.co
-     [exec] a - objects/executors/distinctexecutor.co
-     [exec] a - objects/executors/executorutil.co
-     [exec] a - objects/executors/indexscanexecutor.co
-     [exec] a - objects/executors/insertexecutor.co
-     [exec] a - objects/executors/limitexecutor.co
-     [exec] a - objects/executors/materializeexecutor.co
-     [exec] a - objects/executors/nestloopexecutor.co
-     [exec] a - objects/executors/nestloopindexexecutor.co
-     [exec] a - objects/executors/orderbyexecutor.co
-     [exec] a - objects/executors/projectionexecutor.co
-     [exec] a - objects/executors/receiveexecutor.co
-     [exec] a - objects/executors/sendexecutor.co
-     [exec] a - objects/executors/seqscanexecutor.co
-     [exec] a - objects/executors/unionexecutor.co
-     [exec] a - objects/executors/updateexecutor.co
-     [exec] a - objects/storage/constraintutil.co
-     [exec] a - objects/storage/CopyOnWriteContext.co
-     [exec] a - objects/storage/CopyOnWriteIterator.co
-     [exec] a - objects/storage/ConstraintFailureException.co
-     [exec] a - objects/storage/MaterializedViewMetadata.co
-     [exec] a - objects/storage/persistenttable.co
-     [exec] a - objects/storage/PersistentTableStats.co
-     [exec] a - objects/storage/PersistentTableUndoDeleteAction.co
-     [exec] a - objects/storage/PersistentTableUndoInsertAction.co
-     [exec] a - objects/storage/PersistentTableUndoUpdateAction.co
-     [exec] a - objects/storage/StreamedTableStats.co
-     [exec] a - objects/storage/streamedtable.co
-     [exec] a - objects/storage/table.co
-     [exec] a - objects/storage/TableCatalogDelegate.co
-     [exec] a - objects/storage/tablefactory.co
-     [exec] a - objects/storage/TableStats.co
-     [exec] a - objects/storage/tableutil.co
-     [exec] a - objects/storage/temptable.co
-     [exec] a - objects/storage/TempTableLimits.co
-     [exec] a - objects/storage/TupleStreamWrapper.co
-     [exec] a - objects/storage/RecoveryContext.co
-     [exec] a - objects/storage/TupleBlock.co
-     [exec] a - objects/indexes/tableindex.co
-     [exec] a - objects/indexes/tableindexfactory.co
-     [exec] a - objects/indexes/IndexStats.co
-     [exec] a - objects/catalog/authprogram.co
-     [exec] a - objects/catalog/catalog.co
-     [exec] a - objects/catalog/cataloginteger.co
-     [exec] a - objects/catalog/catalogtype.co
-     [exec] a - objects/catalog/cluster.co
-     [exec] a - objects/catalog/column.co
-     [exec] a - objects/catalog/columnref.co
-     [exec] a - objects/catalog/connector.co
-     [exec] a - objects/catalog/connectortableinfo.co
-     [exec] a - objects/catalog/constraint.co
-     [exec] a - objects/catalog/constraintref.co
-     [exec] a - objects/catalog/database.co
-     [exec] a - objects/catalog/deployment.co
-     [exec] a - objects/catalog/group.co
-     [exec] a - objects/catalog/groupref.co
-     [exec] a - objects/catalog/host.co
-     [exec] a - objects/catalog/index.co
-     [exec] a - objects/catalog/materializedviewinfo.co
-     [exec] a - objects/catalog/partition.co
-     [exec] a - objects/catalog/planfragment.co
-     [exec] a - objects/catalog/procedure.co
-     [exec] a - objects/catalog/procparameter.co
-     [exec] a - objects/catalog/program.co
-     [exec] a - objects/catalog/site.co
-     [exec] a - objects/catalog/statement.co
-     [exec] a - objects/catalog/stmtparameter.co
-     [exec] a - objects/catalog/systemsettings.co
-     [exec] a - objects/catalog/table.co
-     [exec] a - objects/catalog/user.co
-     [exec] a - objects/catalog/userref.co
-     [exec] a - objects/catalog/snapshotschedule.co
-     [exec] a - objects/catalog/commandlog.co
-     [exec] a - objects/common/CompactingStringPool.co
-     [exec] a - objects/common/CompactingStringStorage.co
-     [exec] a - objects/common/ThreadLocalPool.co
-     [exec] a - objects/common/SegvException.co
-     [exec] a - objects/common/SerializableEEException.co
-     [exec] a - objects/common/SQLException.co
-     [exec] a - objects/common/StringRef.co
-     [exec] a - objects/common/tabletuple.co
-     [exec] a - objects/common/TupleSchema.co
-     [exec] a - objects/common/types.co
-     [exec] a - objects/common/UndoLog.co
-     [exec] a - objects/common/NValue.co
-     [exec] a - objects/common/RecoveryProtoMessage.co
-     [exec] a - objects/common/RecoveryProtoMessageBuilder.co
-     [exec] a - objects/common/DefaultTupleSerializer.co
-     [exec] a - objects/common/executorcontext.co
-     [exec] a - objects/common/serializeio.co
-     [exec] a - objects/logging/JNILogProxy.co
-     [exec] a - objects/logging/LogManager.co
-     [exec] a - objects/plannodes/abstractjoinnode.co
-     [exec] a - objects/plannodes/abstractoperationnode.co
-     [exec] a - objects/plannodes/abstractplannode.co
-     [exec] a - objects/plannodes/abstractscannode.co
-     [exec] a - objects/plannodes/aggregatenode.co
-     [exec] a - objects/plannodes/deletenode.co
-     [exec] a - objects/plannodes/distinctnode.co
-     [exec] a - objects/plannodes/indexscannode.co
-     [exec] a - objects/plannodes/insertnode.co
-     [exec] a - objects/plannodes/limitnode.co
-     [exec] a - objects/plannodes/materializenode.co
-     [exec] a - objects/plannodes/nestloopindexnode.co
-     [exec] a - objects/plannodes/nestloopnode.co
-     [exec] a - objects/plannodes/orderbynode.co
-     [exec] a - objects/plannodes/plannodefragment.co
-     [exec] a - objects/plannodes/plannodeutil.co
-     [exec] a - objects/plannodes/projectionnode.co
-     [exec] a - objects/plannodes/receivenode.co
-     [exec] a - objects/plannodes/SchemaColumn.co
-     [exec] a - objects/plannodes/sendnode.co
-     [exec] a - objects/plannodes/seqscannode.co
-     [exec] a - objects/plannodes/unionnode.co
-     [exec] a - objects/plannodes/updatenode.co
-     [exec] a - objects/expressions/abstractexpression.co
-     [exec] a - objects/expressions/expressionutil.co
-     [exec] a - objects/expressions/tupleaddressexpression.co
-     [exec] a - objects/execution/JNITopend.co
-     [exec] a - objects/execution/VoltDBEngine.co
-     [exec] a - objects/structures/CompactingPool.co
-     [exec] a - objects/structures/ContiguousAllocator.co
-     [exec] a - objects/json_spirit/json_spirit_reader.co
-     [exec] a - objects/json_spirit/json_spirit_value.co
-     [exec] a - objects/harness.o
-     [exec] a - objects/execution/IPCTopend.o
+     [exec] ar rv objects/volt.a objects/executors/nestloopindexexecutor.co
+     [exec] r - objects/executors/nestloopindexexecutor.co
      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee -g3 -rdynamic   -g3 -DDEBUG  -o prod/voltdbipc ../../src/ee/voltdbipc.cpp objects/volt.a  -ldl
      [exec] make: Leaving directory `/home/mike/voltdb/fork/voltdb/obj/release'
 
@@ -217,7 +85,7 @@ check:
      [exec] jnicompile:
      [exec] 
      [exec] buildinfo:
-     [exec]      [exec] Version:  2.5 voltdb-2.5-48-g2df76c6-dirty-local
+     [exec]      [exec] Version:  2.5 voltdb-2.5-50-g31cd210-dirty-local
      [exec] 
      [exec] ee:
      [exec]      [exec] make: Entering directory `/home/mike/voltdb/fork/voltdb/obj/release'
@@ -229,39 +97,6 @@ check:
      [exec]      [exec] make: Nothing to be done for `main'.
      [exec]      [exec] make: Leaving directory `/home/mike/voltdb/fork/voltdb/obj/release'
      [exec]      [exec] make: Entering directory `/home/mike/voltdb/fork/voltdb/obj/release'
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/logging_test.o ../../tests/ee/logging/logging_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/index_key_test.o ../../tests/ee/indexes/index_key_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/index_scripted_test.o ../../tests/ee/indexes/index_scripted_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/index_test.o ../../tests/ee/indexes/index_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/compacting_hash_index.o ../../tests/ee/indexes/compacting_hash_index.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/CompactionTest.o ../../tests/ee/storage/CompactionTest.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/CopyOnWriteTest.o ../../tests/ee/storage/CopyOnWriteTest.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/constraint_test.o ../../tests/ee/storage/constraint_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/filter_test.o ../../tests/ee/storage/filter_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/persistent_table_log_test.o ../../tests/ee/storage/persistent_table_log_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/PersistentTableMemStatsTest.o ../../tests/ee/storage/PersistentTableMemStatsTest.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/serialize_test.o ../../tests/ee/storage/serialize_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/StreamedTable_test.o ../../tests/ee/storage/StreamedTable_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/table_and_indexes_test.o ../../tests/ee/storage/table_and_indexes_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/table_test.o ../../tests/ee/storage/table_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/tabletuple_export_test.o ../../tests/ee/storage/tabletuple_export_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/TempTableLimitsTest.o ../../tests/ee/storage/TempTableLimitsTest.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/TupleStreamWrapper_test.o ../../tests/ee/storage/TupleStreamWrapper_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/harness_test.o ../../tests/ee/./harness_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/catalog_test.o ../../tests/ee/catalog/catalog_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/debuglog_test.o ../../tests/ee/common/debuglog_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/serializeio_test.o ../../tests/ee/common/serializeio_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/undolog_test.o ../../tests/ee/common/undolog_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/valuearray_test.o ../../tests/ee/common/valuearray_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/nvalue_test.o ../../tests/ee/common/nvalue_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/tabletuple_test.o ../../tests/ee/common/tabletuple_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/PlanNodeFragmentTest.o ../../tests/ee/plannodes/PlanNodeFragmentTest.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/expression_test.o ../../tests/ee/expressions/expression_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/add_drop_table.o ../../tests/ee/execution/add_drop_table.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/engine_test.o ../../tests/ee/execution/engine_test.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/CompactingMapTest.o ../../tests/ee/structures/CompactingMapTest.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/CompactingHashTest.o ../../tests/ee/structures/CompactingHashTest.cpp
-     [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee  -c -I../../tests/ee  -g3 -DDEBUG  -o static_objects/CompactingPoolTest.o ../../tests/ee/structures/CompactingPoolTest.cpp
      [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee -g3 -rdynamic   -g3 -DDEBUG  -o cpptests/logging/logging_test static_objects/logging_test.o objects/volt.a
      [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee -g3 -rdynamic   -g3 -DDEBUG  -o cpptests/indexes/index_key_test static_objects/index_key_test.o objects/volt.a
      [exec]      [exec] g++  -Wall -Wextra -Werror -Woverloaded-virtual -Wpointer-arith -Wcast-qual -Wwrite-strings -Winit-self -Wno-sign-compare -Wno-unused-parameter -pthread -D__STDC_CONSTANT_MACROS -D__STDC_LIMIT_MACROS -DNOCLOCK -fno-omit-frame-pointer -fvisibility=hidden -DBOOST_SP_DISABLE_THREADS -Wno-ignored-qualifiers -fno-strict-aliasing -Wno-attributes -Wcast-align -Wconversion -DLINUX -fpic -isystem ../../third_party/cpp -I../../src/ee -g3 -rdynamic   -g3 -DDEBUG  -o cpptests/indexes/index_scripted_test static_objects/index_scripted_test.o objects/volt.a
@@ -310,17 +145,17 @@ check:
      [exec]      [exec] 	SingleVarChar30: PASSED.
      [exec]      [exec] 	Int64Packing2Int32sWithSecondNull: PASSED.
      [exec]      [exec] PASSED
-     [exec]      [exec] successes/failures: 3/0 in 30us on UniqueGenericHash/CompactingTreeUniqueIndex
-     [exec]      [exec] successes/failures: 3/0 in 22us on UniqueIntsHash/CompactingHashUniqueIndex
-     [exec]      [exec] successes/failures: 3/0 in 10us on UniqueGenericTree/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 3/0 in 27us on UniqueGenericHash/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 3/0 in 20us on UniqueIntsHash/CompactingHashUniqueIndex
+     [exec]      [exec] successes/failures: 3/0 in 12us on UniqueGenericTree/CompactingTreeUniqueIndex
      [exec]      [exec] successes/failures: 3/0 in 6us on UniqueIntsTree/CompactingTreeUniqueIndex
-     [exec]      [exec] successes/failures: 3/0 in 11us on MultiGenericHash/CompactingTreeMultiMapIndex
-     [exec]      [exec] successes/failures: 3/0 in 11us on MultiIntsHash/CompactingHashMultiMapIndex
+     [exec]      [exec] successes/failures: 3/0 in 10us on MultiGenericHash/CompactingTreeMultiMapIndex
+     [exec]      [exec] successes/failures: 3/0 in 13us on MultiIntsHash/CompactingHashMultiMapIndex
      [exec]      [exec] successes/failures: 3/0 in 6us on MultiGenericTree/CompactingTreeMultiMapIndex
-     [exec]      [exec] successes/failures: 3/0 in 3us on MultiIntsTree/CompactingTreeMultiMapIndex
-     [exec]      [exec] successes/failures: 4/0 in 15us on UniqueGenericHash/CompactingTreeUniqueIndex
-     [exec]      [exec] successes/failures: 4/0 in 7us on UniqueGenericTree/CompactingTreeUniqueIndex
-     [exec]      [exec] successes/failures: 4/0 in 10us on MultiGenericHash/CompactingTreeMultiMapIndex
+     [exec]      [exec] successes/failures: 3/0 in 4us on MultiIntsTree/CompactingTreeMultiMapIndex
+     [exec]      [exec] successes/failures: 4/0 in 14us on UniqueGenericHash/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 4/0 in 8us on UniqueGenericTree/CompactingTreeUniqueIndex
+     [exec]      [exec] successes/failures: 4/0 in 9us on MultiGenericHash/CompactingTreeMultiMapIndex
      [exec]      [exec] successes/failures: 4/0 in 7us on MultiGenericTree/CompactingTreeMultiMapIndex
      [exec]      [exec] /home/mike/voltdb/fork/voltdb/obj/release/cpptests/indexes
      [exec]      [exec] IndexTest:
@@ -458,17 +293,17 @@ check:
      [exec]      [exec] 	HexDecode: PASSED.
      [exec]      [exec] PASSED
      [exec]      [exec] DebugLogTest:
-     [exec]      [exec] 	SimpleTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:64:run()] 2012-05-31 21:18:30 - debug message
-     [exec]      [exec] [INFO ] [../../tests/ee/common/debuglog_test.cpp:65:run()] 2012-05-31 21:18:30 - debug message2
+     [exec]      [exec] 	SimpleTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:64:run()] 2012-06-11 17:51:52 - debug message
+     [exec]      [exec] [INFO ] [../../tests/ee/common/debuglog_test.cpp:65:run()] 2012-06-11 17:51:52 - debug message2
      [exec]      [exec] PASSED.
-     [exec]      [exec] 	ParamTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:69:run()] 2012-05-31 21:18:30 - debug value 123
-     [exec]      [exec] [INFO ] [../../tests/ee/common/debuglog_test.cpp:70:run()] 2012-05-31 21:18:30 - debug value2 hogehoge
-     [exec]      [exec] [ERROR] [../../tests/ee/common/debuglog_test.cpp:71:run()] 2012-05-31 21:18:30 - debug value3 -471
-     [exec]      [exec] [WARN ] [../../tests/ee/common/debuglog_test.cpp:72:run()] 2012-05-31 21:18:30 - debug value4 0
+     [exec]      [exec] 	ParamTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:69:run()] 2012-06-11 17:51:52 - debug value 123
+     [exec]      [exec] [INFO ] [../../tests/ee/common/debuglog_test.cpp:70:run()] 2012-06-11 17:51:52 - debug value2 hogehoge
+     [exec]      [exec] [ERROR] [../../tests/ee/common/debuglog_test.cpp:71:run()] 2012-06-11 17:51:52 - debug value3 -471
+     [exec]      [exec] [WARN ] [../../tests/ee/common/debuglog_test.cpp:72:run()] 2012-06-11 17:51:52 - debug value4 0
      [exec]      [exec] PASSED.
-     [exec]      [exec] 	MultiParamTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:75:run()] 2012-05-31 21:18:30 - debug value 123, hoho, 10
+     [exec]      [exec] 	MultiParamTest: [DEBUG] [../../tests/ee/common/debuglog_test.cpp:75:run()] 2012-06-11 17:51:52 - debug value 123, hoho, 10
      [exec]      [exec] PASSED.
-     [exec]      [exec] 	EnabledTest: [ERROR] [../../tests/ee/common/debuglog_test.cpp:79:run()] 2012-05-31 21:18:30 - this should be displayed
+     [exec]      [exec] 	EnabledTest: [ERROR] [../../tests/ee/common/debuglog_test.cpp:79:run()] 2012-06-11 17:51:52 - this should be displayed
      [exec]      [exec] PASSED.
      [exec]      [exec] PASSED
      [exec]      [exec] SerializeIOTest:
@@ -584,68 +419,68 @@ check:
      [exec] 
      [exec] junit:
      [exec]     [junit] Running org.hsqldb_voltpatches.TestHSQLDB
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.46 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.55 sec
      [exec]     [junit] Running org.hsqldb_voltpatches.TestJDBC
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 0.60 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 0.63 sec
      [exec]     [junit] Running org.voltdb.TestAdHocQueries
-     [exec]     [junit] [ERROR] [../../src/ee/executors/insertexecutor.cpp:307:p_next_pull()] 2012-05-31 21:20:17 - Mispartitioned Tuple in single-partition plan.
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 2.83 sec
+     [exec]     [junit] [ERROR] [../../src/ee/executors/insertexecutor.cpp:307:p_next_pull()] 2012-06-11 17:53:40 - Mispartitioned Tuple in single-partition plan.
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 3.27 sec
      [exec]     [junit] Running org.voltdb.TestBuildString
      [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.22 sec
      [exec]     [junit] Running org.voltdb.TestClientInterface
-     [exec]     [junit] Tests run:  15, Failures:   0, Errors:   0, Time elapsed: 1.37 sec
+     [exec]     [junit] Tests run:  15, Failures:   0, Errors:   0, Time elapsed: 1.31 sec
      [exec]     [junit] Running org.voltdb.TestEELibraryLoader
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.38 sec
      [exec]     [junit] Running org.voltdb.TestExecutionSite
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 2.13 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 2.17 sec
      [exec]     [junit] Running org.voltdb.TestExpectations
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 3.15 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 2.69 sec
      [exec]     [junit] Running org.voltdb.TestHSQLBackend
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 11.63 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 11.55 sec
      [exec]     [junit] Running org.voltdb.TestJSONInterface
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 49.99 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 51.51 sec
      [exec]     [junit] Running org.voltdb.TestJdbcDatabaseMetaDataGenerator
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 1.42 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 1.41 sec
      [exec]     [junit] Running org.voltdb.TestParameterSet
      [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.TestRejoinEndToEnd
-     [exec]     [junit] Tests run:  14, Failures:   0, Errors:   0, Time elapsed: 154.41 sec
+     [exec]     [junit] Tests run:  14, Failures:   0, Errors:   0, Time elapsed: 152.45 sec
      [exec]     [junit] Running org.voltdb.TestRejoinFuzz
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 155.10 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 156.47 sec
      [exec]     [junit] Running org.voltdb.TestRejoinFuzz2
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 88.13 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 82.33 sec
      [exec]     [junit] Running org.voltdb.TestReplicatedInvocation
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 6.27 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 6.70 sec
      [exec]     [junit] Running org.voltdb.TestRestoreAgent
-     [exec]     [junit] Tests run:  21, Failures:   0, Errors:   0, Time elapsed: 40.07 sec
+     [exec]     [junit] Tests run:  21, Failures:   0, Errors:   0, Time elapsed: 37.91 sec
      [exec]     [junit] Running org.voltdb.TestSimpleCJK
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 5.06 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 4.60 sec
      [exec]     [junit] Running org.voltdb.TestSnapshotDaemon
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 9.04 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 9.01 sec
      [exec]     [junit] Running org.voltdb.TestStatsAgent
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 2.11 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 2.17 sec
      [exec]     [junit] Running org.voltdb.TestTheHashinator
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.69 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.70 sec
      [exec]     [junit] Running org.voltdb.TestTransactionIdManager
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.34 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.33 sec
      [exec]     [junit] Running org.voltdb.TestTwoSitePlans
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 2.38 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 2.45 sec
      [exec]     [junit] Running org.voltdb.TestVoltDB
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 6.96 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 6.88 sec
      [exec]     [junit] Running org.voltdb.TestVoltProcedure
-     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 1.10 sec
+     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 1.04 sec
      [exec]     [junit] Running org.voltdb.TestVoltTable
      [exec]     [junit] Tests run:  29, Failures:   0, Errors:   0, Time elapsed: 0.57 sec
      [exec]     [junit] Running org.voltdb.TestVoltType
      [exec]     [junit] Tests run:   9, Failures:   0, Errors:   0, Time elapsed: 0.16 sec
      [exec]     [junit] Running org.voltdb.catalog.TestCatalogDiffs
-     [exec]     [junit] Tests run:  27, Failures:   0, Errors:   0, Time elapsed: 24.78 sec
+     [exec]     [junit] Tests run:  27, Failures:   0, Errors:   0, Time elapsed: 24.82 sec
      [exec]     [junit] Running org.voltdb.catalog.TestCatalogSerialization
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 4.86 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 4.85 sec
      [exec]     [junit] Running org.voltdb.client.TestClientTimeouts
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.70 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.67 sec
      [exec]     [junit] Running org.voltdb.client.TestDistributer
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 13.83 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 13.81 sec
      [exec]     [junit] Running org.voltdb.client.TestProcedureInvocation
      [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
      [exec]     [junit] Running org.voltdb.compiler.TestAsyncCompilerAgent
@@ -655,50 +490,50 @@ check:
      [exec]     [junit] Running org.voltdb.compiler.TestDDLCompiler
      [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 1.58 sec
      [exec]     [junit] Running org.voltdb.compiler.TestMilestoneOneCompile
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 1.04 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 1.01 sec
      [exec]     [junit] Running org.voltdb.compiler.TestVoltCompiler
-     [exec]     [junit] Tests run:  56, Failures:   0, Errors:   0, Time elapsed: 10.84 sec
+     [exec]     [junit] Tests run:  56, Failures:   0, Errors:   0, Time elapsed: 10.77 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestDtxnInitiatorMailbox
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.69 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.70 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestInFlightTxnState
      [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 0.22 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestNonDetermisticSeppuku
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 12.52 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 13.19 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestRestrictedPriorityQueue
      [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.26 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestSimpleWorkUnit
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.51 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.52 sec
      [exec]     [junit] Running org.voltdb.dtxn.TestSiteTracker
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.65 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.61 sec
      [exec]     [junit] Running org.voltdb.executionsitefuzz.TestExecutionSiteFuzzChecker
-     [exec]     [junit] Tests run:  13, Failures:   0, Errors:   0, Time elapsed: 0.28 sec
+     [exec]     [junit] Tests run:  13, Failures:   0, Errors:   0, Time elapsed: 0.30 sec
      [exec]     [junit] Running org.voltdb.export.TestExportDataSource
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.50 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.51 sec
      [exec]     [junit] Running org.voltdb.export.TestExportProtoMessage
-     [exec]     [junit] Tests run:  11, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
+     [exec]     [junit] Tests run:  11, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.export.TestStreamBlockQueue
      [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 7.28 sec
      [exec]     [junit] Running org.voltdb.export.processors.TestRawProcessor
-     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 0.49 sec
+     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 0.51 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestCtrlC
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 35.20 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 29.35 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestExportDataSink
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.22 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestExportDecoderBase
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.15 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestExportOpsEvents
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 7.80 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 7.32 sec
      [exec]     [junit] Running org.voltdb.exportclient.TestExportToFileClient
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.23 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.36 sec
      [exec]     [junit] Running org.voltdb.expressions.TestExpressionUtil
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.16 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.17 sec
      [exec]     [junit] Running org.voltdb.fault.TestFaultDistributor
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.67 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.64 sec
      [exec]     [junit] Running org.voltdb.jdbc.TestJDBCDriver
-     [exec]     [junit] Tests run:  15, Failures:   0, Errors:   0, Time elapsed: 4.54 sec
+     [exec]     [junit] Tests run:  15, Failures:   0, Errors:   0, Time elapsed: 4.64 sec
      [exec]     [junit] Running org.voltdb.jni.TestExecutionEngine
-     [exec]     [junit] [ERROR] [../../src/ee//voltdbjni.cpp:336:Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog()] 2012-05-31 21:32:10 - loadCatalog failed
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 20.73 sec
+     [exec]     [junit] [ERROR] [../../src/ee//voltdbjni.cpp:336:Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog()] 2012-06-11 18:05:20 - loadCatalog failed
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 20.76 sec
      [exec]     [junit] Running org.voltdb.messaging.TestFastSerializer
      [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.34 sec
      [exec]     [junit] Running org.voltdb.messaging.TestMessaging
@@ -706,15 +541,17 @@ check:
      [exec]     [junit] Running org.voltdb.messaging.TestVoltMessageSerialization
      [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.25 sec
      [exec]     [junit] Running org.voltdb.network.TestNIOReadStream
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.network.TestNIOWriteStream
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.30 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.32 sec
      [exec]     [junit] Running org.voltdb.network.TestVoltNetwork
      [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.network.TestVoltPort
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.planner.TestColumnTrimmingPlans
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.87 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.93 sec
+     
+     //@TODO Fixed - inlined Projection 
      [exec]     [junit] Running org.voltdb.planner.TestCoveringIndexPlans
      [exec]     [junit]     testEng1023 failed an assertion.
      [exec]     [junit]         org.voltdb.planner.TestCoveringIndexPlans(TestCoveringIndexPlans.java:98)
@@ -726,162 +563,166 @@ check:
      [exec]     [junit]         org.voltdb.planner.TestCoveringIndexPlans(TestCoveringIndexPlans.java:170)
      [exec]     [junit]     testSingleColumnLessThan failed an assertion.
      [exec]     [junit]         org.voltdb.planner.TestCoveringIndexPlans(TestCoveringIndexPlans.java:188)
-     [exec]     [junit] Tests run:   6, Failures:   5, Errors:   0, Time elapsed: 0.89 sec
+     [exec]     [junit] Tests run:   6, Failures:   5, Errors:   0, Time elapsed: 0.88 sec
      [exec]     [junit] Test org.voltdb.planner.TestCoveringIndexPlans FAILED
      [exec]     [junit] Running org.voltdb.planner.TestFunctions
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.49 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.50 sec
+     
+     //@TODO Fixed - inlined Projection 
      [exec]     [junit] Running org.voltdb.planner.TestIndexVSHashChoice
      [exec]     [junit]     testEng931Plan failed an assertion.
      [exec]     [junit]         org.voltdb.planner.TestIndexVSHashChoice(TestIndexVSHashChoice.java:89)
      [exec]     [junit] Tests run:   1, Failures:   1, Errors:   0, Time elapsed: 0.60 sec
      [exec]     [junit] Test org.voltdb.planner.TestIndexVSHashChoice FAILED
      [exec]     [junit] Running org.voltdb.planner.TestJoinOrder
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.65 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.64 sec
      [exec]     [junit] Running org.voltdb.planner.TestParsedStatements
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 11.93 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 11.82 sec
      [exec]     [junit] Running org.voltdb.planner.TestPlannerTool
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 16.27 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 17.80 sec
      [exec]     [junit] Running org.voltdb.planner.TestPlansGroupBy
      [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 0.82 sec
      [exec]     [junit] Running org.voltdb.planner.TestPlansOrderBy
-     [exec]     [junit] Tests run:   9, Failures:   0, Errors:   0, Time elapsed: 0.93 sec
+     [exec]     [junit] Tests run:   9, Failures:   0, Errors:   0, Time elapsed: 0.91 sec
      [exec]     [junit] Running org.voltdb.planner.TestPlansTPCC
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 1.77 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 1.78 sec
      [exec]     [junit] Running org.voltdb.planner.TestPushDownAggregates
      [exec]     [junit] Tests run:  19, Failures:   0, Errors:   0, Time elapsed: 1.27 sec
      [exec]     [junit] Running org.voltdb.planner.TestVerbotenPlans
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.89 sec
      [exec]     [junit] Running org.voltdb.plannodes.TestNestLoopPlanNode
      [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.17 sec
+     
+     //@TODO Fixed - inlined Projection 
      [exec]     [junit] Running org.voltdb.plannodes.TestScanPlanNode
      [exec]     [junit]     testOutputSchemaSomeScanColumns failed an assertion.
      [exec]     [junit]         org.voltdb.plannodes.TestScanPlanNode(TestScanPlanNode.java:116)
      [exec]     [junit] Tests run:   3, Failures:   1, Errors:   0, Time elapsed: 0.48 sec
      [exec]     [junit] Test org.voltdb.plannodes.TestScanPlanNode FAILED
      [exec]     [junit] Running org.voltdb.regressionsuites.TestAdminMode
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.00 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 9.03 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestCRUDSuite
-     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 25.50 sec
+     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 24.74 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestCatalogUpdateSuite
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 163.48 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 160.64 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestDecimalDefaults
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 1.94 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 1.90 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestExecutionSiteDeath
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 5.16 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 4.75 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestFailureDetectSuite
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 19.63 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 18.75 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestFailuresSuite
-     [exec]     [junit] Tests run:  42, Failures:   0, Errors:   0, Time elapsed: 129.08 sec
+     [exec]     [junit] Tests run:  42, Failures:   0, Errors:   0, Time elapsed: 136.78 sec
+     
+     //@TODO Need to investigate. Row count is 25!!! 
      [exec]     [junit] Running org.voltdb.regressionsuites.TestFixedSQLSuite
-     [exec]     [junit] Test org.voltdb.regressionsuites.TestFixedSQLSuite FAILED (crashed)
+     [exec]     [junit]     testTickets227And228-localSingleProcess-1-JNI failed an assertion.
+     [exec]     [junit]         org.voltdb.regressionsuites.TestFixedSQLSuite(TestFixedSQLSuite.java:789)
+     [exec]     [junit] Tests run:  66, Failures:   1, Errors:   0, Time elapsed: 120.87 sec
+     [exec]     [junit] Test org.voltdb.regressionsuites.TestFixedSQLSuite FAILED
      [exec]     [junit] Running org.voltdb.regressionsuites.TestGiantDeleteSuite
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 107.61 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 108.15 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestIndexMemoryOwnershipSuite
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 3.85 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 4.14 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestIndexesSuite
-     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 32.08 sec
+     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 32.89 sec
+     
+     //@TODO Need to investigate. Row count is 0!!! 
      [exec]     [junit] Running org.voltdb.regressionsuites.TestLimitOffsetSuite
-     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 36.08 sec
+     [exec]     [junit]     testJoinAndLimitOffset-localSingleProcess-1-JNI failed an assertion.
+     [exec]     [junit]         org.voltdb.regressionsuites.TestLimitOffsetSuite(TestLimitOffsetSuite.java:118)
+     [exec]     [junit]     testJoinAndLimitOffset-localSingleProcess-3-JNI failed an assertion.
+     [exec]     [junit]         org.voltdb.regressionsuites.TestLimitOffsetSuite(TestLimitOffsetSuite.java:118)
+     [exec]     [junit]     testJoinAndLimitOffset-localCluster-2-2-JNI failed an assertion.
+     [exec]     [junit]         org.voltdb.regressionsuites.TestLimitOffsetSuite(TestLimitOffsetSuite.java:118)
+     [exec]     [junit] Tests run:  18, Failures:   3, Errors:   0, Time elapsed: 35.98 sec
+     [exec]     [junit] Test org.voltdb.regressionsuites.TestLimitOffsetSuite FAILED
      [exec]     [junit] Running org.voltdb.regressionsuites.TestLoadingSuite
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 12.52 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 11.93 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestMaterializedViewSuite
-     [exec]     [junit] Tests run:  24, Failures:   0, Errors:   0, Time elapsed: 51.25 sec
+     [exec]     [junit] Tests run:  24, Failures:   0, Errors:   0, Time elapsed: 52.00 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestMultiPartitionSuite
-     [exec]     [junit] Tests run:  20, Failures:   0, Errors:   0, Time elapsed: 47.44 sec
+     [exec]     [junit] Tests run:  20, Failures:   0, Errors:   0, Time elapsed: 47.16 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestOrderBySuite
-     [exec]     [junit] Tests run:  40, Failures:   0, Errors:   0, Time elapsed: 79.09 sec
+     [exec]     [junit] Tests run:  40, Failures:   0, Errors:   0, Time elapsed: 76.99 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestPartitionDetection
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 9.14 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 8.83 sec
      [exec]     [junit] External VoltDB process terminated abnormally with return: 255
      [exec]     [junit] Running org.voltdb.regressionsuites.TestPlansGroupBySuite
-     [exec]     [junit] Tests run:  42, Failures:   0, Errors:   0, Time elapsed: 68.93 sec
+     [exec]     [junit] Tests run:  42, Failures:   0, Errors:   0, Time elapsed: 67.91 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestReplicatedSaveRestoreSysprocSuite
-     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 40.33 sec
+     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 40.22 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestReplicationSuite
-     [exec]     [junit] Tests run:  20, Failures:   0, Errors:   0, Time elapsed: 94.98 sec
+     [exec]     [junit] Tests run:  20, Failures:   0, Errors:   0, Time elapsed: 93.33 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestRollbackSuite
-     [exec]     [junit] Tests run:  48, Failures:   0, Errors:   0, Time elapsed: 166.00 sec
+     [exec]     [junit] Tests run:  48, Failures:   0, Errors:   0, Time elapsed: 165.07 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSQLFeaturesSuite
-     [exec]     [junit] Tests run:  45, Failures:   0, Errors:   0, Time elapsed: 756.13 sec
+     [exec]     [junit] Tests run:  45, Failures:   0, Errors:   0, Time elapsed: 750.47 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSQLTypesSuite
-     [exec]     [junit] Tests run:  36, Failures:   0, Errors:   0, Time elapsed: 126.99 sec
+     [exec]     [junit] Tests run:  36, Failures:   0, Errors:   0, Time elapsed: 127.89 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSaveRestoreSysprocSuite
-     [exec]     [junit] WARNING in native method: JNI FindClass received a bad class descriptor "Lorg/xerial/snappy/SnappyNative;".  A correct class descriptor has no leading "L" or trailing ";".  Incorrect descriptors will not be accepted in future releases.
-     [exec]     [junit] 	at org.xerial.snappy.SnappyNative.rawUncompress(Native Method)
-     [exec]     [junit] 	at org.xerial.snappy.Snappy.uncompress(Snappy.java:463)
-     [exec]     [junit] 	at org.voltdb.utils.CompressionService.decompressBuffer(CompressionService.java:189)
-     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.readChunks(TableSaveFile.java:637)
-     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.run(TableSaveFile.java:769)
-     [exec]     [junit] 	at java.lang.Thread.run(Thread.java:662)
-     [exec]     [junit] WARNING in native method: JNI FindClass received a bad class descriptor "Lorg/xerial/snappy/SnappyNative;".  A correct class descriptor has no leading "L" or trailing ";".  Incorrect descriptors will not be accepted in future releases.
-     [exec]     [junit] 	at org.xerial.snappy.SnappyNative.rawUncompress(Native Method)
-     [exec]     [junit] 	at org.xerial.snappy.Snappy.uncompress(Snappy.java:463)
-     [exec]     [junit] 	at org.voltdb.utils.CompressionService.decompressBuffer(CompressionService.java:189)
-     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.readChunks(TableSaveFile.java:637)
-     [exec]     [junit] 	at org.voltdb.sysprocs.saverestore.TableSaveFile$ChunkReader.run(TableSaveFile.java:769)
-     [exec]     [junit] 	at java.lang.Thread.run(Thread.java:662)
-     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 91.09 sec
+     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 90.82 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSecuritySuite
-     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 31.42 sec
+     [exec]     [junit] Tests run:  10, Failures:   0, Errors:   0, Time elapsed: 30.67 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSneakyExecutionOrderSuite
-     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 4.79 sec
+     [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 4.78 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSqlAggregateSuite
-     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 48.14 sec
+     [exec]     [junit] Tests run:  18, Failures:   0, Errors:   0, Time elapsed: 48.44 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSqlLogicOperatorsSuite
-     [exec]     [junit] Tests run:  16, Failures:   0, Errors:   0, Time elapsed: 39.42 sec
+     [exec]     [junit] Tests run:  16, Failures:   0, Errors:   0, Time elapsed: 36.98 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSqlUpdateSuite
-     [exec]     [junit] Tests run:  36, Failures:   0, Errors:   0, Time elapsed: 76.99 sec
+     [exec]     [junit] Tests run:  36, Failures:   0, Errors:   0, Time elapsed: 77.30 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSystemCatalogSuite
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 25.58 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 24.94 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSystemInformationSuite
-     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 15.04 sec
+     [exec]     [junit] Tests run:   6, Failures:   0, Errors:   0, Time elapsed: 13.91 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestSystemProcedureSuite
-     [exec]     [junit] Tests run:  38, Failures:   0, Errors:   0, Time elapsed: 114.33 sec
+     [exec]     [junit] Tests run:  38, Failures:   0, Errors:   0, Time elapsed: 114.34 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestTPCCSuite
-     [exec]     [junit] Tests run:  14, Failures:   0, Errors:   0, Time elapsed: 73.01 sec
+     [exec]     [junit] Tests run:  14, Failures:   0, Errors:   0, Time elapsed: 71.63 sec
      [exec]     [junit] Running org.voltdb.regressionsuites.TestTempTableMemoryKnob
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 5.49 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 5.47 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestClusterSaveFileState
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.30 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 0.32 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestPartitionedTableSaveFileState
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.73 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.70 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestReplicatedTableSaveFileState
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.46 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.48 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestSavedTableConverter
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.60 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.53 sec
      [exec]     [junit] Running org.voltdb.sysprocs.saverestore.TestTableSaveFile
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 1.50 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 1.41 sec
      [exec]     [junit] Running org.voltdb.types.TestBlobType
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 5.95 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 6.18 sec
      [exec]     [junit] Running org.voltdb.types.TestExpressionType
      [exec]     [junit] Tests run:   2, Failures:   0, Errors:   0, Time elapsed: 0.16 sec
      [exec]     [junit] Running org.voltdb.types.TestVoltDecimalHelper
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.22 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.utils.TestCLibrary
-     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.27 sec
+     [exec]     [junit] Tests run:   1, Failures:   0, Errors:   0, Time elapsed: 0.26 sec
      [exec]     [junit] Running org.voltdb.utils.TestCatalogUtil
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 25.95 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 25.48 sec
      [exec]     [junit] Running org.voltdb.utils.TestCommandLine
-     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.24 sec
+     [exec]     [junit] Tests run:   5, Failures:   0, Errors:   0, Time elapsed: 0.23 sec
      [exec]     [junit] Running org.voltdb.utils.TestDBBPool
-     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.30 sec
+     [exec]     [junit] Tests run:   8, Failures:   0, Errors:   0, Time elapsed: 0.28 sec
      [exec]     [junit] Running org.voltdb.utils.TestEncoder
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 4.60 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 4.62 sec
      [exec]     [junit] Running org.voltdb.utils.TestInMemoryJarfile
-     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 13.13 sec
+     [exec]     [junit] Tests run:   3, Failures:   0, Errors:   0, Time elapsed: 12.88 sec
      [exec]     [junit] Running org.voltdb.utils.TestPersistentBinaryDeque
-     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 13.38 sec
+     [exec]     [junit] Tests run:  17, Failures:   0, Errors:   0, Time elapsed: 12.39 sec
      [exec]     [junit] Running org.voltdb.utils.TestVoltTypeUtil
-     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.17 sec
+     [exec]     [junit] Tests run:   4, Failures:   0, Errors:   0, Time elapsed: 0.16 sec
      [exec]     [junit] Running org.voltdb.zk.TestZK
-     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 2.19 sec
+     [exec]     [junit] Tests run:   7, Failures:   0, Errors:   0, Time elapsed: 2.17 sec
      [exec]     [mkdir] Created dir: /home/mike/voltdb/fork/voltdb/obj/release/testoutput/report
      [exec] [junitreport] Processing /home/mike/voltdb/fork/voltdb/obj/release/testoutput/TESTS-TestSuites.xml to /home/mike/voltdb/fork/voltdb/obj/release/testoutput/report/junit-noframes.html
      [exec] [junitreport] Loading stylesheet jar:file:/usr/share/ant/lib/ant-junit.jar!/org/apache/tools/ant/taskdefs/optional/junit/xsl/junit-noframes.xsl
-     [exec] [junitreport] Transform time: 1268ms
+     [exec] [junitreport] Transform time: 1452ms
      [exec] [junitreport] Processing /home/mike/voltdb/fork/voltdb/obj/release/testoutput/TESTS-TestSuites.xml to /home/mike/voltdb/fork/voltdb/obj/release/testoutput/junit-noframes.html
      [exec] [junitreport] Loading stylesheet /home/mike/voltdb/fork/voltdb/tools/junit-noframes.xsl
-     [exec] [junitreport] Transform time: 486ms
+     [exec] [junitreport] Transform time: 325ms
      [exec]      [exec] See obj/release/testoutput/report/junit-noframes.html for details.
      [exec]      [exec] Suite TestCoveringIndexPlans reports 5 failure(s).
      [exec]      [exec]   Testcase testEng1023 junit.framework.AssertionFailedError
@@ -893,14 +734,20 @@ check:
      [exec]      [exec]   Testcase testEng931Plan junit.framework.AssertionFailedError
      [exec]      [exec] Suite TestScanPlanNode reports 1 failure(s).
      [exec]      [exec]   Testcase testOutputSchemaSomeScanColumns junit.framework.AssertionFailedError
+     [exec]      [exec] Suite TestFixedSQLSuite reports 1 failure(s).
+     [exec]      [exec]   Testcase testTickets227And228-localSingleProcess-1-JNI junit.framework.AssertionFailedError
+     [exec]      [exec] Suite TestLimitOffsetSuite reports 3 failure(s).
+     [exec]      [exec]   Testcase testJoinAndLimitOffset-localSingleProcess-1-JNI junit.framework.AssertionFailedError
+     [exec]      [exec]   Testcase testJoinAndLimitOffset-localSingleProcess-3-JNI junit.framework.AssertionFailedError
+     [exec]      [exec]   Testcase testJoinAndLimitOffset-localCluster-2-2-JNI junit.framework.AssertionFailedError
      [exec]      [exec] 
      [exec] 
      [exec] BUILD FAILED
      [exec] /home/mike/voltdb/fork/voltdb/build.xml:1241: JUnit had failures
      [exec] 
-     [exec] Total time: 65 minutes 2 seconds
+     [exec] Total time: 64 minutes 41 seconds
 
 BUILD FAILED
 /home/mike/voltdb/fork/voltdb/build.xml:143: exec returned: 1
 
-Total time: 65 minutes 46 seconds
+Total time: 65 minutes 28 seconds

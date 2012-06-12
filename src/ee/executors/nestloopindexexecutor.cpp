@@ -506,7 +506,8 @@ namespace detail {
             m_outerCols(outerCols),
             m_innerCols(innerCols),
             m_searchkeyCols(searchkeyCols),
-            m_needNextOuter(true)
+            m_needNextOuter(true),
+            m_hasMatch(false)
         {}
 
         AbstractExecutor* m_outerExecutor;
@@ -518,6 +519,7 @@ namespace detail {
         int m_innerCols;
         int m_searchkeyCols;
         bool m_needNextOuter;
+        bool m_hasMatch;
 
     };
 
@@ -620,16 +622,6 @@ TableTuple NestLoopIndexExecutor::p_next_pull() {
             VOLT_TRACE("outer_tuple:%s",
                        m_state->m_outerTuple.debug(outer_table->name()).c_str());
 
-            // Prepare inner index scan
-            reset_inner_state();
-            m_state->m_needNextOuter = false;
-        }
-
-        TableTuple innerTuple = m_state->m_innerExecutor->next_pull();
-        if (!innerTuple.isNullTuple())
-        {
-            VOLT_TRACE("inner_tuple:%s",
-                       innerTuple.debug(inner_table->name()).c_str());
             //
             // Try to put the tuple into our output table
             //
@@ -641,6 +633,17 @@ TableTuple NestLoopIndexExecutor::p_next_pull() {
                 joinedTuple.setNValue(col_ctr,
                     m_outputExpressions[col_ctr]->eval(&m_state->m_outerTuple, NULL));
             }
+            // Prepare inner index scan
+            reset_inner_state();
+            m_state->m_needNextOuter = false;
+            m_state->m_hasMatch = false;
+        }
+
+        TableTuple innerTuple = m_state->m_innerExecutor->next_pull();
+        if (!innerTuple.isNullTuple())
+        {
+            VOLT_TRACE("inner_tuple:%s",
+                       innerTuple.debug(inner_table->name()).c_str());
             //
             // Append the inner values to the end of our join tuple
             //
@@ -656,6 +659,8 @@ TableTuple NestLoopIndexExecutor::p_next_pull() {
 
             VOLT_TRACE("MATCH: %s",
                        joinedTuple.debug(output_table->name()).c_str());
+
+            m_state->m_hasMatch = true;
             break;
         }
         else
@@ -664,7 +669,7 @@ TableTuple NestLoopIndexExecutor::p_next_pull() {
             //
             // Left Outer Join
             //
-            if (join_type == JOIN_TYPE_LEFT)
+            if (join_type == JOIN_TYPE_LEFT && m_state->m_hasMatch == false)
             {
                 //
                 // Append NULLs to the end of our join tuple
