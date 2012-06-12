@@ -184,6 +184,8 @@ class CSVLoader {
     	} else {
     		insertProcedure = config.procedurename;
     	}
+        if (!config.reportdir.endsWith("/")) 
+        	config.reportdir += "/";
     	int waits = 0;
         int shortWaits = 0;
         
@@ -327,14 +329,15 @@ class CSVLoader {
     }
     
 	private static void produceFiles() {
-		String path_invalidrowfile = config.reportdir + CSVLoader.invaliderowsfile;
-		String path_logfile =  config.reportdir + CSVLoader.logfile;
-    	String path_reportfile = config.reportdir  + CSVLoader.reportfile;
+		String myinsert = insertProcedure;
+		myinsert = myinsert.replaceAll("\\.", "_");
+		String path_invalidrowfile = config.reportdir + myinsert + "_"+ CSVLoader.invaliderowsfile;
+		String path_logfile =  config.reportdir + myinsert + "_"+ CSVLoader.logfile;
+    	String path_reportfile = config.reportdir  + myinsert + "_"+ CSVLoader.reportfile;
     	
 		int bulkflush = 300; // by default right now
 		try {
 			BufferedWriter out_invaliderowfile = new BufferedWriter(new FileWriter(path_invalidrowfile));
-
 			BufferedWriter out_logfile = new BufferedWriter(new FileWriter(path_logfile));
 			BufferedWriter out_reportfile = new BufferedWriter(new FileWriter(path_reportfile));
 			long linect = 0;
@@ -372,8 +375,8 @@ class CSVLoader {
 					+ "log file is generated to:" + path_logfile + "\n"
 					+ "report file is generated to:" + path_reportfile);
 		} catch (FileNotFoundException e) {
-			System.err.println("CSV file '" + config.inputfile
-					+ "' could not be found.");
+			System.err.println("CSV report directory '" + config.reportdir
+					+ "' does not exist.");
 		} catch (Exception x) {
 			System.err.println(x.getMessage());
 		}
