@@ -198,7 +198,8 @@ public class SpScheduler extends Scheduler
             needsRepair.remove(m_mailbox.getHSId());
             // make a copy because handleIv2 non-repair case does?
             Iv2InitiateTaskMessage localWork =
-                new Iv2InitiateTaskMessage(m_mailbox.getHSId(), m_mailbox.getHSId(), message);
+                new Iv2InitiateTaskMessage(message.getInitiatorHSId(), 
+                    message.getCoordinatorHSId(), message);
 
             final SpProcedureTask task = new SpProcedureTask(m_mailbox, runner,
                     localWork.getSpHandle(), m_pendingTasks, localWork);
