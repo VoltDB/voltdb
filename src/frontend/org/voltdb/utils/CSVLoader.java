@@ -46,10 +46,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  * (or pass it to any stored proc, but ignoring any result other than the success code.).
  *
  * TODO:
- *   - Nulls are not handled (or at least I didn't test them).
- *   - Assumes localhost
- *   - Assumes no username/password
- *   - Usage help is ugly and cryptic: options are listed but not described.
  *   - No associated test suite.
  *   - Forces JVM into UTC. All input date TZs assumed to be GMT+0
  *   - Requires canonical JDBC SQL timestamp format
@@ -66,8 +62,8 @@ class CSVLoader {
     private static int reportEveryNRows = 10000;
     private static int waitSeconds = 10;
     
-    final CSVConfig config;
-    private long latency = -1;
+    private static CSVConfig config = null;
+    private static long latency = -1;
 
 	private static boolean standin = false;
     
@@ -174,20 +170,35 @@ class CSVLoader {
     			standin = true;
     		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
     		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
+    		if (port < 0) exitWithMessageAndUsage("port number must be >= 0");
     	}
     }
     
-    public CSVLoader (CSVConfig cfg) {
-    	this.config = cfg;
+    /**
+     * TODO(xin): add line number data into the callback and add the invalid line number 
+     * into a list that will help us to produce a separate file to record the invalid line
+     * data in the csv file.
+     * 
+     * Asynchronously invoking procedures to response the actual wrong line number and 
+     * start from last wrong line in the csv file is not easy. You can not ensure the 
+     * FIFO order of the callback.
+     * @param args
+     * @return long number of the actual rows acknowledged by the database server
+     */
+    
+
+    public static void main(String[] args) {
+        long start = System.currentTimeMillis();
+        
+        config = new CSVConfig();
     	
-    	if(!config.tablename.equals("")) {
+        config.parse(CSVLoader.class.getName(), args);
+        if(!config.tablename.equals("")) {
     		insertProcedure = config.tablename + ".insert";
     	} else {
     		insertProcedure = config.procedurename;
     	}
-    }
-    
-    public void run() {
+    	
     	int waits = 0;
         int shortWaits = 0;
         
@@ -224,21 +235,8 @@ class CSVLoader {
                     	if (i != line.length -1)
                     		linedata.append(",");
                     }
-                	
                 	String[] correctedLine = line;
-                    // TODO(): correct the line here
-                    
                     cb = new MyCallback(outCount.get(), config, linedata.toString());
-                    
-                    // This message will be removed later
-                    // print out the parameters right now
-                    String msg = "<xin>params: ";
-                    for (int i=0; i < correctedLine.length; i++) {
-                    	if (correctedLine != null)
-                    		msg += correctedLine[i] + ",";
-                    }
-                    System.out.println(msg);
-                    
                     String lineCheckResult;
                     if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
                     	System.err.println("<zheng>Stop at line " + (outCount.get()));
@@ -282,38 +280,11 @@ class CSVLoader {
                 System.out.println("Waited too briefly? " + shortWaits + " times");
             }
         }
-        //return inCount.get();
     	
-    }
-    
-    
-    
-    /**
-     * TODO(xin): add line number data into the callback and add the invalid line number 
-     * into a list that will help us to produce a separate file to record the invalid line
-     * data in the csv file.
-     * 
-     * Asynchronously invoking procedures to response the actual wrong line number and 
-     * start from last wrong line in the csv file is not easy. You can not ensure the 
-     * FIFO order of the callback.
-     * @param args
-     * @return long number of the actual rows acknowledged by the database server
-     */
-    
-
-    public static void main(String[] args) {
-        long start = System.currentTimeMillis();
-        
-    	CSVConfig cfg = new CSVConfig();
-    	cfg.parse(CSVLoader.class.getName(), args);
+        latency = System.currentTimeMillis()-start;
+        System.out.println("CSVLoader elaspsed: " + latency/1000F + " seconds");
+    	CSVLoader.produceFiles();
     	
-    	
-    	CSVLoader loader = new CSVLoader(cfg);
-    	loader.run();
-    	loader.setLatency(System.currentTimeMillis()-start);
-    	loader.produceFiles();
-    	
-    	System.out.println("CSVLoader elaspsed: " + loader.getLatency()/1000F + " seconds");
     }
     
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
@@ -337,7 +308,7 @@ class CSVLoader {
      * @param linefragement
      */
 
-    private String checkLineFormat(String[] linefragement, Client client ) {
+    private static String checkLineFormat(String[] linefragement, Client client ) {
     	String msg = "";
         int columnCnt = 0;
         VoltTable procInfo = null;
@@ -390,7 +361,7 @@ class CSVLoader {
 	 * Bulk the flush later...
 	 * @param inputFile
 	 */
-	private void produceFiles() {
+	private static void produceFiles() {
 		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
 		// TODO: add the inputFileName to the outputFileName
 
@@ -398,7 +369,7 @@ class CSVLoader {
 		String path_logfile =  config.reportdir + CSVLoader.logfile;
     	String path_reportfile = config.reportdir  + CSVLoader.reportfile;
     	
-		int bulkflush = 3; // by default right now
+		int bulkflush = 300; // by default right now
 		try {
 			BufferedWriter out_invaliderowfile = new BufferedWriter(new FileWriter(path_invaliderowsfile));
 
@@ -421,14 +392,13 @@ class CSVLoader {
 				}
 			}
 			// Get elapsed time in seconds
-			float elapsedTimeSec = this.getLatency()/1000F;
+			float elapsedTimeSec = latency / 1000F;
 			out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds\n");
 			out_reportfile.write("Number of tuples tring to insert:" + outCount.get() + "\n");
 			out_reportfile.write("Number of failed tuples:" + errorInfo.size() + "\n");
 			out_reportfile.write("Number of acknowledged tuples:     " + inCount.get() + "\n");
 			out_reportfile.write("CSVLoader rate: " + outCount.get() / elapsedTimeSec + " row/s\n");
 
-			// TODO(xin): Add more report message
 			out_invaliderowfile.flush();
 			out_logfile.flush();
 			out_reportfile.flush();
@@ -443,14 +413,6 @@ class CSVLoader {
 			System.err.println(x.getMessage());
 		}
     }
-
-	public float getLatency() {
-		return latency;
-	}
-
-	public void setLatency(long latency) {
-		this.latency = latency;
-	}
 
 	public static void flush() {
 		inCount.set( 0 );
