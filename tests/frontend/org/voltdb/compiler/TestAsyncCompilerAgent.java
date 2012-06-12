@@ -34,7 +34,6 @@ import org.mockito.stubbing.Answer;
 import org.mockito.verification.VerificationMode;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
-import org.voltcore.messaging.MessagingException;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -72,7 +71,7 @@ public class TestAsyncCompilerAgent {
      * @throws InterruptedException
      */
     @Test
-    public void testMaxQueueDepth() throws MessagingException, InterruptedException {
+    public void testMaxQueueDepth() throws InterruptedException {
         /*
          * mock the compileAdHocPlan method so that we can control how many
          * things will be waiting in the queue

@@ -57,7 +57,6 @@ import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.ClientInterface.ClientInputHandler;
@@ -202,11 +201,10 @@ public class TestClientInterface {
      * @param isEverySite
      * @return StoredProcedureInvocation object passed to createTransaction()
      * @throws IOException
-     * @throws MessagingException
      */
     private StoredProcedureInvocation readAndCheck(ByteBuffer msg, String procName, Object partitionParam,
                                                    boolean isAdmin, boolean isReadonly, boolean isSinglePart,
-                                                   boolean isEverySite) throws IOException, MessagingException {
+                                                   boolean isEverySite) throws IOException {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
                                            any(StoredProcedureInvocation.class),
                                            anyBoolean(), anyBoolean(), anyBoolean(),
@@ -242,7 +240,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testAdHoc() throws IOException, MessagingException {
+    public void testAdHoc() throws IOException {
         ByteBuffer msg = createMsg("@AdHoc", "select * from a");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
@@ -301,7 +299,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testUpdateCatalog() throws IOException, MessagingException {
+    public void testUpdateCatalog() throws IOException {
         String catalogHex = Encoder.hexEncode("blah");
         ByteBuffer msg = createMsg("@UpdateApplicationCatalog", catalogHex, "blah");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
@@ -313,7 +311,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testNegativeUpdateCatalog() throws IOException, MessagingException {
+    public void testNegativeUpdateCatalog() throws IOException {
         ByteBuffer msg = createMsg("@UpdateApplicationCatalog", new Integer(1), new Long(0));
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         // expect an error response from handleRead.
@@ -371,7 +369,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testUserProc() throws IOException, MessagingException {
+    public void testUserProc() throws IOException {
         ByteBuffer msg = createMsg("hello", 1);
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "hello", 1, false, true, true, false);
@@ -379,7 +377,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testSystemInformation() throws IOException, MessagingException {
+    public void testSystemInformation() throws IOException {
         ByteBuffer msg = createMsg("@SystemInformation");
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "@SystemInformation", 1, false, true, false, false);
@@ -401,7 +399,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testStatisticsProc() throws IOException, MessagingException {
+    public void testStatisticsProc() throws IOException {
         ByteBuffer msg = createMsg("@Statistics", "table", 0);
         StoredProcedureInvocation invocation =
                 readAndCheck(msg, "@Statistics", null, false, true, false, false);
@@ -409,7 +407,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testLoadSinglePartTable() throws IOException, MessagingException {
+    public void testLoadSinglePartTable() throws IOException {
         VoltTable table = new VoltTable(new ColumnInfo("i", VoltType.INTEGER));
         table.addRow(1);
         ByteBuffer msg = createMsg("@LoadSinglepartitionTable", "a", table);
@@ -417,7 +415,7 @@ public class TestClientInterface {
     }
 
     @Test
-    public void testPausedMode() throws IOException, MessagingException {
+    public void testPausedMode() throws IOException {
         // pause the node
         when(m_volt.getMode()).thenReturn(OperationMode.PAUSED);
         ByteBuffer msg = createMsg("hello", 1);

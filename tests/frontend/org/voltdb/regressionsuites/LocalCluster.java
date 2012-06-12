@@ -36,7 +36,6 @@ import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -82,6 +81,7 @@ public class LocalCluster implements VoltServerConfig {
     private final boolean m_debug;
     FailureState m_failureState;
     ArrayList<Process> m_cluster = new ArrayList<Process>();
+    int perLocalClusterExtProcessIndex = 0;
 
     // Dedicated paths in the filesystem to be used as a root for each process
     ArrayList<File> m_subRoots = new ArrayList<File>();
@@ -224,6 +224,8 @@ public class LocalCluster implements VoltServerConfig {
             pathToLicense(ServerThread.getTestLicensePath()).
             log4j(log4j);
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
+        // "tag" this command line so it's clear which test started it
+        this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
     }
 
     /**
@@ -587,15 +589,13 @@ public class LocalCluster implements VoltServerConfig {
                 }
             }
 
-            String timestampStr = MiscUtils.getCompactStringTimestamp(System.currentTimeMillis());
-
             PipeToFile ptf = new PipeToFile(
                     testoutputdir +
                     File.separator +
                     "LC-" +
-                    timestampStr + "-" +
                     getFileName() + "-" +
-                    hostId +
+                    hostId + "-" +
+                    "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                     ".txt",
                     proc.getInputStream(),
                     PipeToFile.m_initToken, false, proc);
@@ -697,15 +697,13 @@ public class LocalCluster implements VoltServerConfig {
                 assert(status);
             }
 
-            String timestampStr = MiscUtils.getCompactStringTimestamp(System.currentTimeMillis());
-
             ptf = new PipeToFile(
                     testoutputdir +
                     File.separator +
                     "LC-" +
-                    timestampStr + "-" +
                     getFileName() + "-" +
-                    hostId +
+                    hostId + "-" +
+                    "idx" + String.valueOf(perLocalClusterExtProcessIndex++) +
                     ".rejoined.txt",
                     proc.getInputStream(),
                     PipeToFile.m_rejoinToken, true, proc);

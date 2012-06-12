@@ -162,7 +162,13 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
+        // note that this value can be set two ways, either by specifiying the
+        // leaderport explicitly, or by setting the internalport without specifying
+        // the leaderport.
         public Integer m_leaderPort = DEFAULT_INTERNAL_PORT;
+
+        /** Behavior-less arg used to differentiate command lines from "ps" */
+        public String m_tag;
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
@@ -179,6 +185,9 @@ public class VoltDB {
 
         public Configuration(String args[]) {
             String arg;
+
+            // check if the leaderport is explicitly set
+            boolean containsLeaderPortConfig = false;
 
             // Arguments are accepted in any order.
             //
@@ -261,6 +270,11 @@ public class VoltDB {
                 }
                 else if (arg.equals("leaderport")) {
                     m_leaderPort = Integer.valueOf(args[++i]);
+                    containsLeaderPortConfig = true;
+                }
+                else if (arg.startsWith("leaderport ")) {
+                    m_leaderPort = Integer.parseInt(arg.substring("leaderport ".length()));
+                    containsLeaderPortConfig = true;
                 }
                 else if (arg.equals("leader")) {
                     m_leader = args[++i].trim();
@@ -297,6 +311,14 @@ public class VoltDB {
                     m_timestampTestingSalt = Long.parseLong(arg.substring("timestampsalt ".length()));
                 }
 
+                // handle behaviorless tag field
+                else if (arg.equals("tag")) {
+                    m_tag = args[++i];
+                }
+                else if (arg.startsWith("tag ")) {
+                    m_tag = arg.substring("tag ".length());
+                }
+
                 else if (arg.equals("catalog")) {
                     m_pathToCatalog = args[++i];
                 }
@@ -318,6 +340,11 @@ public class VoltDB {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();
                     System.exit(-1);
+                }
+
+                // set the leaderport to the internalport if leaderport isn't set explicitly
+                if (!containsLeaderPortConfig) {
+                    m_leaderPort = m_internalPort;
                 }
             }
             // ENG-2815 If deployment is null (the user wants the default) and

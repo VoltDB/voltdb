@@ -43,6 +43,7 @@
 #include "common/serializeio.h"
 #include "common/types.h"
 #include "common/value_defs.h"
+#include "utf8.h"
 
 #define CHECK_FPE( x ) ( std::isinf(x) || std::isnan(x) )
 namespace voltdb {
@@ -251,6 +252,11 @@ class NValue {
     NValue op_add(const NValue rhs) const;
     NValue op_multiply(const NValue rhs) const;
     NValue op_divide(const NValue rhs) const;
+    /*
+     * This NValue must be VARCHAR and the rhs must be VARCHAR.
+     * This NValue is the value and the rhs is the pattern
+     */
+    NValue like(const NValue rhs) const;
 
     template <ExpressionType E> // template for SQL functions returning constants (like pi)
     static NValue callConstant();
@@ -1820,6 +1826,8 @@ inline int NValue::compare(const NValue rhs) const {
         return compareDoubleValue(rhs);
       case VALUE_TYPE_VARCHAR:
         return compareStringValue(rhs);
+      case VALUE_TYPE_VARBINARY:
+        return compareBinaryValue(rhs);
       case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
       default: {
@@ -2704,6 +2712,171 @@ inline NValue NValue::op_divide(const NValue rhs) const {
                getTypeName(rhs.getValueType()).c_str());
 }
 
+/*
+ * The LHS (this) should always be the string being compared
+ * and the RHS should always be the LIKE expression. The planner or EE
+ * needs to enforce this.
+ */
+inline NValue NValue::like(const NValue rhs) const {
+    const bool lhsIsNull = isNull();
+    const bool rhsIsNull = rhs.isNull();
+    if (lhsIsNull || rhsIsNull) {
+        return getFalse();
+    }
+
+    /*
+     * Validate that all params are VARCHAR
+     */
+    const ValueType mType = getValueType();
+    if (mType != VALUE_TYPE_VARCHAR) {
+        throwFatalException("lhs of LIKE expression is %d not VALUE_TYPE_VARCHAR(%d)", mType, VALUE_TYPE_VARCHAR);
+    }
+
+    const ValueType rhsType = rhs.getValueType();
+    if (rhsType != VALUE_TYPE_VARCHAR) {
+        throwFatalException("rhs of LIKE expression is %d not VALUE_TYPE_VARCHAR(%d)", mType, VALUE_TYPE_VARCHAR);
+    }
+
+    const int32_t valueUTF8Length = getObjectLength();
+    const int32_t patternUTF8Length = rhs.getObjectLength();
+
+    if (0 == patternUTF8Length) {
+        if (0 == valueUTF8Length) {
+            return getTrue();
+        } else {
+            return getFalse();
+        }
+    }
+
+    char *valueChars = reinterpret_cast<char*>(getObjectValue());
+    char *patternChars = reinterpret_cast<char*>(rhs.getObjectValue());
+    assert(valueChars);
+    assert(patternChars);
+
+    /*
+     * Because lambdas are for poseurs.
+     */
+    class Liker {
+
+    public:
+        Liker(char *valueChars, char* patternChars, int32_t valueUTF8Length, int32_t patternUTF8Length) :
+            valueChars_(valueChars), patternChars_(patternChars),
+            valueCharsEnd_(valueChars + valueUTF8Length), patternCharsEnd_(patternChars + patternUTF8Length)
+             {}
+
+        bool like() {
+            return compareAt( patternChars_, valueChars_);
+        }
+
+    private:
+        /*
+         * Go through a lot of trouble to make sure that corrupt
+         * utf8 data doesn't result in touching uninitialized memory
+         * by copying the character data onto the stack.
+         */
+        uint32_t extractCodePoint( const char *&iterator, const char *endIterator) {
+            /*
+             * Copy the next 6 bytes to a temp buffer and retrieve.
+             * We should only get 4 byte code points, and the library
+             * should only accept 4 byte code points, but once upon a time there
+             * were 6 byte code points in UTF-8 so be careful here.
+             */
+            char nextPotentialCodePoint[] = { 0, 0, 0, 0, 0, 0 };
+            char *nextPotentialCodePointIter = nextPotentialCodePoint;
+            //Copy 6 bytes or until the end
+            ::memcpy( nextPotentialCodePoint, iterator, std::min( 6L, endIterator - iterator));
+
+            /*
+             * Extract the code point, find out how many bytes it was
+             */
+            uint32_t codePoint = utf8::unchecked::next(nextPotentialCodePointIter);
+            long int delta = nextPotentialCodePointIter - nextPotentialCodePoint;
+
+            /*
+             * Increment the iterator that was passed in by ref, by the delta
+             */
+            iterator += delta;
+            return codePoint;
+        }
+
+        bool compareAt(const char *patternIterator, const char *valueIterator) {
+            while (patternIterator < patternCharsEnd_) {
+                const uint32_t nextPatternCodePoint = extractCodePoint(patternIterator, patternCharsEnd_);
+                switch (nextPatternCodePoint) {
+                case '%': {
+                    if (patternIterator  >= patternCharsEnd_) {
+                        return true;
+                    }
+
+                    const char *postPercentPatternIterator = patternIterator;
+                    const uint32_t nextPatternCodePointAfterPercent =
+                            extractCodePoint( patternIterator, patternCharsEnd_);
+                    const bool nextPatternCodePointAfterPercentIsSpecial =
+                            (nextPatternCodePointAfterPercent == '_') ||
+                            (nextPatternCodePointAfterPercent == '%');
+
+                    /*
+                     * This loop tries to skip as many characters as possible with the % by checking
+                     * if the next value character matches the pattern character after the %.
+                     *
+                     * If the next pattern character is special then we always have to recurse to
+                     * match that character. For stacked %s this just skips to the last one.
+                     * For stacked _ it will recurse and demand the correct number of characters.
+                     *
+                     * For a regular character it will recurse if the value character matches the pattern character.
+                     * This saves doing a function call per character and allows us to skip if there is no match.
+                     */
+                    while (valueIterator < valueCharsEnd_) {
+
+                        const char *preExtractionValueIterator = valueIterator;
+                        const uint32_t nextValueCodePoint = extractCodePoint( valueIterator, valueCharsEnd_);
+
+                        const bool nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint =
+                                (nextPatternCodePointAfterPercentIsSpecial ||
+                                        (nextPatternCodePointAfterPercent == nextValueCodePoint));
+
+                        if ( nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint &&
+                                compareAt( postPercentPatternIterator, preExtractionValueIterator)) {
+                            return true;
+                        }
+                    }
+                    return false;
+                }
+                case '_': {
+                    if (valueIterator >= valueCharsEnd_) {
+                        return false;
+                    }
+                    //Extract a code point to consume a character
+                    extractCodePoint( valueIterator, valueCharsEnd_);
+                    break;
+                }
+                default: {
+                    if ((valueIterator >= valueCharsEnd_)) {
+                        return false;
+                    }
+                    const int nextValueCodePoint = extractCodePoint( valueIterator, valueCharsEnd_);
+                    if (nextPatternCodePoint != nextValueCodePoint) {
+                        return false;
+                    }
+                    break;
+                }
+                }
+            }
+            if (valueIterator < valueCharsEnd_) {
+                return false;
+            }
+            return true;
+        }
+        const char *valueChars_;
+        const char *patternChars_;
+        const char *valueCharsEnd_;
+        const char *patternCharsEnd_;
+    };
+
+    Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
+
+    return liker.like() ? getTrue() : getFalse();
+}
 
 template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const {
     const ValueType type = getValueType();

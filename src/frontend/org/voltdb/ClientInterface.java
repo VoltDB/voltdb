@@ -53,7 +53,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
 import org.voltcore.messaging.Mailbox;
-import org.voltcore.messaging.MessagingException;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.network.Connection;
 import org.voltcore.network.InputHandler;
@@ -1077,13 +1076,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     handler.m_hostname, handler.isAdmin(), ccxn,
                     sql, sqlStatements, partitionParam));
 
-        try {
-            m_mailbox.send(m_plannerSiteId, work);
-        } catch (MessagingException ex) {
-            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
-                    task.clientHandle);
-        }
+        m_mailbox.send(m_plannerSiteId, work);
         return null;
     }
 
@@ -1113,15 +1106,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     task.clientHandle, handler.connectionId(), handler.m_hostname,
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString));
 
-        try {
-            // XXX: need to know the async compiler mailbox id.
-            m_mailbox.send(m_plannerSiteId, work);
-        } catch (MessagingException ex) {
-            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                    new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
-                    " No data was read or written.",
-                    task.clientHandle);
-        }
+        // XXX: need to know the async compiler mailbox id.
+        m_mailbox.send(m_plannerSiteId, work);
         return null;
     }
 
@@ -1488,20 +1474,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                      plannedStmtBatch.getSQLStatements(),
                                                      plannedStmtBatch.partitionParam));
 
-                        try {
-                            // XXX: Need to know the async mailbox id.
-                            m_mailbox.send(Long.MIN_VALUE, work);
-                        } catch (MessagingException ex) {
-                            final ClientResponseImpl errorResponse =
-                                new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                                        new VoltTable[0], "Failed to process Ad Hoc request. No data was read or written.",
-                                        plannedStmtBatch.clientHandle);
-                            ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                            buf.putInt(buf.capacity() + 4);
-                            errorResponse.flattenToBuffer(buf);
-                            buf.flip();
-                            ((Connection)(plannedStmtBatch.clientData)).writeStream().enqueue(buf);
-                        }
+                        // XXX: Need to know the async mailbox id.
+                        m_mailbox.send(Long.MIN_VALUE, work);
                     }
                     else {
                         createAdHocTransaction(plannedStmtBatch);

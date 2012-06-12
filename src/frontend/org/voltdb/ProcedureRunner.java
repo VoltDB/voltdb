@@ -52,6 +52,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
+import org.voltdb.utils.MiscUtils;
 
 public class ProcedureRunner {
 
@@ -59,8 +60,8 @@ public class ProcedureRunner {
 
     // SQL statement queue info
     //
-    // This must match MAX_BATCH_COUNT in src/ee/execution/VoltDBEngine.h
-    final static int MAX_BATCH_SIZE = 1000;
+    // This must be less than or equal to MAX_BATCH_COUNT in src/ee/execution/VoltDBEngine.h
+    final static int MAX_BATCH_SIZE = 200;
     static class QueuedSQL {
         SQLStmt stmt;
         ParameterSet params;
@@ -341,10 +342,8 @@ public class ProcedureRunner {
     }
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
-        if (m_batch.size() >= MAX_BATCH_SIZE) {
-            throw new RuntimeException("Procedure attempted to queue more than " + MAX_BATCH_SIZE +
-                    "statements in a single batch.\n  You may use multiple batches of up to 1000 statements," +
-                    "each,\n  but you may also want to consider dividing this work into multiple procedures.");
+        if (stmt == null) {
+            throw new IllegalArgumentException("SQLStmt paramter to voltQueueSQL(..) was null.");
         }
         QueuedSQL queuedSQL = new QueuedSQL();
         queuedSQL.expectation = expectation;
@@ -368,7 +367,42 @@ public class ProcedureRunner {
                                        "the final one");
         }
         m_seenFinalBatch = isFinalSQL;
-        return executeQueriesInABatch(m_batch, isFinalSQL);
+
+        // memo-ize the original batch size here
+        int batchSize = m_batch.size();
+
+        // if batch is small (or reasonable size), do it in one go
+        if (batchSize <= MAX_BATCH_SIZE) {
+            return executeQueriesInABatch(m_batch, isFinalSQL);
+        }
+        // otherwise, break it into sub-batches
+        else {
+            List<VoltTable[]> results = new ArrayList<VoltTable[]>();
+
+            while (m_batch.size() > 0) {
+                int subSize = Math.min(MAX_BATCH_SIZE, m_batch.size());
+
+                // get the beginning of the batch (or all if small enough)
+                // note: this is a view into the larger list and changes to it
+                //  will mutate the larger m_batch.
+                List<QueuedSQL> subBatch = m_batch.subList(0, subSize);
+
+                // decide if this sub-batch should be marked final
+                boolean finalSubBatch = isFinalSQL && (subSize == m_batch.size());
+
+                // run the sub-batch and copy the sub-results into the list of lists of results
+                // note: executeQueriesInABatch removes items from the batch as it runs.
+                //  this means subBatch will be empty after running and since subBatch is a
+                //  view on the larger batch, it removes subBatch.size() elements from m_batch.
+                results.add(executeQueriesInABatch(subBatch, finalSubBatch));
+            }
+
+            // merge the list of lists into something returnable
+            VoltTable[] retval = MiscUtils.concatAll(new VoltTable[0], results);
+            assert(retval.length == batchSize);
+
+            return retval;
+        }
     }
 
     protected VoltTable[] executeQueriesInABatch(List<QueuedSQL> batch, boolean isFinalSQL) {

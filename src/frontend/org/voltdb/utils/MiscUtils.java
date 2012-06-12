@@ -23,6 +23,7 @@ import java.net.ServerSocket;
 import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
 import java.util.Date;
 import java.util.GregorianCalendar;
@@ -504,5 +505,28 @@ public class MiscUtils {
             }
         }
         return statements;
+    }
+
+    /**
+     * Concatenate an list of arrays of typed-objects
+     * @param empty An empty array of the right type used for cloning
+     * @param arrayList A list of arrays to concatenate.
+     * @return The concatenated mega-array.
+     */
+    public static <T> T[] concatAll(final T[] empty, Iterable<T[]> arrayList) {
+        assert(empty.length == 0);
+        if (arrayList.iterator().hasNext() == false) return empty;
+
+        int len = 0;
+        for (T[] subArray : arrayList) {
+            len += subArray.length;
+        }
+        int pos = 0;
+        T[] result = Arrays.copyOf(empty, len);
+        for (T[] subArray : arrayList) {
+            System.arraycopy(subArray, 0, result, pos, subArray.length);
+            pos += subArray.length;
+        }
+        return result;
     }
 }
