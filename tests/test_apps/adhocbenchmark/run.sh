@@ -62,20 +62,59 @@ function _benchmark() {
         --configfile=config.xml \
         --warmup=5 \
         --duration=20 \
+        --querytracefile=$1.queries.out \
         --test=$1
+    echo Sample queries:
+    head -6 $1.queries.out
 }
 
 function benchmark-joins() {
     _benchmark join
 }
 
+function benchmark-star-joins() {
+    _benchmark joinstar
+}
+
 function benchmark-projections() {
     _benchmark projection
+}
+
+function benchmark-SP-joins() {
+    _benchmark joinsp
+}
+
+function benchmark-SP-star-joins() {
+    _benchmark joinstarsp
+}
+
+function benchmark-SP-projections() {
+    _benchmark projectionsp
+}
+
+function benchmark-MP-joins() {
+    _benchmark joinmp
+}
+
+function benchmark-MP-star-joins() {
+    _benchmark joinstarmp
+}
+
+function benchmark-MP-projections() {
+    _benchmark projectionmp
 }
 
 function benchmark() {
     benchmark-joins
     benchmark-projections
+    benchmark-star-joins
+    benchmark-SP-joins
+    benchmark-SP-projections
+    benchmark-SP-star-joins
+    benchmark-MP-joins
+    benchmark-MP-projections
+    # broken by planner bug for now
+    # benchmark-MP-star-joins
 }
 
 function help() {

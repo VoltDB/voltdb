@@ -27,11 +27,11 @@ import java.io.FileWriter;
 import java.io.IOException;
 import java.io.OutputStreamWriter;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Iterator;
 import java.util.List;
 import java.util.NoSuchElementException;
 import java.util.Random;
+import java.util.Set;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.CountDownLatch;
@@ -149,21 +149,16 @@ public class Benchmark {
             if (this.querythrottle < 0)
                 exitWithMessageAndUsage("querythrottle must 0 or a positive integer");
             // We don't know the test names here. Ask for them and use them to validate.
-            List<String> tests = Arrays.asList(BenchmarkConfiguration.getTestNames());
+            Set<String> tests = BenchmarkConfiguration.getTestNames();
             this.test = this.test.toLowerCase();
             if (!tests.contains(this.test)) {
                 StringBuilder validTests = new StringBuilder()
-                    .append("test '").append(this.test).append("' is unknown");
-                boolean first = true;
+                    .append("test '").append(this.test).append("' is unknown, use one of: {");
                 for (String test : tests) {
-                    if (first) {
-                        validTests.append(", use one of: ");
-                        first = false;
-                    } else {
-                        validTests.append(" ");
-                    }
+                    validTests.append(" ");
                     validTests.append(test);
                 }
+                validTests.append(" }");
                 exitWithMessageAndUsage(validTests.toString());
             }
         }
