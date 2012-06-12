@@ -23,23 +23,14 @@
 
 package org.voltdb.iv2;
 
-import java.io.IOException;
-
-import java.lang.reflect.Array;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
-import java.util.Map.Entry;
-import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.mockito.InOrder;
 import static org.mockito.Mockito.*;
 
-import org.voltcore.messaging.VoltMessage;
-
-import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import junit.framework.TestCase;
 import org.junit.Test;
@@ -121,7 +112,7 @@ public class TestTerm extends TestCase
 
     // verify that Term asks initMailbox to send the expected repair messages.
     @SuppressWarnings("unchecked")
-	@Test
+    @Test
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
@@ -172,7 +163,7 @@ public class TestTerm extends TestCase
     // order; unsure this is interesting... This test is on one replica because
     // I'm not sure that we guarentee the orer of iteration across replicas.
     @SuppressWarnings("unchecked")
-	@Test
+    @Test
     public void testRepairSurvivorOrder()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);

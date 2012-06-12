@@ -187,6 +187,13 @@ public class SpScheduler extends Scheduler
 
         // set up duplicate counter. expect exactly the responses corresponding
         // to needsRepair. These may, or may not, include the local site.
+
+        // note that a site should never need to repair itself; so
+        // the repair message must be from a different surviving replica;
+        // that means message.initHSId|coordHSId will be the values of
+        // the original leader. It would be more useful to have the original
+        // ClienInterface HSId somewhere handy.
+
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
                 message.getInitiatorHSId(),
@@ -198,7 +205,7 @@ public class SpScheduler extends Scheduler
             needsRepair.remove(m_mailbox.getHSId());
             // make a copy because handleIv2 non-repair case does?
             Iv2InitiateTaskMessage localWork =
-                new Iv2InitiateTaskMessage(message.getInitiatorHSId(), 
+                new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
 
             final SpProcedureTask task = new SpProcedureTask(m_mailbox, runner,
