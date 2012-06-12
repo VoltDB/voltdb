@@ -140,8 +140,8 @@ public class CSVLoader {
     					String[] info = {m_rowdata, response.getStatusString()};
     					errorInfo.put(m_lineNum, info);
     				}
-    				if (errorInfo.size() >= m_config.abortfailurecount) {
-    					System.err.println("The number of Failure row data exceeds " + m_config.abortfailurecount);
+    				if (errorInfo.size() >= m_config.maxerrors) {
+    					System.err.println("The number of Failure row data exceeds " + m_config.maxerrors);
     					flush();
     					System.exit(1);
     				}
@@ -159,13 +159,13 @@ public class CSVLoader {
 
     private static class CSVConfig extends CLIConfig {
     	@Option(desc = "directory path to produce report files.")
-    	String inputfile = "";
+    	String file = "";
     	
     	@Option(desc = "procedure name to insert the data into the database.")
-    	String procedurename = "";
+    	String procedure = "";
     	
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
-    	String tablename = "";
+    	String table = "";
     	
     	@Option(desc = "maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
@@ -174,7 +174,7 @@ public class CSVLoader {
     	String reportdir ="./";
     	
     	@Option(desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
-    	int abortfailurecount =  100;
+    	int maxerrors =  100;
     	
     	@Option(desc = "the delimiter to use for separating entries.")
     	char separator = CSVParser.DEFAULT_SEPARATOR;
@@ -186,13 +186,13 @@ public class CSVLoader {
     	char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
     	
     	@Option(desc = "sets if characters outside the quotes are ignored.")
-    	boolean strictQuotes = CSVParser.DEFAULT_STRICT_QUOTES;
+    	boolean strictquotes = CSVParser.DEFAULT_STRICT_QUOTES;
     	
     	@Option(desc = "the line number to skip for start reading.")
-    	int skipline = CSVReader.DEFAULT_SKIP_LINES;
+    	int skip = CSVReader.DEFAULT_SKIP_LINES;
     	
     	@Option(desc = "the default leading whitespace behavior to use if none is supplied.")
-    	boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+    	boolean nowhitespace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     	
     	@Option(desc = "the servers to be connected")
     	String servers = "localhost";
@@ -208,12 +208,12 @@ public class CSVLoader {
     	
     	@Override
     	public void validate() {
-    		if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
-    		if (procedurename.equals("") && tablename.equals("") )
+    		if (maxerrors < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
+    		if (procedure.equals("") && table.equals("") )
     			exitWithMessageAndUsage("procedure name or a table name required,but only one of them is fine");
-    		if (!procedurename.equals("") && !tablename.equals("") )
+    		if (!procedure.equals("") && !table.equals("") )
     			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-    		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
+    		if (skip < 0) exitWithMessageAndUsage("skipline must be >= 0");
     		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
     		if (port < 0) exitWithMessageAndUsage("port number must be >= 0");
     	}
@@ -229,12 +229,12 @@ public class CSVLoader {
     		final CSVReader reader;
     		if (CSVLoader.standin)
     			reader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)),
-    					config.separator, config.quotechar, config.escape, config.skipline,
-    					config.strictQuotes, config.ignoreLeadingWhiteSpace);
+    					config.separator, config.quotechar, config.escape, config.skip,
+    					config.strictquotes, config.nowhitespace);
     		else 
-    			reader = new CSVReader(new FileReader(config.inputfile),
-    					config.separator, config.quotechar, config.escape, config.skipline,
-    					config.strictQuotes, config.ignoreLeadingWhiteSpace);
+    			reader = new CSVReader(new FileReader(config.file),
+    					config.separator, config.quotechar, config.escape, config.skip,
+    					config.strictquotes, config.nowhitespace);
             ProcedureCallback cb = null;
 
             // Split server list
@@ -287,8 +287,8 @@ public class CSVLoader {
                     			String[] info = {linedata.toString(), lineCheckResult};
                     			errorInfo.put(outCount.get(), info);
                     		}
-                    		if (errorInfo.size() >= config.abortfailurecount) {
-                    			System.err.println("The number of Failure row data exceeds " + config.abortfailurecount);
+                    		if (errorInfo.size() >= config.maxerrors) {
+                    			System.err.println("The number of Failure row data exceeds " + config.maxerrors);
                     			flush();
                     			System.exit(1);
                     		}
@@ -421,12 +421,12 @@ public class CSVLoader {
     }
     
     private static void configuration () {
-    	if (config.inputfile.equals("")) 
+    	if (config.file.equals("")) 
 			standin = true;
-        if(!config.tablename.equals("")) {
-    		insertProcedure = config.tablename + ".insert";
+        if(!config.table.equals("")) {
+    		insertProcedure = config.table + ".insert";
     	} else {
-    		insertProcedure = config.procedurename;
+    		insertProcedure = config.procedure;
     	}
         if (!config.reportdir.endsWith("/")) 
         	config.reportdir += "/";
