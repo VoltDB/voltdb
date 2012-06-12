@@ -67,9 +67,9 @@ class CSVLoader {
 
 	private static boolean standin = false;
     
-    public static final String invaliderowsfile = "csvinvalidrows.csv";
-    public static final String reportfile = "csvLoaderReport.log";
-    public static final String logfile = "csvLoaderLog.log";
+    public static final String invaliderowsfile = "csvloaderinvalidrows.csv";
+    public static final String reportfile = "csvloaderReport.log";
+    public static final String logfile = "csvloaderLog.log";
 
     private static String insertProcedure = "";
     private static Map <Long,String[]> errorInfo = new TreeMap<Long, String[]>();
