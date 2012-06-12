@@ -23,7 +23,6 @@
 
 package com.auctionexample;
 
-import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
@@ -89,8 +88,8 @@ class Loader {
          		"--abortfailurecount=50",
          		//"--separator=','"
          		};
-    	CSVLoader loader = new CSVLoader( myOptions );
-    	while( loader.readNext() ){
+    	new CSVLoader( myOptions );
+    	while( CSVLoader.readNext() ){
     		// figure out auction start and end times
             final int oneMinuteOfMillis = 1000 * 1000 * 60;
             TimestampType startTime = new TimestampType();
@@ -98,11 +97,13 @@ class Loader {
             TimestampType endTime = new TimestampType(startTime.getTime() + duration);
             String [] addStr = {startTime.toString(),endTime.toString()};
             
-            String str = loader.insertLine( addStr )[0];
+            String str = CSVLoader.insertLine( addStr, 9 )[0];
             if( !str.isEmpty() )
             	itemIds.add( Integer.parseInt( str ) );
     	}
-    	loader.flush();
+    	CSVLoader.drain();
+    	CSVLoader.produceFiles();
+    	CSVLoader.flush();
     	return itemIds;
     }
     
@@ -110,7 +111,7 @@ class Loader {
     static ArrayList<Integer> loadItems1(org.voltdb.client.Client client) throws Exception {
         System.out.printf("Loading ITEM Table\n");
         ArrayList<Integer> itemIds = new ArrayList<Integer>();
-        CSVReader reader = getReaderForPath("datafiles/items.txt");
+        CSVReader reader = getReaderForPath("datafiles/items1.txt");
 
         String[] nextLine = null;
         while ((nextLine = reader.readNext()) != null) {
@@ -177,11 +178,13 @@ class Loader {
          		"--abortfailurecount=50",
          		//"--separator=','"
          		};
-    	CSVLoader loader = new CSVLoader( myOptions );
-    	while( loader.readNext() ){
-    		categoryIds.add( Integer.parseInt( loader.insertLine(null)[0] ) );
+    	new CSVLoader( myOptions );
+    	while( CSVLoader.readNext() ){
+    		categoryIds.add( Integer.parseInt( CSVLoader.insertLine(null, 3)[0] ) );
     	}
-    	loader.flush();
+    	CSVLoader.drain();
+    	CSVLoader.produceFiles();
+    	CSVLoader.flush();
     	return categoryIds;
     }
     
@@ -240,11 +243,13 @@ class Loader {
          		"--abortfailurecount=50",
          		//"--separator=','"
          		};
-    	CSVLoader loader = new CSVLoader( myOptions );
-    	while( loader.readNext() ){
-    		userIds.add( Integer.parseInt( loader.insertLine(null)[0] ) );
+    	new CSVLoader( myOptions );
+    	while( CSVLoader.readNext() ){
+    		userIds.add( Integer.parseInt( CSVLoader.insertLine(null, 8)[0] ) );
     	}
-    	loader.flush();
+    	CSVLoader.drain();
+    	CSVLoader.produceFiles();
+    	CSVLoader.flush();
     	return userIds;
     }
     

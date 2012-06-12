@@ -340,7 +340,7 @@ public class CSVLoader {
     //insert the current line read from csv file ( read by readNext ). 
     //So this is a break down of main(), can be used to attach additional columns to each line.
     //invoke drain() before produceFile() while you use insertLine() with readNext()
-    public static String[] insertLine( String[] additionalStr ) throws NoConnectionsException, IOException, InterruptedException {
+    public static String[] insertLine( String[] additionalStr, int columnCnt ) throws NoConnectionsException, IOException, InterruptedException {
     	int waits = 0;
         int shortWaits = 0;
         String[] correctedLine = null;
@@ -361,21 +361,6 @@ public class CSVLoader {
                     
                     MyCallback cb = new MyCallback(outCount.get(), config, linedata.toString());             
                     String lineCheckResult;
-                    
-                    int columnCnt = 0;
-                    VoltTable procInfo = null;
-                    try {
-                    	procInfo = csvClient.callProcedure("@SystemCatalog",
-                        "PROCEDURECOLUMNS").getResults()[0];
-                        while( procInfo.advanceRow() ) {
-                        	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
-                        		columnCnt++;
-                        	}
-                        }
-                     }
-                     catch (Exception e) {
-                        e.printStackTrace();
-                     }
 
                     if( (lineCheckResult = checkLineFormat(correctedLine, columnCnt))!= null){
                     System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );

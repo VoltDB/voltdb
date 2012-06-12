@@ -79,7 +79,7 @@ public class TestCSVLoader extends TestCase {
 	    					};
 	    int invalidLineCnt = 4;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
-	    test_Interface_lineByLine( mySchema, myOptions, myData, invalidLineCnt );
+	    test_Interface_lineByLine( mySchema, 7, myOptions, myData, invalidLineCnt );
 	}
     /*
     public void testNew() throws Exception 
@@ -325,7 +325,7 @@ public class TestCSVLoader extends TestCase {
         }
 	}
 	
-	public void test_Interface_lineByLine( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
+	public void test_Interface_lineByLine( String my_schema, int columnCnt, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
 		try{
 			BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
 			for( int i = 0; i < my_data.length; i++ )
@@ -365,7 +365,7 @@ public class TestCSVLoader extends TestCase {
         	while( CSVLoader.readNext() )
         	{
         		String [] addStr= null;
-        		CSVLoader.insertLine( addStr );
+        		CSVLoader.insertLine( addStr, columnCnt );
         	}
         	CSVLoader.drain();
         	CSVLoader.produceFiles();
