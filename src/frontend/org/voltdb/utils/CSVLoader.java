@@ -103,7 +103,6 @@ class CSVLoader {
 
     		long currentCount = inCount.incrementAndGet();
 
-    		System.out.println("Put line " + inCount.get() + " to databse");
     		if (currentCount % reportEveryNRows == 0) {
     			System.out.println("Inserted " + currentCount + " rows");
     		}
@@ -328,15 +327,13 @@ class CSVLoader {
     }
     
 	private static void produceFiles() {
-		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
-
-		String path_invaliderowsfile = config.reportdir + CSVLoader.invaliderowsfile;
+		String path_invalidrowfile = config.reportdir + CSVLoader.invaliderowsfile;
 		String path_logfile =  config.reportdir + CSVLoader.logfile;
     	String path_reportfile = config.reportdir  + CSVLoader.reportfile;
     	
 		int bulkflush = 300; // by default right now
 		try {
-			BufferedWriter out_invaliderowfile = new BufferedWriter(new FileWriter(path_invaliderowsfile));
+			BufferedWriter out_invaliderowfile = new BufferedWriter(new FileWriter(path_invalidrowfile));
 
 			BufferedWriter out_logfile = new BufferedWriter(new FileWriter(path_logfile));
 			BufferedWriter out_reportfile = new BufferedWriter(new FileWriter(path_reportfile));
@@ -370,7 +367,10 @@ class CSVLoader {
 			out_invaliderowfile.close();
 			out_logfile.close();
 			out_reportfile.close();
-
+			
+			System.out.println("invalid row file is generated to:" + path_invalidrowfile + "\n"
+					+ "log file is generated to:" + path_logfile + "\n"
+					+ "report file is generated to:" + path_reportfile);
 		} catch (FileNotFoundException e) {
 			System.err.println("CSV file '" + config.inputfile
 					+ "' could not be found.");
