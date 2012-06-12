@@ -53,11 +53,11 @@ public class TestCSVLoader extends TestCase {
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
      String []myOptions = {
-     		"--inputfile=" + userHome + "/test.csv", 
+     		"--file=" + userHome + "/test.csv", 
      		//"--procedurename=BLAH.insert",
      		"--reportdir=" + reportdir,
-     		"--tablename=BLAH",
-     		"--abortfailurecount=50",
+     		"--table=BLAH",
+     		"--maxerrors=50",
      		"--user=",
      		"--password=",
      		"--port="
@@ -287,7 +287,7 @@ public class TestCSVLoader extends TestCase {
             System.out.println("data inserted to table BLAH:\n" + modCount);
             int rowct = modCount.getRowCount();
                         
-            BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
+            BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.path_reportfile));
             int lineCount = 0;
             String line = "";
             String promptMsg = "Number of acknowledged tuples:";
@@ -377,7 +377,7 @@ public class TestCSVLoader extends TestCase {
             System.out.println("data inserted to table BLAH:\n" + modCount);
             int rowct = modCount.getRowCount();
                         
-            BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
+            BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.path_reportfile));
             int lineCount = 0;
             String line = "";
             String promptMsg = "Number of acknowledged tuples:";
@@ -396,7 +396,6 @@ public class TestCSVLoader extends TestCase {
             	}	
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
-            //assertEquals(lineCount, rowct);
             assertEquals(invalidLineCnt,invalidlinecnt);
             
         }
