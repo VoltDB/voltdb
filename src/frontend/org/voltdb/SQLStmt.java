@@ -22,15 +22,19 @@ import org.voltdb.catalog.Statement;
 /**
  * <p>A simple wrapper of a parameterized SQL statement. VoltDB uses this instead of
  * a Java String type for performance reasons and to cache statement meta-data like
- * result schema, etc..</p>
+ * result schema, compiled plan, etc..</p>
  *
  * <p>SQLStmts are used exclusively in subclasses of {@link VoltProcedure}</p>
  *
  * @see VoltProcedure
  */
 public class SQLStmt {
+    // Used for uncompiled SQL.
     String sqlText;
     String joinOrder;
+
+    // Used for compiled SQL
+    SQLStmtPlan plan = null;
 
     /**
      * Construct a SQLStmt instance from a SQL statement.
@@ -55,6 +59,25 @@ public class SQLStmt {
     }
 
     /**
+     * Factory method to construct a SQLStmt instance with a compiled plan attached.
+     *
+     * @param sqlText Valid VoltDB compliant SQL
+     * @param aggregatorFragment Compiled aggregator fragment
+     * @param collectorFragment Compiled collector fragment
+     * @param isReplicatedTableDML Flag set to true if replicated
+     *
+     * @return SQLStmt object with plan added
+     */
+    static SQLStmt createWithPlan(String sqlText,
+                                  String aggregatorFragment,
+                                  String collectorFragment,
+                                  boolean isReplicatedTableDML) {
+        SQLStmt stmt = new SQLStmt(sqlText, null);
+        stmt.plan = new SQLStmtPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML);
+        return stmt;
+    }
+
+    /**
      * Get the text of the SQL statement represented.
      *
      * @return String containing the text of the SQL statement represented.
@@ -64,12 +87,32 @@ public class SQLStmt {
     }
 
     /**
+     * Get the pre-compiled plan, if available.
+     *
+     * @return pre-compiled plan object or null
+     */
+    SQLStmtPlan getPlan() {
+        return plan;
+    }
+
+    /**
      * Get the join order hint supplied in the constructor.
      *
      * @return String containing the join order hint.
      */
     public String getJoinOrder() {
         return joinOrder;
+    }
+
+    /**
+     * Check if single partition.
+     *
+     * @return true if it is single partition
+     */
+    boolean isSinglePartition() {
+        // Check the catalog or the plan, depending on which (if any) is available.
+        return (   (this.catStmt != null && this.catStmt.getSinglepartition())
+                || (this.plan != null && this.plan.getCollectorFragment() == null));
     }
 
     byte statementParamJavaTypes[];

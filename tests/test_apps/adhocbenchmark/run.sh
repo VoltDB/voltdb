@@ -61,7 +61,7 @@ function _benchmark() {
         --servers=localhost \
         --configfile=config.xml \
         --warmup=5 \
-        --duration=60 \
+        --duration=20 \
         --test=$1
 }
 

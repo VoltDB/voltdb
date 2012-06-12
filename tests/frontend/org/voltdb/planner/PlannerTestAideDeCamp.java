@@ -157,7 +157,7 @@ public class PlannerTestAideDeCamp {
             // from trying to infer a constant partitioning value from the statement.
             partitionParameter = "PlannerTestAideDeCamp dummied up single partitioning for QueryPlanner";
         }
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, true);
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, true, true);
         QueryPlanner planner =
             new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
                              hsql, estimates, true, false);

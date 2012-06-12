@@ -66,7 +66,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
     public int runQueryTest(String query, int hash, int spPartialSoFar,
             int expected, int validatingSPresult) throws IOException,
             NoConnectionsException, ProcCallException {
-        PlannerTool.Result result = m_pt.planSql(query, null);
+        PlannerTool.Result result = m_pt.planSql(query, null, true);
         boolean spPlan = result.toString().contains("ALL: null");
         if ((validatingSPresult == VALIDATING_SP_RESULT) != spPlan) {
             System.out.println("Missed: "+ query);

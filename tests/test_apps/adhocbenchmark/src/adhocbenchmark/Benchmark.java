@@ -23,7 +23,9 @@
 
 package adhocbenchmark;
 
+import java.io.FileWriter;
 import java.io.IOException;
+import java.io.OutputStreamWriter;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.Iterator;
@@ -38,11 +40,13 @@ import org.voltdb.CLIConfig;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ClientStats;
 import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.NoConnectionsException;
-import org.voltdb.client.NullCallback;
+import org.voltdb.client.ProcedureCallback;
+import org.voltdb.compiler.AsyncCompilerAgent;
 
 /**
  * Class providing the entire benchmark implementation and command line main().
@@ -62,11 +66,43 @@ public class Benchmark {
     Timer timer;
     // Benchmark start time
     long benchmarkStartTS;
-    // Number of queries generated;
-    long queriesProcessed = 0;
+
+    // Counters
+    private static final class Counters {
+        // Number of queries generated.
+        long queriesGenerated = 0;
+        // Number of queries that failed;
+        long queriesFailed = 0;
+        // Number of queries processed (in call-back).
+        long queriesProcessed = 0;
+
+        public Counters() {
+        }
+    }
+    Counters counters = new Counters();
+
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
+
+    private static final class CallProcedureCallback implements ProcedureCallback {
+        int errorStatus = ClientResponse.SUCCESS;
+        String errorString = null;
+        final Counters counters;
+        public CallProcedureCallback(final Counters counters) {
+            this.counters = counters;
+        }
+        @Override
+        public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (this.counters != null) {
+                this.counters.queriesProcessed++;
+            }
+            if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                this.errorStatus = clientResponse.getStatus();
+                this.errorString = clientResponse.getStatusString();
+            }
+        }
+    }
 
     /**
      * Uses included {@link CLIConfig} class to
@@ -87,11 +123,17 @@ public class Benchmark {
         @Option(desc = "Output file path for raw summary statistics.")
         String statsfile = "";
 
+        @Option(desc = "Output file path for query tracing (disabled by default).")
+        String querytracefile = "";
+
         @Option(desc = "Benchmark duration in seconds (0=infinite).")
         int duration = 60;
 
-        @Option(desc = "Warmup duration in seconds.")
+        @Option(desc = "Warm-up duration in seconds (0=disable warm-up).")
         int warmup = 5;
+
+        @Option(desc = "Maximum # of outstanding transactions (0=not throttled).")
+        int querythrottle = AsyncCompilerAgent.MAX_QUEUE_DEPTH;
 
         @Option(desc = "Test to run.")
         String test = BenchmarkConfiguration.getDefaultTestName();
@@ -102,8 +144,10 @@ public class Benchmark {
                 exitWithMessageAndUsage("displayinterval must be > 0");
             if (this.duration < 0)
                 exitWithMessageAndUsage("duration must be 0 or a positive integer");
-            if (this.warmup <= 0)
-                exitWithMessageAndUsage("warmup must be a positive integer");
+            if (this.warmup < 0)
+                exitWithMessageAndUsage("warmup must be 0 or a positive integer");
+            if (this.querythrottle < 0)
+                exitWithMessageAndUsage("querythrottle must 0 or a positive integer");
             // We don't know the test names here. Ask for them and use them to validate.
             List<String> tests = Arrays.asList(BenchmarkConfiguration.getTestNames());
             this.test = this.test.toLowerCase();
@@ -147,6 +191,12 @@ public class Benchmark {
         this.cliConfig = cliConfig;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        // Throttle so that ad hoc queries don't get rejected with "planner not available".
+        if (this.cliConfig.querythrottle > 0) {
+            System.out.printf("Throttling maximum outstanding transactions to %d\n",
+                              this.cliConfig.querythrottle);
+            clientConfig.setMaxOutstandingTxns(this.cliConfig.querythrottle);
+        }
         this.client = ClientFactory.createClient(clientConfig);
 
         this.periodicStatsContext = this.client.createStatsContext();
@@ -231,7 +281,7 @@ public class Benchmark {
         ClientStats stats = this.periodicStatsContext.fetchAndResetBaseline().getStats();
         long time = Math.round((stats.getEndTimestamp() - this.benchmarkStartTS) / 1000.0);
 
-        System.out.printf("Count %d ", this.queriesProcessed);
+        System.out.printf("Count %d ", this.counters.queriesGenerated);
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
         System.out.printf("Aborts/Failures %d/%d, ",
@@ -253,7 +303,9 @@ public class Benchmark {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Results");
         System.out.println(HORIZONTAL_RULE);
-        System.out.printf("Total queries generated:       %9d\n", this.queriesProcessed);
+        System.out.printf("Total queries generated:       %9d\n", this.counters.queriesGenerated);
+        System.out.printf("Total queries succeeded:       %9d\n", this.counters.queriesGenerated - this.counters.queriesFailed);
+        System.out.printf("Total queries failed:          %9d\n", this.counters.queriesFailed);
         System.out.printf("Query elapsed time:            %9.2f seconds\n", queryElapsedMS / 1000.0);
         System.out.printf("Test overhead elapsed time:    %9.2f seconds\n", (totalElapsedMS - queryElapsedMS)/ 1000.0);
         System.out.printf("Total elapsed time:            %9.2f seconds\n\n", totalElapsedMS / 1000.0);
@@ -411,6 +463,42 @@ public class Benchmark {
         }
     }
 
+    private static class QueryTracer {
+        private final OutputStreamWriter writer;
+        private final boolean doGood;
+
+        QueryTracer(String path) throws IOException {
+            if (path != null && !path.isEmpty()) {
+                this.writer = new FileWriter(path);
+                this.doGood = true;
+            } else {
+                this.writer = null;
+                this.doGood = false;
+            }
+        }
+
+        private void write(String format, Object... args) throws IOException {
+            String msg = String.format(format, args);
+            if (this.writer != null) {
+                this.writer.write(msg);
+                this.writer.write("\n");
+            } else {
+                System.out.println(msg);
+            }
+        }
+
+        void traceGood(String query) throws IOException {
+            if (this.doGood) {
+                this.write("[QUERY] %s", query);
+            }
+        }
+
+        void traceBad(String query, int errorStatus, String errorString) throws IOException {
+            this.write("[BAD] %s", query);
+            this.write("[ERROR(%d)] %s", errorStatus, errorString);
+        }
+    }
+
     /**
      * Core benchmark code.
      * Connect. Initialize. Run the loop. Cleanup. Print Results.
@@ -439,11 +527,20 @@ public class Benchmark {
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
+        // Set up optional query tracer.
+        QueryTracer tracer = new QueryTracer(cliConfig.querytracefile);
+
         // Run the benchmark loop for the requested warmup time
         // The throughput may be throttled depending on client configuration
-        System.out.println("Warming up...");
-        for (String query : new QueryGenerator(tests, this.cliConfig.warmup)) {
-            this.client.callProcedure(new NullCallback(), "@AdHoc", query);
+        if (this.cliConfig.warmup > 0) {
+            System.out.println("Warming up...");
+            CallProcedureCallback cb1 = new CallProcedureCallback(null);
+            for (String query : new QueryGenerator(tests, this.cliConfig.warmup)) {
+                this.client.callProcedure(cb1, "@AdHoc", query);
+                if (cb1.errorStatus != ClientResponse.SUCCESS) {
+                    tracer.traceBad(query, cb1.errorStatus, cb1.errorString);
+                }
+            }
         }
 
         // reset the stats after warmup
@@ -457,12 +554,23 @@ public class Benchmark {
 
         // Run the benchmark for the requested duration.
         System.out.printf("\nRunning '%s' benchmark...\n", this.cliConfig.test);
+        CallProcedureCallback cb2 = new CallProcedureCallback(this.counters);
         for (String query : new QueryGenerator(tests, this.cliConfig.duration)) {
             long startTS = System.currentTimeMillis();
-            this.client.callProcedure(new NullCallback(), "@AdHoc", query);
+            this.client.callProcedure(cb2, "@AdHoc", query);
+            if (cb2.errorStatus != ClientResponse.SUCCESS) {
+                tracer.traceBad(query, cb2.errorStatus, cb2.errorString);
+                this.counters.queriesFailed++;
+            } else {
+                tracer.traceGood(query);
+            }
             queryElapsedMS += (System.currentTimeMillis() - startTS);
-            this.queriesProcessed++;
+            this.counters.queriesGenerated++;
         }
+
+        System.out.printf("\n%d queries generated\n", this.counters.queriesGenerated);
+        System.out.printf("%d queries processed\n", this.counters.queriesProcessed);
+        System.out.printf("%d queries to drain\n\n", this.counters.queriesGenerated - this.counters.queriesProcessed);
 
         printStatistics();
         System.out.println("");
