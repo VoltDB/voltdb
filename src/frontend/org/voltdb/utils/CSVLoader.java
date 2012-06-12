@@ -19,6 +19,7 @@ package org.voltdb.utils;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -165,8 +166,6 @@ class CSVLoader {
     			exitWithMessageAndUsage("procedure name or a table name required,but only one of them is fine");
     		if (!procedurename.equals("") && !tablename.equals("") )
     			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-    		if (inputfile.equals("")) 
-    			standin = true;
     		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
     		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
     		if (port < 0) exitWithMessageAndUsage("port number must be >= 0");
@@ -175,17 +174,12 @@ class CSVLoader {
     
     public static void main(String[] args) {
         long start = System.currentTimeMillis();
-        
         config = new CSVConfig();
-    	
         config.parse(CSVLoader.class.getName(), args);
-        if(!config.tablename.equals("")) {
-    		insertProcedure = config.tablename + ".insert";
-    	} else {
-    		insertProcedure = config.procedurename;
-    	}
-        if (!config.reportdir.endsWith("/")) 
-        	config.reportdir += "/";
+        
+        // configure the parser parameters
+        configuration();
+        
     	int waits = 0;
         int shortWaits = 0;
         
@@ -273,6 +267,26 @@ class CSVLoader {
         System.out.println("CSVLoader elaspsed: " + latency/1000F + " seconds");
     	CSVLoader.produceFiles();
     	flush();
+    }
+    
+    private static void configuration () {
+    	if (config.inputfile.equals("")) 
+			standin = true;
+        if(!config.tablename.equals("")) {
+    		insertProcedure = config.tablename + ".insert";
+    	} else {
+    		insertProcedure = config.procedurename;
+    	}
+        if (!config.reportdir.endsWith("/")) 
+        	config.reportdir += "/";
+        try {
+        	File dir = new File(config.reportdir);
+        	if (!dir.exists()) {
+        		dir.mkdirs();
+        	}
+        } catch (Exception x) {
+        	System.err.println(x.getMessage());
+        }
     }
     
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
