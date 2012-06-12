@@ -79,9 +79,9 @@ class Loader {
        */
     static ArrayList<Integer> loadItems() throws InterruptedException, IOException {
     	ArrayList<Integer> itemIds = new ArrayList<Integer>();
-    	String userHome = System.getProperty("user.home"); 
+    	URL url = Loader.class.getResource("datafiles/items1.txt");
     	String []myOptions = {
-         		"--inputfile="+ userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/items.txt", 
+         		"--inputfile="+ url.getPath(), 
          		"--procedurename=InsertIntoItem",
          		//"--reportdir=" + reportdir,
          		//"--tablename=InsertIntoItem",
