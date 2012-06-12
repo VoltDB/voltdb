@@ -54,13 +54,14 @@ public class TestCSVLoader extends TestCase {
                 "); ";
      String []myOptions = {
      		"--file=" + userHome + "/test.csv", 
-     		//"--procedurename=BLAH.insert",
+     		//"--procedure=BLAH.insert",
      		"--reportdir=" + reportdir,
      		"--table=BLAH",
      		"--maxerrors=50",
      		"--user=",
      		"--password=",
-     		"--port="
+     		"--port=",
+     		"--strictquotes=true"
      		};
      
 	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
