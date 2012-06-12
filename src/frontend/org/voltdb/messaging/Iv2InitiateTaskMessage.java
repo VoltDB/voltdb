@@ -90,9 +90,8 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         super(initiatorHSId, coordinatorHSId, rhs.m_txnId, rhs.isReadOnly());
         m_isSinglePartition = rhs.m_isSinglePartition;
         m_invocation = rhs.m_invocation;
-        m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
-        // should repair advance truncation?
         m_truncationHandle = rhs.m_truncationHandle;
+        m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
     }
 
     @Override

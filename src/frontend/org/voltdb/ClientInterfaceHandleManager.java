@@ -38,6 +38,7 @@ import org.voltcore.network.Connection;
 public class ClientInterfaceHandleManager
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger tmLog = new VoltLogger("TM");
     static final int PART_ID_BITS = 10;
     static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
     static final int PART_ID_SHIFT = 54;
@@ -169,27 +170,27 @@ public class ClientInterfaceHandleManager
         Deque<Iv2InFlight> perPartDeque = m_partitionTxns.get(partitionId);
         if (perPartDeque == null) {
             // whoa, bad
-            hostLog.error("Unable to find handle list for partition: " + partitionId);
+            tmLog.error("Unable to find handle list for partition: " + partitionId);
             return null;
         }
         while (perPartDeque.peekFirst() != null) {
             Iv2InFlight inFlight = perPartDeque.pollFirst();
             if (inFlight.m_ciHandle < ciHandle) {
                 // lost txn, do something eventually
-                hostLog.info("Apparently lost transaction with handle: " + inFlight.m_ciHandle +
+                tmLog.info("Lost transaction with handle: " + inFlight.m_ciHandle +
                         ", partition: " + partitionId);
             }
             else if (inFlight.m_ciHandle > ciHandle) {
                 // we've gone too far, need to jam this back into the front of the deque and run away.
                 perPartDeque.addFirst(inFlight);
-                hostLog.error("Handle missing: " + ciHandle);
+                tmLog.error("Handle missing: " + ciHandle);
                 break;
             }
             else {
                 return inFlight;
             }
         }
-        hostLog.error("Unable to find Client data for client interface handle: " + ciHandle);
+        tmLog.error("Unable to find Client data for client interface handle: " + ciHandle);
         return null;
     }
 
