@@ -47,11 +47,8 @@ project_start = '''\
     <database>
         <schemas>
             <schema path='ddl.sql' />
-        </schemas>
-        <partitions>'''
-project_partition="            <partition table='%s' column='%s' />"
+        </schemas>'''
 project_end = '''\
-        </partitions>
     </database>
 </project>'''
 announcement_separator = '-' * 42
@@ -131,11 +128,7 @@ def get_tables():
 
 def generate_project(tables):
     yield project_start
-    for table in tables:
-        if table.pk is not None:
-            for variation in range(table.nvariations):
-                yield project_partition % ('%s_%d' % (table.name, variation+1),
-                                                      table.columns[table.pk].name)
+    #TODO: support partitioning
     yield project_end
 
 def generate_comma_separated_list(generator, indent, comment):
