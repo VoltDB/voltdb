@@ -17,7 +17,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestCSVLoader extends TestCase {
 	
-	private String simpleSchema;
 	private String pathToCatalog;
     private String pathToDeployment;
     private ServerThread localServer;
@@ -29,14 +28,6 @@ public class TestCSVLoader extends TestCase {
     private String reportdir = userHome + "/";
     String path_csv = userHome + "/" + "test.csv";
     
-    private String []options = {
-    		"--inputfile=" + userHome + "/test.csv", 
-    		//"--procedurename=BLAH.insert",
-    		"--reportdir=" + reportdir,
-    		"--tablename=BLAH",
-    		"--abortfailurecount=50",
-    		};
-
     @Override
     protected void setUp() throws Exception
     {
@@ -67,24 +58,26 @@ public class TestCSVLoader extends TestCase {
      		"--reportdir=" + reportdir,
      		"--tablename=BLAH",
      		"--abortfailurecount=50",
-     		//"--separator=','"
+     		"--user=",
+     		"--password=",
+     		"--port="
      		};
      
 	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
-	    		  			"10,10,10,10 101 010,second,2.20,2.22",
-	    					"2,2,2,222222,second,3.30,null",
+	    					"2,2,2,222222,second,3.30,NULL",
 	    					"3,3,3,333333, third ,NULL, 3.33",
-	    					"4,4,4,444444, null ,4.40 ,4.44",
+	    					"4,4,4,444444, NULL ,4.40 ,4.44",
 	    					"5,5,5,5555555, fifth, 5.50, 5.55",
-	    	 			    "6,6,null,666666, sixth, 6.60, 6.66",
-	    					"7,null,7,7777777, seventh, 7.70, 7.77 ",
+	    	 			    "6,6,NULL,666666, sixth, 6.60, 6.66",
+	    					"7,NULL,7,7777777, seventh, 7.70, 7.77 ",
 	    					"11, 1,1,\"1,000\",first,1.10,1.11",
 	    					//invalid lines below
 	    					"8, 8",
 	    					"",
+	    					"10,10,10,10 101 010,second,2.20,2.22",
 	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
 	    					};
-	    int invalidLineCnt = 3;
+	    int invalidLineCnt = 4;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	    test_Interface_lineByLine( mySchema, myOptions, myData, invalidLineCnt );
 	}
@@ -368,17 +361,14 @@ public class TestCSVLoader extends TestCase {
         	client = ClientFactory.createClient();
         	client.createConnection("localhost");
         	
-        	CSVLoader loader = new CSVLoader( my_options );
-        	long start = System.currentTimeMillis();
-        	while( loader.readNext() )
+        	new CSVLoader( my_options );
+        	while( CSVLoader.readNext() )
         	{
         		String [] addStr= null;
-        		loader.insertLine( addStr );
+        		CSVLoader.insertLine( addStr );
         	}
-        	loader.setLatency(System.currentTimeMillis()-start);
-        	System.out.println("CSVLoader elaspsed: " + loader.getLatency()/1000F + " seconds");
-        	loader.drain();
-        	loader.produceInvalidRowsFile();
+        	CSVLoader.drain();
+        	CSVLoader.produceFiles();
         	CSVLoader.flush();
             // do the test
             

@@ -19,6 +19,7 @@ package org.voltdb.utils;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -27,7 +28,6 @@ import java.io.InputStreamReader;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.TreeMap;
-import java.util.Vector;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.apache.commons.lang3.ArrayUtils;
@@ -35,6 +35,7 @@ import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -49,10 +50,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  * (or pass it to any stored proc, but ignoring any result other than the success code.).
  *
  * TODO:
- *   - Nulls are not handled (or at least I didn't test them).
- *   - Assumes localhost
- *   - Assumes no username/password
- *   - Usage help is ugly and cryptic: options are listed but not described.
  *   - No associated test suite.
  *   - Forces JVM into UTC. All input date TZs assumed to be GMT+0
  *   - Requires canonical JDBC SQL timestamp format
@@ -68,18 +65,16 @@ public class CSVLoader {
     private static int reportEveryNRows = 10000;
     private static int waitSeconds = 10;
     
-    final CSVConfig config;
-    private long latency = -1;
-
+    private static CSVConfig config = null;
+    private static long latency = -1;
 	private static boolean standin = false;
     
-    public static final String invaliderowsfile = "csvinvalidrows.csv";
-    public static final String reportfile = "csvLoaderReport.log";
-    public static final String logfile = "csvLoaderLog.log";
-
+    public static final String invaliderowsfile = "csvloaderinvalidrows.csv";
+    public static final String reportfile = "csvloaderReport.log";
+    public static final String logfile = "csvloaderLog.log";
     private static String insertProcedure = "";
     private static Map <Long,String[]> errorInfo = new TreeMap<Long, String[]>();
-    
+
     private static CSVReader csvReader;
     private static Client csvClient;
     private static String [] csvLine;
@@ -92,14 +87,9 @@ public class CSVLoader {
     	CSVConfig cfg = new CSVConfig();
     	cfg.parse(CSVLoader.class.getName(), options);
     	
-    	this.config = cfg;
-    	if(!config.tablename.equals("")) {
-    		insertProcedure = config.tablename + ".insert";
-    	} else {
-    		insertProcedure = config.procedurename;
-    	}
+    	config = cfg;
+    	configuration();
     	try {
-    		final CSVReader reader;
     		if (CSVLoader.standin)
     			csvReader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)),
     					config.separator, config.quotechar, config.escape, config.skipline,
@@ -108,7 +98,6 @@ public class CSVLoader {
     			csvReader = new CSVReader(new FileReader(config.inputfile),
     					config.separator, config.quotechar, config.escape, config.skipline,
     					config.strictQuotes, config.ignoreLeadingWhiteSpace);
-            ProcedureCallback cb = null;
 
             csvClient = ClientFactory.createClient();
             csvClient.createConnection("localhost");
@@ -129,8 +118,6 @@ public class CSVLoader {
 		} catch (Exception x) {
 			System.err.println(x.getMessage());
 		}
-		
-    	
     }
     
     private static final class MyCallback implements ProcedureCallback {
@@ -155,6 +142,7 @@ public class CSVLoader {
     				}
     				if (errorInfo.size() >= m_config.abortfailurecount) {
     					System.err.println("The number of Failure row data exceeds " + m_config.abortfailurecount);
+    					flush();
     					System.exit(1);
     				}
     			}
@@ -163,7 +151,6 @@ public class CSVLoader {
 
     		long currentCount = inCount.incrementAndGet();
 
-    		System.out.println("Put line " + inCount.get() + " to databse");
     		if (currentCount % reportEveryNRows == 0) {
     			System.out.println("Inserted " + currentCount + " rows");
     		}
@@ -179,9 +166,6 @@ public class CSVLoader {
     	
     	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
     	String tablename = "";
-    	
-//    	@Option(desc = "trim whitespace in each line loaded from the csv file if this parameter is set to be true. Will not trim whitespace for string( varchar ).")
-//    	boolean trimwhitespace = false;
     	
     	@Option(desc = "maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
@@ -210,33 +194,36 @@ public class CSVLoader {
     	@Option(desc = "the default leading whitespace behavior to use if none is supplied.")
     	boolean ignoreLeadingWhiteSpace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     	
+    	@Option(desc = "the servers to be connected")
+    	String servers = "localhost";
+    	
+    	@Option(desc = "user name that is used to connect to the servers,by defalut null")
+    	String user = "";
+    	
+    	@Option(desc = "password for this user to use to connect the servers,by defalut null")
+    	String password = "";
+    	
+    	@Option(desc = "port to be used for the servers right now")
+    	int port = Client.VOLTDB_SERVER_PORT;
+    	
     	@Override
     	public void validate() {
     		if (abortfailurecount < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
     		if (procedurename.equals("") && tablename.equals("") )
-    			exitWithMessageAndUsage("procedure name or a table name required");
+    			exitWithMessageAndUsage("procedure name or a table name required,but only one of them is fine");
     		if (!procedurename.equals("") && !tablename.equals("") )
     			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
-    		if (inputfile.equals("")) 
-    			standin = true;
     		if (skipline < 0) exitWithMessageAndUsage("skipline must be >= 0");
     		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
+    		if (port < 0) exitWithMessageAndUsage("port number must be >= 0");
     	}
     }
     
-    public CSVLoader (CSVConfig cfg) {
-    	this.config = cfg;
-    	
-    	if(!config.tablename.equals("")) {
-    		insertProcedure = config.tablename + ".insert";
-    	} else {
-    		insertProcedure = config.procedurename;
-    	}
-    }
-    
-    public void run() {
+    public static void main(String[] args) throws IOException, InterruptedException {
+        long start = System.currentTimeMillis();
     	int waits = 0;
         int shortWaits = 0;
+        new CSVLoader( args );
         
     	try {
     		final CSVReader reader;
@@ -250,45 +237,49 @@ public class CSVLoader {
     					config.strictQuotes, config.ignoreLeadingWhiteSpace);
             ProcedureCallback cb = null;
 
-            final Client client = ClientFactory.createClient();
-            client.createConnection("localhost");
+            // Split server list
+            String[] serverlist = config.servers.split(",");
             
+            // Create connection
+            ClientConfig c_config = new ClientConfig(config.user,config.password);
+            c_config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
+            final Client client = CSVLoader.getClient(c_config, serverlist, config.port);
             boolean lastOK = true;
             String line[] = null;
+            
+            int columnCnt = 0;
+            VoltTable procInfo = null;
+            //Vector<Integer> strColIndex = new Vector<Integer>();
+            try {
+            	procInfo = client.callProcedure("@SystemCatalog",
+                "PROCEDURECOLUMNS").getResults()[0];
+                while( procInfo.advanceRow() ) {
+                	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
+                			//if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
+                				//strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
+                			
+                		columnCnt++;
+                	}
+                }
+             }
+             catch (Exception e) {
+                e.printStackTrace();
+             }
 
             while ((config.limitrows-- > 0) && (line = reader.readNext()) != null) {
             	outCount.incrementAndGet();
                 boolean queued = false;
                 while (queued == false) {
                 	StringBuilder linedata = new StringBuilder();
-                    for(String s : line) 
-                    	linedata.append(s);
-                	
+                    for(int i = 0; i < line.length; i++) {
+                    	linedata.append(line[i]);
+                    	if (i != line.length -1)
+                    		linedata.append(",");
+                    }
                 	String[] correctedLine = line;
-                    // TODO(): correct the line here
-                    
                     cb = new MyCallback(outCount.get(), config, linedata.toString());
-                    
                     String lineCheckResult;
-                    
-                    int columnCnt = 0;
-                    VoltTable procInfo = null;
-                    //Vector<Integer> strColIndex = new Vector<Integer>();
-                    try {
-                    	procInfo = client.callProcedure("@SystemCatalog",
-                        "PROCEDURECOLUMNS").getResults()[0];
-                        while( procInfo.advanceRow() ) {
-                        	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
-                        			//if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
-                        				//strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
-                        			
-                        		columnCnt++;
-                        	}
-                        }
-                     }
-                     catch (Exception e) {
-                        e.printStackTrace();
-                     }
+                     
                     if( (lineCheckResult = checkLineFormat(correctedLine, columnCnt))!= null){
                     	System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );
                     	synchronized (errorInfo) {
@@ -298,12 +289,14 @@ public class CSVLoader {
                     		}
                     		if (errorInfo.size() >= config.abortfailurecount) {
                     			System.err.println("The number of Failure row data exceeds " + config.abortfailurecount);
-                        		System.exit(1);
+                    			flush();
+                    			System.exit(1);
                     		}
                     	}
                     	break;
                     }
                     queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    
                     if (queued == false) {
                         ++waits;
                         if (lastOK == false) {
@@ -327,14 +320,16 @@ public class CSVLoader {
                 System.out.println("Waited too briefly? " + shortWaits + " times");
             }
         }
-        //return inCount.get();
     	
+        latency = System.currentTimeMillis()-start;
+        System.out.println("CSVLoader elaspsed: " + latency/1000F + " seconds");
+    	produceFiles();
+    	flush();
     }
     
     //works with insertLine
     //return true if next line of csv file is not null, load the line into this.csvLine.
-    //else produceInvalid 
-    public boolean readNext() throws IOException {
+    public static boolean readNext() throws IOException {
     	if ( (config.limitrows-- > 0) && (csvLine = csvReader.readNext()) != null )
     		return true;
     	else{
@@ -342,7 +337,10 @@ public class CSVLoader {
     	}
     }
     
-    public String[] insertLine( String[] additionalStr ) throws NoConnectionsException, IOException, InterruptedException {
+    //insert the current line read from csv file ( read by readNext ). 
+    //So this is a break down of main(), can be used to attach additional columns to each line.
+    //invoke drain() before produceFile() while you use insertLine() with readNext()
+    public static String[] insertLine( String[] additionalStr ) throws NoConnectionsException, IOException, InterruptedException {
     	int waits = 0;
         int shortWaits = 0;
         String[] correctedLine = null;
@@ -360,7 +358,6 @@ public class CSVLoader {
                     	linedata.append(s);
                 	
                 	correctedLine = csvLine;
-                    // TODO(): correct the line here
                     
                     MyCallback cb = new MyCallback(outCount.get(), config, linedata.toString());             
                     String lineCheckResult;
@@ -412,59 +409,16 @@ public class CSVLoader {
                 System.out.println("Waited too briefly? " + shortWaits + " times");
             }
         }
-        //return inCount.get();
         return correctedLine;
     }
     
-    
-    
-    /**
-     * TODO(xin): add line number data into the callback and add the invalid line number 
-     * into a list that will help us to produce a separate file to record the invalid line
-     * data in the csv file.
-     * 
-     * Asynchronously invoking procedures to response the actual wrong line number and 
-     * start from last wrong line in the csv file is not easy. You can not ensure the 
-     * FIFO order of the callback.
-     * @param args
-     * @return long number of the actual rows acknowledged by the database server
-     * @throws InterruptedException 
-     * @throws IOException 
-     */
-    
-
-    public static void main(String[] args) throws InterruptedException, IOException {
-        long start = System.currentTimeMillis();
-        
-    	CSVLoader loader = new CSVLoader( args );
-    	loader.run();
-    	loader.setLatency(System.currentTimeMillis()-start);
-    	
-    	loader.produceInvalidRowsFile();
-    	loader.flush();
-    	
-    	System.out.println("CSVLoader elaspsed: " + loader.getLatency()/1000F + " seconds");
-    }
-    /**
-     * Check for each line
-     * TODO(zheng):
-     * Use the client handler to get the schema of the table, and then check the number of
-     * parameters it expects with the input line fragements.
-     * Check the following:
-     * 1.blank line
-     * 2.# of attributes in the insertion procedure
-     * And does other pre-checks...(figure out it later) 
-     * @param linefragement
-     */
-
-    private String checkLineFormat(String[] linefragement, int columnCnt ) {
+    private static String checkLineFormat(String[] linefragement, int columnCnt ) {
     	String msg = "";
         
          if( linefragement.length == 1 && linefragement[0].equals( "" ) ) {
         		msg = "checkLineFormat Error: blank line";
         		return msg;
          }
-       //# attributes not match
         if( linefragement.length != columnCnt ){
         	msg = "checkLineFormat Error: # of attributes do not match, # of attributes needed: "+columnCnt;
         	return msg;
@@ -474,28 +428,50 @@ public class CSVLoader {
         	for(int i=0; i<linefragement.length;i++) {
         		//trim white space in this line.
         		linefragement[i] = linefragement[i].trim();
-        		if ((linefragement[i]).indexOf("NULL") != -1 || (linefragement[i]).indexOf("null") != -1)
+        		if ((linefragement[i]).equals("NULL"))
         			linefragement[i] = null;
         	}
         } 
         return null;
     }
-   
-    public long getSleepTime(){
-    	return this.waitSeconds;
+    
+    private static void configuration () {
+    	if (config.inputfile.equals("")) 
+			standin = true;
+        if(!config.tablename.equals("")) {
+    		insertProcedure = config.tablename + ".insert";
+    	} else {
+    		insertProcedure = config.procedurename;
+    	}
+        if (!config.reportdir.endsWith("/")) 
+        	config.reportdir += "/";
+        try {
+        	File dir = new File(config.reportdir);
+        	if (!dir.exists()) {
+        		dir.mkdirs();
+        	}
+        } catch (Exception x) {
+        	System.err.println(x.getMessage());
+        }
     }
     
-    /**
-	 * TODO(xin): produce the invalid row file from
-	 * Bulk the flush later...
-	 * @param inputFile
-     * @throws InterruptedException 
-	 */
-	public void produceInvalidRowsFile() throws InterruptedException {
-		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
-		// TODO: add the inputFileName to the outputFileName
+    public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
+    {
+        final Client client = ClientFactory.createClient(config);
+
+        for (String server : servers)
+            client.createConnection(server.trim(), port);
+        return client;
+    }
+ 
+	public static void produceFiles() { 
+		String myinsert = insertProcedure;
+		myinsert = myinsert.replaceAll("\\.", "_");
+		String path_invalidrowfile = config.reportdir + myinsert + "_"+ CSVLoader.invaliderowsfile;
+		String path_logfile =  config.reportdir + myinsert + "_"+ CSVLoader.logfile;
+    	String path_reportfile = config.reportdir  + myinsert + "_"+ CSVLoader.reportfile;
     	
-		int bulkflush = 3; // by default right now
+		int bulkflush = 300; // by default right now
 		try {
 			long linect = 0;
 
@@ -505,7 +481,6 @@ public class CSVLoader {
 					System.out.println("internal error, infomation is not enough");
 				linect++;
 				out_invaliderowfile.write(info[0] + "\n");
-
 				String message = "invalid line " + irow + ":  " + info[0] + "\n";
 				System.err.print(message);
 				out_logfile.write(message + info[1] + "\n"); 
@@ -515,32 +490,30 @@ public class CSVLoader {
 				}
 			}
 			// Get elapsed time in seconds
-			float elapsedTimeSec = this.getLatency()/1000F;
+			float elapsedTimeSec = latency / 1000F;
 			out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec + " seconds\n");
 			out_reportfile.write("Number of tuples tring to insert:" + outCount.get() + "\n");
 			out_reportfile.write("Number of failed tuples:" + errorInfo.size() + "\n");
 			out_reportfile.write("Number of acknowledged tuples:     " + inCount.get() + "\n");
 			out_reportfile.write("CSVLoader rate: " + outCount.get() / elapsedTimeSec + " row/s\n");
-
-			// TODO(xin): Add more report message
-
+			
+			System.out.println("invalid row file is generated to:" + path_invalidrowfile + "\n"
+					+ "log file is generated to:" + path_logfile + "\n"
+					+ "report file is generated to:" + path_reportfile);
+			
+			out_invaliderowfile.flush();
+			out_logfile.flush();
+			out_reportfile.flush();
 		} catch (FileNotFoundException e) {
-			System.err.println("CSV file '" + config.inputfile
-					+ "' could not be found.");
+			System.err.println("CSV report directory '" + config.reportdir
+					+ "' does not exist.");
 		} catch (Exception x) {
 			System.err.println(x.getMessage());
 		}
+		
     }
-
-	public float getLatency() {
-		return latency;
-	}
-
-	public void setLatency(long latency) {
-		this.latency = latency;
-	}
 	
-	public void drain() throws NoConnectionsException, InterruptedException {
+	public static void drain() throws NoConnectionsException, InterruptedException {
 		csvClient.drain();
 	}
 	
@@ -548,11 +521,9 @@ public class CSVLoader {
 		inCount.set( 0 );
 		outCount.set( 0 );
 		errorInfo.clear();
+		
 		csvReader.close();
         csvClient.close();
-		out_invaliderowfile.flush();
-		out_logfile.flush();
-		out_reportfile.flush();
 		out_invaliderowfile.close();
 		out_logfile.close();
 		out_reportfile.close();

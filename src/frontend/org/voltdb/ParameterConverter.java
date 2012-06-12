@@ -124,7 +124,6 @@ public class ParameterConverter {
         if ((slot == short.class) && (pclass == Short.class || pclass == Byte.class)) return param;
         if ((slot == byte.class) && (pclass == Byte.class)) return param;
         if ((slot == double.class) && (param instanceof Number)) return ((Number)param).doubleValue();
-        if ((slot == float.class) && (param instanceof Number)) return ((Number)param).floatValue();
         if ((slot == String.class) && (pclass == String.class)) return param;
         if (slot == TimestampType.class) {
             if (pclass == Long.class) return new TimestampType((Long)param);
@@ -248,8 +247,7 @@ public class ParameterConverter {
         // Coerce strings to primitive numbers.
         else if (pclass == String.class) {
             try {
-            	//String value = ((String) param).trim();
-            	String value = ((String) param).replaceAll("\\s","");
+            	String value = ((String) param).trim();
             	value = value.replaceAll("\\,","");
             	if (slot == byte.class) {
                     return Byte.parseByte(value);
@@ -265,9 +263,6 @@ public class ParameterConverter {
                 }
                 if (slot == double.class) {
                 	return Double.parseDouble(value);
-                }
-                if (slot == float.class) {
-                	return Float.parseFloat(value);
                 }
             }
             catch (NumberFormatException nfe) {
