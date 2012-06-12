@@ -18,11 +18,13 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Collections;
 
 import java.util.concurrent.atomic.AtomicLong;
 
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
@@ -57,24 +59,35 @@ public class SpScheduler extends Scheduler
 
     // This is going to run in the BabySitter's thread.  This and deliver are synchronized by
     // virtue of both being called on InitiatorMailbox and not directly called.
+    // (That is, InitiatorMailbox's API, used by BabySitter, is synchronized on the same
+    // lock deliver() is synchronized on.)
     @Override
     public void updateReplicas(List<Long> replicas)
     {
+        // First - correct the official replica set.
         m_replicaHSIds = replicas;
-        Iterator<DuplicateCounter> iter = m_duplicateCounters.values().iterator();
-        while (iter.hasNext()) {
-            DuplicateCounter counter = iter.next();
+
+        // Cleanup duplicate counters and collect DONE counters
+        // in this list for further processing.
+        List<Long> doneCounters = new LinkedList<Long>();
+        for (DuplicateCounter counter : m_duplicateCounters.values()) {
             int result = counter.updateReplicas(m_replicaHSIds);
             if (result == DuplicateCounter.DONE) {
-                m_duplicateCounters.remove(counter);
-                VoltMessage resp = counter.getLastResponse();
-                if (resp != null) {
-                    m_mailbox.send(counter.m_destinationId, resp);
-                }
-                else {
-                    hostLog.warn("TXN " + counter.getTxnId() + " lost all replicas and " +
-                            "had no responses.  This should be impossible?");
-                }
+                doneCounters.add(counter.getTxnId());
+            }
+        }
+
+        // Maintain the CI invariant that responses arrive in txnid order.
+        Collections.sort(doneCounters);
+        for (Long txnId : doneCounters) {
+            DuplicateCounter counter = m_duplicateCounters.remove(txnId);
+            VoltMessage resp = counter.getLastResponse();
+            if (resp != null) {
+                m_mailbox.send(counter.m_destinationId, resp);
+            }
+            else {
+                hostLog.warn("TXN " + counter.getTxnId() + " lost all replicas and " +
+                        "had no responses.  This should be impossible?");
             }
         }
     }
