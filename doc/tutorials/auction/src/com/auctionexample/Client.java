@@ -254,7 +254,7 @@ public class Client {
 
         // Load our starting data from our CSV files using the Loader class
         try {
-            allAuctionIds = Loader.loadItems();
+            allAuctionIds = Loader.loadItems(client);
             //allAuctionIds = Loader.loadItems1(client);
             activeAuctionIds.addAll(allAuctionIds);
             userIds = Loader.loadUsers();

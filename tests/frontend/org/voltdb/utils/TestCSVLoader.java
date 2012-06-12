@@ -54,7 +54,7 @@ public class TestCSVLoader extends TestCase {
                 "); ";
      String []myOptions = {
      		"--file=" + userHome + "/test.csv", 
-     		//"--procedurename=BLAH.insert",
+     		//"--procedure=BLAH.insert",
      		"--reportdir=" + reportdir,
      		"--table=BLAH",
      		"--maxerrors=50",
@@ -78,10 +78,10 @@ public class TestCSVLoader extends TestCase {
 	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
 	    					};
 	    int invalidLineCnt = 4;
-		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+		//test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	    test_Interface_lineByLine( mySchema, 7, myOptions, myData, invalidLineCnt );
 	}
-    /*
+    
     public void testNew() throws Exception 
    	{
         String mySchema =
@@ -99,20 +99,23 @@ public class TestCSVLoader extends TestCase {
                    //"clm_varinary varbinary default null" + // for later
                    "); ";
         String []myOptions = {
-        		"--inputfile=" + userHome + "/test.csv", 
-        		//"--procedurename=BLAH.insert",
-        		"--reportdir=" + reportdir,
-        		"--tablename=BLAH",
-        		"--abortfailurecount=50",
-        		};
+         		"--file=" + userHome + "/test.csv", 
+         		//"--procedure=BLAH.insert",
+         		"--reportdir=" + reportdir,
+         		"--table=BLAH",
+         		"--maxerrors=50",
+         		"--user=",
+         		"--password=",
+         		"--port="
+         		};
         
-   	    String []myData = { "1,1111111111",
-   	    					"2,12131231231"
+   	    String []myData = { "1,2012-06-08 18:07:57.672",
+   	    					"2,-1213131"
    	    					};
    	    int invalidLineCnt = 0;
    		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
    	}
-    */
+    
     
     //csvloader --inputfile=/tmp/ --tablename=VOTES --abortfailurecount=50 
 //    public void testOptions() throws Exception 
@@ -306,7 +309,7 @@ public class TestCSVLoader extends TestCase {
             	}	
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
-            //assertEquals(lineCount, rowct);
+            assertEquals(lineCount, rowct);
             assertEquals(invalidLineCnt, invalidlinecnt);
             
         }
@@ -396,6 +399,7 @@ public class TestCSVLoader extends TestCase {
             	}	
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
+            assertEquals(lineCount, rowct);
             assertEquals(invalidLineCnt,invalidlinecnt);
             
         }

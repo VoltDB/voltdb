@@ -73,20 +73,21 @@ class Loader {
      *
      * @param client Connection to the database.
      * @return An ArrayList of ids of newly inserted objects.
-     * @throws IOException 
-     * @throws InterruptedException 
      * @throws Exception Rethrows any exceptions thrown from within.
        */
-    static ArrayList<Integer> loadItems() throws InterruptedException, IOException {
+    static ArrayList<Integer> loadItems( org.voltdb.client.Client client ) throws Exception {
     	ArrayList<Integer> itemIds = new ArrayList<Integer>();
     	String userHome = System.getProperty("user.home"); 
+ 
     	String []myOptions = {
-         		"--inputfile="+ userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/items.txt", 
-         		"--procedurename=InsertIntoItem",
+         		"--file=" + userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/items.txt", 
+    			"--procedure=InsertIntoItem",
          		//"--reportdir=" + reportdir,
-         		//"--tablename=InsertIntoItem",
-         		"--abortfailurecount=50",
-         		//"--separator=','"
+         		//"--table=InsertIntoItem",
+         		"--maxerrors=50",
+         		"--user=program",
+         		"--password=pass",
+         		"--port="
          		};
     	new CSVLoader( myOptions );
     	while( CSVLoader.readNext() ){
@@ -97,9 +98,21 @@ class Loader {
             TimestampType endTime = new TimestampType(startTime.getTime() + duration);
             String [] addStr = {startTime.toString(),endTime.toString()};
             
-            String str = CSVLoader.insertLine( addStr, 9 )[0];
-            if( !str.isEmpty() )
-            	itemIds.add( Integer.parseInt( str ) );
+            String [] str = CSVLoader.insertLine( addStr, 9 ).clone();
+           
+            if( !str[0].isEmpty() )
+            {
+            	int itemId = Integer.parseInt( str[0] );
+            	itemIds.add( itemId );
+            	double startPrice = Double.parseDouble( str[6] );     
+            	// insert a user-less bid into the bid table with price = auction.startprice
+            	
+                VoltTable[] table = client.callProcedure("InsertIntoBid", itemId, itemId, -1, 0L, startPrice).getResults();
+                if (table.length != 2)
+                    throw new Exception("InsertIntoBid returned the wrong number of tables.");
+                if (table[0].asScalarLong() != 1)
+                    throw new Exception("InsertIntoBid modified the wrong number of tuples.");
+            }
     	}
     	CSVLoader.drain();
     	CSVLoader.produceFiles();
@@ -171,12 +184,14 @@ class Loader {
     	ArrayList<Integer> categoryIds = new ArrayList<Integer>();
     	String userHome = System.getProperty("user.home"); 
     	String []myOptions = {
-         		"--inputfile="+ userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/categories.txt", 
-         		"--procedurename=InsertIntoCategory",
+         		"--file=" + userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/categories.txt", 
+         		"--procedure=InsertIntoCategory",
          		//"--reportdir=" + reportdir,
-         		//"--tablename=InsertIntoItem",
-         		"--abortfailurecount=50",
-         		//"--separator=','"
+         		//"--table=BLAH",
+         		"--maxerrors=50",
+         		"--user=program",
+         		"--password=pass",
+         		"--port="
          		};
     	new CSVLoader( myOptions );
     	while( CSVLoader.readNext() ){
@@ -236,12 +251,14 @@ class Loader {
     	ArrayList<Integer> userIds = new ArrayList<Integer>();
     	String userHome = System.getProperty("user.home"); 
     	String []myOptions = {
-         		"--inputfile="+ userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/users.txt", 
-         		"--procedurename=InsertIntoUser",
+         		"--file=" + userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/users.txt", 
+         		"--procedure=InsertIntoUser",
          		//"--reportdir=" + reportdir,
-         		//"--tablename=InsertIntoItem",
-         		"--abortfailurecount=50",
-         		//"--separator=','"
+         		//"--table=BLAH",
+         		"--maxerrors=50",
+         		"--user=program",
+         		"--password=pass",
+         		"--port="
          		};
     	new CSVLoader( myOptions );
     	while( CSVLoader.readNext() ){

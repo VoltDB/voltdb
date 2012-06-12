@@ -365,8 +365,6 @@ public class CSVLoader {
                     }
                     lastOK = queued;
             }
-
-        System.out.println("Inserted " + outCount.get() + " and acknowledged " + inCount.get() + " rows (final)");
         if (waits > 0) {
             System.out.println("Waited " + waits + " times");
             if (shortWaits > 0) {
@@ -480,6 +478,7 @@ public class CSVLoader {
 	
 	public static void drain() throws NoConnectionsException, InterruptedException {
 		csvClient.drain();
+		System.out.println("Inserted " + outCount.get() + " and acknowledged " + inCount.get() + " rows (final)");
 	}
 	
 	public static void flush() throws IOException, InterruptedException {
