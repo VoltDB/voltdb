@@ -58,7 +58,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_string varchar(10) default null, " +
                 "clm_decimal decimal default null, " +
                 "clm_float float default null "+ // for later
-                "clm_timestamp timestamp default null, " + // for later
+                //"clm_timestamp timestamp default null, " + // for later
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
      String []myOptions = {
@@ -374,7 +374,7 @@ public class TestCSVLoader extends TestCase {
         	long start = System.currentTimeMillis();
         	while( loader.hasNext() )
         	{
-        		String [] addStr= {"896798797"};
+        		String [] addStr= null;
         		loader.insertLine( addStr );
         	}
         	loader.setLatency(System.currentTimeMillis()-start);

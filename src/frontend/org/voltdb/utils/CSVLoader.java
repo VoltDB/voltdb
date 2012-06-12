@@ -274,7 +274,26 @@ class CSVLoader {
                     cb = new MyCallback(outCount.get(), config, linedata.toString());
                     
                     String lineCheckResult;
-                    if( (lineCheckResult = checkLineFormat(correctedLine, client))!= null){
+                    
+                    int columnCnt = 0;
+                    VoltTable procInfo = null;
+                    //Vector<Integer> strColIndex = new Vector<Integer>();
+                    try {
+                    	procInfo = client.callProcedure("@SystemCatalog",
+                        "PROCEDURECOLUMNS").getResults()[0];
+                        while( procInfo.advanceRow() ) {
+                        	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
+                        			//if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
+                        				//strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
+                        			
+                        		columnCnt++;
+                        	}
+                        }
+                     }
+                     catch (Exception e) {
+                        e.printStackTrace();
+                     }
+                    if( (lineCheckResult = checkLineFormat(correctedLine, columnCnt))!= null){
                     	System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );
                     	synchronized (errorInfo) {
                     		if (!errorInfo.containsKey(outCount.get())) {
@@ -356,21 +375,39 @@ class CSVLoader {
 //                    }
 //                    System.out.println(msg);                 
                     String lineCheckResult;
+                    
+                    int columnCnt = 0;
+                    VoltTable procInfo = null;
+                    //Vector<Integer> strColIndex = new Vector<Integer>();
+                    try {
+                    	procInfo = csvClient.callProcedure("@SystemCatalog",
+                        "PROCEDURECOLUMNS").getResults()[0];
+                        while( procInfo.advanceRow() ) {
+                        	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
+                        			//if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
+                        				//strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
+                        			
+                        		columnCnt++;
+                        	}
+                        }
+                     }
+                     catch (Exception e) {
+                        e.printStackTrace();
+                     }
 
-
-                    if( (lineCheckResult = checkLineFormat(correctedLine, csvClient))!= null){
-                    	System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );
-                    	synchronized (errorInfo) {
-                    		if (!errorInfo.containsKey(outCount.get())) {
-                    			String[] info = {linedata.toString(), lineCheckResult};
-                    			errorInfo.put(outCount.get(), info);
-                    		}
-                    		if (errorInfo.size() >= config.abortfailurecount) {
-                    			System.err.println("The number of Failure row data exceeds " + config.abortfailurecount);
-                        		System.exit(1);
-                    		}
+                    if( (lineCheckResult = checkLineFormat(correctedLine, columnCnt))!= null){
+                    System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );
+                    synchronized (errorInfo) {
+                    	if (!errorInfo.containsKey(outCount.get())) {
+                    		String[] info = {linedata.toString(), lineCheckResult};
+                    		errorInfo.put(outCount.get(), info);
                     	}
-                    	break;
+                    	if (errorInfo.size() >= config.abortfailurecount) {
+                    		System.err.println("The number of Failure row data exceeds " + config.abortfailurecount);
+                        	System.exit(1);
+                    	}
+                    }
+                    break;
                     }
                     queued = csvClient.callProcedure(cb, insertProcedure, (Object[])correctedLine);
                     callProcCount.incrementAndGet();
@@ -436,27 +473,9 @@ class CSVLoader {
      * @param linefragement
      */
 
-    private String checkLineFormat(String[] linefragement, Client client ) {
+    private String checkLineFormat(String[] linefragement, int columnCnt ) {
     	String msg = "";
-        int columnCnt = 0;
-        VoltTable procInfo = null;
-        Vector<Integer> strColIndex = new Vector<Integer>();
         
-        try {
-        	procInfo = client.callProcedure("@SystemCatalog",
-            "PROCEDURECOLUMNS").getResults()[0];
-            while( procInfo.advanceRow() ) {
-            	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
-            			if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
-            				strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
-            			
-            		columnCnt++;
-            	}
-            }
-         }
-         catch (Exception e) {
-            e.printStackTrace();
-         }
          if( linefragement.length == 1 && linefragement[0].equals( "" ) ) {
         		msg = "checkLineFormat Error: blank line";
         		return msg;
