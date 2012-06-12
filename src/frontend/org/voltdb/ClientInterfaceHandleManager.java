@@ -177,8 +177,9 @@ public class ClientInterfaceHandleManager
             Iv2InFlight inFlight = perPartDeque.pollFirst();
             if (inFlight.m_ciHandle < ciHandle) {
                 // lost txn, do something eventually
-                tmLog.info("Lost transaction with handle: " + inFlight.m_ciHandle +
-                        ", partition: " + partitionId);
+                tmLog.info("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
+                        " for partition: " + partitionId + " while searching for handle " +
+                        ciHandle);
             }
             else if (inFlight.m_ciHandle > ciHandle) {
                 // we've gone too far, need to jam this back into the front of the deque and run away.
