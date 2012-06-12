@@ -23,16 +23,20 @@
 
 package com.auctionexample;
 
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.Random;
 
 import org.voltdb.VoltTable;
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.CSVLoader;
 
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
+
 
 /**
  * Loader class contains a set of static methods that
@@ -70,9 +74,40 @@ class Loader {
      *
      * @param client Connection to the database.
      * @return An ArrayList of ids of newly inserted objects.
+     * @throws IOException 
+     * @throws InterruptedException 
      * @throws Exception Rethrows any exceptions thrown from within.
        */
-    static ArrayList<Integer> loadItems(org.voltdb.client.Client client) throws Exception {
+    static ArrayList<Integer> loadItems() throws InterruptedException, IOException {
+    	ArrayList<Integer> itemIds = new ArrayList<Integer>();
+    	String userHome = System.getProperty("user.home"); 
+    	String []myOptions = {
+         		"--inputfile="+ userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/items.txt", 
+         		"--procedurename=InsertIntoItem",
+         		//"--reportdir=" + reportdir,
+         		//"--tablename=InsertIntoItem",
+         		"--abortfailurecount=50",
+         		//"--separator=','"
+         		};
+    	CSVLoader loader = new CSVLoader( myOptions );
+    	while( loader.readNext() ){
+    		// figure out auction start and end times
+            final int oneMinuteOfMillis = 1000 * 1000 * 60;
+            TimestampType startTime = new TimestampType();
+            int duration = oneMinuteOfMillis + random.nextInt(oneMinuteOfMillis);
+            TimestampType endTime = new TimestampType(startTime.getTime() + duration);
+            String [] addStr = {startTime.toString(),endTime.toString()};
+            
+            String str = loader.insertLine( addStr )[0];
+            if( !str.isEmpty() )
+            	itemIds.add( Integer.parseInt( str ) );
+    	}
+    	loader.flush();
+    	return itemIds;
+    }
+    
+    
+    static ArrayList<Integer> loadItems1(org.voltdb.client.Client client) throws Exception {
         System.out.printf("Loading ITEM Table\n");
         ArrayList<Integer> itemIds = new ArrayList<Integer>();
         CSVReader reader = getReaderForPath("datafiles/items.txt");
@@ -130,39 +165,59 @@ class Loader {
      * @return An ArrayList of ids of newly inserted objects.
      * @throws Exception Rethrows any exceptions thrown from within.
      */
-    static ArrayList<Byte> loadCategories(org.voltdb.client.Client client) throws Exception {
-        System.out.printf("Loading CATEGORY Table\n");
-        ArrayList<Byte> categoryIds = new ArrayList<Byte>();
-        CSVReader reader = getReaderForPath("datafiles/categories.txt");
-
-        String[] nextLine = null;
-        while ((nextLine = reader.readNext()) != null) {
-            // check this tuple is the right size
-            if (nextLine.length <= 1)
-                continue;
-            if (nextLine.length != 3)
-                throw new Exception("Malformed CSV Line for CATEGORY table.");
-
-            // get the values of the tuple to insert
-            Byte catId = Byte.valueOf(nextLine[0]);
-            String catName = nextLine[1];
-            String catDescription = nextLine[2];
-
-            VoltTable[] table = client.callProcedure("InsertIntoCategory", catId, catName, catDescription).getResults();
-            if (table.length != 1)
-                throw new Exception("InsertIntoCategory returned the wrong number of tables.");
-            if (table[0].asScalarLong() != 1)
-                throw new Exception("InsertIntoCategory modified the wrong number of tuples.");
-
-            System.out.printf("  inserted (%d, \"%s\", \"%s\")\n",
-                    catId, catName, catDescription);
-
-            categoryIds.add(catId);
-        }
-
-        System.out.printf("CATEGORY Table Loaded\n\n");
-        return categoryIds;
+    
+    static ArrayList<Integer> loadCategories() throws InterruptedException, IOException {
+    	ArrayList<Integer> categoryIds = new ArrayList<Integer>();
+    	String userHome = System.getProperty("user.home"); 
+    	String []myOptions = {
+         		"--inputfile="+ userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/categories.txt", 
+         		"--procedurename=InsertIntoCategory",
+         		//"--reportdir=" + reportdir,
+         		//"--tablename=InsertIntoItem",
+         		"--abortfailurecount=50",
+         		//"--separator=','"
+         		};
+    	CSVLoader loader = new CSVLoader( myOptions );
+    	while( loader.readNext() ){
+    		categoryIds.add( Integer.parseInt( loader.insertLine(null)[0] ) );
+    	}
+    	loader.flush();
+    	return categoryIds;
     }
+    
+//    static ArrayList<Byte> loadCategories1(org.voltdb.client.Client client) throws Exception {
+//        System.out.printf("Loading CATEGORY Table\n");
+//        ArrayList<Byte> categoryIds = new ArrayList<Byte>();
+//        CSVReader reader = getReaderForPath("datafiles/categories.txt");
+//
+//        String[] nextLine = null;
+//        while ((nextLine = reader.readNext()) != null) {
+//            // check this tuple is the right size
+//            if (nextLine.length <= 1)
+//                continue;
+//            if (nextLine.length != 3)
+//                throw new Exception("Malformed CSV Line for CATEGORY table.");
+//
+//            // get the values of the tuple to insert
+//            Byte catId = Byte.valueOf(nextLine[0]);
+//            String catName = nextLine[1];
+//            String catDescription = nextLine[2];
+//
+//            VoltTable[] table = client.callProcedure("InsertIntoCategory", catId, catName, catDescription).getResults();
+//            if (table.length != 1)
+//                throw new Exception("InsertIntoCategory returned the wrong number of tables.");
+//            if (table[0].asScalarLong() != 1)
+//                throw new Exception("InsertIntoCategory modified the wrong number of tuples.");
+//
+//            System.out.printf("  inserted (%d, \"%s\", \"%s\")\n",
+//                    catId, catName, catDescription);
+//
+//            categoryIds.add(catId);
+//        }
+//
+//        System.out.printf("CATEGORY Table Loaded\n\n");
+//        return categoryIds;
+//    }
 
     /**
      * Insert records into the USER table from a csv file.
@@ -170,44 +225,66 @@ class Loader {
      * @param client Connection to the database.
      * @return An ArrayList of ids of newly inserted objects.
      * @throws Exception Rethrows any exceptions thrown from within.
+     * 
+     * 
      */
-    static ArrayList<Integer> loadUsers(org.voltdb.client.Client client) throws Exception {
-        System.out.printf("Loading USER Table\n");
-        ArrayList<Integer> userIds = new ArrayList<Integer>();
-        CSVReader reader = getReaderForPath("datafiles/users.txt");
-
-        String[] nextLine = null;
-        while ((nextLine = reader.readNext()) != null) {
-            // check this tuple is the right size
-            if (nextLine.length <= 1)
-                continue;
-            if (nextLine.length != 8)
-                throw new Exception("Malformed CSV Line for USER table.");
-
-            // get the values of the tuple to insert
-            int userId = Integer.valueOf(nextLine[0]);
-            String lastName = nextLine[1];
-            String firstName = nextLine[2];
-            String streetAddress = nextLine[3];
-            String city = nextLine[4];
-            String state = nextLine[5];
-            String zip = nextLine[6];
-            String email = nextLine[7];
-
-            VoltTable[] table = client.callProcedure("InsertIntoUser", userId, lastName, firstName,
-                    streetAddress, city, state, zip, email).getResults();
-            if (table.length != 1)
-                throw new Exception("InsertIntoUser returned the wrong number of tables.");
-            if (table[0].asScalarLong() != 1)
-                throw new Exception("InsertIntoUser modified the wrong number of tuples.");
-
-            System.out.printf("  inserted (%d, \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\")\n",
-                    userId, lastName, firstName, streetAddress, city, state, zip, email);
-
-            userIds.add(userId);
-        }
-
-        System.out.printf("USER Table Loaded\n\n");
-        return userIds;
+    
+    static ArrayList<Integer> loadUsers() throws InterruptedException, IOException {
+    	ArrayList<Integer> userIds = new ArrayList<Integer>();
+    	String userHome = System.getProperty("user.home"); 
+    	String []myOptions = {
+         		"--inputfile="+ userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/users.txt", 
+         		"--procedurename=InsertIntoUser",
+         		//"--reportdir=" + reportdir,
+         		//"--tablename=InsertIntoItem",
+         		"--abortfailurecount=50",
+         		//"--separator=','"
+         		};
+    	CSVLoader loader = new CSVLoader( myOptions );
+    	while( loader.readNext() ){
+    		userIds.add( Integer.parseInt( loader.insertLine(null)[0] ) );
+    	}
+    	loader.flush();
+    	return userIds;
     }
+    
+//    static ArrayList<Integer> loadUsers1(org.voltdb.client.Client client) throws Exception {
+//        System.out.printf("Loading USER Table\n");
+//        ArrayList<Integer> userIds = new ArrayList<Integer>();
+//        CSVReader reader = getReaderForPath("datafiles/users.txt");
+//
+//        String[] nextLine = null;
+//        while ((nextLine = reader.readNext()) != null) {
+//            // check this tuple is the right size
+//            if (nextLine.length <= 1)
+//                continue;
+//            if (nextLine.length != 8)
+//                throw new Exception("Malformed CSV Line for USER table.");
+//
+//            // get the values of the tuple to insert
+//            int userId = Integer.valueOf(nextLine[0]);
+//            String lastName = nextLine[1];
+//            String firstName = nextLine[2];
+//            String streetAddress = nextLine[3];
+//            String city = nextLine[4];
+//            String state = nextLine[5];
+//            String zip = nextLine[6];
+//            String email = nextLine[7];
+//
+//            VoltTable[] table = client.callProcedure("InsertIntoUser", userId, lastName, firstName,
+//                    streetAddress, city, state, zip, email).getResults();
+//            if (table.length != 1)
+//                throw new Exception("InsertIntoUser returned the wrong number of tables.");
+//            if (table[0].asScalarLong() != 1)
+//                throw new Exception("InsertIntoUser modified the wrong number of tuples.");
+//
+//            System.out.printf("  inserted (%d, \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\", \"%s\")\n",
+//                    userId, lastName, firstName, streetAddress, city, state, zip, email);
+//
+//            userIds.add(userId);
+//        }
+//
+//        System.out.printf("USER Table Loaded\n\n");
+//        return userIds;
+//    }
 }

@@ -57,7 +57,7 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  *   - Forces JVM into UTC. All input date TZs assumed to be GMT+0
  *   - Requires canonical JDBC SQL timestamp format
  */
-class CSVLoader {
+public class CSVLoader {
 
 	public synchronized static void setDefaultTimezone() {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
@@ -65,9 +65,6 @@ class CSVLoader {
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
-    private static final AtomicLong callBackCount = new AtomicLong(0);
-    private static final AtomicLong callProcCount = new AtomicLong(0);
-    
     private static int reportEveryNRows = 10000;
     private static int waitSeconds = 10;
     
@@ -148,7 +145,6 @@ class CSVLoader {
     	}
     	@Override
     	public void clientCallback(ClientResponse response) throws Exception {
-    		callBackCount.incrementAndGet();
     		if (response.getStatus() != ClientResponse.SUCCESS) {
     			System.err.println(response.getStatusString());
     			System.err.println("<xin>Stop at line " + m_lineNum);
@@ -318,6 +314,7 @@ class CSVLoader {
                     lastOK = queued;
                 }
             }
+            client.drain();
             
         } catch (Exception e) {
             e.printStackTrace();
@@ -337,7 +334,7 @@ class CSVLoader {
     //works with insertLine
     //return true if next line of csv file is not null, load the line into this.csvLine.
     //else produceInvalid 
-    public boolean hasNext() throws IOException {
+    public boolean readNext() throws IOException {
     	if ( (config.limitrows-- > 0) && (csvLine = csvReader.readNext()) != null )
     		return true;
     	else{
@@ -345,9 +342,10 @@ class CSVLoader {
     	}
     }
     
-    public void insertLine( String[] additionalStr ) throws NoConnectionsException, IOException, InterruptedException {
+    public String[] insertLine( String[] additionalStr ) throws NoConnectionsException, IOException, InterruptedException {
     	int waits = 0;
         int shortWaits = 0;
+        String[] correctedLine = null;
 
             boolean lastOK = true;
 
@@ -361,32 +359,19 @@ class CSVLoader {
                     for(String s : csvLine) 
                     	linedata.append(s);
                 	
-                	String[] correctedLine = csvLine;
+                	correctedLine = csvLine;
                     // TODO(): correct the line here
                     
-                    MyCallback cb = new MyCallback(outCount.get(), config, linedata.toString());
-                    
-                    // This message will be removed later
-                    // print out the parameters right now
-//                    String msg = "<xin>params: ";
-//                    for (int i=0; i < correctedLine.length; i++) {
-//                    	if (correctedLine != null)
-//                    		msg += correctedLine[i] + ",";
-//                    }
-//                    System.out.println(msg);                 
+                    MyCallback cb = new MyCallback(outCount.get(), config, linedata.toString());             
                     String lineCheckResult;
                     
                     int columnCnt = 0;
                     VoltTable procInfo = null;
-                    //Vector<Integer> strColIndex = new Vector<Integer>();
                     try {
                     	procInfo = csvClient.callProcedure("@SystemCatalog",
                         "PROCEDURECOLUMNS").getResults()[0];
                         while( procInfo.advanceRow() ) {
                         	if( insertProcedure.matches( (String) procInfo.get("PROCEDURE_NAME", VoltType.STRING) ) ) {
-                        			//if( procInfo.get( "TYPE_NAME", VoltType.STRING ).toString().matches("VARCHAR") )
-                        				//strColIndex.add( Integer.parseInt( procInfo.get( "ORDINAL_POSITION", VoltType.INTEGER ).toString()) - 1 );
-                        			
                         		columnCnt++;
                         	}
                         }
@@ -410,7 +395,6 @@ class CSVLoader {
                     break;
                     }
                     queued = csvClient.callProcedure(cb, insertProcedure, (Object[])correctedLine);
-                    callProcCount.incrementAndGet();
                     if (queued == false) {
                         ++waits;
                         if (lastOK == false) {
@@ -429,6 +413,7 @@ class CSVLoader {
             }
         }
         //return inCount.get();
+        return correctedLine;
     }
     
     
@@ -444,20 +429,19 @@ class CSVLoader {
      * @param args
      * @return long number of the actual rows acknowledged by the database server
      * @throws InterruptedException 
+     * @throws IOException 
      */
     
 
-    public static void main(String[] args) throws InterruptedException {
+    public static void main(String[] args) throws InterruptedException, IOException {
         long start = System.currentTimeMillis();
         
-    	CSVConfig cfg = new CSVConfig();
-    	cfg.parse(CSVLoader.class.getName(), args);
-    	
-    	
-    	CSVLoader loader = new CSVLoader(cfg);
+    	CSVLoader loader = new CSVLoader( args );
     	loader.run();
     	loader.setLatency(System.currentTimeMillis()-start);
+    	
     	loader.produceInvalidRowsFile();
+    	loader.flush();
     	
     	System.out.println("CSVLoader elaspsed: " + loader.getLatency()/1000F + " seconds");
     }
@@ -510,10 +494,6 @@ class CSVLoader {
 	public void produceInvalidRowsFile() throws InterruptedException {
 		System.out.println("All the invalid row numbers are:" + errorInfo.keySet());
 		// TODO: add the inputFileName to the outputFileName
-    	while( this.callProcCount.get() != this.callBackCount.get() )
-    	{
-    		Thread.sleep( this.getSleepTime() );
-    	}
     	
 		int bulkflush = 3; // by default right now
 		try {
@@ -560,14 +540,15 @@ class CSVLoader {
 		this.latency = latency;
 	}
 	
+	public void drain() throws NoConnectionsException, InterruptedException {
+		csvClient.drain();
+	}
+	
 	public static void flush() throws IOException, InterruptedException {
 		inCount.set( 0 );
 		outCount.set( 0 );
-		callBackCount.set(0);
-		callProcCount.set(0);
 		errorInfo.clear();
 		csvReader.close();
-        csvClient.drain();
         csvClient.close();
 		out_invaliderowfile.flush();
 		out_logfile.flush();
