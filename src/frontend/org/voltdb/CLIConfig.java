@@ -85,8 +85,10 @@ public abstract class CLIConfig {
             field.set(this, Float.parseFloat(value));
         else if ((cls == double.class) || (cls == Double.class))
             field.set(this, Double.parseDouble(value));
-        else if ((cls == char.class) || (cls == Character.class) || (cls == String.class))
-            field.set(this, value);
+        else if ((cls == String.class))
+        	field.set(this, value);
+        else if ((cls == char.class) || (cls == Character.class))
+        	field.set(this, value.charAt(0));
         else
             assert(false);
     }
