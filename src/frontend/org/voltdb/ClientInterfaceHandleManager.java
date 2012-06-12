@@ -182,8 +182,9 @@ public class ClientInterfaceHandleManager
             }
             else if (inFlight.m_ciHandle > ciHandle) {
                 // we've gone too far, need to jam this back into the front of the deque and run away.
+                tmLog.error("CI clientData lookup missing handle: " + ciHandle
+                        + ". Next expected client data handle is: " + inFlight.m_ciHandle);
                 perPartDeque.addFirst(inFlight);
-                tmLog.error("Handle missing: " + ciHandle);
                 break;
             }
             else {

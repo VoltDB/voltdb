@@ -380,8 +380,18 @@ public class Term
             }
         }
         tmLog.info(m_whoami + "finished queuing " + queued + " replica repair messages.");
-        declareReadyAsLeader();
+
+        // Can't run ZK work on a Network thread. Hack up a new context here.
+        // See ENG-3176
+        Thread declareLeaderThread = new Thread() {
+            @Override
+            public void run() {
+                declareReadyAsLeader();
+            }
+        };
+        declareLeaderThread.start();
     }
+
 
 
     // with leadership election complete, update the master list
