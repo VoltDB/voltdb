@@ -71,8 +71,6 @@ public class CommandLine extends VoltDB.Configuration
         // final in baseclass: cl.m_commitLogDir = new File("/tmp");
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
-        cl.m_leaderPort = m_leaderPort;
-        cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
 
         // second, copy the derived class fields
