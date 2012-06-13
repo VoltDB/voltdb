@@ -204,12 +204,7 @@ public abstract class CLIConfig {
                     	fields[j].setAccessible(true);
                     	fields[j].set(this, leftargs[i]);
                     }
-                } else {
-                	System.err.println("Expected " + leftover + " args, but receive " + leftargs.length + " args");
-                	printUsage();
-                	System.exit(-1);
                 }
-                	
             }
 
             // check that the values read are valid

@@ -252,6 +252,7 @@ public class CSVLoader {
             while ((config.limitrows-- > 0) && (line = csvReader.readNext()) != null) {
             	outCount.incrementAndGet();
                 boolean queued = false;
+                /*
                 while (queued == false) {
                 	StringBuilder linedata = new StringBuilder();
                     for(int i = 0; i < line.length; i++) {
@@ -262,7 +263,7 @@ public class CSVLoader {
                 	String[] correctedLine = line;
                     cb = new MyCallback(outCount.get(), config, linedata.toString());
                     String lineCheckResult;
-                     
+                    
                     if( (lineCheckResult = checkparams_trimspace(correctedLine, columnCnt))!= null){
                     	synchronized (errorInfo) {
                     		if (!errorInfo.containsKey(outCount.get())) {
@@ -289,6 +290,7 @@ public class CSVLoader {
                     }
                     lastOK = queued;
                 }
+                */
             }
             csvClient.drain();
             
