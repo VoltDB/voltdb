@@ -62,9 +62,9 @@ public class TestCSVLoader extends TestCase {
      		"--password=",
      		"--port=",
      		"--strictquotes=false",
-     		//"--separator=','",
-     		//"--quotechar=\"\"",
-     		//"--escape=\\",
+     		"--separator=,",
+     		"--quotechar=\"\"",
+     		"--escape=\\",
      		"--skip=0",
      		"--nowhitespace=true"
      		};
