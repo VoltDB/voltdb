@@ -98,12 +98,26 @@ public class FragmentTask extends TransactionTask
              * No roll back support.
              */
             try {
-                final VoltTable dependency =
-                    siteConnection.executePlanFragment(fragmentId,
-                                                       inputDepId,
-                                                       params,
-                                                       m_txn.txnId,
-                                                       m_txn.isReadOnly());
+                VoltTable dependency;
+                if (m_task.getFragmentPlan(frag) != null) {
+                    // make dependency ids available to the execution engine
+                    if ((m_inputDeps != null) && (m_inputDeps.size() > 0)) {
+                        siteConnection.stashWorkUnitDependencies(m_inputDeps);
+                    }
+                    dependency = siteConnection.executeCustomPlanFragment(
+                            m_task.getFragmentPlan(frag),
+                            inputDepId,
+                            m_txn.txnId);
+                }
+                else {
+                    dependency =
+                        siteConnection.executePlanFragment(fragmentId,
+                                inputDepId,
+                                params,
+                                m_txn.txnId,
+                                m_txn.isReadOnly());
+                }
+
                 if (hostLog.isTraceEnabled()) {
                     hostLog.l7dlog(Level.TRACE,
                        LogKeys.org_voltdb_ExecutionSite_SendingDependency.name(),

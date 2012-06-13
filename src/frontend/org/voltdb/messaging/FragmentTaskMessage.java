@@ -20,6 +20,7 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -44,10 +45,55 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public static final byte SYS_PROC_PER_PARTITION = 1;
     public static final byte SYS_PROC_PER_SITE = 2;
 
-    long[] m_fragmentIds = null;
-    ByteBuffer[] m_parameterSets = null;
-    int[] m_outputDepIds = null;
-    ArrayList<?>[] m_inputDepIds = null;
+    private static class FragmentData {
+        long m_fragmentId = 0;
+        ByteBuffer m_parameterSet = null;
+        Integer m_outputDepId = null;
+        ArrayList<Integer> m_inputDepIds = null;
+        // For unplanned item
+        String m_fragmentPlan = null;
+
+        public FragmentData() {
+        }
+
+        @Override
+        public String toString() {
+            StringBuilder sb = new StringBuilder();
+            sb.append(String.format("FRAGMENT ID: %d\n", m_fragmentId));
+            if (m_parameterSet != null) {
+                FastDeserializer fds = new FastDeserializer(m_parameterSet.asReadOnlyBuffer());
+                ParameterSet pset = null;
+                try {
+                    pset = fds.readObject(ParameterSet.class);
+                } catch (IOException e) {
+                    e.printStackTrace();
+                }
+                assert(pset != null);
+                sb.append("\n  ").append(pset.toString());
+            }
+            if (m_outputDepId != null) {
+                sb.append("\n");
+                sb.append("  OUTPUT_DEPENDENCY_ID ");
+                sb.append(m_outputDepId);
+            }
+            if ((m_inputDepIds != null) && (m_inputDepIds.size() > 0)) {
+                sb.append("\n");
+                sb.append("  INPUT_DEPENDENCY_IDS ");
+                for (long id : m_inputDepIds)
+                    sb.append(id).append(", ");
+                sb.setLength(sb.lastIndexOf(", "));
+            }
+            if (m_fragmentPlan != null && !m_fragmentPlan.isEmpty()) {
+                sb.append("\n");
+                sb.append("  FRAGMENT_PLAN ");
+                sb.append(m_fragmentPlan);
+            }
+            return sb.toString();
+        }
+    }
+
+    List<FragmentData> m_items = new ArrayList<FragmentData>();
+
     boolean m_isFinal = false;
     byte m_taskType = 0;
     // Unused, should get removed from this message
@@ -65,28 +111,15 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * @param coordinatorHSId
      * @param txnId
      * @param isReadOnly
-     * @param fragmentIds
-     * @param outputDepIds
-     * @param parameterSets
      * @param isFinal
      */
     public FragmentTaskMessage(long initiatorHSId,
-                        long coordinatorHSId,
-                        long txnId,
-                        boolean isReadOnly,
-                        long[] fragmentIds,
-                        int[] outputDepIds,
-                        ByteBuffer[] parameterSets,
-                        boolean isFinal) {
+                               long coordinatorHSId,
+                               long txnId,
+                               boolean isReadOnly,
+                               boolean isFinal) {
         super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
 
-        assert(fragmentIds != null);
-        assert(parameterSets != null);
-        assert(parameterSets.length == fragmentIds.length);
-
-        m_fragmentIds = fragmentIds;
-        m_outputDepIds = outputDepIds;
-        m_parameterSets = parameterSets;
         m_isFinal = isFinal;
         m_subject = Subject.DEFAULT.getId();
         assert(selfCheck());
@@ -103,65 +136,119 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         m_spHandle = ftask.m_spHandle;
         m_taskType = ftask.m_taskType;
-        m_fragmentIds = ftask.m_fragmentIds;
-        m_outputDepIds = ftask.m_outputDepIds;
-        m_parameterSets = ftask.m_parameterSets;
         m_isFinal = ftask.m_isFinal;
         m_subject = ftask.m_subject;
         m_inputDepCount = ftask.m_inputDepCount;
-        m_inputDepIds = ftask.m_inputDepIds;
+        m_items = ftask.m_items;
         assert(selfCheck());
     }
 
+    /**
+     * Add a pre-planned fragment.
+     *
+     * @param fragmentId
+     * @param outputDepId
+     * @param parameterSet
+     */
+    public void addFragment(long fragmentId, int outputDepId, ByteBuffer parameterSet) {
+        FragmentData item = new FragmentData();
+        item.m_fragmentId = fragmentId;
+        item.m_outputDepId = outputDepId;
+        item.m_parameterSet = parameterSet;
+        m_items.add(item);
+    }
+
+    /**
+     * Add an unplanned fragment.
+     *
+     * @param fragmentId
+     * @param outputDepId
+     * @param parameterSet
+     * @param fragmentPlan
+     */
+    public void addCustomFragment(int outputDepId, ByteBuffer parameterSet, String fragmentPlan) {
+        FragmentData item = new FragmentData();
+        item.m_outputDepId = outputDepId;
+        item.m_parameterSet = parameterSet;
+        item.m_fragmentPlan = fragmentPlan;
+        m_items.add(item);
+    }
+
+
+    /**
+     * Convenience factory method to replace constructory that includes arrays of stuff.
+     *
+     * @param initiatorHSId
+     * @param coordinatorHSId
+     * @param txnId
+     * @param isReadOnly
+     * @param fragmentId
+     * @param outputDepId
+     * @param parameterSet
+     * @param isFinal
+     *
+     * @return new FragmentTaskMessage
+     */
+    public static FragmentTaskMessage createWithOneFragment(long initiatorHSId,
+                                                            long coordinatorHSId,
+                                                            long txnId,
+                                                            boolean isReadOnly,
+                                                            long fragmentId,
+                                                            int outputDepId,
+                                                            ByteBuffer parameterSet,
+                                                            boolean isFinal) {
+        FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
+                                                          txnId, isReadOnly, isFinal);
+        ret.addFragment(fragmentId, outputDepId, parameterSet);
+        return ret;
+    }
+
     private boolean selfCheck() {
-        for (ByteBuffer paramSet : m_parameterSets)
-            if (paramSet == null)
+        for (FragmentData item : m_items) {
+            if (item == null) {
                 return false;
+            }
+            if (item.m_parameterSet == null) {
+                return false;
+            }
+        }
         return true;
     }
 
     public void addInputDepId(int index, int depId) {
-        if (m_inputDepIds == null)
-            m_inputDepIds = new ArrayList<?>[m_fragmentIds.length];
-        assert(index < m_fragmentIds.length);
-        if (m_inputDepIds[index] == null)
-            m_inputDepIds[index] = new ArrayList<Integer>();
-        @SuppressWarnings("unchecked")
-        ArrayList<Integer> l = (ArrayList<Integer>) m_inputDepIds[index];
-        l.add(depId);
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        if (item.m_inputDepIds == null)
+            item.m_inputDepIds = new ArrayList<Integer>();
+        item.m_inputDepIds.add(depId);
         m_inputDepCount++;
     }
 
-    @SuppressWarnings("unchecked")
     public ArrayList<Integer> getInputDepIds(int index) {
-        if (m_inputDepIds == null)
-            return null;
-        return (ArrayList<Integer>) m_inputDepIds[index];
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        return item.m_inputDepIds;
     }
 
     public int getOnlyInputDepId(int index) {
-        if (m_inputDepIds == null)
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        if (item.m_inputDepIds == null)
             return -1;
-        @SuppressWarnings("unchecked")
-        ArrayList<Integer> l = (ArrayList<Integer>) m_inputDepIds[index];
-        if (l == null)
-            return -1;
-        assert(l.size() == 1);
-        return l.get(0);
+        assert(item.m_inputDepIds.size() == 1);
+        return item.m_inputDepIds.get(0);
     }
 
     public int[] getAllUnorderedInputDepIds() {
         int[] retval = new int[m_inputDepCount];
         int i = 0;
-        if (m_inputDepIds != null) {
-            for (ArrayList<?> l : m_inputDepIds) {
-                @SuppressWarnings("unchecked")
-                ArrayList<Integer> l2 = (ArrayList<Integer>) l;
-                if (l2 != null)
-                {
-                    for (int depId : l2) {
-                        retval[i++] = depId;
-                    }
+        for (FragmentData item : m_items) {
+            if (item.m_inputDepIds != null) {
+                for (int depId : item.m_inputDepIds) {
+                    retval[i++] = depId;
                 }
             }
         }
@@ -186,25 +273,33 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     }
 
     public int getFragmentCount() {
-        return (m_fragmentIds != null) ?
-            m_fragmentIds.length : 0;
+        return m_items.size();
     }
 
     public long getFragmentId(int index) {
-        return m_fragmentIds[index];
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        return item.m_fragmentId;
     }
 
     public int getOutputDepId(int index) {
-        return m_outputDepIds[index];
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        return item.m_outputDepId;
     }
 
     public ByteBuffer getParameterDataForFragment(int index) {
-        return m_parameterSets[index].asReadOnlyBuffer();
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        return item.m_parameterSet.asReadOnlyBuffer();
     }
 
     public ParameterSet getParameterSetForFragment(int index) {
         ParameterSet params = null;
-        final ByteBuffer paramData = m_parameterSets[index].asReadOnlyBuffer();
+        final ByteBuffer paramData = m_items.get(index).m_parameterSet.asReadOnlyBuffer();
         if (paramData != null) {
             final FastDeserializer fds = new FastDeserializer(paramData);
             try {
@@ -222,37 +317,91 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return params;
     }
 
+    public String getFragmentPlan(int index) {
+        assert(index >= 0 && index < m_items.size());
+        FragmentData item = m_items.get(index);
+        assert(item != null);
+        return item.m_fragmentPlan;
+    }
+
+    /*
+     * Serialization Format [description: type: byte count]
+     *
+     * Fixed header:
+     *     item count (nitems): short: 2
+     *     unplanned item count (nunplanned): short: 2
+     *     final flag: byte: 1
+     *     task type: byte: 1
+     *     should undo flag: byte: 1
+     *     output dependencies flag (outdep): byte: 1
+     *     input dependencies flag (indep): byte: 1
+     *
+     * Fragment ID block (1 per item):
+     *     fragment ID: long: 8 * nitems
+     *
+     * Parameter set block (1 per item):
+     *     parameter buffer size: int: 4 * nitems
+     *     parameter buffer: bytes: ? * nitems
+     *
+     * Output dependency block (1 per item if outdep == 1):
+     *     output dependency ID: int: 4 * nitems
+     *
+     * Input dependency block (1 per item if indep == 1):
+     *     ID count: short: 2 * nitems
+     *     input dependency ID sub-block (1 per ID):
+     *         input dependency ID: int: 4 * ? * nitems
+     *
+     * Unplanned block (1 of each per unplanned item):
+     *    item index: short: 2 * nunplanned
+     *    fragment plan string length: int: 4 * nunplanned
+     *    fragment plan string: bytes: ? * nunplanned
+     */
+
     @Override
     public int getSerializedSize()
     {
+        assert(m_items != null);
+        assert(!m_items.isEmpty());
+
         int msgsize = super.getSerializedSize();
 
-        // Fixed length components:
-        // m_fragmentIds count (2)
-        // m_outputDepIds count (2)
-        // m_inputDepIds count (2)
-        // m_isFinal (1)
-        // m_taskType (1)
-        // m_shouldUndo (1)
+        // Fixed header
+        msgsize += 2 + 2 + 1 + 1 + 1 + 1 + 1;
 
-        // Plus a long (8) per fragment ID
-        //    plus an int for the length of the params for a fragment ID
-        //    plus the actual length of the params
-        // Plus an int (4) per input and output dependency ID
+        // Fragment ID block
+        msgsize += 8 * m_items.size();
 
-        msgsize += 2 + 2 + 2 + 1 + 1 + 1;
-        if (m_fragmentIds != null) {
-            msgsize += 8 * m_fragmentIds.length;
-            // each frag has one parameter set
-            for (int i = 0; i < m_fragmentIds.length; i++)
-                msgsize += 4 + m_parameterSets[i].remaining();
-        }
+        // Make a pass through the fragment data items to account for the
+        // optional output and input dependency blocks, plus the unplanned block.
+        boolean foundOutputDepId = false;
+        boolean foundInputDepIds = false;
+        for (FragmentData item : m_items) {
+            // Account for parameter sets
+            msgsize += 4 + item.m_parameterSet.remaining();
 
-        if (m_inputDepIds != null) {
-            msgsize += 4 * m_inputDepIds.length;
-        }
-        if (m_outputDepIds != null) {
-            msgsize += 4 * m_outputDepIds.length;
+            // Account for the optional output dependency block, if needed.
+            if (!foundOutputDepId && item.m_outputDepId != null) {
+                msgsize += 4 * m_items.size();
+                foundOutputDepId = true;
+            }
+
+            // Account for the optional input dependency block, if needed.
+            if (item.m_inputDepIds != null) {
+                if (!foundInputDepIds) {
+                    // Account for the size short for each item now that we know
+                    // that the optional block is needed.
+                    msgsize += 2 * m_items.size();
+                    foundInputDepIds = true;
+                }
+                // Account for the input dependency IDs themselves, if any.
+                msgsize += 4 * item.m_inputDepIds.size();
+            }
+
+            // Each unplanned item gets an index (2) and a size (4) and buffer for
+            // the fragment plan string.
+            if (item.m_fragmentPlan != null) {
+                msgsize += 2 + 4 + item.m_fragmentPlan.length();
+            }
         }
 
         return msgsize;
@@ -261,51 +410,84 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
+        // See Serialization Format comment above getSerializedSize().
+
+        assert(m_items != null);
+        assert(!m_items.isEmpty());
+
         buf.put(VoltDbMessageFactory.FRAGMENT_TASK_ID);
         super.flattenToBuffer(buf);
 
-        if (m_fragmentIds == null) {
-            buf.putShort((short) 0);
-        }
-        else {
-            buf.putShort((short) m_fragmentIds.length);
-            for (int i = 0; i < m_fragmentIds.length; i++) {
-                buf.putLong(m_fragmentIds[i]);
+        // Get useful statistics for the header and optional blocks.
+        short nInputDepIds = 0;
+        short nOutputDepIds = 0;
+        short nUnplanned = 0;
+        for (FragmentData item : m_items) {
+            if (item.m_inputDepIds != null) {
+                // Supporting only one input dep id for now.
+                nInputDepIds++;
             }
-            for (int i = 0; i < m_fragmentIds.length; i++) {
-                buf.putInt(m_parameterSets[i].remaining());
-                //Duplicate because the parameter set might be used locally also
-                buf.put(m_parameterSets[i].duplicate());
+            if (item.m_outputDepId != null) {
+                nOutputDepIds++;
             }
-        }
-
-        if (m_outputDepIds == null) {
-            buf.putShort((short) 0);
-        }
-        else {
-            buf.putShort((short) m_outputDepIds.length);
-            for (int i = 0; i < m_outputDepIds.length; i++) {
-                buf.putInt(m_outputDepIds[i]);
+            if (item.m_fragmentPlan != null) {
+                nUnplanned++;
             }
         }
 
-        if (m_inputDepIds == null) {
-            buf.putShort((short) 0);
-        }
-        else {
-            buf.putShort((short) m_inputDepIds.length);
-            for (int i = 0; i < m_inputDepIds.length; i++) {
-                @SuppressWarnings("unchecked")
-                ArrayList<Integer> l = (ArrayList<Integer>) m_inputDepIds[i];
-                buf.putShort((short) l.size());
-                for (int depId : l)
-                    buf.putInt(depId);
-            }
-        }
-
+        // Header block
+        buf.putShort((short) m_items.size());
+        buf.putShort(nUnplanned);
         buf.put(m_isFinal ? (byte) 1 : (byte) 0);
         buf.put(m_taskType);
         buf.put(m_shouldUndo ? (byte) 1 : (byte) 0);
+        buf.put(nOutputDepIds > 0 ? (byte) 1 : (byte) 0);
+        buf.put(nInputDepIds  > 0 ? (byte) 1 : (byte) 0);
+
+        // Fragment ID block
+        for (FragmentData item : m_items) {
+            buf.putLong(item.m_fragmentId);
+        }
+
+        // Parameter set block
+        for (FragmentData item : m_items) {
+            buf.putInt(item.m_parameterSet.remaining());
+            buf.put(item.m_parameterSet.asReadOnlyBuffer());
+        }
+
+        // Optional output dependency ID block
+        if (nOutputDepIds > 0) {
+            for (FragmentData item : m_items) {
+                buf.putInt(item.m_outputDepId);
+            }
+        }
+
+        // Optional input dependency ID block
+        if (nInputDepIds > 0) {
+            for (FragmentData item : m_items) {
+                if (item.m_inputDepIds == null || item.m_inputDepIds.size() == 0) {
+                    buf.putShort((short) 0);
+                } else {
+                    buf.putShort((short) item.m_inputDepIds.size());
+                    for (Integer inputDepId : item.m_inputDepIds) {
+                        buf.putInt(inputDepId);
+                    }
+                }
+            }
+        }
+
+        // Unplanned item block
+        for (short index = 0; index < m_items.size(); index++) {
+            // Each unplanned item gets an index (2) and a size (4) and buffer for
+            // the fragment plan string.
+            FragmentData item = m_items.get(index);
+            if (item.m_fragmentPlan != null) {
+                buf.putShort(index);
+                byte[] bytes = item.m_fragmentPlan.getBytes();
+                buf.putInt(bytes.length);
+                buf.put(bytes);
+            }
+        }
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -314,50 +496,75 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
     {
+        // See Serialization Format comment above getSerializedSize().
+
         super.initFromBuffer(buf);
 
+        // Header block
         short fragCount = buf.getShort();
-        if (fragCount > 0) {
-            m_fragmentIds = new long[fragCount];
-            for (int i = 0; i < fragCount; i++)
-                m_fragmentIds[i] = buf.getLong();
-            m_parameterSets = new ByteBuffer[fragCount];
-            for (int i = 0; i < fragCount; i++) {
-                int paramsbytecount = buf.getInt();
-                m_parameterSets[i] = ByteBuffer.allocate(paramsbytecount);
-                int cachedLimit = buf.limit();
-                buf.limit(buf.position() + m_parameterSets[i].remaining());
-                m_parameterSets[i].put(buf);
-                m_parameterSets[i].flip();
-                buf.limit(cachedLimit);
-            }
-        }
-        short expectedDepCount = buf.getShort();
-        if (expectedDepCount > 0) {
-            m_outputDepIds = new int[expectedDepCount];
-            for (int i = 0; i < expectedDepCount; i++)
-                m_outputDepIds[i] = buf.getInt();
+        assert(fragCount > 0);
+        short unplannedCount = buf.getShort();
+        assert(unplannedCount >= 0 && unplannedCount <= fragCount);
+        m_isFinal = buf.get() != 0;
+        m_taskType = buf.get();
+        m_shouldUndo = buf.get() != 0;
+        boolean haveOutputDependencies = buf.get() != 0;
+        boolean haveInputDependencies = buf.get() != 0;
+
+        m_items = new ArrayList<FragmentData>(fragCount);
+
+        // Fragment ID block (creates the FragmentData objects)
+        for (int i = 0; i < fragCount; i++) {
+            FragmentData item = new FragmentData();
+            item.m_fragmentId = buf.getLong();
+            m_items.add(item);
         }
 
-        short inputDepCount = buf.getShort();
-        if (inputDepCount > 0) {
-            m_inputDepIds = new ArrayList<?>[inputDepCount];
-            for (int i = 0; i < inputDepCount; i++) {
+        // Parameter set block
+        for (FragmentData item : m_items) {
+            int paramsbytecount = buf.getInt();
+            item.m_parameterSet = ByteBuffer.allocate(paramsbytecount);
+            int cachedLimit = buf.limit();
+            buf.limit(buf.position() + item.m_parameterSet.remaining());
+            item.m_parameterSet.put(buf);
+            item.m_parameterSet.flip();
+            buf.limit(cachedLimit);
+        }
+
+        // Optional output dependency block
+        if (haveOutputDependencies) {
+            for (FragmentData item : m_items) {
+                item.m_outputDepId = buf.getInt();
+            }
+        }
+
+        // Optional input dependency block
+        if (haveInputDependencies) {
+            for (FragmentData item : m_items) {
                 short count = buf.getShort();
                 if (count > 0) {
-                    ArrayList<Integer> l = new ArrayList<Integer>();
+                    item.m_inputDepIds = new ArrayList<Integer>(count);
                     for (int j = 0; j < count; j++) {
-                        l.add(buf.getInt());
+                        item.m_inputDepIds.add(buf.getInt());
                         m_inputDepCount++;
                     }
-                    m_inputDepIds[i] = l;
                 }
             }
         }
 
-        m_isFinal = buf.get() == 1;
-        m_taskType = buf.get();
-        m_shouldUndo = buf.get() == 1;
+        // Unplanned block
+        for (int iUnplanned = 0; iUnplanned < unplannedCount; iUnplanned++) {
+            short index = buf.getShort();
+            assert(index >= 0 && index < m_items.size());
+            FragmentData item = m_items.get(index);
+            int fragmentPlanLength = buf.getInt();
+            if (fragmentPlanLength > 0) {
+                byte[] bytes = new byte[fragmentPlanLength];
+                buf.get(bytes);
+                item.m_fragmentPlan = new String(bytes);
+            }
+        }
+
         assert(buf.capacity() == buf.position());
     }
 
@@ -377,20 +584,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             sb.append("  WRITE, COORD ");
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
-        if ((m_fragmentIds != null) && (m_fragmentIds.length > 0)) {
-            sb.append("\n");
-            sb.append("  FRAGMENT_IDS ");
-            for (long id : m_fragmentIds)
-                sb.append(id).append(", ");
-            sb.setLength(sb.lastIndexOf(", "));
-        }
-
-        if ((m_inputDepIds != null) && (m_inputDepIds.length > 0)) {
-            sb.append("\n");
-            sb.append("  DEPENDENCY_IDS ");
-            for (ArrayList<?> id : m_inputDepIds)
-                sb.append(id).append(", ");
-            sb.setLength(sb.lastIndexOf(", "));
+        for (FragmentData item : m_items) {
+            sb.append("\n=====\n");
+            sb.append(item.toString());
         }
 
         if (m_isFinal)
@@ -416,21 +612,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         if (m_shouldUndo)
             sb.append("\n  THIS IS AN UNDO REQUEST");
 
-        if ((m_parameterSets != null) && (m_parameterSets.length > 0)) {
-            for (ByteBuffer paramSetBytes : m_parameterSets) {
-                FastDeserializer fds = new FastDeserializer(paramSetBytes.asReadOnlyBuffer());
-                ParameterSet pset = null;
-                try {
-                    pset = fds.readObject(ParameterSet.class);
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-                assert(pset != null);
-                sb.append("\n  ").append(pset.toString());
-
-            }
-        }
-
         return sb.toString();
+    }
+
+    public boolean isEmpty() {
+        return m_items.isEmpty();
     }
 }

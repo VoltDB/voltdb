@@ -55,7 +55,7 @@ public class Iv2TestMpTransactionState extends TestCase
         FragmentTaskMessage localWork;
         List<FragmentResponseMessage> generatedResponses =
             new ArrayList<FragmentResponseMessage>();
-        int[] depsToResume;
+        List<Integer> depsToResume;
     }
 
     ByteBuffer createDummyParameterSet() throws IOException
@@ -69,7 +69,7 @@ public class Iv2TestMpTransactionState extends TestCase
     }
 
     // Currently emulates the code in ProcedureRunner.slowPath()
-    // So any change to how that stuff is build will need to
+    // So any change to how that stuff is built will need to
     // be reflected here
     MpTestPlan createTestPlan(int batchSize, boolean readOnly,
                               boolean replicatedTable, boolean rollback,
@@ -98,25 +98,20 @@ public class Iv2TestMpTransactionState extends TestCase
             }
         }
 
-        // Convert collections to arrays for message
-        long[] distributedFragIdArray = new long[distributedOutputDepIds.size()];
-        int[] distributedOutputDepIdArray = new int[distributedOutputDepIds.size()];
-        ByteBuffer[] distributedParamsArray = new ByteBuffer[distributedOutputDepIds.size()];
-        for (int i = 0; i < distributedOutputDepIds.size(); i++) {
-            distributedFragIdArray[i] = Long.MIN_VALUE; // Don't care?
-            distributedOutputDepIdArray[i] = distributedOutputDepIds.get(i);
-            distributedParamsArray[i] = createDummyParameterSet();
-        }
+        // store resume dependencies in the MpTestPlan for later.
+        plan.depsToResume = depsToResumeList;
 
         // generate remote task with output IDs, fill in lists appropriately
         plan.remoteWork = new FragmentTaskMessage(Long.MIN_VALUE, // try not to care?
                                                   Long.MIN_VALUE, // try not to care
                                                   1234l, // magic, change if it matters
                                                   readOnly,
-                                                  distributedFragIdArray,
-                                                  distributedOutputDepIdArray,
-                                                  distributedParamsArray,
                                                   false);  // IV2 doesn't use final task (yet)
+
+        for (int i = 0; i < distributedOutputDepIds.size(); i++) {
+            plan.remoteWork.addFragment(Long.MIN_VALUE,
+                    distributedOutputDepIds.get(i), createDummyParameterSet());
+        }
         System.out.println("REMOTE TASK: " + plan.remoteWork.toString());
 
         if (!single_frag) {
@@ -130,8 +125,8 @@ public class Iv2TestMpTransactionState extends TestCase
                 }
                 else {
                     resp.setStatus(FragmentResponseMessage.SUCCESS, null);
-                    for (int j = 0; j < distributedOutputDepIdArray.length; j++) {
-                        resp.addDependency(distributedOutputDepIdArray[j],
+                    for (int j = 0; j < distributedOutputDepIds.size(); j++) {
+                        resp.addDependency(distributedOutputDepIds.get(j),
                                            new VoltTable(new VoltTable.ColumnInfo("BOGO",
                                                                                   VoltType.BIGINT)));
                     }
@@ -141,26 +136,17 @@ public class Iv2TestMpTransactionState extends TestCase
             }
         }
 
-        ByteBuffer[] localParams = new ByteBuffer[batchSize];
-        for (int i = 0; i < batchSize; i++) {
-            localParams[i] = createDummyParameterSet();
-        }
-        int[] depsToResume = new int[depsToResumeList.size()];
-        for (int i = 0; i < depsToResumeList.size(); i++) {
-            depsToResume[i] = depsToResumeList.get(i);
-        }
-        plan.depsToResume = depsToResume;
-        long[] localFragIds = new long[batchSize];
-        // generate local task with new output IDs, use above outputs as inputs,
-        // if any
+        // generate local task with new output IDs, use above outputs as inputs, if any
         plan.localWork = new FragmentTaskMessage(Long.MIN_VALUE, // try not to care
-                                                 Long.MIN_VALUE,
-                                                 1234l,
-                                                 readOnly,
-                                                 localFragIds,
-                                                 depsToResume,
-                                                 localParams,
-                                                 false);
+                Long.MIN_VALUE,
+                1234l,
+                readOnly,
+                false);
+
+        for (int i = 0; i < batchSize; i++) {
+            plan.localWork.addFragment(0L, depsToResumeList.get(i), createDummyParameterSet());
+        }
+
        for (int i = 0; i < depsForLocalTask.size(); i++) {
            if (depsForLocalTask.get(i) < 0) continue;
            plan.localWork.addInputDepId(i, depsForLocalTask.get(i));
@@ -169,8 +155,8 @@ public class Iv2TestMpTransactionState extends TestCase
        FragmentResponseMessage resp =
            new FragmentResponseMessage(plan.remoteWork, remoteHSIds[0]);
        resp.setStatus(FragmentResponseMessage.SUCCESS, null);
-       for (int j = 0; j < depsToResume.length; j++) {
-           resp.addDependency(depsToResume[j],
+       for (int j = 0; j < batchSize ; j++) {
+           resp.addDependency(depsToResumeList.get(j),
                               new VoltTable(new VoltTable.ColumnInfo("BOGO",
                                                                      VoltType.BIGINT)));
        }

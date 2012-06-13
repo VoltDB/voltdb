@@ -41,8 +41,10 @@ public abstract class AdHocQueryTester extends TestCase {
     protected final int VALIDATING_SP_RESULT = 1;
     protected final int VALIDATING_TOTAL_SP_RESULT = 2;
 
-    public static VoltDB.Configuration setUpSPDB() throws IOException, Exception {
-        String spSchema =
+    public static void setUpSchema(VoltProjectBuilder builder,
+                                   String pathToCatalog,
+                                   String pathToDeployment) throws Exception {
+        String schema =
                 "create table PARTED1 (" +
                 "PARTVAL bigint not null, " +
                 "NONPART bigint not null," +
@@ -68,14 +70,19 @@ public abstract class AdHocQueryTester extends TestCase {
                 "NONPART bigint not null," +
                 "PRIMARY KEY(REPPEDVAL));";
 
+        builder.addLiteralSchema(schema);
+        builder.addPartitionInfo("PARTED1", "PARTVAL");
+        builder.addPartitionInfo("PARTED2", "PARTVAL");
+        builder.addPartitionInfo("PARTED3", "PARTVAL");
+    }
+
+    public static VoltDB.Configuration setUpSPDB() throws IOException, Exception {
         String pathToCatalog = Configuration.getPathToCatalogForTest("adhocsp.jar");
         String pathToDeployment = Configuration.getPathToCatalogForTest("adhocsp.xml");
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(spSchema);
-        builder.addPartitionInfo("PARTED1", "PARTVAL");
-        builder.addPartitionInfo("PARTED2", "PARTVAL");
-        builder.addPartitionInfo("PARTED3", "PARTVAL");
+
+        setUpSchema(builder, pathToCatalog, pathToDeployment);
         boolean success = builder.compile(pathToCatalog, 2, 1, 0);
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);

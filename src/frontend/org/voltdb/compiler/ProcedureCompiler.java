@@ -219,7 +219,7 @@ public abstract class ProcedureCompiler {
                 // from trying to infer a constant partitioning value from the statement.
                 partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
             }
-            PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false);
+            PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
             StatementCompiler.compile(compiler, hsql, catalog, db,
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(), partitioning);
 
@@ -521,7 +521,7 @@ public abstract class ProcedureCompiler {
             // from trying to infer a constant partitioning value from the statement.
             partitionParameter = "StatementCompiler dummied up single partitioning for QueryPlanner";
         }
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false);
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, false, true);
         StatementCompiler.compile(compiler, hsql, catalog, db,
                 estimates, catalogStmt, procedureDescriptor.m_singleStmt,
                 procedureDescriptor.m_joinOrder, partitioning);

@@ -23,7 +23,6 @@
 
 package adhocbenchmark;
 
-import adhocbenchmark.QueryTestHelper;
 
 /**
  * Base class for query test configuration.
@@ -63,4 +62,10 @@ public abstract class QueryTestBase {
      * @return  query string
      */
     public abstract String getQuery(final int iQuery, QueryTestHelper helper);
+
+    protected interface Factory {
+        public QueryTestBase make(final String tablePrefix, int nVariations, final String columnPrefix,
+                final int nColumns, final int nRandomNumbers);
+    }
+
 }

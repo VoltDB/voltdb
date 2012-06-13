@@ -129,6 +129,13 @@ public class MpTransactionState extends TransactionState
         }
     }
 
+    // I met this List at bandcamp...
+    public void setupProcedureResume(boolean isFinal, List<Integer> deps)
+    {
+        setupProcedureResume(isFinal,
+                com.google.common.primitives.Ints.toArray(deps));
+    }
+
     @Override
     public void createLocalFragmentWork(FragmentTaskMessage task, boolean nonTransactional)
     {

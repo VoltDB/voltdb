@@ -110,9 +110,6 @@ public class Iv2TestScheduler extends TestCase
                                     Long.MIN_VALUE, // don't care
                                     txnId,
                                     readOnly,
-                                    new long[] {},
-                                    new int[] {},
-                                    new ByteBuffer[] {},
                                     false);
         return frag;
     }

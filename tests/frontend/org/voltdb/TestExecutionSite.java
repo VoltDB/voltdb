@@ -686,25 +686,25 @@ public class TestExecutionSite extends TestCase {
                     int localTask_outputDep = m_txnState.getNextDependencyId();
 
                     FragmentTaskMessage localTask =
-                        new FragmentTaskMessage(m_txnState.initiatorHSId,
+                        FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
                                                 m_txnState.isReadOnly(),
-                                                new long[] {1},
-                                                new int[] {localTask_outputDep},
-                                                new ByteBuffer[] {paramBuf},
+                                                1,
+                                                localTask_outputDep,
+                                                paramBuf,
                                                 false);
 
                     localTask.addInputDepId(0, localTask_startDep);
 
                     FragmentTaskMessage distributedTask =
-                        new FragmentTaskMessage(m_txnState.initiatorHSId,
+                        FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
                                                 m_txnState.isReadOnly(),
-                                                new long[] {0},
-                                                new int[] {localTask_startDep},
-                                                new ByteBuffer[] {paramBuf},
+                                                0,
+                                                localTask_startDep,
+                                                paramBuf,
                                                 finalTask);
 
                     m_txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask);

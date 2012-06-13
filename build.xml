@@ -243,49 +243,6 @@ DISTRIBUTION
 ***************************************
 -->
 
-<macrodef name="voltbin-macro">
-  <sequential>
-    <mkdir dir="${build.dir}/voltbin" />
-    <copy todir="${build.dir}/voltbin" flatten="true">
-        <fileset dir="${build.dir}" defaultexcludes="yes">
-            <include name="nativelibs/libvoltdb*" />
-            <include name="prod/voltdbfat.jar" />
-        </fileset>
-    </copy>
-    <!-- use cp to preserve permissions -->
-    <exec dir="tools" executable="cp" failonerror="true">
-        <arg line="getmac.py"/>
-        <arg line="killstragglers.sh"/>
-        <arg line="${build.dir}/voltbin"/>
-    </exec>
-    <!-- populate the logging configuration files -->
-    <copy tofile="${build.dir}/voltbin/log4j.properties" file="voltdb/log4j.properties"/>
-    <copy tofile="${build.dir}/voltbin/log4j.xml" file="voltdb/log4j.xml"/>
-  </sequential>
-</macrodef>
-
-<target name="voltbin" depends="compile, ee, jars">
-  <voltbin-macro/>
-
-  <!-- strip the voltbin shared library (~40x size reduction) -->
-  <exec dir='${build.dir}/voltbin' executable='/bin/sh'>
-    <arg line="-c '/usr/bin/strip -x libvoltdb*'"/>
-  </exec>
-</target>
-
-<target name="voltbin_profile" depends="compile, ee_profile, jars">
-  <voltbin-macro/>
-</target>
-
-<target name="voltbin_copy" depends="compile,ee,jars">
-  <voltbin-macro/>
-
-  <!-- copy the voltbin contents to $HOME/voltbin -->
-  <exec dir="${build.dir}" executable='/bin/sh'>
-    <arg line="-c 'cp voltbin/* $HOME/voltbin/'"/>
-  </exec>
-</target>
-
 <target name="javadoc">
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
@@ -1077,23 +1034,65 @@ TEST CASES
     </emma>
 </target>
 
-<!-- common junit parameters go here -->
-<macrodef name='run_junit'>
-    <attribute name='timeout'/>
-    <attribute name='printsummary' default='off' />
-    <attribute name='showoutput' default='false' />
-    <element name='tests'/>
-    <element name='formatters'/>
+<!-- script that runs junit_onesuite for each class in a fileset -->
+<!-- if there's a better way to do this than embedding javascript, please help... -->
+<scriptdef name="junit-files" language="javascript">
+<element name="fileset" type="fileset"/>
+<![CDATA[
+  filesets = elements.get("fileset");
+  for (i = 0; i < filesets.size(); ++i) {
+    fileset = filesets.get(i);
+    scanner = fileset.getDirectoryScanner(project);
+    scanner.scan();
+    files = scanner.getIncludedFiles();
+    for( j=0; j < files.length; j++) {
+        jfile = self.project.createTask("antcall");
+        project.setProperty("testfilename", files[j]);
+        jfile.setTarget("junit_onesuite");
+        jfile.execute();
+    }
+  }
+]]>
+</scriptdef>
+
+<!-- run junit for one suite -->
+<target name='junit_onesuite'>
+    <!-- set defaults for junit vars if not already set -->
+    <condition property="junit.timeout" value="${junit.timeout}" else='1800000'>
+        <isset property="junit.timeout"/>
+    </condition>
+    <condition property="junit.printsummary" value="${junit.printsummary}" else='yes'>
+        <isset property="junit.printsummary"/>
+    </condition>
+    <condition property="junit.showoutput" value="${junit.showoutput}" else="false">
+        <isset property="junit.showoutput"/>
+    </condition>
+    <!-- select which set of regression suite configuration types to run -->
+    <condition property="regressions" value="${regressions}" else="all">
+        <isset property="regressions"/>
+    </condition>
+
     <sequential>
-        <mkdir dir='${build.testoutput.dir}' />
+
+        <!-- convert the filename to a classname -->
+        <!-- assumes the file coming in has 1-1 folders to packages -->
+        <loadresource property="testname">
+            <string value="${testfilename}" />
+            <filterchain>
+                <replaceregex pattern="/" replace="\." flags="g" />
+                <replaceregex pattern="\.class" replace="" />
+            </filterchain>
+        </loadresource>
+
+        <!-- run ant's junit runner -->
         <junit
             fork="yes"
             haltonfailure="${junit.haltonfailure}"
             failureproperty="junit.failures"
-            printsummary="@{printsummary}"
-            timeout="@{timeout}"
+            printsummary="false"
+            timeout="${junit.timeout}"
             maxmemory='1024M'
-            showoutput="@{showoutput}"
+            showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
             <jvmarg value="-Djava.library.path=${build.dir}/nativelibs:${base.dir}/third_party/cpp/jnilib" />
@@ -1117,71 +1116,41 @@ TEST CASES
             <jvmarg value="-Demma.coverage.out.merge=true" />
             <!-- junit log4j settings, generates log output of last suite -->
             <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml" />
-            <!-- -->
-            <formatters/>
-            <batchtest todir="${build.testoutput.dir}">
-                <tests/>
-            </batchtest>
-            <assertions><enable/></assertions>
-        </junit>
-    </sequential>
-</macrodef>
 
- <macrodef name="junitreport-macro">
-   <attribute name="testoutput" />
-   <sequential>
-     <mkdir dir='@{testoutput}/report' />
-     <junitreport todir="@{testoutput}">
-       <fileset dir="@{testoutput}">
-            <include name="TEST-*.xml" />
-        </fileset>
-        <report format="noframes" todir="@{testoutput}/report"/>
-        <report
-            styledir="tools"
-            format="noframes"
-            todir="@{testoutput}"
-        />
-     </junitreport>
-   </sequential>
-</macrodef>
-
-<!-- A set of junit tests that only run on hudson and have an extended timeout -->
-<!-- Run this before junit to pick up these tests in the reporting -->
-<target name="junit-hudson">
-    <run_junit timeout="900000" printsummary="yes">
-        <formatters>
-            <formatter type="xml" />
-        </formatters>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <!-- currently empty! -->
-            </fileset>
-        </tests>
-    </run_junit>
-</target>
-
-<target name="timeoutbakeoff" description = "Reporting for junit tests">
-    <run_junit timeout="600000" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
+            <!-- write per-testcase output to console if verbose mode -->
+            <formatter type="plain" usefile="false" if="verbosereport"/>
+            <!-- write per-testcase output to testoutput folder -->
+            <formatter type="plain" usefile="true" />
+            <!-- write all kinds of fun voltdb output to testoutput folder -->
             <formatter
                 type='xml'
                 classname="org.voltdb.VoltJUnitFormatter"
                 usefile='false'
                 extension="none"
             />
+            <!-- write xml output for the report  -->
             <formatter type="xml" />
-        </formatters>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <include name='org/voltdb/**/TestExecutionSite.class'/>
-                <include name='org/voltdb/**/TestRejoinEndToEnd.class'/>
-                <include name='org/voltdb/**/TestPartitionDetection.class'/>
-                <include name='org/voltdb/**/TestRestoreAgent.class'/>
-            </fileset>
-        </tests>
-    </run_junit>
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
+
+            <!-- specify the tests here (there should be only one) -->
+            <batchtest todir="${build.testoutput.dir}">
+                <fileset dir='${build.test.dir}'>
+                    <include name='${testfilename}'/>
+                </fileset>
+            </batchtest>
+
+            <assertions><enable/></assertions>
+        </junit>
+
+        <!-- per-test post processing script
+             1. ensure a result xml file got written
+             2. ensure no whacky processes were stranded -->
+        <exec executable="/usr/bin/env">
+            <arg value="python" />
+            <arg value="${base.dir}/tools/junit-post-process.py" />
+            <arg value="--testname=${testname}" />
+            <arg value="--outputpath=${build.testoutput.dir}" />
+        </exec>
+    </sequential>
 </target>
 
 <target
@@ -1287,32 +1256,50 @@ TEST CASES
     />
 </target>
 
-<!-- Junit tests that run quickly -->
-<target
-    name="junit_quick"
-    description="Tests and suites that run in under 3 minutes under memcheck"
->
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
-        <isset property="timeoutLength"/>
-    </condition>
-    <!-- select which set of regression suite configuration types to run -->
-    <condition property="regressions" value="${regressions}" else="all">
-        <isset property="regressions"/>
-    </condition>
-    <condition property="enableiv2" value="${enableiv2}" else="false">
-        <isset property="enableiv2"/>
-    </condition>
-    <run_junit timeout="${timeoutLength}" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
+<!-- common macro to run a bynch of junit -->
+<macrodef name='run_junit'>
+    <element name='tests'/>
+    <sequential>
+        <mkdir dir='${build.testoutput.dir}' />
+        <mkdir dir='${build.dir}/testoutput-archive/' />
+        <exec executable="/usr/bin/env" failonerror='true'>
+            <arg value="python" />
+            <arg value="${base.dir}/tools/junit-pre-process.py" />
+            <arg value="--archivepath=${build.dir}/testoutput-archive/" />
+            <arg value="--outputpath=${build.testoutput.dir}" />
+        </exec>
+        <junit-files>
+            <tests/>
+        </junit-files>
+
+        <echo message='' /><echo message='' />
+        <junitreport todir="${build.testoutput.dir}">
+            <fileset dir="${build.testoutput.dir}">
+                <include name="TEST-*.xml" />
+            </fileset>
+            <report format="noframes" todir="${build.testoutput.dir}/report"/>
+            <report
+                styledir="tools"
+                format="noframes"
+                todir="${build.testoutput.dir}"
             />
-            <formatter type="xml" />
-        </formatters>
+        </junitreport>
+        <exec dir="${build.testoutput.dir}" executable='cat'>
+            <arg line="junit-noframes.html"/>
+        </exec>
+        <!-- Fail the build if there were any problems.
+             This runs all the tests before failing. -->
+        <fail
+             if="junit.failures"
+             unless="emma.enabled"
+             message="JUnit had failures"
+        />
+    </sequential>
+</macrodef>
+
+<!-- Junit tests that run quickly -->
+<target name="junit_quick" description="Tests and suites that run in under 3 minutes under memcheck">
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
@@ -1347,97 +1334,10 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-
-    <!-- Fail the build if there were any problems.
-        This runs all the tests before failing. -->
-    <fail
-        if="junit.failures"
-        unless="emma.enabled"
-        message="JUnit had failures"
-    />
-</target>
-
-<!-- Junit tests that run quickly -->
-<target
-    name="junit_noclustering"
-    description="Tests and suites that run on a single node"
->
-    <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
-        <isset property="timeoutLength"/>
-    </condition>
-    <property name="regressions" value="localhsql"/>
-    <condition property="enableiv2" value="${enableiv2}" else="false">
-        <isset property="enableiv2"/>
-    </condition>
-    <run_junit timeout="${timeoutLength}" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-            <formatter type="xml" />
-        </formatters>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <include name='org/hsqldb_voltpatches/**/Test*.class' />
-                <include name='org/voltdb/**/Test*.class' />
-                <exclude name="**/*$*.class" />
-                <exclude name="**/TestRejoin*.class" />
-                <exclude name="**/TestFailureDetectSuite.class" />
-                <exclude name="**/TestFaultDistributor.class" />
-                <exclude name="**/TestPartitionDetection.class" />
-                <exclude name="**/TestSecondaryRejoin.class" />
-                <exclude name="**/TestNonDetermisticSeppuku.class" />
-                <exclude name="**/TestExportOpsEvents.class" />
-                <exclude name="**/TestMaliciousClientSuite.class" />
-                <exclude name="org/voltdb/quarantine/**/*.class"/>
-            </fileset>
-        </tests>
-    </run_junit>
-
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-
-    <exec dir="${build.testoutput.dir}" executable='cat'>
-        <arg line="junit-noframes.html"/>
-    </exec>
-    <!-- Fail the build if there were any problems.
-        This runs all the tests before failing. -->
-    <fail
-        if="junit.failures"
-        unless="emma.enabled"
-        message="JUnit had failures"
-    />
 </target>
 
 <target name="junit" description="Run testcases for Java classes.">
-    <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
-        <isset property="timeoutLength"/>
-    </condition>
-    <!-- select which set of regression suite configuration types to run -->
-    <condition property="regressions" value="${regressions}" else="all">
-        <isset property="regressions"/>
-    </condition>
-    <condition property="enableiv2" value="${enableiv2}" else="false">
-        <isset property="enableiv2"/>
-    </condition>
-    <run_junit timeout="${timeoutLength}" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-            <formatter type="xml" />
-        </formatters>
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
@@ -1453,50 +1353,10 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-
-    <exec dir="${build.testoutput.dir}" executable='cat'>
-        <arg line="junit-noframes.html"/>
-    </exec>
-    <delete
-        dir='${build.testoutput.dir}'
-        includes='TEST-*.xml'
-    />
-    <!-- Fail the build if there were any problems.
-        This runs all the tests before failing. -->
-    <fail
-        if="junit.failures"
-        unless="emma.enabled"
-        message="JUnit had failures"
-    />
-
 </target>
 
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
-    <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
-        <isset property="timeoutLength"/>
-    </condition>
-    <!-- select which set of regression suite configuration types to run -->
-    <condition property="regressions" value="${regressions}" else="all">
-        <isset property="regressions"/>
-    </condition>
-    <condition property="enableiv2" value="${enableiv2}" else="false">
-        <isset property="enableiv2"/>
-    </condition>
-
-    <run_junit timeout="${timeoutLength}" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-            <formatter type="xml" />
-        </formatters>
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/voltdb/quarantine/**/Test*.class'/>
@@ -1504,17 +1364,6 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-
-    <!-- Generate unit test reports. -->
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-
-    <!-- Fail the build if there were any problems.
-        This runs all the tests before failing. -->
-    <fail
-        if="junit.failures"
-        unless="emma.enabled"
-        message="JUnit had failures"
-    />
 </target>
 
 <target
@@ -1693,26 +1542,18 @@ TEST CASES
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
     </condition>
-    <!-- select which set of regression suite configuration types to run -->
-    <condition property="regressions" value="${regressions}" else="all">
-        <isset property="regressions"/>
+    <condition property="junit.showoutput" value="${junit.showoutput}" else="true">
+        <isset property="junit.showoutput"/>
+    </condition>
+    <!-- output per-testcase stats at the end of each suite -->
+    <condition property="verbosereport" value="${verbosereport}" else="true">
+        <isset property="verbosereport"/>
     </condition>
     <condition property="enableiv2" value="${enableiv2}" else="false">
         <isset property="enableiv2"/>
     </condition>
 
-    <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
-        <formatters>
-            <!-- keep the per-case final summary -->
-            <formatter usefile="false" type="plain"/>
-            <!-- Also log to obj/BUILD/testoutput -->
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-        </formatters>
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
               <include name="**/${junitclass}.class"/>

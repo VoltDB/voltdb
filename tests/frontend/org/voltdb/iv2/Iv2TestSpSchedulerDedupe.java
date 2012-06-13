@@ -120,9 +120,6 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
                                     destHSId, // don't care
                                     txnId,
                                     readOnly,
-                                    new long[] {},
-                                    new int[] {},
-                                    new ByteBuffer[] {},
                                     false);
         return frag;
     }

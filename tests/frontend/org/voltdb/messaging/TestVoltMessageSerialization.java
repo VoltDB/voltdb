@@ -36,6 +36,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.exceptions.EEException;
 
 public class TestVoltMessageSerialization extends TestCase {
@@ -115,7 +116,7 @@ public class TestVoltMessageSerialization extends TestCase {
         table.addRow("howmanylicksdoesittaketogettothecenterofatootsiepop");
 
         InitiateResponseMessage iresponse = new InitiateResponseMessage(itask);
-        iresponse.setResults( new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+        iresponse.setResults( new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                 new VoltTable[] { table, table }, "knockknockbananna", new EEException(1)));
         iresponse.setClientHandle(99);
 
@@ -125,8 +126,8 @@ public class TestVoltMessageSerialization extends TestCase {
     }
 
     public void testFragmentTask() throws IOException {
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true,
-            new long[] { 5 }, new int[] { 12 }, new ByteBuffer[] { ByteBuffer.allocate(0) }, true);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true, true);
+        ft.addFragment(5, 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
@@ -159,9 +160,9 @@ public class TestVoltMessageSerialization extends TestCase {
         param2_fs.writeObject(param_set2);
         ByteBuffer param2_buf = param2_fs.getBuffer();
 
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true,
-            new long[] { 5, 10 }, new int[] { 12, 24 },
-            new ByteBuffer[] { param1_buf, param2_buf }, true);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true, true);
+        ft.addFragment(5, 12, param1_buf);
+        ft.addFragment(10, 24, param2_buf);
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
         FragmentTaskMessage ft2 = (FragmentTaskMessage) checkVoltMessage(ft);
@@ -182,26 +183,23 @@ public class TestVoltMessageSerialization extends TestCase {
         if (paramData != null) {
             final FastDeserializer fds = new FastDeserializer(paramData);
             params = fds.readObject(ParameterSet.class);
+            assertEquals(10, params.toArray()[0]);
+            assertEquals(10.1, params.toArray()[1]);
         }
-        assertEquals(10, params.toArray()[0]);
-        assertEquals(10.1, params.toArray()[1]);
 
         params = null;
         paramData = ft2.getParameterDataForFragment(1);
         if (paramData != null) {
             final FastDeserializer fds = new FastDeserializer(paramData);
             params = fds.readObject(ParameterSet.class);
+            assertEquals(20, params.toArray()[0]);
+            assertEquals(20.2, params.toArray()[1]);
         }
-        assertEquals(20, params.toArray()[0]);
-        assertEquals(20.2, params.toArray()[1]);
     }
 
 
     public void testFragmentResponse() throws IOException {
-        FragmentTaskMessage ft = new FragmentTaskMessage(
-                15, 12, 37,
-                false, new long[0], null,
-                new ByteBuffer[0], false);
+        FragmentTaskMessage ft = new FragmentTaskMessage(15, 12, 37, false, false);
 
         VoltTable table = new VoltTable(
                 new VoltTable.ColumnInfo("bearhugg", VoltType.STRING)

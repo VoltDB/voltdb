@@ -217,15 +217,15 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 parambytes = fs.getBuffer();
             }
 
-            FragmentTaskMessage task = new FragmentTaskMessage(
-                txnState.initiatorHSId,
-                m_site.getCorrespondingSiteId(),
-                txnState.txnId,
-                false,
-                new long[] { pf.fragmentId },
-                new int[] { pf.outputDepId },
-                new ByteBuffer[] { parambytes },
-                false);
+            FragmentTaskMessage task = FragmentTaskMessage.createWithOneFragment(
+                    txnState.initiatorHSId,
+                    m_site.getCorrespondingSiteId(),
+                    txnState.txnId,
+                    false,
+                    pf.fragmentId,
+                    pf.outputDepId,
+                    parambytes,
+                    false);
             if (pf.inputDepIds != null) {
                 for (int depId : pf.inputDepIds) {
                     task.addInputDepId(0, depId);
