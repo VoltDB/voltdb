@@ -224,7 +224,7 @@ public class Client {
      * @param args This program uses no command line arguments.
      */
     public static void main(String[] args) {
-    	CSVLoader.setTimezone("GMT+0");
+    	//CSVLoader.setTimezone("GMT-1");
         System.out.println("***************************************");
         System.out.println("* Welcome to Bobbi's Awesome Auctions *");
         System.out.println("*                                     *");
@@ -255,8 +255,8 @@ public class Client {
 
         // Load our starting data from our CSV files using the Loader class
         try {
-            allAuctionIds = Loader.loadItems(client);
-           //allAuctionIds = Loader.loadItems1(client);
+            //allAuctionIds = Loader.loadItems(client);
+           allAuctionIds = Loader.loadItems1(client);
             activeAuctionIds.addAll(allAuctionIds);
             userIds = Loader.loadUsers();
             Loader.loadCategories();

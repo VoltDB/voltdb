@@ -92,6 +92,9 @@ public class AuctionStatus extends VoltProcedure {
         long sellerId = itemRow.getLong("SELLERID");
         String itemName = itemRow.getString("ITEMNAME");
         long endTime = itemRow.getTimestampAsLong("ENDTIME");
+        
+        System.out.println("Out:"+itemRow.getTimestampAsTimestamp("ENDTIME"));
+        
         long highBidId = itemRow.getLong("HIGHBIDID");
 
         // get high bid info
@@ -129,6 +132,10 @@ public class AuctionStatus extends VoltProcedure {
         // check the timing and set the auction status accordingly
         String status = "OPEN";
         long now = new TimestampType().getTime();
+        
+        System.out.println("current time"+ new TimestampType());
+        System.out.println("endTime time"+ itemRow.getTimestampAsTimestamp("ENDTIME") );
+        
         if (endTime < now)
             status = "CLOSED";
 

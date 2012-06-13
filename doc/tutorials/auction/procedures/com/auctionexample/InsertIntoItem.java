@@ -53,6 +53,7 @@ public class InsertIntoItem extends VoltProcedure {
      */
     public VoltTable[] run(int itemId, String itemName, String itemDescription, long sellerId, long categoryId, long highBidId, double startPrice, TimestampType startTime,
         TimestampType endTime) throws VoltAbortException {
+    	System.out.println( endTime );
         voltQueueSQL(insert, itemId, itemName, itemDescription, sellerId, categoryId, highBidId, startPrice, startTime, endTime);
         voltQueueSQL(insertForExport, itemId, itemName, itemDescription, sellerId, categoryId, highBidId, startPrice, startTime, endTime);
         return voltExecuteSQL();
