@@ -422,8 +422,8 @@ public class CSVLoader {
         String myinsert = insertProcedure;
 		myinsert = myinsert.replaceAll("\\.", "_");
 		path_invalidrowfile = config.reportdir + myinsert + "_" + "csvloaderinvalidrows.csv";
-		path_logfile =  config.reportdir + myinsert + "_"+ "csvloaderReport.log";
-    	path_reportfile = config.reportdir  + myinsert + "_"+ "csvloaderLog.log";
+		path_logfile =  config.reportdir + myinsert + "_"+ "csvloaderLog.log";
+    	path_reportfile = config.reportdir  + myinsert + "_"+ "csvloaderReport.log";
     	
     	try {
 			out_invaliderowfile = new BufferedWriter(new FileWriter(path_invalidrowfile));
