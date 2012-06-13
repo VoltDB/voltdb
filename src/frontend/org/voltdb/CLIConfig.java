@@ -55,7 +55,7 @@ public abstract class CLIConfig {
 
     // Apache Commons CLI API - requires JAR
     protected final Options options = new Options();
-    protected Options helpmsg = new Options(); 
+    protected Options helpmsgs = new Options();
     protected String cmdName = "command";
 
     protected String configDump;
@@ -71,7 +71,7 @@ public abstract class CLIConfig {
         // automatically generate the help statement
         HelpFormatter formatter = new HelpFormatter();
         formatter.setOptPrefix("--");
-        formatter.printHelp(cmdName, helpmsg, false);
+        formatter.printHelp(cmdName, helpmsgs, false);
     }
 
     private void assignValueToField(Field field, String value) throws Exception {
@@ -113,7 +113,7 @@ public abstract class CLIConfig {
         this.cmdName = cmdName;
 
         try {
-            options.addOption("help", false, "Print this message");
+            options.addOption("help","h", false, "Print this message");
             // add all of the declared options to the cli
             for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class)) {
@@ -126,12 +126,12 @@ public abstract class CLIConfig {
                     String shortopt = option.shortOpt();
                     if ((shortopt == null) || (shortopt.trim().length() == 0)) {
                     	options.addOption(opt, option.hasArg(), option.desc());
+                    	helpmsgs.addOption(opt, option.hasArg(), option.desc());
                     } else {
                     	options.addOption(opt, shortopt, option.hasArg(), option.desc());
+                    	helpmsgs.addOption(opt, shortopt, option.hasArg(), option.desc());
                     }
-                }
-
-                if (field.isAnnotationPresent(Leftargs.class)) {
+                } else if (field.isAnnotationPresent(Leftargs.class)) {
                 	Leftargs params = field.getAnnotation(Leftargs.class);
                 	String opt = params.opt();
                 	if ((opt == null) || (opt.trim().length() == 0)) {
@@ -153,7 +153,6 @@ public abstract class CLIConfig {
             int leftover = 0;
             // string key-value pairs
             Map<String, String> kvMap = new TreeMap<String, String>();
-            
             
             for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class) ) {
@@ -196,12 +195,13 @@ public abstract class CLIConfig {
             if (leftargs != null) {
             	if (leftargs.length <= leftover) {
                 	Field[] fields = getClass().getDeclaredFields();
-                    for (int i = 0; i<leftargs.length; i++) {
-                    	Field field = fields[i];
-                    	if (field.isAnnotationPresent(Leftargs.class)) {
-                    		field.setAccessible(true);
-                        	field.set(this, leftargs[i]);
+                    for (int i = 0,j=0; i<leftargs.length; i++) {
+                    	for (;j < fields.length; j++) {
+                    		if (fields[j].isAnnotationPresent(Leftargs.class)) 
+                    			break;
                     	}
+                    	fields[j].setAccessible(true);
+                    	fields[j].set(this, leftargs[i]);
                     }
                 } else {
                 	System.err.println("Expected " + leftover + " args, but receive " + leftargs.length + " args");
