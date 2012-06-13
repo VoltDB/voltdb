@@ -38,9 +38,17 @@ public abstract class CLIConfig {
     @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
     public @interface Option {
         String opt() default "";
+        String shortOpt() default "";
         boolean hasArg() default true;
         boolean required() default false;
         String desc() default "";
+    }
+    
+    @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
+    @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
+    public @interface AdditionalArgs {
+    	String opt() default "";
+    	String desc() default "";
     }
 
     // Apache Commons CLI API - requires JAR
@@ -106,26 +114,42 @@ public abstract class CLIConfig {
 
             // add all of the declared options to the cli
             for (Field field : getClass().getDeclaredFields()) {
-                if (field.isAnnotationPresent(Option.class) == false) {
-                    continue;
+                if (field.isAnnotationPresent(Option.class)) {
+                	Option option = field.getAnnotation(Option.class);
+
+                    String opt = option.opt();
+                    if ((opt == null) || (opt.trim().length() == 0)) {
+                        opt = field.getName();
+                    }
+                    String shortopt = option.shortOpt();
+                    if ((shortopt == null) || (shortopt.trim().length() == 0)) {
+                    	options.addOption(opt, option.hasArg(), option.desc());
+                    } else {
+                    	options.addOption(opt, shortopt, option.hasArg(), option.desc());
+                    }
                 }
 
-                Option option = field.getAnnotation(Option.class);
-
-                String opt = option.opt();
-                if ((opt == null) || (opt.trim().length() == 0)) {
-                    opt = field.getName();
+                if (field.isAnnotationPresent(AdditionalArgs.class)) {
+                	AdditionalArgs additionalArgs = field.getAnnotation(AdditionalArgs.class);
+                	String opt = additionalArgs.opt();
+                	if ((opt == null) || (opt.trim().length() == 0)) {
+                        opt = field.getName();
+                    }
+                	
                 }
-
-                options.addOption(opt, option.hasArg(), option.desc());
+                
             }
 
             CommandLineParser parser = new PosixParser();
             CommandLine cmd = parser.parse(options, args);
-
+            
             if (cmd.hasOption("help")) {
                 printUsage();
                 System.exit(0);
+            }
+            String[] leftargs = cmd.getArgs();
+            if (leftargs != null) {
+            	
             }
 
             // string key-value pairs
@@ -139,7 +163,7 @@ public abstract class CLIConfig {
                 Option option = field.getAnnotation(Option.class);
 
                 String opt = option.opt();
-                if ((opt == null) || (opt.length() == 0)) {
+                if ((opt == null) || (opt.trim().length() == 0)) {
                     opt = field.getName();
                 }
 
@@ -148,8 +172,9 @@ public abstract class CLIConfig {
                         assignValueToField(field, cmd.getOptionValue(opt));
                     }
                     else {
-                        if (field.getClass().equals(boolean.class) || field.getClass().equals(Boolean.class)) {
-                            try {
+                        if (field.getType().equals(boolean.class) || field.getType().equals(Boolean.class)) {
+                        	field.setAccessible(true);
+                        	try {
                                 field.set(this, true);
                             } catch (Exception e) {
                                 e.printStackTrace();
