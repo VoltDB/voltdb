@@ -41,7 +41,6 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcedureCallback;
 
-
 import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
@@ -50,7 +49,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  * (or pass it to any stored proc, but ignoring any result other than the success code.).
  *
  * TODO:
- *   - No associated test suite.
  *   - Forces JVM into UTC. All input date TZs assumed to be GMT+0
  *   - Requires canonical JDBC SQL timestamp format
  */
@@ -422,9 +420,18 @@ public class CSVLoader {
 		path_invalidrowfile = config.reportdir + myinsert + "_" + "csvloaderinvalidrows.csv";
 		path_logfile =  config.reportdir + myinsert + "_"+ "csvloaderReport.log";
     	path_reportfile = config.reportdir  + myinsert + "_"+ "csvloaderLog.log";
+    	
+    	try {
+			out_invaliderowfile = new BufferedWriter(new FileWriter(path_invalidrowfile));
+			out_logfile = new BufferedWriter(new FileWriter(path_logfile));
+			out_reportfile = new BufferedWriter(new FileWriter(path_reportfile)); 
+		} catch (IOException e) {
+			System.err.println(e.getMessage());
+		}
+		
     }
     
-    public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
+    private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
         final Client client = ClientFactory.createClient(config);
 
@@ -438,10 +445,6 @@ public class CSVLoader {
 		int bulkflush = 300; // by default right now
 		try {
 			long linect = 0;
-			out_invaliderowfile = new BufferedWriter(new FileWriter(path_invalidrowfile));
-			 out_logfile = new BufferedWriter(new FileWriter(path_logfile));
-			 out_reportfile = new BufferedWriter(new FileWriter(path_reportfile)); 
-			 
 			for (Long irow : errorInfo.keySet()) {
 				String info[] = errorInfo.get(irow);
 				if (info.length != 2)

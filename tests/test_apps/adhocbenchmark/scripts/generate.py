@@ -81,20 +81,19 @@ class Column(object):
         self.modifiers = modifiers
 
 class Table(object):
-    def __init__(self, name, nvariations, columns, pk):
+    def __init__(self, name, nvariations, columns, ipartcol, ipkcol):
         self.name = name
         self.nvariations = nvariations
         self.columns = columns
-        self.pk = pk
+        self.partcol = ipartcol
+        self.pkcol = ipkcol
 
-def create_table(name, prefix, nvariations, ncolumns):
-    columns = [Column('id', 'bigint', 'NOT NULL')]
-    # Add a foreign key for joins if generating variations.
-    if nvariations > 1:
-        columns.append(Column('parent_id', 'bigint', None))
+def create_table(name, prefix, nvariations, ncolumns, ipartcol, ipkcol):
+    # Add a possible primary / possible partition key and a foreign/non-partition key.
+    columns = [Column('id', 'bigint', 'NOT NULL'), Column('parent_id', 'bigint', None)]
     for i in range(ncolumns):
         columns.append(Column('%s_%d' % (prefix, i+1), 'varchar(32)', None))
-    return Table(name, nvariations, columns, 0)
+    return Table(name, nvariations, columns, ipartcol, ipkcol)
 
 def get_tables():
     print 'Reading %s...' % config_path
@@ -120,7 +119,19 @@ def get_tables():
             ncolumns = int(xmltable.attrib['columns'])
             if ncolumns < 1:
                 raise Fatal('Bad columns value: %d' % ncolumns)
-            tables.append(create_table(name, prefix, nvariations, ncolumns))
+            try:
+                ipartcol = int(xmltable.attrib['partitioncolumn'])
+                if ipartcol < 0 or ipartcol >= ncolumns:
+                    raise Fatal('Bad partition column index value: %d' % ipartcol)
+            except KeyError, e:
+                ipartcol = None # The partitioncolumn attribute is optional, tables default to replicated
+            try:
+                ipkcol = int(xmltable.attrib['primarykey'])
+                if ipkcol < 0 or ipkcol >= ncolumns:
+                    raise Fatal('Bad primary key column index value: %d' % ipkcol)
+            except KeyError, e:
+                ipkcol = None # The primarykey attribute is optional, tables default to having no pk index
+            tables.append(create_table(name, prefix, nvariations, ncolumns, ipartcol, ipkcol))
     except (OSError, IOError), e:
         raise Fatal('Failed to parse %s' % config_path, e)
     except KeyError, e:
@@ -132,10 +143,10 @@ def get_tables():
 def generate_project(tables):
     yield project_start
     for table in tables:
-        if table.pk is not None:
+        if table.partcol is not None:
             for variation in range(table.nvariations):
                 yield project_partition % ('%s_%d' % (table.name, variation+1),
-                                                      table.columns[table.pk].name)
+                                                      table.columns[table.partcol].name)
     yield project_end
 
 def generate_comma_separated_list(generator, indent, comment):
@@ -157,8 +168,10 @@ def generate_table_ddl_lines(table, name):
         else:
             modifiers = ''
         yield '%s %s%s' % (column.name, column.type, modifiers)
-    if table.pk is not None:
-        yield ddl_pk % (name, table.columns[table.pk].name)
+    if table.pkcol is not None:
+        yield ddl_pk % (name, table.columns[table.pkcol].name)
+    if table.partcol is not None:
+        yield ddl_partition % (table.columns[table.partcol].name)
 
 def generate_ddl(tables):
     yield ddl_start
@@ -169,7 +182,6 @@ def generate_ddl(tables):
             generator = generate_table_ddl_lines(table, name)
             for line in generate_comma_separated_list(generator, '  ', '--'):
                 yield line
-            yield ddl_partition % table.columns[0].name
             yield table_end
     yield ddl_end
 

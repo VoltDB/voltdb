@@ -60,7 +60,13 @@ public class TestCSVLoader extends TestCase {
      		"--maxerrors=50",
      		"--user=",
      		"--password=",
-     		"--port="
+     		"--port=",
+     		"--strictquotes=false",
+     		"--separator=,",
+     		"--quotechar=\"\"",
+     		"--escape=\\",
+     		"--skip=0",
+     		"--nowhitespace=true"
      		};
      
 	    String []myData = { "1,1,1,11111111,first,1.10,1.11",

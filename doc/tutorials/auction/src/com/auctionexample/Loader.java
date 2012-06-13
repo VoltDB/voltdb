@@ -77,10 +77,10 @@ class Loader {
        */
     static ArrayList<Integer> loadItems( org.voltdb.client.Client client ) throws Exception {
     	ArrayList<Integer> itemIds = new ArrayList<Integer>();
-    	String userHome = System.getProperty("user.home"); 
+    	URL url = Loader.class.getResource("datafiles/items.txt");
     	String []myOptions = {
-         		"--file=" + userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/items.txt", 
-    			"--procedure=InsertIntoItem",
+         		"--file="+ url.getPath(), 
+         		"--procedure=InsertIntoItem",
          		//"--reportdir=" + reportdir,
          		//"--table=InsertIntoItem",
          		"--maxerrors=50",
@@ -182,9 +182,9 @@ class Loader {
     
     static ArrayList<Integer> loadCategories() throws InterruptedException, IOException {
     	ArrayList<Integer> categoryIds = new ArrayList<Integer>();
-    	String userHome = System.getProperty("user.home"); 
+    	URL url = Loader.class.getResource("datafiles/categories.txt");
     	String []myOptions = {
-         		"--file=" + userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/categories.txt", 
+         		"--file="+ url.getPath(),         		
          		"--procedure=InsertIntoCategory",
          		//"--reportdir=" + reportdir,
          		//"--table=BLAH",
@@ -249,9 +249,9 @@ class Loader {
     
     static ArrayList<Integer> loadUsers() throws InterruptedException, IOException {
     	ArrayList<Integer> userIds = new ArrayList<Integer>();
-    	String userHome = System.getProperty("user.home"); 
+    	URL url = Loader.class.getResource("datafiles/users.txt");
     	String []myOptions = {
-         		"--file=" + userHome + "/workspace/voltdb/doc/tutorials/auction/src/com/auctionexample/datafiles/users.txt", 
+         		"--file="+ url.getPath(),         		
          		"--procedure=InsertIntoUser",
          		//"--reportdir=" + reportdir,
          		//"--table=BLAH",
