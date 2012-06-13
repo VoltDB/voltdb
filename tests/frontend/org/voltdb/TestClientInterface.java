@@ -288,7 +288,7 @@ public class TestClientInterface {
                                               anyInt(), anyObject(), anyInt(), anyLong());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
-        assertFalse(boolValues.get(1)); // readonly
+        assertTrue(boolValues.get(1));  // readonly
         assertFalse(boolValues.get(2)); // single-part
         assertFalse(boolValues.get(3)); // every site
         assertEquals("@AdHocReadOnly", invocationCaptor.getValue().getProcName());
