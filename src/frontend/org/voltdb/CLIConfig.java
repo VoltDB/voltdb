@@ -87,10 +87,15 @@ public abstract class CLIConfig {
             field.set(this, Double.parseDouble(value));
         else if ((cls == String.class))
         	field.set(this, value);
-        else if ((cls == char.class) || (cls == Character.class))
+        else if (value.length() == 1 && ((cls == char.class) || (cls == Character.class)))
         	field.set(this, value.charAt(0));
-        else
-            assert(false);
+        else {
+        	System.err.println("Parsing failed. Reason: can not assign " + value + " to "
+        			+ cls.toString() + " class");
+        	printUsage();
+            System.exit(-1);
+        }
+            
     }
 
     public void parse(String cmdName, String[] args) {
