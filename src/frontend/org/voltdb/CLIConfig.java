@@ -48,7 +48,7 @@ public abstract class CLIConfig {
     @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
     public @interface Leftargs {
     	String opt() default "";
-    	boolean hasArg() default true;
+    	boolean hasArg() default false;
     	boolean required() default false;
     	String desc() default "";
     }
@@ -189,6 +189,7 @@ public abstract class CLIConfig {
                      field.setAccessible(true);
                      kvMap.put(opt, field.get(this).toString());
                 } else if (field.isAnnotationPresent(Leftargs.class)) {
+                	// Deal with --table=BLHA, offer nice error message
                 	leftover++;
                 }
             }

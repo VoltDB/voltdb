@@ -23,8 +23,8 @@
 
 
 package org.voltdb;
-import java.math.BigDecimal;
 
+import org.voltdb.types.TimestampType;
 import junit.framework.TestCase;
 
 
@@ -65,15 +65,6 @@ public class TestParameterConverter extends TestCase
         assertEquals(new Double(34.56), ((Double)r).doubleValue());
     }
     
-    
-    public void testStringToFloat() throws Exception
-    {
-        Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, float.class, null, "34.56");
-        assertTrue("expect float", r.getClass() == Float.class);
-        assertEquals(new Float(34.56), ((Float)r).floatValue());
-    }
-    
     // Add more test unit cases
     public void testStringWithWhitespaceToDouble() throws Exception
     {
@@ -107,11 +98,20 @@ public class TestParameterConverter extends TestCase
         assertEquals(VoltType.NULL_INTEGER, r);
     }
     
-    public void testNULLToString() throws Exception
+//    public void testNULLToString() throws Exception
+//    {
+//        Object r = ParameterConverter.
+//            tryToMakeCompatible(true, false, String.class, null, null);
+//        assertTrue("expect null string", r.getClass() == String.class);
+//        //assertEquals( null, r);
+//    }
+    
+    public void testStringToTimestamp() throws Exception
     {
+    	TimestampType t = new TimestampType();
         Object r = ParameterConverter.
-            tryToMakeCompatible(true, false, int.class, null, null);
-        assertTrue("expect integer", r.getClass() == String.class);
-        assertEquals( VoltType.NULL_STRING_OR_VARBINARY, r);
+            tryToMakeCompatible(true, false, TimestampType.class, null, t);
+        assertTrue("expect timestamp", r.getClass() == TimestampType.class);
+        assertEquals(t, r);
     }
 }

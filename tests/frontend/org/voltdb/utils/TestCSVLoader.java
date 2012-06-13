@@ -53,20 +53,22 @@ public class TestCSVLoader extends TestCase {
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
      String []myOptions = {
-     		"--file=" + userHome + "/test.csv", 
+     		"--fi=" + userHome + "/test.csv",
      		//"--procedure=BLAH.insert",
      		"--reportdir=" + reportdir,
-     		"--table=BLAH",
+     		"BLAH",
+     		
+     		//"--table=BLAH",
      		"--maxerrors=50",
      		"--user=",
      		"--password=",
      		"--port=",
-     		"--strictquotes=false",
      		"--separator=,",
-     		"--quotechar=\"\"",
+     		"--quotechar=\"",
      		"--escape=\\",
      		"--skip=0",
-     		"--nowhitespace=true"
+     		"--nowhitespace"
+     		//"--strictquotes",
      		};
      
 	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
@@ -83,6 +85,7 @@ public class TestCSVLoader extends TestCase {
 	    					"10,10,10,10 101 010,second,2.20,2.22",
 	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
 	    					};
+     //String []myData = { "1,NULL,1,11111111,first,1.10,1.11"};
 	    int invalidLineCnt = 4;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	    test_Interface_lineByLine( mySchema, 7, myOptions, myData, invalidLineCnt );
