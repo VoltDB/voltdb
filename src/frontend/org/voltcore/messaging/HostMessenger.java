@@ -106,11 +106,11 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         private void initNetworkThreads() {
             try {
-                logger.info("Default thread count: " + this.networkThreads);
+                logger.info("Default network thread count: " + this.networkThreads);
                 Integer networkThreadConfig = Integer.getInteger("networkThreads");
                 if ( networkThreadConfig != null ) {
                     this.networkThreads = networkThreadConfig;
-                    logger.info("Overridden thread count: " + this.networkThreads);
+                    logger.info("Overridden network thread count: " + this.networkThreads);
                 }
 
             } catch (Exception e) {
