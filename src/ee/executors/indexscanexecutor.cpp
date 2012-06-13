@@ -75,13 +75,15 @@ namespace detail {
             m_targetTableSchema(schema),
             m_endExpression(endExpression),
             m_postExpression(postExpression),
-            m_joinTuple(NULL)
+            m_firstTuple(NULL),
+            m_secondTuple(NULL)
         {}
 
         const TupleSchema* m_targetTableSchema;
         AbstractExpression* m_endExpression;
         AbstractExpression* m_postExpression;
-        const TableTuple *m_joinTuple;
+        const TableTuple *m_firstTuple;
+        const TableTuple *m_secondTuple;
 
     };
 
@@ -528,7 +530,7 @@ TableTuple IndexScanExecutor::p_next_pull() {
         // First check whether the end_expression is now false
         //
         if (m_state->m_endExpression != NULL &&
-            m_state->m_endExpression->eval(&m_tuple, m_state->m_joinTuple).isFalse())
+            m_state->m_endExpression->eval(m_state->m_firstTuple, m_state->m_secondTuple).isFalse())
         {
             VOLT_TRACE("End Expression evaluated to false, stopping scan");
             m_tuple = TableTuple(m_state->m_targetTableSchema);
@@ -538,7 +540,7 @@ TableTuple IndexScanExecutor::p_next_pull() {
         // Then apply our post-predicate to do further filtering
         //
         if (m_state->m_postExpression != NULL &&
-            m_state->m_postExpression->eval(&m_tuple, m_state->m_joinTuple).isFalse())
+            m_state->m_postExpression->eval(m_state->m_firstTuple, m_state->m_secondTuple).isFalse())
         {
             continue;
         }
@@ -633,7 +635,15 @@ void IndexScanExecutor::set_expressions_pull(const NValueArray &params)
 void IndexScanExecutor::set_search_key_pull(const TableTuple& searchKey, const TableTuple* otherTuple)
 {
     m_searchKey = searchKey;
-    m_state->m_joinTuple = otherTuple;
+    if (otherTuple == NULL)
+    {
+        m_state->m_firstTuple = &m_tuple;
+    }
+    else
+    {
+        m_state->m_firstTuple = otherTuple;
+        m_state->m_secondTuple = &m_tuple;
+    }
 
     //
     // An index scan has three parts:
