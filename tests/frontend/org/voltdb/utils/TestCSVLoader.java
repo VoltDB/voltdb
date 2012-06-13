@@ -53,11 +53,9 @@ public class TestCSVLoader extends TestCase {
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
      String []myOptions = {
-     		"--fi=" + userHome + "/test.csv",
+     		"--f=" + userHome + "/test.csv",
      		//"--procedure=BLAH.insert",
      		"--reportdir=" + reportdir,
-     		"BLAH",
-     		
      		//"--table=BLAH",
      		"--maxerrors=50",
      		"--user=",
@@ -67,8 +65,9 @@ public class TestCSVLoader extends TestCase {
      		"--quotechar=\"",
      		"--escape=\\",
      		"--skip=0",
-     		"--nowhitespace"
+     		"--nowhitespace",
      		//"--strictquotes",
+     		"BLAH"
      		};
      
 	    String []myData = { "1,1,1,11111111,first,1.10,1.11",

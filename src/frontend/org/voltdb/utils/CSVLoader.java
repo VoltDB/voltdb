@@ -156,7 +156,7 @@ public class CSVLoader {
     }
 
     private static class CSVConfig extends CLIConfig {
-    	@Option(shortOpt = "fi",desc = "directory path to produce report files.")
+    	@Option(shortOpt = "f",desc = "directory path to produce report files.")
     	String file = "";
     	
     	@Option(shortOpt = "p",desc = "procedure name to insert the data into the database.")
@@ -252,7 +252,6 @@ public class CSVLoader {
             while ((config.limitrows-- > 0) && (line = csvReader.readNext()) != null) {
             	outCount.incrementAndGet();
                 boolean queued = false;
-                /*
                 while (queued == false) {
                 	StringBuilder linedata = new StringBuilder();
                     for(int i = 0; i < line.length; i++) {
@@ -290,7 +289,6 @@ public class CSVLoader {
                     }
                     lastOK = queued;
                 }
-                */
             }
             csvClient.drain();
             
