@@ -26,11 +26,11 @@ package com.auctionexample;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Random;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
+import org.voltdb.utils.CSVLoader;
 
 /**
  * The Client class is the main driver for the Auction example.
@@ -224,6 +224,7 @@ public class Client {
      * @param args This program uses no command line arguments.
      */
     public static void main(String[] args) {
+    	CSVLoader.setTimezone("GMT+0");
         System.out.println("***************************************");
         System.out.println("* Welcome to Bobbi's Awesome Auctions *");
         System.out.println("*                                     *");
@@ -255,7 +256,7 @@ public class Client {
         // Load our starting data from our CSV files using the Loader class
         try {
             allAuctionIds = Loader.loadItems(client);
-            //allAuctionIds = Loader.loadItems1(client);
+           //allAuctionIds = Loader.loadItems1(client);
             activeAuctionIds.addAll(allAuctionIds);
             userIds = Loader.loadUsers();
             Loader.loadCategories();

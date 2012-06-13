@@ -59,6 +59,10 @@ public class CSVLoader {
 	public synchronized static void setDefaultTimezone() {
         TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
     }
+	
+	public synchronized static void setTimezone( String tz ) {
+        TimeZone.setDefault(TimeZone.getTimeZone(tz));
+    }
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
@@ -381,7 +385,7 @@ public class CSVLoader {
     	}
     	if( linefragement.length != columnCnt ){
     		System.err.println("<zheng>Stop at line " + (outCount.get()) );
-    		return "Error: # of attributes do not match, # of attributes needed: " + columnCnt;
+    		return "Error: # of attributes do not match, # of attributes needed: " + columnCnt + "# of attributes inputed: " + linefragement.length;
     	}
 
     	for(int i=0; i<linefragement.length;i++) {

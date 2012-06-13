@@ -79,42 +79,45 @@ public class TestCSVLoader extends TestCase {
 	    					};
 	    int invalidLineCnt = 4;
 		//test_Interface( mySchema, myOptions, myData, invalidLineCnt );
-	    test_Interface_lineByLine( mySchema, 7, myOptions, myData, invalidLineCnt );
+	    test_Interface_lineByLine( mySchema, 7, myOptions, myData, invalidLineCnt, null );
 	}
     
-    public void testNew() throws Exception 
-   	{
-        String mySchema =
-                   "create table BLAH (" +
-                   "clm_integer integer default 0 not null, " + // column that is partitioned on
-
-//                   "clm_tinyint tinyint default 0, " +
-//                   "clm_smallint smallint default 0, " +
-//                   "clm_bigint bigint default 0, " +
-//                   
-//                   "clm_string varchar(10) default null, " +
-//                   "clm_decimal decimal default null, " +
-//                   "clm_float float default null "+ // for later
-                   "clm_timestamp timestamp default null, " + // for later
-                   //"clm_varinary varbinary default null" + // for later
-                   "); ";
-        String []myOptions = {
-         		"--file=" + userHome + "/test.csv", 
-         		//"--procedure=BLAH.insert",
-         		"--reportdir=" + reportdir,
-         		"--table=BLAH",
-         		"--maxerrors=50",
-         		"--user=",
-         		"--password=",
-         		"--port="
-         		};
-        
-   	    String []myData = { "1,2012-06-08 18:07:57.672",
-   	    					"2,-1213131"
-   	    					};
-   	    int invalidLineCnt = 0;
-   		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
-   	}
+//    public void testNew() throws Exception 
+//   	{
+//        String mySchema =
+//                   "create table BLAH (" +
+//                   "clm_integer integer default 0 not null, " + // column that is partitioned on
+//
+////                   "clm_tinyint tinyint default 0, " +
+////                   "clm_smallint smallint default 0, " +
+////                   "clm_bigint bigint default 0, " +
+////                   
+////                   "clm_string varchar(10) default null, " +
+////                   "clm_decimal decimal default null, " +
+////                   "clm_float float default null "+ // for later
+//                   "clm_timestamp timestamp default null, " + // for later
+//                   //"clm_varinary varbinary default null" + // for later
+//                   "); ";
+//        String []myOptions = {
+//         		"--file=" + userHome + "/test.csv", 
+//         		//"--procedure=BLAH.insert",
+//         		"--reportdir=" + reportdir,
+//         		"--table=BLAH",
+//         		"--maxerrors=50",
+//         		"--user=",
+//         		"--password=",
+//         		"--port="
+//         		};
+//        
+//   	    String []myData = { "1",
+//   	    					"2"
+//   	    					};
+//   	    //CSVLoader.setDefaultTimezone();
+//   	    String [] addStr = {new TimestampType().toString()};
+//   	    int invalidLineCnt = 0;
+//   		//test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+//   		test_Interface_lineByLine( mySchema, 2, myOptions, myData, invalidLineCnt, addStr );
+//   	}
     
     
     //csvloader --inputfile=/tmp/ --tablename=VOTES --abortfailurecount=50 
@@ -328,7 +331,7 @@ public class TestCSVLoader extends TestCase {
         }
 	}
 	
-	public void test_Interface_lineByLine( String my_schema, int columnCnt, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
+	public void test_Interface_lineByLine( String my_schema, int columnCnt, String[] my_options, String[] my_data, int invalidLineCnt, String[] addStr ) throws Exception {
 		try{
 			BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
 			for( int i = 0; i < my_data.length; i++ )
@@ -367,7 +370,6 @@ public class TestCSVLoader extends TestCase {
         	new CSVLoader( my_options );
         	while( CSVLoader.readNext() )
         	{
-        		String [] addStr= null;
         		CSVLoader.insertLine( addStr, columnCnt );
         	}
         	CSVLoader.drain();
@@ -401,7 +403,6 @@ public class TestCSVLoader extends TestCase {
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
             assertEquals(invalidLineCnt,invalidlinecnt);
-            
         }
         finally {
             if (client != null) client.close();
