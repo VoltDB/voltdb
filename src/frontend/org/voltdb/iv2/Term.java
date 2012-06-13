@@ -340,7 +340,7 @@ public class Term
             if (rrs.update(response) == 0) {
                 tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
                         + " responses for " + rrs.m_expectedResponses +
-                        " repair log entries from " + response.m_sourceHSId);
+                        " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
                 if (areRepairLogsComplete()) {
                     repairSurvivors();
                 }
