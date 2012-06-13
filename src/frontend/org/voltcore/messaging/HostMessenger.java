@@ -73,6 +73,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      *
      */
     public static class Config {
+        private static final VoltLogger logger = new VoltLogger("org.voltdb.messaging.impl.HostMessenger.Config");
+
         public InetSocketAddress coordinatorIp;
         public String zkInterface = "127.0.0.1:2181";
         public ScheduledExecutorService ses = null;
@@ -89,6 +91,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             } else {
                 coordinatorIp = new InetSocketAddress(coordIp, coordPort);
             }
+            initNetworkThreads();
         }
 
         public Config() {
@@ -101,10 +104,25 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             internalPort = ports.next();
         }
 
+        private void initNetworkThreads() {
+            try {
+                logger.info("Default thread count: " + this.networkThreads);
+                Integer networkThreadConfig = Integer.getInteger("networkThreads");
+                if ( networkThreadConfig != null ) {
+                    this.networkThreads = networkThreadConfig;
+                    logger.info("Overridden thread count: " + this.networkThreads);
+                }
+
+            } catch (Exception e) {
+                logger.error("Error setting network thread count", e);
+            }
+        }
+
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
 
+        @Override
         public String toString() {
             JSONStringer js = new JSONStringer();
             try {
