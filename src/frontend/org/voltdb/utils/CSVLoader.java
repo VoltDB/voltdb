@@ -187,7 +187,7 @@ public class CSVLoader {
     	int skip = CSVReader.DEFAULT_SKIP_LINES;
     	
     	@Option(desc = "the default leading whitespace behavior to use if none is supplied.", hasArg = false)
-    	boolean nowhitespace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+    	boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     	
     	@Option(desc = "the servers to be connected")
     	String servers = "localhost";
