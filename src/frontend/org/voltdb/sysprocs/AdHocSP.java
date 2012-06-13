@@ -34,13 +34,6 @@ import org.voltdb.VoltTable;
  */
 public class AdHocSP extends AdHocBase {
 
-    /* (non-Javadoc)
-     * @see org.voltdb.VoltSystemProcedure#init()
-     */
-    @Override
-    public void init() {
-    }
-
     /**
      * System procedure run hook.
      * Use the base class implementation.

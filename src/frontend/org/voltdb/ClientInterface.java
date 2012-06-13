@@ -1064,7 +1064,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                    plannedStatement.isReplicatedTableDML);
         }
         // All statements retrieved from cache?
-        if (planBatch.plannedStatements.size() == sqlStatements.size()) {
+        if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
             createAdHocTransaction(planBatch);
             return null;
         }
@@ -1378,12 +1378,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         int partitions[] = null;
 
         if (isSinglePartition) {
-            task.procName = "@AdHocSP";
+            if (plannedStmtBatch.isReadOnly()) {
+                task.procName = "@AdHocReadOnlySP";
+            }
+            else {
+                task.procName = "@AdHocSP";
+            }
             assert(plannedStmtBatch.isSinglePartitionCompatible());
             partitions = new int[] { TheHashinator.hashToPartition(plannedStmtBatch.partitionParam) };
         }
         else {
-            task.procName = "@AdHoc";
+            if (plannedStmtBatch.isReadOnly()) {
+                task.procName = "@AdHocReadOnly";
+            }
+            else {
+                task.procName = "@AdHoc";
+            }
             partitions = m_allPartitions;
         }
 
@@ -1429,14 +1439,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // initiate the transaction
         createTransaction(plannedStmtBatch.connectionId, plannedStmtBatch.hostname,
                 plannedStmtBatch.adminConnection,
-                task, false, isSinglePartition, false, partitions,
+                task, plannedStmtBatch.isReadOnly(), isSinglePartition, false, partitions,
                 partitions.length, plannedStmtBatch.clientData,
                 0, EstTime.currentTimeMillis());
 
         // cache the plans, but don't hold onto the connection object
         plannedStmtBatch.clientData = null;
-        for (AdHocPlannedStatement plannedStatement : plannedStmtBatch.plannedStatements) {
-            m_adhocCache.put(plannedStatement);
+        for (int index = 0; index < plannedStmtBatch.getPlannedStatementCount(); index++) {
+            m_adhocCache.put(plannedStmtBatch.getPlannedStatement(index));
         }
     }
 

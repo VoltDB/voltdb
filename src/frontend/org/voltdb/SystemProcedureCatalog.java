@@ -105,8 +105,10 @@ public class SystemProcedureCatalog {
         new HashMap<String, Config>();
 
     static {
-        listing.put("@AdHoc",                   new Config("org.voltdb.sysprocs.AdHoc",             false, false, false, false, false, true));
+        listing.put("@AdHoc",                   new Config("org.voltdb.sysprocs.AdHocMP",           false, false, false, false, false, true));
         listing.put("@AdHocSP",                 new Config("org.voltdb.sysprocs.AdHocSP",           false, false, false, false, false, true));
+        listing.put("@AdHocReadOnly",           new Config("org.voltdb.sysprocs.AdHocReadOnlyMP",   true, false, false, false, false, true));
+        listing.put("@AdHocReadOnlySP",         new Config("org.voltdb.sysprocs.AdHocReadOnlySP",   true, false, false, false, false, true));
         listing.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",             false, true,  false, false, true, true));
         listing.put("@Resume",                  new Config("org.voltdb.sysprocs.Resume",            false, true,  false, false, true, true));
         listing.put("@Quiesce",                 new Config("org.voltdb.sysprocs.Quiesce",           false, false, false, false, true, true));

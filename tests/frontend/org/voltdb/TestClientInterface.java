@@ -291,7 +291,7 @@ public class TestClientInterface {
         assertFalse(boolValues.get(1)); // readonly
         assertFalse(boolValues.get(2)); // single-part
         assertFalse(boolValues.get(3)); // every site
-        assertEquals("@AdHoc", invocationCaptor.getValue().getProcName());
+        assertEquals("@AdHocReadOnly", invocationCaptor.getValue().getProcName());
         String[] sqlStatements = (String[]) invocationCaptor.getValue().getParameterAtIndex(2);
         assertNotNull(sqlStatements);
         assertEquals(1, sqlStatements.length);
