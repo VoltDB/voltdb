@@ -57,6 +57,10 @@ public class PartitioningForStatement {
      * so the planner may not commit to plan changes specific to single-partition execution.
      */
     private final boolean m_lockIn;
+    /**
+     * Enables inference of single partitioning from statement.
+     */
+    private final boolean m_inferSP;
     /*
      * For partitioned table DML, caches the partitioning column for later matching with its prospective value.
      * If that value is constant or a parameter, SP is an option.
@@ -99,9 +103,10 @@ public class PartitioningForStatement {
      * @param specifiedValue non-null if only SP plans are to be assumed
      * @param lockInInferredPartitioningConstant true if MP plans should be automatically optimized for SP where possible
      */
-    public PartitioningForStatement(Object specifiedValue, boolean lockInInferredPartitioningConstant) {
+    public PartitioningForStatement(Object specifiedValue, boolean lockInInferredPartitioningConstant, boolean inferSP) {
         m_specifiedValue = specifiedValue;
         m_lockIn = lockInInferredPartitioningConstant;
+        m_inferSP = inferSP;
     }
 
     /**
@@ -147,6 +152,17 @@ public class PartitioningForStatement {
             assert(m_inferredValue == null);
             return m_specifiedValue;
         }
+        if (m_inferSP) {
+            return m_inferredValue;
+        }
+        return null;
+    }
+
+    /**
+     * accessor
+     * @return
+     */
+    public Object inferredPartitioningValue() {
         return m_inferredValue;
     }
 
@@ -231,7 +247,9 @@ public class PartitioningForStatement {
      * @param partitioncolumn
      */
     public void setPartitioningColumn(Column partitioncolumn) {
-        m_partitionCol = partitioncolumn; // Not used in SELECT plans.
+        if (m_inferSP) {
+            m_partitionCol = partitioncolumn; // Not used in SELECT plans.
+        }
 
     }
 
@@ -241,5 +259,13 @@ public class PartitioningForStatement {
     public Column getColumn() {
         // TODO Auto-generated method stub
         return m_partitionCol;
+    }
+
+    /**
+     * accessor
+     * @return
+     */
+    public boolean isInferringSP() {
+        return m_inferSP;
     }
 }

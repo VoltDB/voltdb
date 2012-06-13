@@ -95,12 +95,12 @@ public class PlannerTool {
         m_hsql.close();
     }
 
-    public Result planSql(String sql, Object partitionParam) {
-        if ((sql == null) || (sql.length() == 0)) {
+    public Result planSql(String sqlIn, Object partitionParam, boolean inferSP) {
+        if ((sqlIn == null) || (sqlIn.length() == 0)) {
             throw new RuntimeException("Can't plan empty or null SQL.");
         }
         // remove any spaces or newlines
-        sql = sql.trim();
+        String sql = sqlIn.trim();
 
         hostLog.debug("received sql stmt: " + sql);
 
@@ -109,7 +109,7 @@ public class PlannerTool {
         //////////////////////
 
         TrivialCostModel costModel = new TrivialCostModel();
-        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, true);
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
         QueryPlanner planner = new QueryPlanner(
                 m_context.cluster, m_context.database, partitioning, m_hsql, new DatabaseEstimates(), false, true);
         CompiledPlan plan = null;

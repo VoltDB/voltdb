@@ -23,17 +23,16 @@
 
 package adhocbenchmark;
 
-import adhocbenchmark.QueryTestBase;
-import adhocbenchmark.QueryTestHelper;
 
 /**
  * Configuration that determines what the projection queries look like.
  */
 class ProjectionTest extends QueryTestBase {
-
-    public ProjectionTest(final String tableName,
-                          final String columnPrefix, int nColumns) {
+    private final String m_idColumn;
+    private ProjectionTest(final String tableName,
+                           final String columnPrefix, int nColumns, String idColumn) {
         super(tableName, columnPrefix, nColumns, nColumns);
+        m_idColumn = idColumn;
     }
 
     @Override
@@ -47,11 +46,31 @@ class ProjectionTest extends QueryTestBase {
             query.append(helper.columnName(helper.getShuffledNumber(iColumn)));
         }
         // Complete the query.
-        query.append(" FROM ")
-             .append(this.tablePrefix)
-             .append(" WHERE ")
-             .append(helper.columnName(helper.getShuffledNumber(0)))
-             .append(" = 'abc'");
+        // Enough cache-thrashing complexity comes fom the random column list,
+        // so keep the where clause simple --
+        // an equality filter with a random constant enables parallel SP processing
+        // when the table is partitioned on that column (ID).
+        // For a replicated table, or an MP query against partitioned data,
+        // this where clause (against a non-partitioning column) doesn't greatly complicate the plan,
+        // so keep it.
+        query.append(" FROM " + this.tablePrefix + "_1 WHERE " + m_idColumn + " = " + helper.getShuffledNumber(0));
         return query.toString();
     }
+
+    public static class Factory implements QueryTestBase.Factory {
+        @Override
+        public QueryTestBase make(final String tablePrefix, int nVariations, final String columnPrefix,
+                final int nColumns, final int nRandomNumbers) {
+            return new ProjectionTest(tablePrefix, columnPrefix, nColumns, "ID");
+        }
+    }
+
+    public static class MPFactory implements QueryTestBase.Factory {
+        @Override
+        public QueryTestBase make(final String tablePrefix, int nVariations, final String columnPrefix,
+                final int nColumns, final int nRandomNumbers) {
+            return new ProjectionTest(tablePrefix, columnPrefix, nColumns, "PARENT_ID");
+        }
+    }
+
 }
