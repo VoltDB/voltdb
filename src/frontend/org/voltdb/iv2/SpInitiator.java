@@ -17,26 +17,17 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayList;
-
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.List;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.zk.BabySitter;
-import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
@@ -44,7 +35,6 @@ import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 
 /**
  * Subclass of Initiator to manage single-partition operations.

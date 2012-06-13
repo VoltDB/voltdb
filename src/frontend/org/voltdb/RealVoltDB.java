@@ -95,7 +95,6 @@ import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.iv2.InitiatorMailbox;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.licensetool.LicenseApi;
