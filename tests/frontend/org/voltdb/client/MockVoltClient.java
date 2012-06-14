@@ -152,7 +152,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public void drain() throws NoConnectionsException {
+    public void drain() {
         // TODO Auto-generated method stub
 
     }
@@ -242,6 +242,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         return false;
     }
 
+    @Override
     public boolean callProcedure(long originalTxnId,
                                  ProcedureCallback callback,
                                  String procName,

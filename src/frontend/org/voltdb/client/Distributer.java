@@ -399,7 +399,7 @@ class Distributer {
         }
     }
 
-    void drain() throws NoConnectionsException, InterruptedException {
+    void drain() throws InterruptedException {
         boolean more;
         do {
             more = false;
