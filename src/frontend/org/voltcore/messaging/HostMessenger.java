@@ -62,6 +62,7 @@ import org.voltdb.utils.MiscUtils;
  * and failure detection.
  */
 public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMessenger {
+    private static final VoltLogger logger = new VoltLogger("NETWORK");
 
     /**
      * Configuration for a host messenger. The leader binds to the coordinator ip and
@@ -89,6 +90,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             } else {
                 coordinatorIp = new InetSocketAddress(coordIp, coordPort);
             }
+            initNetworkThreads();
         }
 
         public Config() {
@@ -103,6 +105,20 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
 
         public int getZKPort() {
             return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
+        }
+
+        private void initNetworkThreads() {
+            try {
+                logger.info("Default network thread count: " + this.networkThreads);
+                Integer networkThreadConfig = Integer.getInteger("networkThreads");
+                if ( networkThreadConfig != null ) {
+                    this.networkThreads = networkThreadConfig;
+                    logger.info("Overridden network thread count: " + this.networkThreads);
+                }
+
+            } catch (Exception e) {
+                logger.error("Error setting network thread count", e);
+            }
         }
 
         @Override
