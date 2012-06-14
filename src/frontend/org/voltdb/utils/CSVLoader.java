@@ -87,7 +87,7 @@ public class CSVLoader {
     private static BufferedWriter out_logfile;
 	private static BufferedWriter out_reportfile;
 	
-	private static ArrayList<Object> firstIds = new ArrayList<Object>();
+	private static ArrayList<String> firstIds = new ArrayList<String>();
 	
     public CSVLoader( String[] options ) {
     	CSVConfig cfg = new CSVConfig();
@@ -315,7 +315,7 @@ public class CSVLoader {
     	flush();
     }
     
-    public static ArrayList<Object> getFirstIds() {
+    public static ArrayList<String> getFirstIds() {
     	return firstIds;
     }
     
