@@ -58,8 +58,8 @@ public class CSVLoader {
 	private static boolean standin = false;
 
 	public static String pathInvalidrowfile = "";
-	public static String pathReportfile = "csvloaderReport.log";
-	public static String pathLogfile = "csvloaderLog.log";
+	public static String pathReportfile = "";
+	public static String pathLogfile = "";
 
 	private static BufferedWriter out_invaliderowfile;
 	private static BufferedWriter out_logfile;
@@ -195,7 +195,7 @@ public class CSVLoader {
 				csvReader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)),
 						config.separator, config.quotechar, config.escape, config.skip,
 						config.strictquotes, config.nowhitespace);
-			else 
+			else
 				csvReader = new CSVReader(new FileReader(config.file),
 						config.separator, config.quotechar, config.escape, config.skip,
 						config.strictquotes, config.nowhitespace);
@@ -323,14 +323,14 @@ public class CSVLoader {
 	}
 
 	private static void configuration () {
-		if (config.file.equals("")) 
+		if (config.file.equals(""))
 			standin = true;
 		if(!config.table.equals("")) {
 			insertProcedure = config.table + ".insert";
 		} else {
 			insertProcedure = config.procedure;
 		}
-		if (!config.reportdir.endsWith("/")) 
+		if (!config.reportdir.endsWith("/"))
 			config.reportdir += "/";
 		try {
 			File dir = new File(config.reportdir);
@@ -352,7 +352,7 @@ public class CSVLoader {
 		try {
 			out_invaliderowfile = new BufferedWriter(new FileWriter(pathInvalidrowfile));
 			out_logfile = new BufferedWriter(new FileWriter(pathLogfile));
-			out_reportfile = new BufferedWriter(new FileWriter(pathReportfile)); 
+			out_reportfile = new BufferedWriter(new FileWriter(pathReportfile));
 		} catch (IOException e) {
 			System.err.println(e.getMessage());
 			System.exit(1);
@@ -367,7 +367,7 @@ public class CSVLoader {
 		return client;
 	}
 
-	private static void produceFiles() { 
+	private static void produceFiles() {
 
 		int bulkflush = 300; // by default right now
 		try {
@@ -380,7 +380,7 @@ public class CSVLoader {
 				out_invaliderowfile.write(info[0] + "\n");
 				String message = "invalid line " + irow + ":  " + info[0] + "\n";
 				System.err.print(message);
-				out_logfile.write(message + info[1] + "\n"); 
+				out_logfile.write(message + info[1] + "\n");
 				if (linect % bulkflush == 0) {
 					out_invaliderowfile.flush();
 					out_logfile.flush();
