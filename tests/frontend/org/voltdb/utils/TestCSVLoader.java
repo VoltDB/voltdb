@@ -42,7 +42,6 @@ public class TestCSVLoader extends TestCase {
     private Client client;
 
     private final String userHome = System.getProperty("user.home");
-    private final String reportdir = userHome + "/";
     String path_csv = userHome + "/" + "test.csv";
 
     @Override
@@ -82,7 +81,7 @@ public class TestCSVLoader extends TestCase {
      		"--separator=,",
      		"--quotechar=\"",
      		"--escape=\\",
-     		"--skip",
+     		"--skip=0",
      		"--nowhitespace",
      		//"--strictquotes",
      		"BLAH"
