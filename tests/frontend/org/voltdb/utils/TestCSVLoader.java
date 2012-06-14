@@ -37,58 +37,61 @@ public class TestCSVLoader extends TestCase {
         
     }
     
-//    public void testCommon() throws Exception 
-//	{
-//     String mySchema =
-//                "create table BLAH (" +
-//                "clm_integer integer default 0 not null, " + // column that is partitioned on
-//
-//                "clm_tinyint tinyint default 0, " +
-//                "clm_smallint smallint default 0, " +
-//                "clm_bigint bigint default 0, " +
-//                
-//                "clm_string varchar(10) default null, " +
-//                "clm_decimal decimal default null, " +
-//                "clm_float float default null "+ // for later
-//                //"clm_timestamp timestamp default null, " + // for later
-//                //"clm_varinary varbinary default null" + // for later
-//                "); ";
-//     String []myOptions = {
-//     		"--file=" + userHome + "/test.csv", 
-//     		//"--procedure=BLAH.insert",
-//     		"--reportdir=" + reportdir,
-//     		"--table=BLAH",
-//     		"--maxerrors=50",
-//     		"--user=",
-//     		"--password=",
-//     		"--port=",
-//     		"--strictquotes=false",
-//     		"--separator=,",
-//     		"--quotechar=\"\"",
-//     		"--escape=\\",
-//     		"--skip=0",
-//     		"--nowhitespace=true"
-//     		};
-//     
-//	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
-//	    					"2,2,2,222222,second,3.30,NULL",
-//	    					"3,3,3,333333, third ,NULL, 3.33",
-//	    					"4,4,4,444444, NULL ,4.40 ,4.44",
-//	    					"5,5,5,5555555, fifth, 5.50, 5.55",
-//	    	 			    "6,6,NULL,666666, sixth, 6.60, 6.66",
-//	    					"7,NULL,7,7777777, seventh, 7.70, 7.77 ",
-//	    					"11, 1,1,\"1,000\",first,1.10,1.11",
-//	    					//invalid lines below
-//	    					"8, 8",
-//	    					"",
-//	    					"10,10,10,10 101 010,second,2.20,2.22",
-//	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
-//	    					};
-//	    int invalidLineCnt = 4;
-//		//test_Interface( mySchema, myOptions, myData, invalidLineCnt );
-//	    test_Interface_lineByLine( mySchema, 7, myOptions, myData, invalidLineCnt, null );
-//	}
+    public void testCommon() throws Exception 
+	{
+     String mySchema =
+                "create table BLAH (" +
+                "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
+                "clm_bigint bigint default 0, " +
+                
+                "clm_string varchar(10) default null, " +
+                "clm_decimal decimal default null, " +
+                "clm_float float default null "+ // for later
+                //"clm_timestamp timestamp default null, " + // for later
+                //"clm_varinary varbinary default null" + // for later
+                "); ";
+     String []myOptions = {
+     		"--f=" + userHome + "/test.csv",
+     		//"--procedure=BLAH.insert",
+     		"--reportdir=" + reportdir,
+     		//"--table=BLAH",
+     		"--maxerrors=50",
+     		"--user=",
+     		"--password=",
+     		"--port=",
+     		"--separator=,",
+     		"--quotechar=\"",
+     		"--escape=\\",
+     		"--skip=0",
+     		"--nowhitespace",
+     		//"--strictquotes",
+     		"BLAH"
+     		};
+     
+	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
+	    					"2,2,2,222222,second,3.30,NULL",
+	    					"3,3,3,333333, third ,NULL, 3.33",
+	    					"4,4,4,444444, NULL ,4.40 ,4.44",
+	    					"5,5,5,5555555, fifth, 5.50, 5.55",
+	    	 			    "6,6,NULL,666666, sixth, 6.60, 6.66",
+	    					"7,NULL,7,7777777, seventh, 7.70, 7.77 ",
+	    					"11, 1,1,\"1,000\",first,1.10,1.11",
+	    					//invalid lines below
+	    					"8, 8",
+	    					"",
+	    					"10,10,10,10 101 010,second,2.20,2.22",
+	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
+	    					};
+     //String []myData = { "1,NULL,1,11111111,first,1.10,1.11"};
+	    int invalidLineCnt = 4;
+		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+	    //test_Interface_lineByLine( mySchema, 7, myOptions, myData, invalidLineCnt );
+	}
     
+    /*
     public void testNew() throws Exception 
    	{
         String mySchema =

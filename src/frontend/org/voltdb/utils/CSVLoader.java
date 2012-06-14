@@ -163,19 +163,16 @@ public class CSVLoader {
     }
 
     private static class CSVConfig extends CLIConfig {
-    	@Option(desc = "directory path to produce report files.")
+    	@Option(shortOpt = "f",desc = "directory path to produce report files.")
     	String file = "";
     	
-    	@Option(desc = "procedure name to insert the data into the database.")
+    	@Option(shortOpt = "p",desc = "procedure name to insert the data into the database.")
     	String procedure = "";
-    	
-    	@Option(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
-    	String table = "";
     	
     	@Option(desc = "maximum rows to be read of the csv file.")
     	int limitrows = Integer.MAX_VALUE;
     	
-    	@Option(desc = "directory path to produce report files.")
+    	@Option(shortOpt = "r",desc = "directory path to produce report files.")
     	String reportdir ="./";
     	
     	@Option(desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
@@ -190,40 +187,50 @@ public class CSVLoader {
     	@Option(desc = "the character to use for escaping a separator or quote.")
     	char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
     	
-    	@Option(desc = "sets if characters outside the quotes are ignored.")
+    	@Option(desc = "sets if characters outside the quotes are ignored.", hasArg = false)
     	boolean strictquotes = CSVParser.DEFAULT_STRICT_QUOTES;
     	
     	@Option(desc = "the line number to skip for start reading.")
     	int skip = CSVReader.DEFAULT_SKIP_LINES;
     	
-    	@Option(desc = "the default leading whitespace behavior to use if none is supplied.")
-    	boolean nowhitespace = CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+    	@Option(desc = "the default leading whitespace behavior to use if none is supplied.", hasArg = false)
+    	boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
     	
     	@Option(desc = "the servers to be connected")
     	String servers = "localhost";
     	
-    	@Option(desc = "user name that is used to connect to the servers,by defalut null")
+    	@Option(shortOpt = "u",desc = "user name that is used to connect to the servers,by defalut null")
     	String user = "";
     	
-    	@Option(desc = "password for this user to use to connect the servers,by defalut null")
+    	@Option(shortOpt = "pw",desc = "password for this user to use to connect the servers,by defalut null")
     	String password = "";
     	
     	@Option(desc = "port to be used for the servers right now")
     	int port = Client.VOLTDB_SERVER_PORT;
     	
+
     	@Option(desc = "skip format checking when loading the csv file on the client")
     	boolean skipPreChecks = false;
+
+    	@Leftargs(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
+    	String table = "";
     	
     	@Override
     	public void validate() {
     		if (maxerrors < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
     		if (procedure.equals("") && table.equals("") )
-    			exitWithMessageAndUsage("procedure name or a table name required,but only one of them is fine");
+    			exitWithMessageAndUsage("procedure name or a table name required");
     		if (!procedure.equals("") && !table.equals("") )
     			exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
     		if (skip < 0) exitWithMessageAndUsage("skipline must be >= 0");
     		if (limitrows > Integer.MAX_VALUE) exitWithMessageAndUsage("limitrows to read must be < " + Integer.MAX_VALUE);
     		if (port < 0) exitWithMessageAndUsage("port number must be >= 0");
+    	}
+    	
+    	@Override
+    	public void printUsage() {
+    		System.out.println("Semantics: csvloader [args] tablename or csvloader [args] -p procedurename");
+    		super.printUsage();
     	}
     }
     
@@ -266,7 +273,7 @@ public class CSVLoader {
                 	String[] correctedLine = line;
                     cb = new MyCallback(outCount.get(), config, linedata.toString());
                     String lineCheckResult;
-                     
+   
                     if( !config.skipPreChecks && (lineCheckResult = checkparams_trimspace(correctedLine, columnCnt))!= null){
                     	synchronized (errorInfo) {
                     		if (!errorInfo.containsKey(outCount.get())) {
@@ -429,8 +436,8 @@ public class CSVLoader {
         String myinsert = insertProcedure;
 		myinsert = myinsert.replaceAll("\\.", "_");
 		path_invalidrowfile = config.reportdir + myinsert + "_" + "csvloaderinvalidrows.csv";
-		path_logfile =  config.reportdir + myinsert + "_"+ "csvloaderReport.log";
-    	path_reportfile = config.reportdir  + myinsert + "_"+ "csvloaderLog.log";
+		path_logfile =  config.reportdir + myinsert + "_"+ "csvloaderLog.log";
+    	path_reportfile = config.reportdir  + myinsert + "_"+ "csvloaderReport.log";
     	
     	try {
 			out_invaliderowfile = new BufferedWriter(new FileWriter(path_invalidrowfile));
