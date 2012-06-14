@@ -42,6 +42,8 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -93,7 +95,8 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
+        final int numLocalSites = (VoltDB.instance().getLocalSites().values().size() -
+                ExecutionSite.recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -239,8 +242,10 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        int hosts = context.getSiteTracker().getAllHosts().size();
-        createSnapshotCompletionNode( nonce, txnId, isTruncation, hosts);
+        if (!createSnapshotCompletionNode(nonce, txnId, isTruncation)) {
+            // the node already exists, increase the participating host count
+            increaseParticipateHostCount(txnId);
+        }
 
         try {
             cb1.get();
@@ -251,6 +256,46 @@ public class SnapshotSaveAPI
         }
     }
 
+    /**
+     * Increase the participating host count by one in the snapshot completion
+     * node.
+     *
+     * @param txnId The snapshot txnId
+     */
+    public static void increaseParticipateHostCount(long txnId) {
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+
+        final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
+        boolean success = false;
+        while (!success) {
+            Stat stat = new Stat();
+            byte data[] = null;
+            try {
+                data = zk.getData(snapshotPath, false, stat);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("This ZK get should never fail", true, e);
+            }
+            if (data == null) {
+                VoltDB.crashLocalVoltDB("Data should not be null if the node exists", false, null);
+            }
+
+            try {
+                JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
+                if (jsonObj.getLong("txnId") != txnId) {
+                    VoltDB.crashLocalVoltDB("TxnId should match", false, null);
+                }
+                int numHostsParticipating = jsonObj.getInt("hosts") + 1;
+                jsonObj.put("hosts", numHostsParticipating);
+
+                zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
+            } catch (KeeperException.BadVersionException e) {
+                continue;
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("This ZK call should never fail", true, e);
+            }
+            success = true;
+        }
+    }
 
     /**
      * Create the completion node for the snapshot identified by the txnId. It
@@ -259,25 +304,21 @@ public class SnapshotSaveAPI
      *
      * @param txnId
      * @param isTruncation Whether or not this is a truncation snapshot
-     * @param hosts The total number of live hosts
+     * @return true if the node is created successfully, false if the node already exists.
      */
-    public static void createSnapshotCompletionNode(String nonce,
-                                                    long txnId,
-                                                    boolean isTruncation,
-                                                    int hosts) {
-        if (hosts == 0) {
-            VoltDB.crashGlobalVoltDB("Hosts must be greater than 0", true, null);
-        }
+    public static boolean createSnapshotCompletionNode(String nonce,
+                                                       long txnId,
+                                                       boolean isTruncation) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
 
-        byte  nodeBytes[] = null;
+        byte nodeBytes[] = null;
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
             stringer.key("txnId").value(txnId);
-            stringer.key("hosts").value(hosts);
+            stringer.key("hosts").value(1);
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("finishedHosts").value(0);
             stringer.key("nonce").value(nonce);
@@ -296,10 +337,13 @@ public class SnapshotSaveAPI
 
         try {
             cb.get();
+            return true;
         } catch (KeeperException.NodeExistsException e) {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unexpected exception logging snapshot completion to ZK", true, e);
         }
+
+        return false;
     }
 
     private void createSetup(
@@ -307,7 +351,8 @@ public class SnapshotSaveAPI
             long txnId, String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
-            final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
+            final int numLocalSites =
+                    (VoltDB.instance().getLocalSites().values().size() - ExecutionSite.recoveringSiteCount.get());
             SiteTracker tracker = context.getSiteTracker();
 
             // non-null if targeting only one site (used for rejoin)
@@ -592,8 +637,7 @@ public class SnapshotSaveAPI
                 synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
                     boolean aborted = false;
                     if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
-                        SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(
-                                VoltDB.instance().getLocalSites().values().size());
+                        SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(numLocalSites);
                         for (int ii = 0; ii < numLocalSites; ii++) {
                             SnapshotSiteProcessor.m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>());
                         }

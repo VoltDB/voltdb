@@ -452,9 +452,6 @@ public class SnapshotSiteProcessor {
                 if (jsonObj.getLong("txnId") != txnId) {
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
-                if (jsonObj.getInt("hosts") != numHosts) {
-                    VoltDB.crashLocalVoltDB("Num hosts should match", false, null);
-                }
                 int numHostsFinished = jsonObj.getInt("finishedHosts") + 1;
                 jsonObj.put("finishedHosts", numHostsFinished);
                 if (!snapshotSuccess) {

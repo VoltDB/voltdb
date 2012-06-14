@@ -519,16 +519,18 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                      */
                     JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
                     final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
-                    int hosts = VoltDB.instance().getSiteTracker()
-                                      .getAllHosts().size();
                     try {
                         m_zk.delete(VoltZK.request_truncation_snapshot, -1);
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB(
                                 "Unexpected error deleting truncation snapshot request", true, e);
                     }
-                    SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
-                                                                 true, hosts);
+
+                    if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
+                                                                      true)) {
+                        SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId);
+                    }
+
                     try {
                         TruncationSnapshotAttempt snapshotAttempt =
                             m_truncationSnapshotAttempts.get(snapshotTxnId);
