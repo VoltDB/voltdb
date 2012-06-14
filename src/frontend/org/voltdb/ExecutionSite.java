@@ -1246,8 +1246,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         return;
                     }
 
-                    m_recoveryLog.info("Rejoin snapshot requested " + txnId);
-
                     // Send a message to self to avoid synchronization
                     RejoinMessage msg = new RejoinMessage(txnId);
                     m_mailbox.send(getSiteId(), msg);
@@ -1258,7 +1256,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             }
         };
 
-        SnapshotUtil.requestSnapshot(0l, "", "Rejoin snapshot", false,
+        String nonce = "Rejoin_" + getSiteId() + "_" + System.currentTimeMillis();
+        SnapshotUtil.requestSnapshot(0l, "", nonce, false,
                                      SnapshotFormat.STREAM, data, handler);
 
         return null;
