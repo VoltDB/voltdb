@@ -206,7 +206,7 @@ ProjectionExecutor::~ProjectionExecutor() {
 
 TableTuple ProjectionExecutor::p_next_pull()
 {
-    TableTuple tuple = m_state->m_childExecutor->p_next_pull();
+    TableTuple tuple = m_state->m_childExecutor->next_pull();
     if (tuple.isNullTuple())
     {
         return tuple;

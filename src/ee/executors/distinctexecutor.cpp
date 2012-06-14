@@ -150,9 +150,9 @@ TableTuple DistinctExecutor::p_next_pull() {
     AbstractExpression* distinctExpr = m_state->m_distinctExpression;
     std::set<NValue, NValue::ltNValue>& foundValues = m_state->m_foundValues;
     TableTuple tuple; // childExec will init schema.
-    for (tuple = childExec->p_next_pull();
+    for (tuple = childExec->next_pull();
          tuple.isNullTuple() == false;
-         tuple = childExec->p_next_pull()) {
+         tuple = childExec->next_pull()) {
         NValue tuple_value = distinctExpr->eval(&tuple, NULL);
         if (foundValues.find(tuple_value) == foundValues.end()) {
             foundValues.insert(tuple_value);

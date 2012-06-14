@@ -83,15 +83,9 @@ class AbstractExecutor {
     /** Returns true if executor supports pull mode */
     virtual bool support_pull() const;
 
-    // @TODO: Eventually, every executor class will have its own p_next_pull implementation
-    // that operates within the pull protocol as best it can.
-    // Then this function will be made abstract (pure virtual).
-    // For now, AbstractExecutor provides this sub-optimal implementation that
-    // relies on the executor class implementation of the older push protocol.
-    // In particular, it pulls tuples from the output table that was populated by p_execute.
     /** Gets next available tuple(s) from input table as needed
      * and applies executor specific logic to produce its next tuple. */
-    virtual TableTuple p_next_pull();
+    TableTuple next_pull();
 
     /** Generic behavior wrapping the custom p_pre_execute_pull. */
     // @TODO: Does the need to prep m_tmpOutputTable really cut across executor classes?
@@ -100,6 +94,9 @@ class AbstractExecutor {
 
     /** Cleans up after the p_next_pull iteration. */
     void post_execute_pull();
+
+    /** Reset executor's pull state */
+    void reset_state_pull();
 
     // Clean up the output table of the executor tree as needed
     // Generic behavior wrapping the custom p_pre_execute_pull.
@@ -118,9 +115,6 @@ class AbstractExecutor {
      */
     inline AbstractPlanNode* getPlanNode() { return m_abstractNode; }
 
-  protected:
-    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode);
-
     // Generic method to depth first iterate over the children and call the functor on each level
     // The functor signature is void f(AbstractExecutor*)
     // The second parameter controls whether the iteration should stop
@@ -129,6 +123,9 @@ class AbstractExecutor {
     // It will become obsolete after all executors will be converted to the pull mode.
     template <typename Functor>
     typename Functor::result_type  depth_first_iterate_pull(Functor& f, bool stopOnPush);
+
+  protected:
+    AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode);
 
   private:
     /** Concrete executor classes implement initialization in p_init() */
@@ -165,6 +162,19 @@ class AbstractExecutor {
 
     // Saves processed tuple
     virtual void p_insert_output_table_pull(TableTuple& tuple);
+
+    /** Reset executor's pull state */
+    virtual void p_reset_state_pull();
+
+    // @TODO: Eventually, every executor class will have its own p_next_pull implementation
+    // that operates within the pull protocol as best it can.
+    // Then this function will be made abstract (pure virtual).
+    // For now, AbstractExecutor provides this sub-optimal implementation that
+    // relies on the executor class implementation of the older push protocol.
+    // In particular, it pulls tuples from the output table that was populated by p_execute.
+    /** Gets next available tuple(s) from input table as needed
+     * and applies executor specific logic to produce its next tuple. */
+    virtual TableTuple p_next_pull();
 
     // Helps clean up output tables of an executor and its dependencies.
     void clearOutputTable_pull();
@@ -213,6 +223,11 @@ inline void AbstractExecutor::p_execute_pull()
     }
 }
 
+inline TableTuple AbstractExecutor::next_pull()
+{
+    return this->p_next_pull();
+}
+
 inline void AbstractExecutor::pre_execute_pull(const NValueArray& params) {
     assert(m_abstractNode);
     VOLT_TRACE("Starting execution of plannode(id=%d)...",
@@ -230,6 +245,10 @@ inline void AbstractExecutor::pre_execute_pull(const NValueArray& params) {
 
 inline void AbstractExecutor::post_execute_pull() {
     p_post_execute_pull();
+}
+
+inline void AbstractExecutor::reset_state_pull() {
+    this->p_reset_state_pull();
 }
 
 template <typename Functor>
@@ -281,6 +300,9 @@ inline void AbstractExecutor::clearOutputTable_pull()
 
 inline bool AbstractExecutor::support_pull() const {
     return false;
+}
+
+inline void AbstractExecutor::p_reset_state_pull() {
 }
 
 inline void AbstractExecutor::clearOutputTables()

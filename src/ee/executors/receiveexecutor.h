@@ -46,12 +46,20 @@
 #ifndef HSTORERECEIVEEXECUTOR_H
 #define HSTORERECEIVEEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 #include <iostream>
 
 namespace voltdb {
+
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct ReceiveExecutorState;
+} //namespace detail
 
 class UndoLog;
 class ReadWriteSet;
@@ -61,19 +69,23 @@ class ReadWriteSet;
  */
 class ReceiveExecutor : public AbstractExecutor {
     public:
-        ReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-    {
-        this->engine = engine;
-    }
+        ReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
         ~ReceiveExecutor();
+
         bool needsPostExecuteClear() { return true; }
+        bool support_pull() const;
+
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
     private:
-        VoltDBEngine *engine;
+        TableTuple p_next_pull();
+        void p_pre_execute_pull(const NValueArray& params);
+        void p_reset_state_pull();
+
+        VoltDBEngine *m_engine;
+        boost::scoped_ptr<detail::ReceiveExecutorState> m_state;
 };
 
 }
