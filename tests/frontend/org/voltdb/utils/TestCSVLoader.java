@@ -65,7 +65,7 @@ public class TestCSVLoader extends TestCase {
      		"--separator=,",
      		"--quotechar=\"",
      		"--escape=\\",
-     		"--skip=0",
+     		"--skip",
      		"--nowhitespace",
      		//"--strictquotes",
      		"BLAH"
@@ -304,7 +304,7 @@ public class TestCSVLoader extends TestCase {
             System.out.println("data inserted to table BLAH:\n" + modCount);
             int rowct = modCount.getRowCount();
                         
-            BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.reportfile));
+            BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.pathReportfile));
             int lineCount = 0;
             String line = "";
             String promptMsg = "Number of acknowledged tuples:";

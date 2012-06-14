@@ -46,7 +46,7 @@ public abstract class CLIConfig {
     
     @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
     @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
-    public @interface Leftargs {
+    public @interface AdditionalArgs {
     	String opt() default "";
     	boolean hasArg() default false;
     	boolean required() default false;
@@ -131,8 +131,8 @@ public abstract class CLIConfig {
                     	options.addOption(opt, shortopt, option.hasArg(), option.desc());
                     	helpmsgs.addOption(opt, shortopt, option.hasArg(), option.desc());
                     }
-                } else if (field.isAnnotationPresent(Leftargs.class)) {
-                	Leftargs params = field.getAnnotation(Leftargs.class);
+                } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
+                	AdditionalArgs params = field.getAnnotation(AdditionalArgs.class);
                 	String opt = params.opt();
                 	if ((opt == null) || (opt.trim().length() == 0)) {
                         opt = field.getName();
@@ -188,8 +188,8 @@ public abstract class CLIConfig {
 
                      field.setAccessible(true);
                      kvMap.put(opt, field.get(this).toString());
-                } else if (field.isAnnotationPresent(Leftargs.class)) {
-                	// Deal with --table=BLHA, offer nice error message
+                } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
+                	// Deal with --table=BLHA, offer nice error message later
                 	leftover++;
                 }
             }
@@ -198,7 +198,7 @@ public abstract class CLIConfig {
                 	Field[] fields = getClass().getDeclaredFields();
                     for (int i = 0,j=0; i<leftargs.length; i++) {
                     	for (;j < fields.length; j++) {
-                    		if (fields[j].isAnnotationPresent(Leftargs.class)) 
+                    		if (fields[j].isAnnotationPresent(AdditionalArgs.class)) 
                     			break;
                     	}
                     	fields[j].setAccessible(true);
