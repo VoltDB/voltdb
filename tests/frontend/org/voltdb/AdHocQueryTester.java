@@ -205,6 +205,9 @@ public abstract class AdHocQueryTester extends TestCase {
         runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL != A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL != A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
 
+        // spPartialCount = runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;", 0, 0, 2, NOT_VALIDATING_SP_RESULT);
+        // runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL;", 1, spPartialCount, 2, VALIDATING_TOTAL_SP_RESULT);
+
         // TODO: Three-way join test cases are probably required to cover all code paths through AccessPaths.
     }
 

@@ -51,24 +51,22 @@ __NULL = {VOLTTYPE_TINYINT: -128,
           VOLTTYPE_BIGINT: -9223372036854775808,
           VOLTTYPE_FLOAT: -1.7E+308}
 
-SIGNIFICANT_DIGITS = 13
+RELIABLE_DECIMAL_PLACES = 12
 
 def normalize_value(v, vtype):
     global __NULL
     if vtype in __NULL and v == __NULL[vtype]:
         return None
-    elif vtype == VOLTTYPE_FLOAT:
-        # round to the desired number of decimal places -- accounting for significant digits before the decimal
-        decimal_places = SIGNIFICANT_DIGITS
-        abs_v = abs(float(v))
-        if abs_v >= 1.0:
-            # round to the total number of significant digits, including the integer part
-            decimal_places = SIGNIFICANT_DIGITS - 1 - int(math.floor(math.log10(abs_v)))
-        return round(v, decimal_places)
-    elif vtype == VOLTTYPE_DECIMAL:
-        return decimal.Decimal(v)._rescale(-12, "ROUND_HALF_EVEN")
-    else:
-        return v
+    elif vtype == VOLTTYPE_BIGINT or vtype == VOLTTYPE_DECIMAL:
+        # Adapt (with rounding?) to the way HSQL returns some BIGINT results as floats
+        v = float(v)
+        vtype = VOLTTYPE_FLOAT
+    if vtype == VOLTTYPE_FLOAT:
+        if v != 0.0:
+            # round to the desired number of decimal places -- including any digits before the decimal
+            decimal_places = RELIABLE_DECIMAL_PLACES - 1 - int(math.floor(math.log10(abs(v))))
+            return round(v, decimal_places)
+    return v
 
 def normalize_values(tuples, columns):
     # 'c' here is a voltdbclient.VoltColumn and
