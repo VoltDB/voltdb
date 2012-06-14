@@ -158,7 +158,46 @@ namespace
         }
         return true;
     }
-}
+} // namespace
+
+namespace voltdb {
+namespace detail {
+
+    struct NestLoopExecutorState
+    {
+        NestLoopExecutorState(AbstractExpression* predicate, TempTable* outputTable,
+            AbstractExecutor* outerExecutor, AbstractExecutor* innerExecutor,
+            const TupleSchema* outerSchema, int outerCols, int innerCols) :
+            m_predicate(predicate),
+            m_outerExecutor(outerExecutor),
+            m_innerExecutor(innerExecutor),
+            m_outputTable(outputTable),
+            m_outerSchema(outerSchema),
+            m_outerTuple(outerSchema),
+            m_outerCols(outerCols),
+            m_innerCols(innerCols),
+            m_needNextOuter(true)
+        {}
+
+        AbstractExpression* m_predicate;
+        AbstractExecutor* m_outerExecutor;
+        AbstractExecutor* m_innerExecutor;
+        TempTable* m_outputTable;
+        const TupleSchema* m_outerSchema;
+        TableTuple m_outerTuple;
+        int m_outerCols;
+        int m_innerCols;
+        bool m_needNextOuter;
+
+    };
+
+} // namespace detail
+} // namespace voltdb
+
+NestLoopExecutor::NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
+    AbstractExecutor(engine, abstract_node)
+{}
+
 
 bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
                               TempTableLimits* limits)
@@ -200,7 +239,7 @@ bool NestLoopExecutor::p_init(AbstractPlanNode* abstract_node,
 bool NestLoopExecutor::p_execute(const NValueArray &params) {
     VOLT_DEBUG("executing NestLoop...");
 
-    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(m_abstractNode);
+    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(getPlanNode());
     assert(node);
     assert(node->getInputTables().size() == 2);
 
@@ -259,4 +298,107 @@ bool NestLoopExecutor::p_execute(const NValueArray &params) {
     }
 
     return (true);
+}
+
+//@TODO pullexec prototype
+TableTuple NestLoopExecutor::p_next_pull() {
+    bool hasNext = false;
+    TableTuple joinedTuple = m_state->m_outputTable->tempTuple();
+    while (!hasNext)
+    {
+        if (m_state->m_needNextOuter)
+        {
+            m_state->m_outerTuple = m_state->m_outerExecutor->next_pull();
+            if (m_state->m_outerTuple.isNullTuple())
+            {
+                joinedTuple = TableTuple(m_state->m_outerSchema);
+                break;
+            }
+            m_state->m_needNextOuter = false;
+        }
+
+        // populate output table's temp tuple with outer table's values
+        // probably have to do this at least once - avoid doing it many
+        // times per outer tuple
+        for (int col_ctr = 0; col_ctr < m_state->m_outerCols; col_ctr++) {
+            joinedTuple.setNValue(col_ctr, m_state->m_outerTuple.getNValue(col_ctr));
+        }
+
+        while (true)
+        {
+            TableTuple innerTuple = m_state->m_innerExecutor->next_pull();
+            if (innerTuple.isNullTuple())
+            {
+                m_state->m_needNextOuter = true;
+                // Reset the inner table
+                reset_inner_state();
+                break;
+            }
+            if (m_state->m_predicate == NULL ||
+                m_state->m_predicate->eval(&m_state->m_outerTuple, &innerTuple).isTrue()) {
+                // Matched! Complete the joined tuple with the inner column values.
+                for (int col_ctr = 0; col_ctr < m_state->m_innerCols; col_ctr++) {
+                    joinedTuple.setNValue(col_ctr + m_state->m_outerCols, innerTuple.getNValue(col_ctr));
+                }
+                hasNext = true;
+                break;
+            }
+        }
+    }
+
+    return joinedTuple;
+}
+
+void NestLoopExecutor::p_pre_execute_pull(const NValueArray &params) {
+    //
+    // Initialize itself
+    //
+    NestLoopPlanNode* node = dynamic_cast<NestLoopPlanNode*>(getPlanNode());
+    assert(node);
+    assert(node->getInputTables().size() == 2);
+    assert(node->getChildren().size() == 2);
+
+    Table* output_table_ptr = node->getOutputTable();
+    assert(output_table_ptr);
+
+    // output table must be a temp table
+    TempTable* output_table = dynamic_cast<TempTable*>(output_table_ptr);
+    assert(output_table);
+
+    Table* outer_table = node->getInputTables()[0];
+    assert(outer_table);
+    AbstractExecutor* outer_executor = node->getChildren()[0]->getExecutor();
+    assert(outer_executor);
+    int outer_cols = outer_table->columnCount();
+
+    Table* inner_table = node->getInputTables()[1];
+    assert(inner_table);
+    AbstractExecutor* inner_executor = node->getChildren()[1]->getExecutor();
+    assert(inner_executor);
+    int inner_cols = inner_table->columnCount();
+
+    VOLT_TRACE ("input table left:\n %s", outer_table->debug().c_str());
+    VOLT_TRACE ("input table right:\n %s", inner_table->debug().c_str());
+
+    //
+    // Join Expression
+    //
+    AbstractExpression *predicate = node->getPredicate();
+    if (predicate) {
+        predicate->substitute(params);
+        VOLT_TRACE ("predicate: %s", predicate == NULL ?
+                    "NULL" : predicate->debug(true).c_str());
+    }
+
+    m_state.reset(new detail::NestLoopExecutorState(predicate, output_table,
+        outer_executor, inner_executor, outer_table->schema(), outer_cols, inner_cols));
+}
+
+bool NestLoopExecutor::support_pull() const {
+    return true;
+}
+
+void NestLoopExecutor::reset_inner_state() {
+    boost::function<void(AbstractExecutor*)> freset = &AbstractExecutor::reset_state_pull;
+    m_state->m_innerExecutor->depth_first_iterate_pull(freset, false);
 }

@@ -57,6 +57,25 @@
 
 namespace voltdb {
 
+namespace detail {
+
+struct ProjectionExecutorState
+{
+    ProjectionExecutorState(AbstractExecutor* childExec, TempTable* output_table) :
+        m_childExecutor(childExec),
+        m_tempTuple(output_table->tempTuple())
+    {}
+
+    AbstractExecutor* m_childExecutor;
+    TableTuple& m_tempTuple;
+};
+
+} // namespace detail
+
+ProjectionExecutor::ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
+    : AbstractExecutor(engine, abstractNode), output_table(NULL), m_state()
+{}
+
 bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
                                 TempTableLimits* limits)
 {
@@ -112,8 +131,7 @@ bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
 
 bool ProjectionExecutor::p_execute(const NValueArray &params) {
 #ifndef NDEBUG
-    ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
-#endif
+    ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(getPlanNode());
     assert (node);
     assert (!node->isInline()); // inline projection's execute() should not be
                                 // called
@@ -121,6 +139,7 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
     assert (output_table);
     assert (input_table == node->getInputTables()[0]);
     assert (input_table);
+#endif
 
     VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
 
@@ -180,6 +199,79 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
 }
 
 ProjectionExecutor::~ProjectionExecutor() {
+}
+
+
+TableTuple ProjectionExecutor::p_next_pull()
+{
+    TableTuple tuple = m_state->m_childExecutor->next_pull();
+    if (tuple.isNullTuple())
+    {
+        return tuple;
+    }
+
+    //
+    // Project (or replace) values from input tuple only if values
+    // are not all ParameterValueExpression ones. If they are, temp_tuple
+    // is already pre-computed
+    if (all_tuple_array != NULL) {
+        VOLT_TRACE("sweet, all tuples");
+        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+            m_state->m_tempTuple.setNValue(ctr, tuple.getNValue(all_tuple_array[ctr]));
+        }
+    } else if (all_param_array == NULL) {
+        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+            m_state->m_tempTuple.setNValue(ctr, expression_array[ctr]->eval(&tuple, NULL));
+        }
+    }
+    return m_state->m_tempTuple;
+}
+
+void  ProjectionExecutor::p_pre_execute_pull(const NValueArray &params) {
+    ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(getPlanNode());
+    assert (node);
+    assert (!node->isInline()); // inline projection's execute() should not be called
+    assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
+    assert (output_table);
+    assert (input_table == node->getInputTables()[0]);
+    assert (input_table);
+
+    VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
+
+    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    assert(children.size() == 1);
+    AbstractExecutor* childExec = children[0]->getExecutor();
+    assert(childExec);
+    m_state.reset(new detail::ProjectionExecutorState(childExec, output_table));
+
+    //
+    // Since we have the input params, we need to call substitute to change any
+    // nodes in our expression tree to be ready for the projection operations in
+    // execute
+    //
+    assert (m_columnCount == (int)node->getOutputColumnNames().size());
+    if (all_tuple_array == NULL && all_param_array == NULL) {
+        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+            assert(expression_array[ctr]);
+            expression_array[ctr]->substitute(params);
+            VOLT_TRACE("predicate[%d]: %s", ctr,
+                       expression_array[ctr]->debug(true).c_str());
+        }
+    }
+
+    //
+    // Optimization. Initialize all-params temp tuple once and cache it on the state
+    // if all values are ParameterValueExpression
+    //
+    if (all_param_array != NULL) {
+        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+            m_state->m_tempTuple.setNValue(ctr, params[all_param_array[ctr]]);
+        }
+    }
+}
+
+bool ProjectionExecutor::support_pull() const {
+    return true;
 }
 
 }

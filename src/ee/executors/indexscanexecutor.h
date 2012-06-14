@@ -51,8 +51,7 @@
 #include "executors/abstractexecutor.h"
 
 #include "boost/shared_array.hpp"
-#include "boost/unordered_set.hpp"
-#include "boost/pool/pool_alloc.hpp"
+#include "boost/scoped_ptr.hpp"
 #include <set>
 #include <memory>
 
@@ -70,15 +69,22 @@ class IndexScanPlanNode;
 class ProjectionPlanNode;
 class LimitPlanNode;
 
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct IndexScanExecutorState;
+} //namespace detail
+
 class IndexScanExecutor : public AbstractExecutor
 {
 public:
-    IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL)
-    {
-        m_projectionExpressions = NULL;
-    }
+    IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode);
     ~IndexScanExecutor();
+
+    void set_search_key_pull(const TableTuple& searchKey, const TableTuple* other);
+    void set_expressions_pull(const NValueArray &params);
+
+    bool support_pull() const;
 
 protected:
     bool p_init(AbstractPlanNode*,
@@ -131,6 +137,13 @@ protected:
         m_searchKeyBeforeSubstituteArrayPtr;
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
+
+private:
+
+    TableTuple p_next_pull();
+    void p_pre_execute_pull(const NValueArray& params);
+
+    boost::scoped_ptr<detail::IndexScanExecutorState> m_state;
 };
 
 }

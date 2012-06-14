@@ -136,7 +136,7 @@ private:
 bool
 OrderByExecutor::p_execute(const NValueArray &params)
 {
-    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(m_abstractNode);
+    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -154,7 +154,7 @@ OrderByExecutor::p_execute(const NValueArray &params)
         limit_node->getLimitAndOffsetByReference(params, limit, offset);
     }
 
-    VOLT_TRACE("Running OrderBy '%s'", m_abstractNode->debug().c_str());
+    VOLT_TRACE("Running OrderBy '%s'", getPlanNode()->debug().c_str());
     VOLT_TRACE("Input Table:\n '%s'", input_table->debug().c_str());
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());

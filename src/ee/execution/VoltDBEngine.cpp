@@ -310,7 +310,6 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
 {
-    Table *cleanUpTable = NULL;
     m_currentOutputDepId = outputDependencyId;
     m_currentInputDepId = inputDependencyId;
 
@@ -353,39 +352,34 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     assert (iter != m_executorMap.end());
     boost::shared_ptr<ExecutorVector> execsForFrag = iter->second;
 
-    // Walk through the queue and execute each plannode.  The query
-    // planner guarantees that for a given plannode, all of its
-    // children are positioned before it in this list, therefore
-    // dependency tracking is not needed here.
-    size_t ttl = execsForFrag->list.size();
-    for (int ctr = 0; ctr < ttl; ++ctr) {
-        AbstractExecutor *executor = execsForFrag->list[ctr];
-        assert (executor);
+    // This code assumes executor pull support.
+    // Any node that does not actually implement a custom execute_pull
+    // instead inherits a sub-optimal default behavior from AbstractExecutor
+    // that adapts the specific executor's support for the older push protocol for
+    // use by the pull protocol.
 
-        if (executor->needsPostExecuteClear())
-            cleanUpTable =
-                dynamic_cast<Table*>(executor->getPlanNode()->getOutputTable());
+    // Execute each plannode.
+    // The planner guarantees that for a given plannode, all of its
+    // children are positioned before it in this list. It also guarantees that
+    // the last executor in chain is always the SendExecutor.
+    // The executor pull protocol operates "leaf-first" on the executor tree structure,
+    // therefore dependency tracking is not needed here, just a single
+    // executor invocation on the final "parent" executor.
+    size_t ttl = execsForFrag->list.size();
+    if (ttl > 0) {
+
+        AbstractExecutor* executor = execsForFrag->list[ttl - 1];
+        assert (executor);
 
         try {
             // Now call the execute method to actually perform whatever action
             // it is that the node is supposed to do...
-            if (!executor->execute(params)) {
-                VOLT_TRACE("The Executor's execution at position '%d'"
-                           " failed for PlanFragment '%jd'",
-                           ctr, (intmax_t)planfragmentId);
-                if (cleanUpTable != NULL)
-                    cleanUpTable->deleteAllTuples(false);
-                // set these back to -1 for error handling
-                m_currentOutputDepId = -1;
-                m_currentInputDepId = -1;
-                return ENGINE_ERRORCODE_ERROR;
-            }
+            executor->execute_pull(params);
         } catch (SerializableEEException &e) {
             VOLT_TRACE("The Executor's execution at position '%d'"
                        " failed for PlanFragment '%jd'",
                        ctr, (intmax_t)planfragmentId);
-            if (cleanUpTable != NULL)
-                cleanUpTable->deleteAllTuples(false);
+            executor->clearOutputTables();
             resetReusedResultOutputBuffer();
             e.serialize(getExceptionOutputSerializer());
 
@@ -394,9 +388,11 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
             m_currentInputDepId = -1;
             return ENGINE_ERRORCODE_ERROR;
         }
+        // @TODO currently we do clean-up twice.
+        // First time during the execute_pull call as part of the pre_execute_pull call for each executor
+        // Second time here
+        executor->clearOutputTables();
     }
-    if (cleanUpTable != NULL)
-        cleanUpTable->deleteAllTuples(false);
 
     // assume this is sendless dml
     if (m_numResultDependencies == 0) {

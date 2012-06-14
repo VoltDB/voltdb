@@ -47,13 +47,20 @@
 #define HSTOREPROJECTIONEXECUTOR_H
 
 #include <vector>
-#include "boost/shared_array.hpp"
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
+
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct ProjectionExecutorState;
+} //namespace detail
 
 class AbstractExpression;
 class TempTable;
@@ -64,10 +71,10 @@ class Table;
  */
 class ProjectionExecutor : public AbstractExecutor {
     public:
-        ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) {
-            output_table = NULL;
-        }
+        ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+
         ~ProjectionExecutor();
+
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
@@ -87,7 +94,29 @@ class ProjectionExecutor : public AbstractExecutor {
 
         boost::shared_array<AbstractExpression*> expression_array_ptr;
         AbstractExpression** expression_array;
+
+        TableTuple p_next_pull();
+        bool support_pull() const;
+
+        //@TODO just a hack
+        bool needsPostExecuteClear() { return true; }
+
+        void p_pre_execute_pull(const NValueArray& params);
+        void p_insert_output_table_pull(TableTuple& tuple);
+
+        // Has to be a pointer because it's an incomplete type at that point.
+        // Moving definition to the header would clutter it with the
+        // implementation details in my opinion.
+        // Changed it to be scoped ptr instead of shared.
+        boost::scoped_ptr<detail::ProjectionExecutorState> m_state;
 };
+
+
+inline void ProjectionExecutor::p_insert_output_table_pull(TableTuple& tuple)
+{
+    assert(output_table);
+    output_table->insertTupleNonVirtual(tuple);
+}
 
 }
 

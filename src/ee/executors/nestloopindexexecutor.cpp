@@ -51,6 +51,7 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "execution/VoltDBEngine.h"
+#include "executors/indexscanexecutor.h"
 #include "expressions/abstractexpression.h"
 #include "expressions/tuplevalueexpression.h"
 #include "plannodes/nestloopindexnode.h"
@@ -274,7 +275,7 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
 
 bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
 {
-    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(m_abstractNode));
+    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(getPlanNode()));
     assert(node);
     assert (inline_node == dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
     assert(inline_node);
@@ -564,6 +565,220 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     return (true);
 }
 
-NestLoopIndexExecutor::~NestLoopIndexExecutor() {
+namespace voltdb {
+namespace detail {
+
+    struct NestLoopIndexExecutorState
+    {
+        NestLoopIndexExecutorState(TempTable* outputTable,
+            AbstractExecutor* outerExecutor, IndexScanExecutor* innerExecutor,
+            const TupleSchema* outerSchema, int outerCols, int innerCols, int searchkeyCols) :
+            m_outerExecutor(outerExecutor),
+            m_innerExecutor(innerExecutor),
+            m_outputTable(outputTable),
+            m_outerSchema(outerSchema),
+            m_outerTuple(outerSchema),
+            m_outerCols(outerCols),
+            m_innerCols(innerCols),
+            m_searchkeyCols(searchkeyCols),
+            m_needNextOuter(true),
+            m_hasMatch(false)
+        {}
+
+        AbstractExecutor* m_outerExecutor;
+        IndexScanExecutor* m_innerExecutor;
+        TempTable* m_outputTable;
+        const TupleSchema* m_outerSchema;
+        TableTuple m_outerTuple;
+        int m_outerCols;
+        int m_innerCols;
+        int m_searchkeyCols;
+        bool m_needNextOuter;
+        bool m_hasMatch;
+
+    };
+
+} // namespace detail
+} // namespace voltdb
+
+NestLoopIndexExecutor::NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node),
+    node(NULL), inline_node(NULL), m_lookupType(INDEX_LOOKUP_TYPE_INVALID),
+    output_table(NULL), inner_table(NULL), index(NULL), index_values(),
+    outer_table(NULL), join_type(), m_outputExpressions(), m_sortDirection(),
+    index_values_backing_store(NULL), m_state()
+{}
+
+NestLoopIndexExecutor::~NestLoopIndexExecutor()
+{
     delete [] index_values_backing_store;
+}
+
+bool NestLoopIndexExecutor::support_pull() const
+{
+    return true;
+}
+
+void NestLoopIndexExecutor::p_pre_execute_pull(const NValueArray& params)
+{
+    assert (node == dynamic_cast<NestLoopIndexPlanNode*>(getPlanNode()));
+    assert(node);
+    assert (inline_node == dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN)));
+    assert(inline_node);
+
+    assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
+    assert(output_table);
+
+    //inner_table is the table that has the index to be used in this executor
+    assert (inner_table == dynamic_cast<PersistentTable*>(inline_node->getTargetTable()));
+    assert(inner_table);
+    IndexScanExecutor* inner_executor = dynamic_cast<IndexScanExecutor*>(inline_node->getExecutor());
+    assert(inner_executor);
+    TableTuple inner_tuple(inner_table->schema());
+    int inner_cols = inner_tuple.sizeInValues();
+    assert(inner_table->columnCount() == inner_cols);
+
+
+    // IndexScanPlanNode is inlined and its p_pre_execute_pull is not called.
+    inner_executor->set_expressions_pull(params);
+
+    //outer_table is the input table that have tuples to be iterated
+    assert(node->getInputTables().size() == 1);
+    assert (outer_table == node->getInputTables()[0]);
+    assert (outer_table);
+    VOLT_TRACE("executing NestLoopIndex with outer table: %s, inner table: %s",
+               outer_table->debug().c_str(), inner_table->debug().c_str());
+    AbstractExecutor* outer_executor = node->getChildren()[0]->getExecutor();
+    TableTuple outer_tuple(outer_table->schema());
+    int outer_cols = outer_tuple.sizeInValues();
+    assert (outer_table->columnCount() == outer_cols);
+
+
+    //
+    // Substitute parameter to SEARCH KEY Note that the expressions
+    // will include TupleValueExpression even after this substitution
+    //
+    int num_of_searchkeys = (int)inline_node->getSearchKeyExpressions().size();
+    for (int ctr = 0; ctr < num_of_searchkeys; ctr++) {
+        VOLT_TRACE("Search Key[%d] before substitution:\n%s",
+                   ctr, inline_node->getSearchKeyExpressions()[ctr]->debug(true).c_str());
+
+        inline_node->getSearchKeyExpressions()[ctr]->substitute(params);
+
+        VOLT_TRACE("Search Key[%d] after substitution:\n%s",
+                   ctr, inline_node->getSearchKeyExpressions()[ctr]->debug(true).c_str());
+    }
+
+    m_state.reset(new detail::NestLoopIndexExecutorState(output_table,
+        outer_executor, inner_executor, outer_table->schema(),
+        outer_cols, inner_cols, num_of_searchkeys));
+}
+
+void NestLoopIndexExecutor::p_post_execute_pull() {
+    VOLT_TRACE ("result table:\n %s", m_state->m_outputTable->debug().c_str());
+    VOLT_TRACE("Finished NestLoopIndex");
+}
+
+TableTuple NestLoopIndexExecutor::p_next_pull() {
+    //
+    // OUTER TABLE ITERATION
+    //
+    TableTuple joinedTuple = m_state->m_outputTable->tempTuple();
+    while (true)
+    {
+        if (m_state->m_needNextOuter)
+        {
+            m_state->m_outerTuple = m_state->m_outerExecutor->next_pull();
+            if (m_state->m_outerTuple.isNullTuple())
+            {
+                joinedTuple = TableTuple(m_state->m_outerSchema);
+                break;
+            }
+            VOLT_TRACE("outer_tuple:%s",
+                       m_state->m_outerTuple.debug(outer_table->name()).c_str());
+
+            //
+            // Try to put the tuple into our output table
+            //
+            // This is a bit hacky.  It duplicates the non-eval
+            // world that was here before.  Could fold these two
+            // loops together if we assign table indexes in p_init
+            for (int col_ctr = 0; col_ctr < m_state->m_outerCols; ++col_ctr)
+            {
+                joinedTuple.setNValue(col_ctr,
+                    m_outputExpressions[col_ctr]->eval(&m_state->m_outerTuple, NULL));
+            }
+            // Prepare inner index scan
+            reset_inner_state();
+            m_state->m_needNextOuter = false;
+            m_state->m_hasMatch = false;
+        }
+
+        TableTuple innerTuple = m_state->m_innerExecutor->next_pull();
+        if (!innerTuple.isNullTuple())
+        {
+            VOLT_TRACE("inner_tuple:%s",
+                       innerTuple.debug(inner_table->name()).c_str());
+            //
+            // Append the inner values to the end of our join tuple
+            //
+            for (int col_ctr = m_state->m_outerCols; col_ctr < joinedTuple.sizeInValues(); ++col_ctr)
+            {
+                // For the sake of consistency, we don't try to do
+                // output expressions here with columns from both tables.
+                joinedTuple.setNValue(col_ctr,
+                    m_outputExpressions[col_ctr]->eval(&innerTuple, NULL));
+            }
+            VOLT_TRACE("join_tuple tuple: %s",
+                       joinedTuple.debug(output_table->name()).c_str());
+
+            VOLT_TRACE("MATCH: %s",
+                       joinedTuple.debug(output_table->name()).c_str());
+
+            m_state->m_hasMatch = true;
+            break;
+        }
+        else
+        {
+            m_state->m_needNextOuter = true;
+            //
+            // Left Outer Join
+            //
+            if (join_type == JOIN_TYPE_LEFT && m_state->m_hasMatch == false)
+            {
+                //
+                // Append NULLs to the end of our join tuple
+                //
+                for (int col_ctr = 0; col_ctr < m_state->m_innerCols; ++col_ctr)
+                {
+                    const int index = col_ctr + m_state->m_outerCols;
+                    NValue value = joinedTuple.getNValue(index);
+                    value.setNull();
+                    joinedTuple.setNValue(col_ctr + m_state->m_outerCols, value);
+                }
+                break;
+            }
+        }
+    }
+
+    return joinedTuple;
+}
+
+void NestLoopIndexExecutor::reset_inner_state()
+{
+    //
+    // Now use the outer table tuple to construct the search key
+    // against the inner table
+    //
+    //nshi commented this out in revision 4495 of the old repo in index scan executor
+    //the code is cut and paste in nest loop and the change is necessary here as well
+    //assert (index_values.getSchema()->columnCount() == num_of_searchkeys || m_lookupType == INDEX_LOOKUP_TYPE_GT);
+    for (int ctr = m_state->m_searchkeyCols - 1; ctr >= 0 ; --ctr) {
+        index_values.setNValue(ctr,
+            inline_node->getSearchKeyExpressions()[ctr]->eval(&m_state->m_outerTuple, NULL));
+    }
+    VOLT_TRACE("Searching %s", index_values.debug("").c_str());
+
+    // Prepare inner index scan
+    m_state->m_innerExecutor->set_search_key_pull(index_values, &m_state->m_outerTuple);
 }

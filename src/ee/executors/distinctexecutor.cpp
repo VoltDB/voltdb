@@ -57,13 +57,39 @@
 #include <set>
 #include <cassert>
 
+namespace voltdb {
+namespace detail {
+
+struct DistinctExecutorState
+{
+    DistinctExecutorState(AbstractExecutor* childExec, AbstractExpression* distinctExpr, Table* input_table):
+        m_childExecutor(childExec),
+        m_distinctExpression(distinctExpr),
+        m_iterator(input_table->iterator()),
+        m_foundValues()
+    {}
+
+    AbstractExecutor* m_childExecutor;
+    AbstractExpression* m_distinctExpression;
+    TableIterator m_iterator;
+    std::set<NValue, NValue::ltNValue> m_foundValues;
+};
+
+} // namespace detail
+} // namespace voltdb
+
 using namespace voltdb;
+
+DistinctExecutor::DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node),
+    distinct_column_type(VALUE_TYPE_INVALID), m_state() {
+}
 
 bool DistinctExecutor::p_init(AbstractPlanNode*,
                               TempTableLimits* limits)
 {
     VOLT_DEBUG("init Distinct Executor");
-    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
+    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(getPlanNode());
     assert(node);
     //
     // Create a duplicate of input table
@@ -84,7 +110,7 @@ bool DistinctExecutor::p_init(AbstractPlanNode*,
 }
 
 bool DistinctExecutor::p_execute(const NValueArray &params) {
-    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(m_abstractNode);
+    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -116,4 +142,44 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
 }
 
 DistinctExecutor::~DistinctExecutor() {
+}
+
+
+TableTuple DistinctExecutor::p_next_pull() {
+    AbstractExecutor* childExec = m_state->m_childExecutor;
+    AbstractExpression* distinctExpr = m_state->m_distinctExpression;
+    std::set<NValue, NValue::ltNValue>& foundValues = m_state->m_foundValues;
+    TableTuple tuple; // childExec will init schema.
+    for (tuple = childExec->next_pull();
+         tuple.isNullTuple() == false;
+         tuple = childExec->next_pull()) {
+        NValue tuple_value = distinctExpr->eval(&tuple, NULL);
+        if (foundValues.find(tuple_value) == foundValues.end()) {
+            foundValues.insert(tuple_value);
+            break;
+        }
+    }
+    return tuple;
+}
+
+void DistinctExecutor::p_pre_execute_pull(const NValueArray &params) {
+    //
+    // Initialize itself
+    //
+    DistinctPlanNode* node = dynamic_cast<DistinctPlanNode*>(getPlanNode());
+    assert(node);
+    Table* input_table = node->getInputTables()[0];
+    assert(input_table);
+    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    assert(children.size() == 1);
+    AbstractExecutor* childExec = children[0]->getExecutor();
+    assert(childExec);
+    //@TODO: Some day params may have to be factored into generalized distinct expressions.
+    AbstractExpression* distinctExpr = node->getDistinctExpression();
+    assert(distinctExpr);
+    m_state.reset(new detail::DistinctExecutorState(childExec, distinctExpr, input_table));
+}
+
+bool DistinctExecutor::support_pull() const {
+    return true;
 }

@@ -75,9 +75,17 @@ protected:
     virtual bool needsOutputTableClear() { return false; };
 
 private:
+    TableTuple p_next_pull();
+    bool support_pull() const;
+    void p_pre_execute_pull(const NValueArray &params);
+    void p_execute_pull();
+
     Table* m_inputTable;
     VoltDBEngine *m_engine;
 };
+
+inline void SendExecutor::p_pre_execute_pull(const NValueArray &params)
+{}
 
 }
 

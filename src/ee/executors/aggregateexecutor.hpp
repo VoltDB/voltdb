@@ -934,7 +934,7 @@ bool AggregateExecutor<aggregateType>::p_execute(const NValueArray &params)
 {
     m_memoryPool.purge();
     VOLT_DEBUG("started AGGREGATE");
-    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(m_abstractNode);
+    AggregatePlanNode* node = dynamic_cast<AggregatePlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);

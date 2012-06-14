@@ -46,26 +46,41 @@
 #ifndef HSTORESEQSCANEXECUTOR_H
 #define HSTORESEQSCANEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb
 {
+    // Aggregate Struct to keep Executor state in between iteration
+    namespace detail
+    {
+        struct SeqScanExecutorState;
+    } //namespace detail
+
     class UndoLog;
     class ReadWriteSet;
 
     class SeqScanExecutor : public AbstractExecutor {
     public:
-        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node)
-        {}
-    protected:
+        SeqScanExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        bool support_pull() const;
+
+    private:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray& params);
         bool needsOutputTableClear();
+
+        TableTuple p_next_pull();
+        void p_pre_execute_pull(const NValueArray& params);
+        void p_reset_state_pull();
+
+        boost::scoped_ptr<detail::SeqScanExecutorState> m_state;
     };
+
 }
 
 #endif

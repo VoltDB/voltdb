@@ -46,12 +46,21 @@
 #ifndef HSTOREINSERTEXECUTOR_H
 #define HSTOREINSERTEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
+
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct InsertExecutorState;
+} //namespace detail
 
 class InsertPlanNode;
 class TempTable;
@@ -62,16 +71,7 @@ class TempTable;
 class InsertExecutor : public AbstractExecutor
 {
 public:
-    InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-    {
-        m_inputTable = NULL;
-        m_targetTable = NULL;
-        m_node = NULL;
-        m_engine = engine;
-        m_partitionColumn = -1;
-        m_multiPartition = false;
-    }
+    InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
     protected:
         bool p_init(AbstractPlanNode*,
@@ -93,6 +93,23 @@ public:
 
         /** reference to the engine/context to store the number of modified tuples */
         VoltDBEngine* m_engine;
+
+
+    //@TODO pullexec prototype
+    public:
+        TableTuple p_next_pull();
+        bool support_pull() const;
+
+    protected:
+
+        void p_pre_execute_pull(const NValueArray& params);
+        void p_post_execute_pull();
+        void p_insert_output_table_pull(TableTuple& tuple);
+
+    private:
+
+        boost::scoped_ptr<detail::InsertExecutorState> m_state;
+
 };
 
 }

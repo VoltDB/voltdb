@@ -62,8 +62,45 @@
 
 #include <vector>
 
+namespace voltdb {
+namespace detail {
+
+    struct InsertExecutorState
+    {
+        InsertExecutorState(Table* inputTable, Table* outputTable, Table* targetTable) :
+            m_outputTable(outputTable),
+            m_countTuple(outputTable->tempTuple()),
+            m_inputTableSchema(inputTable->schema()),
+            m_inputTableName(inputTable->name().c_str()),
+            m_outputTableName(outputTable->name().c_str()),
+            m_targetTableName(targetTable->name().c_str()),
+            m_iterator(inputTable->iterator()),
+            m_modifiedTuples(0)
+        {}
+
+        Table* m_outputTable;
+        TableTuple m_countTuple;
+        const TupleSchema* m_inputTableSchema;
+        const char* m_inputTableName;
+        const char* m_outputTableName;
+        const char* m_targetTableName;
+        TableIterator m_iterator;
+        int m_modifiedTuples;
+    };
+
+} // namespace detail
+} // namespace voltdb
+
+
 using namespace std;
 using namespace voltdb;
+
+InsertExecutor::InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node), m_node(NULL), m_inputTable(NULL),
+    m_targetTable(NULL), m_tuple(), m_partitionColumn(-1),
+    m_multiPartition(false), m_engine(engine), m_state()
+
+{}
 
 bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
                             TempTableLimits* limits)
@@ -118,7 +155,7 @@ bool InsertExecutor::p_init(AbstractPlanNode* abstractNode,
 }
 
 bool InsertExecutor::p_execute(const NValueArray &params) {
-    assert(m_node == dynamic_cast<InsertPlanNode*>(m_abstractNode));
+    assert(m_node == dynamic_cast<InsertPlanNode*>(getPlanNode()));
     assert(m_node);
     assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
     assert(m_inputTable);
@@ -207,5 +244,121 @@ bool InsertExecutor::p_execute(const NValueArray &params) {
     // add to the planfragments count of modified tuples
     m_engine->m_tuplesModified += modifiedTuples;
     VOLT_INFO("Finished inserting tuple");
+    return true;
+}
+
+
+
+
+//@TODO pullexec prototype
+void InsertExecutor::p_pre_execute_pull(const NValueArray &params) {
+    assert(m_node == dynamic_cast<InsertPlanNode*>(getPlanNode()));
+    assert(m_node);
+    assert(m_inputTable == dynamic_cast<TempTable*>(m_node->getInputTables()[0]));
+    assert(m_inputTable);
+    assert(m_targetTable);
+    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
+    assert (m_inputTable->activeTupleCount() > 0);
+    assert (m_tuple.sizeInValues() == m_inputTable->columnCount());
+#ifdef DEBUG
+    //
+    // This should probably just be a warning in the future when we are
+    // running in a distributed cluster
+    //
+    if (m_inputTable->activeTupleCount() == 0) {
+        char message[128];
+        snprintf(message, 128, "No tuples were found in our input table '%s'",
+                   m_inputTable->name().c_str());
+        VOLT_ERROR("%s", message);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+    }
+#endif
+
+    Table* outputTable = m_node->getOutputTable();
+    assert(outputTable);
+    m_state.reset(new detail::InsertExecutorState(m_inputTable, outputTable, m_targetTable));
+}
+
+TableTuple InsertExecutor::p_next_pull() {
+
+    //
+    // An insert is quite simple really. We just loop through our m_inputTable
+    // and insert any tuple that we find into our m_targetTable.
+    // It doesn't get any easier than that!
+    //
+    bool result = false;
+    while ((result = m_state->m_iterator.next(m_tuple))) {
+        VOLT_TRACE("Inserting tuple '%s' into target table '%s' with table schema: %s",
+                   m_tuple.debug(m_targetTable->name()).c_str(), m_targetTable->name().c_str(),
+                   m_targetTable->schema()->debug().c_str());
+
+        // if there is a partition column for the target table
+        if (m_partitionColumn != -1) {
+
+            // get the value for the partition column
+            NValue value = m_tuple.getNValue(m_partitionColumn);
+            bool isLocal = m_engine->isLocalSite(value);
+
+            // if it doesn't map to this site
+            if (!isLocal) {
+                if (!m_multiPartition) {
+                    char message[128];
+                    snprintf(message, 128, "Mispartitioned Tuple in single-partition plan.");
+                    VOLT_ERROR("%s", message);
+                    throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+                }
+                // don't insert
+                continue;
+            }
+        }
+
+        // for multi partition export tables,
+        //  only insert them into one place (the partition with hash(0))
+        if (m_isStreamed && m_multiPartition) {
+            bool isLocal = m_engine->isLocalSite(ValueFactory::getBigIntValue(0));
+            if (!isLocal) continue;
+        }
+
+        // try to put the tuple into the target table
+        if (!m_targetTable->insertTuple(m_tuple)) {
+            char message[128];
+            snprintf(message, 128, "Failed to insert tuple from input table '%s' into"
+                       " target table '%s'",
+                       m_state->m_inputTableName,
+                       m_state->m_targetTableName);
+            VOLT_ERROR("%s", message);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
+
+        // successfully inserted
+        m_state->m_countTuple.setNValue(
+            0, ValueFactory::getBigIntValue(++m_state->m_modifiedTuples));
+        break;
+    }
+    if (!result) {
+        m_state->m_countTuple = TableTuple(m_state->m_countTuple.getSchema());
+    }
+    return m_state->m_countTuple;
+}
+
+void InsertExecutor::p_post_execute_pull() {
+    // add to the planfragments count of modified tuples
+    m_engine->m_tuplesModified += m_state->m_modifiedTuples;
+    VOLT_INFO("Finished inserting tuple");
+}
+
+void InsertExecutor::p_insert_output_table_pull(TableTuple& tuple) {
+    // try to put the tuple into the output table
+    if (!m_state->m_outputTable->insertTuple(m_state->m_countTuple)) {
+        char message[128];
+        snprintf(message, 128, "Failed to insert tuple count (%d) into"
+                               " output table '%s'",
+                m_state->m_modifiedTuples, m_state->m_outputTableName);
+        VOLT_ERROR("%s", message);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+    }
+}
+
+bool InsertExecutor::support_pull() const {
     return true;
 }
