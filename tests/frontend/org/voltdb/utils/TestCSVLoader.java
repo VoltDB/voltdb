@@ -1,3 +1,20 @@
+/* This file is part of VoltDB.
+ * Copyright (C) 2008-2012 VoltDB Inc.
+ *
+ * VoltDB is free software: you can redistribute it and/or modify
+ * it under the terms of the GNU General Public License as published by
+ * the Free Software Foundation, either version 3 of the License, or
+ * (at your option) any later version.
+ *
+ * VoltDB is distributed in the hope that it will be useful,
+ * but WITHOUT ANY WARRANTY; without even the implied warranty of
+ * MERCHANTABILITY or FITNESS FOR A PARTICULAR PURPOSE.  See the
+ * GNU General Public License for more details.
+ *
+ * You should have received a copy of the GNU General Public License
+ * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
+ */
+
 package org.voltdb.utils;
 
 import java.io.BufferedReader;
@@ -16,27 +33,27 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestCSVLoader extends TestCase {
-	
+
 	private String pathToCatalog;
     private String pathToDeployment;
     private ServerThread localServer;
     private VoltDB.Configuration config;
     private VoltProjectBuilder builder;
     private Client client;
-    
-    private String userHome = System.getProperty("user.home"); 
-    private String reportdir = userHome + "/";
+
+    private final String userHome = System.getProperty("user.home");
+    private final String reportdir = userHome + "/";
     String path_csv = userHome + "/" + "test.csv";
-    
+
     @Override
     protected void setUp() throws Exception
     {
         super.setUp();
 
-        
+
     }
-    
-    public void testCommon() throws Exception 
+
+    public void testCommon() throws Exception
 	{
      String mySchema =
                 "create table BLAH (" +
@@ -45,7 +62,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_tinyint tinyint default 0, " +
                 "clm_smallint smallint default 0, " +
                 "clm_bigint bigint default 0, " +
-                
+
                 "clm_string varchar(10) default null, " +
                 "clm_decimal decimal default null, " +
                 "clm_float float default null "+ // for later
@@ -70,7 +87,7 @@ public class TestCSVLoader extends TestCase {
      		//"--strictquotes",
      		"BLAH"
      		};
-     
+
 	    String []myData = { "1,1,1,11111111,first,1.10,1.11",
 	    					"2,2,2,222222,second,3.30,NULL",
 	    					"3,3,3,333333, third ,NULL, 3.33",
@@ -89,9 +106,9 @@ public class TestCSVLoader extends TestCase {
 	    int invalidLineCnt = 4;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	}
-    
+
     /*
-    public void testNew() throws Exception 
+    public void testNew() throws Exception
    	{
         String mySchema =
                    "create table BLAH (" +
@@ -100,7 +117,7 @@ public class TestCSVLoader extends TestCase {
 //                   "clm_tinyint tinyint default 0, " +
 //                   "clm_smallint smallint default 0, " +
 //                   "clm_bigint bigint default 0, " +
-//                   
+//
 //                   "clm_string varchar(10) default null, " +
 //                   "clm_decimal decimal default null, " +
 //                   "clm_float float default null "+ // for later
@@ -108,7 +125,7 @@ public class TestCSVLoader extends TestCase {
                    //"clm_varinary varbinary default null" + // for later
                    "); ";
         String []myOptions = {
-         		"--file=" + userHome + "/test.csv", 
+         		"--file=" + userHome + "/test.csv",
          		//"--procedure=BLAH.insert",
          		"--reportdir=" + reportdir,
          		"--table=BLAH",
@@ -117,7 +134,7 @@ public class TestCSVLoader extends TestCase {
          		"--password=",
          		"--port="
          		};
-        
+
    	    String []myData = { "1",
    	    					"2"
    	    					};
@@ -129,10 +146,10 @@ public class TestCSVLoader extends TestCase {
    		//test_Interface( mySchema, myOptions, myData, invalidLineCnt );
    		test_Interface_lineByLine( mySchema, 2, myOptions, myData, invalidLineCnt, addStr );
    	}
-    
-    
-    //csvloader --inputfile=/tmp/ --tablename=VOTES --abortfailurecount=50 
-//    public void testOptions() throws Exception 
+
+
+    //csvloader --inputfile=/tmp/ --tablename=VOTES --abortfailurecount=50
+//    public void testOptions() throws Exception
 //	{
 //     String mySchema =
 //                "create table BLAH (" +
@@ -141,7 +158,7 @@ public class TestCSVLoader extends TestCase {
 //                "clm_tinyint tinyint default 0, " +
 //                "); ";
 //     String []myOptions = {
-//     		"--inputfile=" + userHome + "/test.csv", 
+//     		"--inputfile=" + userHome + "/test.csv",
 //     		//"--procedurename=BLAH.insert",
 //     		"--reportdir=" + reportdir,
 //     		"--tablename=BLAH",
@@ -157,7 +174,7 @@ public class TestCSVLoader extends TestCase {
 //	    	 			    "6,6,null,666666, sixth, 6.60, 6.66",
 //	    					"7,null,7,7777777, seventh, 7.70, 7.77 ",
 //	    					"11, 1,1,\"1,000\",first,1.10,1.11",
-//	    					
+//
 //	    					"8, 8",
 //	    					"",
 //	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
@@ -165,7 +182,7 @@ public class TestCSVLoader extends TestCase {
 //	    int invalidLineCnt = 3;
 //		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 //	}
-	
+
 //	public void testDelimeters () throws Exception
 //	{
 //		simpleSchema =
@@ -175,7 +192,7 @@ public class TestCSVLoader extends TestCase {
 //                "clm_tinyint tinyint default 0, " +
 //                //"clm_smallint smallint default 0, " +
 //                //"clm_bigint bigint default 0, " +
-//                
+//
 //               // "clm_string varchar(10) default null, " +
 //                //"clm_decimal decimal default null, " +
 //                //"clm_float float default 1.0, "+ // for later
@@ -185,7 +202,7 @@ public class TestCSVLoader extends TestCase {
 //		char str = '.';
 //		 String []params = {
 //		    		//userHome + "/testdb.csv",
-//		    		"--inputfile=" + userHome + "/test.csv", 
+//		    		"--inputfile=" + userHome + "/test.csv",
 //		    		//"--procedurename=BLAH.insert",
 //		    		"--reportdir=" + reportdir,
 //		    		"--tablename=BLAH",
@@ -204,16 +221,16 @@ public class TestCSVLoader extends TestCase {
                 "clm_tinyint tinyint default 0, " +
                 //"clm_smallint smallint default 0, " +
                 //"clm_bigint bigint default 0, " +
-                
+
                	//"clm_string varchar(10) default null, " +
                 //"clm_decimal decimal default null, " +
                 //"clm_float float default 1.0, "+ // for later
                 //"clm_timestamp timestamp default null, " + // for later
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
-	
+
 		 String []params_simple = {
-	    		//"--inputfile=" + userHome + "/testdb.csv", 
+	    		//"--inputfile=" + userHome + "/testdb.csv",
 	    		//"--procedurename=BLAH.insert",
 	    		//"--reportdir=" + reportdir,
 	    		//"--tablename=BLAH",
@@ -227,12 +244,12 @@ public class TestCSVLoader extends TestCase {
             modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
             System.out.println("data inserted to table BLAH:\n" + modCount);
             int rowct = modCount.getRowCount();
-                        
+
             BufferedReader csvreport = new BufferedReader(new FileReader(new String(reportdir + CSVLoader.reportfile)));
             int lineCount = 0;
             String line = "";
             String promptMsg = "Number of acknowledged tuples:";
-            
+
             while ((line = csvreport.readLine()) != null) {
             	if (line.startsWith(promptMsg)) {
             		String num = line.substring(promptMsg.length());
@@ -259,7 +276,7 @@ public class TestCSVLoader extends TestCase {
         }
 	}
 	*/
-	
+
 	public void test_Interface( String my_schema, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
 		try{
 			BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
@@ -271,14 +288,14 @@ public class TestCSVLoader extends TestCase {
 		catch( Exception e) {
 			System.err.print( e.getMessage() );
 		}
-		
+
 		try{
 			pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
 			pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
 			builder = new VoltProjectBuilder();
 			//builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
 			//builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, 5, 'nullchar');");
-        
+
 			builder.addLiteralSchema(my_schema);
 			builder.addPartitionInfo("BLAH", "clm_integer");
 			boolean success = builder.compile(pathToCatalog, 2, 1, 0);
@@ -289,29 +306,29 @@ public class TestCSVLoader extends TestCase {
 			config.m_pathToDeployment = pathToDeployment;
 			localServer = new ServerThread(config);
 			client = null;
-        
+
           	localServer.start();
         	localServer.waitForInitialization();
-        
+
         	client = ClientFactory.createClient();
         	client.createConnection("localhost");
-        	
+
         	CSVLoader.main( my_options );
             // do the test
-            
+
             VoltTable modCount;
             modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
             System.out.println("data inserted to table BLAH:\n" + modCount);
             int rowct = modCount.getRowCount();
-                        
+
             BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.pathReportfile));
             int lineCount = 0;
             String line = "";
             String promptMsg = "Number of acknowledged tuples:";
-            
+
             String promptFailMsg = "Number of failed tuples:";
             int invalidlinecnt = 0;
-            
+
             while ((line = csvreport.readLine()) != null) {
             	if (line.startsWith(promptMsg)) {
             		String num = line.substring(promptMsg.length());
@@ -320,12 +337,12 @@ public class TestCSVLoader extends TestCase {
             	if( line.startsWith(promptFailMsg)){
             		String num = line.substring(promptFailMsg.length());
             		invalidlinecnt = Integer.parseInt(num.replaceAll("\\s",""));
-            	}	
+            	}
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
             assertEquals(lineCount, rowct);
             assertEquals(invalidLineCnt, invalidlinecnt);
-            
+
         }
         finally {
             if (client != null) client.close();
@@ -341,5 +358,5 @@ public class TestCSVLoader extends TestCase {
             System.gc();
         }
 	}
-	
+
 }
