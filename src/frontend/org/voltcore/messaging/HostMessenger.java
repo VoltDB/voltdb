@@ -73,7 +73,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
      *
      */
     public static class Config {
-        private static final VoltLogger logger = new VoltLogger("org.voltdb.messaging.impl.HostMessenger.Config");
+        private static final VoltLogger logger = new VoltLogger("HOST");
 
         public InetSocketAddress coordinatorIp;
         public String zkInterface = "127.0.0.1:2181";
@@ -144,7 +144,6 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         }
     }
 
-    private static final VoltLogger m_logger = new VoltLogger("org.voltdb.messaging.impl.HostMessenger");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     public static final int AGREEMENT_SITE_ID = -1;
@@ -698,7 +697,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             //java.io.PrintWriter pw = new java.io.PrintWriter(sw);
             //t.printStackTrace(pw);
             //pw.flush();
-            m_logger.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
+            hostLog.warn("Attempted delivery of message to failed site: " + CoreUtils.hsIdToString(hsId));
             //m_logger.warn(sw.toString());
             return null;
         }
