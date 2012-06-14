@@ -45,10 +45,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
 /**
  * CSVLoader is a simple utility to load data from a CSV formatted file to a table
  * (or pass it to any stored proc, but ignoring any result other than the success code.).
- *
- * TODO:
- *   - Forces JVM into UTC. All input date TZs assumed to be GMT+0
- *   - Requires canonical JDBC SQL timestamp format
  */
 public class CSVLoader {
 
@@ -61,9 +57,9 @@ public class CSVLoader {
 	private static long latency = -1;
 	private static boolean standin = false;
 
-	public static String path_invalidrowfile = "csvloaderinvalidrows.csv";
-	public static String path_reportfile = "csvloaderReport.log";
-	public static String path_logfile = "csvloaderLog.log";
+	public static String invalidrowfile = "csvloaderinvalidrows.csv";
+	public static String reportfile = "csvloaderReport.log";
+	public static String logfile = "csvloaderLog.log";
 	
 	private static BufferedWriter out_invaliderowfile;
 	private static BufferedWriter out_logfile;
@@ -352,14 +348,14 @@ public class CSVLoader {
 
 		String myinsert = insertProcedure;
 		myinsert = myinsert.replaceAll("\\.", "_");
-		path_invalidrowfile = config.reportdir + myinsert + "_" + "csvloaderinvalidrows.csv";
-		path_logfile =  config.reportdir + myinsert + "_"+ "csvloaderLog.log";
-		path_reportfile = config.reportdir  + myinsert + "_"+ "csvloaderReport.log";
+		invalidrowfile = config.reportdir + myinsert + "_" + invalidrowfile;
+		logfile =  config.reportdir + myinsert + "_"+ logfile;
+		reportfile = config.reportdir  + myinsert + "_"+ reportfile;
 
 		try {
-			out_invaliderowfile = new BufferedWriter(new FileWriter(path_invalidrowfile));
-			out_logfile = new BufferedWriter(new FileWriter(path_logfile));
-			out_reportfile = new BufferedWriter(new FileWriter(path_reportfile)); 
+			out_invaliderowfile = new BufferedWriter(new FileWriter(invalidrowfile));
+			out_logfile = new BufferedWriter(new FileWriter(logfile));
+			out_reportfile = new BufferedWriter(new FileWriter(reportfile)); 
 		} catch (IOException e) {
 			System.err.println(e.getMessage());
 			System.exit(1);
@@ -401,9 +397,9 @@ public class CSVLoader {
 			out_reportfile.write("Number of acknowledged tuples:     " + inCount.get() + "\n");
 			out_reportfile.write("CSVLoader rate: " + outCount.get() / elapsedTimeSec + " row/s\n");
 
-			System.out.println("invalid row file is generated to:" + path_invalidrowfile + "\n"
-					+ "log file is generated to:" + path_logfile + "\n"
-					+ "report file is generated to:" + path_reportfile);
+			System.out.println("invalid row file is generated to:" + invalidrowfile + "\n"
+					+ "log file is generated to:" + logfile + "\n"
+					+ "report file is generated to:" + reportfile);
 
 			out_invaliderowfile.flush();
 			out_logfile.flush();
