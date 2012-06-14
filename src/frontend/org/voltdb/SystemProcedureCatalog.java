@@ -79,7 +79,8 @@ public class SystemProcedureCatalog {
         }
 
         boolean getSinglepartition() {
-            return className.equals("org.voltdb.sysprocs.UpdateApplicationCatalog");
+            return className.equals("org.voltdb.sysprocs.UpdateApplicationCatalog") ||
+                   className.equals("org.voltdb.sysprocs.AdHocSP");
         }
 
         String getClassname() {
@@ -91,7 +92,7 @@ public class SystemProcedureCatalog {
             p.setClassname(className);
             p.setReadonly(readOnly);
             p.setEverysite(everySite);
-            p.setSinglepartition(false);
+            p.setSinglepartition(getSinglepartition());
             p.setSystemproc(true);
             p.setHasjava(true);
             p.setPartitiontable(null);
@@ -105,6 +106,7 @@ public class SystemProcedureCatalog {
         new HashMap<String, Config>();
 
     static {
+        //                                                                                          RO     Every  Pro    wanboom,wanskip,replicaok
         listing.put("@AdHoc",                   new Config("org.voltdb.sysprocs.AdHoc",             false, false, false, false, false, true));
         listing.put("@AdHocSP",                 new Config("org.voltdb.sysprocs.AdHocSP",           false, false, false, false, false, true));
         listing.put("@Pause",                   new Config("org.voltdb.sysprocs.Pause",             false, true,  false, false, true, true));

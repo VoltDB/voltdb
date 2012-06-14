@@ -417,18 +417,8 @@ public class ProcedureRunner {
 
         VoltTable[] results = null;
 
-        if (batchSize == 0)
+        if (batchSize == 0) {
             return new VoltTable[] {};
-
-        boolean slowPath = false;
-        for (int i = 0; i < batchSize; ++i) {
-            final SQLStmt stmt = batch.get(i).stmt;
-            // if any stmt is not single sited in this batch, the
-            // full batch must take the slow path through the dtxn
-            if (!stmt.isSinglePartition()) {
-                slowPath = true;
-                break;
-            }
         }
 
         // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
@@ -452,14 +442,11 @@ public class ProcedureRunner {
             }
         }
 
-        // FOR MP-TXNS
-        else if (slowPath) {
-            results = slowPath(batch, isFinalSQL);
-        }
-
-        // FOR SP-TXNS (or all replicated read MPs)
-        else {
+        if (m_catProc.getSinglepartition()) {
             results = fastPath(batch);
+        }
+        else {
+            results = slowPath(batch, isFinalSQL);
         }
 
         // check expectations
