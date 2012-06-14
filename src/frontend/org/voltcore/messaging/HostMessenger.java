@@ -81,7 +81,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public int deadHostTimeout = 10000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
-        public int networkThreads =  Runtime.getRuntime().availableProcessors() / 2;
+        public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -105,6 +105,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
 
+        @Override
         public String toString() {
             JSONStringer js = new JSONStringer();
             try {
