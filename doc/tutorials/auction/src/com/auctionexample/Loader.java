@@ -76,7 +76,37 @@ class Loader {
      * @return An ArrayList of ids of newly inserted objects.
      * @throws Exception Rethrows any exceptions thrown from within.
        */
-    static ArrayList<Integer> loadItems( org.voltdb.client.Client client ) throws Exception {
+    static ArrayList<Integer> loadItems(){
+    	ArrayList<Integer> itemIds = new ArrayList<Integer>();
+    	URL url = Loader.class.getResource("datafiles/items.txt");
+    	String []myOptions = {
+         		"--file="+ url.getPath(), 
+         		"--procedure=InsertIntoItem",
+         		//"--reportdir=" + reportdir,
+         		//"--table=InsertIntoItem",
+         		"--maxerrors=50",
+         		"--user=program",
+         		"--password=pass",
+         		"--port=",
+         		"--skipPreChecks=true"
+         		};
+    	try {
+			CSVLoader.main( myOptions );
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	ArrayList<Object> list = CSVLoader.getFirstIds();
+    	for( Object id : list) {
+    		itemIds.add( (Integer)id );
+    	}
+    	return itemIds;
+    }
+    
+    static ArrayList<Integer> loadItems2( org.voltdb.client.Client client ) throws Exception {
     	ArrayList<Integer> itemIds = new ArrayList<Integer>();
     	URL url = Loader.class.getResource("datafiles/items.txt");
     	String []myOptions = {
@@ -184,28 +214,57 @@ class Loader {
      * @throws Exception Rethrows any exceptions thrown from within.
      */
     
-    static ArrayList<Integer> loadCategories() throws InterruptedException, IOException {
+    static ArrayList<Integer> loadCategories() {
     	ArrayList<Integer> categoryIds = new ArrayList<Integer>();
     	URL url = Loader.class.getResource("datafiles/categories.txt");
     	String []myOptions = {
-         		"--file="+ url.getPath(),         		
+         		"--file="+ url.getPath(), 
          		"--procedure=InsertIntoCategory",
          		//"--reportdir=" + reportdir,
-         		//"--table=BLAH",
+         		//"--table=InsertIntoItem",
          		"--maxerrors=50",
          		"--user=program",
          		"--password=pass",
          		"--port="
          		};
-    	new CSVLoader( myOptions );
-    	while( CSVLoader.readNext() ){
-    		categoryIds.add( Integer.parseInt( CSVLoader.insertLine(null, 3)[0] ) );
+    	try {
+			CSVLoader.main( myOptions );
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	ArrayList<Object> list = CSVLoader.getFirstIds();
+    	for( Object id : list) {
+    		categoryIds.add( (Integer)id );
     	}
-    	CSVLoader.drain();
-    	CSVLoader.produceFiles();
-    	CSVLoader.flush();
     	return categoryIds;
     }
+    
+//    static ArrayList<Integer> loadCategories1() throws InterruptedException, IOException {
+//    	ArrayList<Integer> categoryIds = new ArrayList<Integer>();
+//    	URL url = Loader.class.getResource("datafiles/categories.txt");
+//    	String []myOptions = {
+//         		"--file="+ url.getPath(),         		
+//         		"--procedure=InsertIntoCategory",
+//         		//"--reportdir=" + reportdir,
+//         		//"--table=BLAH",
+//         		"--maxerrors=50",
+//         		"--user=program",
+//         		"--password=pass",
+//         		"--port="
+//         		};
+//    	new CSVLoader( myOptions );
+//    	while( CSVLoader.readNext() ){
+//    		categoryIds.add( Integer.parseInt( CSVLoader.insertLine(null, 3)[0] ) );
+//    	}
+//    	CSVLoader.drain();
+//    	CSVLoader.produceFiles();
+//    	CSVLoader.flush();
+//    	return categoryIds;
+//    }
     
 //    static ArrayList<Byte> loadCategories1(org.voltdb.client.Client client) throws Exception {
 //        System.out.printf("Loading CATEGORY Table\n");
@@ -251,28 +310,57 @@ class Loader {
      * 
      */
     
-    static ArrayList<Integer> loadUsers() throws InterruptedException, IOException {
+    static ArrayList<Integer> loadUsers() {
     	ArrayList<Integer> userIds = new ArrayList<Integer>();
     	URL url = Loader.class.getResource("datafiles/users.txt");
     	String []myOptions = {
-         		"--file="+ url.getPath(),         		
+         		"--file="+ url.getPath(), 
          		"--procedure=InsertIntoUser",
          		//"--reportdir=" + reportdir,
-         		//"--table=BLAH",
+         		//"--table=InsertIntoItem",
          		"--maxerrors=50",
          		"--user=program",
          		"--password=pass",
          		"--port="
          		};
-    	new CSVLoader( myOptions );
-    	while( CSVLoader.readNext() ){
-    		userIds.add( Integer.parseInt( CSVLoader.insertLine(null, 8)[0] ) );
+    	try {
+			CSVLoader.main( myOptions );
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		} catch (InterruptedException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    	ArrayList<Object> list = CSVLoader.getFirstIds();
+    	for( Object id : list) {
+    		userIds.add( (Integer)id );
     	}
-    	CSVLoader.drain();
-    	CSVLoader.produceFiles();
-    	CSVLoader.flush();
     	return userIds;
     }
+    
+//    static ArrayList<Integer> loadUsers() throws InterruptedException, IOException {
+//    	ArrayList<Integer> userIds = new ArrayList<Integer>();
+//    	URL url = Loader.class.getResource("datafiles/users.txt");
+//    	String []myOptions = {
+//         		"--file="+ url.getPath(),         		
+//         		"--procedure=InsertIntoUser",
+//         		//"--reportdir=" + reportdir,
+//         		//"--table=BLAH",
+//         		"--maxerrors=50",
+//         		"--user=program",
+//         		"--password=pass",
+//         		"--port="
+//         		};
+//    	new CSVLoader( myOptions );
+//    	while( CSVLoader.readNext() ){
+//    		userIds.add( Integer.parseInt( CSVLoader.insertLine(null, 8)[0] ) );
+//    	}
+//    	CSVLoader.drain();
+//    	CSVLoader.produceFiles();
+//    	CSVLoader.flush();
+//    	return userIds;
+//    }
     
 //    static ArrayList<Integer> loadUsers1(org.voltdb.client.Client client) throws Exception {
 //        System.out.printf("Loading USER Table\n");

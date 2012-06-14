@@ -22,6 +22,9 @@
  */
 package com.auctionexample;
 
+import java.util.Random;
+
+import org.apache.tools.ant.taskdefs.Exec;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
@@ -51,11 +54,18 @@ public class InsertIntoItem extends VoltProcedure {
      * @return The number of rows affected.
      * @throws VoltAbortException
      */
-    public VoltTable[] run(int itemId, String itemName, String itemDescription, long sellerId, long categoryId, long highBidId, double startPrice, TimestampType startTime,
-        TimestampType endTime) throws VoltAbortException {
-    	System.out.println( endTime );
+    public VoltTable[] run(int itemId, String itemName, String itemDescription, long sellerId, long categoryId, long highBidId, double startPrice ) throws VoltAbortException {
+    	// figure out auction start and end times
+    	Random random = new Random();
+        final int oneMinuteOfMillis = 1000 * 1000 * 60;
+        TimestampType startTime = new TimestampType();
+        int duration = oneMinuteOfMillis + random.nextInt(oneMinuteOfMillis);
+        TimestampType endTime = new TimestampType(startTime.getTime() + duration);
+
         voltQueueSQL(insert, itemId, itemName, itemDescription, sellerId, categoryId, highBidId, startPrice, startTime, endTime);
         voltQueueSQL(insertForExport, itemId, itemName, itemDescription, sellerId, categoryId, highBidId, startPrice, startTime, endTime);
+        InsertIntoBid insertIntoBid = null;
+        insertIntoBid.run(itemId, itemId, -1, startTime, startPrice);
         return voltExecuteSQL();
     }
 }

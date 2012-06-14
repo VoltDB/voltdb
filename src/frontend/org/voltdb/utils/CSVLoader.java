@@ -25,6 +25,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
+import java.util.ArrayList;
 import java.util.Map;
 import java.util.TimeZone;
 import java.util.TreeMap;
@@ -85,6 +86,8 @@ public class CSVLoader {
     private static BufferedWriter out_invaliderowfile;
     private static BufferedWriter out_logfile;
 	private static BufferedWriter out_reportfile;
+	
+	private static ArrayList<Object> firstIds = new ArrayList<Object>();
 	
     public CSVLoader( String[] options ) {
     	CSVConfig cfg = new CSVConfig();
@@ -208,6 +211,9 @@ public class CSVLoader {
     	@Option(desc = "port to be used for the servers right now")
     	int port = Client.VOLTDB_SERVER_PORT;
     	
+    	@Option(desc = "skip format checking when loading the csv file on the client")
+    	boolean skipPreChecks = false;
+    	
     	@Override
     	public void validate() {
     		if (maxerrors < 0) exitWithMessageAndUsage("abortfailurecount must be >=0");
@@ -261,7 +267,7 @@ public class CSVLoader {
                     cb = new MyCallback(outCount.get(), config, linedata.toString());
                     String lineCheckResult;
                      
-                    if( (lineCheckResult = checkparams_trimspace(correctedLine, columnCnt))!= null){
+                    if( !config.skipPreChecks && (lineCheckResult = checkparams_trimspace(correctedLine, columnCnt))!= null){
                     	synchronized (errorInfo) {
                     		if (!errorInfo.containsKey(outCount.get())) {
                     			String[] info = {linedata.toString(), lineCheckResult};
@@ -277,6 +283,7 @@ public class CSVLoader {
                     }
                     
                     queued = csvClient.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    firstIds.add( correctedLine[0] );
                     
                     if (queued == false) {
                         ++waits;
@@ -306,6 +313,10 @@ public class CSVLoader {
         System.out.println("CSVLoader elaspsed: " + latency/1000F + " seconds");
     	produceFiles();
     	flush();
+    }
+    
+    public static ArrayList<Object> getFirstIds() {
+    	return firstIds;
     }
     
     //works with insertLine
