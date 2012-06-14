@@ -83,8 +83,7 @@ class Loader {
          		"--maxerrors=50",
          		"--user=program",
          		"--password=pass",
-         		"--port=",
-         		"--skipPreChecks=true"
+         		"--port="
          		};
     	try {
 			CSVLoader.main( myOptions );

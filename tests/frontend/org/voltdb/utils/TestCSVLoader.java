@@ -72,7 +72,7 @@ public class TestCSVLoader extends TestCase {
      String []myOptions = {
      		"-f" + userHome + "/test.csv",
      		//"--procedure=BLAH.insert",
-     		"--reportdir=" + reportdir,
+     		//"--reportdir=" + reportdir,
      		//"--table=BLAH",
      		"--maxerrors=50",
      		//"-user",
