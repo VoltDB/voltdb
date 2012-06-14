@@ -155,10 +155,6 @@ public class CSVLoader {
 		@Option(desc = "port to be used for the servers right now")
 		int port = Client.VOLTDB_SERVER_PORT;
 
-
-		@Option(desc = "skip format checking  on the client for each line read from the csv file.", hasArg = false)
-		boolean skipChecks = false;
-
 		@AdditionalArgs(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
 		String table = "";
 
@@ -253,7 +249,7 @@ public class CSVLoader {
 					cb = new MyCallback(outCount.get(), config, linedata.toString());
 					String lineCheckResult;
 
-					if( !config.skipChecks && (lineCheckResult = checkparams_trimspace(correctedLine, columnCnt))!= null){
+					if( (lineCheckResult = checkparams_trimspace(correctedLine, columnCnt))!= null){
 						synchronized (errorInfo) {
 							if (!errorInfo.containsKey(outCount.get())) {
 								String[] info = {linedata.toString(), lineCheckResult};
