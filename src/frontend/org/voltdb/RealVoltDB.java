@@ -70,7 +70,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
@@ -413,6 +415,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     // XXX-IZZY NEED TO FIX REJOIN TO ADD THE INITIATOR MAILBOXES
                     ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
                     hostLog.info("Set recovering site count to " + p.getFirst().size());
+
+                    // Do IV2 stuff
+                    List<Integer> partitionsToReplace = getIv2PartitionsToReplace(p.getSecond());
+                    m_iv2Initiators = createIv2Initiators(partitionsToReplace);
                 } else {
                     p = createMailboxesForSitesStartup();
                     // XXX-IZZY HACKY, REFACTOR SOMEHOW TO GET PARTITIONS
@@ -845,6 +851,42 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_mailboxPublisher.registerMailbox(MailboxType.ExecutionSite, mnc);
         }
         return Pair.of( mailboxes, clusterConfig);
+    }
+
+    private List<Integer> getIv2PartitionsToReplace(ClusterConfig clusterConfig)
+    {
+        hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
+        List<Integer> repsPerPart = new ArrayList<Integer>(clusterConfig.getPartitionCount());
+        // Just make a local Cartographer here for now until we figure out how it fits into
+        // node/cluster startup in general
+        Cartographer cart = new Cartographer(m_messenger.getZK());
+        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+            repsPerPart.add(i, cart.getReplicaCountForPartition(i));
+        }
+        List<Integer> partitions = new ArrayList<Integer>();
+        int freeSites = clusterConfig.getSitesPerHost();
+        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+            if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
+                partitions.add(i);
+                // pretend to be fully replicated so we don't put two copies of a
+                // partition on this host.
+                repsPerPart.set(i, clusterConfig.getReplicationFactor() + 1);
+                freeSites--;
+                if (freeSites == 0) {
+                    break;
+                }
+            }
+        }
+        if (freeSites > 0) {
+            // double check fully replicated?
+            for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+                if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
+                    hostLog.error("Partition " + i + " should have been replicated but wasn't");
+                }
+            }
+        }
+        hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
+        return partitions;
     }
 
     private List<Initiator> createIv2Initiators(Collection<Integer> partitions)

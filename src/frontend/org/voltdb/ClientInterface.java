@@ -69,6 +69,8 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheReader;
+
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltZK.MailboxType;
@@ -152,6 +154,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private ClientInterfaceHandleManager m_ciHandles =
         new ClientInterfaceHandleManager();
     private final BackpressureTracker m_backpressure;
+    private final Cartographer m_cartographer;
 
     /**
      * Policies used to determine if we can accept an invocation.
@@ -959,6 +962,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_iv2Masters = new MapCache(messenger.getZK(), VoltZK.iv2masters);
         m_iv2Masters.start(true);
         m_backpressure = new BackpressureTracker(this);
+        m_cartographer = new Cartographer(messenger.getZK());
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
@@ -1256,14 +1260,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         try {
            ColumnInfo[] masterCols = new ColumnInfo[] {
               new ColumnInfo("Partition", VoltType.STRING),
-              new ColumnInfo("Master", VoltType.BIGINT),
-              new ColumnInfo("Host", VoltType.INTEGER)};
+              new ColumnInfo("Sites", VoltType.STRING),
+              new ColumnInfo("Leader", VoltType.STRING)};
            VoltTable masterTable = new VoltTable(masterCols);
            Map<String, JSONObject> masters = m_iv2Masters.pointInTimeCache();
            for (Entry<String, JSONObject> entry : masters.entrySet()) {
                long partitionId = Long.valueOf(entry.getValue().getLong("hsid"));
-               masterTable.addRow(entry.getKey(), partitionId,
-                       CoreUtils.getHostIdFromHSId(partitionId));
+               masterTable.addRow(entry.getKey(),
+                       CoreUtils.hsIdCollectionToString(m_cartographer.getReplicasForIv2Master(entry.getKey())),
+                       CoreUtils.hsIdToString(partitionId));
            }
            return new ClientResponseImpl(ClientResponseImpl.SUCCESS,
                    new VoltTable[]{masterTable}, null, task.clientHandle);
