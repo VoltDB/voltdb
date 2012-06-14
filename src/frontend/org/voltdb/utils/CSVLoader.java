@@ -101,8 +101,7 @@ public class CSVLoader {
     	} catch (FileNotFoundException e) {
 			System.err.println("CSV file '" + config.file
 					+ "' could not be found.");
-		} catch (Exception e) {
-            e.printStackTrace();
+			System.exit(1);
         }
     	// Split server list
         String[] serverlist = config.servers.split(",");
@@ -114,7 +113,7 @@ public class CSVLoader {
 			csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
 		} catch (Exception e) {
 			System.err.println("Error to connect to the servers:" + config.servers);
-			e.printStackTrace();
+			System.exit(1);
 		}
     }
     
@@ -417,6 +416,7 @@ public class CSVLoader {
         	}
         } catch (Exception x) {
         	System.err.println(x.getMessage());
+        	x.printStackTrace();
         }
         
         String myinsert = insertProcedure;
@@ -431,6 +431,7 @@ public class CSVLoader {
 			out_reportfile = new BufferedWriter(new FileWriter(path_reportfile)); 
 		} catch (IOException e) {
 			System.err.println(e.getMessage());
+			e.printStackTrace();
 		}
 		
     }
