@@ -159,7 +159,7 @@ public class CSVLoader {
 		@Option(desc = "skip format checking when loading the csv file on the client")
 		boolean skipPreChecks = false;
 
-		@Leftargs(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
+		@AdditionalArgs(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
 		String table = "";
 
 		@Override
