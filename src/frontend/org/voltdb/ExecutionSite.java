@@ -1389,7 +1389,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     m_rejoinTaskLog.logTask(txnState.getNotice());
                     m_loggedTxnCount++;
                 } catch (IOException e) {
-                    m_recoveryLog.error("Failed to log task message: " + e.getMessage());
+                    VoltDB.crashLocalVoltDB("Failed to log task message", true, e);
                 }
             }
 
