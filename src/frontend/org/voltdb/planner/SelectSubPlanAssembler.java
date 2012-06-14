@@ -264,7 +264,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                 // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
                 return;
             }
-            if (m_partitioning.effectivePartitioningValue() == null) {
+            if (m_partitioning.inferredPartitioningValue() == null) {
                 // For (multiPartitionScanCount == 1), "case 2" where the last-listed (first-scanned) partitioned table
                 // has no constant filter, it accounts for the 1 independent partitioned scan.
                 // In this case, whether to suppress the usual Receive/Send nodes below the joins depends on whether
@@ -288,7 +288,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
                     // localized and non-localized joins.
                     return;
                 } else {
-                    suppressSendReceivePair = true; // No Send/Receive needed in a single-partition statement.
+                    suppressSendReceivePair = m_partitioning.isInferringSP(); // No Send/Receive needed in a single-partition statement.
                 }
             }
             // Anything else can be handled in one or two plan fragments, injecting Receive/Send nodes below any joins.

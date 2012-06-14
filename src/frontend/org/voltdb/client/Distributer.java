@@ -24,6 +24,7 @@ import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
@@ -91,63 +92,68 @@ class Distributer {
     class CallExpiration implements Runnable {
         @Override
         public void run() {
+            try {
+                // make a threadsafe copy of all connections
+                ArrayList<NodeConnection> connections = new ArrayList<NodeConnection>();
+                synchronized (Distributer.this) {
+                    connections.addAll(m_connections);
+                }
 
-            // make a threadsafe copy of all connections
-            ArrayList<NodeConnection> connections = new ArrayList<NodeConnection>();
-            synchronized (Distributer.this) {
-                connections.addAll(m_connections);
-            }
+                long now = System.currentTimeMillis();
 
-            long now = System.currentTimeMillis();
+                // for each connection
+                for (NodeConnection c : connections) {
+                    synchronized(c) {
+                        // check for connection age
+                        long sinceLastResponse = now - c.m_lastResponseTime;
 
-            // for each connection
-            for (NodeConnection c : connections) {
-                synchronized(c) {
-                    // check for connection age
-                    long sinceLastResponse = now - c.m_lastResponseTime;
+                        // if outstanding ping and timeout, close the connection
+                        if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutMS)) {
+                            // memoize why it's closing
+                            c.m_closeCause = DisconnectCause.TIMEOUT;
+                            // this should trigger NodeConnection.stopping(..)
+                            c.m_connection.unregister();
+                        }
 
-                    // if outstanding ping and timeout, close the connection
-                    if (c.m_outstandingPing && (sinceLastResponse > m_connectionResponseTimeoutMS)) {
-                        // memoize why it's closing
-                        c.m_closeCause = DisconnectCause.TIMEOUT;
-                        // this should trigger NodeConnection.stopping(..)
-                        c.m_connection.unregister();
-                    }
+                        // if 1/3 of the timeout since last response, send a ping
+                        if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutMS / 3))) {
+                            c.sendPing();
+                        }
 
-                    // if 1/3 of the timeout since last response, send a ping
-                    if ((!c.m_outstandingPing) && (sinceLastResponse > (m_connectionResponseTimeoutMS / 3))) {
-                        c.sendPing();
-                    }
+                        // for each outstanding procedure
+                        Iterator<Entry<Long, CallbackBookeeping>> iter = c.m_callbacks.entrySet().iterator();
+                        while (iter.hasNext()) {
+                            Entry<Long, CallbackBookeeping> e = iter.next();
+                            long handle = e.getKey();
+                            CallbackBookeeping cb = e.getValue();
 
-                    // for each outstanding procedure
-                    for (Entry<Long, CallbackBookeeping> e : c.m_callbacks.entrySet()) {
-                        long handle = e.getKey();
-                        CallbackBookeeping cb = e.getValue();
+                            // if the timeout is expired, call the callback and remove the
+                            // bookeeping data
+                            if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
+                                ClientResponseImpl r = new ClientResponseImpl(
+                                        ClientResponse.CONNECTION_TIMEOUT,
+                                        (byte)0,
+                                        "",
+                                        new VoltTable[0],
+                                        String.format("No response received in the allotted time (set to %d ms).",
+                                                m_procedureCallTimeoutMS));
+                                r.setClientHandle(handle);
+                                r.setClientRoundtrip((int) (now - cb.timestamp));
+                                r.setClusterRoundtrip((int) (now - cb.timestamp));
 
-                        // if the timeout is expired, call the callback and remove the
-                        // bookeeping data
-                        if ((now - cb.timestamp) > m_procedureCallTimeoutMS) {
-                            ClientResponseImpl r = new ClientResponseImpl(
-                                    ClientResponse.CONNECTION_TIMEOUT,
-                                    (byte)0,
-                                    "",
-                                    new VoltTable[0],
-                                    String.format("No response received in the allotted time (set to %d ms).",
-                                            m_procedureCallTimeoutMS));
-                            r.setClientHandle(handle);
-                            r.setClientRoundtrip((int) (now - cb.timestamp));
-                            r.setClusterRoundtrip((int) (now - cb.timestamp));
-
-                            try {
-                                cb.callback.clientCallback(r);
-                            } catch (Exception e1) {
-                                e1.printStackTrace();
+                                try {
+                                    cb.callback.clientCallback(r);
+                                } catch (Exception e1) {
+                                    e1.printStackTrace();
+                                }
+                                iter.remove();
+                                c.m_callbacksToInvoke.decrementAndGet();
                             }
-                            c.m_callbacks.remove(e.getKey());
-                            c.m_callbacksToInvoke.decrementAndGet();
                         }
                     }
                 }
+            } catch (Throwable t) {
+                t.printStackTrace();
             }
         }
     }

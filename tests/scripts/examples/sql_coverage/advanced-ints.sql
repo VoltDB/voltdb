@@ -3,5 +3,6 @@
 {@cmp_type = "_value[int64]"}
 {@assign_col = "BIG"}
 {@assign_type = "_value[int64]"}
-
+{@optional_fn = "_pick[@FN1 <options=,ABS>]"}
+{@optional_fn2 = "_pick[@FN2 <options=,ABS>]"}
 <advanced-template.sql>

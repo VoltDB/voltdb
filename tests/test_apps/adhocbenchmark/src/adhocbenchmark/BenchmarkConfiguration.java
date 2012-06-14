@@ -34,6 +34,7 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
 import javax.xml.parsers.DocumentBuilder;
 import javax.xml.parsers.DocumentBuilderFactory;
@@ -49,6 +50,33 @@ import org.xml.sax.SAXException;
  *
  */
 public class BenchmarkConfiguration {
+    private final static String defaultTestName = "join";
+    private final static Map<String, QueryTestBase.Factory> testFactory = new HashMap<String, QueryTestBase.Factory>();
+
+    public static void installFactory(String name, QueryTestBase.Factory factory) {
+        testFactory.put(name.toLowerCase(), factory);
+    }
+
+    static {
+        installFactory("join",         new JoinTest.ChainFactory());
+        installFactory("joinstar",     new JoinTest.StarFactory());
+        installFactory("projection",   new ProjectionTest.Factory());
+        installFactory("joinsp",       new JoinTest.SPChainFactory());
+        installFactory("joinstarsp",   new JoinTest.SPStarFactory());
+        installFactory("projectionsp", new ProjectionTest.Factory()); // Same as "projection" -- different table config
+        installFactory("joinmp",       new JoinTest.MPChainFactory());
+        installFactory("joinstarmp",   new JoinTest.MPStarFactory());
+        installFactory("projectionmp", new ProjectionTest.MPFactory());
+        // Install additional benchmark tests here as QueryTestBase.Factory-based factories.
+    }
+
+    /**
+     * Provide the factory associated with the given test name.
+     * @return  factory from the map of registered factories
+     */
+    public static QueryTestBase.Factory factoryByName(String name) {
+        return testFactory.get(name.toLowerCase());
+    }
 
     /**
      * Table configuration data from config.xml
@@ -118,8 +146,8 @@ public class BenchmarkConfiguration {
      * Provide the list of known test names.
      * @return  test name string array
      */
-    public static String[] getTestNames() {
-        return new String[]{"join", "projection"};
+    public static Set<String> getTestNames() {
+        return testFactory.keySet();
     }
 
     /**
@@ -127,7 +155,18 @@ public class BenchmarkConfiguration {
      * @return  default test name
      */
     public static String getDefaultTestName() {
-        return "join";
+        // Guard against defaulting to an invalid name. That would be confusing.
+        // If the default test name ever gets out of sync with the set of registered test factories,
+        // pick its successor arbitrarily from the set, and complain about it.
+        if (factoryByName(defaultTestName) == null) {
+            for (String anyName : getTestNames()) {
+                System.out.println("Warning: someone forgot to hard-code a new default test name now that " +
+                                   defaultTestName + " has gone missing, so the code is arbitrarily substituting " +
+                                   anyName + ". If that works for you, consider eliminating this warning by making it the new hard-coded default.");
+                return anyName; // as good as any, now that defaultTestName is out of the running.
+            }
+        }
+        return defaultTestName;
     }
 
     /**
@@ -138,6 +177,10 @@ public class BenchmarkConfiguration {
      * @throws ConfigurationException
      */
     public static List<QueryTestBase> configureTests(final String path, final String testName) throws ConfigurationException {
+        QueryTestBase.Factory factory = factoryByName(testName);
+        if (factory == null) {
+            throw new ConfigurationException(String.format("Specified test type '%s' has no implementation installed in BenchmarkConfiguration.java", testName));
+        }
         List<QueryTestBase> tests = new ArrayList<QueryTestBase>();
 
         try {
@@ -160,25 +203,16 @@ public class BenchmarkConfiguration {
             NodeList testNodes = testElement.getElementsByTagName("test");
             for (int iTest = 0; iTest < testNodes.getLength(); iTest++) {
                 ConfigurationTest test = ConfigurationTest.fromElement((Element)testNodes.item(iTest));
-                if (tables.containsKey(test.table)) {
-                    ConfigurationTable table = tables.get(test.table);
-                    if (test.type.equalsIgnoreCase("join")) {
-                        if (testName.equalsIgnoreCase("join")) {
-                            tests.add(new JoinTest(test.table, table.nVariations, table.columnPrefix,
-                                                   table.nColumns, test.nLevels));
-                        }
-                    }
-                    else if (test.type.equalsIgnoreCase("projection")) {
-                        if (testName.equalsIgnoreCase("projection")) {
-                            tests.add(new ProjectionTest(test.table, table.columnPrefix, table.nColumns));
-                        }
-                    } else {
-                        throw new ConfigurationException(
-                                String.format("Configuration has unknown test type '%s'", test.type));
-                    }
-                } else {
-                    throw new ConfigurationException(
-                            String.format("Configuration has test for unknown table '%s'", test.table));
+                ConfigurationTable table = tables.get(test.table);
+                // Warning about a configuration issue that doesn't affect the current test may give the user time
+                // to patch the configuration file possibly before it gets read again when the affected test gets launched
+                // from the same shell script.
+                if (table == null) {
+                    System.out.println("Configuration warning: test type '" + testName + "' references unknown table '" + test.table + "'");
+                    continue;
+                }
+                if (testName.equalsIgnoreCase(test.type)) {
+                    tests.add(factory.make(test.table, table.nVariations, table.columnPrefix, table.nColumns, test.nLevels));
                 }
             }
         } catch (SAXException e) {
@@ -189,6 +223,9 @@ public class BenchmarkConfiguration {
             throw new ConfigurationException("XML parser I/O exception", e);
         }
 
+        if (tests.isEmpty()) {
+            throw new ConfigurationException(String.format("Specified test type '%s' or its table is not defined in configuration file '%s'.", testName, path));
+        }
         return tests;
     }
 }
