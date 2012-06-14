@@ -459,5 +459,4 @@ public class CSVLoader {
         out_logfile.close();
         out_reportfile.close();
     }
-
 }
