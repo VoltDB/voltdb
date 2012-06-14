@@ -50,16 +50,16 @@ public class CSVLoader {
 
 	private static final AtomicLong inCount = new AtomicLong(0);
 	private static final AtomicLong outCount = new AtomicLong(0);
-	private static int reportEveryNRows = 10000;
-	private static int waitSeconds = 10;
+	private static final int reportEveryNRows = 10000;
+	private static final int waitSeconds = 10;
 
 	private static CSVConfig config = null;
 	private static long latency = -1;
 	private static boolean standin = false;
 
-	public static String invalidrowfile = "csvloaderinvalidrows.csv";
-	public static String reportfile = "csvloaderReport.log";
-	public static String logfile = "csvloaderLog.log";
+	public static String pathInvalidrowfile = "";
+	public static String pathReportfile = "csvloaderReport.log";
+	public static String pathLogfile = "csvloaderLog.log";
 	
 	private static BufferedWriter out_invaliderowfile;
 	private static BufferedWriter out_logfile;
@@ -348,14 +348,14 @@ public class CSVLoader {
 
 		String myinsert = insertProcedure;
 		myinsert = myinsert.replaceAll("\\.", "_");
-		invalidrowfile = config.reportdir + myinsert + "_" + invalidrowfile;
-		logfile =  config.reportdir + myinsert + "_"+ logfile;
-		reportfile = config.reportdir  + myinsert + "_"+ reportfile;
+		pathInvalidrowfile = config.reportdir + myinsert + "_" + "csvloaderinvalidrows.csv";
+		pathLogfile =  config.reportdir + myinsert + "_"+ "csvloaderReport.log";
+		pathReportfile = config.reportdir  + myinsert + "_"+ "csvloaderLog.log";
 
 		try {
-			out_invaliderowfile = new BufferedWriter(new FileWriter(invalidrowfile));
-			out_logfile = new BufferedWriter(new FileWriter(logfile));
-			out_reportfile = new BufferedWriter(new FileWriter(reportfile)); 
+			out_invaliderowfile = new BufferedWriter(new FileWriter(pathInvalidrowfile));
+			out_logfile = new BufferedWriter(new FileWriter(pathLogfile));
+			out_reportfile = new BufferedWriter(new FileWriter(pathReportfile)); 
 		} catch (IOException e) {
 			System.err.println(e.getMessage());
 			System.exit(1);
@@ -397,9 +397,9 @@ public class CSVLoader {
 			out_reportfile.write("Number of acknowledged tuples:     " + inCount.get() + "\n");
 			out_reportfile.write("CSVLoader rate: " + outCount.get() / elapsedTimeSec + " row/s\n");
 
-			System.out.println("invalid row file is generated to:" + invalidrowfile + "\n"
-					+ "log file is generated to:" + logfile + "\n"
-					+ "report file is generated to:" + reportfile);
+			System.out.println("invalid row file is generated to:" + pathInvalidrowfile + "\n"
+					+ "log file is generated to:" + pathLogfile + "\n"
+					+ "report file is generated to:" + pathReportfile);
 
 			out_invaliderowfile.flush();
 			out_logfile.flush();
