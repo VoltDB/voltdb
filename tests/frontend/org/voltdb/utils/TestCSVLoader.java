@@ -53,7 +53,7 @@ public class TestCSVLoader extends TestCase {
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
      String []myOptions = {
-     		"-f " + userHome + "/test.csv",
+     		"-f" + userHome + "/test.csv",
      		//"--procedure=BLAH.insert",
      		"--reportdir=" + reportdir,
      		//"--table=BLAH",
@@ -89,6 +89,7 @@ public class TestCSVLoader extends TestCase {
 	    int invalidLineCnt = 4;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	}
+    
     /*
     public void testNew() throws Exception 
    	{
@@ -107,20 +108,28 @@ public class TestCSVLoader extends TestCase {
                    //"clm_varinary varbinary default null" + // for later
                    "); ";
         String []myOptions = {
-        		"--inputfile=" + userHome + "/test.csv", 
-        		//"--procedurename=BLAH.insert",
-        		"--reportdir=" + reportdir,
-        		"--tablename=BLAH",
-        		"--abortfailurecount=50",
-        		};
+         		"--file=" + userHome + "/test.csv", 
+         		//"--procedure=BLAH.insert",
+         		"--reportdir=" + reportdir,
+         		"--table=BLAH",
+         		"--maxerrors=50",
+         		"--user=",
+         		"--password=",
+         		"--port="
+         		};
         
-   	    String []myData = { "1,1111111111",
-   	    					"2,12131231231"
+   	    String []myData = { "1",
+   	    					"2"
    	    					};
+   	    //CSVLoader.setDefaultTimezone();
+   	    //String [] addStr = { String.valueOf( (new TimestampType()).getTime() ) };
+   	    CSVLoader.setTimezone("GMT+0");
+   	    String [] addStr = { (new TimestampType()).toString() };
    	    int invalidLineCnt = 0;
-   		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+   		//test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+   		test_Interface_lineByLine( mySchema, 2, myOptions, myData, invalidLineCnt, addStr );
    	}
-    */
+    
     
     //csvloader --inputfile=/tmp/ --tablename=VOTES --abortfailurecount=50 
 //    public void testOptions() throws Exception 
@@ -314,7 +323,7 @@ public class TestCSVLoader extends TestCase {
             	}	
             }
             System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
-            //assertEquals(lineCount, rowct);
+            assertEquals(lineCount, rowct);
             assertEquals(invalidLineCnt, invalidlinecnt);
             
         }
