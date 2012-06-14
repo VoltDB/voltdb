@@ -802,14 +802,14 @@ public class PlanAssembler {
         //@TODO pullexec prototype
         // if the projection can be done inline...
         //if (rootNode instanceof AbstractScanPlanNode) {
-        if (rootNode instanceof IndexScanPlanNode) {
-            rootNode.addInlinePlanNode(projectionNode);
-            return rootNode;
-        } else {
+        //if (rootNode instanceof IndexScanPlanNode) {
+        //    rootNode.addInlinePlanNode(projectionNode);
+        //    return rootNode;
+        //} else {
             projectionNode.addAndLinkChild(rootNode);
             projectionNode.generateOutputSchema(m_catalogDb);
             return projectionNode;
-        }
+        //}
     }
 
     /**

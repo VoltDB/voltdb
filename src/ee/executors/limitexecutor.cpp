@@ -161,7 +161,7 @@ LimitExecutor::p_execute(const NValueArray &params)
 TableTuple LimitExecutor::p_next_pull() {
     // Skip first offset tuples
     for (;m_state->m_skipped < m_state->m_offset; ++m_state->m_skipped) {
-        TableTuple tuple = m_state->m_childExecutor->p_next_pull();
+        TableTuple tuple = m_state->m_childExecutor->next_pull();
         if (tuple.isNullTuple()) {
             return tuple;
         }
@@ -173,7 +173,7 @@ TableTuple LimitExecutor::p_next_pull() {
         return TableTuple(m_state->m_inputTableSchema);
 
     ++m_state->m_tupleCtr;
-    return m_state->m_childExecutor->p_next_pull();
+    return m_state->m_childExecutor->next_pull();
 }
 
 void LimitExecutor::p_pre_execute_pull(const NValueArray &params) {

@@ -56,6 +56,21 @@
 
 namespace voltdb {
 
+namespace detail {
+
+    struct ReceiveExecutorState
+    {
+        ReceiveExecutorState(Table* outputTable) :
+            m_outputTable(outputTable), m_iterator(outputTable->iterator()),
+            m_targetTableSchema(outputTable->schema())
+        {}
+
+        Table* m_outputTable;
+        TableIterator m_iterator;
+        const TupleSchema* m_targetTableSchema;
+    };
+} // namespace detail
+
 bool ReceiveExecutor::p_init(AbstractPlanNode* abstract_node,
                              TempTableLimits* limits)
 {
@@ -96,13 +111,50 @@ bool ReceiveExecutor::p_execute(const NValueArray &params) {
     // as the underlying table loader would use it.
     do {
         loadedDeps =
-        engine->loadNextDependency(output_table);
+        m_engine->loadNextDependency(output_table);
     } while (loadedDeps > 0);
 
     return true;
 }
 
+ReceiveExecutor::ReceiveExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node), m_engine(engine), m_state()
+{}
+
 ReceiveExecutor::~ReceiveExecutor() {
+}
+
+//@TODO pullexec prototype
+TableTuple ReceiveExecutor::p_next_pull() {
+    TableTuple tuple(m_state->m_targetTableSchema);
+    if (!m_state->m_iterator.next(tuple))
+        tuple = TableTuple(m_state->m_targetTableSchema);
+    return tuple;
+}
+
+void ReceiveExecutor::p_pre_execute_pull(const NValueArray &params) {
+    int loadedDeps = 0;
+    ReceivePlanNode* node = dynamic_cast<ReceivePlanNode*>(getPlanNode());
+    Table* output_table = dynamic_cast<Table*>(node->getOutputTable());
+
+    // iterate dependencies stored in the frontend and union them
+    // into the output_table. The engine does this work for peanuts.
+
+    // todo: should pass the transaction's string pool through
+    // as the underlying table loader would use it.
+    do {
+        loadedDeps = m_engine->loadNextDependency(output_table);
+    } while (loadedDeps > 0);
+
+    m_state.reset(new detail::ReceiveExecutorState(output_table));
+}
+
+bool ReceiveExecutor::support_pull() const {
+    return true;
+}
+
+void ReceiveExecutor::p_reset_state_pull() {
+    m_state->m_iterator = m_state->m_outputTable->iterator();
 }
 
 }

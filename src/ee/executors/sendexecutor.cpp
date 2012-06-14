@@ -127,7 +127,7 @@ TableTuple SendExecutor::p_next_pull()
         // so it never needs to produce its tuples.
         // iteration stops when an empty tuple is returned
         while (true) {
-            tuple = childExec->p_next_pull();
+            tuple = childExec->next_pull();
             if (tuple.isNullTuple()) {
                 break;
             }

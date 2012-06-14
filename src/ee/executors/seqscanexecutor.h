@@ -76,6 +76,7 @@ namespace voltdb
 
         TableTuple p_next_pull();
         void p_pre_execute_pull(const NValueArray& params);
+        void p_reset_state_pull();
 
         boost::scoped_ptr<detail::SeqScanExecutorState> m_state;
     };

@@ -46,6 +46,8 @@
 #ifndef HSTORENESTLOOPINDEXEXECUTOR_H
 #define HSTORENESTLOOPINDEXEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -62,6 +64,12 @@ class Table;
 class TempTable;
 class TableIndex;
 
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct NestLoopIndexExecutorState;
+} //namespace detail
+
 /**
  * Nested loop for IndexScan.
  * This is the implementation of usual nestloop which receives
@@ -73,25 +81,21 @@ class TableIndex;
 class NestLoopIndexExecutor : public AbstractExecutor
 {
 public:
-    NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node),
-        index_values_backing_store(NULL)
-    {
-        node = NULL;
-        inline_node = NULL;
-        output_table = NULL;
-        inner_table = NULL;
-        index = NULL;
-        outer_table = NULL;
-        m_lookupType = INDEX_LOOKUP_TYPE_INVALID;
-    }
+    NestLoopIndexExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
 
     ~NestLoopIndexExecutor();
+
+    bool support_pull() const;
 
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+
+    TableTuple p_next_pull();
+    void p_pre_execute_pull(const NValueArray& params);
+    void p_post_execute_pull();
+    void reset_inner_state();
 
     NestLoopIndexPlanNode* node;
     IndexScanPlanNode* inline_node;
@@ -107,6 +111,8 @@ protected:
 
     //So valgrind doesn't report the data as lost.
     char *index_values_backing_store;
+
+    boost::scoped_ptr<detail::NestLoopIndexExecutorState> m_state;
 };
 
 }
