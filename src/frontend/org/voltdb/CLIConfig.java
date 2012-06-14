@@ -70,7 +70,7 @@ public abstract class CLIConfig {
     public void printUsage() {
         // automatically generate the help statement
         HelpFormatter formatter = new HelpFormatter();
-        formatter.setOptPrefix("--");
+        //formatter.setOptPrefix("--");
         formatter.printHelp(cmdName, helpmsgs, false);
     }
 
@@ -125,11 +125,11 @@ public abstract class CLIConfig {
                     }
                     String shortopt = option.shortOpt();
                     if ((shortopt == null) || (shortopt.trim().length() == 0)) {
-                    	options.addOption(opt, option.hasArg(), option.desc());
-                    	helpmsgs.addOption(opt, option.hasArg(), option.desc());
+                    	options.addOption(null, opt, option.hasArg(), option.desc());
+                    	helpmsgs.addOption(null, opt, option.hasArg(), option.desc());
                     } else {
-                    	options.addOption(opt, shortopt, option.hasArg(), option.desc());
-                    	helpmsgs.addOption(opt, shortopt, option.hasArg(), option.desc());
+                    	options.addOption(shortopt, opt, option.hasArg(), option.desc());
+                    	helpmsgs.addOption(shortopt, opt, option.hasArg(), option.desc());
                     }
                 } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
                 	AdditionalArgs params = field.getAnnotation(AdditionalArgs.class);
@@ -139,7 +139,6 @@ public abstract class CLIConfig {
                     }
                 	options.addOption(opt, params.hasArg(), params.desc());
                 }
-                
             }
 
             CommandLineParser parser = new PosixParser();

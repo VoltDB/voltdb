@@ -60,7 +60,7 @@ public class CSVLoader {
 	public static String pathInvalidrowfile = "";
 	public static String pathReportfile = "csvloaderReport.log";
 	public static String pathLogfile = "csvloaderLog.log";
-	
+
 	private static BufferedWriter out_invaliderowfile;
 	private static BufferedWriter out_logfile;
 	private static BufferedWriter out_reportfile;
@@ -86,7 +86,6 @@ public class CSVLoader {
 		public void clientCallback(ClientResponse response) throws Exception {
 			if (response.getStatus() != ClientResponse.SUCCESS) {
 				System.err.println(response.getStatusString());
-				System.err.println("<xin>Stop at line " + m_lineNum);
 				synchronized (errorInfo) {
 					if (!errorInfo.containsKey(m_lineNum)) {
 						String[] info = {m_rowdata, response.getStatusString()};
@@ -303,11 +302,9 @@ public class CSVLoader {
 
 	private static String checkparams_trimspace(String[] linefragement, int columnCnt ) {
 		if( linefragement.length == 1 && linefragement[0].equals( "" ) ) {
-			System.err.println("<zheng>Stop at line " + (outCount.get()) );
 			return "Error: blank line";
 		}
 		if( linefragement.length != columnCnt ){
-			System.err.println("<zheng>Stop at line " + (outCount.get()) );
 			return "Error: # of attributes do not match, # of attributes needed: " + columnCnt + "# of attributes inputed: " + linefragement.length;
 		}
 
@@ -345,8 +342,8 @@ public class CSVLoader {
 		String myinsert = insertProcedure;
 		myinsert = myinsert.replaceAll("\\.", "_");
 		pathInvalidrowfile = config.reportdir + myinsert + "_" + "csvloaderinvalidrows.csv";
-		pathLogfile =  config.reportdir + myinsert + "_"+ "csvloaderReport.log";
-		pathReportfile = config.reportdir  + myinsert + "_"+ "csvloaderLog.log";
+		pathLogfile =  config.reportdir + myinsert + "_" + "csvloaderLog.log";
+		pathReportfile = config.reportdir  + myinsert + "_" + "csvloaderReport.log";
 
 		try {
 			out_invaliderowfile = new BufferedWriter(new FileWriter(pathInvalidrowfile));
