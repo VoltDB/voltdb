@@ -1,4 +1,4 @@
-/* This file is part of VoltDB.
+פרט/* This file is part of VoltDB.
  * Copyright (C) 2008-2012 VoltDB Inc.
  *
  * VoltDB is free software: you can redistribute it and/or modify
@@ -43,14 +43,14 @@ public abstract class CLIConfig {
         boolean required() default false;
         String desc() default "";
     }
-
+    
     @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
     @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
     public @interface AdditionalArgs {
-        String opt() default "";
-        boolean hasArg() default false;
-        boolean required() default false;
-        String desc() default "";
+    	String opt() default "";
+    	boolean hasArg() default false;
+    	boolean required() default false;
+    	String desc() default "";
     }
 
     // Apache Commons CLI API - requires JAR
@@ -97,16 +97,16 @@ public abstract class CLIConfig {
         else if ((cls == double.class) || (cls == Double.class))
             field.set(this, Double.parseDouble(value));
         else if ((cls == String.class))
-                field.set(this, value);
+        	field.set(this, value);
         else if (value.length() == 1 && ((cls == char.class) || (cls == Character.class)))
-                field.set(this, value.charAt(0));
+        	field.set(this, value.charAt(0));
         else {
-                System.err.println("Parsing failed. Reason: can not assign " + value + " to "
-                                + cls.toString() + " class");
-                printUsage();
+        	System.err.println("Parsing failed. Reason: can not assign " + value + " to "
+        			+ cls.toString() + " class");
+        	printUsage();
             System.exit(-1);
         }
-
+            
     }
 
     public void parse(String cmdName, String[] args) {
@@ -117,7 +117,7 @@ public abstract class CLIConfig {
             // add all of the declared options to the cli
             for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class)) {
-                        Option option = field.getAnnotation(Option.class);
+                	Option option = field.getAnnotation(Option.class);
 
                     String opt = option.opt();
                     if ((opt == null) || (opt.trim().length() == 0)) {
@@ -125,25 +125,25 @@ public abstract class CLIConfig {
                     }
                     String shortopt = option.shortOpt();
                     if ((shortopt == null) || (shortopt.trim().length() == 0)) {
-                        options.addOption(null, opt, option.hasArg(), option.desc());
-                        helpmsgs.addOption(null, opt, option.hasArg(), option.desc());
+                    	options.addOption(null, opt, option.hasArg(), option.desc());
+                    	helpmsgs.addOption(null, opt, option.hasArg(), option.desc());
                     } else {
-                        options.addOption(shortopt, opt, option.hasArg(), option.desc());
-                        helpmsgs.addOption(shortopt, opt, option.hasArg(), option.desc());
+                    	options.addOption(shortopt, opt, option.hasArg(), option.desc());
+                    	helpmsgs.addOption(shortopt, opt, option.hasArg(), option.desc());
                     }
                 } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
-                        AdditionalArgs params = field.getAnnotation(AdditionalArgs.class);
-                        String opt = params.opt();
-                        if ((opt == null) || (opt.trim().length() == 0)) {
+                	AdditionalArgs params = field.getAnnotation(AdditionalArgs.class);
+                	String opt = params.opt();
+                	if ((opt == null) || (opt.trim().length() == 0)) {
                         opt = field.getName();
                     }
-                        options.addOption(opt, params.hasArg(), params.desc());
+                	options.addOption(opt, params.hasArg(), params.desc());
                 }
             }
 
             CommandLineParser parser = new PosixParser();
             CommandLine cmd = parser.parse(options, args);
-
+            
             if (cmd.hasOption("help")) {
                 printUsage();
                 System.exit(0);
@@ -152,10 +152,10 @@ public abstract class CLIConfig {
             int leftover = 0;
             // string key-value pairs
             Map<String, String> kvMap = new TreeMap<String, String>();
-
+            
             for (Field field : getClass().getDeclaredFields()) {
                 if (field.isAnnotationPresent(Option.class) ) {
-                         Option option = field.getAnnotation(Option.class);
+                	 Option option = field.getAnnotation(Option.class);
                      String opt = option.opt();
                      if ((opt == null) || (opt.trim().length() == 0)) {
                          opt = field.getName();
@@ -167,8 +167,8 @@ public abstract class CLIConfig {
                          }
                          else {
                              if (field.getType().equals(boolean.class) || field.getType().equals(Boolean.class)) {
-                                field.setAccessible(true);
-                                try {
+                             	field.setAccessible(true);
+                             	try {
                                      field.set(this, true);
                                  } catch (Exception e) {
                                      e.printStackTrace();
@@ -188,26 +188,26 @@ public abstract class CLIConfig {
                      field.setAccessible(true);
                      kvMap.put(opt, field.get(this).toString());
                 } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
-                        // Deal with --table=BLHA, offer nice error message later
-                        leftover++;
+                	// Deal with --table=BLHA, offer nice error message later
+                	leftover++;
                 }
             }
             if (leftargs != null) {
-                if (leftargs.length <= leftover) {
-                        Field[] fields = getClass().getDeclaredFields();
+            	if (leftargs.length <= leftover) {
+                	Field[] fields = getClass().getDeclaredFields();
                     for (int i = 0,j=0; i<leftargs.length; i++) {
-                        for (;j < fields.length; j++) {
-                                if (fields[j].isAnnotationPresent(AdditionalArgs.class))
-                                        break;
-                        }
-                        fields[j].setAccessible(true);
-                        fields[j].set(this, leftargs[i]);
+                    	for (;j < fields.length; j++) {
+                    		if (fields[j].isAnnotationPresent(AdditionalArgs.class)) 
+                    			break;
+                    	}
+                    	fields[j].setAccessible(true);
+                    	fields[j].set(this, leftargs[i]);
                     }
-                } else {
-                        System.err.println("Expected " + leftover + " args, but receive " + leftargs.length + " args");
-                        printUsage();
-                        System.exit(-1);
-                }
+            	} else {
+            		System.err.println("Expected " + leftover + " args, but receive " + leftargs.length + " args");
+            		printUsage();
+            		System.exit(-1);
+            	}
             }
 
             // check that the values read are valid

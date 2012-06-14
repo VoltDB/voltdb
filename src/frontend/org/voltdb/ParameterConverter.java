@@ -47,7 +47,7 @@ public class ParameterConverter {
     {
         if (param == null ||
             param == VoltType.NULL_STRING_OR_VARBINARY ||
-            param == VoltType.NULL_DECIMAL || 
+            param == VoltType.NULL_DECIMAL ||
             param instanceof String && ((String)param).equals("/N")) {
             if (isPrimitive) {
                 VoltType type = VoltType.typeFromClass(paramType);
@@ -130,11 +130,11 @@ public class ParameterConverter {
             if (pclass == Date.class) return new TimestampType((Date) param);
             // if a string is given for a date, use java's JDBC parsing
             if (pclass == String.class) {
-            	String longtime = ((String) param).trim();
+                String longtime = ((String) param).trim();
                 try {
-                	return new java.sql.Timestamp(Long.parseLong(longtime));
+                        return new java.sql.Timestamp(Long.parseLong(longtime));
                 } catch (IllegalArgumentException e) {
-                	// Defer errors to the generic Exception throw below, if it's not the right format
+                        // Defer errors to the generic Exception throw below, if it's not the right format
                 }
                 try {
                     return new TimestampType(longtime);
@@ -150,19 +150,19 @@ public class ParameterConverter {
             if (param instanceof TimestampType) return ((TimestampType) param).asJavaTimestamp();
             // If a string is given for a date, use java's JDBC parsing.
             if (pclass == String.class) {
-            	String longtime = ((String) param).trim();
+                String longtime = ((String) param).trim();
                 try {
-                	return new java.sql.Timestamp(Long.parseLong(longtime));
+                        return new java.sql.Timestamp(Long.parseLong(longtime));
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
                 try {
-                	return java.sql.Timestamp.valueOf(longtime);
+                        return java.sql.Timestamp.valueOf(longtime);
                 } catch (IllegalArgumentException e) {
-                	// Defer errors to the generic Exception throw below, if it's not the right format
+                        // Defer errors to the generic Exception throw below, if it's not the right format
                 }
-                
+
             }
         }
         else if (slot == java.sql.Date.class) {
@@ -246,9 +246,9 @@ public class ParameterConverter {
         // Coerce strings to primitive numbers.
         else if (pclass == String.class) {
             try {
-            	String value = ((String) param).trim();
-            	value = value.replaceAll("\\,","");
-            	if (slot == byte.class) {
+                String value = ((String) param).trim();
+                value = value.replaceAll("\\,","");
+                if (slot == byte.class) {
                     return Byte.parseByte(value);
                 }
                 if (slot == short.class) {
@@ -261,7 +261,7 @@ public class ParameterConverter {
                     return Long.parseLong(value);
                 }
                 if (slot == double.class) {
-                	return Double.parseDouble(value);
+                        return Double.parseDouble(value);
                 }
             }
             catch (NumberFormatException nfe) {

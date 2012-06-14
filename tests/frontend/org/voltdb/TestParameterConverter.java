@@ -56,7 +56,7 @@ public class TestParameterConverter extends TestCase
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1000, ((Integer)r).intValue());
     }
-    
+
     public void testStringToDouble() throws Exception
     {
         Object r = ParameterConverter.
@@ -64,7 +64,7 @@ public class TestParameterConverter extends TestCase
         assertTrue("expect double", r.getClass() == Double.class);
         assertEquals(new Double(34.56), ((Double)r).doubleValue());
     }
-    
+
     // Add more test unit cases
     public void testStringWithWhitespaceToDouble() throws Exception
     {
@@ -73,7 +73,7 @@ public class TestParameterConverter extends TestCase
         assertTrue("expect double", r.getClass() == Double.class);
         assertEquals(new Double(34.56), ((Double)r).doubleValue());
     }
-    
+
     public void testCommasStringIntegerToInt() throws Exception
     {
         Object r = ParameterConverter.
@@ -81,7 +81,7 @@ public class TestParameterConverter extends TestCase
         assertTrue("expect integer", r.getClass() == Integer.class);
         assertEquals(1100, ((Integer)r).intValue());
     }
-    
+
     public void testCommasStringIntegerToDouble() throws Exception
     {
         Object r = ParameterConverter.
@@ -89,7 +89,7 @@ public class TestParameterConverter extends TestCase
         assertTrue("expect integer", r.getClass() == Double.class);
         assertEquals(new Double(2301100.23), ((Double)r).doubleValue());
     }
-    
+
     public void testNULLToInt() throws Exception
     {
         Object r = ParameterConverter.
@@ -97,7 +97,7 @@ public class TestParameterConverter extends TestCase
         assertTrue("expect null integer", r.getClass() == Integer.class);
         assertEquals(VoltType.NULL_INTEGER, r);
     }
-    
+
 //    public void testNULLToString() throws Exception
 //    {
 //        Object r = ParameterConverter.
@@ -105,10 +105,10 @@ public class TestParameterConverter extends TestCase
 //        assertTrue("expect null string", r.getClass() == String.class);
 //        //assertEquals( null, r);
 //    }
-    
+
     public void testStringToTimestamp() throws Exception
     {
-    	TimestampType t = new TimestampType();
+        TimestampType t = new TimestampType();
         Object r = ParameterConverter.
             tryToMakeCompatible(true, false, TimestampType.class, null, t);
         assertTrue("expect timestamp", r.getClass() == TimestampType.class);
