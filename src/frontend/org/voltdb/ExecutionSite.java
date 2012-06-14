@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -187,11 +188,36 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private RecoverySiteProcessor m_recoveryProcessor = null;
     // The following variables are used for new rejoin
     private RejoinSiteProcessor m_rejoinSnapshotProcessor = null;
-    private long m_rejoinSnapshotTxnId = -1;
+    private volatile long m_rejoinSnapshotTxnId = -1;
+    // The snapshot completion handler will set this to true
+    private volatile boolean m_rejoinSnapshotFinished = false;
     private long m_rejoinCoordinatorHSId = -1;
     private TaskLog m_rejoinTaskLog = null;
     private long m_replayedTxnCount = 0;
     private long m_loggedTxnCount = 0;
+    private final SnapshotCompletionInterest m_snapshotCompletionHandler =
+            new SnapshotCompletionInterest() {
+        @Override
+        public CountDownLatch snapshotCompleted(String nonce,
+                                                long txnId,
+                                                boolean truncationSnapshot) {
+            if (m_rejoinSnapshotTxnId != -1) {
+                if (m_rejoinSnapshotTxnId == txnId) {
+                    m_recoveryLog.debug("Rejoin snapshot for site " + getSiteId() +
+                                        " is finished");
+                    VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
+                    // Notify the rejoin coordinator so that it can start the next site
+                    if (m_rejoinCoordinatorHSId != -1) {
+                        RejoinMessage msg =
+                                new RejoinMessage(getSiteId(), RejoinMessage.Type.SNAPSHOT_FINISHED);
+                        m_mailbox.send(m_rejoinCoordinatorHSId, msg);
+                    }
+                    m_rejoinSnapshotFinished = true;
+                }
+            }
+            return new CountDownLatch(0);
+        }
+    };
 
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
@@ -465,6 +491,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             m_recoveryProcessor = null;
             m_rejoinSnapshotProcessor = null;
             m_rejoinSnapshotTxnId = -1;
+            m_rejoinSnapshotFinished = false;
             m_rejoinTaskLog = null;
             m_rejoining = false;
             if (m_haveRecoveryPermit) {
@@ -486,15 +513,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                      */
                     if (!newRejoin) {
                         VoltDB.instance().onExecutionSiteRejoinCompletion(bytesTransferredTotal);
-                    } else {
-                        // Notify the rejoin coordinator that this site has finished
-                        if (m_rejoinCoordinatorHSId != -1) {
-                            RejoinMessage msg =
-                                    new RejoinMessage(getSiteId(), RejoinMessage.Type.REPLAY_FINISHED);
-                            m_mailbox.send(m_rejoinCoordinatorHSId, msg);
-                        }
-                        m_rejoinCoordinatorHSId = -1;
                     }
+                }
+
+                /*
+                 * New rejoin is site independent, so don't have to look at the
+                 * remaining count
+                 */
+                if (newRejoin) {
+                    // Notify the rejoin coordinator that this site has finished
+                    if (m_rejoinCoordinatorHSId != -1) {
+                        RejoinMessage msg =
+                                new RejoinMessage(getSiteId(), RejoinMessage.Type.REPLAY_FINISHED);
+                        m_mailbox.send(m_rejoinCoordinatorHSId, msg);
+                    }
+                    m_rejoinCoordinatorHSId = -1;
                 }
             } else {
                 m_recoveryLog.info("Source recovery complete for site " + m_siteId +
@@ -1054,12 +1087,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             m_recoveryLog.info("New rejoin snapshot transfer is finished");
             m_rejoinSnapshotProcessor.close();
             m_rejoinSnapshotProcessor = null;
-            // Notify the rejoin coordinator so that it can start the next site
-            if (m_rejoinCoordinatorHSId != -1) {
-                RejoinMessage msg =
-                        new RejoinMessage(getSiteId(), RejoinMessage.Type.SNAPSHOT_FINISHED);
-                m_mailbox.send(m_rejoinCoordinatorHSId, msg);
-            }
+            /*
+             * Don't notify the rejoin coordinator yet. The stream snapshot may
+             * have not finished on all nodes, let the snapshot completion
+             * monitor tell the rejoin coordinator.
+             */
         }
 
         return doneWork;
@@ -1106,7 +1138,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         } else {
             boolean rejoinCompleted = false;
             try {
-                if (m_rejoinTaskLog.isEmpty()) {
+                if (m_rejoinTaskLog.isEmpty() && m_rejoinSnapshotFinished) {
                     rejoinCompleted = true;
                 }
             } catch (IOException e) {
@@ -1205,6 +1237,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             jsStringer.endArray();
             jsStringer.key("port").value(port);
             // make this snapshot only contain data from this site
+            m_recoveryLog.debug("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
+                                " is " + CoreUtils.hsIdToString(sourceSite));
             jsStringer.key("target_hsid").value(sourceSite);
             jsStringer.endObject();
             data = jsStringer.toString();
@@ -1277,6 +1311,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (m_rejoinTaskLog != null) {
                 m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
             }
+            VoltDB.instance().getSnapshotCompletionMonitor()
+                  .addInterest(m_snapshotCompletionHandler);
         } else {
             VoltDB.crashLocalVoltDB("Unknown rejoin message type " + type,
                                     false, null);
