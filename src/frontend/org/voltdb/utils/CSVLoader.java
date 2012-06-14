@@ -60,7 +60,7 @@ public class CSVLoader {
 	public static String pathInvalidrowfile = "";
 	public static String pathReportfile = "csvloaderReport.log";
 	public static String pathLogfile = "csvloaderLog.log";
-	
+
 	private static BufferedWriter out_invaliderowfile;
 	private static BufferedWriter out_logfile;
 	private static BufferedWriter out_reportfile;
