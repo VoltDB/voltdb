@@ -53,11 +53,12 @@ public class TestCSVLoader extends TestCase {
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
      String []myOptions = {
-     		"--f=" + userHome + "/test.csv",
+     		"-f " + userHome + "/test.csv",
      		//"--procedure=BLAH.insert",
      		"--reportdir=" + reportdir,
      		//"--table=BLAH",
      		"--maxerrors=50",
+     		//"-user",
      		"--user=",
      		"--password=",
      		"--port=",
@@ -87,7 +88,6 @@ public class TestCSVLoader extends TestCase {
      //String []myData = { "1,NULL,1,11111111,first,1.10,1.11"};
 	    int invalidLineCnt = 4;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
-	    test_Interface_lineByLine( mySchema, 7, myOptions, myData, invalidLineCnt );
 	}
     /*
     public void testNew() throws Exception 
@@ -333,93 +333,4 @@ public class TestCSVLoader extends TestCase {
         }
 	}
 	
-	public void test_Interface_lineByLine( String my_schema, int columnCnt, String[] my_options, String[] my_data, int invalidLineCnt ) throws Exception {
-		try{
-			BufferedWriter out_csv = new BufferedWriter( new FileWriter( path_csv ) );
-			for( int i = 0; i < my_data.length; i++ )
-				out_csv.write( my_data[ i ]+"\n" );
-			out_csv.flush();
-			out_csv.close();
-		}
-		catch( Exception e) {
-			System.err.print( e.getMessage() );
-		}
-		
-		try{
-			pathToCatalog = Configuration.getPathToCatalogForTest("csv.jar");
-			pathToDeployment = Configuration.getPathToCatalogForTest("csv.xml");
-			builder = new VoltProjectBuilder();
-			//builder.addStmtProcedure("Insert", "insert into blah values (?, ?, ?);", null);
-			//builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, 5, 'nullchar');");
-        
-			builder.addLiteralSchema(my_schema);
-			builder.addPartitionInfo("BLAH", "clm_integer");
-			boolean success = builder.compile(pathToCatalog, 2, 1, 0);
-			assertTrue(success);
-			MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
-			config = new VoltDB.Configuration();
-			config.m_pathToCatalog = pathToCatalog;
-			config.m_pathToDeployment = pathToDeployment;
-			localServer = new ServerThread(config);
-			client = null;
-        
-          	localServer.start();
-        	localServer.waitForInitialization();
-        
-        	client = ClientFactory.createClient();
-        	client.createConnection("localhost");
-        	
-        	new CSVLoader( my_options );
-        	while( CSVLoader.readNext() )
-        	{
-        		String [] addStr= null;
-        		CSVLoader.insertLine( addStr, columnCnt );
-        	}
-        	CSVLoader.drain();
-        	CSVLoader.produceFiles();
-        	CSVLoader.flush();
-            // do the test
-            
-            VoltTable modCount;
-            modCount = client.callProcedure("@AdHoc", "SELECT * FROM BLAH;").getResults()[0];
-            System.out.println("data inserted to table BLAH:\n" + modCount);
-            int rowct = modCount.getRowCount();
-                        
-            BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.path_reportfile));
-            int lineCount = 0;
-            String line = "";
-            String promptMsg = "Number of acknowledged tuples:";
-            
-            String promptFailMsg = "Number of failed tuples:";
-            int invalidlinecnt = 0;
-            
-            while ((line = csvreport.readLine()) != null) {
-            	if (line.startsWith(promptMsg)) {
-            		String num = line.substring(promptMsg.length());
-            		lineCount = Integer.parseInt(num.replaceAll("\\s",""));
-                    }
-            	if( line.startsWith(promptFailMsg)){
-            		String num = line.substring(promptFailMsg.length());
-            		invalidlinecnt = Integer.parseInt(num.replaceAll("\\s",""));
-            	}	
-            }
-            System.out.println(String.format("The rows infected: (%d,%s)", lineCount, rowct));
-            assertEquals(invalidLineCnt,invalidlinecnt);
-            
-        }
-        finally {
-            if (client != null) client.close();
-            client = null;
-
-            if (localServer != null) {
-                localServer.shutdown();
-                localServer.join();
-            }
-            localServer = null;
-
-            // no clue how helpful this is
-            System.gc();
-        }
-	}
-
 }

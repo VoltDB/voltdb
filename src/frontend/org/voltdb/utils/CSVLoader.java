@@ -82,41 +82,6 @@ public class CSVLoader {
     private static BufferedWriter out_logfile;
 	private static BufferedWriter out_reportfile;
 	
-    public CSVLoader( String[] options ) {
-    	CSVConfig cfg = new CSVConfig();
-    	cfg.parse(CSVLoader.class.getName(), options);
-    	
-    	config = cfg;
-    	configuration();
-    	try {
-    		if (CSVLoader.standin)
-    			csvReader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)),
-    					config.separator, config.quotechar, config.escape, config.skip,
-    					config.strictquotes, config.nowhitespace);
-    		else 
-    			csvReader = new CSVReader(new FileReader(config.file),
-    					config.separator, config.quotechar, config.escape, config.skip,
-    					config.strictquotes, config.nowhitespace);
-
-    	} catch (FileNotFoundException e) {
-			System.err.println("CSV file '" + config.file
-					+ "' could not be found.");
-			System.exit(1);
-        }
-    	// Split server list
-        String[] serverlist = config.servers.split(",");
-        
-        // Create connection
-        ClientConfig c_config = new ClientConfig(config.user,config.password);
-        c_config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
-        try {
-			csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
-		} catch (Exception e) {
-			System.err.println("Error to connect to the servers:" + config.servers);
-			System.exit(1);
-		}
-    }
-    
     private static final class MyCallback implements ProcedureCallback {
     	private final long m_lineNum;
     	private final CSVConfig m_config;
@@ -226,7 +191,39 @@ public class CSVLoader {
         long start = System.currentTimeMillis();
     	int waits = 0;
         int shortWaits = 0;
-        new CSVLoader( args );
+       
+        CSVConfig cfg = new CSVConfig();
+    	cfg.parse(CSVLoader.class.getName(), args);
+    	
+    	config = cfg;
+    	configuration();
+    	try {
+    		if (CSVLoader.standin)
+    			csvReader = new CSVReader(new BufferedReader(new InputStreamReader(System.in)),
+    					config.separator, config.quotechar, config.escape, config.skip,
+    					config.strictquotes, config.nowhitespace);
+    		else 
+    			csvReader = new CSVReader(new FileReader(config.file),
+    					config.separator, config.quotechar, config.escape, config.skip,
+    					config.strictquotes, config.nowhitespace);
+
+    	} catch (FileNotFoundException e) {
+			System.err.println("CSV file '" + config.file
+					+ "' could not be found.");
+			System.exit(1);
+        }
+    	// Split server list
+        String[] serverlist = config.servers.split(",");
+        
+        // Create connection
+        ClientConfig c_config = new ClientConfig(config.user,config.password);
+        c_config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
+        try {
+			csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
+		} catch (Exception e) {
+			System.err.println("Error to connect to the servers:" + config.servers);
+			System.exit(1);
+		}
         
     	try {
             ProcedureCallback cb = null;
@@ -309,76 +306,6 @@ public class CSVLoader {
     	flush();
     }
     
-    //works with insertLine
-    //return true if next line of csv file is not null, load the line into this.csvLine.
-    public static boolean readNext() throws IOException {
-    	if ( (config.limitrows-- > 0) && (csvLine = csvReader.readNext()) != null )
-    		return true;
-    	else{
-    		return false;
-    	}
-    }
-    
-    //insert the current line read from csv file ( read by readNext ). 
-    //So this is a break down of main(), can be used to attach additional columns to each line.
-    //invoke drain() before produceFile() while you use insertLine() with readNext()
-    public static String[] insertLine( String[] additionalStr, int columnCnt ) throws NoConnectionsException, IOException, InterruptedException {
-    	int waits = 0;
-        int shortWaits = 0;
-        String[] correctedLine = null;
-
-            boolean lastOK = true;
-
-              	outCount.incrementAndGet();
-                boolean queued = false;
-                while (queued == false) {
-                	StringBuilder linedata = new StringBuilder();
-                	
-                	csvLine = ArrayUtils.addAll(csvLine, additionalStr);
-                	
-                    for(String s : csvLine) 
-                    	linedata.append(s);
-                	
-                	correctedLine = csvLine;
-                    
-                    MyCallback cb = new MyCallback(outCount.get(), config, linedata.toString());             
-                    String lineCheckResult;
-
-                    if( (lineCheckResult = checkparams_trimspace(correctedLine, columnCnt))!= null){
-                    System.err.println("<zheng>Stop at line " + (outCount.get()) + lineCheckResult );
-                    synchronized (errorInfo) {
-                    	if (!errorInfo.containsKey(outCount.get())) {
-                    		String[] info = {linedata.toString(), lineCheckResult};
-                    		errorInfo.put(outCount.get(), info);
-                    	}
-                    	if (errorInfo.size() >= config.maxerrors) {
-                    		System.err.println("The number of Failure row data exceeds " + config.maxerrors);
-                        	System.exit(1);
-                    	}
-                    }
-                    break;
-                    }
-                    queued = csvClient.callProcedure(cb, insertProcedure, (Object[])correctedLine);
-                    if (queued == false) {
-                        ++waits;
-                        if (lastOK == false) {
-                            ++shortWaits;
-                        }
-                        Thread.sleep(waitSeconds);
-                    }
-                    lastOK = queued;
-            }
-
-        System.out.println("Inserted " + outCount.get() + " and acknowledged " + inCount.get() + " rows (final)");
-        if (waits > 0) {
-            System.out.println("Waited " + waits + " times");
-            if (shortWaits > 0) {
-                System.out.println("Waited too briefly? " + shortWaits + " times");
-            }
-        }
-        return correctedLine;
-    }
-
     private static String checkparams_trimspace(String[] linefragement, int columnCnt ) {
     	if( linefragement.length == 1 && linefragement[0].equals( "" ) ) {
     		System.err.println("<zheng>Stop at line " + (outCount.get()) );
@@ -417,9 +344,23 @@ public class CSVLoader {
         } catch (Exception x) {
         	System.err.println(x.getMessage());
         	x.printStackTrace();
+        	System.exit(1);
         }
         
-        String myinsert = insertProcedure;
+    }
+    
+    private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
+    {
+        final Client client = ClientFactory.createClient(config);
+
+        for (String server : servers)
+            client.createConnection(server.trim(), port);
+        return client;
+    }
+ 
+	public static void produceFiles() { 
+		
+		String myinsert = insertProcedure;
 		myinsert = myinsert.replaceAll("\\.", "_");
 		path_invalidrowfile = config.reportdir + myinsert + "_" + "csvloaderinvalidrows.csv";
 		path_logfile =  config.reportdir + myinsert + "_"+ "csvloaderLog.log";
@@ -433,19 +374,6 @@ public class CSVLoader {
 			System.err.println(e.getMessage());
 			e.printStackTrace();
 		}
-		
-    }
-    
-    private static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
-    {
-        final Client client = ClientFactory.createClient(config);
-
-        for (String server : servers)
-            client.createConnection(server.trim(), port);
-        return client;
-    }
- 
-	public static void produceFiles() { 
     	
 		int bulkflush = 300; // by default right now
 		try {
