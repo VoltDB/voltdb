@@ -335,7 +335,6 @@ public class CSVLoader {
                     + "inputed: "
                     + slot.length;
         }
-
         for (int i = 0; i < slot.length; i++) {
             // trim white space in this line.
             slot[i] = slot[i].trim();

@@ -54,6 +54,7 @@ public class TestCSVLoader extends TestCase {
 
     }
 
+
     public void testSnapshotAndLoad () throws Exception {
         String my_schema =
                 "create table BLAH (" +
@@ -283,6 +284,7 @@ public class TestCSVLoader extends TestCase {
 //         		"--password=",
 //         		"--port="
 //         		};
+//
 //   	    String []myData = { "1",
 //   	    					"2"
 //   	    					};
