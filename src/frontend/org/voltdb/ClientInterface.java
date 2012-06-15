@@ -1237,6 +1237,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // is single or multi partition and read-only or read-write.
         if (sysProc == null && task.procName.equals("@AdHoc")) {
             sysProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP");
+            assert(sysProc != null);
         }
 
         if (user == null) {
@@ -1268,7 +1269,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (sysProc != null) {
             // these have helpers that do all the work...
-            if (task.procName.startsWith("@AdHoc")) {
+            if (task.procName.equals("@AdHoc")) {
                 return dispatchAdHoc(task, handler, ccxn);
             } else if (task.procName.equals("@UpdateApplicationCatalog")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);

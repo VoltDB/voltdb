@@ -136,21 +136,13 @@ public class TestAdHocQueries extends AdHocQueryTester {
         assertEquals(expected, result.getRowCount());
 
         result = m_client.callProcedure("@AdHoc", query, hashable).getResults()[0];
-        int spResultImplicit = result.getRowCount();
+        int spResult = result.getRowCount();
         System.out.println(result.toString());
         if (validatingSPresult != 0) {
-            assertEquals(expected, spPartialSoFar + spResultImplicit);
+            assertEquals(expected, spPartialSoFar + spResult);
         }
 
-        result = m_client.callProcedure("@AdHoc_RW_SP", query, hashable).getResults()[0];
-        int spResultExplicit = result.getRowCount();
-        System.out.println(result.toString());
-        if (validatingSPresult != 0) {
-            assertEquals(expected, spPartialSoFar + spResultExplicit);
-        }
-        assertEquals(spResultExplicit, spResultImplicit);
-
-        return spResultExplicit;
+        return spResult;
     }
 
     String m_catalogJar = "adhoc.jar";
