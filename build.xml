@@ -1158,12 +1158,6 @@ TEST CASES
     name="junit_iv2"
     description="Tests exclusive to IV2 functionality.">
 
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
-        <isset property="timeoutLength"/>
-    </condition>
-    <condition property="regressions" value="${regressions}" else="all">
-        <isset property="regressions"/>
-    </condition>
     <condition property="enableiv2" value="${enableiv2}" else="true">
         <isset property="enableiv2"/>
     </condition>
@@ -1235,16 +1229,6 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-
-    <!-- Fail the build if there were any problems.
-        This runs all the tests before failing. -->
-    <fail
-        if="junit.failures"
-        unless="emma.enabled"
-        message="JUnit had failures"
-    />
 </target>
 
 <!-- common macro to run a bynch of junit -->
