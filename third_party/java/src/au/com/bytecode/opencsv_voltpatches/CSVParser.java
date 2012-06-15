@@ -210,11 +210,13 @@ public class CSVParser {
             pending = null;
             inQuotes = true;
         }
+
         for (int i = 0; i < nextLine.length(); i++) {
 
             char c = nextLine.charAt(i);
             if (c == this.escape) {
-                if (isNullcaseForEscape(nextLine, inQuotes, i)) {
+                String test = sb.toString();
+                if (isNullcaseForEscape(nextLine, inQuotes, i, sb.toString())) {
                     sb.append(c);
                     inField = true;
                 } else if (isNextCharacterEscapable(nextLine, inQuotes || inField, i)) {
@@ -313,16 +315,28 @@ public class CSVParser {
      * @param i
      * @return
      */
-    protected boolean isNullcaseForEscape(String nextLine, boolean inQuotes, int i) {
+    protected boolean isNullcaseForEscape(String nextLine, boolean inQuotes, int i, String sb) {
         boolean result = false, hasmet = false;
+        for (int k = 0; k < sb.length(); k++) {
+            char c = sb.charAt(k);
+            if (Character.isWhitespace(c)) continue;
+            else if (c == quotechar) {
+                if (!inQuotes || hasmet) return false;
+                hasmet = true;
+                continue;
+            } else
+                return false;
+        }
+        hasmet = false;
         if (nextLine.length() > (i + 1) && (nextLine.charAt(i + 1) == 'N' )) {
             for (int j=i+2;j < nextLine.length(); j++) {
-                if (Character.isWhitespace(nextLine.charAt(j))) continue;
-                else if (nextLine.charAt(j) == quotechar) {
+                char c = nextLine.charAt(j);
+                if (Character.isWhitespace(c)) continue;
+                else if (c == quotechar) {
                     if (!inQuotes || hasmet) return false;
                     hasmet = true;
                     continue;
-                } else if (nextLine.charAt(j) == separator) break;
+                } else if (c == separator) break;
                 else return false;
             }
             result = true;
