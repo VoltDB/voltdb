@@ -687,7 +687,11 @@ public class SQLCommand
                 for (int i = 0; i < columnCount; i++)
                 {
                     padding[i] += 1;
-                    fmt[i] = "%1$" + ((t.getColumnType(i) == VoltType.STRING || t.getColumnType(i) == VoltType.TIMESTAMP || t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "#") + padding[i] + "s";
+                    fmt[i] = "%1$" +
+                        ((t.getColumnType(i) == VoltType.STRING ||
+                          t.getColumnType(i) == VoltType.TIMESTAMP ||
+                          t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
+                        + padding[i] + "s";
                 }
                 if (OutputShowMetadata)
                 {
