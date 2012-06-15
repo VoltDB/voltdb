@@ -268,4 +268,8 @@ public class CoreUtils {
         sb.append('}');
         return sb.toString();
     }
+
+    public static int availableProcessors() {
+        return Math.max(1, Runtime.getRuntime().availableProcessors());
+    }
 }

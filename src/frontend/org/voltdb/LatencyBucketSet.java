@@ -37,6 +37,11 @@ public class LatencyBucketSet {
 
     public void update(int newLatencyValue) {
         ++totalTxns;
+
+        // set floor for latency
+        if (newLatencyValue < 0) newLatencyValue = 0;
+
+        // update the bucket
         int bucketOffset = newLatencyValue / msPerBucket;
         if (bucketOffset >= numberOfBuckets) {
             ++unaccountedTxns;

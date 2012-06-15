@@ -3,5 +3,6 @@
 {@cmp_type = "_value[decimal]"}
 {@assign_col = "CASH"}
 {@assign_type = "_value[decimal]"}
-
+{@optional_fn = "_pick[@FN1 <options=,ABS>]"}
+{@optional_fn2 = "_pick[@FN2 <options=,ABS>]"}
 <advanced-template.sql>
