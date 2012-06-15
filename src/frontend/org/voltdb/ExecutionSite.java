@@ -193,8 +193,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private volatile boolean m_rejoinSnapshotFinished = false;
     private long m_rejoinCoordinatorHSId = -1;
     private TaskLog m_rejoinTaskLog = null;
-    private long m_replayedTxnCount = 0;
-    private long m_loggedTxnCount = 0;
+    // Used to track if the site can keep up on rejoin, default is 10 seconds
+    private static final long MAX_BEHIND_DURATION =
+            Long.parseLong(System.getProperty("MAX_REJOIN_BEHIND_DURATION", "10000"));
+    private long m_lastTimeMadeProgress = 0;
+    private long m_remainingTasks = 0;
+    private long m_executedTaskCount = 0;
+    private long m_loggedTaskCount = 0;
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
         @Override
@@ -486,8 +491,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * The logged txn count will be greater than the replayed txn count
              * because some logged ones were before the stream snapshot
              */
-            m_recoveryLog.info("Replayed " + m_replayedTxnCount + " txns");
-            m_recoveryLog.info("Logged " + m_loggedTxnCount + " txns");
+            m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks");
+            m_recoveryLog.info("Logged " + m_loggedTaskCount + " tasks");
             m_recoveryProcessor = null;
             m_rejoinSnapshotProcessor = null;
             m_rejoinSnapshotTxnId = -1;
@@ -1059,9 +1064,34 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     break;
                 }
             }
+
+            checkTaskExecutionProgress();
         }
 
         return doneWork;
+    }
+
+    /**
+     * Check if the site is executing tasks faster than they come in. If the
+     * site cannot keep up in a certain period of time, break rejoin.
+     */
+    private void checkTaskExecutionProgress() {
+        final long remainingTasks = m_executedTaskCount - m_loggedTaskCount;
+        final long currTime = System.currentTimeMillis();
+        if (m_lastTimeMadeProgress == 0 || remainingTasks < m_remainingTasks) {
+            m_lastTimeMadeProgress = currTime;
+        }
+        m_remainingTasks = remainingTasks;
+
+        if (currTime > (m_lastTimeMadeProgress + MAX_BEHIND_DURATION)) {
+            int duration = (int) (currTime - m_lastTimeMadeProgress) / 1000;
+            VoltDB.crashLocalVoltDB("Site " + CoreUtils.hsIdToString(getSiteId()) +
+                                    " has not made any progress in " + duration +
+                                    " seconds, please reduce workload and " +
+                                    "try pauseless rejoin again, or use " +
+                                    "paused rejoin",
+                                    false, null);
+        }
     }
 
     /**
@@ -1132,7 +1162,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             recursableRun(ts);
             doneWork = true;
             m_recoveryLog.trace("Replayed " + ts.getNotice().getTxnId());
-            m_replayedTxnCount++;
+            m_executedTaskCount++;
         } else {
             boolean rejoinCompleted = false;
             try {
@@ -1385,7 +1415,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
                     m_rejoinTaskLog.logTask(txnState.getNotice());
-                    m_loggedTxnCount++;
+                    m_loggedTaskCount++;
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to log task message", true, e);
                 }
