@@ -324,23 +324,24 @@ public class CSVLoader {
         return firstIds;
     }
 
-    private static String checkparams_trimspace(String[] linefragement,
+    private static String checkparams_trimspace(String[] slot,
             int columnCnt) {
-        if (linefragement.length == 1 && linefragement[0].equals("")) {
+        if (slot.length == 1 && slot[0].equals("")) {
             return "Error: blank line";
         }
-        if (linefragement.length != columnCnt) {
+        if (slot.length != columnCnt) {
             return "Error: # of attributes do not match, # of attributes needed: "
                     + columnCnt
                     + "# of attributes inputed: "
-                    + linefragement.length;
+                    + slot.length;
         }
 
-        for (int i = 0; i < linefragement.length; i++) {
+        for (int i = 0; i < slot.length; i++) {
             // trim white space in this line.
-            linefragement[i] = linefragement[i].trim();
-            if ((linefragement[i]).equals("NULL"))
-                linefragement[i] = null;
+            slot[i] = slot[i].trim();
+            if ((slot[i]).equals("NULL")
+                    || slot[i].equals("\\N") || slot[i].equals("\"\\N\""))
+                slot[i] = null;
         }
 
         return null;
