@@ -209,6 +209,9 @@ public class MpTransactionState extends TransactionState
                 }
             }
         }
+        // satisified. Clear this defensively. Procedure runner is sloppy with
+        // cleaning up if it decides new work is necessary that is local-only.
+        m_remoteWork = null;
 
         BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
         borrowmsg.addInputDepMap(m_remoteDepTables);
@@ -217,6 +220,7 @@ public class MpTransactionState extends TransactionState
         FragmentResponseMessage msg = null;
         try {
             msg = m_newDeps.take();
+            m_localWork = null;
         }
         catch (InterruptedException e) {
             // this is a valid shutdown path.
