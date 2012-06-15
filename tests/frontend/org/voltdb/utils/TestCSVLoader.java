@@ -62,7 +62,7 @@ public class TestCSVLoader extends TestCase {
                 "clm_smallint smallint default 0, " +
                 "clm_bigint bigint default 0, " +
 
-                "clm_string varchar(10) default null, " +
+                "clm_string varchar(20) default null, " +
                 "clm_decimal decimal default null, " +
                 "clm_float float default null "+ // for later
                 //"clm_timestamp timestamp default null, " + // for later
@@ -101,10 +101,57 @@ public class TestCSVLoader extends TestCase {
 	    					"10,10,10,10 101 010,second,2.20,2.22",
 	    					"12,n ull,12,12121212,twelveth,12.12,12.12"
 	    					};
-     //String []myData = { "1,NULL,1,11111111,first,1.10,1.11"};
 	    int invalidLineCnt = 4;
 		test_Interface( mySchema, myOptions, myData, invalidLineCnt );
 	}
+
+    public void testNULL() throws Exception
+    {
+     String mySchema =
+                "create table BLAH (" +
+                "clm_integer integer default 0 not null, " + // column that is partitioned on
+
+                "clm_tinyint tinyint default 0, " +
+                "clm_smallint smallint default 0, " +
+                "clm_bigint bigint default 0, " +
+
+                "clm_string varchar(20) default null, " +
+                "clm_decimal decimal default null, " +
+                "clm_float float default null "+ // for later
+                //"clm_timestamp timestamp default null, " + // for later
+                //"clm_varinary varbinary default null" + // for later
+                "); ";
+     String []myOptions = {
+            "-f" + userHome + "/test.csv",
+            //"--procedure=BLAH.insert",
+            //"--reportdir=" + reportdir,
+            //"--table=BLAH",
+            "--maxerrors=50",
+            //"-user",
+            "--user=",
+            "--password=",
+            "--port=",
+            "--separator=,",
+            "--quotechar=\"",
+            "--escape=\\",
+            "--skip=0",
+            "--nowhitespace",
+            //"--strictquotes",
+            "BLAH"
+            };
+
+     String []myData = {
+             "1,\\N,1,11111111,\"\"NULL\"\",1.10,1.11",
+             "2,\"\\N\",1,11111111,\"NULL\",1.10,1.11",
+             "3,\\N,1,11111111,  \\N  ,1.10,1.11",
+             "4,\\N,1,11111111,  \"\\N\"  ,1.10,1.11",
+             "5,\\N,1,11111111, \"  \\N  \",1.10,1.11",
+             "6,\\N,1,11111111, \"  \\N L \",1.10,1.11",
+             "7,\\N,1,11111111,  \"abc\\N\"  ,1.10,1.11"
+             };
+        int invalidLineCnt = 0;
+        test_Interface( mySchema, myOptions, myData, invalidLineCnt );
+    }
 
     /*
     public void testNew() throws Exception
