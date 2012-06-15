@@ -142,7 +142,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertEquals(expected, spPartialSoFar + spResultImplicit);
         }
 
-        result = m_client.callProcedure("@AdHocSP", query, hashable).getResults()[0];
+        result = m_client.callProcedure("@AdHoc_RW_SP", query, hashable).getResults()[0];
         int spResultExplicit = result.getRowCount();
         System.out.println(result.toString());
         if (validatingSPresult != 0) {

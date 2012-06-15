@@ -1231,6 +1231,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final Procedure catProc = catalogContext.procedures.get(task.procName);
         Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
 
+        // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
+        // configured differently for @AdHoc... variants this code will have to
+        // change in order to use the proper variant based on whether the work
+        // is single or multi partition and read-only or read-write.
+        if (sysProc == null && task.procName.equals("@AdHoc")) {
+            sysProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP");
+        }
+
         if (user == null) {
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -1373,26 +1381,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // pick the sysproc based on the presence of partition info
-        // HSQL does not specifically implement AdHocSP -- instead, use its always-SP implementation of AdHoc
+        // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = (plannedStmtBatch.partitionParam != null) && ! m_isConfiguredForHSQL;
         int partitions[] = null;
 
         if (isSinglePartition) {
             if (plannedStmtBatch.isReadOnly()) {
-                task.procName = "@AdHocReadOnlySP";
+                task.procName = "@AdHoc_RO_SP";
             }
             else {
-                task.procName = "@AdHocSP";
+                task.procName = "@AdHoc_RW_SP";
             }
             assert(plannedStmtBatch.isSinglePartitionCompatible());
             partitions = new int[] { TheHashinator.hashToPartition(plannedStmtBatch.partitionParam) };
         }
         else {
             if (plannedStmtBatch.isReadOnly()) {
-                task.procName = "@AdHocReadOnly";
+                task.procName = "@AdHoc_RO_MP";
             }
             else {
-                task.procName = "@AdHoc";
+                task.procName = "@AdHoc_RW_MP";
             }
             partitions = m_allPartitions;
         }
