@@ -1075,8 +1075,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         if (rejoinWork != null) {
             int tableId = rejoinWork.getFirst();
             ByteBuffer buffer = rejoinWork.getSecond();
-            m_recoveryLog.info("Got a snapshot block for table " + tableId + " " +
-                    buffer.remaining());
             VoltTable table =
                     PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
                                                                       true);
