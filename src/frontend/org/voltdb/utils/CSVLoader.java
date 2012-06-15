@@ -339,8 +339,8 @@ public class CSVLoader {
         for (int i = 0; i < slot.length; i++) {
             // trim white space in this line.
             slot[i] = slot[i].trim();
-            if ((slot[i]).equals("NULL")
-                    || slot[i].equals("\\N") || slot[i].equals("\"\\N\""))
+            if ((slot[i]).equals("NULL") || slot[i].equals("\\N")
+                    || !config.strictquotes && slot[i].equals("\"\\N\""))
                 slot[i] = null;
         }
 
