@@ -441,8 +441,7 @@ public class ProcedureRunner {
                                                                 qs.stmt, qs.params, sparams);
             }
         }
-
-        if (m_catProc.getSinglepartition()) {
+        else if (m_catProc.getSinglepartition()) {
             results = fastPath(batch);
         }
         else {
