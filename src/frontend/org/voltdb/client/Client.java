@@ -197,9 +197,11 @@ public interface Client {
 
     /**
      * Block the current thread until all queued stored procedure invocations have received responses
-     * or there are no more connections to the cluster
+     * or there are no more connections to the cluster.
+     * @throws NoConnectionsException never, this is deprecated behavior, declared only for backward compatibility.
+     * @throws InterruptedException
      */
-    public void drain() throws InterruptedException;
+    public void drain() throws NoConnectionsException, InterruptedException;
 
     /**
      * Shutdown the {@link Client} closing all network connections and release all memory resources.
