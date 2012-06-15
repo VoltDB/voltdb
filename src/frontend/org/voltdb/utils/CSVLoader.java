@@ -332,7 +332,7 @@ public class CSVLoader {
         if (slot.length != columnCnt) {
             return "Error: # of attributes do not match, # of attributes needed: "
                     + columnCnt
-                    + "# of attributes inputed: "
+                    + "inputed: "
                     + slot.length;
         }
 
