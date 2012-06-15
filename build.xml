@@ -1167,17 +1167,7 @@ TEST CASES
         <isset property="enableiv2"/>
     </condition>
 
-    <run_junit timeout="${timeoutLength}" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-            <formatter type="xml" />
-        </formatters>
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
