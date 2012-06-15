@@ -651,11 +651,16 @@ public class SnapshotSaveAPI
                      */
                     for (int ii = 0; ii < numLocalSites && !partitionedSnapshotTasks.isEmpty(); ii++) {
                         SnapshotSiteProcessor.m_taskListsForSites.get(ii).addAll(partitionedSnapshotTasks);
+                        if (!format.isTableBased()) {
+                            SnapshotSiteProcessor.m_taskListsForSites.get(ii).addAll(replicatedSnapshotTasks);
+                        }
                     }
 
-                    int siteIndex = 0;
-                    for (SnapshotTableTask t : replicatedSnapshotTasks) {
-                        SnapshotSiteProcessor.m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
+                    if (format.isTableBased()) {
+                        int siteIndex = 0;
+                        for (SnapshotTableTask t : replicatedSnapshotTasks) {
+                            SnapshotSiteProcessor.m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
+                        }
                     }
                     if (!aborted) {
                         logSnapshotStartToZK( txnId, context, file_nonce);
