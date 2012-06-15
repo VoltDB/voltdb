@@ -265,21 +265,21 @@ public class TestAdHocQueries extends AdHocQueryTester {
             batcher.add("UPDATE BLAH SET DVAL = 0 WHERE IVAL = 102", 1);
             batcher.run();
 
-//            // mix replicated and partitioned
-//            batcher.addUnchecked("DELETE FROM PARTED1");
-//            batcher.addUnchecked("DELETE FROM REPPED1");
-//            for (int i = 1; i <= 10; i++) {
-//                batcher.add(String.format("INSERT INTO PARTED1 VALUES (%d, %d)", i, 100+i), 1);
-//                batcher.add(String.format("INSERT INTO REPPED1 VALUES (%d, %d)", i, 100+i), 1);
-//            }
-//            batcher.run();
-//            batcher.add("SELECT * FROM PARTED1", 10);
-//            batcher.add("SELECT * FROM REPPED1", 10);
-//            batcher.add("DELETE FROM PARTED1 WHERE PARTVAL > 5", 5);
-//            batcher.add("DELETE FROM REPPED1 WHERE REPPEDVAL > 5", 5);
-//            batcher.add("SELECT * FROM PARTED1", 5);
-//            batcher.add("SELECT * FROM REPPED1", 5);
-//            batcher.run();
+            // mix replicated and partitioned
+            batcher.addUnchecked("DELETE FROM PARTED1");
+            batcher.addUnchecked("DELETE FROM REPPED1");
+            for (int i = 1; i <= 10; i++) {
+                batcher.add(String.format("INSERT INTO PARTED1 VALUES (%d, %d)", i, 100+i), 1);
+                batcher.add(String.format("INSERT INTO REPPED1 VALUES (%d, %d)", i, 100+i), 1);
+            }
+            batcher.run();
+            batcher.add("SELECT * FROM PARTED1", 10);
+            batcher.add("SELECT * FROM REPPED1", 10);
+            batcher.add("DELETE FROM PARTED1 WHERE PARTVAL > 5", 5);
+            batcher.add("DELETE FROM REPPED1 WHERE REPPEDVAL > 5", 5);
+            batcher.add("SELECT * FROM PARTED1", 5);
+            batcher.add("SELECT * FROM REPPED1", 5);
+            batcher.run();
 
             // roll-back entire batch if one statement fails (start from a clean slate)
             batcher.addUnchecked("DELETE FROM BLAH");
