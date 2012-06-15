@@ -364,7 +364,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public void drain() throws NoConnectionsException, InterruptedException {
+    public void drain() throws InterruptedException {
         if (m_isShutdown) {
             return;
         }

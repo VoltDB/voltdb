@@ -62,6 +62,7 @@ import org.voltdb.utils.MiscUtils;
  * and failure detection.
  */
 public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMessenger {
+    private static final VoltLogger logger = new VoltLogger("NETWORK");
 
     /**
      * Configuration for a host messenger. The leader binds to the coordinator ip and
@@ -81,7 +82,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         public int deadHostTimeout = 10000;
         public long backwardsTimeForgivenessWindow = 1000 * 60 * 60 * 24 * 7;
         public VoltMessageFactory factory = new VoltMessageFactory();
-        public int networkThreads =  Runtime.getRuntime().availableProcessors() / 2;
+        public int networkThreads =  Math.max(2, CoreUtils.availableProcessors() / 4);
 
         public Config(String coordIp, int coordPort) {
             if (coordIp == null || coordIp.length() == 0) {
@@ -89,6 +90,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             } else {
                 coordinatorIp = new InetSocketAddress(coordIp, coordPort);
             }
+            initNetworkThreads();
         }
 
         public Config() {
@@ -105,6 +107,21 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             return MiscUtils.getPortFromHostnameColonPort(zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
 
+        private void initNetworkThreads() {
+            try {
+                logger.info("Default network thread count: " + this.networkThreads);
+                Integer networkThreadConfig = Integer.getInteger("networkThreads");
+                if ( networkThreadConfig != null ) {
+                    this.networkThreads = networkThreadConfig;
+                    logger.info("Overridden network thread count: " + this.networkThreads);
+                }
+
+            } catch (Exception e) {
+                logger.error("Error setting network thread count", e);
+            }
+        }
+
+        @Override
         public String toString() {
             JSONStringer js = new JSONStringer();
             try {

@@ -28,6 +28,7 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -45,7 +46,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
     public void testRejoinFuzz() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
-        int processors = Runtime.getRuntime().availableProcessors();
+        int processors = CoreUtils.availableProcessors();
         final int numHosts = processors >= 8 ? 10 : 5;
         final int kfactor = 4;
         final LocalCluster cluster =
