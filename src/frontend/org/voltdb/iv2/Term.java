@@ -157,7 +157,7 @@ public class Term
             List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, children);
             tmLog.info(m_whoami
                     + "replica change handler updating replica list to: "
-                    + CoreUtils.hsIdListToString(replicas));
+                    + CoreUtils.hsIdCollectionToString(replicas));
             m_mailbox.updateReplicas(replicas);
         }
     };
@@ -314,7 +314,7 @@ public class Term
 
         tmLog.info(m_whoami + "found (including self) " + survivors.size()
                 + " surviving replicas to repair. "
-                + " Survivors: " + CoreUtils.hsIdListToString(survivors));
+                + " Survivors: " + CoreUtils.hsIdCollectionToString(survivors));
         VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
     }

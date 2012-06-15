@@ -169,20 +169,6 @@ public class CoreUtils {
         return Integer.toString((int)hsId) + ":" + Integer.toString((int)(hsId >> 32));
     }
 
-    public static String hsIdListToString(List<Long> hsIds) {
-        if (hsIds == null || hsIds.size() == 0) {
-            return "<none>";
-        }
-        String result = "";
-        boolean first = true;
-        for (long hsId : hsIds) {
-            if (!first) result += ", ";
-            first = false;
-            result += hsIdToString(hsId);
-        }
-        return result;
-    }
-
     public static String hsIdCollectionToString(Collection<Long> ids) {
         StringBuilder sb = new StringBuilder();
         boolean first = false;
