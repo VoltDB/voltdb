@@ -330,9 +330,9 @@ public class CSVLoader {
             return "Error: blank line";
         }
         if (linefragement.length != columnCnt) {
-            return "Error: # of attributes do not match, # of attributes needed: "
+            return "Error: # of attributes do not match those in the procedure, needed : "
                     + columnCnt
-                    + "# of attributes inputed: "
+                    + "inputed: "
                     + linefragement.length;
         }
 

@@ -25,6 +25,8 @@
 package org.voltdb;
 
 import org.voltdb.types.TimestampType;
+import org.voltdb.utils.Encoder;
+
 import junit.framework.TestCase;
 
 
@@ -113,5 +115,14 @@ public class TestParameterConverter extends TestCase
             tryToMakeCompatible(true, false, TimestampType.class, null, t);
         assertTrue("expect timestamp", r.getClass() == TimestampType.class);
         assertEquals(t, r);
+    }
+    
+    public void testStringToVarBinary() throws Exception
+    {
+        String t = "1e3a";
+        Object r = ParameterConverter.
+            tryToMakeCompatible(true, false, byte[].class, null, t);
+        assertTrue("expect varbinary", r.getClass() == byte[].class);
+        //assertEquals(t, Encoder.hexDecode((String)r).toString() );
     }
 }
