@@ -215,7 +215,6 @@ public class CSVParser {
 
             char c = nextLine.charAt(i);
             if (c == this.escape) {
-                String test = sb.toString();
                 if (isNullcaseForEscape(nextLine, inQuotes, i, sb.toString())) {
                     sb.append(c);
                     inField = true;
