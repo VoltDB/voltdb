@@ -36,6 +36,14 @@ import org.voltdb.VoltTable;
 public abstract class AdHocBase extends VoltSystemProcedure {
 
     /* (non-Javadoc)
+     * @see org.voltdb.VoltSystemProcedure#init()
+     */
+    @Override
+    public void init()
+    {
+    }
+
+    /* (non-Javadoc)
      * @see org.voltdb.VoltSystemProcedure#executePlanFragment(java.util.Map, long, org.voltdb.ParameterSet, org.voltdb.SystemProcedureExecutionContext)
      */
     @Override

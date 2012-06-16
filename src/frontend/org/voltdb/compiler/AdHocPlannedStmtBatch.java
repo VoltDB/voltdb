@@ -33,7 +33,13 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     // May be reassigned if the planner infers single partition work.
     public Object partitionParam;
     public final int catalogVersion;
-    public final List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
+
+    // The planned statements.
+    // Keep private so that isReadOnly can be maintained by methods of this class.
+    private final List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
+
+    // Assume the batch is read-only until we see the first non-select statement.
+    private boolean readOnly = true;
 
     /**
      * Statement batch constructor.
@@ -164,8 +170,13 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
                                                         isReplicatedTableDML,
                                                         partitionParam,
                                                         catalogVersion);
+        // The first non-select statement makes it not read-only.
+        if (readOnly && !sqlStatement.trim().toLowerCase().startsWith("select")) {
+            readOnly = false;
+        }
         plannedStmt.clientHandle = clientHandle;
         plannedStmt.connectionId = connectionId;
+
         plannedStmt.hostname = hostname;
         plannedStmt.adminConnection = adminConnection;
         plannedStmt.clientData = clientData;
@@ -183,6 +194,35 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             }
         }
         return true;
+    }
+
+    /**
+     * Get the number of planned statements.
+     *
+     * @return planned statement count
+     */
+    public int getPlannedStatementCount() {
+        return plannedStatements.size();
+    }
+
+    /**
+     * Get a particular planned statement by index.
+     * The index is not validated here.
+     *
+     * @param index
+     * @return planned statement
+     */
+    public AdHocPlannedStatement getPlannedStatement(int index) {
+        return plannedStatements.get(index);
+    }
+
+    /**
+     * Read-only flag accessor
+     *
+     * @return true if read-only
+     */
+    public boolean isReadOnly() {
+        return readOnly;
     }
 
 }
