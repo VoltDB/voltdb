@@ -1144,6 +1144,7 @@ TEST CASES
             <arg value="${base.dir}/tools/junit-post-process.py" />
             <arg value="--testname=${testname}" />
             <arg value="--outputpath=${build.testoutput.dir}" />
+            <arg value="--testresult=${junit.failures}" />
         </exec>
     </sequential>
 </target>
@@ -1176,16 +1177,15 @@ TEST CASES
                 todir="${build.testoutput.dir}"
             />
         </junitreport>
+
         <exec dir="${build.testoutput.dir}" executable='cat'>
             <arg line="junit-noframes.html"/>
         </exec>
+
         <!-- Fail the build if there were any problems.
              This runs all the tests before failing. -->
-        <fail
-             if="junit.failures"
-             unless="emma.enabled"
-             message="JUnit had failures"
-        />
+        <available file="${build.testoutput.dir}/JUNITHADFAILURES" property="junit.failures"/>
+        <fail if="junit.failures" unless="emma.enabled" message="JUnit had failures" />
     </sequential>
 </macrodef>
 

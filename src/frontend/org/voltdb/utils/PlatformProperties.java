@@ -24,6 +24,7 @@ import java.io.InputStreamReader;
 import java.io.Serializable;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.processtools.ShellTools;
 
 
@@ -68,7 +69,7 @@ public class PlatformProperties implements Serializable {
     protected HardwareInfo getMacHardwareInfo() {
         HardwareInfo hw = new HardwareInfo();
 
-        hw.hardwareThreads = Runtime.getRuntime().availableProcessors();
+        hw.hardwareThreads = CoreUtils.availableProcessors();
 
         String result = ShellTools.cmd("/usr/sbin/system_profiler -detailLevel mini SPHardwareDataType").trim();
         String[] lines = result.split("\n");

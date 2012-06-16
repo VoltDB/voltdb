@@ -292,7 +292,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             m_computationService = MoreExecutors.listeningDecorator(
                     Executors.newFixedThreadPool(
-                        Runtime.getRuntime().availableProcessors(),
+                        Math.max(2, CoreUtils.availableProcessors() / 4),
                         new ThreadFactory() {
                             private int threadIndex = 0;
                             @Override
@@ -352,12 +352,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
 
             // Create the thread pool here. It's needed by buildClusterMesh()
-            final int availableProcessors = Runtime.getRuntime().availableProcessors();
-            int poolSize = 1;
-            if (availableProcessors > 4) {
-                poolSize = 2;
-            }
-            m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", poolSize, 1024 * 128);
+            m_periodicWorkThread = CoreUtils.getScheduledThreadPoolExecutor("Periodic Work", 1, 1024 * 128);
 
             m_licenseApi = MiscUtils.licenseApiFactory(m_config.m_pathToLicense);
             if (m_licenseApi == null) {
