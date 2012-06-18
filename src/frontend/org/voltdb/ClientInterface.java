@@ -1230,16 +1230,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         ParameterSet params = task.getParams();
         // dispatch selectors that do not us the @Statistics system procedure
         if ((params.toArray().length != 0)) {
-           if (((String)params.toArray()[0]).equals("DR")) {
+            String selector = (String)params.toArray()[0];
+            if (selector.equals("DR") || selector.equals("TOPO")) {
                try {
-                   VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, "DR");
+                   VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector);
                    return null;
                } catch (Exception e) {
                    return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
                }
-           }
-           else if (((String)params.toArray()[0]).equals("TOPO")) {
-               return dispatchTopology(sysProc, buf, task, handler, ccxn);
            }
         }
         int[] involvedPartitions = m_allPartitions;
@@ -1736,6 +1734,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         if (m_snapshotDaemon != null) {
             m_snapshotDaemon.shutdown();
+        }
+        if (m_cartographer != null) {
+            m_cartographer.shutdown();
         }
         if (m_iv2Masters != null) {
             m_iv2Masters.shutdown();

@@ -18,28 +18,111 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Iterator;
 import java.util.List;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+
 import org.voltcore.logging.VoltLogger;
 
-import org.voltcore.zk.LeaderElector;
+import org.voltcore.utils.CoreUtils;
 
+import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCacheReader;
+
+import org.voltdb.StatsSource;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
+
+import com.google.common.collect.UnmodifiableIterator;
 
 /**
  * Cartographer provides answers to queries about the components in a cluster.
+ * It provides the StatsSource interface for the TOPO statistics selector, but
+ * can be called directly as long as the caller is careful about not calling
+ * from a network thread (need to avoid ZK deadlocks).
  */
-public class Cartographer
+public class Cartographer extends StatsSource
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    final ZooKeeper m_zk;
+    private final MapCacheReader m_iv2Masters;
+    private final ZooKeeper m_zk;
+
+    /**
+     * A dummy iterator that wraps an UnmodifiableIterator<String> and provides the
+     * Iterator<Object>
+     */
+    private class DummyIterator implements Iterator<Object> {
+        private final UnmodifiableIterator<String> i;
+
+        private DummyIterator(UnmodifiableIterator<String> i) {
+            this.i = i;
+        }
+
+        @Override
+        public boolean hasNext() {
+            return i.hasNext();
+        }
+
+        @Override
+        public Object next() {
+            return i.next();
+        }
+
+        @Override
+        public void remove() {
+            i.remove();
+        }
+    }
 
     public Cartographer(ZooKeeper zk)
     {
+        super(false);
         m_zk = zk;
+        m_iv2Masters = new MapCache(m_zk, VoltZK.iv2masters);
+        try {
+            m_iv2Masters.start(true);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Screwed", true, e);
+        }
+    }
+
+    @Override
+    protected void populateColumnSchema(ArrayList<ColumnInfo> columns)
+    {
+        columns.add(new ColumnInfo("Partition", VoltType.STRING));
+        columns.add(new ColumnInfo("Sites", VoltType.STRING));
+        columns.add(new ColumnInfo("Leader", VoltType.STRING));
+
+    }
+
+    @Override
+    protected Iterator<Object> getStatsRowKeyIterator(boolean interval)
+    {
+        return new DummyIterator(m_iv2Masters.pointInTimeCache().keySet().iterator());
+    }
+
+    @Override
+    protected void updateStatsRow(Object rowKey, Object[] rowValues) {
+        JSONObject thing = m_iv2Masters.pointInTimeCache().get((String)rowKey);
+        long leader = Long.MIN_VALUE;
+        try {
+            leader = Long.valueOf(thing.getLong("hsid"));
+        } catch (JSONException e) {
+            throw new RuntimeException(e);
+        }
+        List<Long> sites = getReplicasForIv2Master((String)rowKey);
+
+        rowValues[columnNameToIndex.get("Partition")] = rowKey;
+        rowValues[columnNameToIndex.get("Sites")] = CoreUtils.hsIdCollectionToString(sites);
+        rowValues[columnNameToIndex.get("Leader")] = CoreUtils.hsIdToString(leader);
     }
 
     /**
@@ -59,6 +142,9 @@ public class Cartographer
         return retval;
     }
 
+    /**
+     * Given a partition ID, return a list of HSIDs of all the sites with copies of that partition
+     */
     public List<Long> getReplicasForPartition(int partition) {
         String zkpath = LeaderElector.electionDirForPartition(partition);
         List<Long> retval = new ArrayList<Long>();
@@ -84,5 +170,10 @@ public class Cartographer
      */
     public int getReplicaCountForPartition(int partition) {
         return getReplicasForPartition(partition).size();
+    }
+
+    public void shutdown() throws InterruptedException
+    {
+        m_iv2Masters.shutdown();
     }
 }

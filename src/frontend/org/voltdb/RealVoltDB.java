@@ -177,6 +177,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     // IV2 things
     List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
+    Cartographer m_cartographer = null;
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -398,6 +399,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
                 m_mailboxTracker.start();
 
+                // We need the cartographer to do IV2 rejoin, so get it early
+                m_cartographer = new Cartographer(m_messenger.getZK());
                 /*
                  * Will count this down at the right point on regular startup as well as rejoin
                  */
@@ -647,6 +650,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_memoryStats = new MemoryStats();
             m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
                     0, m_memoryStats);
+            m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
@@ -853,15 +857,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return Pair.of( mailboxes, clusterConfig);
     }
 
+    // IZZY: move this into Cartographer
     private List<Integer> getIv2PartitionsToReplace(ClusterConfig clusterConfig)
     {
         hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
         List<Integer> repsPerPart = new ArrayList<Integer>(clusterConfig.getPartitionCount());
-        // Just make a local Cartographer here for now until we figure out how it fits into
-        // node/cluster startup in general
-        Cartographer cart = new Cartographer(m_messenger.getZK());
         for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
-            repsPerPart.add(i, cart.getReplicaCountForPartition(i));
+            repsPerPart.add(i, m_cartographer.getReplicaCountForPartition(i));
         }
         List<Integer> partitions = new ArrayList<Integer>();
         int freeSites = clusterConfig.getSitesPerHost();
@@ -1492,6 +1494,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 if (m_iv2Initiators != null) {
                     for (Initiator init : m_iv2Initiators)
                         init.shutdown();
+                }
+
+                if (m_cartographer != null) {
+                    m_cartographer.shutdown();
                 }
 
                 // try to join all threads but the main one
