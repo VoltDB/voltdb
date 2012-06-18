@@ -23,15 +23,9 @@
 
 package com.auctionexample;
 
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
-import java.util.Random;
 import org.voltdb.utils.CSVLoader;
-
-import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 
 /**
@@ -41,30 +35,6 @@ import au.com.bytecode.opencsv_voltpatches.CSVReader;
  *
  */
 class Loader {
-
-    // random number generator
-    static Random random = new Random();
-
-    
-    
-    /**
-     * Given a path to a CSV, get a CSVReader instance for that file.
-     *
-     * @param path Path to the CSV file requested, relative to current package.
-     * @return A CSVReader instance loaded with the CSV file specified.
-     */
-    static CSVReader getReaderForPath(String path) {
-        URL url = Loader.class.getResource(path);
-        FileReader fr = null;
-        try {
-            fr = new FileReader(url.getPath());
-        } catch (FileNotFoundException e) {
-            e.printStackTrace();
-        }
-        CSVReader reader = new CSVReader(fr);
-        return reader;
-    }
-
     /**
      * Insert records into the ITEM table from a csv file.
      *
@@ -78,8 +48,6 @@ class Loader {
     	String []myOptions = {
          		"--file="+ url.getPath(), 
          		"--procedure=InsertIntoItemAndBid",
-         		//"--reportdir=" + reportdir,
-         		//"--table=InsertIntoItem",
          		"--maxerrors=50",
          		"--user=program",
          		"--password=pass",
@@ -87,11 +55,7 @@ class Loader {
          		};
     	try {
 			CSVLoader.main( myOptions );
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
     	ArrayList<String> list = CSVLoader.getFirstIds();
@@ -115,8 +79,6 @@ class Loader {
     	String []myOptions = {
          		"--file="+ url.getPath(), 
          		"--procedure=InsertIntoCategory",
-         		//"--reportdir=" + reportdir,
-         		//"--table=InsertIntoItem",
          		"--maxerrors=50",
          		"--user=program",
          		"--password=pass",
@@ -124,11 +86,7 @@ class Loader {
          		};
     	try {
 			CSVLoader.main( myOptions );
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
+		} catch (Exception e) {
 			e.printStackTrace();
 		}
     	ArrayList<String> list = CSVLoader.getFirstIds();
@@ -154,8 +112,6 @@ class Loader {
     	String []myOptions = {
          		"--file="+ url.getPath(), 
          		"--procedure=InsertIntoUser",
-         		//"--reportdir=" + reportdir,
-         		//"--table=InsertIntoItem",
          		"--maxerrors=50",
          		"--user=program",
          		"--password=pass",
@@ -163,13 +119,9 @@ class Loader {
          		};
     	try {
 			CSVLoader.main( myOptions );
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		} catch (InterruptedException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+		}catch (Exception e) {
+            e.printStackTrace();
+        }
     	ArrayList<String> list = CSVLoader.getFirstIds();
     	for( String id : list) {
     		userIds.add( Integer.parseInt( id ) );

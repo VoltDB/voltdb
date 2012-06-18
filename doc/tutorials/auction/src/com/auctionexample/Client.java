@@ -223,7 +223,6 @@ public class Client {
      * @param args This program uses no command line arguments.
      */
     public static void main(String[] args) {
-    	//CSVLoader.setTimezone("GMT-1");
         System.out.println("***************************************");
         System.out.println("* Welcome to Bobbi's Awesome Auctions *");
         System.out.println("*                                     *");
