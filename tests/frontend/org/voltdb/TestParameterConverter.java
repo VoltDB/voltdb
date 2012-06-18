@@ -24,10 +24,9 @@
 
 package org.voltdb;
 
-import org.voltdb.types.TimestampType;
-import org.voltdb.utils.Encoder;
-
 import junit.framework.TestCase;
+
+import org.voltdb.types.TimestampType;
 
 
 public class TestParameterConverter extends TestCase
@@ -100,14 +99,6 @@ public class TestParameterConverter extends TestCase
         assertEquals(VoltType.NULL_INTEGER, r);
     }
 
-//    public void testNULLToString() throws Exception
-//    {
-//        Object r = ParameterConverter.
-//            tryToMakeCompatible(true, false, String.class, null, null);
-//        assertTrue("expect null string", r.getClass() == String.class);
-//        //assertEquals( null, r);
-//    }
-
     public void testStringToTimestamp() throws Exception
     {
         TimestampType t = new TimestampType();
@@ -116,7 +107,7 @@ public class TestParameterConverter extends TestCase
         assertTrue("expect timestamp", r.getClass() == TimestampType.class);
         assertEquals(t, r);
     }
-    
+
     public void testStringToVarBinary() throws Exception
     {
         String t = "1e3a";
