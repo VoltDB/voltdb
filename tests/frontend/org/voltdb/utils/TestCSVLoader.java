@@ -43,8 +43,8 @@ public class TestCSVLoader extends TestCase {
     private VoltProjectBuilder builder;
     private Client client;
 
-    private final String userHome = System.getProperty("user.home");
-    String path_csv = userHome + "/" + "test.csv";
+    private final String reportDir = "/tmp/";
+    String path_csv = reportDir + "/" + "test.csv";
 
     @Override
     protected void setUp() throws Exception
@@ -174,9 +174,9 @@ public class TestCSVLoader extends TestCase {
                 "clm_timestamp timestamp default null " +
                 "); ";
      String []myOptions = {
-     		"-f" + userHome + "/test.csv",
+     		"-f" + reportDir + "/test.csv",
      		//"--procedure=BLAH.insert",
-     		//"--reportdir=" + reportdir,
+     		"--reportdir=" + reportDir,
      		//"--table=BLAH",
      		"--maxerrors=50",
      		//"-user",
@@ -227,9 +227,9 @@ public class TestCSVLoader extends TestCase {
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
      String []myOptions = {
-            "-f" + userHome + "/test.csv",
+            "-f" + reportDir + "/test.csv",
             //"--procedure=BLAH.insert",
-            //"--reportdir=" + reportdir,
+            "--reportdir=" + reportDir,
             //"--table=BLAH",
             "--maxerrors=50",
             //"-user",
