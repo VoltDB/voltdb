@@ -30,6 +30,7 @@ import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.CLIConfig;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -72,6 +73,8 @@ public class CSVLoader {
     private static CSVReader csvReader;
     private static Client csvClient;
     private static ArrayList<String> firstIds = new ArrayList<String>();
+    
+    protected static final VoltLogger m_log = new VoltLogger("CSVLoader");
 
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;
@@ -87,16 +90,14 @@ public class CSVLoader {
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
-                System.err.println(response.getStatusString());
+                m_log.error( response.getStatusString() );
                 synchronized (errorInfo) {
                     if (!errorInfo.containsKey(m_lineNum)) {
                         String[] info = { m_rowdata, response.getStatusString() };
                         errorInfo.put(m_lineNum, info);
                     }
                     if (errorInfo.size() >= m_config.maxerrors) {
-                        System.err
-                                .println("The number of Failure row data exceeds "
-                                        + m_config.maxerrors);
+                        m_log.error("The number of Failure row data exceeds " + m_config.maxerrors);
                         close_cleanup();
                         System.exit(1);
                     }
@@ -107,7 +108,7 @@ public class CSVLoader {
             long currentCount = inCount.incrementAndGet();
 
             if (currentCount % reportEveryNRows == 0) {
-                System.out.println("Inserted " + currentCount + " rows");
+                m_log.info( "Inserted " + currentCount + " rows" );
             }
         }
     }
@@ -209,8 +210,7 @@ public class CSVLoader {
                         config.skip, config.strictquotes, config.nowhitespace);
 
         } catch (FileNotFoundException e) {
-            System.err.println("CSV file '" + config.file
-                    + "' could not be found.");
+            m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(1);
         }
         // Split server list
@@ -223,7 +223,7 @@ public class CSVLoader {
         try {
             csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
         } catch (Exception e) {
-            System.err.println("Error to connect to the servers:"
+            m_log.error("Error to connect to the servers:"
                     + config.servers);
             System.exit(1);
         }
@@ -273,9 +273,8 @@ public class CSVLoader {
                                 errorInfo.put(outCount.get(), info);
                             }
                             if (errorInfo.size() >= config.maxerrors) {
-                                System.err
-                                        .println("The number of Failure row data exceeds "
-                                                + config.maxerrors);
+                                m_log.error("The number of Failure row data exceeds "
+                                        + config.maxerrors);
                                 close_cleanup();
                                 System.exit(1);
                             }
@@ -303,18 +302,18 @@ public class CSVLoader {
             e.printStackTrace();
         }
 
-        System.out.println("Inserted " + outCount.get() + " and acknowledged "
+        m_log.info("Inserted " + outCount.get() + " and acknowledged "
                 + inCount.get() + " rows (final)");
         if (waits > 0) {
-            System.out.println("Waited " + waits + " times");
+            m_log.info("Waited " + waits + " times");
             if (shortWaits > 0) {
-                System.out.println("Waited too briefly? " + shortWaits
-                        + " times");
+                m_log.info( "Waited too briefly? " + shortWaits
+                        + " times" );
             }
         }
 
         latency = System.currentTimeMillis() - start;
-        System.out.println("CSVLoader elaspsed: " + latency / 1000F
+        m_log.info("CSVLoader elaspsed: " + latency / 1000F
                 + " seconds");
         produceFiles();
         close_cleanup();
@@ -363,7 +362,7 @@ public class CSVLoader {
                 dir.mkdirs();
             }
         } catch (Exception x) {
-            System.err.println(x.getMessage());
+            m_log.error(x.getMessage());
             x.printStackTrace();
             System.exit(1);
         }
@@ -382,7 +381,7 @@ public class CSVLoader {
             out_logfile = new BufferedWriter(new FileWriter(pathLogfile));
             out_reportfile = new BufferedWriter(new FileWriter(pathReportfile));
         } catch (IOException e) {
-            System.err.println(e.getMessage());
+            m_log.error(e.getMessage());
             System.exit(1);
         }
     }
@@ -408,10 +407,9 @@ public class CSVLoader {
                             .println("internal error, infomation is not enough");
                 linect++;
                 out_invaliderowfile.write(info[0] + "\n");
-                String message = "invalid line " + irow + ":  " + info[0]
-                        + "\n";
-                System.err.print(message);
-                out_logfile.write(message + info[1] + "\n");
+                String message = "invalid line " + irow + ":  " + info[0];
+                m_log.error(message);
+                out_logfile.write(message + "\n" + info[1] + "\n");
                 if (linect % bulkflush == 0) {
                     out_invaliderowfile.flush();
                     out_logfile.flush();
@@ -430,19 +428,18 @@ public class CSVLoader {
             out_reportfile.write("CSVLoader rate: " + outCount.get()
                     / elapsedTimeSec + " row/s\n");
 
-            System.out.println("invalid row file is generated to:"
-                    + pathInvalidrowfile + "\n" + "log file is generated to:"
-                    + pathLogfile + "\n" + "report file is generated to:"
-                    + pathReportfile);
+            m_log.info("invalid row file is generated to:" + pathInvalidrowfile);
+            m_log.info("log file is generated to:" + pathLogfile);
+            m_log.info("report file is generated to:" + pathReportfile);
 
             out_invaliderowfile.flush();
             out_logfile.flush();
             out_reportfile.flush();
         } catch (FileNotFoundException e) {
-            System.err.println("CSV report directory '" + config.reportdir
+            m_log.error("CSV report directory '" + config.reportdir
                     + "' does not exist.");
         } catch (Exception x) {
-            System.err.println(x.getMessage());
+            m_log.error(x.getMessage());
         }
 
     }
