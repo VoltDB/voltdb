@@ -242,9 +242,9 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        if (!createSnapshotCompletionNode(nonce, txnId, isTruncation)) {
-            // the node already exists, increase the participating host count
-            increaseParticipateHostCount(txnId);
+        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation)) {
+            // the node already exists, add local host ID to the list
+            increaseParticipateHostCount(txnId, context.getHostId());
         }
 
         try {
@@ -257,12 +257,12 @@ public class SnapshotSaveAPI
     }
 
     /**
-     * Increase the participating host count by one in the snapshot completion
-     * node.
+     * Add the host to the list of hosts participating in this snapshot.
      *
      * @param txnId The snapshot txnId
+     * @param hostId The host ID of the host that's calling this
      */
-    public static void increaseParticipateHostCount(long txnId) {
+    public static void increaseParticipateHostCount(long txnId, int hostId) {
         ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
         final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
@@ -284,8 +284,18 @@ public class SnapshotSaveAPI
                 if (jsonObj.getLong("txnId") != txnId) {
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
                 }
-                int numHostsParticipating = jsonObj.getInt("hosts") + 1;
-                jsonObj.put("hosts", numHostsParticipating);
+
+                boolean hasLocalhost = false;
+                JSONArray hosts = jsonObj.getJSONArray("hosts");
+                for (int i = 0; i < hosts.length(); i++) {
+                    if (hosts.getInt(i) == hostId) {
+                        hasLocalhost = true;
+                        break;
+                    }
+                }
+                if (!hasLocalhost) {
+                    hosts.put(hostId);
+                }
 
                 zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
             } catch (KeeperException.BadVersionException e) {
@@ -302,12 +312,15 @@ public class SnapshotSaveAPI
      * assumes that all hosts will race to call this, so it doesn't fail if the
      * node already exists.
      *
+     * @param nonce Nonce of the snapshot
      * @param txnId
+     * @param hostId The local host ID
      * @param isTruncation Whether or not this is a truncation snapshot
      * @return true if the node is created successfully, false if the node already exists.
      */
     public static boolean createSnapshotCompletionNode(String nonce,
                                                        long txnId,
+                                                       int hostId,
                                                        boolean isTruncation) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
@@ -318,7 +331,7 @@ public class SnapshotSaveAPI
             JSONStringer stringer = new JSONStringer();
             stringer.object();
             stringer.key("txnId").value(txnId);
-            stringer.key("hosts").value(1);
+            stringer.key("hosts").array().value(hostId).endArray();
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("finishedHosts").value(0);
             stringer.key("nonce").value(nonce);
