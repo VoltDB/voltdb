@@ -200,6 +200,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private long m_remainingTasks = 0;
     private long m_executedTaskCount = 0;
     private long m_loggedTaskCount = 0;
+    private long m_taskExeStartTime = 0;
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
         @Override
@@ -491,8 +492,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * The logged txn count will be greater than the replayed txn count
              * because some logged ones were before the stream snapshot
              */
-            m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks");
+            final long duration = (System.currentTimeMillis() - m_taskExeStartTime) / 1000;
+            final long throughput = duration == 0 ? m_executedTaskCount : m_executedTaskCount / duration;
             m_recoveryLog.info("Logged " + m_loggedTaskCount + " tasks");
+            m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks in " +
+                    duration + " seconds at a rate of " +
+                    throughput + " tasks/second");
             m_recoveryProcessor = null;
             m_rejoinSnapshotProcessor = null;
             m_rejoinSnapshotTxnId = -1;
@@ -1115,6 +1120,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             m_recoveryLog.info("New rejoin snapshot transfer is finished");
             m_rejoinSnapshotProcessor.close();
             m_rejoinSnapshotProcessor = null;
+            m_taskExeStartTime = System.currentTimeMillis();
             /*
              * Don't notify the rejoin coordinator yet. The stream snapshot may
              * have not finished on all nodes, let the snapshot completion
