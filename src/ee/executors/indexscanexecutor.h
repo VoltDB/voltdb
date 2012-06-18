@@ -140,6 +140,9 @@ protected:
 
 private:
 
+    bool initSearchKey(int ctr, IndexLookupType&, SortDirectionType&,
+                       int& activeNumOfSearchKeys, bool& shortCircuit);
+
     TableTuple p_next_pull();
     void p_pre_execute_pull(const NValueArray& params);
 

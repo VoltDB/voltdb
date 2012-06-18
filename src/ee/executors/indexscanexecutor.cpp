@@ -69,8 +69,9 @@ namespace detail {
 
     struct IndexScanExecutorState
     {
-        IndexScanExecutorState(const TupleSchema* schema, AbstractExpression* endExpression,
+        IndexScanExecutorState(bool shortCircuit, const TupleSchema* schema, AbstractExpression* endExpression,
             AbstractExpression* postExpression) :
+            m_shortCircuit(shortCircuit),
             m_targetTableSchema(schema),
             m_endExpression(endExpression),
             m_postExpression(postExpression),
@@ -78,6 +79,7 @@ namespace detail {
             m_secondTuple(NULL)
         {}
 
+        bool m_shortCircuit;
         const TupleSchema* m_targetTableSchema;
         AbstractExpression* m_endExpression;
         AbstractExpression* m_postExpression;
@@ -94,7 +96,7 @@ using namespace voltdb;
 IndexScanExecutor::IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
     : AbstractExecutor(engine, abstractNode), m_node(NULL), m_numOfColumns(0), m_numOfSearchkeys(0),
     m_projectionNode(NULL), m_projectionAllTupleArray(NULL), m_projectionExpressions(NULL),
-    m_searchKey(), m_searchKeyBeforeSubstituteArray(NULL), m_searchKeyAllParamArray(NULL),
+    m_searchKey(), m_searchKeyBeforeSubstituteArray(NULL),
     m_needsSubstituteProject(NULL), m_needsSubstituteSearchKey(NULL),
     m_needsSubstitutePostExpression(false), m_needsSubstituteEndExpression(false),
     m_lookupType(), m_sortDirection(), m_limitNode (NULL), m_limitSize(0), m_limitOffset(0),
@@ -273,6 +275,69 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
+bool IndexScanExecutor::initSearchKey(int ctr, IndexLookupType& localLookupType, SortDirectionType& localSortDirection, int& activeNumOfSearchKeys, bool& shortCircuit)
+{
+    NValue candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
+    try {
+        m_searchKey.setNValue(ctr, candidateValue);
+    }
+    catch (SQLException e) {
+        // This next bit of logic handles underflow and overflow while
+        // setting up the search keys.
+        // e.g. TINYINT > 200 or INT <= 6000000000
+
+        // rethow if not an overflow - currently, it's expected to always be an overflow
+        if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+            throw e;
+        }
+
+        // handle the case where this is a comparison, rather than equality match
+        // comparison is the only place where the executor might return matching tuples
+        // e.g. TINYINT < 1000 should return all values
+        if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
+            (ctr == (activeNumOfSearchKeys - 1))) {
+
+            if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+                if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
+                    (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
+
+                    // gt or gte when key overflows returns nothing
+                    shortCircuit = true;
+                    return true;
+                }
+                // VoltDB should only support LT or LTE with
+                // empty search keys for order-by without lookup
+                throw e;
+            }
+            if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+                if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
+                    (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
+
+                    // lt or lte when key underflows returns nothing
+                    shortCircuit = true;
+                    return true;
+                }
+                // don't allow GTE because it breaks null handling
+                localLookupType = INDEX_LOOKUP_TYPE_GT;
+            }
+
+            // if here, means all tuples with the previous searchkey
+            // columns need to be scaned. Note, if only one column,
+            // then all tuples will be scanned
+            activeNumOfSearchKeys--;
+            if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
+                localSortDirection = SORT_DIRECTION_TYPE_ASC;
+            }
+        }
+        // if a EQ comparison is out of range, then return no tuples
+        else {
+            shortCircuit = true;
+        }
+        return true;
+    }
+    return false;
+}
+
 bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
@@ -321,62 +386,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         if (m_needsSubstituteSearchKey[ctr]) {
             m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
         }
-        NValue candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
-        try {
-            m_searchKey.setNValue(ctr, candidateValue);
-        }
-        catch (SQLException e) {
-            // This next bit of logic handles underflow and overflow while
-            // setting up the search keys.
-            // e.g. TINYINT > 200 or INT <= 6000000000
-
-            // rethow if not an overflow - currently, it's expected to always be an overflow
-            if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
-                throw e;
-            }
-
-            // handle the case where this is a comparison, rather than equality match
-            // comparison is the only place where the executor might return matching tuples
-            // e.g. TINYINT < 1000 should return all values
-            if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                (ctr == (activeNumOfSearchKeys - 1))) {
-
-                if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
-                        (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
-
-                        // gt or gte when key overflows returns nothing
-                        return true;
-                    }
-                    else {
-                        // VoltDB should only support LT or LTE with
-                        // empty search keys for order-by without lookup
-                        throw e;
-                    }
-                }
-                if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
-                        (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                        // lt or lte when key underflows returns nothing
-                        return true;
-                    }
-                    else {
-                        // don't allow GTE because it breaks null handling
-                        localLookupType = INDEX_LOOKUP_TYPE_GT;
-                    }
-                }
-
-                // if here, means all tuples with the previous searchkey
-                // columns need to be scaned. Note, if only one column,
-                // then all tuples will be scanned
-                activeNumOfSearchKeys--;
-                if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
-                    localSortDirection = SORT_DIRECTION_TYPE_ASC;
-                }
-            }
-            // if a EQ comparison is out of range, then return no tuples
-            else {
+        bool shortCircuit = false;
+        bool done = initSearchKey(ctr, localLookupType, localSortDirection, activeNumOfSearchKeys, shortCircuit);
+        if (done) {
+            if (shortCircuit) {
                 return true;
             }
             break;
@@ -557,7 +570,9 @@ bool IndexScanExecutor::support_pull() const {
 }
 
 TableTuple IndexScanExecutor::p_next_pull() {
-
+    if (m_state->m_shortCircuit) {
+        return m_tuple;
+    }
     while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
             !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
            ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || m_numOfSearchkeys == 0) &&
@@ -609,23 +624,18 @@ void IndexScanExecutor::p_pre_execute_pull(const NValueArray &params)
     //         m_lookupType == INDEX_LOOKUP_TYPE_GT);
     m_searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
-    if (m_searchKeyAllParamArray != NULL)
-    {
-        VOLT_TRACE("sweet, all params");
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
-        {
-            m_searchKey.setNValue( ctr, params[m_searchKeyAllParamArray[ctr]]);
+    for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
+        if (m_needsSubstituteSearchKey[ctr]) {
+            m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
         }
-    }
-    else
-    {
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
-            if (m_needsSubstituteSearchKey[ctr]) {
-                m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
+        bool shortCircuit = false;
+        bool done = initSearchKey(ctr, m_lookupType, m_sortDirection, m_numOfSearchkeys, shortCircuit);
+        if (done) {
+            if (shortCircuit) {
+                m_state.reset(new detail::IndexScanExecutorState(true, NULL, NULL, NULL));
+                return;
             }
-            m_searchKey.
-              setNValue(ctr,
-                        m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL));
+            break;
         }
     }
     assert(m_searchKey.getSchema()->columnCount() > 0);
@@ -640,6 +650,11 @@ void IndexScanExecutor::p_pre_execute_pull(const NValueArray &params)
 
 void IndexScanExecutor::set_expressions_pull(const NValueArray &params)
 {
+    // TODO: Need to properly set/reset shortCircuit, which might be influenced by new params?
+    if (m_state && m_state->m_shortCircuit) {
+        return;
+    }
+
     // Need to set it if this method is called from nestloop executor
     m_tuple = TableTuple(m_targetTable->schema());
     //
@@ -666,12 +681,15 @@ void IndexScanExecutor::set_expressions_pull(const NValueArray &params)
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
 
-    m_state.reset(new detail::IndexScanExecutorState(m_targetTable->schema(), end_expression, post_expression));
+    m_state.reset(new detail::IndexScanExecutorState(false, m_targetTable->schema(), end_expression, post_expression));
 }
 
 //@TODO
 void IndexScanExecutor::set_search_key_pull(const TableTuple& searchKey, const TableTuple* otherTuple)
 {
+    if (m_state->m_shortCircuit) {
+        return;
+    }
     m_searchKey = searchKey;
     if (otherTuple == NULL)
     {
