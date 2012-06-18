@@ -43,8 +43,8 @@ public class TestCSVLoader extends TestCase {
     private VoltProjectBuilder builder;
     private Client client;
 
-    private final String userHome = System.getProperty("user.home");
-    String path_csv = userHome + "/" + "test.csv";
+    private final String reportDir = "/tmp/";
+    String path_csv = reportDir + "/" + "test.csv";
 
     @Override
     protected void setUp() throws Exception
@@ -174,9 +174,9 @@ public class TestCSVLoader extends TestCase {
                 "clm_timestamp timestamp default null " +
                 "); ";
      String []myOptions = {
-     		"-f" + userHome + "/test.csv",
+     		"-f" + reportDir + "/test.csv",
      		//"--procedure=BLAH.insert",
-     		//"--reportdir=" + reportdir,
+     		"--reportdir=" + reportDir,
      		//"--table=BLAH",
      		"--maxerrors=50",
      		//"-user",
@@ -196,7 +196,7 @@ public class TestCSVLoader extends TestCase {
 	    					"2,2,2,222222,second,3.30,NULL,"+currentTime,
 	    					"3,3,3,333333, third ,NULL, 3.33,"+currentTime,
 	    					"4,4,4,444444, NULL ,4.40 ,4.44,"+currentTime,
-	    					"5,5,5,5555555, fifth, 5.50, 5.55,"+currentTime,
+	    					"5,5,5,5555555,  \"abcde\"g, 5.50, 5.55,"+currentTime,
 	    	 			    "6,6,NULL,666666, sixth, 6.60, 6.66,"+currentTime,
 	    					"7,NULL,7,7777777, seventh, 7.70, 7.77,"+currentTime,
 	    					"11, 1,1,\"1,000\",first,1.10,1.11,"+currentTime,
@@ -227,9 +227,9 @@ public class TestCSVLoader extends TestCase {
                 //"clm_varinary varbinary default null" + // for later
                 "); ";
      String []myOptions = {
-            "-f" + userHome + "/test.csv",
+            "-f" + reportDir + "/test.csv",
             //"--procedure=BLAH.insert",
-            //"--reportdir=" + reportdir,
+            "--reportdir=" + reportDir,
             //"--table=BLAH",
             "--maxerrors=50",
             //"-user",
