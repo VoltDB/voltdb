@@ -399,7 +399,7 @@ class Distributer {
         }
     }
 
-    void drain() throws NoConnectionsException, InterruptedException {
+    void drain() throws InterruptedException {
         boolean more;
         do {
             more = false;
@@ -432,7 +432,7 @@ class Distributer {
             long connectionResponseTimeoutMS) {
         m_useMultipleThreads = useMultipleThreads;
         m_network = new VoltNetworkPool(
-                m_useMultipleThreads ? Runtime.getRuntime().availableProcessors() / 2 : 1,
+                m_useMultipleThreads ? Math.max(2, CoreUtils.availableProcessors()) / 4 : 1,
                         null);
         m_network.start();
         m_procedureCallTimeoutMS = procedureCallTimeoutMS;

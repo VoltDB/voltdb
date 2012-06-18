@@ -81,16 +81,16 @@ public class TestFunctionsSuite extends RegressionSuite {
         VoltTable r = null;
 
         cr = client.callProcedure("WHERE_ABS");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        assertTrue(r.asScalarLong() == 5);
+        assertEquals(5, r.asScalarLong());
 
         try {
             // test decimal support and non-column expressions
             cr = client.callProcedure("WHERE_ABSFF");
-            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
-            assertTrue(r.asScalarLong() == 5);
+            assertEquals(5, r.asScalarLong());
         } catch (ProcCallException hsqlFailed) {
             // Give HSQLDB a pass on this query.
             String msg = hsqlFailed.getMessage();
@@ -99,15 +99,15 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         // Test type promotions
         cr = client.callProcedure("WHERE_ABSIF");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        assertTrue(r.asScalarLong() == 5);
+        assertEquals(5, r.asScalarLong());
 
         try {
             cr = client.callProcedure("WHERE_ABSFI");
-            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
-        assertTrue(r.asScalarLong() == 5);
+        assertEquals(5, r.asScalarLong());
         } catch (ProcCallException hsqlFailed) {
             // Give HSQLDB a pass on this query.
             String msg = hsqlFailed.getMessage();
@@ -118,9 +118,9 @@ public class TestFunctionsSuite extends RegressionSuite {
         // Test application to weakly typed NUMERIC constants
         try {
             cr = client.callProcedure("WHERE_ABSWEAK");
-            assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
             r = cr.getResults()[0];
-            assertTrue(r.asScalarLong() == 5);
+            assertEquals(5, r.asScalarLong());
         } catch (ProcCallException hsqlFailed) {
             // Give HSQLDB a pass on this query.
             String msg = hsqlFailed.getMessage();
@@ -128,80 +128,95 @@ public class TestFunctionsSuite extends RegressionSuite {
         }
 
         cr = client.callProcedure("DISPLAY_ABS");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        assertTrue(r.asScalarLong() == 5);
+        assertEquals(5, r.asScalarLong());
 
         cr = client.callProcedure("ORDER_ABS");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         r.advanceRow();
         long value = r.getLong(0);
-        assertTrue(value == 5);
+        assertEquals(5, value);
 /*
         cr = client.callProcedure("GROUP_ABS");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        assertTrue(r.asScalarLong() == 5);
+        assertEquals(5, r.asScalarLong());
 */
         cr = client.callProcedure("AGG_OF_ABS");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        assertTrue(r.asScalarLong() == 5);
+        assertEquals(5, r.asScalarLong());
 /*
         cr = client.callProcedure("ABS_OF_AGG");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        assertTrue(r.asScalarLong() == 5);
+        assertEquals(5, r.asScalarLong());
 */
         // Test null propagation
         cr = client.callProcedure("INSERT_NULL", 99);
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("INSERT_NULL", 98);
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("INSERT_NULL", 97);
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("INSERT_NULL", 96);
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         cr = client.callProcedure("INSERT_NULL", 95);
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         long resultA;
         long resultB;
 
         cr = client.callProcedure("@AdHoc", "select count(*) from P1 where NUM > 9");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultA = r.asScalarLong();
 
         cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(NUM) > 9");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
-        assertTrue(resultA == resultB);
+        assertEquals(resultA, resultB);
 
         cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(0-NUM) > 9");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
-        assertTrue(resultA == resultB);
+        assertEquals(resultA, resultB);
 
         cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not NUM > 9");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultA = r.asScalarLong();
 
         cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(0-NUM) > 9");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
-        assertTrue(resultA == resultB);
+        assertEquals(resultA, resultB);
 
         cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(NUM) > 9");
-        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
-        assertTrue(resultA == resultB);
+        assertEquals(resultA, resultB);
+
+        // These two cases are apparently not close enough to trigger ENG-3191, but they're worth trying?
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) > (ABS(NUM) + 4)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(NUM) < (ABS(ID) - 4)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+
 
         boolean caught = false;
 

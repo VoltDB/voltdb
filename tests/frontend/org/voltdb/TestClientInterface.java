@@ -288,10 +288,10 @@ public class TestClientInterface {
                                               anyInt(), anyObject(), anyInt(), anyLong());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
-        assertFalse(boolValues.get(1)); // readonly
+        assertTrue(boolValues.get(1));  // readonly
         assertFalse(boolValues.get(2)); // single-part
         assertFalse(boolValues.get(3)); // every site
-        assertEquals("@AdHoc", invocationCaptor.getValue().getProcName());
+        assertEquals("@AdHoc_RO_MP", invocationCaptor.getValue().getProcName());
         String[] sqlStatements = (String[]) invocationCaptor.getValue().getParameterAtIndex(2);
         assertNotNull(sqlStatements);
         assertEquals(1, sqlStatements.length);

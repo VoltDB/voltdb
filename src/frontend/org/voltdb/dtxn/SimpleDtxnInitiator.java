@@ -101,6 +101,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     private final int m_hostId;
     private long m_lastSeenOriginalTxnId = Long.MIN_VALUE;
 
+    // Keeps track of site index for choosing sites via round robin discipline.
+    private int m_roundRobinSiteIndex = 0;
+
     public SimpleDtxnInitiator(DtxnInitiatorMailbox mailbox,
                                CatalogContext context,
                                HostMessenger messenger, int hostId,
@@ -195,7 +198,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         {
             SiteTracker tracker = VoltDB.instance().getSiteTracker();
             List<Long> sitesOnThisHost = tracker.getSitesForHost(m_hostId);
-            long coordinatorId = sitesOnThisHost.get(0);
+            // Choose coordinator using round robin technique.
+            // Check for wrapping around before using the round robin index to
+            // innoculate against size changes, etc..
+            if (m_roundRobinSiteIndex >= sitesOnThisHost.size()) {
+                m_roundRobinSiteIndex = 0;
+            }
+            long coordinatorId = sitesOnThisHost.get(m_roundRobinSiteIndex);
+            m_roundRobinSiteIndex++;
             ArrayList<Long> replicaIds = new ArrayList<Long>();
             for (Long replica : tracker.getSitesForPartition(tracker.getPartitionForSite(coordinatorId))) {
                 if (replica != coordinatorId) {

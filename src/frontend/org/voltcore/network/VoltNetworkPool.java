@@ -45,6 +45,9 @@ public class VoltNetworkPool {
     }
 
     public VoltNetworkPool(int numThreads, ScheduledExecutorService ses) {
+        if (numThreads < 1) {
+            throw new IllegalArgumentException("Must specify a postive number of threads");
+        }
         m_networks = new VoltNetwork[numThreads];
         for (int ii = 0; ii < numThreads; ii++) {
             m_networks[ii] = new VoltNetwork(ii, ses);

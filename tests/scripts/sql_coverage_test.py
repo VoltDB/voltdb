@@ -101,6 +101,15 @@ def run_once(name, command, statements_path, results_path):
                     "Failed to kill the server process %d" % (server.pid)
             break
         tables = None
+        if client.response == None:
+            print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
+                (statement["SQL"], sys.exc_info()[1])
+            killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+            killer.communicate()
+            if killer.returncode != 0:
+                print >> sys.stderr, \
+                    "Failed to kill the server process %d" % (server.pid)
+            break
         if client.response.tables != None:
             tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
         cPickle.dump({"Status": client.response.status,

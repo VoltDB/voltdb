@@ -1064,7 +1064,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                    plannedStatement.isReplicatedTableDML);
         }
         // All statements retrieved from cache?
-        if (planBatch.plannedStatements.size() == sqlStatements.size()) {
+        if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
             createAdHocTransaction(planBatch);
             return null;
         }
@@ -1231,6 +1231,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         final Procedure catProc = catalogContext.procedures.get(task.procName);
         Config sysProc = SystemProcedureCatalog.listing.get(task.procName);
 
+        // Map @AdHoc... to @AdHoc_RW_MP for validation. In the future if security is
+        // configured differently for @AdHoc... variants this code will have to
+        // change in order to use the proper variant based on whether the work
+        // is single or multi partition and read-only or read-write.
+        if (sysProc == null && task.procName.equals("@AdHoc")) {
+            sysProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP");
+            assert(sysProc != null);
+        }
+
         if (user == null) {
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -1260,7 +1269,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         if (sysProc != null) {
             // these have helpers that do all the work...
-            if (task.procName.startsWith("@AdHoc")) {
+            if (task.procName.equals("@AdHoc")) {
                 return dispatchAdHoc(task, handler, ccxn);
             } else if (task.procName.equals("@UpdateApplicationCatalog")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
@@ -1373,17 +1382,27 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // create the execution site task
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // pick the sysproc based on the presence of partition info
-        // HSQL does not specifically implement AdHocSP -- instead, use its always-SP implementation of AdHoc
+        // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
         boolean isSinglePartition = (plannedStmtBatch.partitionParam != null) && ! m_isConfiguredForHSQL;
         int partitions[] = null;
 
         if (isSinglePartition) {
-            task.procName = "@AdHocSP";
+            if (plannedStmtBatch.isReadOnly()) {
+                task.procName = "@AdHoc_RO_SP";
+            }
+            else {
+                task.procName = "@AdHoc_RW_SP";
+            }
             assert(plannedStmtBatch.isSinglePartitionCompatible());
             partitions = new int[] { TheHashinator.hashToPartition(plannedStmtBatch.partitionParam) };
         }
         else {
-            task.procName = "@AdHoc";
+            if (plannedStmtBatch.isReadOnly()) {
+                task.procName = "@AdHoc_RO_MP";
+            }
+            else {
+                task.procName = "@AdHoc_RW_MP";
+            }
             partitions = m_allPartitions;
         }
 
@@ -1429,14 +1448,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // initiate the transaction
         createTransaction(plannedStmtBatch.connectionId, plannedStmtBatch.hostname,
                 plannedStmtBatch.adminConnection,
-                task, false, isSinglePartition, false, partitions,
+                task, plannedStmtBatch.isReadOnly(), isSinglePartition, false, partitions,
                 partitions.length, plannedStmtBatch.clientData,
                 0, EstTime.currentTimeMillis());
 
         // cache the plans, but don't hold onto the connection object
         plannedStmtBatch.clientData = null;
-        for (AdHocPlannedStatement plannedStatement : plannedStmtBatch.plannedStatements) {
-            m_adhocCache.put(plannedStatement);
+        for (int index = 0; index < plannedStmtBatch.getPlannedStatementCount(); index++) {
+            m_adhocCache.put(plannedStmtBatch.getPlannedStatement(index));
         }
     }
 
