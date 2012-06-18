@@ -48,7 +48,7 @@ public class ParameterConverter {
         if (param == null ||
             param == VoltType.NULL_STRING_OR_VARBINARY ||
             param == VoltType.NULL_DECIMAL ||
-            param instanceof String && ((String)param).equals("/N")) {
+            (param instanceof String && ((String)param).equals("\\N") )) {
             if (isPrimitive) {
                 VoltType type = VoltType.typeFromClass(paramType);
                 switch (type) {
@@ -132,7 +132,7 @@ public class ParameterConverter {
             if (pclass == String.class) {
                 String longtime = ((String) param).trim();
                 try {
-                        return new java.sql.Timestamp(Long.parseLong(longtime));
+                        return new TimestampType(Long.parseLong(longtime));
                 } catch (IllegalArgumentException e) {
                         // Defer errors to the generic Exception throw below, if it's not the right format
                 }

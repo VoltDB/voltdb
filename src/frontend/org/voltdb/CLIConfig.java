@@ -70,7 +70,6 @@ public abstract class CLIConfig {
     public void printUsage() {
         // automatically generate the help statement
         HelpFormatter formatter = new HelpFormatter();
-        //formatter.setOptPrefix("--");
         formatter.printHelp(cmdName, helpmsgs, false);
     }
 
