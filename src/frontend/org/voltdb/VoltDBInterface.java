@@ -17,17 +17,15 @@
 package org.voltdb;
 
 import java.util.ArrayList;
-import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
+import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
-
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -115,7 +113,7 @@ public interface VoltDBInterface
     /**
      * Notify RealVoltDB that recovery is complete
      */
-    void onExecutionSiteRecoveryCompletion(long transferred);
+    void onExecutionSiteRejoinCompletion(long transferred);
 
     /**
      * Set the operational mode this server should be in once it has finished

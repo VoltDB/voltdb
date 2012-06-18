@@ -760,6 +760,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         return sm;
     }
 
+    /**
+     * Discard a mailbox
+     */
+    public void removeMailbox(long hsId) {
+        m_siteMailboxes.remove(hsId);
+    }
+
     public void send(final long destinationHSId, final VoltMessage message)
     {
         assert(message != null);

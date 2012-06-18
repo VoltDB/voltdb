@@ -120,6 +120,9 @@ public class VoltDB {
         /** information used to rejoin this new node to a cluster */
         public String m_rejoinToHostAndPort = null;
 
+        /** Use the new rejoin code */
+        public boolean m_newRejoin = false;
+
         /** HTTP port can't be set here, but eventually value will be reflected here */
         public int m_httpPort = Integer.MAX_VALUE;
 
@@ -304,6 +307,9 @@ public class VoltDB {
                 }
                 else if (arg.startsWith("rejoinhost ")) {
                     m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
+                }
+                else if (arg.equals("newrejoin")) {
+                    m_newRejoin = true;
                 }
 
                 else if (arg.equals("create")) {

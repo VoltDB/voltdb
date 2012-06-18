@@ -44,6 +44,7 @@ import org.voltdb.messaging.FragmentTaskMessage;
 public abstract class TransactionState extends OrderableTransaction  {
     public final long coordinatorSiteId;
     protected final boolean m_isReadOnly;
+    protected final TransactionInfoBaseMessage m_notice;
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
     protected final SiteTransactionConnection m_site;
@@ -51,6 +52,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
+    private boolean m_sendResponse = true; // whether or not to send response
 
     /** Iv2 constructor */
     protected TransactionState(long txnId, Mailbox mbox,
@@ -59,6 +61,7 @@ public abstract class TransactionState extends OrderableTransaction  {
         super(txnId, notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = null;
+        m_notice = notice;
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = Site.kInvalidUndoToken;
@@ -78,9 +81,22 @@ public abstract class TransactionState extends OrderableTransaction  {
         super(notice.getTxnId(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = site;
+        m_notice = notice;
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
+    }
+
+    final public TransactionInfoBaseMessage getNotice() {
+        return m_notice;
+    }
+
+    public boolean shouldSendResponse() {
+        return m_sendResponse;
+    }
+
+    public void setSendResponse(boolean sendResponse) {
+        m_sendResponse = sendResponse;
     }
 
     // Assume that done-ness is a latch.
@@ -114,7 +130,7 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract boolean hasTransactionalWork();
 
-    public abstract boolean doWork(boolean recovering);
+    public abstract boolean doWork(boolean rejoining);
 
     public void storeResults(ClientResponseImpl response) {
         m_response = response;

@@ -23,12 +23,9 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
-
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
@@ -167,17 +164,17 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return has_transactional_work;
     }
 
-    private boolean m_startedWhileRecovering;
+    private boolean m_startedWhileRejoining;
 
     @Override
-    public boolean doWork(boolean recovering) {
+    public boolean doWork(boolean rejoining) {
         if (!m_hasStartedWork) {
             m_site.beginNewTxn(this);
             m_hasStartedWork = true;
-            m_startedWhileRecovering = recovering;
+            m_startedWhileRejoining = rejoining;
         }
 
-        assert(m_startedWhileRecovering == recovering);
+        assert(m_startedWhileRejoining == rejoining);
 
         if (m_done) {
             return true;
@@ -209,7 +206,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 initiateProcedure((InitiateTaskMessage) payload);
             }
             else if (payload instanceof FragmentTaskMessage) {
-                if (recovering && (wu.nonTransactional == false)) {
+                if (rejoining && (wu.nonTransactional == false)) {
                     processRecoveringFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
                 }
                 else {

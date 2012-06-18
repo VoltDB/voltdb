@@ -61,7 +61,7 @@ public class VoltZK {
      */
     public static enum MailboxType {
         ClientInterface, ExecutionSite, Initiator, StatsAgent,
-        MpInitiator
+        MpInitiator, OTHER
     }
     public static final String mailboxes = "/db/mailboxes";
 
