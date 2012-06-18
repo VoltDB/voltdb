@@ -125,7 +125,7 @@ public class CSVLoader {
         @Option(shortOpt = "r", desc = "directory path to produce report files.")
         String reportdir = "./";
 
-        @Option(desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
+        @Option(shortOpt = "m", desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
         int maxerrors = 100;
 
         @Option(desc = "the delimiter to use for separating entries.")
@@ -146,13 +146,13 @@ public class CSVLoader {
         @Option(desc = "the default leading whitespace behavior to use if none is supplied.", hasArg = false)
         boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
 
-        @Option(desc = "the servers to be connected")
+        @Option(shortOpt = "s", desc = "the servers to be connected")
         String servers = "localhost";
 
         @Option(shortOpt = "u", desc = "user name that is used to connect to the servers,by defalut null")
         String user = "";
 
-        @Option(shortOpt = "pw", desc = "password for this user to use to connect the servers,by defalut null")
+        @Option(shortOpt = "P", desc = "password for this user to use to connect the servers,by defalut null")
         String password = "";
 
         @Option(desc = "port to be used for the servers right now")
@@ -324,23 +324,24 @@ public class CSVLoader {
         return firstIds;
     }
 
-    private static String checkparams_trimspace(String[] linefragement,
+    private static String checkparams_trimspace(String[] slot,
             int columnCnt) {
-        if (linefragement.length == 1 && linefragement[0].equals("")) {
+        if (slot.length == 1 && slot[0].equals("")) {
             return "Error: blank line";
         }
-        if (linefragement.length != columnCnt) {
-            return "Error: # of attributes do not match those in the procedure, needed : "
+        if (slot.length != columnCnt) {
+            return "Error: # of attributes do not match, # of attributes needed: "
                     + columnCnt
                     + "inputed: "
-                    + linefragement.length;
+                    + slot.length;
         }
-
-        for (int i = 0; i < linefragement.length; i++) {
+        for (int i = 0; i < slot.length; i++) {
             // trim white space in this line.
-            linefragement[i] = linefragement[i].trim();
-            if ((linefragement[i]).equals("NULL"))
-                linefragement[i] = null;
+            slot[i] = slot[i].trim();
+            // treat NULL, \N and "\N" as actual null value
+            if ((slot[i]).equals("NULL") || slot[i].equals("\\N")
+                    || !config.strictquotes && slot[i].equals("\"\\N\""))
+                slot[i] = null;
         }
 
         return null;

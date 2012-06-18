@@ -28,6 +28,7 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -48,7 +49,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
     public void testRejoinFuzz2ElectricBoogaloo() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
-        int processors = Runtime.getRuntime().availableProcessors();
+        int processors = CoreUtils.availableProcessors();
         final int numHosts = processors >= 8 ? 6 : 3;
         final int numTuples = 204800 * (processors >= 8 ? 6 : 1);//about 100 megs per
         //final int numTuples = 0;
