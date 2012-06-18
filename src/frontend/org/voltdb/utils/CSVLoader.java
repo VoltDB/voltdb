@@ -123,7 +123,7 @@ public class CSVLoader {
         int limitrows = Integer.MAX_VALUE;
 
         @Option(shortOpt = "r", desc = "directory path to produce report files.")
-        String reportdir = "./";
+        String reportdir = System.getProperty("user.dir");
 
         @Option(shortOpt = "m", desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
         int maxerrors = 100;
