@@ -353,7 +353,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         }
         assert(caught);
     }
-/*
+
     public void testJoinOrder() throws Exception {
         if (isHSQL() || isValgrind()) return;
 
