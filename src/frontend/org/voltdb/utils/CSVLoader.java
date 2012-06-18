@@ -125,7 +125,7 @@ public class CSVLoader {
         @Option(shortOpt = "r", desc = "directory path to produce report files.")
         String reportdir = "./";
 
-        @Option(desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
+        @Option(shortOpt = "m", desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
         int maxerrors = 100;
 
         @Option(desc = "the delimiter to use for separating entries.")
@@ -146,13 +146,13 @@ public class CSVLoader {
         @Option(desc = "the default leading whitespace behavior to use if none is supplied.", hasArg = false)
         boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
 
-        @Option(desc = "the servers to be connected")
+        @Option(shortOpt = "s", desc = "the servers to be connected")
         String servers = "localhost";
 
         @Option(shortOpt = "u", desc = "user name that is used to connect to the servers,by defalut null")
         String user = "";
 
-        @Option(shortOpt = "pw", desc = "password for this user to use to connect the servers,by defalut null")
+        @Option(shortOpt = "P", desc = "password for this user to use to connect the servers,by defalut null")
         String password = "";
 
         @Option(desc = "port to be used for the servers right now")
