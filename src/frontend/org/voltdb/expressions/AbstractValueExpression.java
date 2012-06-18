@@ -34,8 +34,4 @@ public abstract class AbstractValueExpression extends AbstractExpression {
         super(type);
     }
 
-    public AbstractValueExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
-        super(type, right, left);
-    }
-
 }

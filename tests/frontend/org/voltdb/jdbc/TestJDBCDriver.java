@@ -29,6 +29,7 @@ import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
 import java.io.File;
+import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
@@ -37,6 +38,7 @@ import java.sql.SQLException;
 import java.sql.Types;
 import java.util.Arrays;
 import java.util.List;
+import java.util.regex.Pattern;
 
 import org.junit.AfterClass;
 import org.junit.BeforeClass;
@@ -52,19 +54,32 @@ public class TestJDBCDriver {
     static String testjar;
     static ServerThread server;
     static Connection conn;
+    static TPCCProjectBuilder pb;
 
     @BeforeClass
-    public static void setUp() throws Exception {
+    public static void setUp() throws ClassNotFoundException, SQLException {
         testjar = BuildDirectoryUtils.getBuildDirectoryPath() + File.separator
                 + "jdbcdrivertest.jar";
 
         // compile a catalog
-        TPCCProjectBuilder pb = new TPCCProjectBuilder();
+        pb = new TPCCProjectBuilder();
         pb.addDefaultSchema();
         pb.addDefaultPartitioning();
         pb.addProcedures(MultiSiteSelect.class, InsertNewOrder.class);
         pb.compile(testjar, 2, 0);
 
+        // Set up ServerThread and Connection
+        startServer();
+    }
+
+    @AfterClass
+    public static void tearDown() throws Exception {
+        stopServer();
+        File f = new File(testjar);
+        f.delete();
+    }
+
+    private static void startServer() throws ClassNotFoundException, SQLException {
         server = new ServerThread(testjar, pb.getPathToDeployment(),
                                   BackendTarget.NATIVE_EE_JNI);
         server.start();
@@ -74,12 +89,15 @@ public class TestJDBCDriver {
         conn = DriverManager.getConnection("jdbc:voltdb://localhost:21212");
     }
 
-    @AfterClass
-    public static void tearDown() throws Exception {
-        conn.close();
-        server.shutdown();
-        File f = new File(testjar);
-        f.delete();
+    private static void stopServer() throws SQLException {
+        if (conn != null) {
+            conn.close();
+            conn = null;
+        }
+        if (server != null) {
+            try { server.shutdown(); } catch (InterruptedException e) { /*empty*/ }
+            server = null;
+        }
     }
 
     @Test
@@ -327,6 +345,38 @@ public class TestJDBCDriver {
     }
 
     @Test
+    public void testBadProcedureName() throws SQLException {
+        CallableStatement cs = conn.prepareCall("{call Oopsy(?)}");
+        cs.setLong(1, 99);
+        try {
+            cs.execute();
+        } catch (SQLException e) {
+            // Since it's a GENERAL_ERROR we need to look for a string by pattern.
+            assertEquals(e.getSQLState(), SQLError.GENERAL_ERROR);
+            assertTrue(Pattern.matches(".*Procedure .* not found.*", e.getMessage()));
+        }
+    }
+
+    @Test
+    public void testDoubleInsert() throws SQLException {
+        // long i_id, long i_im_id, String i_name, double i_price, String i_data
+        CallableStatement cs = conn.prepareCall("{call InsertNewOrder(?, ?, ?)}");
+        cs.setInt(1, 55);
+        cs.setInt(2, 66);
+        cs.setInt(3, 77);
+        cs.execute();
+        try {
+            cs.setInt(1, 55);
+            cs.setInt(2, 66);
+            cs.setInt(3, 77);
+            cs.execute();
+        } catch (SQLException e) {
+            // Since it's a GENERAL_ERROR we need to look for a string by pattern.
+            assertEquals(e.getSQLState(), SQLError.GENERAL_ERROR);
+            assertTrue(e.getMessage().contains("violation of constraint"));
+        }
+    }
+
     public void testVersionMetadata() throws SQLException {
         int major = conn.getMetaData().getDatabaseMajorVersion();
         int minor = conn.getMetaData().getDatabaseMinorVersion();
@@ -334,4 +384,18 @@ public class TestJDBCDriver {
         assertTrue(minor >= 0);
     }
 
+    @Test
+    public void testLostConnection() throws SQLException, ClassNotFoundException {
+        // Break the current connection and try to execute a procedure call.
+        CallableStatement cs = conn.prepareCall("{call Oopsy(?)}");
+        stopServer();
+        cs.setLong(1, 99);
+        try {
+            cs.execute();
+        } catch (SQLException e) {
+            assertEquals(e.getSQLState(), SQLError.CONNECTION_FAILURE);
+        }
+        // Restore a working connection for any remaining tests
+        startServer();
+    }
 }

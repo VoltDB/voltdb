@@ -16,32 +16,32 @@
  */
 package org.voltdb.utils;
 
-import java.io.ByteArrayOutputStream;
 import java.io.File;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.InputStream;
+import java.io.IOException;
+import java.net.BindException;
+import java.net.ServerSocket;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Calendar;
+import java.util.Date;
 import java.util.GregorianCalendar;
-import java.util.Set;
-import java.util.concurrent.ExecutorService;
-import java.util.concurrent.LinkedBlockingQueue;
-import java.util.concurrent.ScheduledThreadPoolExecutor;
-import java.util.concurrent.ThreadFactory;
-import java.util.concurrent.ThreadPoolExecutor;
-import java.util.concurrent.TimeUnit;
+import java.util.List;
 import java.util.regex.Matcher;
 import java.util.regex.Pattern;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ReplicationRole;
 import org.voltdb.licensetool.LicenseApi;
-import org.voltdb.logging.VoltLogger;
+
+import com.google.common.net.HostAndPort;
 
 public class MiscUtils {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger consoleLog = new VoltLogger("CONSOLE");
 
     /**
      * Simple code to copy a file from one place to another...
@@ -50,25 +50,7 @@ public class MiscUtils {
     public static void copyFile(String fromPath, String toPath) throws Exception {
         File inputFile = new File(fromPath);
         File outputFile = new File(toPath);
-
-        FileReader in = new FileReader(inputFile);
-        FileWriter out = new FileWriter(outputFile);
-        int c;
-
-        while ((c = in.read()) != -1)
-          out.write(c);
-
-        in.close();
-        out.close();
-    }
-
-    public static final int[] toArray(Set<Integer> set) {
-        int retval[] = new int[set.size()];
-        int ii = 0;
-        for (Integer i : set) {
-            retval[ii++] = i;
-        }
-        return retval;
+        com.google.common.io.Files.copy(inputFile, outputFile);
     }
 
     /**
@@ -224,7 +206,7 @@ public class MiscUtils {
 
         // print out trial success message
         if (licenseApi.isTrial()) {
-            hostLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
+            consoleLog.info("Starting VoltDB with trial license. License expires on " + expiresStr + ".");
             return true;
         }
 
@@ -251,7 +233,7 @@ public class MiscUtils {
                                    (valid ? "" : "invalid "),
                                    licenseApi.maxHostcount(),
                                    expiresStr);
-        hostLog.info(msg);
+        consoleLog.info(msg);
 
         return true;
     }
@@ -288,107 +270,6 @@ public class MiscUtils {
 
     }
 
-    /*
-     * Have shutdown actually means shutdown. Tasks that need to complete should use
-     * futures.
-     */
-    public static ScheduledThreadPoolExecutor getScheduledThreadPoolExecutor(String name, int poolSize, int stackSize) {
-        ScheduledThreadPoolExecutor ses = new ScheduledThreadPoolExecutor(poolSize, getThreadFactory(name));
-        ses.setContinueExistingPeriodicTasksAfterShutdownPolicy(false);
-        ses.setExecuteExistingDelayedTasksAfterShutdownPolicy(false);
-        return ses;
-    }
-
-    /**
-     * Create a bounded single threaded executor that rejects requests if more than capacity
-     * requests are outstanding.
-     */
-    public static ExecutorService getBoundedSingleThreadExecutor(String name, int capacity) {
-        LinkedBlockingQueue<Runnable> lbq = new LinkedBlockingQueue<Runnable>(capacity);
-        ThreadPoolExecutor tpe = new ThreadPoolExecutor(1, 1, Long.MAX_VALUE, TimeUnit.DAYS, lbq, getThreadFactory(name));
-        return tpe;
-    }
-
-    public static ThreadFactory getThreadFactory(String name) {
-        return getThreadFactory(name, 1024 * 1024);
-    }
-
-    public static ThreadFactory getThreadFactory(final String name, final int stackSize) {
-        return new ThreadFactory() {
-            @Override
-            public Thread newThread(Runnable r) {
-                Thread t = new Thread(null, r, name, stackSize);
-                t.setDaemon(true);
-                return t;
-            }
-        };
-    }
-
-    private static String checkForJavaHomeInEnvironment() throws Exception {
-        String javahome = System.getenv("JAVA_HOME");
-        if (javahome != null) {
-            File f = new File(new File(javahome, "bin"), "java");
-            if (f.exists() && f.canExecute()) {
-                return f.getAbsolutePath();
-            } else {
-                hostLog.warn("JAVA_HOME environment variable (" + javahome +
-                        ") was set, but could not find an executable java binary at " + f.getAbsolutePath());
-            }
-        } else {
-            hostLog.warn("JAVA_HOME environment variable was not set, couldn't be used to find a java binary");
-        }
-        return null;
-    }
-
-    private static String checkForJavaInPath() throws Exception {
-        Process p = Runtime.getRuntime().exec("which java");
-        p.waitFor();
-        InputStream is = p.getInputStream();
-        ByteArrayOutputStream baos = new ByteArrayOutputStream();
-        int read = 0;
-        while ((read = is.read()) != -1) {
-            baos.write(read);
-        }
-        String java = new String(baos.toByteArray(), "UTF-8").trim();
-        if (java != null) {
-            File f = new File(java);
-            if (f.exists() && f.canExecute()) {
-                return f.getAbsolutePath();
-            } else {
-                hostLog.warn("Attempted to discover java binary from PATH using 'which java' (" +
-                        java + ") but an executable binary was not found at " + f.getAbsolutePath());
-            }
-        }
-        return null;
-    }
-
-    public static String getJavaPath() throws Exception {
-        String javahome = System.getProperties().getProperty("java.home");
-        if (javahome != null) {
-            File f = new File(javahome + "/bin/java");
-            if (f.exists() && f.canExecute()) {
-                return f.getAbsolutePath();
-            } else {
-                hostLog.warn("Couldn't find java binary in java home (" + javahome + ") defined by " +
-                        "the java.home system property. Path checked was " + f.getAbsolutePath());
-            }
-        } else {
-            hostLog.warn("java.home system property not defined");
-        }
-        String javaPath = checkForJavaHomeInEnvironment();
-        if (javaPath == null) {
-          javaPath = checkForJavaInPath();
-        }
-        if (javaPath == null) {
-            hostLog.error(
-                    "Could not find executable java binary in the java.home property specified by " +
-                    "the JVM, or in the Java home specified  by the JAVA_HOME environment variable, " +
-                    " or in the PATH");
-            throw new Exception("Could not find java binary");
-        }
-        return javaPath;
-    }
-
     public static String formatHostMetadataFromJSON(String json) {
         try {
             JSONObject obj = new JSONObject(json);
@@ -423,15 +304,7 @@ public class MiscUtils {
      * @return hostname or textual ip representation.
      */
     public static String getHostnameFromHostnameColonPort(String server) {
-        server = server.trim();
-        String[] parts = server.split(":");
-        if (parts.length == 1) {
-            return server;
-        }
-        else {
-            assert(parts.length == 2);
-            return parts[0].trim();
-        }
+        return HostAndPort.fromString(server).getHostText();
     }
 
     /**
@@ -440,14 +313,7 @@ public class MiscUtils {
      * @return port number.
      */
     public static int getPortFromHostnameColonPort(String server, int defaultPort) {
-        String[] parts = server.split(":");
-        if (parts.length == 1) {
-            return defaultPort;
-        }
-        else {
-            assert(parts.length == 2);
-            return Integer.parseInt(parts[1]);
-        }
+        return HostAndPort.fromString(server).getPortOrDefault(defaultPort);
     }
 
     /**
@@ -456,18 +322,211 @@ public class MiscUtils {
      * @return String in hostname/ip:port format.
      */
     public static String getHostnameColonPortString(String server, int defaultPort) {
-        server = server.trim();
-        String[] parts = server.trim().split(":");
-        if (parts.length == 1) {
-            // handle empty port string
-            if (server.endsWith(":"))
-                return server + String.valueOf(0);
-            // handle no port string given
-            return server + ":" + String.valueOf(defaultPort);
+        return HostAndPort.fromString(server).withDefaultPort(defaultPort).toString();
+    }
+
+    /**
+     * I heart commutativity
+     * @param buffer ByteBuffer assumed position is at end of data
+     * @return the cheesy checksum of this VoltTable
+     */
+    public static final long cheesyBufferCheckSum(ByteBuffer buffer) {
+        final int mypos = buffer.position();
+        buffer.position(0);
+        long checksum = 0;
+        if (buffer.hasArray()) {
+            final byte bytes[] = buffer.array();
+            final int end = buffer.arrayOffset() + mypos;
+            for (int ii = buffer.arrayOffset(); ii < end; ii++) {
+                checksum += bytes[ii];
+            }
+        } else {
+            for (int ii = 0; ii < mypos; ii++) {
+                checksum += buffer.get();
+            }
         }
-        else {
-            assert(parts.length == 2);
-            return server;
+        buffer.position(mypos);
+        return checksum;
+    }
+
+    public static String getCompactStringTimestamp(long timestamp) {
+        SimpleDateFormat sdf =
+                new SimpleDateFormat("MMddHHmmss");
+        Date tsDate = new Date(timestamp);
+        return sdf.format(tsDate);
+    }
+
+    public static synchronized boolean isBindable(int port) {
+        try {
+            ServerSocket ss = new ServerSocket(port);
+            ss.close();
+            ss = null;
+            return true;
         }
+        catch (BindException be) {
+            return false;
+        }
+        catch (IOException e) {
+            throw new RuntimeException(e);
+        }
+    }
+
+    /**
+     * Log (to the fatal logger) the list of ports in use.
+     * Uses "lsof -i" internally.
+     *
+     * @param log VoltLogger used to print output or warnings.
+     */
+    public static synchronized void printPortsInUse(VoltLogger log) {
+        try {
+            Process p = Runtime.getRuntime().exec("lsof -i");
+            java.io.InputStreamReader reader = new java.io.InputStreamReader(p.getInputStream());
+            java.io.BufferedReader br = new java.io.BufferedReader(reader);
+            String str = null;
+            while((str = br.readLine()) != null) {
+                if (str.contains("LISTEN")) {
+                    log.fatal(str);
+                }
+            }
+        }
+        catch (Exception e) {
+            log.fatal("Unable to list ports in use at this time.");
+        }
+    }
+
+    /**
+     * Split SQL statements on semi-colons with quoted string and comment support.
+     *
+     * Degenerate formats such as escape as the last character or unclosed strings are ignored and
+     * left to the SQL parser to complain about. This is a simple string splitter that errs on the
+     * side of not splitting.
+     *
+     * Regexes are avoided.
+     *
+     * Handle single and double quoted strings and backslash escapes. Backslashes escape a single
+     * character.
+     *
+     * Handle double-dash (single line) and C-style (muli-line) comments. Nested C-style comments
+     * are not supported.
+     *
+     * @param sql raw SQL text to split
+     * @return list of individual SQL statements
+     */
+    public static List<String> splitSQLStatements(final String sql) {
+        List<String> statements = new ArrayList<String>();
+        // Use a character array for efficient character-at-a-time scanning.
+        char[] buf = sql.toCharArray();
+        // Set to null outside of quoted segments or the quote character inside them.
+        Character cQuote = null;
+        // Set to null outside of comments or to the string that ends the comment.
+        String sCommentEnd = null;
+        // Index to start of current statement.
+        int iStart = 0;
+        // Index to current character.
+        // IMPORTANT: The loop is structured in a way that requires all if/else/... blocks to bump
+        // iCur appropriately. Failure of a corner case to bump iCur will cause an infinite loop.
+        int iCur = 0;
+        while (iCur < buf.length) {
+            if (sCommentEnd != null) {
+                // Processing the interior of a comment. Check if at the comment or buffer end.
+                if (iCur >= buf.length - sCommentEnd.length()) {
+                    // Exit
+                    iCur = buf.length;
+                } else if (String.copyValueOf(buf, iCur, sCommentEnd.length()).equals(sCommentEnd)) {
+                    // Move past the comment end.
+                    iCur += sCommentEnd.length();
+                    sCommentEnd = null;
+                } else {
+                    // Keep going inside the comment.
+                    iCur++;
+                }
+            } else if (cQuote != null) {
+                // Processing the interior of a quoted string.
+                if (buf[iCur] == '\\') {
+                    // Skip the '\' escape and the trailing single escaped character.
+                    // Doesn't matter if iCur is beyond the end, it won't be used in that case.
+                    iCur += 2;
+                } else if (buf[iCur] == cQuote) {
+                    // Look at the next character to distinguish a double escaped quote
+                    // from the end of the quoted string.
+                    iCur++;
+                    if (iCur < buf.length) {
+                        if (buf[iCur] != cQuote) {
+                            // Not a double escaped quote - end of quoted string.
+                            cQuote = null;
+                        } else {
+                            // Move past the double escaped quote.
+                            iCur++;
+                        }
+                    }
+                } else {
+                    // Move past an ordinary character.
+                    iCur++;
+                }
+            } else {
+                // Outside of a quoted string - watch for the next separator, quote or comment.
+                if (buf[iCur] == ';') {
+                    // Add terminated statement (if not empty after trimming).
+                    String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+                    if (!statement.isEmpty()) {
+                        statements.add(statement);
+                    }
+                    iStart = iCur + 1;
+                    iCur = iStart;
+                } else if (buf[iCur] == '"' || buf[iCur] == '\'') {
+                    // Start of quoted string.
+                    cQuote = buf[iCur];
+                    iCur++;
+                } else if (iCur <= buf.length - 2) {
+                    // Comment (double-dash or C-style)?
+                    if (buf[iCur] == '-' && buf[iCur+1] == '-') {
+                        // One line double-dash comment start.
+                        sCommentEnd = "\n"; // Works for *IX (\n) and Windows (\r\n).
+                        iCur += 2;
+                    } else if (buf[iCur] == '/' && buf[iCur+1] == '*') {
+                        // Multi-line C-style comment start.
+                        sCommentEnd = "*/";
+                        iCur += 2;
+                    } else {
+                        // Not a comment start, move past this character.
+                        iCur++;
+                    }
+                } else {
+                    // Move past a non-quote/non-separator character.
+                    iCur++;
+                }
+            }
+        }
+        // Get the last statement, if any.
+        if (iStart < buf.length) {
+            String statement = String.copyValueOf(buf, iStart, iCur - iStart).trim();
+            if (!statement.isEmpty()) {
+                statements.add(statement);
+            }
+        }
+        return statements;
+    }
+
+    /**
+     * Concatenate an list of arrays of typed-objects
+     * @param empty An empty array of the right type used for cloning
+     * @param arrayList A list of arrays to concatenate.
+     * @return The concatenated mega-array.
+     */
+    public static <T> T[] concatAll(final T[] empty, Iterable<T[]> arrayList) {
+        assert(empty.length == 0);
+        if (arrayList.iterator().hasNext() == false) return empty;
+
+        int len = 0;
+        for (T[] subArray : arrayList) {
+            len += subArray.length;
+        }
+        int pos = 0;
+        T[] result = Arrays.copyOf(empty, len);
+        for (T[] subArray : arrayList) {
+            System.arraycopy(subArray, 0, result, pos, subArray.length);
+            pos += subArray.length;
+        }
+        return result;
     }
 }

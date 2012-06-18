@@ -18,6 +18,7 @@
 package org.voltdb.client;
 
 import java.io.IOException;
+import java.nio.ByteBuffer;
 
 import org.voltdb.ParameterSet;
 import org.voltdb.messaging.FastDeserializer;
@@ -28,17 +29,18 @@ import org.voltdb.messaging.FastSerializer;
  * Client stored procedure invocation object. Server uses an internal
  * format compatible with this wire protocol format.
  */
-class ProcedureInvocation implements FastSerializable {
+public class ProcedureInvocation {
 
     private final long m_clientHandle;
     private final String m_procName;
+    private byte m_procNameBytes[];
     private final ParameterSet m_parameters;
 
     // used for replicated procedure invocations
     private final long m_originalTxnId;
     private final ProcedureInvocationType m_type;
 
-    ProcedureInvocation(long handle, String procName, Object... parameters) {
+    public ProcedureInvocation(long handle, String procName, Object... parameters) {
         this(-1, handle, procName, parameters);
     }
 
@@ -65,19 +67,24 @@ class ProcedureInvocation implements FastSerializable {
         return m_procName;
     }
 
-    /** This default deserializer is never used. */
-    public void readExternal(FastDeserializer in) throws IOException {
-        throw new UnsupportedOperationException("Not supported yet.");
+    public int getSerializedSize() {
+        try {
+            m_procNameBytes = m_procName.getBytes("UTF-8");
+        } catch (Exception e) {/*No UTF-8? Really?*/}
+        int size =
+            1 + (m_type == ProcedureInvocationType.REPLICATED ? 8 : 0) +
+            m_procNameBytes.length + 4 + 8 + m_parameters.getSerializedSize();
+        return size;
     }
 
-    /** Produce a serialization matching ExecutionSiteTask.createFromWireProtocol(). */
-    public void writeExternal(FastSerializer out) throws IOException {
-        out.writeByte(m_type.getValue());//Version
+    public ByteBuffer flattenToBuffer(ByteBuffer buf) throws IOException {
+        buf.put(m_type.getValue());//Version
         if (m_type == ProcedureInvocationType.REPLICATED) {
-            out.writeLong(m_originalTxnId);
+            buf.putLong(m_originalTxnId);
         }
-        out.writeString(m_procName);
-        out.writeLong(m_clientHandle);
-        out.writeObject(m_parameters);
+        FastSerializer.writeString(m_procNameBytes, buf);
+        buf.putLong(m_clientHandle);
+        m_parameters.flattenToBuffer(buf);
+        return buf;
     }
 }

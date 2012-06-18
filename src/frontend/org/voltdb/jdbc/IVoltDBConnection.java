@@ -18,14 +18,17 @@
 package org.voltdb.jdbc;
 
 import java.io.IOException;
-import org.voltdb.client.exampleutils.PerfCounter;
-import org.voltdb.client.exampleutils.PerfCounterMap;
+
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 
 public interface IVoltDBConnection
 {
-    PerfCounterMap getStatistics();
-    PerfCounter getStatistics(String procedure);
-    PerfCounter getStatistics(String... procedures);
+    void writeSummaryCSV(ClientStats stats, String path) throws IOException;
+    ClientStatsContext createStatsContext();
+    JDBC4PerfCounterMap getStatistics();
+    JDBC4PerfCounter getStatistics(String procedure);
+    JDBC4PerfCounter getStatistics(String... procedures);
     void saveStatistics(String file) throws IOException;
 }
 

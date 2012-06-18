@@ -22,29 +22,36 @@ import java.io.FileOutputStream;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.nio.channels.FileChannel;
+import java.util.List;
 import java.util.concurrent.Callable;
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.ScheduledExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
+import java.util.concurrent.Semaphore;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.atomic.AtomicInteger;
-import java.util.concurrent.atomic.AtomicReference;
-import java.util.concurrent.Semaphore;
-import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.locks.Condition;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.zip.CRC32;
 
-import org.voltdb.client.ConnectionUtil;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.messaging.FastSerializer;
+import org.voltdb.utils.CompressionService;
+
+import com.google.common.util.concurrent.Callables;
+import com.google.common.util.concurrent.Futures;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+import com.google.common.util.concurrent.ListeningScheduledExecutorService;
+import com.google.common.util.concurrent.MoreExecutors;
 
 
 public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
@@ -88,30 +95,35 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     private final String m_tableName;
 
     private final AtomicInteger m_outstandingWriteTasks = new AtomicInteger(0);
+    private final ReentrantLock m_outstandingWriteTasksLock = new ReentrantLock();
+    private final Condition m_noMoreOutstandingWriteTasksCondition =
+            m_outstandingWriteTasksLock.newCondition();
 
-    private static final ExecutorService m_es = Executors.newSingleThreadExecutor(new ThreadFactory() {
-        @Override
-        public Thread newThread(Runnable r) {
+    private static final ListeningExecutorService m_es = MoreExecutors.listeningDecorator(
+                Executors.newSingleThreadExecutor(new ThreadFactory() {
+            @Override
+            public Thread newThread(Runnable r) {
 
-            return new Thread(
-                    Thread.currentThread().getThreadGroup(),
-                    r,
-                    "Snapshot write service ",
-                    131072);
-        }
-    });
+                return new Thread(
+                        Thread.currentThread().getThreadGroup(),
+                        r,
+                        "Snapshot write service ",
+                        131072);
+            }
+        }));
 
-    private static final ScheduledExecutorService m_syncService = Executors.newSingleThreadScheduledExecutor(
-            new ThreadFactory() {
-                @Override
-                public Thread newThread(Runnable r) {
-                    return new Thread(
-                            Thread.currentThread().getThreadGroup(),
-                            r,
-                            "Snapshot sync service ",
-                            131072);
-                }
-            });
+    private static final ListeningScheduledExecutorService m_syncService = MoreExecutors.listeningDecorator(
+            Executors.newSingleThreadScheduledExecutor(
+                new ThreadFactory() {
+                    @Override
+                    public Thread newThread(Runnable r) {
+                        return new Thread(
+                                Thread.currentThread().getThreadGroup(),
+                                r,
+                                "Snapshot sync service ",
+                                131072);
+                    }
+                }));
 
     public DefaultSnapshotDataTarget(
             final File file,
@@ -121,7 +133,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final String tableName,
             final int numPartitions,
             final boolean isReplicated,
-            final int partitionIds[],
+            final List<Integer> partitionIds,
             final VoltTable schemaTable,
             final long txnId) throws IOException {
         this(
@@ -146,12 +158,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
             final String tableName,
             final int numPartitions,
             final boolean isReplicated,
-            final int partitionIds[],
+            final List<Integer> partitionIds,
             final VoltTable schemaTable,
             final long txnId,
             int version[]
             ) throws IOException {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         m_file = file;
         m_tableName = tableName;
         m_fos = new FileOutputStream(file);
@@ -200,16 +212,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         container.b.putInt(container.b.remaining() - 4);
         container.b.position(0);
 
-        FastSerializer schemaSerializer = new FastSerializer();
-        schemaTable.writeExternal(schemaSerializer);
-        final BBContainer schemaContainer = schemaSerializer.getBBContainer();
-        schemaContainer.b.limit(schemaContainer.b.limit() - 4);//Don't want the row count
-        schemaContainer.b.position(schemaContainer.b.position() + 4);//Don't want total table length
+        final byte schemaBytes[] = schemaTable.getSchemaBytes();
 
         final CRC32 crc = new CRC32();
-        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaContainer.b.remaining());
+        ByteBuffer aggregateBuffer = ByteBuffer.allocate(container.b.remaining() + schemaBytes.length);
         aggregateBuffer.put(container.b);
-        aggregateBuffer.put(schemaContainer.b);
+        aggregateBuffer.put(schemaBytes);
         aggregateBuffer.flip();
         crc.update(aggregateBuffer.array(), 4, aggregateBuffer.capacity() - 4);
 
@@ -229,7 +237,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
          * the disk is probably full or the path is bunk etc.
          */
         m_acceptOneWrite = true;
-        Future<?> writeFuture = write(DBBPool.wrapBB(aggregateBuffer), false);
+        ListenableFuture<?> writeFuture =
+                write(Callables.returning((BBContainer)DBBPool.wrapBB(aggregateBuffer)), false);
         try {
             writeFuture.get();
         } catch (InterruptedException e) {
@@ -265,10 +274,13 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public void close() throws IOException, InterruptedException {
         try {
-            synchronized (m_outstandingWriteTasks) {
+            m_outstandingWriteTasksLock.lock();
+            try {
                 while (m_outstandingWriteTasks.get() > 0) {
-                    m_outstandingWriteTasks.wait();
+                    m_noMoreOutstandingWriteTasksCondition.await();
                 }
+            } finally {
+                m_outstandingWriteTasksLock.unlock();
             }
             m_syncTask.cancel(false);
             m_channel.force(false);
@@ -292,14 +304,32 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
     @Override
     public int getHeaderSize() {
-        return 4;
+        return 0;
     }
 
     /*
      * Prepend length is basically synonymous with writing actual tuple data and not
      * the header.
      */
-    private Future<?> write(final BBContainer tupleData, final boolean prependLength) {
+    private ListenableFuture<?> write(final Callable<BBContainer> tupleDataC, final boolean prependLength) {
+        /*
+         * Unwrap the data to be written. For the traditional
+         * snapshot data target this should be a noop.
+         */
+        BBContainer tupleDataTemp;
+        try {
+            tupleDataTemp = tupleDataC.call();
+            /*
+             * Can be null if the dedupe filter nulled out the buffer
+             */
+            if (tupleDataTemp == null) {
+                return Futures.immediateFuture(null);
+            }
+        } catch (Throwable t) {
+            return Futures.immediateFailedFuture(t);
+        }
+        final BBContainer tupleData = tupleDataTemp;
+
         if (m_writeFailed) {
             tupleData.discard();
             return null;
@@ -309,16 +339,12 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
         Future<byte[]> compressionTask = null;
         if (prependLength) {
-            tupleData.b.position(tupleData.b.position() + 16);
+            tupleData.b.position(tupleData.b.position() + 12);
             compressionTask = CompressionService.compressBufferAsync(tupleData.b);
         }
+        final Future<byte[]> compressionTaskFinal = compressionTask;
 
-        //Need to be able to null this out to prevent pack rat on the future
-        //that wraps up the result of the write.
-        final AtomicReference<Future<byte[]>> compressionTaskFinal =
-            new AtomicReference<Future<byte[]>>(compressionTask);
-
-        Future<?> writeTask = m_es.submit(new Callable<Object>() {
+        ListenableFuture<?> writeTask = m_es.submit(new Callable<Object>() {
             @Override
             public Object call() throws Exception {
                 try {
@@ -335,18 +361,14 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
 
                     int totalWritten = 0;
                     if (prependLength) {
-                        ByteBuffer payloadBuffer = null;
-                        try {
-                            payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get().get());
-                        } finally {
-                            compressionTaskFinal.set(null);
-                        }
+                        final ByteBuffer payloadBuffer = ByteBuffer.wrap(compressionTaskFinal.get());
+
                         ByteBuffer lengthPrefix = ByteBuffer.allocate(16);
                         m_bytesAllowedBeforeSync.acquire(payloadBuffer.remaining() + 16);
                         lengthPrefix.putInt(payloadBuffer.remaining());
+                        lengthPrefix.putInt(tupleData.b.getInt(0));
                         lengthPrefix.putInt(tupleData.b.getInt(4));
                         lengthPrefix.putInt(tupleData.b.getInt(8));
-                        lengthPrefix.putInt(tupleData.b.getInt(12));
                         lengthPrefix.flip();
                         while (lengthPrefix.hasRemaining()) {
                             totalWritten += m_channel.write(lengthPrefix);
@@ -368,10 +390,13 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
                     throw e;
                 } finally {
                     tupleData.discard();
-                    synchronized (m_outstandingWriteTasks) {
+                    m_outstandingWriteTasksLock.lock();
+                    try {
                         if (m_outstandingWriteTasks.decrementAndGet() == 0) {
-                            m_outstandingWriteTasks.notify();
+                            m_noMoreOutstandingWriteTasksCondition.signalAll();
                         }
+                    } finally {
+                        m_outstandingWriteTasksLock.unlock();
                     }
                 }
                 return null;
@@ -381,7 +406,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public Future<?> write(final BBContainer tupleData) {
+    public ListenableFuture<?> write(final Callable<BBContainer> tupleData) {
         return write(tupleData, true);
     }
 
@@ -400,4 +425,8 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
         return m_writeException;
     }
 
+    @Override
+    public String toString() {
+        return m_file.toString();
+    }
 }

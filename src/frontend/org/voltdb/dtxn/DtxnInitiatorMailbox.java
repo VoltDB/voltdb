@@ -17,28 +17,29 @@
 
 package org.voltdb.dtxn;
 
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
+import org.voltcore.messaging.HeartbeatMessage;
+import org.voltcore.messaging.HeartbeatResponseMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.messaging.HostMessenger;
+
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
 import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
-import org.voltdb.messaging.HeartbeatMessage;
-import org.voltdb.messaging.HeartbeatResponseMessage;
-import org.voltdb.messaging.HostMessenger;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.network.Connection;
+import org.voltcore.network.Connection;
 import org.voltdb.utils.ResponseSampler;
 
 /**
@@ -61,37 +62,24 @@ public class DtxnInitiatorMailbox implements Mailbox
         {
             synchronized (m_initiator) {
                 for (VoltFault fault : faults) {
-                    if (fault instanceof NodeFailureFault)
+                    if (fault instanceof SiteFailureFault)
                     {
-                        NodeFailureFault node_fault = (NodeFailureFault)fault;
-                        ArrayList<Integer> dead_sites =
-                            VoltDB.instance().getCatalogContext().siteTracker.
-                            getAllSitesForHost(node_fault.getHostId());
-                        for (Integer site_id : dead_sites)
-                        {
-                            removeSite(site_id);
-                            m_safetyState.removeState(site_id);
+                        SiteFailureFault site_fault = (SiteFailureFault)fault;
+                        for (Long site : site_fault.getSiteIds()) {
+                            removeSite(site);
+                            m_safetyState.removeState(site);
                         }
                     }
-                    VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
                 }
             }
-        }
-
-        @Override
-        public void faultCleared(Set<VoltFault> faults) {
         }
     }
 
     /** Map of transaction ids to transaction information */
-    private final int m_siteId;
+    private long m_hsId;
     private final Map<Long, InFlightTxnState> m_pendingTxns =
         new HashMap<Long, InFlightTxnState>();
     private TransactionInitiator m_initiator;
-    //private final HashMap<Long, InitiateResponseMessage> m_txnIdResponses;
-    // need a separate copy of the VoltTables so that we can have
-    // thread-safe meta-data
-    //private final HashMap<Long, VoltTable[]> m_txnIdResults;
     private final HostMessenger m_hostMessenger;
 
     private final ExecutorTxnIdSafetyState m_safetyState;
@@ -99,34 +87,31 @@ public class DtxnInitiatorMailbox implements Mailbox
     /**
      * Storage for initiator statistics
      */
-    final InitiatorStats m_stats;
+    InitiatorStats m_stats = null;
     /**
      * Latency distribution, stored in buckets.
      */
-    final LatencyStats m_latencies;
+    LatencyStats m_latencies = null;
 
     /**
      * Construct a new DtxnInitiatorQueue
-     * @param siteId  The mailbox siteId for this initiator
      */
-    public DtxnInitiatorMailbox(int siteId, ExecutorTxnIdSafetyState safetyState, HostMessenger hostMessenger)
+    public DtxnInitiatorMailbox(ExecutorTxnIdSafetyState safetyState, HostMessenger hostMessenger)
     {
         assert(safetyState != null);
         assert(hostMessenger != null);
         m_hostMessenger = hostMessenger;
-        m_siteId = siteId;
         m_safetyState = safetyState;
-        m_stats = new InitiatorStats(siteId);
-        m_latencies = new LatencyStats(siteId);
-        //m_txnIdResults =
-        //    new HashMap<Long, VoltTable[]>();
-        //m_txnIdResponses = new HashMap<Long, InitiateResponseMessage>();
         VoltDB.instance().getFaultDistributor().
         // For Node failure, the initiators need to be ordered after the catalog
         // but before everything else (to prevent any new work for bad sites)
-        registerFaultHandler(NodeFailureFault.NODE_FAILURE_INITIATOR,
+        registerFaultHandler(SiteFailureFault.SITE_FAILURE_INITIATOR,
                              new InitiatorNodeFailureFaultHandler(),
-                             FaultType.NODE_FAILURE);
+                             FaultType.SITE_FAILURE);
+    }
+
+    public ExecutorTxnIdSafetyState getSafetyState() {
+        return m_safetyState;
     }
 
     public void setInitiator(TransactionInitiator initiator) {
@@ -138,7 +123,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         m_pendingTxns.put(txn.txnId, txn);
     }
 
-    public void removeSite(int siteId)
+    public void removeSite(long siteId)
     {
         ArrayList<Long> txnIdsToRemove = new ArrayList<Long>();
         for (InFlightTxnState state : m_pendingTxns.values())
@@ -159,7 +144,6 @@ public class DtxnInitiatorMailbox implements Mailbox
                 m_initiator.reduceBackpressure(state.messageSize);
 
                 if (!state.hasSentResponse()) {
-                    // TODO badness here...
                     assert(false);
                 }
             }
@@ -188,7 +172,10 @@ public class DtxnInitiatorMailbox implements Mailbox
                 delta,
                 response.getStatus());
         m_latencies.logTransactionCompleted(delta);
-        c.writeStream().enqueue(response);
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf).flip();
+        c.writeStream().enqueue(buf);
     }
 
     public void removeConnectionStats(long connectionId) {
@@ -218,7 +205,8 @@ public class DtxnInitiatorMailbox implements Mailbox
             // update the state of seen txnids for each executor
             if (message instanceof HeartbeatResponseMessage) {
                 HeartbeatResponseMessage hrm = (HeartbeatResponseMessage) message;
-                m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(hrm.getExecSiteId(), hrm.getLastReceivedTxnId(), hrm.isBlocked());
+                m_safetyState.updateLastSeenTxnIdFromExecutorBySiteId(
+                        hrm.getExecHSId(), hrm.getLastReceivedTxnId(), hrm.isBlocked());
                 return;
             }
 
@@ -228,16 +216,16 @@ public class DtxnInitiatorMailbox implements Mailbox
 
             state = m_pendingTxns.get(r.getTxnId());
 
-            assert(m_siteId == r.getInitiatorSiteId());
+            assert(m_hsId == r.getInitiatorHSId());
 
             // if this is a dummy response, make sure the m_pendingTxns list thinks
             // the site has been removed from the list
             if (r.isRecovering()) {
-                toSend = state.addFailedOrRecoveringResponse(r.getCoordinatorSiteId());
+                toSend = state.addFailedOrRecoveringResponse(r.getCoordinatorHSId());
             }
             // otherwise update the InFlightTxnState with the response
             else {
-                toSend = state.addResponse(r.getCoordinatorSiteId(), r.getClientResponseData());
+                toSend = state.addResponse(r.getCoordinatorHSId(), r.getClientResponseData());
             }
 
             if (state.hasAllResponses()) {
@@ -254,7 +242,7 @@ public class DtxnInitiatorMailbox implements Mailbox
         if (toSend != null) {
             // the next bit is usually a noop, unless we're sampling responses for test
             if (!state.isReadOnly)
-                ResponseSampler.offerResponse(this.getSiteId(), state.txnId, state.invocation, toSend);
+                ResponseSampler.offerResponse(this.getHSId(), state.txnId, state.invocation, toSend);
             // queue the response to be sent to the client
             enqueueResponse(toSend, state);
         }
@@ -262,16 +250,12 @@ public class DtxnInitiatorMailbox implements Mailbox
 
     private void demuxCoalescedHeartbeatMessage(
             CoalescedHeartbeatMessage message) {
-        final int destinations[] = message.getHeartbeatDestinations();
+        final long destinations[] = message.getHeartbeatDestinations();
         final HeartbeatMessage heartbeats[] = message.getHeartbeatsToDeliver();
         assert(destinations.length == heartbeats.length);
 
-        try {
-            for (int ii = 0; ii < destinations.length; ii++) {
-                m_hostMessenger.send(destinations[ii], VoltDB.DTXN_MAILBOX_ID, heartbeats[ii]);
-            }
-        } catch (MessagingException e) {
-            VoltDB.crashLocalVoltDB("Error attempting to demux and deliver coalesced heartbeat messages", true, e);
+        for (int ii = 0; ii < destinations.length; ii++) {
+            m_hostMessenger.send(destinations[ii], heartbeats[ii]);
         }
     }
 
@@ -301,15 +285,17 @@ public class DtxnInitiatorMailbox implements Mailbox
     }
 
     @Override
-    public void send(int siteId, int mailboxId, VoltMessage message) throws MessagingException {
-        m_hostMessenger.send(siteId, mailboxId, message);
+    public void send(long hsId, VoltMessage message) {
+        message.m_sourceHSId = m_hsId;
+        m_hostMessenger.send(hsId, message);
     }
 
     @Override
-    public void send(int[] siteIds, int mailboxId, VoltMessage message) throws MessagingException {
+    public void send(long[] hsIds, VoltMessage message) {
         assert(message != null);
-        assert(siteIds != null);
-        m_hostMessenger.send(siteIds, mailboxId, message);
+        assert(hsIds != null);
+        message.m_sourceHSId = m_hsId;
+        m_hostMessenger.send(hsIds, message);
     }
 
     @Override
@@ -323,8 +309,15 @@ public class DtxnInitiatorMailbox implements Mailbox
     }
 
     @Override
-    public int getSiteId() {
-        return m_siteId;
+    public long getHSId() {
+        return m_hsId;
+    }
+
+    @Override
+    public void setHSId(long hsId) {
+        this.m_hsId = hsId;
+        m_stats = new InitiatorStats(m_hsId);
+        m_latencies = new LatencyStats(m_hsId);
     }
 
     Map<Long, long[]> getOutstandingTxnStats()

@@ -79,6 +79,22 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     /**
+     * Does the plan guarantee an identical result/effect
+     * when "replayed" against the same database state, such as during replication or CL recovery.
+     * @return true unless the scan has an inline limit and no particular order.
+     */
+    @Override
+    public boolean isContentDeterministic() {
+        AbstractPlanNode limit = this.getInlinePlanNode(PlanNodeType.LIMIT);
+        if ((limit == null) || isOrderDeterministic()) {
+            return true;
+        } else {
+            m_nondeterminismDetail = "a limit on an unordered scan may return different rows";
+            return false;
+        }
+    }
+
+    /**
      * @return the target_table_name
      */
     public String getTargetTableName() {

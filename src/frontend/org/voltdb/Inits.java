@@ -17,14 +17,13 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.io.FileInputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.lang.reflect.Constructor;
-import java.net.InetSocketAddress;
 import java.net.MalformedURLException;
 import java.net.URL;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Arrays;
 import java.util.HashMap;
@@ -35,21 +34,23 @@ import java.util.Map.Entry;
 import java.util.Set;
 import java.util.concurrent.PriorityBlockingQueue;
 
-import org.voltdb.agreement.AgreementSite;
+import org.apache.zookeeper_voltpatches.CreateMode;
+import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+
+import org.voltcore.utils.Pair;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Site;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.Mailbox;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
-import org.voltdb.utils.Pair;
 import org.voltdb.utils.PlatformProperties;
 
 /**
@@ -205,11 +206,10 @@ public class Inits {
         SetupAdminMode
         StartHTTPServer
         InitHashinator
-        InitAgreementSiteAndStatsAgent
+        InitStatsAgent
         SetupReplicationRole
-
-        CreateRestoreAgentAndPlan <- InitAgreementSiteAndStatsAgent
-        DistributeCatalog <- InitAgreementSiteAndStatsAgent, CreateRestoreAgentAndPlan
+        CreateRestoreAgentAndPlan
+        DistributeCatalog <- CreateRestoreAgentAndPlan
         EnforceLicensing <- CreateRestoreAgentAndPlan, SetupReplicationRole
         LoadCatalog <- DistributeCatalog
         SetupCommandLogging <- LoadCatalog
@@ -227,7 +227,6 @@ public class Inits {
 
     class DistributeCatalog extends InitWork {
         DistributeCatalog() {
-            dependsOn(InitAgreementSiteAndStatsAgent.class);
             dependsOn(CreateRestoreAgentAndPlan.class);
         }
 
@@ -265,10 +264,24 @@ public class Inits {
                     }
                     byte[] catalogBytes = Arrays.copyOf(buffer, totalBytes);
                     hostLog.debug(String.format("Sending %d catalog bytes", catalogBytes.length));
-                    m_rvdb.m_messenger.sendCatalog(catalogBytes);
+
+                    ByteBuffer versionAndBytes = ByteBuffer.allocate(catalogBytes.length + 4);
+                    versionAndBytes.putInt(0);
+                    versionAndBytes.put(catalogBytes);
+                    // publish the catalog bytes to ZK
+                    m_rvdb.getHostMessenger().getZK().create(VoltZK.catalogbytes,
+                            versionAndBytes.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                    versionAndBytes = null;
+
                 }
                 catch (IOException e) {
                     VoltDB.crashGlobalVoltDB("Unable to distribute catalog.", false, e);
+                }
+                catch (org.apache.zookeeper_voltpatches.KeeperException e) {
+                    VoltDB.crashGlobalVoltDB("Unable to publish catalog.", false, e);
+                }
+                catch (InterruptedException e) {
+                    VoltDB.crashGlobalVoltDB("Interrupted while publishing catalog.", false, e);
                 }
             }
         }
@@ -281,28 +294,24 @@ public class Inits {
 
         @Override
         public void run() {
-            // wait till RealVoltDB says a catalog has been found
-            try {
-                m_rvdb.m_hasCatalog.await();
-            } catch (InterruptedException e1) {
-                VoltDB.crashLocalVoltDB("System was interrupted while waiting for a catalog.", false, e1);
-            }
-
-            // Initialize the catalog and some common shortcuts
-            if (m_config.m_pathToCatalog.startsWith("http")) {
-                hostLog.info("Loading application catalog jarfile from " + m_config.m_pathToCatalog);
-            }
-            else {
-                File f = new File(m_config.m_pathToCatalog);
-                hostLog.info("Loading application catalog jarfile from " + f.getAbsolutePath());
-            }
-
             byte[] catalogBytes = null;
-            try {
-                catalogBytes = CatalogUtil.toBytes(new File(m_config.m_pathToCatalog));
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Failed to read catalog: " + e.getMessage(), false, e);
-            }
+            int version = 0;
+            do {
+                try {
+                    ByteBuffer versionAndBytes =
+                        ByteBuffer.wrap(m_rvdb.getHostMessenger().getZK().getData(VoltZK.catalogbytes, false, null));
+                    version = versionAndBytes.getInt();
+                    catalogBytes = new byte[versionAndBytes.remaining()];
+                    versionAndBytes.get(catalogBytes);
+                    versionAndBytes = null;
+                }
+                catch (org.apache.zookeeper_voltpatches.KeeperException.NoNodeException e) {
+                }
+                catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("System was interrupted while waiting for a catalog.", false, null);
+                }
+            } while (catalogBytes == null);
+
             m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
@@ -322,21 +331,23 @@ public class Inits {
                 System.exit(-1);
             }
 
-            // copy the existing cluster up/down status to the new catalog
-            Cluster newCluster = catalog.getClusters().get("cluster");
-            Cluster oldCluster = m_rvdb.m_catalogContext.cluster;
-            for (Site site : oldCluster.getSites()) {
-                newCluster.getSites().get(site.getTypeName()).setIsup(site.getIsup());
+            try {
+                long catalogTxnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
+                zk.create(
+                        VoltZK.initial_catalog_txnid,
+                        String.valueOf(catalogTxnId).getBytes("UTF-8"),
+                        Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT, new ZKUtil.StringCallback(), null);
+                ZKUtil.ByteArrayCallback cb = new ZKUtil.ByteArrayCallback();
+                zk.getData(VoltZK.initial_catalog_txnid, false, cb, null);
+                catalogTxnId = Long.valueOf(new String(cb.getData(), "UTF-8"));
+                m_rvdb.m_serializedCatalog = catalog.serialize();
+                m_rvdb.m_catalogContext = new CatalogContext(
+                        catalogTxnId,
+                        catalog, catalogBytes, m_rvdb.m_depCRC, version, -1);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Error agreeing on starting catalog version", false, e);
             }
-
-            // if the dummy catalog doesn't have a 0 txnid (like from a rejoin), use that one
-            long existingCatalogTxnId = m_rvdb.m_catalogContext.m_transactionId;
-            int existingCatalogVersion = m_rvdb.m_messenger.getDiscoveredCatalogVersion();
-
-            m_rvdb.m_serializedCatalog = catalog.serialize();
-            m_rvdb.m_catalogContext = new CatalogContext(
-                    existingCatalogTxnId,
-                    catalog, catalogBytes, m_rvdb.m_depCRC, existingCatalogVersion, -1);
         }
     }
 
@@ -440,7 +451,7 @@ public class Inits {
                 try {
                     m_rvdb.m_adminListener = new HTTPAdminListener(m_rvdb.m_jsonEnabled, httpPort);
                 } catch (Exception e1) {
-                    hostLog.info("HTTP admin console unable to bind to port " + httpPort + ". Exiting.");
+                    hostLog.fatal("HTTP admin console unable to bind to port " + httpPort + ". Exiting.");
                     System.exit(-1);
                 }
             }
@@ -511,11 +522,36 @@ public class Inits {
 
         @Override
         public void run() {
-            // rejoining nodes figure out the replication role from other nodes
-            if (!m_isRejoin)
-            {
-                // See if we should bring the server up in DR replication mode
-                m_rvdb.setReplicationRole(m_config.m_replicationRole);
+            try {
+                ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
+                // rejoining nodes figure out the replication role from other nodes
+                if (!m_isRejoin)
+                {
+                    try {
+                        zk.create(
+                                VoltZK.replicationrole,
+                                m_config.m_replicationRole.toString().getBytes("UTF-8"),
+                                Ids.OPEN_ACL_UNSAFE,
+                                CreateMode.PERSISTENT);
+                    } catch (KeeperException.NodeExistsException e) {}
+                    String discoveredReplicationRole =
+                        new String(zk.getData(VoltZK.replicationrole, false, null), "UTF-8");
+                    if (!discoveredReplicationRole.equals(m_config.m_replicationRole.toString())) {
+                        VoltDB.crashGlobalVoltDB("Discovered replication role " + discoveredReplicationRole +
+                                " doesn't match locally specified replication role " + m_config.m_replicationRole,
+                                true, null);
+                    }
+
+                    // See if we should bring the server up in WAN replication mode
+                    m_rvdb.setReplicationRole(ReplicationRole.valueOf(discoveredReplicationRole));
+                } else {
+                    String discoveredReplicationRole =
+                        new String(zk.getData(VoltZK.replicationrole, false, null), "UTF-8");
+                    // See if we should bring the server up in WAN replication mode
+                    m_rvdb.setReplicationRole(ReplicationRole.valueOf(discoveredReplicationRole));
+                }
+            } catch (Exception e) {
+                VoltDB.crashGlobalVoltDB("Error discovering replication role", false, e);
             }
         }
     }
@@ -552,68 +588,21 @@ public class Inits {
         }
     }
 
-    class InitAgreementSiteAndStatsAgent extends InitWork {
-        InitAgreementSiteAndStatsAgent() {
+    class InitStatsAgent extends InitWork {
+        InitStatsAgent() {
         }
 
         @Override
         public void run() {
-            /*
-             * Initialize the agreement site with the same site id as the CI/SDTXN,
-             * but a different mailbox.
-             */
-            int myAgreementSiteId = -1;
-            HashSet<Integer> agreementSiteIds = new HashSet<Integer>();
-            int myAgreementInitiatorId = 0;
-            for (Site site : m_rvdb.m_catalogContext.siteTracker.getAllSites()) {
-                int sitesHostId = Integer.parseInt(site.getHost().getTypeName());
-                int currSiteId = Integer.parseInt(site.getTypeName());
-
-                if (sitesHostId == m_rvdb.m_myHostId) {
-                    hostLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingLocalSite.name(), new Object[] { currSiteId }, null);
-                    m_rvdb.m_messenger.createLocalSite(currSiteId);
-                }
-                // Create an agreement site for every initiator
-                if (site.getIsexec() == false) {
-                    agreementSiteIds.add(currSiteId);
-                    if (sitesHostId == m_rvdb.m_myHostId) {
-                        myAgreementSiteId = currSiteId;
-                        myAgreementInitiatorId = site.getInitiatorid();
-                    }
-                }
-            }
-
-            assert(m_rvdb.m_agreementSite == null);
-            assert(myAgreementSiteId != -1);
-            Mailbox agreementMailbox =
-                    m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.AGREEMENT_MAILBOX_ID, false);
             try {
-
-                // Hack in the construction of stats and async compiler mailboxes.
-                // they need the agreementSiteId until mailbox construction is
-                // sanitized. Note that the agents (not the mailboxes) are owned
-                // by RealVoltDB
-                Mailbox statsMailbox =
-                    m_rvdb.getStatsAgent().getMailbox(VoltDB.instance().getHostMessenger(), myAgreementSiteId);
-                m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.STATS_MAILBOX_ID, statsMailbox);
-
-                Mailbox asyncCompilerMailbox =
-                    m_rvdb.getAsyncCompilerAgent().createMailbox(VoltDB.instance().getHostMessenger(), myAgreementSiteId);
-                m_rvdb.m_messenger.createMailbox(myAgreementSiteId, VoltDB.ASYNC_COMPILER_MAILBOX_ID, asyncCompilerMailbox);
-
-                m_rvdb.m_agreementSite =
-                    new AgreementSite(
-                            myAgreementSiteId,
-                            agreementSiteIds,
-                            myAgreementInitiatorId,
-                            m_rvdb.m_downNonExecSites,
-                            agreementMailbox,
-                            new InetSocketAddress(
-                                    m_config.m_zkInterface.split(":")[0],
-                                    Integer.parseInt(m_config.m_zkInterface.split(":")[1])),
-                            m_rvdb.m_faultManager,
-                            m_rvdb.m_recovering);
-                m_rvdb.m_agreementSite.start();
+                final long statsAgentHSId = m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.STATS_SITE_ID);
+                m_rvdb.getStatsAgent().getMailbox(
+                            VoltDB.instance().getHostMessenger(),
+                            statsAgentHSId);
+                m_rvdb.getMailboxPublisher().publish(VoltDB.instance().getHostMessenger().getZK());
+                m_rvdb.getAsyncCompilerAgent().createMailbox(
+                            VoltDB.instance().getHostMessenger(),
+                            m_rvdb.getHostMessenger().getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID));
             } catch (Exception e) {
                 hostLog.fatal(null, e);
                 System.exit(-1);
@@ -623,51 +612,40 @@ public class Inits {
 
     class CreateRestoreAgentAndPlan extends InitWork {
         public CreateRestoreAgentAndPlan() {
-            dependsOn(InitAgreementSiteAndStatsAgent.class);
         }
 
         @Override
         public void run() {
             if (!m_isRejoin && !m_config.m_isRejoinTest) {
-                m_rvdb.startNetworkAndCreateZKClient();
-
                 String snapshotPath = null;
                 if (m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default") != null) {
                     snapshotPath = m_rvdb.m_catalogContext.cluster.getDatabases().get("database").getSnapshotschedule().get("default").getPath();
                 }
 
-                int lowestSite = m_rvdb.m_catalogContext.siteTracker.getLowestLiveNonExecSiteId();
-                int lowestHostId = m_rvdb.m_catalogContext.siteTracker.getHostForSite(lowestSite);
-
-                int[] allPartitions = new int[m_rvdb.m_catalogContext.numberOfPartitions];
-                int i = 0;
-                for (Partition p : m_rvdb.m_catalogContext.cluster.getPartitions()) {
-                    allPartitions[i++] = Integer.parseInt(p.getTypeName());
-                }
+                int[] allPartitions = m_rvdb.getSiteTracker().getAllPartitions();
 
                 org.voltdb.catalog.CommandLog cl = m_rvdb.m_catalogContext.cluster.getLogconfig().get("log");
 
                 try {
                     m_rvdb.m_restoreAgent = new RestoreAgent(
-                                                      m_rvdb.m_zk,
+                                                      m_rvdb.m_messenger.getZK(),
                                                       m_rvdb.getSnapshotCompletionMonitor(),
                                                       m_rvdb,
                                                       m_rvdb.m_myHostId,
                                                       m_config.m_startAction,
-                                                      m_rvdb.m_catalogContext.numberOfPartitions,
                                                       cl.getEnabled(),
                                                       cl.getLogpath(),
                                                       cl.getInternalsnapshotpath(),
                                                       snapshotPath,
-                                                      lowestHostId,
                                                       allPartitions,
-                                                      m_rvdb.m_catalogContext.siteTracker.getAllLiveHosts());
+                                                      m_rvdb.m_siteTracker.getAllHosts());
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Unable to establish a ZooKeeper connection: " +
                             e.getMessage(), false, e);
                 }
 
                 m_rvdb.m_restoreAgent.setCatalogContext(m_rvdb.m_catalogContext);
+                m_rvdb.m_restoreAgent.setSiteTracker(m_rvdb.m_siteTracker);
                 // Generate plans and get (hostID, catalogPath) pair
                 Pair<Integer,String> catalog = m_rvdb.m_restoreAgent.findRestoreCatalog();
 

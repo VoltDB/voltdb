@@ -63,7 +63,7 @@ public class TestPlannerTool extends TestCase {
         m_pt = new PlannerTool(context);
 
         PlannerTool.Result result = null;
-        result = m_pt.planSql("select * from warehouse;", false);
+        result = m_pt.planSql("select * from warehouse;", false, true);
         System.out.println(result);
 
         // try too many tables
@@ -77,7 +77,7 @@ public class TestPlannerTool extends TestCase {
                 "WAREHOUSE.W_ID = ORDERS.O_W_ID and " +
                 "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
                 "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
-                "WAREHOUSE.W_ID = 0", false);
+                "WAREHOUSE.W_ID = 0", false, true);
             fail();
         }
         catch (Exception e) {}
@@ -94,7 +94,7 @@ public class TestPlannerTool extends TestCase {
                 "CUSTOMER.C_W_ID = ORDERS.O_W_ID and " +
                 "CUSTOMER.C_W_ID = ORDER_LINE.OL_W_ID and " +
                 "CUSTOMER.C_W_ID = NEW_ORDER.NO_W_ID and " +
-                "CUSTOMER.C_W_ID = 0", true);
+                "CUSTOMER.C_W_ID = 0", true, true);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -106,7 +106,7 @@ public class TestPlannerTool extends TestCase {
 
         // try garbage
         try {
-            result = m_pt.planSql("ryan likes the yankees", false);
+            result = m_pt.planSql("ryan likes the yankees", false, true);
             fail();
         }
         catch (Exception e) {}
@@ -119,12 +119,12 @@ public class TestPlannerTool extends TestCase {
         }
 
         try {
-            result = m_pt.planSql("ryan likes the yankees", false);
+            result = m_pt.planSql("ryan likes the yankees", false, true);
             fail();
         }
         catch (Exception e) {}
 
-        result = m_pt.planSql("select * from warehouse;", false);
+        result = m_pt.planSql("select * from warehouse;", false, true);
         System.out.println(result);
     }
 
@@ -157,6 +157,6 @@ public class TestPlannerTool extends TestCase {
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
-        m_pt.planSql("select * from A;", false);
+        m_pt.planSql("select * from A;", false, true);
     }
 }

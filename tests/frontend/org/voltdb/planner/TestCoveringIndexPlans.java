@@ -96,9 +96,12 @@ public class TestCoveringIndexPlans extends TestCase {
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
-        assertTrue(pn instanceof ProjectionPlanNode);
-        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof IndexScanPlanNode);
-        IndexScanPlanNode ispn = (IndexScanPlanNode)pn.getChild(0);
+        if (pn instanceof ProjectionPlanNode) {
+            assertTrue(pn.getChildCount() == 1);
+            pn = pn.getChild(0);
+        }
+        assertTrue(pn instanceof IndexScanPlanNode);
+        IndexScanPlanNode ispn = (IndexScanPlanNode)pn;
         assertEquals("COVER2_TREE", ispn.getTargetIndexName());
         assertEquals(IndexLookupType.GTE, ispn.getLookupType());
         assertEquals(1, ispn.getSearchKeyExpressions().size());

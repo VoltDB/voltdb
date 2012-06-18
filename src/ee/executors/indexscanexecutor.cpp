@@ -50,7 +50,6 @@
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
-#include "expressions/expressions.h"
 #include "expressions/expressionutil.h"
 
 // Inline PlanNodes
@@ -70,8 +69,9 @@ namespace detail {
 
     struct IndexScanExecutorState
     {
-        IndexScanExecutorState(const TupleSchema* schema, AbstractExpression* endExpression,
+        IndexScanExecutorState(bool shortCircuit, const TupleSchema* schema, AbstractExpression* endExpression,
             AbstractExpression* postExpression) :
+            m_shortCircuit(shortCircuit),
             m_targetTableSchema(schema),
             m_endExpression(endExpression),
             m_postExpression(postExpression),
@@ -79,6 +79,7 @@ namespace detail {
             m_secondTuple(NULL)
         {}
 
+        bool m_shortCircuit;
         const TupleSchema* m_targetTableSchema;
         AbstractExpression* m_endExpression;
         AbstractExpression* m_postExpression;
@@ -95,7 +96,7 @@ using namespace voltdb;
 IndexScanExecutor::IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
     : AbstractExecutor(engine, abstractNode), m_node(NULL), m_numOfColumns(0), m_numOfSearchkeys(0),
     m_projectionNode(NULL), m_projectionAllTupleArray(NULL), m_projectionExpressions(NULL),
-    m_searchKey(), m_searchKeyBeforeSubstituteArray(NULL), m_searchKeyAllParamArray(NULL),
+    m_searchKey(), m_searchKeyBeforeSubstituteArray(NULL),
     m_needsSubstituteProject(NULL), m_needsSubstituteSearchKey(NULL),
     m_needsSubstitutePostExpression(false), m_needsSubstituteEndExpression(false),
     m_lookupType(), m_sortDirection(), m_limitNode (NULL), m_limitSize(0), m_limitOffset(0),
@@ -149,10 +150,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
                  (sizeof(AbstractExpression*) *
                   m_node->getOutputTable()->columnCount()));
 
-        m_projectionAllTupleArrayPtr =
-          expressionutil::
-            convertIfAllTupleValues(m_projectionNode->
-                                    getOutputColumnExpressions());
+        m_projectionAllTupleArrayPtr = ExpressionUtil::convertIfAllTupleValues(m_projectionNode->getOutputColumnExpressions());
 
         m_projectionAllTupleArray = m_projectionAllTupleArrayPtr.get();
 
@@ -192,10 +190,6 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
       boost::shared_array<AbstractExpression*>
         (new AbstractExpression*[m_numOfSearchkeys]);
     m_searchKeyBeforeSubstituteArray = m_searchKeyBeforeSubstituteArrayPtr.get();
-    m_searchKeyAllParamArrayPtr =
-        expressionutil::
-        convertIfAllParameterValues(m_node->getSearchKeyExpressions());
-    m_searchKeyAllParamArray = m_searchKeyAllParamArrayPtr.get();
     m_needsSubstituteSearchKeyPtr =
         boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
     m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
@@ -281,6 +275,69 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
+bool IndexScanExecutor::initSearchKey(int ctr, IndexLookupType& localLookupType, SortDirectionType& localSortDirection, int& activeNumOfSearchKeys, bool& shortCircuit)
+{
+    NValue candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
+    try {
+        m_searchKey.setNValue(ctr, candidateValue);
+    }
+    catch (SQLException e) {
+        // This next bit of logic handles underflow and overflow while
+        // setting up the search keys.
+        // e.g. TINYINT > 200 or INT <= 6000000000
+
+        // rethow if not an overflow - currently, it's expected to always be an overflow
+        if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+            throw e;
+        }
+
+        // handle the case where this is a comparison, rather than equality match
+        // comparison is the only place where the executor might return matching tuples
+        // e.g. TINYINT < 1000 should return all values
+        if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
+            (ctr == (activeNumOfSearchKeys - 1))) {
+
+            if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+                if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
+                    (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
+
+                    // gt or gte when key overflows returns nothing
+                    shortCircuit = true;
+                    return true;
+                }
+                // VoltDB should only support LT or LTE with
+                // empty search keys for order-by without lookup
+                throw e;
+            }
+            if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+                if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
+                    (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
+
+                    // lt or lte when key underflows returns nothing
+                    shortCircuit = true;
+                    return true;
+                }
+                // don't allow GTE because it breaks null handling
+                localLookupType = INDEX_LOOKUP_TYPE_GT;
+            }
+
+            // if here, means all tuples with the previous searchkey
+            // columns need to be scaned. Note, if only one column,
+            // then all tuples will be scanned
+            activeNumOfSearchKeys--;
+            if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
+                localSortDirection = SORT_DIRECTION_TYPE_ASC;
+            }
+        }
+        // if a EQ comparison is out of range, then return no tuples
+        else {
+            shortCircuit = true;
+        }
+        return true;
+    }
+    return false;
+}
+
 bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
@@ -290,6 +347,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert(m_targetTable == m_node->getTargetTable());
     VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(),
                m_index->getName().c_str());
+
+    int activeNumOfSearchKeys = m_numOfSearchkeys;
+    IndexLookupType localLookupType = m_lookupType;
+    SortDirectionType localSortDirection = m_sortDirection;
 
     // INLINE PROJECTION
     // Set params to expression tree via substitute()
@@ -319,30 +380,22 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     // SEARCH KEY
     //
-    // assert (m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
-    //         m_lookupType == INDEX_LOOKUP_TYPE_GT);
     m_searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
-    if (m_searchKeyAllParamArray != NULL)
-    {
-        VOLT_TRACE("sweet, all params");
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
-        {
-            m_searchKey.setNValue( ctr, params[m_searchKeyAllParamArray[ctr]]);
+    for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
+        if (m_needsSubstituteSearchKey[ctr]) {
+            m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
         }
-    }
-    else
-    {
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
-            if (m_needsSubstituteSearchKey[ctr]) {
-                m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
+        bool shortCircuit = false;
+        bool done = initSearchKey(ctr, localLookupType, localSortDirection, activeNumOfSearchKeys, shortCircuit);
+        if (done) {
+            if (shortCircuit) {
+                return true;
             }
-            m_searchKey.
-              setNValue(ctr,
-                        m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL));
+            break;
         }
     }
-    assert(m_searchKey.getSchema()->columnCount() > 0);
+    assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
 
@@ -367,8 +420,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         if (m_needsSubstitutePostExpression) {
             post_expression->substitute(params);
         }
-        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());    }
-
+        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
+    }
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
@@ -387,51 +440,49 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     // Use our search key to prime the index iterator
     // Now loop through each tuple given to us by the iterator
     //
-    if (m_numOfSearchkeys > 0)
+    if (activeNumOfSearchKeys > 0)
     {
         VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                   m_lookupType, m_numOfSearchkeys, m_searchKey.debugNoHeader().c_str());
+                   localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
-        if (m_lookupType == INDEX_LOOKUP_TYPE_EQ)
-        {
+        if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
             m_index->moveToKey(&m_searchKey);
         }
-        else if (m_lookupType == INDEX_LOOKUP_TYPE_GT)
-        {
+        else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
             m_index->moveToGreaterThanKey(&m_searchKey);
         }
-        else if (m_lookupType == INDEX_LOOKUP_TYPE_GTE)
-        {
+        else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
             m_index->moveToKeyOrGreater(&m_searchKey);
         }
-        else
-        {
+        else {
             return false;
         }
     }
 
-    if (m_sortDirection != SORT_DIRECTION_TYPE_INVALID) {
+    if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
         bool order_by_asc = true;
 
-        if (m_sortDirection == SORT_DIRECTION_TYPE_ASC) {
+        if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
             // nothing now
-        } else {
+        }
+        else {
             order_by_asc = false;
         }
 
-        if (m_numOfSearchkeys == 0)
+        if (activeNumOfSearchKeys == 0) {
             m_index->moveToEnd(order_by_asc);
-    } else if (m_sortDirection == SORT_DIRECTION_TYPE_INVALID &&
-               m_numOfSearchkeys == 0) {
+        }
+    }
+    else if (localSortDirection == SORT_DIRECTION_TYPE_INVALID && activeNumOfSearchKeys == 0) {
         return false;
     }
 
     //
     // We have to different nextValue() methods for different lookup types
     //
-    while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
+    while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
             !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
-           ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || m_numOfSearchkeys == 0) &&
+           ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
             !(m_tuple = m_index->nextValue()).isNullTuple()))
     {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
@@ -519,7 +570,9 @@ bool IndexScanExecutor::support_pull() const {
 }
 
 TableTuple IndexScanExecutor::p_next_pull() {
-
+    if (m_state->m_shortCircuit) {
+        return m_tuple;
+    }
     while ((m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
             !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
            ((m_lookupType != INDEX_LOOKUP_TYPE_EQ || m_numOfSearchkeys == 0) &&
@@ -571,23 +624,18 @@ void IndexScanExecutor::p_pre_execute_pull(const NValueArray &params)
     //         m_lookupType == INDEX_LOOKUP_TYPE_GT);
     m_searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
-    if (m_searchKeyAllParamArray != NULL)
-    {
-        VOLT_TRACE("sweet, all params");
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
-        {
-            m_searchKey.setNValue( ctr, params[m_searchKeyAllParamArray[ctr]]);
+    for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
+        if (m_needsSubstituteSearchKey[ctr]) {
+            m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
         }
-    }
-    else
-    {
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
-            if (m_needsSubstituteSearchKey[ctr]) {
-                m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
+        bool shortCircuit = false;
+        bool done = initSearchKey(ctr, m_lookupType, m_sortDirection, m_numOfSearchkeys, shortCircuit);
+        if (done) {
+            if (shortCircuit) {
+                m_state.reset(new detail::IndexScanExecutorState(true, NULL, NULL, NULL));
+                return;
             }
-            m_searchKey.
-              setNValue(ctr,
-                        m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL));
+            break;
         }
     }
     assert(m_searchKey.getSchema()->columnCount() > 0);
@@ -602,6 +650,11 @@ void IndexScanExecutor::p_pre_execute_pull(const NValueArray &params)
 
 void IndexScanExecutor::set_expressions_pull(const NValueArray &params)
 {
+    // TODO: Need to properly set/reset shortCircuit, which might be influenced by new params?
+    if (m_state && m_state->m_shortCircuit) {
+        return;
+    }
+
     // Need to set it if this method is called from nestloop executor
     m_tuple = TableTuple(m_targetTable->schema());
     //
@@ -628,12 +681,15 @@ void IndexScanExecutor::set_expressions_pull(const NValueArray &params)
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
 
-    m_state.reset(new detail::IndexScanExecutorState(m_targetTable->schema(), end_expression, post_expression));
+    m_state.reset(new detail::IndexScanExecutorState(false, m_targetTable->schema(), end_expression, post_expression));
 }
 
 //@TODO
 void IndexScanExecutor::set_search_key_pull(const TableTuple& searchKey, const TableTuple* otherTuple)
 {
+    if (m_state->m_shortCircuit) {
+        return;
+    }
     m_searchKey = searchKey;
     if (otherTuple == NULL)
     {

@@ -186,7 +186,7 @@ public class TestLoadingSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalSingleProcessServer("loading-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("loading-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile (note the reuse of the TPCC project)
         success = config.compile(project);
@@ -199,7 +199,7 @@ public class TestLoadingSuite extends RegressionSuite {
         // CONFIG #2: HSQLDB
         /////////////////////////////////////////////////////////////
 
-        config = new LocalSingleProcessServer("loading-hsqldb.jar", 1, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("loading-hsqldb.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
@@ -208,7 +208,7 @@ public class TestLoadingSuite extends RegressionSuite {
         // CONFIG #3: Local Cluster (of processes)
         /////////////////////////////////////////////////////////////
 
-        config = new LocalCluster("loading-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("loading-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);

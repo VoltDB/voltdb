@@ -17,6 +17,7 @@
     <attribute name="srcdir"/>
     <attribute name="destdir" default="${build.prod.dir}"/>
     <attribute name="excludes" default=""/>
+    <attribute name="includes" default=""/>
     <sequential>
         <javac
             target="1.6"
@@ -24,14 +25,18 @@
             srcdir="@{srcdir}"
             destdir="@{destdir}"
             excludes="@{excludes}"
+            includes="@{includes}"
             encoding='UTF-8'
-            debug='true'>
+            debug='true'
+            includeAntRuntime='false'>
             <classpath refid="project.classpath" />
         </javac>
     </sequential>
 </macrodef>
 
 <!-- PATHS AND PROPERTIES -->
+
+<tstamp/>
 
 <!-- make environment var foo available as env.foo -->
 <property environment="env"/>
@@ -72,7 +77,6 @@
 <property name='src.ee.parent.dir'           location='src/ee' />
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
-<property name='m1catalog'                   location='${src.test.dir}/org/voltdb/catalog/catalog.txt' />
 <property name='depcache'                    value='.depcache' />
 
 <!-- emma build instrumentation location -->
@@ -107,11 +111,6 @@
     <fileset refid="voltpro.classpath"/>
 </path>
 
-<!-- select which set of regression suite configuration types to run -->
-<condition property="regressions" value="${regressions}" else="all">
-  <isset property="regressions"/>
-</condition>
-
 <!-- Workload Tracer Properties -->
 <condition property="workload.trace.class" value="">
     <not><isset property="workload.trace.class"/></not>
@@ -134,8 +133,8 @@ PRIMARY ENTRY POINTS
     description="Compile Java classes and C++ JNI library."
 />
 <target name="check"
-    depends="compile, licensecheck, voltdbipc, ee"
-    description="Run Java and C++ JNI testcases and test plan fragments." >
+    depends="licensecheck, compile, voltdbipc, ee"
+    description="Run Java and C++ JNI testcases." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
@@ -150,26 +149,21 @@ PRIMARY ENTRY POINTS
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
     </exec>
 </target>
-<target name="newcheck"
-    depends="licensecheck,compile, voltdbipc"
-    description="Run Java and C++ JNI testcases and test plan fragments." >
+<target name="check_noclustering"
+    depends="licensecheck, compile, voltdbipc, ee"
+    description="Run Java and C++ JNI testcases that apply to a single node." >
     <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
         <isset property="timeoutLength"/>
     </condition>
 
-    <mkdir dir='${build.dir}/testrunner/' />
-    <copy todir='${build.dir}/testrunner/'>
-        <fileset dir="tests/testrunner">
-            <exclude name="**/.svn" />
-        </fileset>
-    </copy>
-
-    <exec executable="/bin/sh"
-          failonerror="true"
-          timeout="1800000"
-          dir="${build.dir}"
-          newenvironment='true'>
-        <arg value="testrunner/test.py" />
+    <exec executable="/usr/bin/ant" failonerror="true" timeout="9000000">
+        <arg value="eecheck" />
+        <arg value="junit_noclustering" />
+        <arg value="distcheck" />
+        <arg value="pythonfser" />
+        <arg value="-Dbuild=${build}" />
+        <arg value="-DtimeoutLength=${timeoutLength}" />
+        <arg value="-DVOLT_REGRESSIONS=localhsql" />
     </exec>
 </target>
 <target name="check_quick"
@@ -245,49 +239,6 @@ DISTRIBUTION
 ***************************************
 -->
 
-<macrodef name="voltbin-macro">
-  <sequential>
-    <mkdir dir="${build.dir}/voltbin" />
-    <copy todir="${build.dir}/voltbin" flatten="true">
-        <fileset dir="${build.dir}" defaultexcludes="yes">
-            <include name="nativelibs/libvoltdb*" />
-            <include name="prod/voltdbfat.jar" />
-        </fileset>
-    </copy>
-    <!-- use cp to preserve permissions -->
-    <exec dir="tools" executable="cp" failonerror="true">
-        <arg line="getmac.py"/>
-        <arg line="killstragglers.sh"/>
-        <arg line="${build.dir}/voltbin"/>
-    </exec>
-    <!-- populate the logging configuration files -->
-    <copy tofile="${build.dir}/voltbin/log4j.properties" file="voltdb/log4j.properties"/>
-    <copy tofile="${build.dir}/voltbin/log4j.xml" file="voltdb/log4j.xml"/>
-  </sequential>
-</macrodef>
-
-<target name="voltbin" depends="compile, ee, jars">
-  <voltbin-macro/>
-
-  <!-- strip the voltbin shared library (~40x size reduction) -->
-  <exec dir='${build.dir}/voltbin' executable='/bin/sh'>
-    <arg line="-c '/usr/bin/strip -x libvoltdb*'"/>
-  </exec>
-</target>
-
-<target name="voltbin_profile" depends="compile, ee_profile, jars">
-  <voltbin-macro/>
-</target>
-
-<target name="voltbin_copy" depends="compile,ee,jars">
-  <voltbin-macro/>
-
-  <!-- copy the voltbin contents to $HOME/voltbin -->
-  <exec dir="${build.dir}" executable='/bin/sh'>
-    <arg line="-c 'cp voltbin/* $HOME/voltbin/'"/>
-  </exec>
-</target>
-
 <target name="javadoc">
     <!-- populate selected server/compiler javadoc documentation -->
     <javadoc
@@ -338,8 +289,8 @@ DISTRIBUTION
             <include name="src/frontend/org/voltdb/client/ClientStatusListener.java" />
             <include name="src/frontend/org/voltdb/client/ClientStatusListenerExt.java" />
             <include name="src/frontend/org/voltdb/client/ClientResponse.java" />
-            <include name="src/frontend/org/voltdb/client/StatsUploaderSettings.java" />
-            <include name="src/frontend/org/voltdb/client/exampleutils/*.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStats.java" />
+            <include name="src/frontend/org/voltdb/client/ClientStatsContext.java" />
             <include name="src/frontend/org/voltdb/types/TimestampType.java" />
         </fileset>
     </javadoc>
@@ -376,7 +327,9 @@ DISTRIBUTION
     <copy todir="${dist.dir}/voltdb" flatten="true" >
         <fileset dir="voltdb" defaultexcludes="yes">
             <include name="voltdb-${dist.version}.jar" />
+            <include name="voltdb-${dist.version}-javadoc.jar" />
             <include name="voltdbclient-${dist.version}.jar" />
+            <include name="voltdbclient-${dist.version}-javadoc.jar" />
         </fileset>
     </copy>
     <copy todir="${dist.dir}/voltdb" flatten="true" >
@@ -606,7 +559,7 @@ CLEANING
     <arg line="-c 'rm -rf voltdb/*.jar'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
-    <arg line="-c 'rm -rf voltdb/*.so'"/>
+    <arg line="-c 'rm -rf voltdb/*.so voltdb/*.jnilib'"/>
   </exec>
   <exec dir='.' executable='/bin/sh'>
     <arg line="-c 'rm -rf src/ee/catalog/*'"/>
@@ -647,15 +600,15 @@ JAR BUILDING
 <target name="voltdb.jar" depends="compile, buildinfo">
     <jar destfile="voltdb/voltdb-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
-            <include name="org/voltdb/**" />
+            <include name="org/voltdb/**"/>
+            <include name="org/voltcore/**"/>
             <include name="org/hsqldb_voltpatches/**" />
+            <include name="org/apache/**" />
             <include name="org/eclipse/jetty_voltpatches/**" />
             <include name="javax/servlet_voltpatches/**" />
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
-            <include name="org/apache/jute_voltpatches/**" />
-            <include name="org/apache/zookeeper_voltpatches/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
@@ -679,13 +632,50 @@ JAR BUILDING
             </section>
         </manifest>
     </jar>
+    <!--jar destfile="voltdb/voltdb-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}/javadoc/procedure-api" defaultexcludes="no" >
+            <include name="**"/>
+        </fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB Inc." />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB Database JavaDoc"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar>
+    <jar destfile="voltdb/voltdbclient-${dist.version}-javadoc.jar">
+        <fileset dir="${doc.dir}/javadoc/java-client-api" defaultexcludes="no" >
+            <include name="**"/>
+        </fileset>
+        <manifest>
+            <section name="Credits">
+                <attribute name="Author" value="VoltDB Inc." />
+            </section>
+            <section name="Shared">
+                <attribute
+                    name="Title"
+                    value="VoltDB Client JavaDoc"
+                />
+                <attribute name="Date" value="${TODAY}" />
+            </section>
+        </manifest>
+    </jar-->
+
 </target>
 
 <target name="voltdbclient.jar" depends="compile, buildinfo">
     <jar destfile="voltdb/voltdbclient-${dist.version}.jar">
         <fileset dir="${build.prod.dir}" defaultexcludes="yes" >
+            <include name="org/voltcore/**" />
             <include name="org/voltdb/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/apache/hadoop_voltpatches/**" />
         </fileset>
         <fileset dir="."><include name="buildstring.txt"/></fileset>
         <manifest>
@@ -834,9 +824,24 @@ JAVA COMPILATION
         </fileset>
     </copy>
 
+    <!-- copy zmq to voltdb dir / would be nice to only copy the right one -->
+    <copy todir="voltdb" flatten="true" >
+        <fileset dir="." defaultexcludes="yes">
+            <include name="third_party/cpp/jnilib/libjzmq*" />
+        </fileset>
+    </copy>
+
     <!-- compile the individual source directories -->
+    <!-- hsql -->
     <invoke-javac srcdir="${src.hsqldb.dir}"/>
-    <invoke-javac srcdir="${src.gpl.dir}:${vendor.src.dir}"/>
+    <!-- voltcore and third-party java (including our zookeeper -->
+    <invoke-javac
+        srcdir="${src.gpl.dir}:${vendor.src.dir}"
+        includes="org/voltcore/**/*.java,org/apache/**/*.java
+                  au/**/*.java
+                  org/json_voltpatches/**/*.java" />
+    <!-- non-voltcore voltdb code -->
+    <invoke-javac srcdir="${src.gpl.dir}" excludes="org/voltcore/**/*.java" />
 
     <!-- compile the individual test directories -->
     <invoke-javac srcdir="${src.hsqldb.test.dir}" destdir='${build.test.dir}'/>
@@ -877,13 +882,13 @@ NATIVE EE STUFF
     description="Build C++ JNI library."
     unless='uptodate_jni_h'>
     <delete file="${src.ee.dir}/org_voltdb_jni_ExecutionEngine.h" />
-    <delete file="${src.ee.dir}/org_voltdb_utils_DBBPool.h" />
+    <delete file="${src.ee.dir}/org_voltcore_utils_DBBPool.h" />
     <move
         file='${build.dir}/org_voltdb_jni_ExecutionEngine.h'
         todir='${src.ee.dir}'
     />
     <move
-        file='${build.dir}/org_voltdb_utils_DBBPool.h'
+        file='${build.dir}/org_voltcore_utils_DBBPool.h'
         todir='${src.ee.dir}'
     />
 </target>
@@ -896,8 +901,8 @@ NATIVE EE STUFF
                 file2="${build.dir}/org_voltdb_jni_ExecutionEngine.h"
             />
             <filesmatch
-                file1="${src.ee.dir}/org_voltdb_utils_DBBPool.h"
-                file2="${build.dir}/org_voltdb_utils_DBBPool.h"
+                file1="${src.ee.dir}/org_voltcore_utils_DBBPool.h"
+                file2="${build.dir}/org_voltcore_utils_DBBPool.h"
             />
         </and>
     </condition>
@@ -905,7 +910,7 @@ NATIVE EE STUFF
 
 <target name='jnicompile_temp'>
     <delete file="${build.dir}/org_voltdb_jni_ExecutionEngine.h"/>
-    <delete file="${build.dir}/org_voltdb_utils_DBBPool.h" />
+    <delete file="${build.dir}/org_voltcore_utils_DBBPool.h" />
     <javah
         classpathref="project.classpath"
         force="yes"
@@ -917,7 +922,7 @@ NATIVE EE STUFF
         classpathref="project.classpath"
         force="yes"
         verbose="yes"
-        class="org.voltdb.utils.DBBPool"
+        class="org.voltcore.utils.DBBPool"
         destdir="${build.dir}"
     />
 </target>
@@ -925,7 +930,6 @@ NATIVE EE STUFF
 <target name="eecheck" depends="ee"
     description="Run testcases for C++ JNI library.">
     <exec dir='.' executable='python' failonerror='true'>
-        <env key='M1CATALOG_PATH' value='${m1catalog}' />
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="EETESTSUITE" value="${eetestsuite}"/>
         <arg line="build.py ${build} test" />
@@ -1012,39 +1016,85 @@ TEST CASES
     <property name="emma.dir" location="${build.dir}/emma" />
     <mkdir dir="${emma.dir}" />
     <emma>
-        <!-- don't instrument build.test.dir or any non-voltdb code -->
-        <instr
-            instrpath="${build.prod.dir}/org/voltdb"
-            destdir="${build.instr.dir}/org/voltdb"
-            metadatafile="${emma.dir}/metadata.emma"
-            merge="true"
-        />
+        <instr destdir="${build.instr.dir}/org/"
+               metadatafile="${emma.dir}/metadata.emma"
+               merge="true">
+          <instrpath path="${build.prod.dir}/org"/>
+
+          <filter includes="*voltdb.*"/>
+          <filter includes="*voltcore.*"/>
+          <!--pmsg is the protobuf-generated code for dragent-->
+          <filter excludes="*pmsg.*"/>
+          <filter excludes="*exampleutils.*"/>
+        </instr>
     </emma>
 </target>
 
-<!-- common junit parameters go here -->
-<macrodef name='run_junit'>
-    <attribute name='timeout'/>
-    <attribute name='printsummary' default='off' />
-    <attribute name='showoutput' default='false' />
-    <element name='tests'/>
-    <element name='formatters'/>
+<!-- script that runs junit_onesuite for each class in a fileset -->
+<!-- if there's a better way to do this than embedding javascript, please help... -->
+<scriptdef name="junit-files" language="javascript">
+<element name="fileset" type="fileset"/>
+<![CDATA[
+  filesets = elements.get("fileset");
+  for (i = 0; i < filesets.size(); ++i) {
+    fileset = filesets.get(i);
+    scanner = fileset.getDirectoryScanner(project);
+    scanner.scan();
+    files = scanner.getIncludedFiles();
+    for( j=0; j < files.length; j++) {
+        jfile = self.project.createTask("antcall");
+        project.setProperty("testfilename", files[j]);
+        jfile.setTarget("junit_onesuite");
+        jfile.execute();
+    }
+  }
+]]>
+</scriptdef>
+
+<!-- run junit for one suite -->
+<target name='junit_onesuite'>
+    <!-- set defaults for junit vars if not already set -->
+    <condition property="junit.timeout" value="${junit.timeout}" else='1800000'>
+        <isset property="junit.timeout"/>
+    </condition>
+    <condition property="junit.printsummary" value="${junit.printsummary}" else='yes'>
+        <isset property="junit.printsummary"/>
+    </condition>
+    <condition property="junit.showoutput" value="${junit.showoutput}" else="false">
+        <isset property="junit.showoutput"/>
+    </condition>
+    <!-- select which set of regression suite configuration types to run -->
+    <condition property="regressions" value="${regressions}" else="all">
+        <isset property="regressions"/>
+    </condition>
+
     <sequential>
-        <mkdir dir='${build.testoutput.dir}' />
+
+        <!-- convert the filename to a classname -->
+        <!-- assumes the file coming in has 1-1 folders to packages -->
+        <loadresource property="testname">
+            <string value="${testfilename}" />
+            <filterchain>
+                <replaceregex pattern="/" replace="\." flags="g" />
+                <replaceregex pattern="\.class" replace="" />
+            </filterchain>
+        </loadresource>
+
+        <!-- run ant's junit runner -->
         <junit
             fork="yes"
             haltonfailure="${junit.haltonfailure}"
             failureproperty="junit.failures"
-            printsummary="@{printsummary}"
-            timeout="@{timeout}"
+            printsummary="false"
+            timeout="${junit.timeout}"
             maxmemory='1024M'
-            showoutput="@{showoutput}"
+            showoutput="${junit.showoutput}"
         >
             <classpath refid='project.classpath' />
             <jvmarg value="-Djava.library.path=${build.dir}/nativelibs:${base.dir}/third_party/cpp/jnilib" />
             <jvmarg value="-server" />
             <jvmarg value="-Xcheck:jni" />
-            <jvmarg value="-Xmx2048m"/>
+            <jvmarg value="-Xmx256m"/>
             <jvmarg value="-XX:+HeapDumpOnOutOfMemoryError"/>
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
@@ -1059,92 +1109,89 @@ TEST CASES
             <!-- code coverage output settings, harmless if not in use -->
             <jvmarg value="-Demma.coverage.out.file=${emma.dir}/coverage.emma" />
             <jvmarg value="-Demma.coverage.out.merge=true" />
-            <!-- junit log4j settings, generates log output of last
-            suite -->
-            <jvmarg value="-Dlog4j.configuration=file:${src.gpl.dir}/junit_log4j.properties" />
-            <!-- -->
-            <formatters/>
+            <!-- junit log4j settings, generates log output of last suite -->
+            <jvmarg value="-Dlog4j.configuration=file:${base.dir}/tests/log4j-allconsole.xml" />
+
+            <!-- write per-testcase output to console if verbose mode -->
+            <formatter type="plain" usefile="false" if="verbosereport"/>
+            <!-- write per-testcase output to testoutput folder -->
+            <formatter type="plain" usefile="true" />
+            <!-- write all kinds of fun voltdb output to testoutput folder -->
+            <formatter
+                type='xml'
+                classname="org.voltdb.VoltJUnitFormatter"
+                usefile='false'
+                extension="none"
+            />
+            <!-- write xml output for the report  -->
+            <formatter type="xml" />
+
+            <!-- specify the tests here (there should be only one) -->
             <batchtest todir="${build.testoutput.dir}">
-                <tests/>
+                <fileset dir='${build.test.dir}'>
+                    <include name='${testfilename}'/>
+                </fileset>
             </batchtest>
+
             <assertions><enable/></assertions>
         </junit>
+
+        <!-- per-test post processing script
+             1. ensure a result xml file got written
+             2. ensure no whacky processes were stranded -->
+        <exec executable="/usr/bin/env">
+            <arg value="python" />
+            <arg value="${base.dir}/tools/junit-post-process.py" />
+            <arg value="--testname=${testname}" />
+            <arg value="--outputpath=${build.testoutput.dir}" />
+        </exec>
+    </sequential>
+</target>
+
+<!-- common macro to run a bynch of junit -->
+<macrodef name='run_junit'>
+    <element name='tests'/>
+    <sequential>
+        <mkdir dir='${build.testoutput.dir}' />
+        <mkdir dir='${build.dir}/testoutput-archive/' />
+        <exec executable="/usr/bin/env" failonerror='true'>
+            <arg value="python" />
+            <arg value="${base.dir}/tools/junit-pre-process.py" />
+            <arg value="--archivepath=${build.dir}/testoutput-archive/" />
+            <arg value="--outputpath=${build.testoutput.dir}" />
+        </exec>
+        <junit-files>
+            <tests/>
+        </junit-files>
+
+        <echo message='' /><echo message='' />
+        <junitreport todir="${build.testoutput.dir}">
+            <fileset dir="${build.testoutput.dir}">
+                <include name="TEST-*.xml" />
+            </fileset>
+            <report format="noframes" todir="${build.testoutput.dir}/report"/>
+            <report
+                styledir="tools"
+                format="noframes"
+                todir="${build.testoutput.dir}"
+            />
+        </junitreport>
+        <exec dir="${build.testoutput.dir}" executable='cat'>
+            <arg line="junit-noframes.html"/>
+        </exec>
+        <!-- Fail the build if there were any problems.
+             This runs all the tests before failing. -->
+        <fail
+             if="junit.failures"
+             unless="emma.enabled"
+             message="JUnit had failures"
+        />
     </sequential>
 </macrodef>
 
- <macrodef name="junitreport-macro">
-   <attribute name="testoutput" />
-   <sequential>
-     <mkdir dir='@{testoutput}/report' />
-     <junitreport todir="@{testoutput}">
-       <fileset dir="@{testoutput}">
-            <include name="TEST-*.xml" />
-        </fileset>
-        <report format="noframes" todir="@{testoutput}/report"/>
-        <report
-            styledir="tools"
-            format="noframes"
-            todir="@{testoutput}"
-        />
-     </junitreport>
-   </sequential>
-</macrodef>
-
-<!-- A set of junit tests that only run on hudson and have an extended timeout -->
-<!-- Run this before junit to pick up these tests in the reporting -->
-<target name="junit-hudson">
-    <run_junit timeout="900000" printsummary="yes">
-        <formatters>
-            <formatter type="xml" />
-        </formatters>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <!-- currently empty! -->
-            </fileset>
-        </tests>
-    </run_junit>
-</target>
-
-<target name="timeoutbakeoff" description = "Reporting for junit tests">
-    <run_junit timeout="600000" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-            <formatter type="xml" />
-        </formatters>
-        <tests>
-            <fileset dir='${build.test.dir}'>
-                <include name='org/voltdb/**/TestExecutionSite.class'/>
-                <include name='org/voltdb/**/TestRejoinEndToEnd.class'/>
-                <include name='org/voltdb/**/TestPartitionDetection.class'/>
-                <include name='org/voltdb/**/TestRestoreAgent.class'/>
-            </fileset>
-        </tests>
-    </run_junit>
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-</target>
-
 <!-- Junit tests that run quickly -->
-<target
-    name="junit_quick"
-    description="Tests and suites that run in under 3 minutes under memcheck"
->
-    <run_junit timeout="${timeoutLength}" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-            <formatter type="xml" />
-        </formatters>
+<target name="junit_quick" description="Tests and suites that run in under 3 minutes under memcheck">
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
@@ -1179,38 +1226,14 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-
-    <!-- Fail the build if there were any problems.
-        This runs all the tests before failing. -->
-    <fail
-        if="junit.failures"
-        unless="emma.enabled"
-        message="JUnit had failures"
-    />
 </target>
 
 <target name="junit" description="Run testcases for Java classes.">
-    <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
-        <isset property="timeoutLength"/>
-    </condition>
-
-    <run_junit timeout="${timeoutLength}" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-            <formatter type="xml" />
-        </formatters>
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltcore/**/Test*.class' />
                 <include name='org/voltdb/**/Test*.class'/>
                 <include name='org/voltdb/network/**/Test*.class'/>
                 <include name='org/voltdb/messaging/**/*Test.class'/>
@@ -1222,50 +1245,10 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-
-    <exec dir="${build.testoutput.dir}" executable='cat'>
-        <arg line="junit-noframes.html"/>
-    </exec>
-    <delete
-        dir='${build.testoutput.dir}'
-        includes='TEST-*.xml'
-    />
-    <!-- Fail the build if there were any problems.
-        This runs all the tests before failing. -->
-    <fail
-        if="junit.failures"
-        unless="emma.enabled"
-        message="JUnit had failures"
-    />
-
-    <!-- Regenerate milestoneOneCatalog/ -->
-    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <unjar
-        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
-        dest='${build.dir}/expanded/milestoneOneCatalog'
-    />
 </target>
 
 <target name="junit_quarantine" description="Run testcases which fail unpredictably.">
-    <!-- Run the unit tests -->
-    <condition property="timeoutLength" value="${timeoutLength}" else='1800000'>
-        <isset property="timeoutLength"/>
-    </condition>
-
-    <run_junit timeout="${timeoutLength}" printsummary="no">
-        <formatters>
-            <formatter type="plain" unless="hudson"/>
-            <formatter
-                type='xml'
-                classname="org.voltdb.VoltJUnitFormatter"
-                usefile='false'
-                extension="none"
-            />
-            <formatter type="xml" />
-        </formatters>
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
                 <include name='org/voltdb/quarantine/**/Test*.class'/>
@@ -1273,17 +1256,6 @@ TEST CASES
             </fileset>
         </tests>
     </run_junit>
-
-    <!-- Generate unit test reports. -->
-    <junitreport-macro testoutput="${build.testoutput.dir}"/>
-
-    <!-- Fail the build if there were any problems.
-        This runs all the tests before failing. -->
-    <fail
-        if="junit.failures"
-        unless="emma.enabled"
-        message="JUnit had failures"
-    />
 </target>
 
 <target
@@ -1313,7 +1285,8 @@ TEST CASES
     lcov.dir is the directory in which to put the coverage report
     lcov.target is the ant target to run under coverage
 -->
-<target name='with.lcov' description="Generate C++ code coverage reports.">
+<target name='with.lcov' depends="jnicompile"
+        description="Generate C++ code coverage reports.">
   <property name="lcov.base.tracefile" value="lcov_base.info" />
   <property name="lcov.test.tracefile" value="lcov_test.info" />
   <property name="lcov.tracefile" value="lcov.info" />
@@ -1378,7 +1351,6 @@ TEST CASES
     name='lcov-unit-tests'
     description="Run C++ unit tests from the coverage directory">
     <exec dir='.' executable='python' failonerror='true'>
-        <env key='M1CATALOG_PATH' value='${m1catalog}' />
         <env key="TEST_DIR" value="${build.dir}-coverage/testobjects" />
         <arg line="build.py ${build} test coverage" />
     </exec>
@@ -1456,16 +1428,21 @@ TEST CASES
 <!-- This target will run a junit suite. It will also run a single
      suite under valgrind with -Dbuild=memcheck.  NOTE: to use valgrind,
      you must "cd obj/memcheck && make prod/voltdbipc" separately. -->
-<target name='junitclass'
+<target name="junitclass"
     description="Run one junit suite (i.e, -Djunitclass=TestSQLFeaturesSuite)">
 
     <condition property="timeoutLength" value="${timeoutLength}" else='900000'>
         <isset property="timeoutLength"/>
     </condition>
-    <run_junit timeout="${timeoutLength}" printsummary="yes" showoutput="yes">
-        <formatters>
-            <formatter usefile="false" type="plain"/>
-        </formatters>
+    <condition property="junit.showoutput" value="${junit.showoutput}" else="true">
+        <isset property="junit.showoutput"/>
+    </condition>
+    <!-- output per-testcase stats at the end of each suite -->
+    <condition property="verbosereport" value="${verbosereport}" else="true">
+        <isset property="verbosereport"/>
+    </condition>
+
+    <run_junit>
         <tests>
             <fileset dir='${build.test.dir}'>
               <include name="**/${junitclass}.class"/>
@@ -1510,49 +1487,12 @@ TEST CASES
     <delete dir='${dist.dir}/foo' />
 </target>
 
-<target name='m1test_pre' depends='ee, compile'>
-    <mkdir dir='${build.testoutput.dir}' />
-    <junit fork="yes" printsummary='yes' haltonfailure="yes" showoutput='true'>
-        <jvmarg value="-Djava.library.path=${build.dir}/nativelibs" />
-        <env key="TEST_DIR" value="${build.testobjects.dir}" />
-        <env key="PLANNER" value="${planner}" />
-        <classpath refid='project.classpath' />
-        <formatter type="plain" unless="hudson"/>
-        <formatter type="xml" if="hudson"/>
-        <batchtest todir="${build.testoutput.dir}">
-            <fileset dir='${build.test.dir}'>
-                <include name='org/voltdb/compiler/TestMilestoneOneCompile.class'/>
-                <exclude name="**/*$*.class"/>
-            </fileset>
-        </batchtest>
-        <assertions><enable/></assertions>
-    </junit>
-    <delete dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <mkdir dir='${build.dir}/expanded/milestoneOneCatalog' />
-    <unjar
-        src='${build.testobjects.dir}/milestoneOneCatalog.jar'
-        dest='${build.dir}/expanded/milestoneOneCatalog'
-    />
-    <copy
-        file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-        todir='${build.test.dir}/org/voltdb/catalog'
-    />
-    <copy
-          file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-          todir='${build.test.dir}/org/voltdb/catalog'
-    />
-    <copy
-          file='${build.dir}/expanded/milestoneOneCatalog/catalog.txt'
-          todir='${src.test.dir}/org/voltdb/catalog/'
-    />
-</target>
-
 <target name='sqlcoverage' depends="ee,compile"
     description="Run the SQL coverage tests.">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
-    <property name="log4j.configuration" location="voltdb/log4j.properties" />
+    <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
     <property name="default_config" location="${test.example.dir}/config.py" />
     <property name="regression_config"
               location="${test.example.dir}/regression-config.py" />

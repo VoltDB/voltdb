@@ -153,7 +153,7 @@ public class TestScanPlanNode extends TestCase
 
         // update column 1 with a parameter value
         ParameterValueExpression col2_exp = new ParameterValueExpression();
-        col2_exp.setParameterId(0);
+        col2_exp.setParameterIndex(0);
         col2_exp.setValueType(COLTYPES[1]);
         col2_exp.setValueSize(COLTYPES[1].getLengthInBytesForFixedTypes());
         // XXX I'm not sure what to do with the name for the updated column yet.

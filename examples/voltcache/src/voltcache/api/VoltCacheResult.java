@@ -22,11 +22,12 @@
  */
 package voltcache.api;
 
-import java.util.Map;
 import java.util.HashMap;
+import java.util.Map;
+
 import org.voltdb.VoltTable;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.VoltType;
+import org.voltdb.client.ClientResponse;
 
 public class VoltCacheResult
 {
@@ -68,31 +69,29 @@ public class VoltCacheResult
 
     private static final String[] Name = new String[] {"STORED","NOT_STORED","EXISTS","NOT_FOUND","DELETED","ERROR","CLIENT_ERROR","SERVER_ERROR","OK","SUBMITTED"};
 
-    public final long Code;
-    public long IncrDecrValue = VoltType.NULL_BIGINT;
-    public Map<String,VoltCacheItem> Data = null;
+    public final long code;
+    public long incrDecrValue = VoltType.NULL_BIGINT;
+    public Map<String,VoltCacheItem> data = null;
+
     VoltCacheResult(long code)
     {
-        this.Code = code;
+        this.code = code;
     }
 
     public static String getName(long code)
     {
         return Name[(int)code];
     }
+
     public String getName()
     {
-        return Name[(int)this.Code];
+        return Name[(int)this.code];
     }
 
-    public enum Type
-    {
-            CODE    (0)
-        ,   DATA    (1)
-        ,   IDOP    (2)
-        ;
-        private int Value;
-        Type(int value) { Value = value; }
+    public enum Type {
+       CODE,
+       DATA,
+       IDOP;
     }
 
     public static VoltCacheResult get(Type type, ClientResponse response)
@@ -107,9 +106,9 @@ public class VoltCacheResult
             if (data.getRowCount() > 0)
             {
                 final VoltCacheResult result = VoltCacheResult.OK();
-                result.Data = new HashMap<String,VoltCacheItem>();
+                result.data = new HashMap<String,VoltCacheItem>();
                 while(data.advanceRow())
-                    result.Data.put(
+                    result.data.put(
                                      data.getString(0)
                                    , new VoltCacheItem(
                                                         data.getString(0)
@@ -132,7 +131,7 @@ public class VoltCacheResult
             else
             {
                 final VoltCacheResult result = VoltCacheResult.OK();
-                result.IncrDecrValue = value;
+                result.incrDecrValue = value;
                 return result;
             }
         }

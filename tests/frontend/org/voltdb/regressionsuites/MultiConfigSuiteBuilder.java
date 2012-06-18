@@ -27,6 +27,7 @@ import java.lang.reflect.Constructor;
 import java.lang.reflect.Method;
 import java.util.ArrayList;
 import java.util.List;
+
 import junit.framework.Test;
 import junit.framework.TestCase;
 import junit.framework.TestSuite;
@@ -90,19 +91,16 @@ public class MultiConfigSuiteBuilder extends TestSuite {
 
         if (!(enabled_configs == null || enabled_configs.contentEquals("all")))
         {
-            if ((config instanceof LocalCluster) &&
-                !(enabled_configs.contains("cluster")))
-            {
-                return true;
-            }
-            if ((config instanceof LocalSingleProcessServer) &&
-                !(enabled_configs.contains("local")))
-            {
-                return true;
-            }
-            if (config.isHSQL() && !(enabled_configs.contains("hsql")))
-            {
-                return true;
+            if (config instanceof LocalCluster) {
+                if (config.isHSQL() && !enabled_configs.contains("hsql")) {
+                    return true;
+                }
+                if ((config.getNodeCount() == 1) && !enabled_configs.contains("local")) {
+                    return true;
+                }
+                if ((config.getNodeCount() > 1) && !enabled_configs.contains("cluster")) {
+                    return true;
+                }
             }
         }
 
@@ -110,7 +108,11 @@ public class MultiConfigSuiteBuilder extends TestSuite {
         if (buildType != null) {
             if (buildType.startsWith("memcheck")) {
                 if (config instanceof LocalCluster) {
-                    return true;
+                    LocalCluster lc = (LocalCluster) config;
+                    // don't run valgrind on multi-node clusters without embedded processes
+                    if ((lc.getNodeCount() > 1) || (lc.m_hasLocalServer == false)) {
+                        return true;
+                    }
                 }
                 if (config.isHSQL()) {
                     return true;

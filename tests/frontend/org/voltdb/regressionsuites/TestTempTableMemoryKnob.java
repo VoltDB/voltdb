@@ -98,7 +98,7 @@ public class TestTempTableMemoryKnob extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalSingleProcessServer("tempknob-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("tempknob-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();

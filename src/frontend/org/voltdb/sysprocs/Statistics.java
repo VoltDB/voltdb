@@ -24,8 +24,7 @@ import java.util.Map;
 
 import org.voltdb.ClientInterface;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.LiveClientStats;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
@@ -38,8 +37,8 @@ import org.voltdb.VoltType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.utils.Pair;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.Pair;
 
 /**
  * Access the TABLE, PRCOEDURE, INITIATOR, IOSTATS, or PARTITIONCOUNT statistics.
@@ -120,7 +119,7 @@ public class Statistics extends VoltSystemProcedure {
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies,
                                                   long fragmentId,
                                                   ParameterSet params,
-                                                  ExecutionSite.SystemProcedureExecutionContext context)
+                                                  SystemProcedureExecutionContext context)
     {
         //  TABLE statistics
         if (fragmentId == SysProcFragmentId.PF_tableData) {
@@ -137,7 +136,7 @@ public class Statistics extends VoltSystemProcedure {
                 tableGuids[ii++] = table.getRelativeIndex();
             }
             VoltTable result =
-                context.getExecutionEngine().getStats(
+                context.getSiteProcedureConnection().getStats(
                         SysProcSelector.TABLE,
                         tableGuids,
                         interval,
@@ -164,7 +163,7 @@ public class Statistics extends VoltSystemProcedure {
                 tableGuids[ii++] = table.getRelativeIndex();
             }
             VoltTable result =
-                context.getExecutionEngine().getStats(
+                context.getSiteProcedureConnection().getStats(
                         SysProcSelector.INDEX,
                         tableGuids,
                         interval,
@@ -184,8 +183,8 @@ public class Statistics extends VoltSystemProcedure {
             final boolean interval =
                 ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             final Long now = (Long)params.toArray()[1];
-            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            catalogIds.add(Integer.parseInt(context.getSite().getTypeName()));
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(context.getSiteId());
             VoltTable result = VoltDB.instance().
                     getStatsAgent().getStats(
                             SysProcSelector.PROCEDURE,
@@ -206,8 +205,8 @@ public class Statistics extends VoltSystemProcedure {
             final boolean interval =
                 ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             final Long now = (Long)params.toArray()[1];
-            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            catalogIds.add(Integer.parseInt(context.getSite().getTypeName()));
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(context.getSiteId());
             VoltTable result = VoltDB.instance().
                     getStatsAgent().getStats(
                             SysProcSelector.STARVATION,
@@ -228,8 +227,8 @@ public class Statistics extends VoltSystemProcedure {
             final boolean interval =
                 ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             final Long now = (Long)params.toArray()[1];
-            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            catalogIds.add(0);
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(0L);
             VoltTable result = VoltDB.instance().
             getStatsAgent().getStats(
                                      SysProcSelector.INITIATOR,
@@ -239,11 +238,7 @@ public class Statistics extends VoltSystemProcedure {
 
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
-            if (context.getExecutionSite().getSiteId() != lowest_site_id)
+            if (!context.isLowestSiteId())
             {
                 // Hacky way to generate an empty table with the correct schema
                 result.clearRowData();
@@ -259,8 +254,8 @@ public class Statistics extends VoltSystemProcedure {
             final boolean interval =
                 ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
             final Long now = (Long)params.toArray()[1];
-            ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-            catalogIds.add(0);
+            ArrayList<Long> catalogIds = new ArrayList<Long>();
+            catalogIds.add(0L);
             VoltTable result =
                 VoltDB.instance().getStatsAgent().getStats(SysProcSelector.MEMORY,
                                                            catalogIds,
@@ -269,11 +264,7 @@ public class Statistics extends VoltSystemProcedure {
 
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            int hostId = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowestSiteId =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(hostId);
-            if (context.getExecutionSite().getSiteId() == lowestSiteId) {
+            if (context.isLowestSiteId()) {
                 assert(result.getRowCount() == 1);
             }
             else {
@@ -289,43 +280,43 @@ public class Statistics extends VoltSystemProcedure {
         }
         else if (fragmentId == SysProcFragmentId.PF_partitionCount) {
             VoltTable result = new VoltTable(new VoltTable.ColumnInfo("PARTITION_COUNT", VoltType.INTEGER));
-            result.addRow(context.getCluster().getPartitions().size());
+            result.addRow(context.getNumberOfPartitions());
             return new DependencyPair(DEP_partitionCount, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_ioData) {
             final VoltTable result = new VoltTable(ioColumnInfo);
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 assert(params.toArray() != null);
                 assert(params.toArray().length == 2);
                 final boolean interval =
                     ((Byte)params.toArray()[0]).byteValue() == 0 ? false : true;
                 final Long now = (Long)params.toArray()[1];
-                final Map<Long, Pair<String,long[]>> stats =
-                    VoltDB.instance().getNetwork().getIOStats(interval);
+                try {
+                    final Map<Long, Pair<String,long[]>> stats =
+                        VoltDB.instance().getHostMessenger().getNetwork().getIOStats(interval);
 
-                final Integer hostId = VoltDB.instance().getHostMessenger().getHostId();
-                final String hostname = VoltDB.instance().getHostMessenger().getHostname();
-                for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {
-                    final Long connectionId = e.getKey();
-                    final String remoteHostname = e.getValue().getFirst();
-                    final long counters[] = e.getValue().getSecond();
-                    result.addRow(
-                                  now,
-                                  hostId,
-                                  hostname,
-                                  connectionId,
-                                  remoteHostname,
-                                  counters[0],
-                                  counters[1],
-                                  counters[2],
-                                  counters[3]);
+                    final Integer hostId = VoltDB.instance().getHostMessenger().getHostId();
+                    final String hostname = VoltDB.instance().getHostMessenger().getHostname();
+                    for (Map.Entry<Long, Pair<String, long[]>> e : stats.entrySet()) {
+                        final Long connectionId = e.getKey();
+                        final String remoteHostname = e.getValue().getFirst();
+                        final long counters[] = e.getValue().getSecond();
+                        result.addRow(
+                                      now,
+                                      hostId,
+                                      hostname,
+                                      connectionId,
+                                      remoteHostname,
+                                      counters[0],
+                                      counters[1],
+                                      counters[2],
+                                      counters[3]);
+                    }
+                } catch (Exception e) {
+                    HOST_LOG.warn("Error retrieving stats", e);
                 }
             }
             return new DependencyPair(DEP_ioData, result);
@@ -342,12 +333,8 @@ public class Statistics extends VoltSystemProcedure {
         else if (fragmentId == SysProcFragmentId.PF_liveClientData) {
             // Choose the lowest site ID on this host to do the scan
             // All other sites should just return empty results tables.
-            int hostId = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowestSiteId =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(hostId);
             VoltTable result = new VoltTable(LiveClientStats.liveClientColumnInfo);
-            if (context.getExecutionSite().getSiteId() == lowestSiteId) {
+            if (context.isLowestSiteId()) {
                 assert(params.toArray().length == 2);
                 final Long now = (Long)params.toArray()[1];
                 Map<Long, Pair<String,long[]>> stats =
@@ -364,7 +351,7 @@ public class Statistics extends VoltSystemProcedure {
                     final long counters[] = e.getValue().getSecond();
                     result.addRow(
                                   now,
-                                  hostId,
+                                  context.getHostId(),
                                   hostname,
                                   connectionId,
                                   remoteHostname,

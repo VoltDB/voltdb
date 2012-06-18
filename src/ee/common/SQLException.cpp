@@ -39,13 +39,17 @@ const char* SQLException::volt_decimal_serialization_error = "V0003";
 
 SQLException::SQLException(const char* sqlState, std::string message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
-    m_sqlState(sqlState) {
+    m_sqlState(sqlState), m_internalFlags(0) {
     assert(m_sqlState[5] == '\0');
 }
 
 SQLException::SQLException(const char* sqlState, std::string message, VoltEEExceptionType type) :
     SerializableEEException(type, message),
-    m_sqlState(sqlState) {}
+    m_sqlState(sqlState), m_internalFlags(0) {}
+
+SQLException::SQLException(const char* sqlState, std::string message, int internalFlags) :
+    SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
+    m_sqlState(sqlState), m_internalFlags(internalFlags) {}
 
 void SQLException::p_serialize(ReferenceSerializeOutput *output) {
     for (int ii = 0; m_sqlState != NULL && ii < 5; ii++) {

@@ -44,12 +44,6 @@ public class TupleValueExpression extends AbstractValueExpression {
         super(ExpressionType.VALUE_TUPLE);
     }
 
-    public TupleValueExpression(AbstractExpression left, AbstractExpression right) {
-        super(ExpressionType.VALUE_TUPLE, null, null);
-        assert(left == null);
-        assert(right == null);
-    }
-
     @Override
     public Object clone() throws CloneNotSupportedException {
         TupleValueExpression clone = (TupleValueExpression)super.clone();
@@ -148,6 +142,20 @@ public class TupleValueExpression extends AbstractValueExpression {
 
         // if all seems well, defer to the superclass, which checks kids
         return super.equals(obj);
+    }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = 0;
+        if (m_tableName != null) {
+            result += m_tableName.hashCode();
+        }
+        if (m_columnName != null) {
+            result += m_columnName.hashCode();
+        }
+        // defer to the superclass, which factors in other attributes
+        return result += super.hashCode();
     }
 
     @Override

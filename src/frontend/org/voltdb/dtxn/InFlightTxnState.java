@@ -36,9 +36,9 @@ public class InFlightTxnState implements Serializable {
 
     public InFlightTxnState(
             long txnId,
-            int firstCoordinatorId,
-            ArrayList<Integer> coordinatorReplicas,
-            int otherSiteIds[],
+            long firstCoordinatorId,
+            ArrayList<Long> coordinatorReplicas,
+            long otherSiteIds[],
             boolean isReadOnly,
             boolean isSinglePartition,
             StoredProcedureInvocation invocation,
@@ -66,12 +66,12 @@ public class InFlightTxnState implements Serializable {
         outstandingResponses = 1;
 
         if (isSinglePartition) {
-            outstandingCoordinators = new HashSet<Integer>();
+            outstandingCoordinators = new HashSet<Long>();
             outstandingCoordinators.add(firstCoordinatorId);
         }
     }
 
-    public void addCoordinator(int coordinatorId) {
+    public void addCoordinator(long coordinatorId) {
         assert(isSinglePartition);
         if (outstandingCoordinators.add(coordinatorId))
             outstandingResponses++;
@@ -81,13 +81,13 @@ public class InFlightTxnState implements Serializable {
         return outstandingResponses;
     }
 
-    public ClientResponseImpl addResponse(int coordinatorId, ClientResponseImpl r) {
+    public ClientResponseImpl addResponse(long coordinatorHSId, ClientResponseImpl r) {
         // ensure response to send isn't null
         if (responseToSend == null) responseToSend = r;
 
         // remove this coordinator from the outstanding list
         if (outstandingCoordinators != null)
-            outstandingCoordinators.remove(coordinatorId);
+            outstandingCoordinators.remove(coordinatorHSId);
 
         outstandingResponses--;
 
@@ -104,7 +104,7 @@ public class InFlightTxnState implements Serializable {
             {
                 String msg = "Mismatched result count received for transaction ID: " + txnId;
                 msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                msg += "\n  from execution site: " + coordinatorId;
+                msg += "\n  from execution site: " + coordinatorHSId;
                 msg += "\n  Expected number of results: " + resultsForComparison.length;
                 msg += "\n  Mismatched number of results: " + curr_results.length;
                 // die die die
@@ -117,7 +117,7 @@ public class InFlightTxnState implements Serializable {
                 {
                     String msg = "Mismatched results received for transaction ID: " + txnId;
                     msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                    msg += "\n  from execution site: " + coordinatorId;
+                    msg += "\n  from execution site: " + coordinatorHSId;
                     msg += "\n  Expected results: " + resultsForComparison[i].toString();
                     msg += "\n  Mismatched results: " + curr_results[i].toString();
                     // die die die
@@ -157,7 +157,7 @@ public class InFlightTxnState implements Serializable {
         return null;
     }
 
-    public ClientResponseImpl addFailedOrRecoveringResponse(int coordinatorId) {
+    public ClientResponseImpl addFailedOrRecoveringResponse(long coordinatorId) {
         // verify this transaction has the right coordinator
         if (outstandingCoordinators != null) {
             boolean success = outstandingCoordinators.remove(coordinatorId);
@@ -187,7 +187,7 @@ public class InFlightTxnState implements Serializable {
         return outstandingResponses == 0;
     }
 
-    public boolean siteIsCoordinator(int coordinatorId) {
+    public boolean siteIsCoordinator(long coordinatorId) {
         // for single-partition txns
         if (outstandingCoordinators != null)
             return outstandingCoordinators.contains(coordinatorId);
@@ -203,7 +203,7 @@ public class InFlightTxnState implements Serializable {
         sb.append("IN_FLIGHT_TXN_STATE");
         sb.append("\n  TXN_ID: " + txnId);
         sb.append("\n  OUTSTANDING_COORDINATOR_IDS: ");
-        for (int id : outstandingCoordinators)
+        for (long id : outstandingCoordinators)
             sb.append(id).append(" ");
 
         sb.append("\n  OTHER_SITE_IDS: ");
@@ -228,7 +228,7 @@ public class InFlightTxnState implements Serializable {
     }
 
     public final long txnId;
-    public final int otherSiteIds[];
+    public final long otherSiteIds[];
     public final boolean isReadOnly;
     public final boolean isSinglePartition;
     transient public final StoredProcedureInvocation invocation;
@@ -244,9 +244,9 @@ public class InFlightTxnState implements Serializable {
     //    one coord goes here
     //    if k > 0: the complete set of coords is stored
     //        in the outstandingCoordinators set
-    public final int firstCoordinatorId;
+    public final long firstCoordinatorId;
 
-    public final ArrayList<Integer> coordinatorReplicas;
+    public final ArrayList<Long> coordinatorReplicas;
 
     protected int outstandingResponses = 1;
 
@@ -258,7 +258,7 @@ public class InFlightTxnState implements Serializable {
     //////////////////////////////////////////////////
 
     // list of coordinators that have not responded
-    Set<Integer> outstandingCoordinators = null;
+    Set<Long> outstandingCoordinators = null;
 
     // the response queued to be sent to the client
     // note, this is only needed for write transactions

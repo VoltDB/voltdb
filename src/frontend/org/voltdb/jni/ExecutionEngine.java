@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.voltdb.DependencyPair;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.SysProcSelector;
@@ -33,10 +35,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.export.ExportProtoMessage;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.LogKeys;
 
 /**
@@ -45,7 +44,6 @@ import org.voltdb.utils.LogKeys;
  * for these implementations to the ExecutionSite.
  */
 public abstract class ExecutionEngine implements FastDeserializer.DeserializationMonitor {
-    protected ExecutionSite site;
 
     // is the execution site dirty
     protected boolean m_dirty;
@@ -84,8 +82,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     }
 
     /** Create an ee and load the volt shared library */
-    public ExecutionEngine(final ExecutionSite site) {
-        this.site = site;
+    public ExecutionEngine() {
         org.voltdb.EELibraryLoader.loadExecutionEngineLibrary(true);
     }
 
@@ -120,7 +117,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             new HashMap<Integer, ArrayDeque<VoltTable>>();
 
         private final VoltLogger hostLog = new VoltLogger("HOST");
-
         private final VoltLogger log = new VoltLogger(ExecutionSite.class.getName());
 
 
@@ -222,14 +218,16 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param reason Reason the EE crashed
      */
     public static void crashVoltDB(String reason, String traces[], String filename, int lineno) {
-        if (reason != null) {
-            System.err.println(reason);
-            System.err.println("In " + filename + ":" + lineno);
+        VoltLogger hostLog = new VoltLogger("HOST");
+        String fn = (filename == null) ? "unknown" : filename;
+        String re = (reason == null) ? "Fatal EE error." : reason;
+        hostLog.fatal(re + " In " + fn + ":" + lineno);
+        if (traces != null) {
             for ( String trace : traces) {
-                System.err.println(trace);
+                hostLog.fatal(trace);
             }
         }
-        VoltDB.crashLocalVoltDB("No additional info.", false, null);
+        VoltDB.crashLocalVoltDB(re + " In " + fn + ":" + lineno, true, null);
     }
 
     /**
@@ -273,16 +271,14 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
 
     /** Run a plan fragment */
-    abstract public DependencyPair executePlanFragment(
-        long planFragmentId, int outputDepId,
-        int inputDepId, ParameterSet parameterSet,
+    abstract public VoltTable executePlanFragment(
+        long planFragmentId, int inputDepId, ParameterSet parameterSet,
         long txnId, long lastCommittedTxnId, long undoQuantumToken)
       throws EEException;
 
     /** Run a plan fragment */
     abstract public VoltTable executeCustomPlanFragment(
-            String plan, int outputDepId,
-            int inputDepId, long txnId,
+            String plan, int inputDepId, long txnId,
             long lastCommittedTxnId, long undoQuantumToken) throws EEException;
 
     /** Run multiple query plan fragments */
@@ -420,16 +416,18 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param partitionId id of partitioned assigned to this EE
      * @param hostId id of the host this EE is running on
      * @param hostname name of the host this EE is running on
+     * @param totalPartitions number of partitions in the cluster for the hashinator
      * @return error code
      */
     protected native int nativeInitialize(
             long pointer,
             int clusterIndex,
-            int siteId,
+            long siteId,
             int partitionId,
             int hostId,
-            String hostname,
-            long tempTableMemory);
+            byte hostname[],
+            long tempTableMemory,
+            int totalPartitions);
 
     /**
      * Sets (or re-sets) all the shared direct byte buffers in the EE.
@@ -455,7 +453,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * human-readable text strings separated by line feeds.
      * @return error code
      */
-    protected native int nativeLoadCatalog(long pointer, long txnId, String serialized_catalog);
+    protected native int nativeLoadCatalog(long pointer, long txnId, byte serialized_catalog[]);
 
     /**
      * Update the EE's catalog.
@@ -465,7 +463,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param catalogVersion
      * @return error code
      */
-    protected native int nativeUpdateCatalog(long pointer, long txnId, String diff_commands);
+    protected native int nativeUpdateCatalog(long pointer, long txnId, byte diff_commands[]);
 
     /**
      * This method is called to initially load table data.
@@ -487,10 +485,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @return error code
      */
     protected native int nativeExecutePlanFragment(long pointer, long planFragmentId,
-            int outputDepId, int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
+            int outputDepId, // outputDepId is unused, can set to 0
+            int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
 
-    protected native int nativeExecuteCustomPlanFragment(long pointer, String plan,
-            int outputDepId, int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
+    protected native int nativeExecuteCustomPlanFragment(long pointer, byte plan[],
+            int outputDepId, // outputDepId is unused, can set to 0
+            int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
@@ -638,7 +638,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             boolean syncAction,
             long mAckOffset,
             long seqNo,
-            String mTableSignature);
+            byte mTableSignature[]);
 
     /**
      * Get the USO for an export table. This is primarily used for recovery.
@@ -647,7 +647,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param tableId The table in question
      * @return The USO for the export table.
      */
-    public native long[] nativeGetUSOForExportTable(long pointer, String mTableSignature);
+    public native long[] nativeGetUSOForExportTable(long pointer, byte mTableSignature[]);
 
     /**
      * This code only does anything useful on MACOSX.

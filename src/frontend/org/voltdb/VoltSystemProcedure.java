@@ -60,19 +60,32 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected int m_numberOfPartitions;
     protected Procedure m_catProc;
     protected Cluster m_cluster;
-    protected ExecutionSite m_site;
+    protected SiteProcedureConnection m_site;
+    private LoadedProcedureSet m_loadedProcedureSet;
+    protected ProcedureRunner m_runner; // overrides private parent var
 
-    void initSysProc(int numberOfPartitions, ExecutionSite site,
+    @Override
+    void init(ProcedureRunner procRunner) {
+        super.init(procRunner);
+        m_runner = procRunner;
+    }
+
+    void initSysProc(int numberOfPartitions, SiteProcedureConnection site,
+            LoadedProcedureSet loadedProcedureSet,
             Procedure catProc, Cluster cluster) {
 
         m_numberOfPartitions = numberOfPartitions;
         m_site = site;
         m_catProc = catProc;
         m_cluster = cluster;
+        m_loadedProcedureSet = loadedProcedureSet;
 
         init();
     }
 
+    /**
+     * For Sysproc init tasks like registering plan frags
+     */
     abstract public void init();
 
     /**
@@ -102,7 +115,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
-        public int siteId = -1;
+        public long siteId = -1;
         public long fragmentId = -1;
         public int outputDepId = -1;
         public int inputDepIds[] = null;
@@ -121,7 +134,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     abstract public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params,
-            ExecutionSite.SystemProcedureExecutionContext context);
+            SystemProcedureExecutionContext context);
 
     /**
      * Produce work units, possibly on all sites, for a list of plan fragments.
@@ -205,15 +218,15 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 parambytes = fs.getBuffer();
             }
 
-            FragmentTaskMessage task = new FragmentTaskMessage(
-                txnState.initiatorSiteId,
-                m_site.getCorrespondingSiteId(),
-                txnState.txnId,
-                false,
-                new long[] { pf.fragmentId },
-                new int[] { pf.outputDepId },
-                new ByteBuffer[] { parambytes },
-                false);
+            FragmentTaskMessage task = FragmentTaskMessage.createWithOneFragment(
+                    txnState.initiatorHSId,
+                    m_site.getCorrespondingSiteId(),
+                    txnState.txnId,
+                    false,
+                    pf.fragmentId,
+                    pf.outputDepId,
+                    parambytes,
+                    false);
             if (pf.inputDepIds != null) {
                 for (int depId : pf.inputDepIds) {
                     task.addInputDepId(0, depId);
@@ -232,14 +245,18 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 if (pf.siteId == -1)
                     txnState.createLocalFragmentWork(task, false);
                 else
-                    txnState.createFragmentWork(new int[] { pf.siteId },
+                    txnState.createFragmentWork(new long[] { pf.siteId },
                                                          task);
             }
         }
     }
 
+    // It would be nicer if init() on a sysproc was really "getPlanFragmentIds()"
+    // and then the loader could ask for the ids directly instead of stashing
+    // its reference here and inverting the relationship between loaded procedure
+    // set and system procedure.
     public void registerPlanFragment(long fragmentId) {
         assert(m_runner != null);
-        m_site.registerPlanFragment(fragmentId, m_runner);
+        m_loadedProcedureSet.registerPlanFragment(fragmentId, m_runner);
     }
 }

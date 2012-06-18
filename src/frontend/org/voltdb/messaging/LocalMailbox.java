@@ -17,6 +17,11 @@
 
 package org.voltdb.messaging;
 
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
+
 /**
  * A base class for local mailboxes that always uses hostMessenger.send
  * and requires custom implementation of deliver.
@@ -24,26 +29,32 @@ package org.voltdb.messaging;
 public abstract class LocalMailbox implements Mailbox {
 
     private final HostMessenger hostMessenger;
-    private final int siteId;
+    private long hsId;
 
-    public LocalMailbox(HostMessenger hostMessenger, int siteId) {
+    public LocalMailbox(HostMessenger hostMessenger) {
+        this(hostMessenger, Long.MIN_VALUE);
+    }
+
+    public LocalMailbox(HostMessenger hostMessenger, long hsId) {
         this.hostMessenger = hostMessenger;
-        this.siteId = siteId;
+        this.hsId = hsId;
     }
 
     @Override
-    public void send(int siteId, int mailboxId, VoltMessage message)
-        throws MessagingException {
+    public void send(long hsId, VoltMessage message)
+    {
         assert(message != null);
-        hostMessenger.send(siteId, mailboxId, message);
+        message.m_sourceHSId = this.hsId;
+        hostMessenger.send(hsId, message);
     }
 
     @Override
-    public void send(int[] siteIds, int mailboxId, VoltMessage message)
-        throws MessagingException {
+    public void send(long[] hsIds, VoltMessage message)
+    {
         assert(message != null);
-        assert(siteIds != null);
-        hostMessenger.send(siteIds, mailboxId, message);
+        assert(hsIds != null);
+        message.m_sourceHSId = this.hsId;
+        hostMessenger.send(hsIds, message);
     }
 
     @Override
@@ -85,8 +96,13 @@ public abstract class LocalMailbox implements Mailbox {
     }
 
     @Override
-    public int getSiteId() {
-        return siteId;
+    public long getHSId() {
+        return hsId;
+    }
+
+    @Override
+    public void setHSId(long hsId) {
+        this.hsId = hsId;
     }
 
 }

@@ -17,31 +17,45 @@
 
 package org.voltdb.utils;
 
-import java.io.*;
-import java.lang.StringBuilder;
-import java.util.List;
+import java.io.BufferedReader;
+import java.io.File;
+import java.io.FileDescriptor;
+import java.io.FileInputStream;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
+import java.io.InputStream;
+import java.io.OutputStreamWriter;
+import java.io.PrintWriter;
+import java.io.Writer;
+import java.math.BigDecimal;
+import java.text.SimpleDateFormat;
 import java.util.ArrayList;
-import java.util.regex.Pattern;
-import java.util.regex.Matcher;
-import java.util.Map;
-import java.util.HashMap;
-import java.util.TimeZone;
-import java.util.TreeSet;
 import java.util.Arrays;
 import java.util.Collections;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.LinkedList;
-import java.text.SimpleDateFormat;
-import java.math.BigDecimal;
+import java.util.List;
+import java.util.Map;
+import java.util.TimeZone;
+import java.util.TreeSet;
+import java.util.regex.Matcher;
+import java.util.regex.Pattern;
+
+import jline.ConsoleReader;
+import jline.SimpleCompletor;
+
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import jline.*;
+
+import com.google.common.collect.ImmutableMap;
 
 public class SQLCommand
 {
@@ -237,17 +251,19 @@ public class SQLCommand
                                 else
                                     System.out.println("\n--- System Procedures --------------------------------------");
                             }
-                            System.out.printf(format, procedure);
-                            System.out.print("\t");
-                            int pidx = 0;
-                            for(String paramType : Procedures.get(procedure))
-                            {
-                                if (pidx > 0)
-                                    System.out.print(", ");
-                                System.out.print(paramType);
-                                pidx++;
+                            for (List<String> parameterSet : Procedures.get(procedure).values()) {
+                                System.out.printf(format, procedure);
+                                System.out.print("\t");
+                                int pidx = 0;
+                                for(String paramType : parameterSet)
+                                {
+                                    if (pidx > 0)
+                                        System.out.print(", ");
+                                    System.out.print(paramType);
+                                    pidx++;
+                                }
+                                System.out.print("\n");
                             }
-                            System.out.print("\n");
                             j++;
                         }
                     }
@@ -268,6 +284,7 @@ public class SQLCommand
                             System.out.println("\n--- User Views ---------------------------------------------");
                         else
                             System.out.println("\n--- User Export Streams ------------------------------------");
+                        @SuppressWarnings("unchecked")
                         Iterator<String> list = ((TreeSet<String>)lists[i]).iterator();
                         while(list.hasNext())
                             System.out.println(list.next());
@@ -395,9 +412,14 @@ public class SQLCommand
             if (!Procedures.containsKey(procedure))
                 throw new Exception("Undefined procedure: " + procedure);
 
-            List<String> paramTypes = Procedures.get(procedure);
-            if (params.size() != paramTypes.size())
-                throw new Exception("Invalid parameter count for procedure: " + procedure + "(expected: " + paramTypes.size() + ", received: " + params.size() + ")");
+            List<String> paramTypes = Procedures.get(procedure).get(params.size());
+            if (paramTypes == null || params.size() != paramTypes.size()) {
+                String expectedSizes = "";
+                for (Integer expectedSize : Procedures.get(procedure).keySet()) {
+                    expectedSizes += expectedSize + ", ";
+                }
+                throw new Exception("Invalid parameter count for procedure: " + procedure + "(expected: " + expectedSizes + " received: " + params.size() + ")");
+            }
             Object[] objectParams = new Object[params.size()];
             if (procedure.equals("@SnapshotDelete"))
             {
@@ -422,35 +444,80 @@ public class SQLCommand
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_TINYINT;
                         else
-                            objectParams[i] = Byte.parseByte(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Byte.parseByte(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a byte numeric value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("smallint"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_SMALLINT;
                         else
-                            objectParams[i] = Short.parseShort(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Short.parseShort(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a short numeric value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("int") || paramType.equals("integer"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_INTEGER;
                         else
-                            objectParams[i] = Integer.parseInt(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Integer.parseInt(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a numeric value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("bigint"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_BIGINT;
                         else
-                            objectParams[i] = Long.parseLong(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Long.parseLong(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a numeric value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("float"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_FLOAT;
                         else
-                            objectParams[i] = Double.parseDouble(param);
+                        {
+                            try
+                            {
+                                objectParams[i] = Double.parseDouble(param);
+                            }
+                            catch (NumberFormatException nfe)
+                            {
+                                throw new Exception("Invalid parameter:  Expected a float value, got '" + param + "' (param " + (i+1) + ").");
+                            }
+                        }
                     }
                     else if (paramType.equals("varchar"))
                     {
@@ -475,23 +542,26 @@ public class SQLCommand
                     }
                     else if (paramType.equals("statisticscomponent"))
                     {
-                        if (!StatisticsComponents.contains(param.toUpperCase()))
+                        String p = preprocessParam(param);
+                        if (!StatisticsComponents.contains(p))
                             throw new Exception("Invalid Statistics Component: " + param);
-                        objectParams[i] = param.toUpperCase();
+                        objectParams[i] = p;
                     }
                     else if (paramType.equals("sysinfoselector"))
                     {
-                        if (!SysInfoSelectors.contains(param.toUpperCase()))
+                        String p = preprocessParam(param);
+                        if (!SysInfoSelectors.contains(p))
                             throw new Exception("Invalid SysInfo Selector: " + param);
-                        objectParams[i] = param.toUpperCase();
+                        objectParams[i] = p;
                     }
                     else if (paramType.equals("metadataselector"))
                     {
-                        if (!MetaDataSelectors.contains(param.toUpperCase()))
+                        String p = preprocessParam(param);
+                        if (!MetaDataSelectors.contains(p))
                             throw new Exception("Invalid Meta-Data Selector: " + param);
-                        objectParams[i] = param.toUpperCase();
+                        objectParams[i] = p;
                     }
-                    else if (paramType.equals("varbinary"))
+                    else if (paramType.equals("varbinary") || paramType.equals("tinyint_array"))
                     {
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
@@ -518,6 +588,20 @@ public class SQLCommand
             printResponse(VoltDB.callProcedure("@AdHoc", query));
         }
         return;
+    }
+
+    // Uppercase param.
+    // Remove any quotes.
+    // Trim
+    private static String preprocessParam(String param)
+    {
+        param = param.toUpperCase();
+        if (param.startsWith("'") && param.endsWith("'"))
+            param = param.substring(1, param.length()-1);
+        if (param.charAt(0)=='"' && param.charAt(param.length()-1)=='"')
+            param = param.substring(1, param.length()-1);
+        param = param.trim();
+        return param;
     }
 
     private static String byteArrayToHexString(byte[] data)
@@ -690,33 +774,56 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> Types = Arrays.asList("tinyint","smallint","integer","bigint","float","decimal","varchar","timestamp","varbinary");
     private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
                       "PROCEDURES", "PROCEDURECOLUMNS");
-    private static Map<String,List<String>> Procedures = Collections.synchronizedMap(new HashMap<String,List<String>>());
+    private static Map<String,Map<Integer, List<String>>> Procedures =
+            Collections.synchronizedMap(new HashMap<String,Map<Integer, List<String>>>());
     private static void loadSystemProcedures()
     {
-        Procedures.put("@Pause", new ArrayList<String>());
-        Procedures.put("@Quiesce", new ArrayList<String>());
-        Procedures.put("@Resume", new ArrayList<String>());
-        Procedures.put("@Shutdown", new ArrayList<String>());
-        Procedures.put("@SnapshotDelete", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@SnapshotRestore", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@SnapshotSave", Arrays.asList("varchar", "varchar", "bit"));
-        Procedures.put("@SnapshotScan", Arrays.asList("varchar"));
-        Procedures.put("@Statistics", Arrays.asList("statisticscomponent", "bit"));
-        Procedures.put("@SystemCatalog", Arrays.asList("metadataselector"));
-        Procedures.put("@SystemInformation", Arrays.asList("sysinfoselector"));
-        Procedures.put("@UpdateApplicationCatalog", Arrays.asList("varchar", "varchar"));
-        Procedures.put("@UpdateLogging", Arrays.asList("varchar"));
-        Procedures.put("@Promote", new ArrayList<String>());
-        Procedures.put("@SnapshotStatus", new ArrayList<String>());
-        Procedures.put("@AdHoc", new ArrayList<String>(Arrays.asList("varchar")));
-        Procedures.put("@AdHocSP", new ArrayList<String>(Arrays.asList("varchar", "bigint")));
+        Procedures.put("@Pause",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@Quiesce",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@Resume",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@Shutdown",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@SnapshotDelete",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build()
+                );
+        Procedures.put("@SnapshotRestore",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build()
+                );
+        Procedures.put("@SnapshotSave",
+                ImmutableMap.<Integer, List<String>>builder().put( 3, Arrays.asList("varchar", "varchar", "bit")).
+                put( 1, Arrays.asList("varchar")).build()
+                );
+        Procedures.put("@SnapshotScan",
+                ImmutableMap.<Integer, List<String>>builder().put( 1,
+                Arrays.asList("varchar")).build());
+        Procedures.put("@Statistics",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("statisticscomponent", "bit")).build());
+        Procedures.put("@SystemCatalog",
+                ImmutableMap.<Integer, List<String>>builder().put( 1,Arrays.asList("metadataselector")).build());
+        Procedures.put("@SystemInformation",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("sysinfoselector")).build());
+        Procedures.put("@UpdateApplicationCatalog",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "varchar")).build());
+        Procedures.put("@UpdateLogging",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@Promote",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@SnapshotStatus",
+                ImmutableMap.<Integer, List<String>>builder().put( 0, new ArrayList<String>()).build());
+        Procedures.put("@AdHoc",
+                ImmutableMap.<Integer, List<String>>builder().put( 1, Arrays.asList("varchar")).build());
+        Procedures.put("@AdHocSP",
+                ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("varchar", "bigint")).build());
     }
+
     public static Client getClient(ClientConfig config, String[] servers, int port) throws Exception
     {
         final Client client = ClientFactory.createClient(config);
@@ -736,13 +843,13 @@ public class SQLCommand
     private static void printUsage(int exitCode)
     {
         System.out.println(
-        "Usage: SQLCommand --help\n"
-        + "   or  SQLCommand [--servers=comma_separated_server_list]\n"
-        + "                  [--port=port_number]\n"
-        + "                  [--user=user]\n"
-        + "                  [--password=password]\n"
-        + "                  [--output-format=(fixed|csv|tab)]\n"
-        + "                  [--output-skip-metadata]\n"
+        "Usage: sqlcmd --help\n"
+        + "   or  sqlcmd [--servers=comma_separated_server_list]\n"
+        + "              [--port=port_number]\n"
+        + "              [--user=user]\n"
+        + "              [--password=password]\n"
+        + "              [--output-format=(fixed|csv|tab)]\n"
+        + "              [--output-skip-metadata]\n"
         + "\n"
         + "[--servers=comma_separated_server_list]\n"
         + "  List of servers to connect to.\n"
@@ -817,7 +924,7 @@ public class SQLCommand
         return new Object[] {tables, views, exports};
     }
 
-    private static void loadStoredProcedures(Map<String,List<String>> procedures)
+    private static void loadStoredProcedures(Map<String,Map<Integer, List<String>>> procedures)
     {
         VoltTable procs = null;
         VoltTable params = null;
@@ -860,7 +967,6 @@ public class SQLCommand
         while (procs.advanceRow())
         {
             String proc_name = procs.getString("PROCEDURE_NAME");
-            Integer param_count = proc_param_counts.get(proc_name);
             ArrayList<String> this_params = new ArrayList<String>();
             // prepopulate it to make sure the size is right
             if (proc_param_counts.get(proc_name) != null)
@@ -869,13 +975,34 @@ public class SQLCommand
                     this_params.add(null);
                 }
             }
-            procedures.put(procs.getString("PROCEDURE_NAME"), this_params);
+            HashMap<Integer, List<String>> argLists = new HashMap<Integer, List<String>>();
+            if (proc_param_counts.containsKey(proc_name)) {
+                argLists.put(proc_param_counts.get(proc_name), this_params);
+            } else {
+                argLists.put(0, this_params);
+
+            }
+            procedures.put(procs.getString("PROCEDURE_NAME"), argLists);
         }
+
+        // Retrieve the parameter types.  Note we have to do some special checking
+        // for array types.  ENG-3101
+        params.resetRowPosition();
         while (params.advanceRow())
         {
-            List<String> this_params = procedures.get(params.getString("PROCEDURE_NAME"));
-            this_params.set((int)params.getLong("ORDINAL_POSITION") - 1,
-                            params.getString("TYPE_NAME").toLowerCase());
+            Map<Integer, List<String>> argLists = procedures.get(params.getString("PROCEDURE_NAME"));
+            assert(argLists.size() == 1);
+            List<String> this_params = argLists.values().iterator().next();
+            int idx = (int)params.getLong("ORDINAL_POSITION") - 1;
+            String param_type = params.getString("TYPE_NAME").toLowerCase();
+            // Detect if this parameter is supposed to be an array.  It's kind of clunky, we have to
+            // look in the remarks column...
+            String param_remarks = params.getString("REMARKS");
+            if (null != param_remarks)
+            {
+                param_type += (param_remarks.equalsIgnoreCase("ARRAY_PARAMETER") ? "_array" : "");
+            }
+            this_params.set(idx, param_type);
         }
     }
 
@@ -922,7 +1049,7 @@ public class SQLCommand
                     printHelp();
                     printUsage(0);
                 }
-                else if (arg.equals("--usage"))
+                else if ((arg.equals("--usage")) || (arg.equals("-?")))
                     printUsage(0);
                 else
                     printUsage("Invalid Parameter: " + arg);
@@ -938,7 +1065,9 @@ public class SQLCommand
             DateParser.setLenient(true);
 
             // Create connection
-            VoltDB = getClient(new ClientConfig(user, password), servers,port);
+            ClientConfig config = new ClientConfig(user, password);
+            config.setProcedureCallTimeout(0);  // Set procedure all to infinite timeout, see ENG-2670
+            VoltDB = getClient(config, servers, port);
 
             // Load user stored procs
             loadStoredProcedures(Procedures);

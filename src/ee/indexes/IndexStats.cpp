@@ -129,7 +129,7 @@ void IndexStats::configure(
         string tableName,
         CatalogId hostId,
         string hostname,
-        CatalogId siteId,
+        int64_t siteId,
         CatalogId partitionId,
         CatalogId databaseId) {
 

@@ -141,7 +141,7 @@ public abstract class TransactionInitiator {
      * to rejoined sites.
      * @param executorSiteIds The ids of the sites that joined.
      */
-    public abstract void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds);
+    public abstract void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds);
 
     public abstract Map<Long, long[]> getOutstandingTxnStats();
 

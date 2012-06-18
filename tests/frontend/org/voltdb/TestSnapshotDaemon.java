@@ -31,6 +31,7 @@ import static org.junit.Assert.assertTrue;
 import java.util.concurrent.Future;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.junit.After;
 import org.junit.Before;
@@ -131,7 +132,7 @@ public class TestSnapshotDaemon {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         m_initiator = new Initiator();
         m_daemon = new SnapshotDaemon();
-        m_daemon.init(m_initiator, m_mockVoltDB.getZK());
+        m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK());
         return m_daemon;
     }
 
@@ -572,9 +573,10 @@ public class TestSnapshotDaemon {
         Thread.sleep(800);
         assertNotNull(m_initiator.procedureName);
         assertTrue("@SnapshotSave".equals(m_initiator.procedureName));
-        assertTrue("/tmp".equals(m_initiator.params[0]));
-        assertTrue(((String)m_initiator.params[1]).startsWith("woobie_"));
-        assertEquals(0, m_initiator.params[2]);
+        JSONObject jsObj = new JSONObject((String)m_initiator.params[0]);
+        assertTrue(jsObj.getString("path").equals("/tmp"));
+        assertTrue(jsObj.getString("nonce").startsWith("woobie_"));
+        assertTrue(jsObj.length() == 2);
 
         handle = m_initiator.clientData;
         m_initiator.clear();

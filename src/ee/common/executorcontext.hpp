@@ -40,7 +40,7 @@ class ExecutorContext {
         // currently does not own any of its pointers
     }
 
-    ExecutorContext(CatalogId siteId,
+    ExecutorContext(int64_t siteId,
                     CatalogId partitionId,
                     UndoQuantum *undoQuantum,
                     Topend* topend,
@@ -117,7 +117,7 @@ class ExecutorContext {
 
   public:
     int64_t m_lastCommittedTxnId;
-    CatalogId m_siteId;
+    int64_t m_siteId;
     CatalogId m_partitionId;
     std::string m_hostname;
     CatalogId m_hostId;

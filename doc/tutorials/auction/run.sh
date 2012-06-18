@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="auction"
-VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar`
+VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
 CLASSPATH="$VOLTJAR:../../../lib"
 VOLTDB="../../../bin/voltdb"
 EXPORTTOFILE="../../../bin/exporttofile"
@@ -17,7 +17,7 @@ function clean() {
 function srccompile() {
     mkdir -p obj/com/auctionexample/datafiles
     cp src/com/auctionexample/datafiles/*.txt obj/com/auctionexample/datafiles/
-    javac -classpath $CLASSPATH -d obj \
+    javac -target 1.6 -classpath $CLASSPATH -d obj \
         src/com/auctionexample/*.java \
         procedures/com/auctionexample/*.java \
         procedures/com/auctionexample/debug/*.java

@@ -14,8 +14,8 @@ prunelist = ('hsqldb19b3',
              'jni_md.h',
              'jni.h',
              'org_voltdb_jni_ExecutionEngine.h',
-             'org_voltdb_utils_DBBPool.h',
-             'org_voltdb_utils_DBBPool_DBBContainer.h',
+             'org_voltcore_utils_DBBPool.h',
+             'org_voltcore_utils_DBBPool_DBBContainer.h',
              'simplejson',
              'projectfile',
              'deploymentfile',
@@ -82,6 +82,16 @@ def verifySprintf(f, content):
         return 1
     return 0
 
+def verifyGetStringChars(f, content):
+    if not (f.endswith('.cpp') or f.endswith('.c') or f.endswith('.h') or f.endswith('.hpp')):
+        return 0
+    num = content.count('GetStringChars')
+    num += content.count('GetStringUTFChars')
+    if num > 0:
+        print("ERROR: \"%s\" contains %d calls to GetStringChars/GetStringUTFChars. These methods return invalid UTF-8 code points for some characters. You should do the encoding in Java and pass the string to native code as a byte array." % (f, num))
+        return 1
+    return 0
+
 def readFile(filename):
     "read a file into a string"
     FH=open(filename, 'r')
@@ -108,6 +118,10 @@ def processFile(f, approvedLicensesJavaC, approvedLicensesPython):
     retval = verifySprintf(f, content)
     if (retval != 0):
         return retval
+    retval = verifyGetStringChars(f, content)
+    if (retval != 0):
+        return retval
+
     return 0
 
 def processAllFiles(d, approvedLicensesJavaC, approvedLicensesPython):

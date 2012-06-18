@@ -24,7 +24,6 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.Map.Entry;
 
-import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.server.ServerCnxn;
 import org.apache.zookeeper_voltpatches.server.WatchManager;
 import org.apache.zookeeper_voltpatches.server.ZooTrace;
@@ -32,13 +31,14 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
 import org.apache.zookeeper_voltpatches.Watcher.Event.KeeperState;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class manages watches. It allows watches to be associated with a string
  * and removes watchers and their watches in addition to managing triggers.
  */
 public class WatchManager {
-    private static final Logger LOG = Logger.getLogger(WatchManager.class);
+    private static final VoltLogger LOG = new VoltLogger(WatchManager.class.getSimpleName());
 
     private final HashMap<String, HashSet<Watcher>> watchTable =
         new HashMap<String, HashSet<Watcher>>();

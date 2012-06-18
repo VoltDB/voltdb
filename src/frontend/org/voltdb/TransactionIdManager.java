@@ -20,7 +20,7 @@ package org.voltdb;
 import java.util.Calendar;
 import java.util.Date;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * <p>The TransactionIdManager creates Transaction ids that
@@ -91,7 +91,7 @@ public class TransactionIdManager {
      * @param initiatorId The siteId of the current site.
      * @param timestampTestingSalt Value of the salt used to skew a clock in testing.
      */
-    public TransactionIdManager(int initiatorId, long timestampTestingSalt) {
+    public TransactionIdManager(long initiatorId, long timestampTestingSalt) {
         this.initiatorId = initiatorId;
 
         m_timestampTestingSalt = timestampTestingSalt;
@@ -109,7 +109,7 @@ public class TransactionIdManager {
         VoltDBInterface instance = VoltDB.instance();
         if (instance != null) {
             CatalogContext context = instance.getCatalogContext();
-            if ((context != null) && (context.numberOfNodes == 1)) {
+            if ((context != null) && (VoltDB.instance().getSiteTracker().getAllHosts().size() == 1)) {
                 // millis * seconds * minutes * hours * days = 1 week
                 BACKWARD_TIME_FORGIVENESS_WINDOW_MS = 1000 * 60 * 60 * 24 * 7;
             }

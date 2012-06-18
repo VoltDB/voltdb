@@ -50,21 +50,25 @@ public class SnapshotRegistry {
         public final boolean result; //true success, false failure
 
         public final long bytesWritten;
+        public final boolean csv;
 
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
-        private Snapshot(long txnId, int hostId, String path, String nonce,
+        private Snapshot(long txnId, int hostId, String path, String nonce, boolean csv,
                          org.voltdb.catalog.Table tables[]) {
             this.txnId = txnId;
             this.path = path;
             this.nonce = nonce;
+            this.csv = csv;
             timeFinished = 0;
             synchronized (this.tables) {
                 for (org.voltdb.catalog.Table table : tables) {
                     String filename =
-                        SnapshotUtil.constructFilenameForTable(table,
-                                                               nonce,
-                                                               Integer.toString(hostId));
+                        SnapshotUtil.constructFilenameForTable(
+                                table,
+                                nonce,
+                                csv ? ".csv" : ".vpt",
+                                hostId);
                     this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename));
                 }
             }
@@ -76,6 +80,7 @@ public class SnapshotRegistry {
             txnId = incomplete.txnId;
             path = incomplete.path;
             nonce = incomplete.nonce;
+            csv = incomplete.csv;
             this.timeFinished = timeFinished;
             synchronized (tables) {
                 tables.putAll(incomplete.tables);
@@ -119,7 +124,7 @@ public class SnapshotRegistry {
             public final String name;
             public final String filename;
             public final long size;
-            public final Exception error;
+            public final Throwable error;
 
             private Table(String name, String filename) {
                 this.name = name;
@@ -128,7 +133,7 @@ public class SnapshotRegistry {
                 error = null;
             }
 
-            public Table(Table t, long size, Exception error) {
+            public Table(Table t, long size, Throwable error) {
                 this.name = t.name;
                 this.filename = t.filename;
                 this.size = size;
@@ -137,8 +142,14 @@ public class SnapshotRegistry {
         }
     }
 
-    public static synchronized Snapshot startSnapshot(long txnId, int hostId, String path, String nonce, org.voltdb.catalog.Table tables[]) {
-        final Snapshot s = new Snapshot(txnId, hostId, path, nonce, tables);
+    public static synchronized Snapshot startSnapshot(
+            long txnId,
+            int hostId,
+            String path,
+            String nonce,
+            boolean csv,
+            org.voltdb.catalog.Table tables[]) {
+        final Snapshot s = new Snapshot(txnId, hostId, path, nonce, csv, tables);
 
         m_snapshots.add(s);
         if (m_snapshots.size() > m_maxStatusHistory) {

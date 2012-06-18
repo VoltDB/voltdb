@@ -93,7 +93,7 @@
 #include <jni.h>
 
 #include "org_voltdb_jni_ExecutionEngine.h" // the header file output by javah
-#include "org_voltdb_utils_DBBPool.h" //Utility method for DBBContainer
+#include "org_voltcore_utils_DBBPool.h" //Utility method for DBBContainer
 
 #include "boost/shared_ptr.hpp"
 #include "boost/scoped_array.hpp"
@@ -250,11 +250,12 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     JNIEnv *env, jobject obj,
     jlong enginePtr,
     jint clusterIndex,
-    jint siteId,
+    jlong siteId,
     jint partitionId,
     jint hostId,
-    jstring hostname,
-    jlong tempTableMemory)
+    jbyteArray hostname,
+    jlong tempTableMemory,
+    jint totalPartitions)
 {
     VOLT_DEBUG("nativeInitialize() start");
     VoltDBEngine *engine = castToEngine(enginePtr);
@@ -266,9 +267,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
     try {
         updateJNILogProxy(engine); //JNIEnv pointer can change between calls, must be updated
 
-        const char *hostChars = env->GetStringUTFChars( hostname, NULL);
-        std::string hostString(hostChars);
-        env->ReleaseStringUTFChars( hostname, hostChars);
+        jbyte *hostChars = env->GetByteArrayElements( hostname, NULL);
+        std::string hostString(reinterpret_cast<char*>(hostChars), env->GetArrayLength(hostname));
+        env->ReleaseByteArrayElements( hostname, hostChars, JNI_ABORT);
         // initialization is separated from constructor so that constructor
         // never fails.
         VOLT_DEBUG("calling initialize...");
@@ -278,7 +279,8 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
                                    partitionId,
                                    hostId,
                                    hostString,
-                                   tempTableMemory);
+                                   tempTableMemory,
+                                   totalPartitions);
 
         if (success) {
             VOLT_DEBUG("initialize succeeded");
@@ -297,13 +299,11 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeIniti
  * Load the system catalog for this engine.
  * @param engine_ptr the VoltDBEngine pointer
  * @param serialized_catalog the root catalog object serialized as text strings.
- * this parameter is jstring, not jbytearray because Catalog is serialized into
- * human-readable text strings separated by line feeds.
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jlong txnId, jstring serialized_catalog) {
+    jlong engine_ptr, jlong txnId, jbyteArray serialized_catalog) {
     VOLT_DEBUG("nativeLoadCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -316,9 +316,9 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
     updateJNILogProxy(engine);
 
     //copy to std::string. utf_chars may or may not by a copy of the string
-    const char* utf_chars = env->GetStringUTFChars(serialized_catalog, NULL);
-    string str(utf_chars);
-    env->ReleaseStringUTFChars(serialized_catalog, utf_chars);
+    jbyte * utf_chars = env->GetByteArrayElements(serialized_catalog, NULL);
+    string str(reinterpret_cast<char*>(utf_chars), env->GetArrayLength(serialized_catalog));
+    env->ReleaseByteArrayElements(serialized_catalog, utf_chars, JNI_ABORT);
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
@@ -341,14 +341,13 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeLoadC
  * Load the system catalog for this engine.
  * @param engine_ptr the VoltDBEngine pointer
  * @param serialized_catalog the root catalog object serialized as text strings.
- * this parameter is jstring, not jbytearray because Catalog is serialized into
  * human-readable text strings separated by line feeds.
  * @return error code
 */
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     JNIEnv *env, jobject obj,
-    jlong engine_ptr, jlong txnId, jstring catalog_diffs) {
+    jlong engine_ptr, jlong txnId, jbyteArray catalog_diffs) {
     VOLT_DEBUG("nativeUpdateCatalog() start");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -361,9 +360,9 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
     updateJNILogProxy(engine);
 
     //copy to std::string. utf_chars may or may not by a copy of the string
-    const char* utf_chars = env->GetStringUTFChars(catalog_diffs, NULL);
-    string str(utf_chars);
-    env->ReleaseStringUTFChars(catalog_diffs, utf_chars);
+    jbyte* utf_chars = env->GetByteArrayElements(catalog_diffs, NULL);
+    string str(reinterpret_cast<char*>(utf_chars), env->GetArrayLength(catalog_diffs));
+    env->ReleaseByteArrayElements(catalog_diffs, utf_chars, JNI_ABORT);
     VOLT_DEBUG("calling loadCatalog...");
 
     try {
@@ -561,7 +560,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
     JNIEnv *env,
     jobject obj,
     jlong engine_ptr,
-    jstring plan,
+    jbyteArray plan,
     jint outputDependencyId,
     jint inputDependencyId,
     jlong txnId,
@@ -584,11 +583,10 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
     Pool *stringPool = engine->getStringPool();
 
     // convert java plan string to stdc++ string plan
-    const char *str = static_cast<const char*>(env->GetStringUTFChars(plan,
-                                                                      NULL));
+    jbyte *str = env->GetByteArrayElements(plan, NULL);
     assert(str);
-    string cppplan = str;
-    env->ReleaseStringUTFChars(plan, str);
+    string cppplan( reinterpret_cast<char *>(str), env->GetArrayLength(plan));
+    env->ReleaseByteArrayElements(plan, str, JNI_ABORT);
 
     // execute
     engine->setUsedParamcnt(0);
@@ -715,7 +713,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
 }
 
 /*
- * Class:     org_voltdb_utils_DBBPool
+ * Class:     org_voltcore_utils_DBBPool
  * Method:    getBufferAddress
  * Signature: (Ljava/nio/ByteBuffer;)J
  *
@@ -725,7 +723,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeSeria
  * @param buffer DirectByteBuffer
  * @return Native address of the DirectByteBuffer as a long
  */
-SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_DBBPool_getBufferAddress
+SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltcore_utils_DBBPool_getBufferAddress
   (JNIEnv *env, jclass clazz, jobject buffer)
 {
     void *address = env->GetDirectBufferAddress(buffer);
@@ -738,11 +736,11 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_utils_DBBPool_getBufferAddress
 }
 
 /*
- * Class:     org_voltdb_utils_DBBPool
+ * Class:     org_voltcore_utils_DBBPool
  * Method:    getBufferCRC32
  * Signature: (Ljava/nio/ByteBuffer;II)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getBufferCRC32
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getBufferCRC32
   (JNIEnv *env, jclass clazz, jobject buffer, jint offset, jint length) {
     char *address = reinterpret_cast<char*>(env->GetDirectBufferAddress(buffer));
     if (env->ExceptionCheck()) {
@@ -756,11 +754,11 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getBufferCRC32
 }
 
 /*
- * Class:     org_voltdb_utils_DBBPool
+ * Class:     org_voltcore_utils_DBBPool
  * Method:    getBufferCRC32
  * Signature: (Ljava/nio/ByteBuffer;II)I
  */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_utils_DBBPool_getCRC32
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltcore_utils_DBBPool_getCRC32
   (JNIEnv *env, jclass clazz, jlong ptr, jint offset, jint length) {
     char *address = reinterpret_cast<char*>(ptr);
     assert(address);
@@ -1068,13 +1066,13 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
    jboolean syncAction,
    jlong ackOffset,
    jlong seqNo,
-   jstring tableSignature) {
+   jbyteArray tableSignature) {
     VOLT_DEBUG("nativeExportAction in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    const char *signatureChars = env->GetStringUTFChars(tableSignature, NULL);
-    std::string signature(signatureChars, env->GetStringUTFLength(tableSignature));
-    env->ReleaseStringUTFChars(tableSignature, signatureChars);
+    jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
+    std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
+    env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
     try {
         try {
             engine->resetReusedResultOutputBuffer();
@@ -1097,14 +1095,14 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExpo
  * Signature: (JLjava/lang/String;)[J
  */
 SHAREDLIB_JNIEXPORT jlongArray JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetUSOForExportTable
-  (JNIEnv *env, jobject obj, jlong engine_ptr, jstring tableSignature) {
+  (JNIEnv *env, jobject obj, jlong engine_ptr, jbyteArray tableSignature) {
 
     VOLT_DEBUG("nativeGetUSOForExportTable in C++ called");
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    const char *signatureChars = env->GetStringUTFChars(tableSignature, NULL);
-    std::string signature(signatureChars, env->GetStringUTFLength(tableSignature));
-    env->ReleaseStringUTFChars(tableSignature, signatureChars);
+    jbyte *signatureChars = env->GetByteArrayElements(tableSignature, NULL);
+    std::string signature(reinterpret_cast<char *>(signatureChars), env->GetArrayLength(tableSignature));
+    env->ReleaseByteArrayElements(tableSignature, signatureChars, JNI_ABORT);
     try {
         jlong data[2];
         size_t ackOffset;
@@ -1212,11 +1210,11 @@ SHAREDLIB_JNIEXPORT jlong JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeGetR
 }
 
 /*
- * Class:     org_voltdb_utils_DBBPool
+ * Class:     org_voltcore_utils_DBBPool
  * Method:    deleteCharArrayMemory
  * Signature: (J)V
  */
-SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltdb_utils_DBBPool_deleteCharArrayMemory
+SHAREDLIB_JNIEXPORT void JNICALL Java_org_voltcore_utils_DBBPool_deleteCharArrayMemory
   (JNIEnv *env, jclass clazz, jlong ptr) {
     delete[] reinterpret_cast<char*>(ptr);
 }

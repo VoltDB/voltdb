@@ -26,7 +26,7 @@ import java.util.concurrent.FutureTask;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializable;
 import org.voltdb.messaging.FastSerializer;
@@ -54,7 +54,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
      * This ByteBuffer is accessed from multiple threads concurrently.
      * Always duplicate it before reading
      */
-    ByteBuffer unserializedParams = null;
+    private ByteBuffer serializedParams = null;
 
     FutureTask<ParameterSet> params;
 
@@ -70,13 +70,13 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         copy.params = params;
         copy.procName = procName;
         copy.originalTxnId = originalTxnId;
-        if (unserializedParams != null)
+        if (serializedParams != null)
         {
-            copy.unserializedParams = unserializedParams.duplicate();
+            copy.serializedParams = serializedParams.duplicate();
         }
         else
         {
-            copy.unserializedParams = null;
+            copy.serializedParams = null;
         }
 
         return copy;
@@ -106,7 +106,7 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
                 return params;
             }
         });
-        unserializedParams = null;
+        serializedParams = null;
     }
 
     public ProcedureInvocationType getType() {
@@ -141,14 +141,99 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         return clientHandle;
     }
 
-    /** Read into an unserialized parameter buffer to extract a single parameter */
+    /** Read into an serialized parameter buffer to extract a single parameter */
     Object getParameterAtIndex(int partitionIndex) {
         try {
-            return ParameterSet.getParameterAtIndex(partitionIndex, unserializedParams);
+            return ParameterSet.getParameterAtIndex(partitionIndex, serializedParams);
         }
         catch (IOException ex) {
             throw new RuntimeException("Invalid partitionIndex", ex);
         }
+    }
+
+    public int getSerializedSize()
+    {
+        int size = 1 // Version/type
+            + 4 // proc name string length
+            + procName.length()
+            + 8; // clientHandle
+
+        if (type == ProcedureInvocationType.REPLICATED)
+        {
+            size += 8; // original TXN ID for WAN replication procedures
+        }
+
+        if (serializedParams != null)
+        {
+            size += serializedParams.remaining();
+        }
+        else if (params != null)
+        {
+            size += getParams().getSerializedSize();
+        }
+
+        return size;
+    }
+
+    public void flattenToBuffer(ByteBuffer buf) throws IOException
+    {
+        assert(!((params == null) && (serializedParams == null)));
+        assert((params != null) || (serializedParams != null));
+        buf.put(type.getValue()); //version and type, version is currently 0
+        if (type == ProcedureInvocationType.REPLICATED) {
+            buf.putLong(originalTxnId);
+        }
+        buf.putInt(procName.length());
+        buf.put(procName.getBytes());
+        buf.putLong(clientHandle);
+        if (serializedParams != null)
+        {
+            if (!serializedParams.isReadOnly())
+            {
+                buf.put(serializedParams.array(),
+                        serializedParams.position() + serializedParams.arrayOffset(),
+                        serializedParams.remaining());
+            }
+            else
+            {
+                // duplicate for thread-safety
+                ByteBuffer dup = serializedParams.duplicate();
+                dup.rewind();
+                buf.put(dup);
+            }
+        }
+        else if (params != null) {
+            getParams().flattenToBuffer(buf);
+        }
+    }
+
+    public void initFromBuffer(ByteBuffer buf) throws IOException
+    {
+        FastDeserializer in = new FastDeserializer(buf);
+        byte version = in.readByte();// version number also embeds the type
+        type = ProcedureInvocationType.typeFromByte(version);
+
+        /*
+         * If it's a replicated invocation, there should be two txn IDs
+         * following the version byte. The first txn ID is the new txn ID, the
+         * second one is the original txn ID.
+         */
+        if (type == ProcedureInvocationType.REPLICATED) {
+            originalTxnId = in.readLong();
+        }
+
+        procName = in.readString();
+        clientHandle = in.readLong();
+        // do not deserialize parameters in ClientInterface context
+        serializedParams = in.remainder();
+        final ByteBuffer duplicate = serializedParams.duplicate();
+        params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
+            @Override
+            public ParameterSet call() throws Exception {
+                FastDeserializer fds = new FastDeserializer(duplicate);
+                return fds.readObject(ParameterSet.class);
+            }
+        });
     }
 
     @Override
@@ -168,8 +253,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
         procName = in.readString();
         clientHandle = in.readLong();
         // do not deserialize parameters in ClientInterface context
-        unserializedParams = in.remainder();
-        final ByteBuffer duplicate = unserializedParams.duplicate();
+        serializedParams = in.remainder();
+        final ByteBuffer duplicate = serializedParams.duplicate();
         params = new FutureTask<ParameterSet>(new Callable<ParameterSet>() {
             @Override
             public ParameterSet call() throws Exception {
@@ -181,18 +266,16 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     @Override
     public void writeExternal(FastSerializer out) throws IOException {
-        assert(!((params == null) && (unserializedParams == null)));
-        assert((params != null) || (unserializedParams != null));
+        assert(!((params == null) && (serializedParams == null)));
+        assert((params != null) || (serializedParams != null));
         out.write(type.getValue());//version and type, version is currently 0
         if (type == ProcedureInvocationType.REPLICATED) {
             out.writeLong(originalTxnId);
         }
         out.writeString(procName);
         out.writeLong(clientHandle);
-        if (unserializedParams != null)
-            out.write(unserializedParams.array(),
-                      unserializedParams.position() + unserializedParams.arrayOffset(),
-                      unserializedParams.remaining());
+        if (serializedParams != null)
+            out.write(serializedParams.duplicate());
         else if (params != null) {
             out.writeObject(getParams());
         }
@@ -226,8 +309,8 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
 
     /*
      * Store a copy of the parameters to the procedure in serialized form.
-     * In a cluster there is no reason to throw away the unserialized bytes
-     * because it will be forwarded in most cases and there is no need to repeate the work.
+     * In a cluster there is no reason to throw away the serialized bytes
+     * because it will be forwarded in most cases and there is no need to repeat the work.
      * Command logging also takes advantage of this to avoid reserializing the parameters.
      * In some cases the params will never have been serialized (null) because
      * the SPI is generated internally. A duplicate view of the buffer is returned
@@ -235,14 +318,14 @@ public class StoredProcedureInvocation implements FastSerializable, JSONString {
      * is invoked by the command log.
      */
     public ByteBuffer getSerializedParams() {
-        if (unserializedParams != null) {
-            return unserializedParams.duplicate();
+        if (serializedParams != null) {
+            return serializedParams.duplicate();
         }
         return null;
     }
 
     public void setSerializedParams(ByteBuffer serializedParams) {
-        unserializedParams = serializedParams;
+        this.serializedParams = serializedParams;
     }
 
     @Override

@@ -36,7 +36,7 @@ public class ServerThread extends Thread {
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
         m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = "localhost";
+        m_config.m_leader = "";
 
         if (!m_config.validate()) {
             m_config.usage();
@@ -51,7 +51,7 @@ public class ServerThread extends Thread {
         m_config.m_pathToCatalog = pathToCatalog;
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = "localhost";
+        m_config.m_leader = "";
 
         setName("ServerThread");
     }
@@ -62,7 +62,41 @@ public class ServerThread extends Thread {
         m_config.m_pathToDeployment = pathToDeployment;
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
+        m_config.m_leader = "";
+
+        if (!m_config.validate()) {
+            m_config.usage();
+            System.exit(-1);
+        }
+
+        setName("ServerThread");
+    }
+
+    public ServerThread(String pathToCatalog,
+            String pathToDeployment,
+            int internalPort,
+            int zkPort,
+            BackendTarget target) {
+        this(pathToCatalog, pathToDeployment, VoltDB.DEFAULT_INTERNAL_PORT, internalPort, zkPort, target);
+    }
+
+    public ServerThread(String pathToCatalog,
+                        String pathToDeployment,
+                        int leaderPort,
+                        int internalPort,
+                        int zkPort,
+                        BackendTarget target)
+    {
+        m_config = new VoltDB.Configuration();
+        m_config.m_pathToCatalog = pathToCatalog;
+        m_config.m_pathToDeployment = pathToDeployment;
+        m_config.m_backend = target;
+        m_config.m_pathToLicense = getTestLicensePath();
         m_config.m_leader = "localhost";
+        m_config.m_internalPort = internalPort;
+        m_config.m_leaderPort = leaderPort;
+        m_config.m_zkInterface = "127.0.0.1:" + zkPort;
+        m_config.m_leader = "";
 
         if (!m_config.validate()) {
             m_config.usage();

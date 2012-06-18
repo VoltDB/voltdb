@@ -53,19 +53,12 @@ class AddDropTableTest : public Test {
 
         m_engine->resetReusedResultOutputBuffer();
         m_engine->initialize(m_clusterId, m_siteId, m_partitionId,
-                             m_hostId, m_hostName, DEFAULT_TEMP_TABLE_MEMORY);
+                             m_hostId, m_hostName, DEFAULT_TEMP_TABLE_MEMORY, 3);
 
         std::string initialCatalog =
           "add / clusters cluster\n"
           "add /clusters[cluster] databases database\n"
-          "add /clusters[cluster]/databases[database] programs program\n"
-          "add /clusters[cluster] hosts 0\n"
-          "add /clusters[cluster] partitions 0\n"
-          "add /clusters[cluster] partitions 1\n"
-          "add /clusters[cluster] partitions 2\n"
-          "add /clusters[cluster] sites 0\n"
-          "set /clusters[cluster]/sites[0] partition /clusters[cluster]/partitions[0]\n"
-          "set /clusters[cluster]/sites[0] host /clusters[cluster]/hosts[0]";
+          "add /clusters[cluster]/databases[database] programs program\n";
 
         bool loadResult = m_engine->loadCatalog( -2, initialCatalog);
         ASSERT_TRUE(loadResult);

@@ -598,7 +598,7 @@ class NegationGenerator(SingletonOpGenerator):
     """
 
     def __init__(self):
-        SingletonOpGenerator.__init__(self, ("NOT",))
+        SingletonOpGenerator.__init__(self, ("NOT",""), "_maybe")
 
 class DistinctGenerator(SingletonOpGenerator):
     """This generator generates statements using the distinct operator.
@@ -629,8 +629,14 @@ class CmpGenerator(BinaryOpGenerator):
     """
 
     def __init__(self):
-        BinaryOpGenerator.__init__(self, ("<", ">", "=", "<=", ">=", "!=", "<>"),
-                                   "_cmp")
+        BinaryOpGenerator.__init__(self, ("<", ">", "=", "<=", ">=", "!=", "<>"), "_cmp")
+
+class LikeGenerator(BinaryOpGenerator):
+    """This generator generates statements using LIKE / NOT LIKE.
+    """
+
+    def __init__(self):
+        BinaryOpGenerator.__init__(self, ("LIKE", "NOT LIKE"), "_like")
 
 class SetGenerator(BinaryOpGenerator):
     """This generates statements using set operators (union, etc.).
@@ -871,7 +877,7 @@ class SQLGenerator:
         # Reset the counters
         IDValueGenerator(0)
 
-        self.__operators = (CmpGenerator, MathGenerator, LogicGenerator,
+        self.__operators = (CmpGenerator, LikeGenerator, MathGenerator, LogicGenerator,
                             NegationGenerator, DistinctGenerator,
                             SortOrderGenerator, AggregationGenerator,
                             SetGenerator)

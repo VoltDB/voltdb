@@ -36,7 +36,7 @@ public class TransactionRecord
     boolean m_selfFail;
     boolean m_otherFail;
 
-    HashSet<Integer> m_failedSites;
+    HashSet<Long> m_failedSites;
 
     // Creation of a TransactionRecord with no initial log string will
     // create a null record.  Yes, ugly.
@@ -66,7 +66,7 @@ public class TransactionRecord
         m_coord = logString.isCoordinator();
         m_selfFail = false;
         m_otherFail = false;
-        m_failedSites = new HashSet<Integer>();
+        m_failedSites = new HashSet<Long>();
     }
 
     void updateRecord(LogString logString)
@@ -100,7 +100,7 @@ public class TransactionRecord
         return m_txnId;
     }
 
-    HashSet<Integer> getFailedSites()
+    HashSet<Long> getFailedSites()
     {
         return m_failedSites;
     }
@@ -140,6 +140,7 @@ public class TransactionRecord
         return m_otherFail;
     }
 
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
@@ -157,6 +158,7 @@ public class TransactionRecord
         return sb.toString();
     }
 
+    @Override
     public boolean equals(Object o)
     {
         if (o == this)

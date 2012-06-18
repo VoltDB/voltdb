@@ -25,10 +25,7 @@ import java.sql.SQLFeatureNotSupportedException;
 import java.util.Enumeration;
 import java.util.Properties;
 import java.util.logging.Logger;
-import java.util.regex.Matcher;
 import java.util.regex.Pattern;
-
-import org.voltdb.client.exampleutils.ClientConnectionPool;
 
 public class Driver implements java.sql.Driver
 {
@@ -60,33 +57,38 @@ public class Driver implements java.sql.Driver
         {
             try
             {
-                Matcher m = Pattern.compile("^jdbc:voltdb://([^:]+):(\\d+)$", Pattern.CASE_INSENSITIVE).matcher(url);
-                if (m.matches())
-                {
-                    String[] servers = m.group(1).split(",");
-                    int port = Integer.parseInt(m.group(2));
-                    String user = "";
-                    String password = "";
-                    boolean heavyweight = false;
-                    int maxoutstandingtxns = 0;
-                    for (Enumeration e = info.propertyNames(); e.hasMoreElements();)
-                    {
-                        String key = (String) e.nextElement();
-                        String value = info.getProperty(key);
-                        if (key.toLowerCase().equals("user"))
-                            user = value;
-                        else if (key.toLowerCase().equals("password"))
-                            password = value;
-                        else if (key.toLowerCase().equals("heavyweight"))
-                            heavyweight = (value.toLowerCase().equals("true") || value.toLowerCase().equals("yes") || value.toLowerCase().equals("1"));
-                        else if (key.toLowerCase().equals("maxoutstandingtxns"))
-                            maxoutstandingtxns = Integer.parseInt(value);
-                        // else - unknown; ignore
-                    }
-
-                    // Return JDBC connection wrapper for the client
-                    return new JDBC4Connection(ClientConnectionPool.get(servers,port,user,password,heavyweight,maxoutstandingtxns), user);
+                String prefix = URL_PREFIX + "//";
+                if (!url.startsWith(prefix)) {
+                    throw SQLError.get(SQLError.ILLEGAL_ARGUMENT);
                 }
+
+                // chop off the prefix
+                url = url.substring(prefix.length());
+
+                // get the server strings
+                String[] servers = url.split(",");
+
+                String user = "";
+                String password = "";
+                boolean heavyweight = false;
+                int maxoutstandingtxns = 0;
+                for (Enumeration<?> e = info.propertyNames(); e.hasMoreElements();)
+                {
+                    String key = (String) e.nextElement();
+                    String value = info.getProperty(key);
+                    if (key.toLowerCase().equals("user"))
+                        user = value;
+                    else if (key.toLowerCase().equals("password"))
+                        password = value;
+                    else if (key.toLowerCase().equals("heavyweight"))
+                        heavyweight = (value.toLowerCase().equals("true") || value.toLowerCase().equals("yes") || value.toLowerCase().equals("1"));
+                    else if (key.toLowerCase().equals("maxoutstandingtxns"))
+                        maxoutstandingtxns = Integer.parseInt(value);
+                    // else - unknown; ignore
+                }
+
+                // Return JDBC connection wrapper for the client
+                return new JDBC4Connection(JDBC4ClientConnectionPool.get(servers,user,password,heavyweight,maxoutstandingtxns), user);
             }
             catch(Exception x)
             {

@@ -30,11 +30,11 @@ import java.sql.Statement;
 import java.sql.Timestamp;
 import java.util.List;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.exceptions.ConstraintFailureException;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
@@ -53,9 +53,50 @@ public class HsqlBackend {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger sqlLog = new VoltLogger("SQL");
 
+    private final static Object backendLock = new Object();
+    private static HsqlBackend m_backend = null;
+
+    static public HsqlBackend initializeHSQLBackend(long siteId,
+                                                    CatalogContext context)
+    {
+        synchronized(backendLock) {
+            if (m_backend == null) {
+                try {
+                    m_backend = new HsqlBackend(siteId);
+                    final String hexDDL = context.database.getSchema();
+                    final String ddl = Encoder.hexDecodeToString(hexDDL);
+                    final String[] commands = ddl.split("\n");
+                    for (String command : commands) {
+                        String decoded_cmd = Encoder.hexDecodeToString(command);
+                        decoded_cmd = decoded_cmd.trim();
+                        if (decoded_cmd.length() == 0) {
+                            continue;
+                        }
+                        m_backend.runDDL(decoded_cmd);
+                    }
+                }
+                catch (final Exception ex) {
+                    hostLog.fatal("Unable to construct HSQL backend");
+                    VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
+                }
+            }
+            return m_backend;
+        }
+    }
+
+    static public void shutdownInstance()
+    {
+        synchronized(backendLock) {
+            if (m_backend != null) {
+                m_backend.shutdown();
+                m_backend = null;
+            }
+        }
+    }
+
     Connection dbconn;
 
-    public HsqlBackend(int siteId) {
+    public HsqlBackend(long siteId) {
         try {
             Class.forName("org.hsqldb_voltpatches.jdbcDriver" );
         } catch (Exception e) {
@@ -73,7 +114,7 @@ public class HsqlBackend {
     }
 
     /** Creates a new backend wrapping dbconn. This is used for testing only. */
-    public HsqlBackend(Connection dbconn) {
+    private HsqlBackend(Connection dbconn) {
         this.dbconn = dbconn;
     }
 
@@ -125,6 +166,8 @@ public class HsqlBackend {
                         columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.FLOAT);
                     else if (type.equals("TIMESTAMP"))
                         columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.TIMESTAMP);
+                    else if (type.equals("VARBINARY"))
+                        columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.VARBINARY);
                     else
                         throw new ExpectedProcedureException("Trying to create a column in Backend with a (currently) unsupported type: " + type);
                 }
@@ -147,6 +190,8 @@ public class HsqlBackend {
                             row[i] = rs.getBigDecimal(i + 1);
                         else if (table.getColumnType(i) == VoltType.FLOAT)
                             row[i] = rs.getDouble(i + 1);
+                        else if (table.getColumnType(i) == VoltType.VARBINARY)
+                            row[i] = rs.getBytes(i + 1);
                         else if (table.getColumnType(i) == VoltType.TIMESTAMP) {
                             Timestamp t = rs.getTimestamp(i + 1);
                             if (t == null) {
@@ -214,17 +259,16 @@ public class HsqlBackend {
         }
     }
 
-    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, Object... args) {
+    VoltTable runSQLWithSubstitutions(final SQLStmt stmt, ParameterSet params, List<StmtParameter> sparams) {
         //HSQLProcedureWrapper does nothing smart. it just implements this interface with runStatement()
         StringBuilder sqlOut = new StringBuilder(stmt.getText().length() * 2);
 
-        CatalogMap<StmtParameter> sparamsMap = stmt.catStmt.getParameters();
-        List<StmtParameter> sparams = CatalogUtil.getSortedCatalogItems(sparamsMap, "index");
         assert(sparams != null);
 
         int lastIndex = 0;
         String sql = stmt.getText();
-        for (int i = 0; i < args.length; i++) {
+        Object[] paramObjs = params.toArray();
+        for (int i = 0; i < paramObjs.length; i++) {
             int nextIndex = sql.indexOf('?', lastIndex);
             if (nextIndex == -1)
                 throw new RuntimeException("SQL Statement has more arguments than params.");
@@ -235,20 +279,22 @@ public class HsqlBackend {
             assert(stmtParam != null);
             VoltType type = VoltType.get((byte) stmtParam.getJavatype());
 
-            if (args[i] == null) {
+            if (VoltType.isNullVoltType(paramObjs[i])) {
                 sqlOut.append("NULL");
-            } else if (args[i] instanceof TimestampType) {
+            }
+            else if (paramObjs[i] instanceof TimestampType) {
                 if (type != VoltType.TIMESTAMP)
                     throw new RuntimeException("Inserting date into mismatched column type in HSQL.");
-                TimestampType d = (TimestampType) args[i];
+                TimestampType d = (TimestampType) paramObjs[i];
                 // convert VoltDB's microsecond granularity to millis.
                 Timestamp t = new Timestamp(d.getTime() * 1000);
                 sqlOut.append('\'').append(t.toString()).append('\'');
-            } else if (args[i] instanceof byte[]) {
+            }
+            else if (paramObjs[i] instanceof byte[]) {
                 if (type == VoltType.STRING) {
                     // Convert from byte[] -> String; escape single quotes
                     try {
-                        sqlOut.append(sqlEscape(new String((byte[]) args[i], "UTF-8")));
+                        sqlOut.append(sqlEscape(new String((byte[]) paramObjs[i], "UTF-8")));
                     } catch (UnsupportedEncodingException e) {
                         // should NEVER HAPPEN
                         System.err.println("FATAL: Your JVM doens't support UTF-&");
@@ -257,26 +303,28 @@ public class HsqlBackend {
                 }
                 else if (type == VoltType.VARBINARY) {
                     // Convert from byte[] -> String; using hex
-                    sqlOut.append(sqlEscape(Encoder.hexEncode((byte[]) args[i])));
+                    sqlOut.append(sqlEscape(Encoder.hexEncode((byte[]) paramObjs[i])));
                 }
                 else {
                     throw new RuntimeException("Inserting string/varbinary (bytes) into mismatched column type in HSQL.");
                 }
-            } else if (args[i] instanceof String) {
+            }
+            else if (paramObjs[i] instanceof String) {
                 if (type != VoltType.STRING)
                     throw new RuntimeException("Inserting string into mismatched column type in HSQL.");
                 // Escape single quotes
-                sqlOut.append(sqlEscape((String) args[i]));
-            } else {
+                sqlOut.append(sqlEscape((String) paramObjs[i]));
+            }
+            else {
                 if (type == VoltType.TIMESTAMP) {
-                    long t = Long.parseLong(args[i].toString());
+                    long t = Long.parseLong(paramObjs[i].toString());
                     TimestampType d = new TimestampType(t);
                     // convert VoltDB's microsecond granularity to millis
                     Timestamp ts = new Timestamp(d.getTime() * 1000);
                     sqlOut.append('\'').append(ts.toString()).append('\'');
                 }
                 else
-                    sqlOut.append(args[i].toString());
+                    sqlOut.append(paramObjs[i].toString());
             }
         }
         sqlOut.append(sql, lastIndex, sql.length());
@@ -288,7 +336,7 @@ public class HsqlBackend {
         return "\'" + input.replace("'", "''") + "\'";
     }
 
-    public void shutdown() {
+    private void shutdown() {
         try {
             try {
                 Statement stmt = dbconn.createStatement();
@@ -301,5 +349,4 @@ public class HsqlBackend {
             hostLog.l7dlog( Level.ERROR, LogKeys.host_Backend_ErrorOnShutdown.name(), e);
         }
     }
-
 }

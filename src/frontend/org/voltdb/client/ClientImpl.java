@@ -18,18 +18,16 @@
 package org.voltdb.client;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.Arrays;
 import java.util.concurrent.CopyOnWriteArrayList;
-import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReentrantLock;
 import java.util.logging.Logger;
 
-import org.voltdb.VoltTable;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  *  A client that connects to one or more nodes in a VoltCluster
@@ -40,8 +38,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
     private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
-    private final int m_expectedOutgoingMessageSize;
-
     /*
      * Username and password as set by createConnection. Used
      * to ensure that the same credentials are used every time
@@ -49,6 +45,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     // stored credentials
     private boolean m_credentialsSet = false;
+    private final ReentrantLock m_credentialComparisonLock =
+            new ReentrantLock();
     private String m_createConnectionUsername = null;
     private byte[] m_hashedPassword = null;
     private int m_passwordHashCode = 0;
@@ -72,8 +70,6 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                         Public API
      ****************************************************/
 
-    private final Semaphore m_maxOutstanding = new Semaphore(0);
-
     private volatile boolean m_isShutdown = false;
 
     /**
@@ -86,12 +82,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      * @param heavyweight Whether to use multiple or a single thread
      */
     ClientImpl(ClientConfig config) {
-        m_expectedOutgoingMessageSize = config.m_expectedOutgoingMessageSize;
         m_distributer = new Distributer(
-                config.m_expectedOutgoingMessageSize,
-                config.m_maxArenaSizes,
                 config.m_heavyweight,
-                config.m_statsSettings,
                 config.m_procedureCallTimeoutMS,
                 config.m_connectionResponseTimeoutMS);
         m_distributer.addClientStatusListener(new CSL());
@@ -101,8 +93,15 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             m_distributer.addClientStatusListener(config.m_listener);
         }
         assert(config.m_maxOutstandingTxns > 0);
-        m_maxOutstanding.release(config.m_maxOutstandingTxns);
         m_blessedThreadIds.addAll(m_distributer.getThreadIds());
+        if (config.m_autoTune) {
+            m_distributer.m_rateLimiter.enableAutoTuning(
+                    config.m_autoTuneTargetInternalLatency);
+        }
+        else {
+            m_distributer.m_rateLimiter.setLimits(
+                    config.m_maxTransactionsPerSecond, config.m_maxOutstandingTxns);
+        }
     }
 
     private boolean verifyCredentialsAreAlwaysTheSame(String username, byte[] hashedPassword) {
@@ -112,7 +111,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             return true;
         }
 
-        synchronized(m_createConnectionUsername) {
+        m_credentialComparisonLock.lock();
+        try {
             if (m_credentialsSet == false) {
                 m_credentialsSet = true;
                 m_createConnectionUsername = username;
@@ -132,6 +132,8 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
                             return false;
                 return true;
             }
+        } finally {
+            m_credentialComparisonLock.unlock();
         }
     }
 
@@ -203,10 +205,14 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new NoConnectionsException("Client instance is shutdown");
         }
 
+        if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
+            throw new IOException("Can't invoke a procedure synchronously from with the client callback thread " +
+                    " without deadlocking the client library");
+        }
+
         m_distributer.queue(
                 invocation,
                 cb,
-                m_expectedOutgoingMessageSize,
                 true);
 
         try {
@@ -234,13 +240,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         if (m_isShutdown) {
             return false;
         }
-        return callProcedure(callback, m_expectedOutgoingMessageSize, procName, parameters);
+        return callProcedure(callback, 0, procName, parameters);
     }
 
     /**
-     * Asynchronously invoke a replicated procedure. Does not guarantee that the
-     * invocation is actually queued. If there is backpressure on all
-     * connections to the cluster then the invocation will not be queued. Check
+     * Asynchronously invoke a replicated procedure. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check
      * the return value to determine if queuing actually took place.
      *
      * @param callback ProcedureCallback that will be invoked with procedure results.
@@ -262,7 +268,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         ProcedureInvocation invocation =
             new ProcedureInvocation(originalTxnId, m_handle.getAndIncrement(),
                                     procName, parameters);
-        return callProcedure(callback, m_expectedOutgoingMessageSize, invocation);
+        return private_callProcedure(callback, 0, invocation);
     }
 
     @Override
@@ -270,16 +276,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             Object... parameters) {
         final ProcedureInvocation invocation =
             new ProcedureInvocation(0, procName, parameters);
-        final FastSerializer fds = new FastSerializer();
-        int size = 0;
-        try {
-            final BBContainer c = fds.writeObjectForMessaging(invocation);
-            size = c.b.remaining();
-            c.discard();
-        } catch (final IOException e) {
-            throw new RuntimeException(e);
-        }
-        return size;
+        return invocation.getSerializedSize();
     }
 
     @Override
@@ -294,10 +291,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         }
         ProcedureInvocation invocation =
             new ProcedureInvocation(m_handle.getAndIncrement(), procName, parameters);
-        return callProcedure(callback, expectedSerializedSize, invocation);
+        return private_callProcedure(callback, expectedSerializedSize, invocation);
     }
 
-    private final boolean callProcedure(
+    private final boolean private_callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
             ProcedureInvocation invocation)
@@ -312,28 +309,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
 
         //Blessed threads (the ones that invoke callbacks) are not subject to backpressure
         boolean isBlessed = m_blessedThreadIds.contains(Thread.currentThread().getId());
-        if (!isBlessed) {
-            try {
-                m_maxOutstanding.acquire();
-            } catch (InterruptedException e) {
-                throw new java.io.InterruptedIOException(e.toString());
-            }
-        }
-        final ProcedureCallback userCallback = callback;
-        ProcedureCallback callbackToReturnPermit = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                m_maxOutstanding.release();
-                userCallback.clientCallback(clientResponse);
-            }
-
-        };
         if (m_blockingQueue) {
             while (!m_distributer.queue(
                     invocation,
-                    callbackToReturnPermit,
-                    expectedSerializedSize,
+                    callback,
                     isBlessed)) {
                 try {
                     backpressureBarrier();
@@ -345,8 +324,7 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         } else {
             return m_distributer.queue(
                     invocation,
-                    callbackToReturnPermit,
-                    expectedSerializedSize,
+                    callback,
                     isBlessed);
         }
     }
@@ -470,38 +448,13 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     }
 
     @Override
-    public VoltTable getIOStats() {
-        return m_distributer.getConnectionStats(false);
-    }
-
-    @Override
-    public VoltTable getIOStatsInterval() {
-        return m_distributer.getConnectionStats(true);
+    public ClientStatsContext createStatsContext() {
+        return m_distributer.createStatsContext();
     }
 
     @Override
     public Object[] getInstanceId() {
         return m_distributer.getInstanceId();
-    }
-
-    @Override
-    public VoltTable getProcedureStats() {
-        return m_distributer.getProcedureStats(false);
-    }
-
-    @Override
-    public VoltTable getProcedureStatsInterval() {
-        return m_distributer.getProcedureStats(true);
-    }
-
-    @Override
-    public VoltTable getClientRTTLatencies() {
-        return m_distributer.getClientRTTLatencies(false);
-    }
-
-    @Override
-    public VoltTable getClusterRTTLatencies() {
-        return m_distributer.getClusterRTTLatencies(false);
     }
 
     @Override
@@ -514,13 +467,39 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         return m_blockingQueue;
     }
 
+    private static String getHostnameFromHostnameColonPort(String server) {
+        server = server.trim();
+        String[] parts = server.split(":");
+        if (parts.length == 1) {
+            return server;
+        }
+        else {
+            assert (parts.length == 2);
+            return parts[0].trim();
+        }
+    }
+
+    public static int getPortFromHostnameColonPort(String server,
+            int defaultPort) {
+        String[] parts = server.split(":");
+        if (parts.length == 1) {
+            return defaultPort;
+        }
+        else {
+            assert (parts.length == 2);
+            return Integer.parseInt(parts[1]);
+        }
+    }
+
     @Override
     public void createConnection(String host) throws UnknownHostException, IOException {
         if (m_username == null) {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        createConnectionWithHashedCredentials( host, Client.VOLTDB_SERVER_PORT, m_username, m_passwordHash);
+        int port = getPortFromHostnameColonPort(host, Client.VOLTDB_SERVER_PORT);
+        host = getHostnameFromHostnameColonPort(host);
+        createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
     }
 
     @Override
@@ -529,6 +508,30 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
             throw new IllegalStateException("Attempted to use createConnection(String host) " +
                     "with a client that wasn't constructed with a username and password specified");
         }
-        createConnectionWithHashedCredentials( host, port, m_username, m_passwordHash);
+        createConnectionWithHashedCredentials(host, port, m_username, m_passwordHash);
+    }
+
+    @Override
+    public int[] getThroughputAndOutstandingTxnLimits() {
+        return m_distributer.m_rateLimiter.getLimits();
+    }
+
+    @Override
+    public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        // don't do anything (be silent) if empty path
+        if ((path == null) || (path.length() == 0)) {
+            return;
+        }
+
+        FileWriter fw = new FileWriter(path);
+        fw.append(String.format("%d,%d,%d,%d,%d,%d,%d\n",
+                stats.getStartTimestamp(),
+                stats.getDuration(),
+                stats.getInvocationsCompleted(),
+                stats.kPercentileLatency(0.0),
+                stats.kPercentileLatency(1.0),
+                stats.kPercentileLatency(0.95),
+                stats.kPercentileLatency(0.99)));
+        fw.close();
     }
 }

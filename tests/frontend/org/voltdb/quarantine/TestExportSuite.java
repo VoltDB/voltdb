@@ -164,7 +164,7 @@ public class TestExportSuite extends RegressionSuite {
         super.setUp();
 
         callbackSucceded = true;
-        m_tester = new ExportTestClient(getServerConfig().getNodeCount());
+        m_tester = new ExportTestClient(getServerConfig().getNodeCount(), port(0));
         m_tester.addCredentials("export", "export");
         try {
             m_tester.connect();
@@ -252,7 +252,7 @@ public class TestExportSuite extends RegressionSuite {
               false,
               false,
               0);
-        exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+        exportClient.addServerInfo(new InetSocketAddress("localhost", port(0)));
         exportClient.addCredentials("export", "export");
         final Thread currentThread = Thread.currentThread();
         new Thread() {
@@ -278,7 +278,7 @@ public class TestExportSuite extends RegressionSuite {
 
         ClientConfig adminConfig = new ClientConfig("admin", "admin");
         final Client adminClient = org.voltdb.client.ClientFactory.createClient(adminConfig);
-        adminClient.createConnection("localhost", VoltDB.DEFAULT_ADMIN_PORT);
+        adminClient.createConnection("localhost", adminPort(0));
         adminClient.callProcedure("@Pause");
 
         new Thread() {
@@ -442,7 +442,7 @@ public class TestExportSuite extends RegressionSuite {
               false,
               false,
               0);
-      exportClient.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+      exportClient.addServerInfo(new InetSocketAddress("localhost", port(0)));
       exportClient.addCredentials("export", "export");
       final Thread currentThread = Thread.currentThread();
       new Thread() {
@@ -582,7 +582,7 @@ public class TestExportSuite extends RegressionSuite {
         assertTrue(threwException);
 
         //Reconnect, then do work and expect failure, after a recovery
-        ((LocalCluster)m_config).recoverOne(1, null, "admin:admin@localhost");
+        ((LocalCluster)m_config).recoverOne(1, null, "");
         Thread.sleep(500);
         threwException = false;
         try {
@@ -626,7 +626,7 @@ public class TestExportSuite extends RegressionSuite {
             modifiedTimes[ii++] = f.lastModified();
         }
 
-        ((LocalCluster)m_config).recoverOne(1, null, "admin:admin@localhost");
+        ((LocalCluster)m_config).recoverOne(1, null, "");
         Thread.sleep(500);
         File filesAfterRejoin[] = exportOverflowDir.listFiles();
         ii = 0;
@@ -655,7 +655,7 @@ public class TestExportSuite extends RegressionSuite {
 
         // make a new tester and see if it gets the new advertisement!
         m_tester.disconnect();
-        m_tester = new ExportTestClient(getServerConfig().getNodeCount());
+        m_tester = new ExportTestClient(getServerConfig().getNodeCount(), port(0));
         m_tester.connect();
 
         // verify that it exports

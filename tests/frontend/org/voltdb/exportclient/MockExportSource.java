@@ -126,10 +126,10 @@ public class MockExportSource {
             // build the message and send it
             m = new ExportProtoMessage(0, 0, "i");
             m.openResponse(fs.getBuffer());
-            fs = new FastSerializer();
-            m.writeToFastSerializer(fs);
-            byte[] openResponseBytes = fs.getBytes();
-            out.write(openResponseBytes);
+            ByteBuffer buf = ByteBuffer.allocate(m.serializableBytes() + 4);
+            m.flattenToBuffer(buf);
+            buf.flip();
+            out.write(buf.array());
 
             while ((dataGen.eof() == false) && socket.isConnected()) {
                 // get the ack/poll message
@@ -141,12 +141,12 @@ public class MockExportSource {
                 // an empty table means no more csv
                 if (t.getRowCount() == 0)
                     break;
-                ByteBuffer buf = ExportEncoder.getEncodedTable(t);
+                buf = ExportEncoder.getEncodedTable(t);
                 m = new ExportProtoMessage(0, 0, dataGen.getSignature());
                 m.pollResponse(0, buf);
-                fs = new FastSerializer();
-                m.writeToFastSerializer(fs);
-                byte[] pollResponseBytes = fs.getBytes();
+                buf = ByteBuffer.allocate(4 + m.serializableBytes());
+                m.flattenToBuffer(buf);
+                byte[] pollResponseBytes = buf.array();
                 out.write(pollResponseBytes);
             }
 

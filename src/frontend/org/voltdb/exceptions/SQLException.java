@@ -17,7 +17,6 @@
 
 package org.voltdb.exceptions;
 
-import java.io.IOException;
 import java.nio.BufferUnderflowException;
 import java.nio.ByteBuffer;
 
@@ -71,10 +70,9 @@ public class SQLException extends SerializableException {
 
     /**
      * Serialize the five character SQLState to the provided ByteBuffer
-     * @throws IOException
      */
     @Override
-    protected void p_serializeToBuffer(ByteBuffer b) throws IOException {
+    protected void p_serializeToBuffer(ByteBuffer b) {
         assert (m_sqlState.getBytes().length == 5);
         b.put(m_sqlState.getBytes());
     }

@@ -158,27 +158,27 @@ public class AdhocSmash
 
             // Define parameters and pull from command line
             AppHelper apph = new AppHelper(AdhocSmash.class.getCanonicalName())
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
+                .add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
+                .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
                 .setArguments(args)
             ;
 
             // Retrieve parameters
-            long displayInterval = apph.longValue("display-interval");
+            long displayInterval = apph.longValue("displayinterval");
             long duration        = apph.longValue("duration");
             String servers       = apph.stringValue("servers");
             int port             = apph.intValue("port");
-            long rateLimit       = apph.longValue("rate-limit");
+            long rateLimit       = apph.longValue("ratelimit");
 
             Random rand = new Random();
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("rate-limit", (rateLimit > 0))
+                .validate("displayinterval", (displayInterval > 0))
+                .validate("ratelimit", (rateLimit > 0))
             ;
 
             // Display actual parameters, for reference

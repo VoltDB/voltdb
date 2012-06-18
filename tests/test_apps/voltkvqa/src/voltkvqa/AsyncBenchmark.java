@@ -87,52 +87,52 @@ public class AsyncBenchmark
             // Use the AppHelper utility class to retrieve command line application parameters
 
             // Define parameters and pull from command line
-            apph.add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
+            apph.add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("pool-size", "pool_size", "Size of the pool of keys to work with (10,00, 10,000, 100,000 items, etc.).", 100000)
+                .add("poolsize", "pool_size", "Size of the pool of keys to work with (10,00, 10,000, 100,000 items, etc.).", 100000)
                 .add("preload", "preload", "Whether the data store should be initialized with default values before the benchmark is run (true|false).", true)
-                .add("get-put-ratio", "get_put_ratio", "Ratio of GET versus PUT operations: 1.0 => 100% GETs; 0.0 => 0% GETs; 0.95 => 95% GETs, 5% PUTs. Value between 0 and 1", 0.95)
-                .add("key-size", "key_size", "Size of the keys in number of characters. Max: 250", 50)
-                .add("min-value-size", "min_value_size", "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576", 1000)
-                .add("max-value-size", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
+                .add("getputratio", "get_put_ratio", "Ratio of GET versus PUT operations: 1.0 => 100% GETs; 0.0 => 0% GETs; 0.95 => 95% GETs, 5% PUTs. Value between 0 and 1", 0.95)
+                .add("keysize", "key_size", "Size of the keys in number of characters. Max: 250", 50)
+                .add("minvaluesize", "min_value_size", "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576", 1000)
+                .add("maxvaluesize", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
                 .add("entropy", "entropy", "How compressible the payload should be, lower is more compressible", 127)
-                .add("use-compression", "use_compression", "Whether value blobs should be compressed (GZip) for storage in the database (true|false).", false)
-                .add("rate-limit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
-                .add("auto-tune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
-                .add("latency-target", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
+                .add("usecompression", "use_compression", "Whether value blobs should be compressed (GZip) for storage in the database (true|false).", false)
+                .add("ratelimit", "rate_limit", "Rate limit to start from (number of transactions per second).", 100000)
+                .add("autotune", "auto_tune", "Flag indicating whether the benchmark should self-tune the transaction rate for a target execution latency (true|false).", "true")
+                .add("latencytarget", "latency_target", "Execution latency to target to tune transaction rate (in milliseconds).", 10.0d)
                 .setArguments(args)
             ;
 
             // Retrieve parameters
-            long displayInterval   = apph.longValue("display-interval");
+            long displayInterval   = apph.longValue("displayinterval");
             long duration          = apph.longValue("duration");
             String servers         = apph.stringValue("servers");
             int port               = apph.intValue("port");
-            double getPutRatio     = apph.doubleValue("get-put-ratio");
-            int poolSize           = apph.intValue("pool-size");
+            double getPutRatio     = apph.doubleValue("getputratio");
+            int poolSize           = apph.intValue("poolsize");
             boolean preload        = apph.booleanValue("preload");
-            int keySize            = apph.intValue("key-size");
-            int minValueSize       = apph.intValue("min-value-size");
-            int maxValueSize       = apph.intValue("max-value-size");
-            boolean useCompression = apph.booleanValue("use-compression");
-            long rateLimit         = apph.longValue("rate-limit");
-            boolean autoTune       = apph.booleanValue("auto-tune");
-            double latencyTarget   = apph.doubleValue("latency-target");
-            final String csv       = apph.stringValue("stats");
+            int keySize            = apph.intValue("keysize");
+            int minValueSize       = apph.intValue("minvaluesize");
+            int maxValueSize       = apph.intValue("maxvaluesize");
+            boolean useCompression = apph.booleanValue("usecompression");
+            long rateLimit         = apph.longValue("ratelimit");
+            boolean autoTune       = apph.booleanValue("autotune");
+            double latencyTarget   = apph.doubleValue("latencytarget");
+            final String csv       = apph.stringValue("statsfile");
             final int entropy      = apph.intValue("entropy");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("pool-size", (poolSize > 0))
-                .validate("get-put-ratio", (getPutRatio >= 0) && (getPutRatio <= 1))
-                .validate("key-size", (keySize > 0) && (keySize < 251))
-                .validate("min-value-size", (minValueSize > 0) && (minValueSize < 1048576))
-                .validate("max-value-size", (maxValueSize > 0) && (maxValueSize < 1048576) && (maxValueSize >= minValueSize))
-                .validate("rate-limit", (rateLimit > 0))
-                .validate("latency-target", (latencyTarget > 0))
+                .validate("displayinterval", (displayInterval > 0))
+                .validate("poolsize", (poolSize > 0))
+                .validate("getputratio", (getPutRatio >= 0) && (getPutRatio <= 1))
+                .validate("keysize", (keySize > 0) && (keySize < 251))
+                .validate("minvaluesize", (minValueSize > 0) && (minValueSize < 1048576))
+                .validate("maxvaluesize", (maxValueSize > 0) && (maxValueSize < 1048576) && (maxValueSize >= minValueSize))
+                .validate("ratelimit", (rateLimit > 0))
+                .validate("latencytarget", (latencyTarget > 0))
             ;
 
             // Display actual parameters, for reference
@@ -242,18 +242,20 @@ public class AsyncBenchmark
                             if (response.getStatus() == ClientResponse.CONNECTION_LOST) {
                                 return;
                             }
-                            final VoltTable pairData = response.getResults()[0];
-                            final VoltTableRow tablerow = pairData.fetchRow(0);
-                            final long counter = tablerow.getLong(0);
-                            hm.put(pair.Key, counter);
-                            //System.out.printf("Key: %s\tCount: %d\n", pair.Key, counter);
-                            // Track the result of the operation (Success, Failure, Payload traffic...)
-                            if (response.getStatus() == ClientResponse.SUCCESS)
+                            if (response.getStatus() == ClientResponse.SUCCESS) {
                                 PutStoreResults.incrementAndGet(0);
-                            else
+                                final VoltTable pairData = response.getResults()[0];
+                                final VoltTableRow tablerow = pairData.fetchRow(0);
+                                final long counter = tablerow.getLong(0);
+                                hm.put(pair.Key, counter);
+                                //System.out.printf("Key: %s\tCount: %d\n", pair.Key, counter);
+                                // Track the result of the operation (Success, Failure, Payload traffic...)
+                                PutCompressionResults.addAndGet(0, this.StoreValueLength);
+                                PutCompressionResults.addAndGet(1, this.RawValueLength);
+                            } else {
+                                System.err.println("Put failed because " + response.getStatusString());
                                 PutStoreResults.incrementAndGet(1);
-                            PutCompressionResults.addAndGet(0, this.StoreValueLength);
-                            PutCompressionResults.addAndGet(1, this.RawValueLength);
+                            }
                         }
                     }
                     , "Put"

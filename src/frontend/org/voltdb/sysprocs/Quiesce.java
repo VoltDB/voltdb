@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltSystemProcedure;
@@ -29,7 +29,7 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Forces a flush of committed Export data to the connector queues.
@@ -59,7 +59,7 @@ public class Quiesce extends VoltSystemProcedure {
         try {
             if (fragmentId == SysProcFragmentId.PF_quiesce_sites) {
                 // tell each site to quiesce
-                context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
+                context.getSiteProcedureConnection().quiesce();
                 try {
                     int result = Runtime.getRuntime().exec("sync").waitFor();
                     if (result != 0) {
@@ -68,8 +68,8 @@ public class Quiesce extends VoltSystemProcedure {
                 } catch (Exception e) {
                     HOST_LOG.error(e);
                 }
-                VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.INTEGER));
-                results.addRow(Integer.parseInt(context.getSite().getTypeName()));
+                VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
+                results.addRow(context.getSiteId());
                 return new DependencyPair(DEP_SITES, results);
             }
             else if (fragmentId == SysProcFragmentId.PF_quiesce_processed_sites) {

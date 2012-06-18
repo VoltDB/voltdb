@@ -20,7 +20,6 @@ package org.voltdb;
 import java.io.IOException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
-import java.util.Collections;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -28,6 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ConcurrentLinkedQueue;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -39,13 +39,19 @@ import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
+
+
+import com.google.common.util.concurrent.Callables;
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.MoreExecutors;
 
 /**
  * Encapsulates the state needed to manage an ongoing snapshot at the
@@ -96,7 +102,7 @@ public class SnapshotSiteProcessor {
 
 
     /** Number of snapshot buffers to keep */
-    static final int m_numSnapshotBuffers = 12;
+    static final int m_numSnapshotBuffers = 5;
 
     /**
      * Pick a buffer length that is big enough to store at least one of the largest size tuple supported
@@ -120,14 +126,6 @@ public class SnapshotSiteProcessor {
      * to close each target.
      */
     private ArrayList<SnapshotDataTarget> m_snapshotTargets = null;
-
-    /*
-     * Store the results of write attempts here
-     * so that the terminator thread can review them and
-     * decide whether the snapshot actually succeded.
-     */
-    private static List<Future<?>> m_writeFutures =
-        Collections.synchronizedList(new ArrayList<Future<?>>());
 
     /**
      * Queue of tasks for tables that still need to be snapshotted.
@@ -161,9 +159,9 @@ public class SnapshotSiteProcessor {
      * set and reset the contents.
      */
     public static void populateExportSequenceNumbersForExecutionSite(SystemProcedureExecutionContext context) {
-        ExecutionSite site = context.getExecutionSite();
-        for (Table t : site.m_context.database.getTables()) {
-            if (!CatalogUtil.isTableExportOnly(site.m_context.database, t))
+        Database database = context.getDatabase();
+        for (Table t : database.getTables()) {
+            if (!CatalogUtil.isTableExportOnly(database, t))
                 continue;
 
             List<Pair<Integer, Long>> sequenceNumbers = m_exportSequenceNumbers.get(t.getTypeName());
@@ -172,10 +170,11 @@ public class SnapshotSiteProcessor {
                 m_exportSequenceNumbers.put(t.getTypeName(), sequenceNumbers);
             }
 
-            long[] ackOffSetAndSequenceNumber = context.getExecutionEngine().getUSOForExportTable(t.getSignature());
+            long[] ackOffSetAndSequenceNumber =
+                context.getSiteProcedureConnection().getUSOForExportTable(t.getSignature());
             sequenceNumbers.add(
                     Pair.of(
-                            context.getExecutionSite().getCorrespondingPartitionId(),
+                            context.getPartitionId(),
                             ackOffSetAndSequenceNumber[1]));
         }
     }
@@ -190,34 +189,7 @@ public class SnapshotSiteProcessor {
     private long m_quietUntil = 0;
 
     private boolean inQuietPeriod() {
-        return org.voltdb.utils.EstTime.currentTimeMillis() < m_quietUntil;
-    }
-
-    /**
-     * A class identifying a table that should be snapshotted as well as the destination
-     * for the resulting tuple blocks
-     */
-    public static class SnapshotTableTask {
-        private final int m_tableId;
-        private final SnapshotDataTarget m_target;
-        private final boolean m_isReplicated;
-        private final String m_name;
-
-        public SnapshotTableTask(
-                final int tableId,
-                final SnapshotDataTarget target,
-                boolean isReplicated,
-                final String tableName) {
-            m_tableId = tableId;
-            m_target = target;
-            m_isReplicated = isReplicated;
-            m_name = tableName;
-        }
-
-        @Override
-        public String toString() {
-            return ("SnapshotTableTask for " + m_name + " replicated " + m_isReplicated);
-        }
+        return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
     }
 
     SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority) {
@@ -236,11 +208,11 @@ public class SnapshotSiteProcessor {
 
     void initializeBufferPool() {
         for (int ii = 0; ii < SnapshotSiteProcessor.m_numSnapshotBuffers; ii++) {
-            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
+            final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_snapshotBufferLength);
             m_snapshotBufferOrigins.add(origin);
             long snapshotBufferAddress = 0;
             if (VoltDB.getLoadLibVOLTDB()) {
-                snapshotBufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+                snapshotBufferAddress = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
             }
             m_availableSnapshotBuffers.offer(new BBContainer(origin.b, snapshotBufferAddress) {
                 @Override
@@ -275,8 +247,13 @@ public class SnapshotSiteProcessor {
         }
     }
 
+    private void quietPeriodSet(boolean ignoreQuietPeriod) {
+        if (!ignoreQuietPeriod && m_snapshotPriority > 0) {
+            m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(Math.random() * 15));
+        }
+    }
     public Future<?> doSnapshotWork(ExecutionEngine ee, boolean ignoreQuietPeriod) {
-        Future<?> retval = null;
+        ListenableFuture<?> retval = null;
 
         /*
          * This thread will null out the reference to m_snapshotTableTasks when
@@ -349,13 +326,30 @@ public class SnapshotSiteProcessor {
              */
             snapshotBuffer.b.limit(headerSize + serialized);
             snapshotBuffer.b.position(0);
-            retval = currentTask.m_target.write(snapshotBuffer);
+            Callable<BBContainer> valueForTarget = Callables.returning(snapshotBuffer);
+            for (SnapshotDataFilter filter : currentTask.m_filters) {
+                valueForTarget = filter.filter(valueForTarget);
+            }
+
+            retval = currentTask.m_target.write(valueForTarget);
             if (retval != null) {
-                m_writeFutures.add(retval);
+                final ListenableFuture<?> retvalFinal = retval;
+                retvalFinal.addListener(new Runnable() {
+                    @Override
+                    public void run() {
+                        try {
+                            retvalFinal.get();
+                        } catch (Throwable t) {
+                            if (m_lastSnapshotSucceded) {
+                                hostLog.error("Error while attempting to write snapshot data to file " +
+                                        currentTask.m_target, t);
+                                m_lastSnapshotSucceded = false;
+                            }
+                        }
+                    }
+                }, MoreExecutors.sameThreadExecutor());
             }
-            if (!ignoreQuietPeriod && m_snapshotPriority > 0) {
-                m_quietUntil = System.currentTimeMillis() + (5 * m_snapshotPriority) + ((long)(Math.random() * 15));
-            }
+            quietPeriodSet(ignoreQuietPeriod);
             break;
         }
 
@@ -416,16 +410,7 @@ public class SnapshotSiteProcessor {
                                     hostLog.error("Error running snapshot completion task", e);
                                 }
                             }
-
-                            for (Future<?> retval : m_writeFutures) {
-                                try {
-                                    retval.get();
-                                } catch (Exception e) {
-                                    m_lastSnapshotSucceded = false;
-                                }
-                            }
                         } finally {
-                            m_writeFutures = Collections.synchronizedList(new ArrayList<Future<?>>());
                             try {
                                 logSnapshotCompleteToZK(txnId, numHosts, m_lastSnapshotSucceded);
                             } finally {
@@ -449,9 +434,9 @@ public class SnapshotSiteProcessor {
 
 
     private static void logSnapshotCompleteToZK(long txnId, int numHosts, boolean snapshotSuccess) {
-        ZooKeeper zk = VoltDB.instance().getZK();
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
 
-        final String snapshotPath = "/completed_snapshots/" + txnId;
+        final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
         boolean success = false;
         while (!success) {
             Stat stat = new Stat();
@@ -494,10 +479,10 @@ public class SnapshotSiteProcessor {
          * the completed snapshot messages. Consume them here to bound space usage in ZK.
          */
         try {
-            TreeSet<String> snapshots = new TreeSet<String>(zk.getChildren("/completed_snapshots", false));
+            TreeSet<String> snapshots = new TreeSet<String>(zk.getChildren(VoltZK.completed_snapshots, false));
             while (snapshots.size() > 30) {
                 try {
-                    zk.delete("/completed_snapshots/" + snapshots.first(), -1);
+                    zk.delete(VoltZK.completed_snapshots + "/" + snapshots.first(), -1);
                 } catch (NoNodeException e) {}
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB(
@@ -510,8 +495,8 @@ public class SnapshotSiteProcessor {
         }
 
         try {
-            VoltDB.instance().getZK().delete(
-                    "/nodes_currently_snapshotting/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
+            VoltDB.instance().getHostMessenger().getZK().delete(
+                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), -1);
         } catch (NoNodeException e) {
             hostLog.warn("Expect the snapshot node to already exist during deletion", e);
         } catch (Exception e) {

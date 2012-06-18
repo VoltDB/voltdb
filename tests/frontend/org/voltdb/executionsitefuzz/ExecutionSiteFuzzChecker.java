@@ -30,13 +30,13 @@ import java.util.HashSet;
 import java.util.Iterator;
 import java.util.Set;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public class ExecutionSiteFuzzChecker
 {
     private static final VoltLogger testLog = new VoltLogger("TEST");
 
-    HashMap<Integer, HashMap<Integer, SiteLog>> m_replicaSets;
+    HashMap<Integer, HashMap<Long, SiteLog>> m_replicaSets;
     ArrayList<SiteLog> m_failedSites;
     // a list of replica sets (partition IDs) on which progress can be made
     HashSet<Integer> m_unblockedSets;
@@ -52,7 +52,7 @@ public class ExecutionSiteFuzzChecker
 
     public ExecutionSiteFuzzChecker()
     {
-        m_replicaSets = new HashMap<Integer, HashMap<Integer, SiteLog>>();
+        m_replicaSets = new HashMap<Integer, HashMap<Long, SiteLog>>();
         m_failedSites = new ArrayList<SiteLog>();
         m_unblockedSets = new HashSet<Integer>();
         m_blockedSets = new HashSet<Integer>();
@@ -62,12 +62,12 @@ public class ExecutionSiteFuzzChecker
         m_doneSites = new ArrayList<SiteLog>();
     }
 
-    public void addSite(int siteId, int partitionId, StringWriter logBuffer)
+    public void addSite(long siteId, int partitionId, StringWriter logBuffer)
     {
         //System.out.println("Adding siteID: " + siteId + ", partitionID: " + partitionId);
         if (!m_replicaSets.containsKey(partitionId))
         {
-            m_replicaSets.put(partitionId, new HashMap<Integer, SiteLog>());
+            m_replicaSets.put(partitionId, new HashMap<Long, SiteLog>());
         }
         SiteLog new_site = new SiteLog(siteId, partitionId, logBuffer);
         m_replicaSets.get(partitionId).put(siteId, new_site);
@@ -79,7 +79,7 @@ public class ExecutionSiteFuzzChecker
     {
         for (Integer part_id : m_replicaSets.keySet())
         {
-            for (Integer site_id : m_replicaSets.get(part_id).keySet())
+            for (Long site_id : m_replicaSets.get(part_id).keySet())
             {
                 SiteLog this_log = m_replicaSets.get(part_id).get(site_id);
                 this_log.logComplete();
@@ -170,7 +170,7 @@ public class ExecutionSiteFuzzChecker
         // Should all match
         TransactionRecord model_txn = null;
         TransactionRecord coord_txn = null;
-        HashSet<Integer> failed_sites = new HashSet<Integer>();
+        HashSet<Long> failed_sites = new HashSet<Long>();
         boolean saw_rollback = false;
 
         // Run through the list once and extract coordinator and failure info.
@@ -192,7 +192,7 @@ public class ExecutionSiteFuzzChecker
 
         for (SiteLog site : sites)
         {
-            if (failed_sites.contains((Integer)site.getSiteId()))
+            if (failed_sites.contains(site.getSiteId()))
             {
                 // The coordinator cannot fail early during a read-write multi-partition txn
                 if (site.currentTxn().isCoordinator() && !site.currentTxn().isReadOnly())

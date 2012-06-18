@@ -34,9 +34,4 @@ public class DefaultFaultHandler implements FaultHandler
         }
         VoltDB.crashLocalVoltDB("No additional info", false, null);
     }
-
-    @Override
-    public void faultCleared(Set<VoltFault> faults) {
-    }
-
 }
