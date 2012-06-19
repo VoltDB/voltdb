@@ -508,7 +508,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 m_haveRecoveryPermit = false;
                 m_recoveryPermit.release();
                 m_recoveryLog.info(
-                        "Destination recovery complete for site " + m_siteId +
+                        "Destination recovery complete for site " +
+                        CoreUtils.hsIdToString(m_siteId) +
                         " partition " + m_tracker.getPartitionForSite(m_siteId) +
                         " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
                         " with " + megabytes + " megabytes transferred " +
@@ -1117,7 +1118,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             loadTable(m_rejoinSnapshotTxnId, tableId, table);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
-            m_recoveryLog.info("New rejoin snapshot transfer is finished");
+            m_recoveryLog.debug("Rejoin snapshot transfer is finished");
             m_rejoinSnapshotProcessor.close();
             m_rejoinSnapshotProcessor = null;
             m_taskExeStartTime = System.currentTimeMillis();
@@ -1181,7 +1182,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             }
 
             if (rejoinCompleted) {
-                m_recoveryLog.info("Replay of task messages are done");
                 try {
                     m_rejoinTaskLog.close();
                 } catch (IOException e) {
@@ -1234,7 +1234,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                     true, e);
         }
 
-        m_recoveryLog.info("Initiating new rejoin from " +
+        m_recoveryLog.info("Initiating rejoin from site " +
                 CoreUtils.hsIdToString(getSiteId()));
         initiateRejoinSnapshot(addresses, port);
     }
