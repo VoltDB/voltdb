@@ -24,6 +24,8 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+
+import java.util.concurrent.Future;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -2320,6 +2322,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         throw new RuntimeException("Unsupported IV2-only API.");
      }
 
+    @Override
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    {
+        throw new RuntimeException("Unsupported IV2-only API.");
+    }
 
     @Override
     public VoltTable executePlanFragment(long planFragmentId, int inputDepId,

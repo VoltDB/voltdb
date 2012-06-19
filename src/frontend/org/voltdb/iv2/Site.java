@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.Future;
+
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -282,7 +284,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
             @Override
             public void run() {
-                //m_mailbox.deliver(new PotentialSnapshotWorkMessage());
+                hostLog.info("Creating new SnapshotTask");
+                m_scheduler.offer(new SnapshotTask());
             }
         },
         snapshotPriority);
@@ -372,6 +375,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             task.run(getSiteProcedureConnection());
         }
+
+        m_snapshotter.doSnapshotWork(m_ee, true);
     }
 
     public void startShutdown()
@@ -387,6 +392,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             }
             if (m_ee != null) {
                 m_ee.release();
+            }
+            if (m_snapshotter != null) {
+                m_snapshotter.shutdown();
             }
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);
@@ -568,5 +576,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                                 boolean interval, Long now)
     {
         return m_ee.getStats(selector, locators, interval, now);
+    }
+
+    @Override
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    {
+        return m_snapshotter.doSnapshotWork(m_ee, ignoreQuietPeriod);
     }
 }
