@@ -31,10 +31,20 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.*;
+import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.FeaturesSelectAll;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassAllArgTypes;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectOrderLineByDistInfo;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectWithJoinOrder;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelfJoinTest;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.UpdateTests;
+import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
 
 public class TestSQLFeaturesSuite extends RegressionSuite {
 
@@ -61,7 +71,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     public void testUpdates() throws Exception {
         Client client = getClient();
 
-        client.callProcedure("InsertOrderLine", (byte)1, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, "poo");
+        client.callProcedure("ORDER_LINE.insert", (byte)1, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, "poo");
         client.callProcedure("UpdateTests", (byte)1);
         VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
 
@@ -84,7 +94,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     public void testSelfJoins() throws Exception {
         Client client = getClient();
 
-        client.callProcedure("InsertNewOrder", (byte)1, 3L, 1L);
+        client.callProcedure("NEW_ORDER.insert", (byte)1, 3L, 1L);
         VoltTable[] results = client.callProcedure("SelfJoinTest", (byte)1).getResults();
 
         assertEquals(results.length, 1);
@@ -97,11 +107,11 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
     }
 
     /** Verify that non-latin-1 characters can be stored and retrieved */
-    public void testUTF8Storage() throws IOException {
+    public void testUTF8() throws IOException {
         Client client = getClient();
         final String testString = "並丧";
         try {
-            client.callProcedure("InsertOrderLine", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
+            client.callProcedure("ORDER_LINE.insert", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
             VoltTable[] results = client.callProcedure("FeaturesSelectAll").getResults();
 
             assertEquals(5, results.length);
@@ -113,33 +123,22 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
             VoltTableRow row = table.fetchRow(0);
             String resultString = row.getString("OL_DIST_INFO");
             assertEquals(testString, resultString);
-        }
-        catch (ProcCallException e) {
-            e.printStackTrace();
-            fail();
-        }
-        catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
-    }
 
-    /** Verify that non-latin-1 characters can be used in expressions */
-    public void testUTF8Predicate() throws IOException {
-        Client client = getClient();
-        final String testString = "袪被";
-        try {
+            // reset
+            client.callProcedure("@AdHoc", "delete from ORDER_LINE;");
+
             // Intentionally using a one byte string to make sure length preceded strings are handled correctly in the EE.
-            client.callProcedure("InsertOrderLine", 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1.5, "a");
-            client.callProcedure("InsertOrderLine", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
-            client.callProcedure("InsertOrderLine", 3L, 1L, 1L, 3L, 3L, 3L, 3L, 3L, 1.5, "def");
-            VoltTable[] results = client.callProcedure("SelectOrderLineByDistInfo", testString).getResults();
+            client.callProcedure("ORDER_LINE.insert", 2L, 1L, 1L, 2L, 2L, 2L, 2L, 2L, 1.5, "a");
+            client.callProcedure("ORDER_LINE.insert", 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1L, 1.5, testString);
+            client.callProcedure("ORDER_LINE.insert", 3L, 1L, 1L, 3L, 3L, 3L, 3L, 3L, 1.5, "def");
+            results = client.callProcedure("SelectOrderLineByDistInfo", testString).getResults();
             assertEquals(1, results.length);
-            VoltTable table = results[0];
+            table = results[0];
             assertTrue(table.getRowCount() == 1);
-            VoltTableRow row = table.fetchRow(0);
-            String resultString = row.getString("OL_DIST_INFO");
+            row = table.fetchRow(0);
+            resultString = row.getString("OL_DIST_INFO");
             assertEquals(testString, resultString);
+
         }
         catch (ProcCallException e) {
             e.printStackTrace();
@@ -222,12 +221,137 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         String str = "foo";
         byte bString[] = "bar".getBytes("UTF-8");
 
+        TimestampType tst = new TimestampType(PassAllArgTypes.MILLISECONDS_SINCE_EPOCH_TEST_VALUE*1000);
+        java.util.Date utild = new java.util.Date(PassAllArgTypes.MILLISECONDS_SINCE_EPOCH_TEST_VALUE);
+        java.sql.Date sqld = new java.sql.Date(PassAllArgTypes.MILLISECONDS_SINCE_EPOCH_TEST_VALUE);
+        java.sql.Timestamp ts = new java.sql.Timestamp(PassAllArgTypes.MILLISECONDS_SINCE_EPOCH_TEST_VALUE);
+
         Client client = getClient();
         try {
-            client.callProcedure("PassAllArgTypes", b, bArray, s, sArray, i, iArray, l, lArray, str, bString);
+            ClientResponse cr = client.callProcedure("PassAllArgTypes", b, bArray, s, sArray, i, iArray, l, lArray, str, bString,
+                    tst, utild, sqld, ts);
+            assert(cr.getStatus() == ClientResponse.SUCCESS);
+            VoltTable[] result = cr.getResults();
+            assert(result.length == 4);
+            VoltTable vt = result[0];
+            assert(vt.getRowCount() == 1);
+            VoltTableRow row = vt.fetchRow(0);
+            assertEquals(row.getLong("b"), b);
+            byte[] gotArray = row.getVarbinary("bArray");
+            assertEquals(gotArray.length, bArray.length);
+            for (int j = 0; j < gotArray.length; j++) {
+                assertEquals(gotArray[j], bArray[j]);
+            }
+            assertEquals(gotArray.length, bArray.length);
+            assertEquals(row.getLong("s"), s);
+            assertEquals(row.getLong("i"), i);
+            assertEquals(row.getLong("l"), l);
+            assertEquals(row.getString("str"), str);
+            byte[] gotString = row.getVarbinary("bString");
+            assertEquals(gotString.length, bString.length);
+            for (int j = 0; j < gotString.length; j++) {
+                assertEquals(gotString[j], bString[j]);
+            }
+
+            String tsColName;
+            int tsColIndex;
+            tsColName = "tst";
+            assertEquals(row.getTimestampAsLong(tsColName), tst.getTime());
+            assertEquals(row.getTimestampAsTimestamp(tsColName), tst);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName), ts);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName).getTime(), sqld.getTime());
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName).getTime(), utild.getTime());
+            tsColIndex = vt.getColumnIndex(tsColName);
+            assertEquals(row.getTimestampAsLong(tsColIndex), tst.getTime());
+            assertEquals(row.getTimestampAsTimestamp(tsColIndex), tst);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex), ts);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex).getTime(), sqld.getTime());
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex).getTime(), utild.getTime());
+
+            tsColName = "sqld";
+            assertEquals(row.getTimestampAsLong(tsColName), tst.getTime());
+            assertEquals(row.getTimestampAsTimestamp(tsColName), tst);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName), ts);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName).getTime(), sqld.getTime());
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName).getTime(), utild.getTime());
+            tsColIndex = vt.getColumnIndex(tsColName);
+            assertEquals(row.getTimestampAsLong(tsColIndex), tst.getTime());
+            assertEquals(row.getTimestampAsTimestamp(tsColIndex), tst);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex), ts);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex).getTime(), sqld.getTime());
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex).getTime(), utild.getTime());
+
+            tsColName = "utild";
+            assertEquals(row.getTimestampAsLong(tsColName), tst.getTime());
+            assertEquals(row.getTimestampAsTimestamp(tsColName), tst);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName), ts);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName).getTime(), sqld.getTime());
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName).getTime(), utild.getTime());
+            tsColIndex = vt.getColumnIndex(tsColName);
+            assertEquals(row.getTimestampAsLong(tsColIndex), tst.getTime());
+            assertEquals(row.getTimestampAsTimestamp(tsColIndex), tst);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex), ts);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex).getTime(), sqld.getTime());
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex).getTime(), utild.getTime());
+
+            tsColName = "ts";
+            assertEquals(row.getTimestampAsLong(tsColName), tst.getTime());
+            assertEquals(row.getTimestampAsTimestamp(tsColName), tst);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName), ts);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName).getTime(), sqld.getTime());
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColName).getTime(), utild.getTime());
+            tsColIndex = vt.getColumnIndex(tsColName);
+            assertEquals(row.getTimestampAsLong(tsColIndex), tst.getTime());
+            assertEquals(row.getTimestampAsTimestamp(tsColIndex), tst);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex), ts);
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex).getTime(), sqld.getTime());
+            assertEquals(row.getTimestampAsSqlTimestamp(tsColIndex).getTime(), utild.getTime());
+
+            vt = result[1];
+            assert(vt.getRowCount() == sArray.length);
+            for (int j = 0; j < sArray.length; j++) {
+                assertEquals(vt.fetchRow(j).getLong("sArray"), sArray[j]);
+            }
+            vt = result[2];
+            assert(vt.getRowCount() == iArray.length);
+            for (int j = 0; j < iArray.length; j++) {
+                assertEquals(vt.fetchRow(j).getLong("iArray"), iArray[j]);
+            }
+            vt = result[3];
+            assert(vt.getRowCount() == lArray.length);
+            for (int j = 0; j < lArray.length; j++) {
+                assertEquals(vt.fetchRow(j).getLong("lArray"), lArray[j]);
+            }
+
         } catch (Exception e) {
-            fail();
+            fail("An argument value was mishandled in PassAllArgTypes");
         }
+
+        // Now, go overboard, trying to preserve nano accuracy.
+        // XXX: The following test is a little controversial.
+        // Some would prefer a gentler response -- just truncating/rounding to the nearest microsecond.
+        // When these voices of reason prevail, this test should be replaced by a test that nano-noise
+        // gets filtered out but the result is still correct to microsecond granularity.
+        java.sql.Timestamp ts_nano = new java.sql.Timestamp(PassAllArgTypes.MILLISECONDS_SINCE_EPOCH_TEST_VALUE);
+        assertEquals(ts, ts_nano);
+        // Extract the 1000000 nanos (doubly-counted milliseconds)
+        assertEquals(1000000, ts_nano.getNanos());
+        // and explicitly add in 1001 nanos (1 microsecond + 1 nanosecond)
+        ts_nano.setNanos(ts_nano.getNanos()+1001);
+
+        boolean caught;
+        try {
+            caught = false;
+            // system-defined CRUD inputs
+            client.callProcedure("PassAllArgTypes", b, bArray, s, sArray, i, iArray, l, lArray, str, bString,
+                    ts_nano /* Here's the problem! */, utild, sqld, ts);
+        } catch (RuntimeException e) {
+            caught = true;
+        } catch (Exception e) {
+            caught = true; // but not quite how it was expected to be.
+            fail("Some other exception while testing nano noise in PassAllArgTypes" + e);
+        }
+        assert(caught);
     }
 
     public void testJoinOrder() throws Exception {
@@ -246,9 +370,9 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         }
 
         for (int ii = 0; ii < 1000; ii++) {
-            client.callProcedure("InsertT1", ii);
+            client.callProcedure("T1.insert", ii);
         }
-        client.callProcedure("InsertT2", 0);
+        client.callProcedure("T2.insert", 0);
 
         //Right join order
         client.callProcedure("SelectWithJoinOrder", 0);
@@ -300,14 +424,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         project.addPartitionInfo("WIDE", "P");
         project.addPartitionInfo("MANY_COLUMNS", "P");
         project.addProcedures(PROCEDURES);
-        project.addStmtProcedure("InsertOrderLine",
-                "INSERT INTO ORDER_LINE VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?, ?);");
-        project.addStmtProcedure("InsertNewOrder",
-                "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
-        project.addStmtProcedure("InsertT1",
-                "INSERT INTO T1 VALUES (?);");
-        project.addStmtProcedure("InsertT2",
-                "INSERT INTO T2 VALUES (?);");
         project.addStmtProcedure("SelectRightOrder",
                 "SELECT * FROM WIDE, T1, T2 WHERE T2.ID = T1.ID", null, "T1,T2,WIDE");
         project.addStmtProcedure("SelectWrongOrder",
@@ -320,7 +436,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        config = new LocalSingleProcessServer("sqlfeatures-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqlfeatures-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile
         success = config.compile(project);
@@ -330,43 +446,19 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #2: 2 Local Site/Partitions running on JNI backend
+        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
 
-        // get a server config for the native backend with two sites/partitions
-        config = new LocalSingleProcessServer("sqlfeatures-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalSingleProcessServer("sqlfeatures-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #4: Local Cluster (of processes)
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlfeatures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #5: Local Cluster (of processes) with recovering node
+        // CONFIG #3: Local Cluster (of processes) with failed node
         /////////////////////////////////////////////////////////////
 
-        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_RECOVERING, false);
+        config = new LocalCluster("sqlfeatures-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);

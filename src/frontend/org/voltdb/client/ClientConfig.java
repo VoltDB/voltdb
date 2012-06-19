@@ -25,36 +25,14 @@ public class ClientConfig {
     static final long DEFAULT_PROCEDURE_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
     static final long DEFAULT_CONNECTION_TIMOUT_MS = 2 * 60 * 1000; // default timeout is 2 minutes;
 
-    /**
-     * Clients may queue a wide variety of messages and a lot of them
-     * so give them a large max arena size.
-     */
-    private static final int m_defaultMaxArenaSize = 134217728;
-
     final String m_username;
     final String m_password;
     final ClientStatusListenerExt m_listener;
-    int m_expectedOutgoingMessageSize = 128;
-    int m_maxArenaSizes[] = new int[] {
-            m_defaultMaxArenaSize,//16
-            m_defaultMaxArenaSize,//32
-            m_defaultMaxArenaSize,//64
-            m_defaultMaxArenaSize,//128
-            m_defaultMaxArenaSize,//256
-            m_defaultMaxArenaSize,//512
-            m_defaultMaxArenaSize,//1024
-            m_defaultMaxArenaSize,//2048
-            m_defaultMaxArenaSize,//4096
-            m_defaultMaxArenaSize,//8192
-            m_defaultMaxArenaSize,//16384
-            m_defaultMaxArenaSize,//32768
-            m_defaultMaxArenaSize,//65536
-            m_defaultMaxArenaSize,//131072
-            m_defaultMaxArenaSize//262144
-    };
     boolean m_heavyweight = false;
     int m_maxOutstandingTxns = 3000;
-    StatsUploaderSettings m_statsSettings = null;
+    int m_maxTransactionsPerSecond = Integer.MAX_VALUE;
+    boolean m_autoTune = false;
+    int m_autoTuneTargetInternalLatency = 5;
     long m_procedureCallTimeoutMS = DEFAULT_PROCEDURE_TIMOUT_MS;
     long m_connectionResponseTimeoutMS = DEFAULT_CONNECTION_TIMOUT_MS;
 
@@ -154,38 +132,32 @@ public class ClientConfig {
     }
 
     /**
+     * Deprecated because memory pooling no longer uses arenas. Has no effect
      * Set the maximum size of memory pool arenas before falling back to using heap byte buffers.
      * @param maxArenaSizes
      */
+    @Deprecated
     public void setMaxArenaSizes(int maxArenaSizes[]) {
-        m_maxArenaSizes = maxArenaSizes;
     }
 
     /**
-     * Request a client with more threads. Useful when a client has multiple NICs or is using
-     * 10-gig E
+     * By default a single network thread is created and used to do IO and invoke callbacks.
+     * When set to true, Runtime.getRuntime().availableProcessors() / 2 threads are created.
+     * Multiple server connections are required for more threads to be involved, a connection
+     * is assigned exclusively to a connection.
      */
     public void setHeavyweight(boolean heavyweight) {
-        final int cores = Runtime.getRuntime().availableProcessors();
-        m_heavyweight = cores > 4 ? heavyweight : false;
+        m_heavyweight = heavyweight;
     }
 
     /**
+     * Deprecated and has no effect
      * Provide a hint indicating how large messages will be once serialized. Ensures
      * efficient message buffer allocation.
      * @param size
      */
+    @Deprecated
     public void setExpectedOutgoingMessageSize(int size) {
-        this.m_expectedOutgoingMessageSize = size;
-    }
-
-    /**
-     * Provide configuration information for uploading statistics about client performance
-     * via JDBC
-     * @param statsSettings
-     */
-    public void setStatsUploaderSettings(StatsUploaderSettings statsSettings) {
-        m_statsSettings = statsSettings;
     }
 
     /**
@@ -200,5 +172,44 @@ public class ClientConfig {
                     "Max outstanding must be greater than 0, " + maxOutstanding + " was specified");
         }
         m_maxOutstandingTxns = maxOutstanding;
+    }
+
+    /**
+     * Set the maximum number of transactions that can be run in 1 second. Note this
+     * specified a rate, not a ceiling. If the limit is set to 10, you can't send 10 in
+     * the first half of the second and 5 in the later half; the client will let you send
+     * about 1 transaction every 100ms. Default is {@see Integer#MAX_VALUE}.
+     * @param maxTxnsPerSecond Requested ceiling on rate of call in transaction per second.
+     */
+    public void setMaxTransactionsPerSecond(int maxTxnsPerSecond) {
+        if (maxTxnsPerSecond < 1) {
+            throw new IllegalArgumentException(
+                    "Max TPS must be greater than 0, " + maxTxnsPerSecond + " was specified");
+        }
+        m_maxTransactionsPerSecond = maxTxnsPerSecond;
+    }
+
+    /**
+     * Enable the Auto Tuning feature, which dynamically adjusts the maximum
+     * allowable transaction number with the goal of maintaining a target latency.
+     * The latency value used is the internal latency as reported by the servers.
+     * The internal latency is a good measure of system saturation.
+     * {@see ClientConfig#setAutoTuneTargetInternalLatency(int) setAutoTuneTargetInternalLatency}
+     */
+    public void enableAutoTune() {
+        m_autoTune = true;
+    }
+
+    /**
+     * Set the target latency for the Auto Tune feature. Note this represents internal
+     * latency as reported by the server(s), not round-trip latency measured by the
+     * client. Default value is 5 if this is not called.
+     * @param targetLatency New target latency in milliseconds.
+     */
+    public void setAutoTuneTargetInternalLatency(int targetLatency) {
+        if (targetLatency < 1) {
+            throw new IllegalArgumentException(
+                    "Max auto tune latency must be greater than 0, " + targetLatency + " was specified");
+        }
     }
 }

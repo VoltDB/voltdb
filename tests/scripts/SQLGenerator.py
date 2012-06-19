@@ -29,11 +29,8 @@ import random
 import time
 import datetime
 from sys import maxint
-from voltdbclient import *
-
-VARIABLE_TYPE = "_variable"
-VALUE_TYPE = "_value"
-TABLE_TYPE = "_table"
+from voltdbclient import * # for VoltDB types
+from optparse import OptionParser # for use in standalone test mode
 
 COUNT = 2                       # number of random values to generate by default
 IS_VOLT = False
@@ -60,28 +57,9 @@ def permutations(iterable, r = None):
 def field_name_generator():
     i = 0
     while True:
-        yield "field_%d" % (i)
+        yield "{field_%d}" % (i)
         i += 1
 fn_generator = field_name_generator()
-
-def map_type(type_str):
-    TYPES = {"int": (FastSerializer.VOLTTYPE_TINYINT,
-                     FastSerializer.VOLTTYPE_SMALLINT,
-                     FastSerializer.VOLTTYPE_INTEGER,
-                     FastSerializer.VOLTTYPE_BIGINT),
-             "byte": ((FastSerializer.VOLTTYPE_TINYINT),),
-             "int16": ((FastSerializer.VOLTTYPE_SMALLINT),),
-             "int32": ((FastSerializer.VOLTTYPE_INTEGER),),
-             "int64": ((FastSerializer.VOLTTYPE_BIGINT),),
-             "float": ((FastSerializer.VOLTTYPE_FLOAT),),
-             "string": ((FastSerializer.VOLTTYPE_STRING),),
-             "decimal": ((FastSerializer.VOLTTYPE_DECIMAL),),
-             "date": ((FastSerializer.VOLTTYPE_TIMESTAMP),)}
-
-    if type_str in TYPES:
-        return TYPES[type_str]
-    else:
-        return None
 
 class BaseValueGenerator:
     """This is the base class for all value generators (int, float, etc.)
@@ -93,26 +71,22 @@ class BaseValueGenerator:
     def generate(self, count):
         pass
 
-    def generate_boundries(self):
-        pass
 
 class IntValueGenerator(BaseValueGenerator):
     """This is the base generator for integers.
     """
 
-    def __init__(self, min = None, max = None):
+    def __init__(self, min = (-maxint - 1), max = maxint):
         BaseValueGenerator.__init__(self)
 
-        self.__min = min == None and (-maxint - 1) or min
-        self.__max = max == None and maxint or max
+        self.__min = min
+        self.__max = max
 
     def generate(self, count):
-        values = [random.randint(self.__min, self.__max)
-                  for i in xrange(count)]
-        return values
+        for i in xrange(count):
+            yield random.randint(self.__min, self.__max)
 
-    def generate_boundries(self):
-        return [self.__min, self.__max]
+
 
 class IDValueGenerator(BaseValueGenerator):
     """This generates unique incremental integers.
@@ -120,20 +94,18 @@ class IDValueGenerator(BaseValueGenerator):
 
     counter = 0
 
-    def __init__(self, start = None):
+    def __init__(self):
         BaseValueGenerator.__init__(self)
 
-        if start != None:
-            self.__class__.counter = start
+    @classmethod
+    def initialize(cls, start):
+        cls.counter = start
 
     def generate(self, count):
-        values = []
-
         for i in xrange(count):
-            values.append(self.__class__.counter)
+            id = self.__class__.counter
             self.__class__.counter += 1
-
-        return values
+            yield id
 
 class ByteValueGenerator(IntValueGenerator):
     """This generates bytes.
@@ -172,12 +144,9 @@ class FloatValueGenerator(BaseValueGenerator):
         BaseValueGenerator.__init__(self)
 
     def generate(self, count):
-        values = [random.random()
-                  for i in xrange(count)]
-        return values
+        for i in xrange(count):
+            yield random.random()
 
-    def generate_boundries(self):
-        return [float("-inf"), float("nan")]
 
 class DecimalValueGenerator(BaseValueGenerator):
     """This generates Decimal values.
@@ -189,49 +158,57 @@ class DecimalValueGenerator(BaseValueGenerator):
         decimal.getcontext().prec = 12
 
     def generate(self, count):
-        # we support 7 digits of scale, so magnify those tiny floats
-        values = [decimal.Decimal(str(random.random() * 1e2))
-                  for i in xrange(count)]
-        return values
+        for i in xrange(count):
+            # we support 7 digits of scale, so magnify those tiny floats
+            yield decimal.Decimal(str(random.random() * 1e2))
 
-    def generate_boundries(self):
-        # fill me in with something real if we ever are actually called
-        pass
 
 class StringValueGenerator(BaseValueGenerator):
     """This generates strings.
     """
 
+    ALPHABET = u"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
+
     def __init__(self):
         BaseValueGenerator.__init__(self)
 
     def generate(self, count, length = 17):
-        alphabet = u"ABCDEFGHIJKLMNOPQRSTUVWXYZabcdefghijklmnopqrstuvwxyz"
-        values = []
         for i in xrange(count):
-            string = u""
-            for y in xrange(length):
-                string += random.choice(alphabet)
-            values.append(string)
-        return values
+            list = [random.choice(self.ALPHABET) for y in xrange(length)]
+            yield u"".join(list)
+
+class VarbinaryValueGenerator(BaseValueGenerator):
+    """This generates byte strings expressed as pairs of hex digits.
+    """
+
+    HEXDIGIT = u"0123456789ABCDEF"
+
+    def __init__(self):
+        BaseValueGenerator.__init__(self)
+
+    def generate(self, count, length = 17):
+        for i in xrange(count):
+            list = [random.choice(self.HEXDIGIT) for y in xrange(length*2)] # length*2 hex digits gives whole bytes
+            yield u"".join(list)
 
 class DateValueGenerator(BaseValueGenerator):
     """This generates dates.
     """
 
+    MAX_DT = 9999999999999
+
     def __init__(self):
         BaseValueGenerator.__init__(self)
 
     def generate(self, count):
-        # HSQL doesn't support microsecond, 13 digit number
-        max_dt = 9999999999999
-        values = [random.randint(0, max_dt) for i in xrange(count)]
+        for i in xrange(count):
+            # HSQL doesn't support microsecond, generate a 13 digit number of milliseconds
+            # this gets scaled to microseconds later for VoltDB backends
+            yield random.randint(0, self.MAX_DT)
 
-        return values
 
 class BaseGenerator:
-    """This is the base class for all generators (operator generator, column
-    generator, etc.).
+    """This is the base class for all non-value generators (operator generator, column generator, etc.).
     """
 
     def __init__(self, token):
@@ -239,480 +216,423 @@ class BaseGenerator:
 
         self.__token = token
         self.fn_gen = fn_generator
-
-    def generate(self, statement, params):
-        """All derived classes should overload this method to implement their
-        own generators.
-        """
-
-        pass
-
-    def get_token(self):
-        return self.__token
-
-    def prepare_operands(self, statement):
-        pass
-
-class VariableGenerator(BaseGenerator):
-    """This replaces variables with specific names.
-    """
-
-    __EXPR_TEMPLATE = r"%s(\[%s(\w+)?(:(((\d+),(\d+))|(\w+)))?\])%s"
-
-    def __init__(self, operand_type, label = None):
-        BaseGenerator.__init__(self, None)
-
-        self.EXPR = self._expr_builder(operand_type, label)
-
+        self.__fn = None
         self.__label = None
-        self.__type = None
-        self._fn = None
+
+    # For now, all generators use the same pattern to capture generator attributes,
+    # even though most of them end up ignoring the attributes that don't affect them.
+    # Some attributes are very general, like the label, while others like min and max apply very narrowly
+    # (currently to numeric value generators).
+    # The named attribute facility allows arbitrary named attributes to be specified as
+    # "<name1=value1 name2=value2>" with no embedded spaces allowed except to separate attributes (as shown).
+    # Generators are free to honor or ignore any such attributes.
+    # For labeled tokens, like "_X[@Y...]", attributes are only processed on the first occurrence of each unique
+    # token/label combination in a statement and ignored on other occurrences.
+    #
+    #                   --- token (starting with '_')
+    #                   |       --- optional attribute section between []s
+    #                   |       |
+    LABEL_PATTERN_GROUP =                    "label" # optional label
+    #                   |       |             |
+    KEY_VALUE_PATTERN_GROUP     =                                        "key_values" # optional named attributes (only for columns)
+    #                   |       |             |                           |
+    #                   |       |             |                           |
+    __EXPR_TEMPLATE = r"%s" r"(\[\s*" r"(@(?P<label>\w+)\s*)?" r"(<\s*(?P<key_values>(\w+=[^>\s]+\s*)*)>)?\s*" \
+                      r"(?P<type>\w+)?\s*" r"(:(?P<min>(\d*)),(?P<max>(\d*)))?" r"\])?"
+    #                       |                      |              |                |
+    #                       |                      |              |                --- end of [] attribute section
+    MAX_VALUE_PATTERN_GROUP =                                    "max" # optional max (only for numeric values)
+    #                       |                      |
+    MIN_VALUE_PATTERN_GROUP =                     "min" # optional min (only for numeric values)
+    #                       |
+    TYPE_PATTERN_GROUP =   "type" # optional type (for columns, values, maybe someday aggs/ops/functions?)
+    # The type attribute could arguably be dropped in favor of recognizing "< type=X >" within the key-value attributes.
+
+    # A simpler pattern with no group capture is used to find recurrences of (references to) definition patterns elsewhere in the statement,
+    # identified by label.
+    # These can either be token-type-specific, like "_variable[@number_col]" or generic equivalents "__[@number_col]" either of which would
+    # match a prior "_variable[@number_col int]".
+    # Since the "__" syntax does not introduce a definition, it can also be used as a forward reference, as convenient.
+    #                          .-- token (starting with '_') or just '__' to match/reuse ANY token
+    #                          |      .-- '[' required
+    #                          |      |    .-- matching label, required
+    #                          |      |    |  .-- attributes or other garbage optional/ignored
+    #                          |      |    |  |    .-- final ']' required
+    #                          |      |    |  |    |
+    __RECURRENCE_TEMPLATE = r"(%s|__)\[\s*@%s[^\]]*\]"
 
     @classmethod
-    def _expr_builder(cls, operand_type, label = None, must_exist = False):
-        if label:
-            label = "(@(%s)\s*)" % (label)
-            must_exist = True
-        else:
-            label = "(@(\w+)\s*)?"
-            must_exist = False
+    def _expr_builder(cls, tag):
+        return re.compile(cls.__EXPR_TEMPLATE % (tag))
 
-        if must_exist:
-            tail = ""
-        else:
-            tail = "?"
-        return re.compile(cls.__EXPR_TEMPLATE % (operand_type, label, tail))
+    @classmethod
+    def _recurrence_builder(cls, tag, label):
+        ### print "DEBUG: recurrence template: " + (cls.__RECURRENCE_TEMPLATE % (tag, label))
+        return re.compile(cls.__RECURRENCE_TEMPLATE % (tag, label))
 
-    def get_label(self):
-        return self.__label
+    def generate(self, statement):
+        """statement is an sql statement pattern which still needs some field name resolution.
+           globally substitute each of the generator's candidate parameters.
+        """
+        for i in self.next_param():
+            yield statement.replace(self.__fn, i)
+
+    def prepare_operands(self, statement):
+        """mark with a unique field name a definition with the generator's token and any (like-labeled) occurrences
+        """
+
+        # match the token and capture all of its attributes
+        definition = self._expr_builder(self.__token);
+        match = definition.search(statement)
+
+        # Stop when statement does not have any (more) of these tokens.
+        if not match:
+            return None
+
+        # Process the label, the one universally applicable attribute
+        self.__label = match.group(self.LABEL_PATTERN_GROUP)
+
+        ### print "DEBUG: prepare_operands found " + self.__token + "[@" + ( self.__label or "" ) + "]" + " IN " + statement
+        # Replace the definition with a generated unique field name
+        self.__fn = self.fn_gen.next()
+        stmt = definition.sub(self.__fn, statement, 1)
+
+        # Dispatch to let the specific generator class deal with any custom attributes
+        self.prepare_params(match.groupdict())
+
+        # Anything with a label can recur, replace recurrences with the same field name.
+        if self.__label:
+            recurrence = self._recurrence_builder(self.__token, self.__label)
+            stmt = recurrence.sub(self.__fn, stmt, 0)
+        ### print "DEBUG: prepare_operands after  " + self.__token + "[@" + ( self.__label or "" ) + "]" + " IN " + stmt
+        return stmt
+
+    def prepare_params(self, attribute_groups):
+        """ abstract method implemented by all derived classes """
+        pass
+
+    def next_param(self):
+        """ abstract method implemented by all derived classes """
+        pass
+
+    def get_named_attribute(self, kv, key):
+        """a helper for parsing key-value pairs. Assumes no embedded spaces in key-value pairs.
+        """
+        # Split on white space into key-value pairs keeps the parser dirt-simple.
+        pairs = kv.split();
+        for pair in pairs:
+            # Match the "key=" part and return the rest as the value.
+            match = re.match(key + '=([^\s]*)', pair)
+            if match:
+                return match.group(1)
+
+
+class TableGenerator(BaseGenerator):
+    """This replaces occurrences of token "_table" with a schema table name.
+       Within a statement, intended occurrences of the same table name must use the same '@label'.
+       Tables in the current schema are bound to these _table generators for a statement
+       in a particular pattern that purposely avoids accidental repeats (self-joins) and
+       falls way short of "all combinations" or even "all permutations".
+       -- see class SQLGenerator.
+    """
+
+    def __init__(self):
+        BaseGenerator.__init__(self, "_table")
+        self.__tables = []
+        self.__table = None
+
+    def add_table(self, table):
+        self.__tables.append(table)
+
+    def get_table(self):
+        return self.__table
+
+    def next_param(self):
+        for i in self.__tables:
+            self.__table = i
+            yield i
+
+
+class ColumnGenerator(BaseGenerator):
+    """This replaces occurrences of token _variable with a column name.
+       Within a statement, intended occurrences of the same column name must use the same '@label'.
+       Attributes only matter on the first occurence of "_variable"
+       for a given label.
+       As a convenience, forward references can use the __[@label] syntax instead of _variable[@label]
+       to defer locking in attribute settings to the later _variable occurrence.
+
+       By default, the column name is selected from the schema columns of whichever table
+       is currently bound to the first _table occurence in the statement. This can be
+       overridden using the <table=tablename> syntax in the column's attributes (placed after the column's
+       optional @label and before any unnamed column attributes, e.g. its type), e.g.
+           _variable[@filtered_by <table=MyTestTable> int] > 0
+       which would generate statements that filtered on each of MyTestTable's int-typed columns, or
+           _variable[int] = _variable[<table=_table[@rhs_table]> int]
+       which would generate a join filter pairing each integer column from the first _table (implied)
+       with each integer column from some other table bound to @rhs_label.
+    """
+
+    def __init__(self, default_table):
+        BaseGenerator.__init__(self, "_variable")
+        self.__default_table = default_table
+
+    def prepare_params(self, attribute_groups):
+        self.__type = attribute_groups[self.TYPE_PATTERN_GROUP]
+        self.__table = None
+        kv = attribute_groups[self.KEY_VALUE_PATTERN_GROUP]
+        if kv:
+            self.__table = self.get_named_attribute(kv, "table")
+        if not self.__table:
+            self.__table = self.__default_table
+        self.__columns= []
+
+    def get_table(self):
+        return self.__table
 
     def get_type(self):
         return self.__type
 
-    def generate(self, statement, params):
-        """params is a list of variable name.
-        """
+    def add_column(self, col_name, col_type):
+        self.__columns.append((col_name, col_type))
 
-        for i in params:
-            yield statement.replace(self._fn, i, 1)
+    def next_param(self):
+        for (col_name, col_type) in self.__columns:
+            self.__type = col_type ## cache for later reference by type-matching values (and functions?)
+            yield col_name
 
-    def prepare_operands(self, statement):
-        result = self.EXPR.search(statement)
 
-        if result:
-            self.__label = result.group(3)
-            self.__type = result.group(4)
-            self._fn = "{%s}" % (self.fn_gen.next())
-            stmt = self.EXPR.sub(self._fn, statement, 1)
-        else:
-            return None
-
-        return [stmt, [self]]
-
-class SingletonOpGenerator(BaseGenerator):
-    """This is the base generator for all singleton operator generators.
-    """
-
-    def __init__(self, ops, token = "_singleton"):
-        BaseGenerator.__init__(self, token)
-
-        self.EXPR = re.compile(r"%s" % (token))
-
-        self.__ops = ops
-        self.__fn = None
-
-    def generate(self, statement, params):
-        """params is a dummy variable.
-        """
-
-        for op in self.__ops:
-            yield statement.replace(self.__fn, op, 1)
-
-    def prepare_operands(self, statement):
-        result = self.EXPR.search(statement)
-
-        if result:
-            self.__fn = "{%s}" % (self.fn_gen.next())
-            stmt = self.EXPR.sub(self.__fn, statement, 1)
-        else:
-            return None
-
-        return [stmt, [None]]
-
-class BinaryOpGenerator(BaseGenerator):
-    """This is the base generator for all binary operator generators.
-    """
-
-    def __init__(self, ops, token):
-        BaseGenerator.__init__(self, token)
-
-        self.__ops = ops
-        self.__op_fn = None
-        self.__l = None
-        self.__r = None
-
-    def generate(self, statement, params):
-        """params need to be a list of (left, right) pairs.
-        """
-
-        for op in self.__ops:
-            stmt = statement.replace(self.__op_fn, op, 1)
-            for i in params:
-                if self.__l != None:
-                    for l in self.__l.generate(stmt, (i[0],)):
-                        if self.__r != None:
-                            for r in self.__r.generate(l, (i[1],)):
-                                yield r
-                        else:
-                            yield l
-                else:
-                    if self.__r != None:
-                        for r in self.__r.generate(stmt, (i[1],)):
-                            yield r
-                    else:
-                        yield stmt
-
-    def prepare_operands(self, statement):
-        tokens = statement.split()
-        index = tokens.index(self.get_token())
-        result = [None, None]
-
-        self.__op_fn = "{%s}" % (self.fn_gen.next())
-        tokens[index] = self.__op_fn
-
-        if index > 0:
-            self.__l = VarGenerator()
-            tmp = self.__l.prepare_operands(tokens[index - 1])
-            if tmp != None:
-                tokens[index - 1] = tmp[0]
-                result[0] = self.__l
-            else:
-                self.__l = None
-
-        if index < len(tokens) - 1:
-            self.__r = VarGenerator()
-            tmp = self.__r.prepare_operands(tokens[index + 1])
-            if tmp != None:
-                tokens[index + 1] = tmp[0]
-                result[1] = self.__r
-            else:
-                self.__r = None
-
-        return [" ".join(tokens), result]
-
-class AggregationGenerator(BaseGenerator):
-    """This generates statements with aggregation functions.
-    """
-
-    def __init__(self):
-        BaseGenerator.__init__(self, "_agg")
-
-        self.__ops = ("SUM", "AVG", "MIN", "MAX", "COUNT")
-        self.__op_fn = None
-        self.__operand = None
-
-    def generate(self, statement, params):
-        """params need to be a list of expressions.
-        """
-
-        for op in self.__ops:
-            stmt = statement.replace(self.__op_fn, op, 1)
-            if self.__operand != None:
-                for s in self.__operand.generate(stmt, params[0]):
-                    yield s
-            else:
-                yield stmt
-
-    def prepare_operands(self, statement):
-        tokens = statement.split()
-
-        for i in xrange(len(tokens)):
-            if (self.get_token() in tokens[i]):
-                self.__op_fn = "{%s}" % (self.fn_gen.next())
-                tokens[i] = tokens[i].replace(self.get_token(),
-                                              self.__op_fn, 1)
-
-                self.__operand = VarGenerator()
-                tmp = self.__operand.prepare_operands(tokens[i])
-                if tmp != None:
-                    tokens[i] = tmp[0]
-                    return [" ".join(tokens), [self.__operand]]
-
-                break
-
-        return [" ".join(tokens), [None]]
-
-class TableGenerator(VariableGenerator):
-    """This replaces variable with table name.
-    """
-
-    def __init__(self):
-        VariableGenerator.__init__(self, None)
-        self.EXPR = re.compile(r"%s" % (TABLE_TYPE))
-
-        self.__type = None
-        self.__fn = []
-
-    def get_type(self):
-        return self.__type
-
-    def generate(self, statement, params):
-        """params is a list of variable name.
-        """
-
-        stmt = statement
-        if len(self.__fn) == len(params):
-            for k, v in zip(self.__fn, params):
-                stmt = stmt.replace(k, v, 1)
-            yield stmt
-        elif len(self.__fn) < len(params):
-            for i in xrange(0, len(params), len(self.__fn)):
-                stmt = statement
-                for k, v in zip(self.__fn, params[i:i + len(self.__fn)]):
-                    stmt = stmt.replace(k, v, 1)
-                yield stmt
-
-    def prepare_operands(self, statement):
-        stmt = statement
-        result = self.EXPR.search(stmt)
-
-        while result:
-            self.__fn.append("{%s}" % (self.fn_gen.next()))
-            stmt = self.EXPR.sub(self.__fn[-1], stmt, 1)
-            result = self.EXPR.search(stmt)
-
-        if stmt == statement:
-            return None
-
-        return [stmt, [self]]
-
-class VarGenerator(VariableGenerator):
-    """This replaces variable with table name.
-    """
-
-    def __init__(self):
-        VariableGenerator.__init__(self, VARIABLE_TYPE)
-
-        self.__cnt = 1
-
-    def generate(self, statement, params):
-        """params is a list of variable name.
-        """
-
-        for i in params:
-            yield statement.replace(self._fn, i, self.__cnt)
-
-    def prepare_operands(self, statement):
-        result = self.EXPR.search(statement)
-
-        if result:
-            self.__label = result.group(3)
-            self.__type = result.group(4)
-            self._fn = "{%s}" % (self.fn_gen.next())
-
-            label = self.__label
-            stmt = self.EXPR.sub(self._fn, statement, 1)
-            # Search for the variables with the same label and assign the same
-            # place holder for all of them as if they are the same variable.
-            while label:
-                self.EXPR = self._expr_builder(VARIABLE_TYPE, label)
-                result = self.EXPR.search(stmt)
-                if not result:
-                    break
-                label = result.group(3)
-                if label != self.__label:
-                    break
-                stmt = self.EXPR.sub(self._fn, stmt, 1)
-                self.__cnt += 1
-        else:
-            return None
-
-        return [stmt, [self]]
-
-class ValueGenerator(VariableGenerator):
+class ConstantGenerator(BaseGenerator):
     """This replaces variable with actual value.
     """
 
-    UNIQUE_TYPES = {"id": IDValueGenerator}
-    TYPES = {"int": IntValueGenerator,
+    TYPES = {"id": IDValueGenerator,
+             "int": IntValueGenerator,
              "byte": ByteValueGenerator,
              "int16": Int16ValueGenerator,
              "int32": Int32ValueGenerator,
              "int64": Int64ValueGenerator,
              "float": FloatValueGenerator,
              "string": StringValueGenerator,
+             "varbinary": VarbinaryValueGenerator,
              "decimal": DecimalValueGenerator,
              "date": DateValueGenerator}
 
     def __init__(self):
-        VariableGenerator.__init__(self, VALUE_TYPE)
+        BaseGenerator.__init__(self, "_value")
 
         self.__type = None
-        self.__range = None
-        self.__fn = None
 
-    def is_unique(self):
-        if self.__type in self.__class__.UNIQUE_TYPES:
-            return True
-        return False
+    def prepare_params(self, attribute_groups):
+        self.__type = attribute_groups[self.TYPE_PATTERN_GROUP]
+        assert self.__type
 
-    def generate(self, statement, params):
-        """params is a place holder here, not used.
-        """
+        min = attribute_groups[self.MIN_VALUE_PATTERN_GROUP]
+        max = attribute_groups[self.MAX_VALUE_PATTERN_GROUP]
 
-        assert self.__type != None
-        if self.__type in self.__class__.TYPES:
-            type = self.__class__.TYPES
+        if min != None and max != None:
+            self.__values = self.TYPES[self.__type](int(min), int(max))
         else:
-            type = self.__class__.UNIQUE_TYPES
+            self.__values = self.TYPES[self.__type]()
 
-        if self.__range != None and None not in self.__range:
-            values = type[self.__type](int(self.__range[0]),
-                                       int(self.__range[1]))
-        else:
-            values = type[self.__type]()
-        for i in values.generate(COUNT):
+    def next_param(self):
+        for i in self.__values.generate(COUNT):
             if IS_VOLT and self.__type == "date":
                 i = i * 1000
-            if isinstance(i, basestring):
+            elif isinstance(i, basestring):
                 i = u"'%s'" % (i)
             elif isinstance(i, float):
                 i = u"%.20e" % (i)
-            yield statement.replace(self.__fn, unicode(i), 1)
+            yield unicode(i)
 
-    def prepare_operands(self, statement):
-        result = self.EXPR.search(statement)
 
-        if result:
-            self.__type = result.group(4)
-            self.__range = result.group(8, 9)
-            self.__fn = r"{%s}" % (self.fn_gen.next())
-            stmt = self.EXPR.sub(self.__fn, statement, 1)
+class PickGenerator(BaseGenerator):
+    """This generates statement elements picked from a specified options list, e.g.
+           select _pick[<options=MIN,MAX>](_variable) from _table;
+       would generate statements that tried MAX or MIN but not other aggregate functions.
+       Useful for generating variants that are specialized within a classification like "_agg"
+       or that defy existing classifications.
+    """
+
+    def __init__(self):
+        BaseGenerator.__init__(self, "_pick")
+        self.__options = [' ']
+
+    def prepare_params(self, attribute_groups):
+        kv = attribute_groups[self.KEY_VALUE_PATTERN_GROUP]
+        if kv:
+            self.__options = self.get_named_attribute(kv, "options")
         else:
-            return None
+            print "ERROR: Invalid attribute list for _pick."
 
-        return [stmt, [self]]
+    def next_param(self):
+        for option in self.__options.split(','):
+            if option == '_': # special notation to allow a single empty option, as in <options=_>
+                yield ' '
+            else:
+                yield option
 
-class NegationGenerator(SingletonOpGenerator):
+
+class OpGenerator(BaseGenerator):
+    """This is the base generator for all operator generators.
+    """
+
+    def __init__(self, ops, token):
+        BaseGenerator.__init__(self, token)
+
+        self.__ops = ops
+
+    def next_param(self):
+        for i in self.__ops:
+            yield i
+
+
+class AggregationGenerator(OpGenerator):
+    """This generates statements with aggregation functions.
+    """
+
+    def __init__(self):
+        OpGenerator.__init__(self, ("SUM", "AVG", "MIN", "MAX", "COUNT"), "_agg")
+
+class NumericAggregationGenerator(OpGenerator):
+    """This generates statements with aggregation functions.
+    """
+
+    def __init__(self):
+        OpGenerator.__init__(self, ("SUM", "MIN", "MAX", "COUNT"), "_genericagg")
+
+class NegationGenerator(OpGenerator):
     """This generator generates statements using the not operator.
     """
 
     def __init__(self):
-        SingletonOpGenerator.__init__(self, ("NOT",))
+        OpGenerator.__init__(self, ("NOT", ""), "_singleton")
 
-class DistinctGenerator(SingletonOpGenerator):
-    """This generator generates statements using the distinct operator.
+class DistinctGenerator(OpGenerator):
+    """This generator generates statements optionally using the distinct operator.
     """
 
     def __init__(self):
-        SingletonOpGenerator.__init__(self, ("DISTINCT", ""), "_distinct")
+        OpGenerator.__init__(self, ("DISTINCT", ""), "_distinct")
 
-class SortOrderGenerator(SingletonOpGenerator):
+class SortOrderGenerator(OpGenerator):
     """This generator generates sort order ASC, DESC, blank for ORDER BY
     """
 
     def __init__(self):
-        SingletonOpGenerator.__init__(self, ("", "ASC", "DESC"), "_sortorder")
+        OpGenerator.__init__(self, ("", "ASC", "DESC"), "_sortorder")
 
-class MathGenerator(BinaryOpGenerator):
-    """This generator generates statements using different operators (+, -, *,
-    /, %).
+class MathGenerator(OpGenerator):
+    """This generator generates statements using different operators (+, -, *, /, %).
     """
 
     def __init__(self):
-        #BinaryOpGenerator.__init__(self, ("+", "-", "*", "/", "%"), "_math")
-        BinaryOpGenerator.__init__(self, ("+", "-", "*", "/"), "_math")
+        #OpGenerator.__init__(self, ("+", "-", "*", "/", "%"), "_math")
+        OpGenerator.__init__(self, ("+", "-", "*", "/"), "_math")
 
-class CmpGenerator(BinaryOpGenerator):
-    """This generator generates statements using comparison operators (<, >, =,
-    etc.).
+class CmpGenerator(OpGenerator):
+    """This generator generates statements using comparison operators (<, >, =, etc.).
     """
 
     def __init__(self):
-        BinaryOpGenerator.__init__(self, ("<", ">", "=", "<=", ">=", "!=", "<>"),
-                                   "_cmp")
+        OpGenerator.__init__(self, ("<", ">", "=", "<=", ">=", "!=", "<>"), "_cmp")
 
-class SetGenerator(BinaryOpGenerator):
+class LikeGenerator(OpGenerator):
+    """This generator generates statements using LIKE / NOT LIKE.
+    """
+
+    def __init__(self):
+        OpGenerator.__init__(self, ("LIKE", "NOT LIKE"), "_like")
+
+class SetGenerator(OpGenerator):
     """This generates statements using set operators (union, etc.).
     """
 
     def __init__(self):
-        BinaryOpGenerator.__init__(self, ("UNION",), "_set")
+        OpGenerator.__init__(self, ("UNION",), "_set")
 
-class LogicGenerator(SingletonOpGenerator):
+class LogicGenerator(OpGenerator):
     """This generates statements using logic operators (AND, OR).
     """
 
     def __init__(self):
-        SingletonOpGenerator.__init__(self, ("AND", "OR"), "_logic")
-        #SingletonOpGenerator.__init__(self, ("AND",), "_logic")
+        #OpGenerator.__init__(self, ("AND", "OR"), "_logic")
+        OpGenerator.__init__(self, ("AND",), "_logic")
+
 
 class Statement:
-    def __init__(self, statement, operators, variables, parent = None):
-        self.__statement = unicode(statement)
-        self.__operators = operators
-        self.__variables = variables
-        if parent:
-            self.__tables = parent.__tables
-            self.__table_count = parent.__table_count
-            self.__delay = parent.__delay
-        else:
-            self.__tables = []
-            self.__table_count = None
-            self.__delay = None # Only one delayed type is supported in a single
-                                # statement for now.
+    def __init__(self, text):
+        self.__text = unicode(text)
+        self.__generator_types = (CmpGenerator, MathGenerator, LogicGenerator,
+                                  NegationGenerator, DistinctGenerator,
+                                  SortOrderGenerator, AggregationGenerator, NumericAggregationGenerator,
+                                  SetGenerator, ConstantGenerator, PickGenerator)
 
-    def get_table_count(self):
-        if self.__table_count:
-            return self.__table_count
+        # prepare table generators
+        self.__statement = self.__text
+        self.__table_gens = []
+        self.__first_table = None
+        table_gen = TableGenerator()
+        ret = table_gen.prepare_operands(self.__statement)
 
-        self.__table_count = len(re.findall(TABLE_TYPE, self.__statement))
-        return self.__table_count
-
-    def get_statement(self):
-        if self.__delay != None:
-            for stmt in self.__delay.generate(self.__statement, None):
-                yield stmt
-        else:
-            yield self.__statement
+        while ret:
+            self.__table_gens.append(table_gen)
+            self.__statement = ret
+            table_gen = TableGenerator()
+            ret = table_gen.prepare_operands(self.__statement)
 
     def get_tables(self):
-        return self.__tables
+        return self.__table_gens
 
-    def set_tables(self, tables):
-        if not self.__tables:
-            self.__tables = tables
+    def generate_statements(self, stmt, gens, depth):
+        if depth < len(gens):
+            # apply the next generator
+            for generated_stmt in gens[depth].generate(stmt):
+                # apply the remaining generators
+                for complete_statement in self.generate_statements(generated_stmt, gens, depth+1):
+                    yield complete_statement
+        else:
+            yield stmt # saw the last generator, statement should be complete
 
-    def next(self):
-        for i in self.__operators:
-            gen = i()
-            if gen.get_token() in self.__statement:
-                return [gen, gen.prepare_operands(self.__statement)]
+    def next_table_bound_statement(self):
+        for table_bound_statement in self.generate_statements(self.__statement, self.__table_gens, 0):
+            if self.__table_gens:
+                self.__first_table = self.__table_gens[0].get_table()
+            self.__col_gens = []
+            yield table_bound_statement
 
-        gen = None
+    def init_column_generators(self, table_bound_statement):
+        # prepare columns according to the selection of tables
+        col_gen = ColumnGenerator(self.__first_table)
+        ret = col_gen.prepare_operands(table_bound_statement)
 
-        for i in self.__variables:
-            gen = i()
-            ret = gen.prepare_operands(self.__statement)
-            if ret != None:
-                if isinstance(gen, ValueGenerator) and gen.is_unique():
-                    self.__statement = ret[0]
-                    self.__delay = gen
-                    gen = i()
-                    ret = gen.prepare_operands(ret[0])
-                    if ret != None:
-                        return [gen, ret]
-                    continue
-                elif isinstance(gen, TableGenerator) and not self.__tables:
-                    continue
-                return [gen, ret]
+        while ret:
+            self.__col_gens.append(col_gen)
+            table_bound_statement = ret
+            col_gen = ColumnGenerator(self.__first_table)
+            ret = col_gen.prepare_operands(table_bound_statement)
 
-        gen = TableGenerator()
-        ret = gen.prepare_operands(self.__statement)
-        if ret != None and not self.__tables:
-            return [gen, ret]
+        self.__table_bound_statement = table_bound_statement
+        return self.__col_gens
 
-        return None
+    def next_complete_statement(self):
+        for column_bound_statement in self.generate_statements(self.__table_bound_statement, self.__col_gens, 0):
+
+            # prepare operators and constants according to the selection of column (types)
+            other_gens = []
+            for ctor in self.__generator_types:
+                other_gen = ctor()
+                ret = other_gen.prepare_operands(column_bound_statement)
+
+                while ret:
+                    other_gens.append(other_gen)
+                    column_bound_statement = ret
+                    other_gen = ctor()
+                    ret = other_gen.prepare_operands(column_bound_statement)
+
+            for complete_statement in self.generate_statements(column_bound_statement, other_gens, 0):
+                # Finally, no more tokens!
+                yield complete_statement
+
 
 class Schema:
     def __init__(self, **kwargs):
@@ -741,54 +661,6 @@ class Schema:
 
     def get_columns(self, table):
         return self.__schema[table]["columns"]
-
-    def pick_columns(self, table_count, count, tables, type = None):
-        """Returns count number of column names of the same column type.
-
-        If no column type has at least count number of columns, None is returned.
-        """
-
-        # calculate the number of columns has to be picked from each table
-        col_per_table = count / (table_count == 0 and 1 or table_count)
-
-        if len(self.__schema) < table_count:
-            return
-
-        # Filter out the tables with enough columns
-        if not tables:
-            table_space = filter(lambda x: self.__filter(x, type, col_per_table),
-                                 self.__schema.keys())
-            try:
-                tables.extend(random.sample(table_space, table_count))
-            except:
-                return
-
-        for t in self.__types:
-            candidates = []
-            for table in tables:
-                tmp = list(map(lambda x: ".".join((table, x[0])),
-                               filter(lambda x: x[1] == t and True or False,
-                                      self.__schema[table]["columns"])))
-                if not tmp:
-                    candidates = []
-                    break
-                candidates.extend(tmp)
-            for result in permutations(candidates, count):
-                yield result
-
-    def __filter(self, x, type, col_per_table):
-        # Find a type that has enough columns to satisfy count
-        if type:
-            self.__types = [i[1] for i in self.__schema[x]["columns"]
-                            if i[1] in type]
-        else:
-            self.__types = [i[1] for i in self.__schema[x]["columns"]]
-        self.__types = set(i for i in self.__types
-                           if self.__types.count(i) >= col_per_table)
-
-        if len(self.__types) == 0:
-            return False
-        return True
 
 class Template:
     def __init__(self, **kwargs):
@@ -869,13 +741,7 @@ class SQLGenerator:
         IS_VOLT = is_volt
 
         # Reset the counters
-        IDValueGenerator(0)
-
-        self.__operators = (CmpGenerator, MathGenerator, LogicGenerator,
-                            NegationGenerator, DistinctGenerator,
-                            SortOrderGenerator, AggregationGenerator,
-                            SetGenerator)
-        self.__variables = (TableGenerator, VarGenerator, ValueGenerator)
+        IDValueGenerator.initialize(0)
 
         if isinstance(catalog, Schema):
             self.__schema = catalog
@@ -889,67 +755,107 @@ class SQLGenerator:
 
         self.__statements = self.__template.get_statements()
 
-    def __generate_statement(self, statement):
-        tmp = statement.next()
-        if tmp == None:
-            for stmt in  statement.get_statement():
-                yield stmt
+    TYPES = {"int": (FastSerializer.VOLTTYPE_TINYINT,
+                     FastSerializer.VOLTTYPE_SMALLINT,
+                     FastSerializer.VOLTTYPE_INTEGER,
+                     FastSerializer.VOLTTYPE_BIGINT),
+             "byte": ((FastSerializer.VOLTTYPE_TINYINT),),
+             "int16": ((FastSerializer.VOLTTYPE_SMALLINT),),
+             "int32": ((FastSerializer.VOLTTYPE_INTEGER),),
+             "int64": ((FastSerializer.VOLTTYPE_BIGINT),),
+             "float": ((FastSerializer.VOLTTYPE_FLOAT),),
+             "string": ((FastSerializer.VOLTTYPE_STRING),),
+             "decimal": ((FastSerializer.VOLTTYPE_DECIMAL),),
+             "date": ((FastSerializer.VOLTTYPE_TIMESTAMP),)}
+
+    def get_schema_typed_columns(self, table, type_str, quota):
+        if type_str in self.TYPES:
+            types = self.TYPES[type_str]
         else:
-            # Handle Variables.
-            if isinstance(tmp[0], VariableGenerator):
-                if isinstance(tmp[1][1][0], TableGenerator):
-                    if not statement.get_tables():
-                        params_perm = (self.__schema.get_tables(),)
-                    else:
-                        params_perm = (statement.get_tables(),)
-                elif isinstance(tmp[1][1][0], VarGenerator):
-                    params_perm = \
-                        self.__schema.pick_columns(statement.get_table_count(),
-                                                   1,
-                                                   statement.get_tables(),
-                                                   map_type(tmp[0].get_type()))
-                elif isinstance(tmp[1][1][0], ValueGenerator):
-                    params_perm = (None,)
+            types = None
 
-                for params in params_perm:
-                    for i in tmp[0].generate(tmp[1][0], params):
-                        stmt = Statement(i, self.__operators, self.__variables,
-                                         statement)
-                        for s in self.__generate_statement(stmt):
-                            yield s
-                return
+        typed_columns = [(column[0], column[1])
+                         for column in self.__schema.get_columns(table)
+                         if (not types) or (column[1] in types)]
+        # randomly eliminate candidates to keep under our quota
+        while len(typed_columns) > quota:
+            i = random.randint(0,len(typed_columns)-1)
+            del typed_columns[i:i+1]
+        return typed_columns
 
-            c = [True for i in tmp[1][1]
-                 if isinstance(i, VarGenerator)].count(True)
+    def get_schema_tables(self):
+        return self.__schema.get_tables()
 
-            if c == 0:
-                for i in tmp[0].generate(tmp[1][0], (tmp[1][1],)):
-                    stmt = Statement(i, self.__operators, self.__variables,
-                                     statement)
-                    for s in self.__generate_statement(stmt):
-                        yield s
-            else:
-                type = map_type(tmp[1][1][0] and tmp[1][1][0].get_type() or None)
-                col_gen = self.__schema.pick_columns(statement.get_table_count(),
-                                                     c, statement.get_tables(),
-                                                     type)
-                for columns in col_gen:
-                    for i in xrange(len(tmp[1][1])):
-                        if tmp[1][1][i]:
-                            tmp[1][1][i] = columns.pop(0)
+    def __generate_statement(self, text):
+        statement = Statement(text)
+        table_gens = statement.get_tables()
 
-                    for i in tmp[0].generate(tmp[1][0], (tmp[1][1],)):
-                        stmt = Statement(i, self.__operators, self.__variables,
-                                         statement)
-                        for s in self.__generate_statement(stmt):
-                            yield s
+        if table_gens:
+            schema_tables = self.get_schema_tables()
+            # This is the odd-ish algorithm for assigning schema tables to table generators.
+            # Instead of trying each schema table in each role (i.e. substituted for each _table),
+            # the schema tables are distributed "round robin" among them.
+            # If there are more unique _tables than there are schema tables, some _table(s) will be
+            # starved for a suitable substitution, so no statement will be generated.
+            for i in xrange(0, len(schema_tables), len(table_gens)):
+                for k, v in zip(table_gens, schema_tables[i:]):
+                    k.add_table(v)
 
-    def generate(self):
+        # Start by binding the tables, which may have an effect on column choices
+        # (if they have a table=_table[@label] attribute).
+        for table_bound_statement in statement.next_table_bound_statement():
+            col_gens = statement.init_column_generators(table_bound_statement)
+            # Establish the working set of each column generator.
+            for col_gen in col_gens:
+                for (col_name, col_type) in self.get_schema_typed_columns(col_gen.get_table(),
+                                                                          col_gen.get_type(),
+                                                                          COUNT):
+                    col_gen.add_column(col_name, col_type)
+
+            # Finish by binding columns and then other things (values and operators) that might
+            # (sometimes, some day? by use of labeled tokens in their attributes)
+            # be influenced by column choices.
+            for complete_statement in statement.next_complete_statement():
+                yield complete_statement
+
+    def generate(self, summarize_successes = False):
         for s in self.__statements:
-            stmt = Statement(s, self.__operators, self.__variables)
             results = 0
-            for i in self.__generate_statement(stmt):
+            ### print 'DEBUG VERBOSELY SPOUTING INPUT STATEMENT: ' + s
+            for i in self.__generate_statement(s):
                 results += 1
+                ### print 'DEBUG VERBOSELY SPOUTING OUTPUT STATEMENT: ' + i
                 yield i
             if results == 0:
                 print 'Template "%s" failed to yield SQL statements' % s
+            elif summarize_successes:
+                print 'Template "%s" yielded (%d) SQL statements' % (s, results)
+
+if __name__ == "__main__":
+    # run the SQLGenerator in a test mode that simply prints its results
+    # given the schema file and statement file referenced on the command line.
+    # The schema file should not contain any generic "@macros" only '_'-prefixed
+    # generator tokens (with optional []-bracketed attributes and @-prefixed labels).
+    parser = OptionParser()
+    parser.add_option("-s", "--seed", dest="seed",
+                      help="seed for random number generator")
+    (options, args) = parser.parse_args()
+
+    if options.seed == None:
+        seed = random.randint(0, 2**63)
+        print "Random seed: %d" % seed
+    else:
+        seed = int(options.seed)
+        print "Using supplied seed: " + str(seed)
+    random.seed(seed)
+
+    if len(args) < 2:
+        usage()
+        sys.exit(3)
+
+    catalog = args[0]
+    template = args[1]
+    generator = SQLGenerator(catalog, template, False)
+    for i in generator.generate(True):
+        print 'STATEMENT: ' + i
+

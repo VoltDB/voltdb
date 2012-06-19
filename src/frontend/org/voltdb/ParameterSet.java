@@ -18,8 +18,11 @@
 package org.voltdb;
 
 import java.io.IOException;
+import java.io.UnsupportedEncodingException;
 import java.math.BigDecimal;
 import java.nio.ByteBuffer;
+import java.util.Iterator;
+import java.util.LinkedList;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -41,6 +44,21 @@ import org.voltdb.types.VoltDecimalHelper;
 
     static final byte ARRAY = -99;
 
+    /*
+     * The same ParameterSet instance could be accessed by multiple threads to
+     * serialize the parameters. These two member variables keeps the encoded
+     * copy of strings and string arrays besides the decoded versions in
+     * m_params. There should only be one thread that adds the encoded strings.
+     * Once created, they are not mutated. So it should be safe to not
+     * synchronize on them.
+     */
+    private final LinkedList<byte[]> m_encodedStrings = new LinkedList<byte[]>();
+    private final LinkedList<byte[][]> m_encodedStringArrays = new LinkedList<byte[][]>();
+    private int m_serializedSize = -1; // memoized serialized size
+
+    public ParameterSet() {
+    }
+
     static Object limitType(Object o) {
         Class<?> ctype = o.getClass();
         if (ctype == Integer.class) {
@@ -49,15 +67,25 @@ import org.voltdb.types.VoltDecimalHelper;
 
         return o;
     }
-    Object m_params[] = new Object[0];
+    private Object m_params[] = new Object[0];
 
     /** Sets the internal array to params. Note: this does *not* copy the argument. */
     public void setParameters(Object... params) {
         this.m_params = params;
+        // create encoded copies of strings and calculate size
+        m_serializedSize = calculateSerializedSize();
     }
 
+    /**
+     * Returns the parameters. Don't modify the returned array!
+     * @return
+     */
     public Object[] toArray() {
         return m_params;
+    }
+
+    public int getSerializedSize() {
+        return m_serializedSize;
     }
 
     static Object getParameterAtIndex(int partitionIndex, ByteBuffer unserializedParams) throws IOException {
@@ -206,7 +234,9 @@ import org.voltdb.types.VoltDecimalHelper;
                     out.writeString((String) obj);
                     break;
                 case TIMESTAMP:
-                    out.writeTimestamp((TimestampType) obj);
+                    // FastSerializer does not need to distinguish time stamp types from long counts of microseconds.
+                    long micros = timestampToMicroseconds(obj);
+                    out.writeLong(micros);
                     break;
                 case DECIMAL:
                     VoltDecimalHelper.serializeBigDecimal((BigDecimal)obj, out);
@@ -342,6 +372,8 @@ import org.voltdb.types.VoltDecimalHelper;
         for (int i = 0; i < paramArray.length(); i++) {
             pset.m_params[i] = paramFromPossibleJSON(paramArray.get(i));
         }
+        // create encoded copies of strings and calculate size
+        pset.m_serializedSize = pset.calculateSerializedSize();
         return pset;
     }
 
@@ -397,7 +429,8 @@ import org.voltdb.types.VoltDecimalHelper;
                     }
                     return bin_val;
                 case TIMESTAMP:
-                    return in.readTimestamp();
+                    final long micros = in.readLong();
+                    return new TimestampType(micros);
                 case VOLTTABLE:
                     return in.readObject(VoltTable.class);
                 case DECIMAL: {
@@ -420,5 +453,332 @@ import org.voltdb.types.VoltDecimalHelper;
                     throw new RuntimeException("ParameterSet doesn't support type " + nextType);
             }
         }
+    }
+
+    /**
+     * Calculate the serialized size of this parameter set and encode all the
+     * strings and string arrays. This should only be called once when
+     * parameters are set.
+     *
+     * @return
+     */
+    private int calculateSerializedSize() {
+        if (m_serializedSize != -1) {
+            throw new RuntimeException("Trying to calculate the serialized size " +
+                                       "of the parameter set twice");
+        }
+
+        int size = 2;
+
+        for (int ii = 0; ii < m_params.length; ii++) {
+            Object obj = m_params[ii];
+            if ((obj == null) || (obj == JSONObject.NULL)) {
+                size++;
+                continue;
+            }
+            size += 1;//everything has a type even arrays and null
+            Class<?> cls = obj.getClass();
+            if (cls.isArray()) {
+
+                if (obj instanceof byte[]) {
+                    final byte[] b = (byte[]) obj;
+                    size += 4 + b.length;
+                    continue;
+                }
+
+                VoltType type;
+                try {
+                    type = VoltType.typeFromClass(cls.getComponentType());
+                }
+                catch (VoltTypeException e) {
+                    obj = getAKosherArray((Object[]) obj);
+                    cls = obj.getClass();
+                    type = VoltType.typeFromClass(cls.getComponentType());
+                }
+
+                size +=  1 + 2;// component type, array length
+                switch (type) {
+                    case SMALLINT:
+                        size += 2 * ((short[])obj).length;
+                        break;
+                    case INTEGER:
+                        size += 4 * ((int[])obj).length;
+                        break;
+                    case BIGINT:
+                        size += 8 * ((long[])obj).length;
+                        break;
+                    case FLOAT:
+                        size += 8 * ((double[])obj).length;
+                        break;
+                    case STRING:
+                        String strings[] = (String[]) obj;
+                        byte encodedStrings[][] = new byte[strings.length][];
+                        for (int zz = 0; zz < strings.length; zz++) {
+                            if (strings[zz] == null) {
+                                size += 4;
+                            } else {
+                                try {
+                                    encodedStrings[zz] = strings[zz].getBytes("UTF-8");
+                                } catch (UnsupportedEncodingException e) {
+                                    VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                                }
+                                size += 4 + encodedStrings[zz].length;
+                            }
+                        }
+                        m_encodedStringArrays.add(encodedStrings);
+                        break;
+                    case TIMESTAMP:
+                        size += 8 * ((TimestampType[])obj).length;
+                        break;
+                    case DECIMAL:
+                        size += 16 * ((BigDecimal[])obj).length;
+                        break;
+                    case VOLTTABLE:
+                        for (VoltTable vt : (VoltTable[]) obj) {
+                            size += vt.getSerializedSize();
+                        }
+                        break;
+                    default:
+                        throw new RuntimeException("FIXME: Unsupported type " + type);
+                }
+                continue;
+            }
+
+            // Handle NULL mappings not encoded by type.min_value convention
+            if (obj == VoltType.NULL_TIMESTAMP) {
+                size += 8;
+                continue;
+            }
+            else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
+                size += 4;
+                continue;
+            }
+            else if (obj == VoltType.NULL_DECIMAL) {
+                size += 16;
+                continue;
+            }
+
+            VoltType type = VoltType.typeFromClass(cls);
+            switch (type) {
+                case TINYINT:
+                    size++;
+                    break;
+                case SMALLINT:
+                    size += 2;
+                    break;
+                case INTEGER:
+                    size += 4;
+                    break;
+                case BIGINT:
+                    size += 8;
+                    break;
+                case FLOAT:
+                    size += 8;
+                    break;
+                case STRING:
+                    try {
+                        byte encodedString[] = ((String)obj).getBytes("UTF-8");
+                        size += 4 + encodedString.length;
+                        m_encodedStrings.add(encodedString);
+                    } catch (UnsupportedEncodingException e) {
+                        VoltDB.crashLocalVoltDB("Shouldn't happen", false, e);
+                    }
+                    break;
+                case TIMESTAMP:
+                    size += 8;
+                    break;
+                case DECIMAL:
+                    size += 16;
+                    break;
+                case VOLTTABLE:
+                    size += ((VoltTable) obj).getSerializedSize();
+                    break;
+                default:
+                    throw new RuntimeException("FIXME: Unsupported type " + type);
+            }
+        }
+
+        return size;
+    }
+
+    public void flattenToBuffer(ByteBuffer buf) throws IOException {
+        if (m_serializedSize == -1) {
+            throw new RuntimeException("Invalid use of parameter set. If the " +
+                                       "parameter set was constructed by readExternal(), " +
+                                       "writeExternal() should be used for serialization.");
+        }
+
+        Iterator<byte[][]> strArrayIter = m_encodedStringArrays.iterator();
+        Iterator<byte[]> strIter = m_encodedStrings.iterator();
+        buf.putShort((short)m_params.length);
+
+        for (Object obj : m_params) {
+            if ((obj == null) || (obj == JSONObject.NULL)) {
+                VoltType type = VoltType.NULL;
+                buf.put(type.getValue());
+                continue;
+            }
+
+            Class<?> cls = obj.getClass();
+            if (cls.isArray()) {
+
+                // Since arrays of bytes could be varbinary or strings,
+                // and they are the only kind of array needed by the EE,
+                // special case them as the VARBINARY type.
+                if (obj instanceof byte[]) {
+                    final byte[] b = (byte[]) obj;
+                    // commented out this bit... presumably the EE will do this check upon recipt
+                    /*if (b.length > VoltType.MAX_VALUE_LENGTH) {
+                        throw new IOException("Value of byte[] larger than allowed max string or varbinary " + VoltType.MAX_VALUE_LENGTH_STR);
+                    }*/
+                    buf.put(VoltType.VARBINARY.getValue());
+                    buf.putInt(b.length);
+                    buf.put(b);
+                    continue;
+                }
+
+                buf.put(ARRAY);
+
+                VoltType type;
+                try {
+                    type = VoltType.typeFromClass(cls.getComponentType());
+                }
+                catch (VoltTypeException e) {
+                    obj = getAKosherArray((Object[]) obj);
+                    cls = obj.getClass();
+                    type = VoltType.typeFromClass(cls.getComponentType());
+                }
+
+                buf.put(type.getValue());
+                switch (type) {
+                    case SMALLINT:
+                        FastSerializer.writeArray((short[]) obj, buf);
+                        break;
+                    case INTEGER:
+                        FastSerializer.writeArray((int[]) obj, buf);
+                        break;
+                    case BIGINT:
+                        FastSerializer.writeArray((long[]) obj, buf);
+                        break;
+                    case FLOAT:
+                        FastSerializer.writeArray((double[]) obj, buf);
+                        break;
+                    case STRING:
+                        if (!strArrayIter.hasNext()) {
+                            // should not happen
+                            throw new IOException("String array not encoded");
+                        }
+                        byte encodedStrings[][] = strArrayIter.next();
+                        // This check used to be done by FastSerializer.writeArray(), but things changed?
+                        if (encodedStrings.length > Short.MAX_VALUE) {
+                            throw new IOException("Array exceeds maximum length of "
+                                                  + Short.MAX_VALUE + " bytes");
+                        }
+                        buf.putShort((short)encodedStrings.length);
+                        for (int zz = 0; zz < encodedStrings.length; zz++) {
+                            FastSerializer.writeString(encodedStrings[zz], buf);
+                        }
+                        break;
+                    case TIMESTAMP:
+                        FastSerializer.writeArray((TimestampType[]) obj, buf);
+                        break;
+                    case DECIMAL:
+                        // converted long128 in serializer api
+                        FastSerializer.writeArray((BigDecimal[]) obj, buf);
+                        break;
+                    case VOLTTABLE:
+                        FastSerializer.writeArray((VoltTable[]) obj, buf);
+                        break;
+                    default:
+                        throw new RuntimeException("FIXME: Unsupported type " + type);
+                }
+                continue;
+            }
+
+            // Handle NULL mappings not encoded by type.min_value convention
+            if (obj == VoltType.NULL_TIMESTAMP) {
+                buf.put(VoltType.TIMESTAMP.getValue());
+                buf.putLong(VoltType.NULL_BIGINT);  // corresponds to EE value.h isNull()
+                continue;
+            }
+            else if (obj == VoltType.NULL_STRING_OR_VARBINARY) {
+                buf.put(VoltType.STRING.getValue());
+                buf.putInt(VoltType.NULL_STRING_LENGTH);
+                continue;
+            }
+            else if (obj == VoltType.NULL_DECIMAL) {
+                buf.put(VoltType.DECIMAL.getValue());
+                VoltDecimalHelper.serializeNull(buf);
+                continue;
+            }
+
+            VoltType type = VoltType.typeFromClass(cls);
+            buf.put(type.getValue());
+            switch (type) {
+                case TINYINT:
+                    buf.put((Byte)obj);
+                    break;
+                case SMALLINT:
+                    buf.putShort((Short)obj);
+                    break;
+                case INTEGER:
+                    buf.putInt((Integer) obj);
+                    break;
+                case BIGINT:
+                    buf.putLong((Long) obj);
+                    break;
+                case FLOAT:
+                    if (cls == Float.class)
+                        buf.putDouble(((Float) obj).doubleValue());
+                    else if (cls == Double.class)
+                        buf.putDouble(((Double) obj).doubleValue());
+                    else
+                        throw new RuntimeException("Can't cast parameter type to Double");
+                    break;
+                case STRING:
+                    if (!strIter.hasNext()) {
+                        // should not happen
+                        throw new IOException("String not encoded: " + (String) obj);
+                    }
+                    FastSerializer.writeString(strIter.next(), buf);
+                    break;
+                case TIMESTAMP:
+                    long micros = timestampToMicroseconds(obj);
+                    buf.putLong(micros);
+                    break;
+                case DECIMAL:
+                    VoltDecimalHelper.serializeBigDecimal((BigDecimal)obj, buf);
+                    break;
+                case VOLTTABLE:
+                    ((VoltTable)obj).flattenToBuffer(buf);
+                    break;
+                default:
+                    throw new RuntimeException("FIXME: Unsupported type " + type);
+            }
+        }
+    }
+
+    static long timestampToMicroseconds(Object obj) {
+        long micros = 0;
+        // Adapt the Java standard classes' millisecond count to TIMESTAMP's microseconds.
+        if (obj instanceof java.util.Date) {
+            micros = ((java.util.Date) obj).getTime()*1000;
+            // For Timestamp, also preserve exactly the right amount of fractional second precision.
+            if (obj instanceof java.sql.Timestamp) {
+                long nanos = ((java.sql.Timestamp) obj).getNanos();
+                // XXX: This may be slightly controversial, but...
+                // Throw a conversion error rather than silently rounding/dropping sub-microsecond precision.
+                if ((nanos % 1000) != 0) {
+                    throw new RuntimeException("Can't serialize TIMESTAMP value with fractional microseconds");
+                }
+                // Use MOD 1000000 to prevent double-counting of milliseconds which figure into BOTH getTime() and getNanos().
+                // DIVIDE nanoseconds by 1000 to get microseconds.
+                micros += ((nanos % 1000000)/1000);
+            }
+        } else if (obj instanceof TimestampType) {
+            // Let this throw a cast exception if obj is not actually a TimestampType instance.
+            micros = ((TimestampType) obj).getTime();
+        }
+        return micros;
     }
 }

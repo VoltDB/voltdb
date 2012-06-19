@@ -42,34 +42,33 @@ public class TestSystemInformationSuite extends RegressionSuite {
         super(name);
     }
 
-    public void testInvalidSelector() throws IOException
+    public void testDeploymentSelector() throws IOException, ProcCallException
     {
         Client client = getClient();
-        try
-        {
-            client.callProcedure("@SystemInformation", "NONSENSE");
-        }
-        catch (ProcCallException pce)
-        {
-            assertTrue(pce.getMessage().contains("Invalid @SystemInformation selector NONSENSE"));
-            return;
-        }
-        fail("Invalid selector should have resulted in a ProcCallException but didn't");
-    }
 
-    public void testOverviewSelector() throws IOException, ProcCallException
-    {
-        Client client = getClient();
+        //
+        // Invalid Selector
+        //
+        try {
+            client.callProcedure("@SystemInformation", "NONSENSE");
+            fail("Invalid selector should have resulted in a ProcCallException but didn't");
+        }
+        catch (ProcCallException pce) {
+            assertTrue(pce.getMessage().contains("Invalid @SystemInformation selector NONSENSE"));
+        }
+
+        //
+        // OVERVIEW
+        //
         VoltTable[] results = client.callProcedure("@SystemInformation").getResults();
         System.out.println(results[0]);
         VoltTable[] results2 = client.callProcedure("@SystemInformation", "OVERVIEW").getResults();
         assertTrue(results[0].hasSameContents(results2[0]));
-    }
 
-    public void testDeploymentSelector() throws IOException, ProcCallException
-    {
-        Client client = getClient();
-        VoltTable[] results = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults();
+        //
+        // DEPLOYMENT
+        //
+        results = client.callProcedure("@SystemInformation", "DEPLOYMENT").getResults();
         System.out.println(results[0]);
         HashMap<String, String> sysinfo = new HashMap<String, String>();
         while (results[0].advanceRow())
@@ -81,7 +80,6 @@ public class TestSystemInformationSuite extends RegressionSuite {
         // This is all horribly hardcoded for now.  Would be great to
         // add accessors to VoltServerConfig and VoltProjectBuilder to get them
         // at some point, maybe
-        assertEquals(m_expectedVals.get("adminport"), sysinfo.get("adminport"));
         assertEquals(m_expectedVals.get("adminstartup"), sysinfo.get("adminstartup"));
         assertEquals(m_expectedVals.get("heartbeattimeout"), sysinfo.get("heartbeattimeout"));
         assertEquals(m_expectedVals.get("partitiondetection"), sysinfo.get("partitiondetection"));
@@ -105,8 +103,6 @@ public class TestSystemInformationSuite extends RegressionSuite {
     //
     static public Test suite() throws IOException
     {
-        VoltServerConfig config = null;
-
         MultiConfigSuiteBuilder builder =
             new MultiConfigSuiteBuilder(TestSystemInformationSuite.class);
 
@@ -171,20 +167,15 @@ public class TestSystemInformationSuite extends RegressionSuite {
         //                         Integer.valueOf(m_expectedVals.get("commandlogfreqtxns")));
 
         // Add other defaults
-        m_expectedVals.put("adminport", "21211");
         m_expectedVals.put("adminstartup", "false");
         m_expectedVals.put("heartbeattimeout", "10");
         m_expectedVals.put("httpenabled", "false");
         m_expectedVals.put("jsonenabled", "false");
 
-        config = new LocalSingleProcessServer("getclusterinfo-twosites.jar", 2,
-                                              BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
-        LocalCluster lcconfig = new LocalCluster("getclusterinfo-cluster.jar", 2, 2, 1,
+        LocalCluster lcconfig = new LocalCluster("getclusterinfo-cluster.jar", 2, 3, 1,
                                                BackendTarget.NATIVE_EE_JNI);
-        lcconfig.compile(project);
+        boolean success = lcconfig.compile(project);
+        assertTrue(success);
         // need no local server so we set the VoltFileRoot property properly
         lcconfig.setHasLocalServer(false);
         builder.addServerConfig(lcconfig);

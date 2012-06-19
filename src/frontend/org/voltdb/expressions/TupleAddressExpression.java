@@ -34,12 +34,6 @@ public class TupleAddressExpression extends AbstractValueExpression {
         m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
     }
 
-    public TupleAddressExpression(AbstractExpression left, AbstractExpression right) {
-        super(ExpressionType.VALUE_TUPLE_ADDRESS, right, left);
-        m_type = ExpressionType.VALUE_TUPLE_ADDRESS;
-        m_valueType = VoltType.BIGINT;
-    }
-
     @Override
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
 }

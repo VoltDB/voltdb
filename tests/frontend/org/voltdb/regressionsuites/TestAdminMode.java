@@ -319,7 +319,9 @@ public class TestAdminMode extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalSingleProcessServer config = new LocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        LocalSingleProcessServer config =
+                new LocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
+
         // Start in admin mode
         success = config.compileWithAdminMode(project, 32323, true);
         assertTrue(success);

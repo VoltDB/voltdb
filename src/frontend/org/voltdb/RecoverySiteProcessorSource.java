@@ -28,25 +28,28 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
+import java.util.List;
 import java.util.Map;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.RecoveryMessage;
+import org.voltcore.messaging.RecoveryMessageType;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
+
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.RecoveryMessageType;
-import org.voltdb.messaging.VoltMessage;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.CompressionService;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
 
 /**
  * Encapsulates the state managing the activities related to streaming recovery data
@@ -55,20 +58,15 @@ import org.voltdb.utils.Pair;
  */
 public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
-    static {
-        //new VoltLogger("RECOVERY").setLevel(Level.TRACE);
-    }
 
     /*
      * Some offsets for where data is serialized from/to
      * with the length prefix at the front
      */
     final int siteIdOffset = 4;
-    final int blockIndexOffset = siteIdOffset + 4;
+    final int blockIndexOffset = siteIdOffset + 8;
     final int messageTypeOffset = blockIndexOffset + 4;
 
-    @SuppressWarnings("unused")
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
 
     /**
@@ -96,7 +94,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     /**
      * Placed in each message as a return address for acks
      */
-    private final int m_siteId;
+    private final long m_siteId;
 
     /** Used to get a txn-specific version of the catalog */
     private final ExecutionSite m_site;
@@ -119,7 +117,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      */
     private long m_destinationStoppedBeforeTxnId = Long.MAX_VALUE;
 
-    private final int m_destinationSiteId;
+    private final long m_destinationSiteId;
 
     private final SocketChannel m_sc;
 
@@ -233,7 +231,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                         }
                     }
                     messageBuffer.flip();
-                    messageBuffer.getInt();
+                    messageBuffer.getLong();//drop source site id
                     final int blockIndex = messageBuffer.getInt();
                     if (m_ackTracker.ackReceived(blockIndex)) {
                         m_allowedBuffers.incrementAndGet();
@@ -251,8 +249,10 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                                 }
                             }
                         } else {
+                            RecoveryMessage rm = new RecoveryMessage();
+                            rm.m_sourceHSId = m_siteId;
                             //Notify that a new buffer is available
-                            m_mailbox.deliver(new RecoveryMessage());
+                            m_mailbox.deliver(rm);
                         }
                     }
                 }
@@ -345,15 +345,15 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
          * Destinations that the recovery data is supposed to go to.
          * Will be null if this partition is a recipient.
          */
-        final int m_destinationIds[];
+        final long m_destinationIds[];
 
-        public RecoveryTable(String tableName, int tableId, HashSet<Integer> destinations) {
+        public RecoveryTable(String tableName, int tableId, HashSet<Long> destinations) {
             assert(destinations.size() == 1);
             m_name = tableName;
             m_tableId = tableId;
-            m_destinationIds = new int[destinations.size()];
+            m_destinationIds = new long[destinations.size()];
             int ii = 0;
-            for (Integer destinationId : destinations) {
+            for (Long destinationId : destinations) {
                 m_destinationIds[ii++] = destinationId;
             }
             m_phase = RecoveryMessageType.ScanTuples;
@@ -365,19 +365,20 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
      * Because doRecoveryWork is blocking this method will eventually return back to doRecoveryWork
      */
     @Override
-    public void handleSiteFaults(HashSet<Integer> failedSites, SiteTracker tracker) {
-        int destinationSite = 0;
+    public void handleSiteFaults(HashSet<Long> failedSites, SiteTracker tracker) {
+        long destinationSite = 0;
         for (RecoveryTable table : m_tablesToStream) {
             destinationSite = table.m_destinationIds[0];
         }
         if (failedSites.contains(destinationSite)) {
-            recoveryLog.error("Failing recovery of " + destinationSite + " at source site " + m_siteId);
+            recoveryLog.error("Failing recovery of " + CoreUtils.hsIdToString(destinationSite) +
+                    " at source site " + CoreUtils.hsIdToString(m_siteId));
             m_ackTracker.ignoreAcks();
-            final BBContainer origin = org.voltdb.utils.DBBPool.allocateDirect(m_bufferLength);
+            final BBContainer origin = org.voltcore.utils.DBBPool.allocateDirect(m_bufferLength);
             try {
                 long bufferAddress = 0;
                 if (VoltDB.getLoadLibVOLTDB()) {
-                    bufferAddress = org.voltdb.utils.DBBPool.getBufferAddress(origin.b);
+                    bufferAddress = org.voltcore.utils.DBBPool.getBufferAddress(origin.b);
                 }
                 final BBContainer buffer = new BBContainer(origin.b, bufferAddress) {
                     @Override
@@ -444,11 +445,11 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     public RecoverySiteProcessorSource(
             ExecutionSite site,
             long destinationTxnId,
-            int destinationSiteId,
-            HashMap<Pair<String, Integer>, HashSet<Integer>> tableToSites,
+            long destinationSiteId,
+            HashMap<Pair<String, Integer>, HashSet<Long>> tableToSites,
             ExecutionEngine engine,
             Mailbox mailbox,
-            final int siteId,
+            final long siteId,
             Runnable onCompletion,
             MessageHandler messageHandler,
             SocketChannel sc) throws IOException {
@@ -461,7 +462,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         m_destinationSiteId = destinationSiteId;
         m_destinationStoppedBeforeTxnId = destinationTxnId;
         m_messageHandler = messageHandler;
-        for (Map.Entry<Pair<String, Integer>, HashSet<Integer>> entry : tableToSites.entrySet()) {
+        for (Map.Entry<Pair<String, Integer>, HashSet<Long>> entry : tableToSites.entrySet()) {
             if (entry.getValue().isEmpty()) {
                 continue;
             }
@@ -493,12 +494,12 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         if (!m_sentSkipPastMultipartMsg && !m_sentInitiateResponse) {
             m_sentSkipPastMultipartMsg = true;
             recoveryLog.info(
-                    "Sending blocked on multi-part notification from " + m_siteId +
-                    " at txnId " + currentTxnId + " to site " + m_destinationSiteId);
-            ByteBuffer buf = ByteBuffer.allocate(21);
+                    "Sending blocked on multi-part notification from " + CoreUtils.hsIdToString(m_siteId) +
+                    " at txnId " + currentTxnId + " to site " + CoreUtils.hsIdToString(m_destinationSiteId));
+            ByteBuffer buf = ByteBuffer.allocate(25);
             BBContainer cont = DBBPool.wrapBB(buf);
-            buf.putInt(17);//Length prefix
-            buf.putInt(m_siteId);
+            buf.putInt(21);//Length prefix
+            buf.putLong(m_siteId);
             buf.put(kEXECUTE_PAST_TXN);
             buf.putLong(currentTxnId);
             buf.putInt(0); // placeholder for USO sync string
@@ -539,8 +540,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         if (!m_sentInitiateResponse) {
             m_stopBeforeTxnId = Math.max(nextTxnId, m_destinationStoppedBeforeTxnId);
             recoveryLog.info(
-                    "Sending recovery initiate response from " + m_siteId +
-                    " before txnId " + nextTxnId + " to site " + m_destinationSiteId +
+                    "Sending recovery initiate response from " + CoreUtils.hsIdToString(m_siteId) +
+                    " before txnId " + nextTxnId + " to site " + CoreUtils.hsIdToString(m_destinationSiteId) +
                     " choosing to stop before txnId " + m_stopBeforeTxnId);
             m_sentInitiateResponse = true;
 
@@ -567,16 +568,17 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             catch (UnsupportedEncodingException e) {}
 
             // write the message
-            ByteBuffer buf = ByteBuffer.allocate(21 + exportUSOBytes.length);
+            ByteBuffer buf = ByteBuffer.allocate(25 + exportUSOBytes.length);
             BBContainer cont = DBBPool.wrapBB(buf);
-            buf.putInt(17 + exportUSOBytes.length); // length prefix
-            buf.putInt(m_siteId);
+            buf.putInt(25 + exportUSOBytes.length); // length prefix
+            buf.putLong(m_siteId);
             buf.put(kSTOP_AT_TXN);
             buf.putLong(m_stopBeforeTxnId);
             buf.putInt(exportUSOBytes.length);
             buf.put(exportUSOBytes);
 
             buf.flip();
+            System.out.println("Offering initiate response");
             m_outgoing.offer(cont);
         }
 
@@ -591,7 +593,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             return;
         }
         recoveryLog.info(
-                "Starting recovery of " + m_destinationSiteId + " work before txnId " + nextTxnId);
+                "Starting recovery of " + CoreUtils.hsIdToString(m_destinationSiteId) + " work before txnId " + nextTxnId);
         while (true) {
             while (m_allowedBuffers.get() > 0 && !m_tablesToStream.isEmpty() && !m_buffers.isEmpty()) {
                 /*
@@ -610,7 +612,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                  */
                 buffer.clear();
                 buffer.position(4);
-                buffer.putInt(m_siteId);
+                buffer.putLong(m_siteId);
                 buffer.putInt(m_blockIndex++);
 
                 RecoveryTable table = m_tablesToStream.peek();
@@ -726,7 +728,8 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             if (message instanceof RecoveryMessage) {
                 RecoveryMessage rm = (RecoveryMessage)message;
                 if (!rm.recoveryMessagesAvailable()) {
-                    recoveryLog.error("Received a recovery initiate request from " + rm.sourceSite() +
+                    recoveryLog.error("Received a recovery initiate request from " +
+                            CoreUtils.hsIdToString(rm.sourceSite()) +
                             " while a recovery was already in progress. Ignoring it.");
                 }
             } else {
@@ -742,21 +745,15 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             SiteTracker tracker,
             ExecutionEngine engine,
             Mailbox mailbox,
-            final int siteId,
+            final long siteId,
             Runnable onCompletion,
             MessageHandler messageHandler) {
-        final int destinationSiteId = rm.sourceSite();
+        final long destinationSiteId = rm.sourceSite();
         /*
          * First make sure the recovering partition didn't go down before this message was received.
          * Return null so no recovery work is done.
          */
-        boolean isUp = false;
-        for (int up : tracker.getUpExecutionSites()) {
-            if (destinationSiteId == up) {
-                isUp = true;
-            }
-        }
-        if (!isUp) {
+        if (!tracker.getAllSites().contains(destinationSiteId)) {
             return null;
         }
 
@@ -770,13 +767,13 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
         }
 
         recoveryLog.info("Found " + tables.size() + " tables to recover");
-        HashMap<Pair<String, Integer>, HashSet<Integer>> tableToDestinationSite =
-            new HashMap<Pair<String, Integer>, HashSet<Integer>>();
+        HashMap<Pair<String, Integer>, HashSet<Long>> tableToDestinationSite =
+            new HashMap<Pair<String, Integer>, HashSet<Long>>();
         for (Pair<String, Integer> table : tables) {
             recoveryLog.info("Initiating recovery for table " + table.getFirst());
-            HashSet<Integer> destinations = tableToDestinationSite.get(table);
+            HashSet<Long> destinations = tableToDestinationSite.get(table);
             if (destinations == null) {
-                destinations = new HashSet<Integer>();
+                destinations = new HashSet<Long>();
                 tableToDestinationSite.put(table, destinations);
             }
             destinations.add(destinationSiteId);
@@ -785,7 +782,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
 
         RecoverySiteProcessorSource source = null;
         try {
-            SocketChannel sc = createRecoveryConnection(rm.address(), rm.port());
+            SocketChannel sc = createRecoveryConnection(rm.addresses(), rm.port());
 
             final long destinationTxnId = rm.txnId();
             source = new RecoverySiteProcessorSource(
@@ -800,27 +797,54 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                     messageHandler,
                     sc);
         } catch (IOException e) {
-            String ip = "invalid";
-            try {
-                InetAddress addr = InetAddress.getByAddress(rm.address());
-                ip = addr.getHostAddress();
-            } catch (UnknownHostException ignore) {}
+            StringBuilder sb = new StringBuilder();
+            sb.append(" attempted addresses -> ");
+
+            for (byte address[] : rm.addresses()) {
+                String ip = "invalid";
+                try {
+                    InetAddress addr = InetAddress.getByAddress(address);
+                    ip = addr.getHostAddress();
+                } catch (UnknownHostException ignore) {}
+                sb.append(ip).append(',');
+            }
             recoveryLog.error("Unable to create recovery connection, aborting. " +
                               "The recovery message is: txnId -> " + rm.txnId() +
-                              ", address -> " + ip +
+                              ", " + sb.toString() +
                               ", port -> " + rm.port() +
-                              ", source site -> " + rm.sourceSite(), e);
+                              ", source site -> " + CoreUtils.hsIdToString(rm.sourceSite()), e);
             return null;
         }
         return source;
     }
 
-    public static SocketChannel createRecoveryConnection(byte address[], int port) throws IOException {
-        InetAddress inetAddr = InetAddress.getByAddress(address);
-        InetSocketAddress inetSockAddr = new InetSocketAddress(inetAddr, port);
-        SocketChannel sc = SocketChannel.open(inetSockAddr);
+    public static SocketChannel createRecoveryConnection(List<byte[]> addresses, int port) throws IOException {
+        SocketChannel sc = null;
+        List<Exception> exceptions = new ArrayList<Exception>();
+
+        for (byte address[] : addresses) {
+            try {
+                InetAddress inetAddr = InetAddress.getByAddress(address);
+                InetSocketAddress inetSockAddr = new InetSocketAddress(inetAddr, port);
+                recoveryLog.debug("Attempting to create recovery connection to " + inetSockAddr);
+                sc = SocketChannel.open(inetSockAddr);
+                break;
+            } catch (Exception e) {
+                recoveryLog.debug("Failed to create a recovery connection", e);
+                exceptions.add(e);
+            }
+        }
+
+        if (sc == null) {
+            for (Exception e : exceptions) {
+                recoveryLog.fatal("Connection error", e);
+            }
+            throw new IOException("Unable to create recovery connection due to previously logged exceptions");
+        }
+
         sc.configureBlocking(true);
         sc.socket().setTcpNoDelay(true);
+
         return sc;
     }
 

@@ -36,6 +36,7 @@ import org.apache.zookeeper_voltpatches.server.SessionTrackerImpl;
 import org.apache.zookeeper_voltpatches.server.ZooTrace;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.SessionExpiredException;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This is a full featured SessionTracker. It tracks session in grouped by tick
@@ -44,19 +45,20 @@ import org.apache.zookeeper_voltpatches.KeeperException.SessionExpiredException;
  * in a given interval.
  */
 public class SessionTrackerImpl implements SessionTracker {
-    private static final Logger LOG = Logger.getLogger(SessionTrackerImpl.class);
+    private static final VoltLogger LOG = new VoltLogger(SessionTrackerImpl.class.getSimpleName());
 
-    ConcurrentHashMap<Long, Integer> sessionsById = new ConcurrentHashMap<Long, Integer>();
+    ConcurrentHashMap<Long, Long> sessionsById = new ConcurrentHashMap<Long, Long>();
 
     SessionExpirer m_expirer;
 
     public SessionTrackerImpl(SessionExpirer expirer,
-            ConcurrentHashMap<Long, Integer> sessionsAndOwners)
+            ConcurrentHashMap<Long, Long> sessionsAndOwners)
     {
         m_expirer = expirer;
         sessionsById = sessionsAndOwners;
     }
 
+    @Override
     public void dumpSessions(PrintWriter pwriter) {
         pwriter.print("Session Sets (");
         pwriter.println("):");
@@ -81,11 +83,12 @@ public class SessionTrackerImpl implements SessionTracker {
         return sw.toString();
     }
 
+    @Override
     public void removeSession(long sessionId) {
         if (!sessionsById.containsKey(sessionId)) {
             return;
         }
-        int owner = sessionsById.remove(sessionId);
+        long owner = sessionsById.remove(sessionId);
         if (LOG.isTraceEnabled()) {
             ZooTrace.logTraceMessage(LOG, ZooTrace.SESSION_TRACE_MASK,
                     "SessionTrackerImpl --- Removing session 0x"
@@ -93,7 +96,8 @@ public class SessionTrackerImpl implements SessionTracker {
         }
     }
 
-    public void addSession(long id, int owner) {
+    @Override
+    public void addSession(long id, long owner) {
         if (sessionsById.get(id) == null) {
             sessionsById.put(id, owner);
             if (LOG.isTraceEnabled()) {
@@ -111,10 +115,10 @@ public class SessionTrackerImpl implements SessionTracker {
     }
 
     @Override
-    public void expireSessionsWithOwner(int owner) {
-        Iterator<Map.Entry<Long,Integer>> iter = sessionsById.entrySet().iterator();
+    public void expireSessionsWithOwner(long owner) {
+        Iterator<Map.Entry<Long,Long>> iter = sessionsById.entrySet().iterator();
         while (iter.hasNext()) {
-            Map.Entry<Long, Integer> entry = iter.next();
+            Map.Entry<Long, Long> entry = iter.next();
             if (entry.getValue() == owner) {
                 iter.remove();
                 m_expirer.expire(entry.getKey());

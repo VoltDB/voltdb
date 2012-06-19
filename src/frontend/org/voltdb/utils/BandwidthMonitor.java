@@ -21,7 +21,7 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public class BandwidthMonitor {
 

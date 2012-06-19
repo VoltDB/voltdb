@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="deletes"
-VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar`
+VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
 CLASSPATH="$VOLTJAR:../../../lib" #:./obj/com:./obj/com/procedures"
 VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"

@@ -46,19 +46,15 @@ import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Host;
-import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltFile;
 
 public class SnapshotUtil {
@@ -210,7 +206,7 @@ public class SnapshotUtil {
             if (4 != bis.read(crcBuffer.array())) {
                 throw new EOFException(
                         "EOF while attempting to read CRC from snapshot digest " + f +
-                        " on host " + ConnectionUtil.getHostnameOrAddress());
+                        " on host " + CoreUtils.getHostnameOrAddress());
             }
             final int crc = crcBuffer.getInt();
             final InputStreamReader isr = new InputStreamReader(bis, "UTF-8");
@@ -729,7 +725,8 @@ public class SnapshotUtil {
      */
     public static final String constructFilenameForTable(Table table,
                                                          String fileNonce,
-                                                         String hostId)
+                                                         String extension,
+                                                         int hostId)
     {
         StringBuilder filename_builder = new StringBuilder(fileNonce);
         filename_builder.append("-");
@@ -739,17 +736,18 @@ public class SnapshotUtil {
             filename_builder.append("-host_");
             filename_builder.append(hostId);
         }
-        filename_builder.append(".vpt");//Volt partitioned table
+        filename_builder.append(extension);//Volt partitioned table
         return filename_builder.toString();
     }
 
     public static final File constructFileForTable(Table table,
             String filePath,
             String fileNonce,
-            String hostId)
+            String extension,
+            int hostId)
     {
         return new VoltFile(filePath, SnapshotUtil.constructFilenameForTable(
-            table, fileNonce, hostId));
+            table, fileNonce, extension, hostId));
     }
 
     /**
@@ -785,25 +783,6 @@ public class SnapshotUtil {
         }
         return my_tables;
     }
-
-    public static final int[] getPartitionsOnHost(
-            SystemProcedureExecutionContext c, Host h) {
-        final ArrayList<Partition> results = new ArrayList<Partition>();
-        for (final Site s : VoltDB.instance().getCatalogContext().siteTracker.getUpSites()) {
-            if (s.getHost().getTypeName().equals(h.getTypeName())) {
-                if (s.getPartition() != null) {
-                    results.add(s.getPartition());
-                }
-            }
-        }
-        final int retval[] = new int[results.size()];
-        int ii = 0;
-        for (final Partition p : results) {
-            retval[ii++] = Integer.parseInt(p.getTypeName());
-        }
-        return retval;
-    }
-
 
     public static File[] retrieveRelevantFiles(String filePath,
                                                final String fileNonce)

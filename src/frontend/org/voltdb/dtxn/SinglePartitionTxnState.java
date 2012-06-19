@@ -19,6 +19,8 @@ package org.voltdb.dtxn;
 
 import java.util.HashSet;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
@@ -27,9 +29,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 public class SinglePartitionTxnState extends TransactionState {
 
@@ -85,11 +84,7 @@ public class SinglePartitionTxnState extends TransactionState {
                 m_needsRollback = true;
             }
 
-            try {
-                m_mbox.send(initiatorSiteId, 0, response);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
+            m_mbox.send(initiatorHSId, response);
             m_done = true;
         }
         return m_done;
@@ -107,13 +102,7 @@ public class SinglePartitionTxnState extends TransactionState {
 
             // this tells the initiator that the response is a dummy
             response.setRecovering(true);
-
-            try {
-                m_mbox.send(initiatorSiteId, 0, response);
-            } catch (MessagingException e) {
-                throw new RuntimeException(e);
-            }
-
+            m_mbox.send(initiatorHSId, response);
             m_done = true;
         }
         return m_done;
@@ -121,12 +110,12 @@ public class SinglePartitionTxnState extends TransactionState {
 
     @Override
     public String toString() {
-        return "SinglePartitionTxnState initiator: " + initiatorSiteId +
+        return "SinglePartitionTxnState initiator: " + initiatorHSId +
             " txnId: " + TransactionIdManager.toString(txnId);
     }
 
     @Override
-    public void handleSiteFaults(HashSet<Integer> failedSites) {
+    public void handleSiteFaults(HashSet<Long> failedSites) {
         // nothing to be done here.
     }
 

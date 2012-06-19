@@ -28,7 +28,7 @@ import java.util.Random;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.voltdb.BackendTarget;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -49,7 +49,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
     public void testRejoinFuzz2ElectricBoogaloo() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
-        int processors = Runtime.getRuntime().availableProcessors();
+        int processors = CoreUtils.availableProcessors();
         final int numHosts = processors >= 8 ? 6 : 3;
         final int numTuples = 204800 * (processors >= 8 ? 6 : 1);//about 100 megs per
         //final int numTuples = 0;
@@ -63,7 +63,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, true);
-        cluster.setMaxHeap(64);
+        cluster.setMaxHeap(256);
         if (cluster.isValgrind()) {
             //Way to much data in this test. Using less data makes it redundant
             return;
@@ -77,7 +77,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
 
         Client client = ClientFactory.createClient(m_cconfig);
 
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         Random r = new Random();
         StringBuilder sb = new StringBuilder(512);
@@ -149,7 +149,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                                 haveFailed.set(true);
                                 break;
                             }
-                            if (cluster.recoverOne( dead, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                            if (cluster.recoverOne( dead, toConnectTo, "")) {
                                 break;
                             }
                             attempts++;
@@ -192,7 +192,7 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                         haveFailed.set(true);
                         break;
                     }
-                    if (cluster.recoverOne( recoverNow, toConnectTo, m_username + ":" + m_password + "@localhost")) {
+                    if (cluster.recoverOne( recoverNow, toConnectTo, "")) {
                         break;
                     }
                     attempts++;

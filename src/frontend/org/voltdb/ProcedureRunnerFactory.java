@@ -21,13 +21,19 @@ import org.voltdb.catalog.Procedure;
 
 public class ProcedureRunnerFactory {
 
+    protected SiteProcedureConnection m_site;
+    protected SystemProcedureExecutionContext m_context;
+
+    public void configure(SiteProcedureConnection site,
+            SystemProcedureExecutionContext context) {
+        m_site = site;
+        m_context = context;
+    }
+
     public ProcedureRunner create(
             VoltProcedure procedure,
-            int numberOfPartitions,
-            SiteProcedureConnection site,
-            Procedure catProc,
-            HsqlBackend hsql) {
-        return new ProcedureRunner(procedure, numberOfPartitions, site, catProc, hsql);
+            Procedure catProc) {
+        return new ProcedureRunner(procedure, m_site, m_context, catProc);
     }
 
 }

@@ -116,7 +116,7 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
      */
     public int getSerializedSize() {
         // sizes:  as near as I can tell,
-        // 3 is sizeof(short) for buffer length and sizeof(byte) for exception type
+        // 5 is sizeof(int) for buffer length and sizeof(byte) for exception type
         // 4 is sizeof(int) for message string length
         if (m_message == null) {
             return 5 + 4 + p_getSerializedSize();
@@ -136,9 +136,8 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
     /**
      * Serialize this exception to the supplied byte buffer
      * @param b ByteBuffer to serialize this exception to
-     * @throws IOException
      */
-    public void serializeToBuffer(ByteBuffer b) throws IOException {
+    public void serializeToBuffer(ByteBuffer b) {
         assert(getSerializedSize() <= b.remaining());
         b.putInt(getSerializedSize() - 4);
         b.put((byte)getExceptionType().ordinal());
@@ -156,14 +155,13 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
      * Method for subclasses to implement that serializes the subclass's contents to
      * the ByteBuffer
      * @param b ByteBuffer to serialize the subclass contents to
-     * @throws IOException
      */
-    protected void p_serializeToBuffer(ByteBuffer b) throws IOException {}
+    protected void p_serializeToBuffer(ByteBuffer b) {}
 
     /**
      * Method for subclasses to specify what constant from the SerializableExceptions enum
      * is defined for this type of exception
-     * @return Type of excption
+     * @return Type of exception
      */
     protected SerializableExceptions getExceptionType() {
         return SerializableExceptions.GenericSerializableException;

@@ -32,7 +32,6 @@ import java.net.InetSocketAddress;
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
-import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -95,6 +94,7 @@ public class TestExportToFileClient extends TestCase {
 
         LocalCluster cluster = new LocalCluster("exportAuto.jar",
                 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        cluster.overrideAnyRequestForValgrind();
         cluster.setHasLocalServer(true);
         boolean success = cluster.compile(builder);
         assertTrue(success);
@@ -135,8 +135,8 @@ public class TestExportToFileClient extends TestCase {
                     0,
                     false);
 
-        InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT);
-        InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT + 1);
+        InetSocketAddress inetaddr1 = new InetSocketAddress("localhost", cluster.port(0));
+        InetSocketAddress inetaddr2 = new InetSocketAddress("localhost", cluster.port(1));
 
         exportClient1.addServerInfo(inetaddr1);
         exportClient2.addServerInfo(inetaddr2);

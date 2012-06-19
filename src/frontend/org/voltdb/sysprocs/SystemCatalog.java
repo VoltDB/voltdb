@@ -21,13 +21,13 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Return VoltTable results that correspond to JDBC result sets for selected

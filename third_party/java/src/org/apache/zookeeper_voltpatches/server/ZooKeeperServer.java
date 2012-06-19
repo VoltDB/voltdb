@@ -32,9 +32,10 @@ import java.util.Random;
 import java.util.Set;
 import java.util.concurrent.Semaphore;
 
+import javax.management.InstanceAlreadyExistsException;
+
 import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.apache.jute_voltpatches.Record;
-import org.apache.log4j.Logger;
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
@@ -82,6 +83,7 @@ import org.apache.zookeeper_voltpatches.txn.ErrorTxn;
 import org.apache.zookeeper_voltpatches.txn.SetACLTxn;
 import org.apache.zookeeper_voltpatches.txn.SetDataTxn;
 import org.apache.zookeeper_voltpatches.txn.TxnHeader;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class implements a simple standalone ZooKeeperServer. It sets up the
@@ -90,11 +92,11 @@ import org.apache.zookeeper_voltpatches.txn.TxnHeader;
  */
 public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
         Runnable {
-    protected static final Logger LOG;
+    protected static final VoltLogger LOG;
 
     static boolean skipACL;
     static {
-        LOG = Logger.getLogger("ZK-SERVER");
+        LOG = new VoltLogger("ZK-SERVER");
         //Environment.logEnv("Server environment:", LOG);
         skipACL = System.getProperty("zookeeper.skipACL", "no").equals("yes");
         if (skipACL) {
@@ -277,14 +279,21 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
 
             try {
                 jmxDataTreeBean = new DataTreeBean(zkDb.getDataTree());
-                MBeanRegistry.getInstance().register(jmxDataTreeBean,
-                        jmxServerBean);
-            } catch (Exception e) {
-                LOG.warn("Failed to register with JMX", e);
+                MBeanRegistry.getInstance().register(jmxDataTreeBean, jmxServerBean);
+            }
+            catch (Exception e) {
+                LOG.error("Failed to register with JMX.", e);
                 jmxDataTreeBean = null;
             }
-        } catch (Exception e) {
-            LOG.warn("Failed to register with JMX", e);
+        }
+        catch (InstanceAlreadyExistsException e) {
+            LOG.error("Failed to register ZooKeeper with JMX due to a conflict. " +
+            		"You are likely running two VoltDB instances on one system. " +
+            		"This will only affect JMX management.");
+            jmxServerBean = null;
+        }
+        catch (Exception e) {
+            LOG.error("Failed to register with JMX.", e);
             jmxServerBean = null;
         }
     }
@@ -308,7 +317,7 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
                 zkDb.getSessionWithTimeOuts());
     }
 
-    public void closeSessions(int owner) {
+    public void closeSessions(long owner) {
         sessionTracker.expireSessionsWithOwner(owner);
     }
 
@@ -756,10 +765,10 @@ public class ZooKeeperServer implements SessionExpirer, ServerStats.Provider,
                         txnId, getTime(), OpCode.createSession);
                 request.request.rewind();
                 int to = request.request.getInt();
-                txn = new CreateSessionTxn((Integer)request.getOwner());
+                txn = new CreateSessionTxn((Long)request.getOwner());
                 request.request.rewind();
                 sessionTracker.addSession(request.sessionId,
-                        (Integer) request.getOwner());
+                        (Long) request.getOwner());
                 break;
             case OpCode.closeSession:
                 txnHeader = new TxnHeader(request.sessionId, request.cxid,

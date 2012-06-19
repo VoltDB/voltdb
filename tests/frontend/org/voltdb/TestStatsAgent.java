@@ -22,26 +22,25 @@
  */
 package org.voltdb;
 
-import static org.junit.Assert.assertEquals;
-import static org.junit.Assert.assertTrue;
-
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.Arrays;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Set;
-import java.util.concurrent.LinkedBlockingQueue;
 
 import org.junit.After;
+import static org.junit.Assert.assertEquals;
+import static org.junit.Assert.assertTrue;
 import org.junit.Before;
 import org.junit.Test;
+
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.network.*;
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.messaging.FastSerializable;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MockMailbox;
-import org.voltdb.network.Connection;
-import org.voltdb.network.MockConnection;
-import org.voltdb.network.MockWriteStream;
-import org.voltdb.network.WriteStream;
 
 public class TestStatsAgent {
 
@@ -56,9 +55,16 @@ public class TestStatsAgent {
         public WriteStream writeStream() {
             return new MockWriteStream() {
                 @Override
-                public boolean enqueue(FastSerializable f) {
-                    responses.offer((ClientResponseImpl)f);
-                    return true;
+                public void enqueue(ByteBuffer buf) {
+                    ClientResponseImpl cri = new ClientResponseImpl();
+                    buf.clear();
+                    buf.position(4);
+                    try {
+                        cri.initFromBuffer(buf);
+                    } catch (IOException e) {
+                        throw new RuntimeException(e);
+                    }
+                    responses.offer(cri);
                 }
             };
         }
@@ -67,14 +73,15 @@ public class TestStatsAgent {
     @Before
     public void setUp() throws Exception {
         m_mvoltdb = new MockVoltDB();
-        m_mvoltdb.addHost(0);
-        m_mvoltdb.addHost(1);
-        m_mvoltdb.addSite( 1, 0, 0, false);
-        m_mvoltdb.addSite( 2, 1, 0, false);
+        m_mvoltdb.addSite( CoreUtils.getHSIdFromHostAndSite( 0, 1), MailboxType.Initiator);
+        m_mvoltdb.addSite( CoreUtils.getHSIdFromHostAndSite( 1, 2), MailboxType.Initiator);
         VoltDB.replaceVoltDBInstanceForTest(m_mvoltdb);
         m_secondAgent = new StatsAgent();
-        Mailbox mailbox = m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(), 2);
-        MockMailbox.postoffice.get(VoltDB.STATS_MAILBOX_ID).put(2, mailbox);
+        long secondAgentHSId = VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42);
+        VoltDB.instance().getHostMessenger().generateMailboxId(
+                VoltDB.instance().getHostMessenger().getHSIdForLocalSite(42));
+        m_secondAgent.getMailbox(VoltDB.instance().getHostMessenger(), secondAgentHSId);
+        m_mvoltdb.addSite(secondAgentHSId, MailboxType.StatsAgent);
     }
 
     @After

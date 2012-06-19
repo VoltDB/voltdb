@@ -133,16 +133,15 @@ public class TestSneakyExecutionOrderSuite extends RegressionSuite {
         // CONFIG #1: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
 
-        //VoltServerConfig config = new LocalCluster("sneaky.jar", 2, 2, BackendTarget.NATIVE_EE_JNI);
-        VoltServerConfig config = new LocalSingleProcessServer("sneaky-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("sneaky-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("sneaky-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("sneaky-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assert(success);
         builder.addServerConfig(config);
 
         return builder;

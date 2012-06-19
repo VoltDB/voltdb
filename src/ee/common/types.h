@@ -272,7 +272,12 @@ enum ExpressionType {
     EXPRESSION_TYPE_AGGREGATE_SUM                   = 42,
     EXPRESSION_TYPE_AGGREGATE_MIN                   = 43,
     EXPRESSION_TYPE_AGGREGATE_MAX                   = 44,
-    EXPRESSION_TYPE_AGGREGATE_AVG                   = 45
+    EXPRESSION_TYPE_AGGREGATE_AVG                   = 45,
+
+    // -----------------------------
+    // Functions
+    // -----------------------------
+    EXPRESSION_TYPE_FUNCTION_ABS                    = 100,
 
 };
 

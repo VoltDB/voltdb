@@ -30,11 +30,10 @@ import junit.framework.TestCase;
 
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
-import org.voltdb.VoltDB;
 import org.voltdb.messaging.InitiateTaskMessage;
 
 public class TestRestrictedPriorityQueue extends TestCase{
-    int[] m_initiators;
+    long[] m_initiators;
     RestrictedPriorityQueue m_queue;
     TransactionIdManager m_idManager;
     StoredProcedureInvocation m_proc;
@@ -51,10 +50,10 @@ public class TestRestrictedPriorityQueue extends TestCase{
 
     @Override
     public void setUp() throws InterruptedException {
-        m_initiators = new int[2];
+        m_initiators = new long[2];
         m_initiators[0] = 0;
         m_initiators[1] = 1;
-        m_queue = new RestrictedPriorityQueue(m_initiators, 0, null, VoltDB.DTXN_MAILBOX_ID, true);
+        m_queue = new RestrictedPriorityQueue(m_initiators, 0, null, true);
         m_idManager = new TransactionIdManager(0, 0);
         m_txnIds = new Vector<Long>();
         m_proc = new StoredProcedureInvocation();
@@ -107,7 +106,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
 
     private void addTxnToQueue(TransactionState state)
     {
-        m_queue.noteTransactionRecievedAndReturnLastSeen(state.initiatorSiteId, state.txnId, false, state.txnId);
+        m_queue.noteTransactionRecievedAndReturnLastSeen(state.initiatorHSId, state.txnId, false, state.txnId);
         m_queue.add(state);
     }
 
@@ -181,7 +180,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
      * Provide a failure and then prune based on txnids.
      * @param initiatorId
      */
-    public void simulateInitiatorFault(int initiatorId, long globalInitiationPoint) {
+    public void simulateInitiatorFault(long initiatorId, long globalInitiationPoint) {
         m_queue.gotFaultForInitiator(1);
         Iterator<OrderableTransaction> iterator = m_queue.iterator();
         while (iterator.hasNext()) {
@@ -189,7 +188,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
 
             // Execution site does something along these lines
             if (next.txnId > globalInitiationPoint &&
-                next.initiatorSiteId == initiatorId)
+                next.initiatorHSId == initiatorId)
             {
                 iterator.remove();
             }
@@ -240,7 +239,7 @@ public class TestRestrictedPriorityQueue extends TestCase{
         assertEquals(m_queue.size(), 6);
 
         TransactionState peek = (TransactionState)m_queue.peek();
-        simulateInitiatorFault(peek.initiatorSiteId, Long.MIN_VALUE);
+        simulateInitiatorFault(peek.initiatorHSId, Long.MIN_VALUE);
         TransactionState peek2 = (TransactionState)m_queue.peek();
         assertTrue(peek != peek2);
         assertTrue(peek2.txnId > peek.txnId);

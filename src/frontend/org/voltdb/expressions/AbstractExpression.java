@@ -18,7 +18,9 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.List;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -37,13 +39,20 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         LEFT,
         RIGHT,
         VALUE_TYPE,
-        VALUE_SIZE;
+        VALUE_SIZE,
+        ARGS,
     }
 
     protected String m_id;
     protected ExpressionType m_type;
     protected AbstractExpression m_left = null;
     protected AbstractExpression m_right = null;
+    protected List<AbstractExpression> m_args = null; // Never includes left and right "operator args".
+
+    public void setArgs(List<AbstractExpression> arguments) {
+        m_args = arguments;
+    }
+
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
 
@@ -74,6 +83,13 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null) {
             m_right.validate();
         }
+
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.validate();
+            }
+        }
+
         //
         // Expression Type
         //
@@ -117,6 +133,13 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             AbstractExpression right_clone = (AbstractExpression)m_right.clone();
             clone.m_right = right_clone;
         }
+        if (m_args != null) {
+            clone.m_args = new ArrayList<AbstractExpression>();
+            for (AbstractExpression argument : m_args) {
+                clone.m_args.add((AbstractExpression) argument.clone());
+            }
+        }
+
         return clone;
     }
 
@@ -231,11 +254,36 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             if (expr.m_right.equals(m_right) == false)
                 return false;
 
+        if (expr.m_args != null)
+            if (expr.m_args.equals(m_args) == false) {
+                return false;
+        }
+
         if (m_type != expr.m_type)
             return false;
 
         // this abstract base class gets here if the children verify local members
         return true;
+    }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = 0;
+        // hash the children
+        if (m_left != null) {
+            result += m_left.hashCode();
+        }
+        if (m_right != null) {
+            result += m_right.hashCode();
+        }
+        if (m_args != null) {
+            result += m_args.hashCode();
+        }
+        if (m_type != null) {
+            result += m_type.hashCode();
+        }
+        return result;
     }
 
     @Override
@@ -265,6 +313,16 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null) {
             assert (m_right instanceof JSONString);
             stringer.key(Members.RIGHT.name()).value(m_right);
+        }
+
+        if (m_args != null) {
+            stringer.key(Members.ARGS.name()).array();
+            for (AbstractExpression argument : m_args) {
+                assert (argument instanceof JSONString);
+                stringer.value(argument);
+            }
+            stringer.endArray();
+
         }
     }
 
@@ -314,6 +372,24 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             expr.m_right = AbstractExpression.fromJSONObject(obj.getJSONObject(Members.RIGHT.name()), db);
         }
 
+        if (!obj.isNull(Members.ARGS.name())) {
+            ArrayList<AbstractExpression> arguments = new ArrayList<AbstractExpression>();
+            try {
+                JSONArray argsObject = obj.getJSONArray(Members.ARGS.name());
+                if (argsObject != null) {
+                    for (int i = 0; i < argsObject.length(); i++) {
+                        JSONObject argObject = argsObject.getJSONObject(i);
+                        if (argObject != null) {
+                            arguments.add(AbstractExpression.fromJSONObject(argObject, db));
+                        }
+                    }
+                }
+            } catch (JSONException e) {
+                // ok for it not to be there?
+            }
+            expr.setArgs(arguments);
+        }
+
         expr.loadFromJSONObject(obj, db);
 
         return expr;
@@ -343,6 +419,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null) {
             m_right.findAllSubexpressionsOfType_recurse(type, collected);
         }
+        if (m_args != null) {
+        for (AbstractExpression argument : m_args) {
+            argument.findAllSubexpressionsOfType_recurse(type, collected);
+        }
+    }
     }
 
     /**
@@ -360,6 +441,13 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         if (m_right != null && m_right.hasAnySubexpressionOfType(type)) {
             return true;
+        }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                if (argument.hasAnySubexpressionOfType(type)) {
+                    return true;
+                }
+            }
         }
         return false;
     }
@@ -385,6 +473,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null) {
             m_right.findAllSubexpressionsOfClass_recurse(aeClass, collected);
         }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.findAllSubexpressionsOfClass_recurse(aeClass, collected);
+            }
+        }
     }
 
     /**
@@ -403,6 +496,27 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null && m_right.hasAnySubexpressionOfClass(aeClass)) {
             return true;
         }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                if (argument.hasAnySubexpressionOfClass(aeClass)) {
+                    return true;
+                }
+            }
+        }
+        return false;
+    }
+
+    /**
+     * Convenience method for determining whether an Expression object should have a child
+     * Expression on its RIGHT side. The follow types of Expressions do not need a right child:
+     *      OPERATOR_NOT
+     *      COMPARISON_IN
+     *      OPERATOR_IS_NULL
+     *      AggregageExpression
+     *
+     * @return Does this expression need a right expression to be valid?
+     */
+    public boolean needsRightExpression() {
         return false;
     }
 

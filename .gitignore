@@ -6,6 +6,7 @@
 /last_junit_suite.log
 *.pyc
 *.swp
+*~
 buildstring.txt
 /plannerlog.txt
 obj/
@@ -13,10 +14,17 @@ obj/
 /src/ee/catalog/*
 /src/ee/tags
 /src/ee/org_voltdb_jni_ExecutionEngine.h
-/src/ee/org_voltdb_utils_DBBPool.h
+/src/ee/org_voltcore_utils_DBBPool.h
 /src/frontend/org/voltdb/catalog/*.java
 /voltdb/libvoltdb*.so
 /voltdb/voltdb*.jar
+/examples/*/*.jar
 /.DS_Store
 debugoutput/
-/voltdbroot/
+voltdbroot/
+log/
+voltipc.xcodeproj/
+.cache/
+*runapp*.py
+*.log
+tests/test_apps/*/*.jar

@@ -25,7 +25,6 @@ package org.voltdb.regressionsuites;
 
 import java.io.IOException;
 import java.math.BigDecimal;
-import java.math.MathContext;
 
 import junit.framework.Test;
 
@@ -33,7 +32,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
-import org.voltdb.client.ClientFactory;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestDecimalDefaults extends RegressionSuite
@@ -60,27 +58,20 @@ public class TestDecimalDefaults extends RegressionSuite
     }
 
     public void testDecimalDefaults() throws Exception {
-        final Client client = ClientFactory.createClient();
+        final Client client = getClient();
 
-        try {
-            client.createConnection("localhost");
-            client.callProcedure("Insert", 13);
-            VoltTable results = client.callProcedure("Select", 13).getResults()[0];
-            results.advanceRow();
-            BigDecimal answer = (BigDecimal)results.get("A3", VoltType.DECIMAL);
-            assertEquals(0, answer.compareTo(new BigDecimal(0)));
-            answer = (BigDecimal)results.get("A4", VoltType.DECIMAL);
-            assertEquals(0, answer.compareTo(new BigDecimal(999)));
-            answer = (BigDecimal)results.get("A5", VoltType.DECIMAL);
-            assertEquals(0, answer.compareTo(new BigDecimal(999)));
-            // ENG-1098
-            answer = (BigDecimal)results.get("A6", VoltType.DECIMAL);
-            assertEquals(0, answer.compareTo(new BigDecimal("1.012345678901")));
-        }
-        finally
-        {
-            client.close();
-        }
+        client.callProcedure("Insert", 13);
+        VoltTable results = client.callProcedure("Select", 13).getResults()[0];
+        results.advanceRow();
+        BigDecimal answer = (BigDecimal)results.get("A3", VoltType.DECIMAL);
+        assertEquals(0, answer.compareTo(new BigDecimal(0)));
+        answer = (BigDecimal)results.get("A4", VoltType.DECIMAL);
+        assertEquals(0, answer.compareTo(new BigDecimal(999)));
+        answer = (BigDecimal)results.get("A5", VoltType.DECIMAL);
+        assertEquals(0, answer.compareTo(new BigDecimal(999)));
+        // ENG-1098
+        answer = (BigDecimal)results.get("A6", VoltType.DECIMAL);
+        assertEquals(0, answer.compareTo(new BigDecimal("1.012345678901")));
     }
 
     static public Test suite() throws IOException {
@@ -90,7 +81,7 @@ public class TestDecimalDefaults extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalSingleProcessServer config = new LocalSingleProcessServer("decimal-default.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        LocalCluster config = new LocalCluster("decimal-default.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
 

@@ -22,7 +22,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SysProcSelector;
@@ -46,8 +46,8 @@ public class SnapshotStatus extends VoltSystemProcedure {
 
     public VoltTable[] run(SystemProcedureExecutionContext ctx) throws VoltAbortException
     {
-        ArrayList<Integer> catalogIds = new ArrayList<Integer>();
-        catalogIds.add(0);
+        ArrayList<Long> catalogIds = new ArrayList<Long>();
+        catalogIds.add(0L);
         return new VoltTable[] {
             VoltDB.instance().getStatsAgent().getStats(SysProcSelector.SNAPSHOTSTATUS,
                                                        catalogIds,

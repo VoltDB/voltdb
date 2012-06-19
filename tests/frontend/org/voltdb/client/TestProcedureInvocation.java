@@ -33,7 +33,6 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 
@@ -126,7 +125,7 @@ public class TestProcedureInvocation extends TestCase{
 
 
     public void verifySpi(StoredProcedureInvocation spi) throws Exception {
-        assertEquals(spi.getClientHandle(), 10);
+        assertEquals(10, spi.getClientHandle());
         assertEquals(spi.getProcName(), "invocation1");
         assertEquals(spi.getParams().toArray()[0], byteparam);
         assertEquals(spi.getParams().toArray()[1], shortparam);
@@ -189,20 +188,21 @@ public class TestProcedureInvocation extends TestCase{
     }
 
     /** Mimic the de/ser path from client to client interface */
-    public void testWriteExternal() throws Exception {
+    public void testRoundTrip() throws Exception {
         assertEquals(10, pi.getHandle());
-        FastSerializer fs = new FastSerializer();
+        ByteBuffer buf = ByteBuffer.allocate(pi.getSerializedSize());
         try {
-            pi.writeExternal(fs);
+            pi.flattenToBuffer(buf);
         } catch (IOException e) {
             e.printStackTrace();
             fail();
         }
 
-        FastDeserializer fds = new FastDeserializer(fs.getBytes());
-        StoredProcedureInvocation spi = null;
+        buf.flip();
+
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
         try {
-            spi = fds.readObject(StoredProcedureInvocation.class);
+            spi.initFromBuffer(buf);
         } catch (IOException e) {
             e.printStackTrace();
             fail();
@@ -216,21 +216,36 @@ public class TestProcedureInvocation extends TestCase{
      * @throws IOException
      */
     public void testWriteReplicated() throws IOException {
-        ProcedureInvocation invocation = new ProcedureInvocation(0, 0, "test", 1);
-        FastSerializer fs = new FastSerializer();
-        fs.writeObject(invocation);
+        ProcedureInvocation invocation = new ProcedureInvocation(12345, 54321, "test", 1);
+        ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
+        try {
+            invocation.flattenToBuffer(buf);
+        } catch (IOException e) {
+            e.printStackTrace();
+            fail();
+        }
 
-        FastDeserializer fds = new FastDeserializer(fs.getBytes());
-        StoredProcedureInvocation spi = fds.readObject(StoredProcedureInvocation.class);
-        assertEquals(0, spi.getOriginalTxnId());
+        buf.flip();
+
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        try {
+            spi.initFromBuffer(buf);
+        } catch (IOException e) {
+            e.printStackTrace();
+            fail();
+        }
+
+        assertEquals(54321, spi.getClientHandle());
+        assertEquals(12345, spi.getOriginalTxnId());
+        assertEquals("test", spi.getProcName());
     }
 
     public void testGetAsBytes() throws Exception {
         StoredProcedureInvocation spi = null;
         try {
-            FastSerializer fs = new FastSerializer();
-            fs.writeObject(pi);
-            FastDeserializer fd = new FastDeserializer(fs.getBytes());
+            ByteBuffer buf = ByteBuffer.allocate(pi.getSerializedSize());
+            pi.flattenToBuffer(buf);
+            FastDeserializer fd = new FastDeserializer(buf.array());
             spi = fd.readObject(StoredProcedureInvocation.class);
         } catch (IOException e) {
             e.printStackTrace();
@@ -239,31 +254,4 @@ public class TestProcedureInvocation extends TestCase{
 
         verifySpi(spi);
     }
-
-    /** Differs from above only by using getBuffer v. getBytes */
-    public void testGetAsBuffer() throws Exception {
-        ByteBuffer buf = null;
-        try {
-            FastSerializer fs = new FastSerializer();
-            buf = fs.writeObjectForMessaging(pi).b;
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
-
-        // advance the buffer position past the length framing value
-        // (getAsBuffer() produces a messaging representation).
-        buf.position(4);
-        FastDeserializer fds = new FastDeserializer(buf);
-        StoredProcedureInvocation spi = null;
-        try {
-            spi = fds.readObject(StoredProcedureInvocation.class);
-        } catch (IOException e) {
-            e.printStackTrace();
-            fail();
-        }
-
-        verifySpi(spi);
-    }
-
 }

@@ -28,18 +28,19 @@ import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.TimeUnit;
 
 import org.json_voltpatches.JSONObject;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.BinaryPayloadMessage;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.network.Connection;
+
+import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.messaging.BinaryPayloadMessage;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.network.Connection;
+
 import org.voltdb.utils.CompressionService;
 
 /**
@@ -57,10 +58,10 @@ public class StatsAgent {
     private long m_nextRequestId = 0;
     private Mailbox m_mailbox;
     private final ScheduledThreadPoolExecutor m_es =
-        org.voltdb.utils.MiscUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, 1024 * 128);
+        org.voltcore.utils.CoreUtils.getScheduledThreadPoolExecutor("StatsAgent", 1, 1024 * 128);
 
-    private final HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>> registeredStatsSources =
-        new HashMap<SysProcSelector, HashMap<Integer, ArrayList<StatsSource>>>();
+    private final HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>> registeredStatsSources =
+        new HashMap<SysProcSelector, HashMap<Long, ArrayList<StatsSource>>>();
 
     private final HashSet<SysProcSelector> handledSelectors = new HashSet<SysProcSelector>();
 
@@ -90,13 +91,13 @@ public class StatsAgent {
     public StatsAgent() {
         SysProcSelector selectors[] = SysProcSelector.values();
         for (int ii = 0; ii < selectors.length; ii++) {
-            registeredStatsSources.put(selectors[ii], new HashMap<Integer, ArrayList<StatsSource>>());
+            registeredStatsSources.put(selectors[ii], new HashMap<Long, ArrayList<StatsSource>>());
         }
         handledSelectors.add(SysProcSelector.PROCEDURE);
     }
 
-    public Mailbox getMailbox(final HostMessenger hostMessenger, final int siteId) {
-        m_mailbox = new LocalMailbox(hostMessenger, siteId) {
+    public void getMailbox(final HostMessenger hostMessenger, final long hsId) {
+        m_mailbox = new LocalMailbox(hostMessenger, hsId) {
             @Override
             public void deliver(final VoltMessage message) {
                 m_es.submit(new Runnable() {
@@ -107,7 +108,7 @@ public class StatsAgent {
                 });
             }
         };
-        return m_mailbox;
+        hostMessenger.registerMailbox(m_mailbox);
     }
 
     private void handleMailboxMessage(VoltMessage message) {
@@ -207,7 +208,10 @@ public class StatsAgent {
                 final ClientResponseImpl errorResponse =
                     new ClientResponseImpl(ClientResponse.GRACEFUL_FAILURE,
                                          new VoltTable[0], "Too many pending stat requests", clientHandle);
-                c.writeStream().enqueue(errorResponse);
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                errorResponse.flattenToBuffer(buf).flip();
+                c.writeStream().enqueue(buf);
                 return;
             }
         }
@@ -232,14 +236,14 @@ public class StatsAgent {
 
         JSONObject obj = new JSONObject();
         obj.put("requestId", requestId);
-        obj.put("returnAddress", m_mailbox.getSiteId());
+        obj.put("returnAddress", m_mailbox.getHSId());
         obj.put("selector", "DRNODE");
         byte payloadBytes[] = CompressionService.compressBytes(obj.toString(4).getBytes("UTF-8"));
-        final SiteTracker st = VoltDB.instance().getCatalogContext().siteTracker;
-        for (Integer host : st.getAllLiveHosts()) {
+        final SiteTracker st = VoltDB.instance().getSiteTracker();
+        for (long agent : st.getStatsAgents()) {
             psr.expectedStatsResponses++;
             BinaryPayloadMessage bpm = new BinaryPayloadMessage(new byte[] {JSON_PAYLOAD}, payloadBytes);
-            m_mailbox.send( st.getFirstNonExecSiteForHost(host), VoltDB.STATS_MAILBOX_ID, bpm);
+            m_mailbox.send(agent, bpm);
         }
     }
 
@@ -257,7 +261,10 @@ public class StatsAgent {
                     null,
                     new VoltTable[0], "Stats request hit sixty second timeout before all responses were received");
         response.setClientHandle(psr.clientData);
-        psr.c.writeStream().enqueue(response);
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf).flip();
+        psr.c.writeStream().enqueue(buf);
     }
 
     private void sendStatsResponse(PendingStatsRequest request) throws Exception {
@@ -281,7 +288,10 @@ public class StatsAgent {
         ClientResponseImpl response =
             new ClientResponseImpl(statusCode, Byte.MIN_VALUE, null, responseTables, statusString);
         response.setClientHandle(request.clientData);
-        request.c.writeStream().enqueue(response);
+        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf.putInt(buf.capacity() - 4);
+        response.flattenToBuffer(buf).flip();
+        request.c.writeStream().enqueue(buf);
     }
 
     private void handleJSONMessage(JSONObject obj) throws Exception {
@@ -293,10 +303,10 @@ public class StatsAgent {
     }
 
     private void collectDRStats(JSONObject obj) throws Exception {
-        List<Integer> catalogIds = Arrays.asList(new Integer[] { 0 });
+        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
         Long now = System.currentTimeMillis();
         long requestId = obj.getLong("requestId");
-        int returnAddress = obj.getInt("returnAddress");
+        long returnAddress = obj.getLong("returnAddress");
 
         VoltTable partitionStats = getStats(SysProcSelector.DRPARTITION, catalogIds, false, now);
         VoltTable nodeStats = getStats(SysProcSelector.DRNODE, catalogIds, false, now);
@@ -309,7 +319,7 @@ public class StatsAgent {
             responseBuffer.putLong(requestId);
             byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
             BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
-            m_mailbox.send( returnAddress, VoltDB.STATS_MAILBOX_ID, bpm);
+            m_mailbox.send(returnAddress, bpm);
             return;
         }
 
@@ -330,13 +340,13 @@ public class StatsAgent {
         byte responseBytes[] = CompressionService.compressBytes(responseBuffer.array());
 
         BinaryPayloadMessage bpm = new BinaryPayloadMessage( new byte[] {STATS_PAYLOAD}, responseBytes);
-        m_mailbox.send( returnAddress, VoltDB.STATS_MAILBOX_ID, bpm);
+        m_mailbox.send(returnAddress, bpm);
     }
 
-    public synchronized void registerStatsSource(SysProcSelector selector, int catalogId, StatsSource source) {
+    public synchronized void registerStatsSource(SysProcSelector selector, long catalogId, StatsSource source) {
         assert selector != null;
         assert source != null;
-        final HashMap<Integer, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
+        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
         assert catalogIdToStatsSources != null;
         ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogId);
         if (statsSources == null) {
@@ -348,13 +358,13 @@ public class StatsAgent {
 
     public synchronized VoltTable getStats(
             final SysProcSelector selector,
-            final List<Integer> catalogIds,
+            final List<Long> catalogIds,
             final boolean interval,
             final Long now) {
         assert selector != null;
         assert catalogIds != null;
         assert catalogIds.size() > 0;
-        final HashMap<Integer, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
+        final HashMap<Long, ArrayList<StatsSource>> catalogIdToStatsSources = registeredStatsSources.get(selector);
         assert catalogIdToStatsSources != null;
 
         ArrayList<StatsSource> statsSources = catalogIdToStatsSources.get(catalogIds.get(0));
@@ -386,7 +396,7 @@ public class StatsAgent {
         }
         final VoltTable resultTable = new VoltTable(columns);
 
-        for (Integer catalogId : catalogIds) {
+        for (Long catalogId : catalogIds) {
             statsSources = catalogIdToStatsSources.get(catalogId);
             assert statsSources != null;
             for (final StatsSource ss : statsSources) {

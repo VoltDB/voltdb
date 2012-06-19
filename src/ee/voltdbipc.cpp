@@ -240,8 +240,16 @@ static void writeOrDie(int fd, unsigned char *data, ssize_t sz) {
  */
 static VoltDBIPC *currentVolt = NULL;
 
-// defined in voltdbjni.cpp
-extern void deserializeParameterSetCommon(int, voltdb::ReferenceSerializeInput&, voltdb::GenericValueArray<voltdb::NValue>&, Pool *stringPool);
+/**
+ * Utility used for deserializing ParameterSet passed from Java.
+ */
+void deserializeParameterSetCommon(int cnt, ReferenceSerializeInput &serialize_in,
+                                   NValueArray &params, Pool *stringPool)
+{
+    for (int i = 0; i < cnt; ++i) {
+        params[i] = NValue::deserializeFromAllocateForStorage(serialize_in, stringPool);
+    }
+}
 
 VoltDBIPC::VoltDBIPC(int fd) : m_fd(fd) {
     currentVolt = this;
@@ -417,24 +425,27 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
     struct initialize {
         struct ipc_command cmd;
         int clusterId;
-        int siteId;
+        long siteId;
         int partitionId;
         int hostId;
         int64_t logLevels;
+        int64_t tempTableMemory;
+        int32_t totalPartitions;
         int16_t hostnameLength;
         char hostname[0];
-        int64_t tempTableMemory;
-    };
+    }__attribute__((packed));
     struct initialize * cs = (struct initialize*) cmd;
 
-    printf("initialize: cluster=%d, site=%d\n",
-           ntohl(cs->clusterId), ntohl(cs->siteId));
+    printf("initialize: cluster=%d, site=%jd\n",
+           ntohl(cs->clusterId), (intmax_t)ntohll(cs->siteId));
     cs->clusterId = ntohl(cs->clusterId);
-    cs->siteId = ntohl(cs->siteId);
+    cs->siteId = ntohll(cs->siteId);
     cs->partitionId = ntohl(cs->partitionId);
     cs->hostId = ntohl(cs->hostId);
     cs->hostnameLength = ntohs(cs->hostnameLength);
+    cs->logLevels = ntohll(cs->logLevels);
     cs->tempTableMemory = ntohll(cs->tempTableMemory);
+    cs->totalPartitions = ntohl(cs->totalPartitions);
     std::string hostname(cs->hostname, cs->hostnameLength);
     try {
         m_engine = new VoltDBEngine(new voltdb::IPCTopend(this), new voltdb::StdoutLogProxy());
@@ -447,7 +458,8 @@ int8_t VoltDBIPC::initialize(struct ipc_command *cmd) {
                                  cs->partitionId,
                                  cs->hostId,
                                  hostname,
-                                 cs->tempTableMemory) == true) {
+                                 cs->tempTableMemory,
+                                 cs->totalPartitions) == true) {
             return kErrorCode_Success;
         }
     } catch (FatalException e) {
@@ -1289,6 +1301,7 @@ int main(int argc, char **argv) {
 
         // dispatch the request
         struct ipc_command *cmd = (struct ipc_command*) data;
+
         // size at least length + command
         if (ntohl(cmd->msgsize) < sizeof(struct ipc_command)) {
             printf("bytesread=%zx cmd=%d msgsize=%d\n",

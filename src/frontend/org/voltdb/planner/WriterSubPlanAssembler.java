@@ -17,9 +17,12 @@
 
 package org.voltdb.planner;
 
-import java.util.*;
-import org.voltdb.catalog.*;
-import org.voltdb.plannodes.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+
+import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
+import org.voltdb.plannodes.AbstractPlanNode;
 
 /**
  * For a delete or update plan, this class builds the part of the plan
@@ -45,12 +48,11 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
      *
      * @param db The catalog's Database object.
      * @param parsedStmt The parsed and dissected statement object describing the sql to execute.
-     * @param singlePartition Does this statement access one or multiple partitions?
+     * @param partitioning Describes the specified and inferred partition context.
      */
-    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, boolean singlePartition,
-                           int partitionCount)
+    WriterSubPlanAssembler(Database db, AbstractParsedStmt parsedStmt, PartitioningForStatement partitioning)
     {
-        super(db, parsedStmt, singlePartition, partitionCount);
+        super(db, parsedStmt, partitioning);
 
         assert(m_parsedStmt.tableList.size() == 1);
         m_targetTable = m_parsedStmt.tableList.get(0);
@@ -64,10 +66,13 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
     AbstractPlanNode nextPlan() {
         if (!m_generatedPlans) {
             m_generatedPlans = true;
-            // for each table, just add the empty access path (the full table scan)
             Table nextTables[] = new Table[0];
             ArrayList<AccessPath> paths = getRelevantAccessPathsForTable(m_targetTable, nextTables);
-
+            if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_partitioning.getCountOfPartitionedTables() > 0) {
+                m_partitioning.setEffectiveValue(null);
+                // Search the one partitioned table for a constant- or parameter-based equality filter that would justify SP processing.
+                AccessPath.tagForMultiPartitionAccess(new Table[] { m_targetTable }, new AccessPath[] { paths.get(0) }, m_partitioning);
+            }
             // for each access path
             for (AccessPath accessPath : paths) {
                 // get a plan
@@ -79,13 +84,4 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
         return m_plans.poll();
     }
 
-    /**
-     * Determines whether a table will require a distributed scan.
-     * @param table The table that may or may not require a distributed scan
-     * @return true if the table requires a distributed scan, false otherwise
-     */
-    @Override
-    protected boolean tableRequiresDistributedScan(Table table) {
-        return m_singlePartition == false;
-    }
 }

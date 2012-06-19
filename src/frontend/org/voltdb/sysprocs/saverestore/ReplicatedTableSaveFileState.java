@@ -20,7 +20,9 @@ package org.voltdb.sysprocs.saverestore;
 import java.io.IOException;
 import java.util.HashSet;
 import java.util.Set;
+import java.util.TreeSet;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
@@ -30,6 +32,8 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     ReplicatedTableSaveFileState(String tableName, long txnId)
     {
         super(tableName, txnId);
@@ -41,7 +45,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         assert(row.getString("TABLE").equals(getTableName()));
 
         checkSiteConsistency(row); // throws if inconsistent
-        // XXX this cast should be safe; site_ids are ints but get
+        // this cast should be safe; site_ids are ints but get
         // promoted to long in the VoltTable.row.getLong return
         m_hostsWithThisTable.add((int) row.getLong("CURRENT_HOST_ID"));
     }
@@ -49,7 +53,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     @Override
     public boolean isConsistent()
     {
-        // XXX right now there is nothing to check across all rows
+        // right now there is nothing to check across all rows
         m_consistencyResult = "Table: " + getTableName() +
             " has consistent savefile state.";
         return true;
@@ -64,8 +68,7 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     generateRestorePlan(Table catalogTable)
     {
         for (int hostId : m_hostsWithThisTable) {
-            m_sitesWithThisTable.addAll(VoltDB.instance().getCatalogContext().
-                                        siteTracker.getLiveExecutionSitesForHost(hostId));
+            m_sitesWithThisTable.addAll(VoltDB.instance().getSiteTracker().getSitesForHost(hostId));
         }
 
         SynthesizedPlanFragment[] restore_plan = null;
@@ -75,7 +78,9 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         }
         else
         {
-            // XXX Not implemented until we're going to support catalog changes
+            // Not implemented until we're going to support catalog changes
+            hostLog.error("Unable to convert replicated table " + getTableName() + " to partitioned because " +
+                    "the conversion is currently unsupported.");
         }
         return restore_plan;
     }
@@ -96,9 +101,9 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     generateReplicatedToReplicatedPlan()
     {
         SynthesizedPlanFragment[] restore_plan = null;
-        Set<Integer> execution_site_ids =
-            VoltDB.instance().getCatalogContext().siteTracker.getExecutionSiteIds();
-        Set<Integer> sites_missing_table =
+        Set<Long> execution_site_ids =
+            VoltDB.instance().getSiteTracker().getAllSites();
+        Set<Long> sites_missing_table =
             getSitesMissingTable(execution_site_ids);
         // not sure we want to deal with handling expected load failures,
         // so let's send an individual load to each site with the table
@@ -106,17 +111,17 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         restore_plan =
             new SynthesizedPlanFragment[execution_site_ids.size() + 1];
         int restore_plan_index = 0;
-        for (Integer site_id : m_sitesWithThisTable)
+        for (Long site_id : m_sitesWithThisTable)
         {
             restore_plan[restore_plan_index] =
                 constructLoadReplicatedTableFragment();
             restore_plan[restore_plan_index].siteId = site_id;
             ++restore_plan_index;
         }
-        for (Integer site_id : sites_missing_table)
+        for (Long site_id : sites_missing_table)
         {
-            int source_site_id =
-                m_sitesWithThisTable.iterator().next(); // XXX hacky
+            long source_site_id =
+                m_sitesWithThisTable.iterator().next();
             restore_plan[restore_plan_index] =
                 constructDistributeReplicatedTableFragment(source_site_id,
                                                            site_id);
@@ -128,10 +133,10 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         return restore_plan;
     }
 
-    private Set<Integer> getSitesMissingTable(Set<Integer> clusterSiteIds)
+    private Set<Long> getSitesMissingTable(Set<Long> clusterSiteIds)
     {
-        Set<Integer> sites_missing_table = new HashSet<Integer>();
-        for (int site_id : clusterSiteIds)
+        Set<Long> sites_missing_table = new HashSet<Long>();
+        for (long site_id : clusterSiteIds)
         {
             if (!m_sitesWithThisTable.contains(site_id))
             {
@@ -159,8 +164,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private SynthesizedPlanFragment
-    constructDistributeReplicatedTableFragment(int sourceSiteId,
-                                               int destinationSiteId)
+    constructDistributeReplicatedTableFragment(long sourceSiteId,
+                                               long destinationSiteId)
     {
         int result_dependency_id = getNextDependencyId();
         SynthesizedPlanFragment plan_fragment = new SynthesizedPlanFragment();
@@ -196,5 +201,5 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private final Set<Integer> m_hostsWithThisTable = new HashSet<Integer>();
-    private final Set<Integer> m_sitesWithThisTable = new HashSet<Integer>();
+    private final Set<Long> m_sitesWithThisTable = new TreeSet<Long>();
 }

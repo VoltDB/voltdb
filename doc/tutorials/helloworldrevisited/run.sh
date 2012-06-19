@@ -1,7 +1,7 @@
 #!/usr/bin/env bash
 
 APPNAME="helloworld"
-VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar`
+VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
 CLASSPATH="$VOLTJAR:../../../lib"
 VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"
@@ -15,7 +15,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -classpath $CLASSPATH -d obj *.java
+    javac -target 1.6 -classpath $CLASSPATH -d obj *.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }

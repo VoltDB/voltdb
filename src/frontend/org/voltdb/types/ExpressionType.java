@@ -17,9 +17,22 @@
 
 package org.voltdb.types;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
-import org.voltdb.expressions.*;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.AggregateExpression;
+import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.ConjunctionExpression;
+import org.voltdb.expressions.ConstantValueExpression;
+import org.voltdb.expressions.FunctionExpression;
+import org.voltdb.expressions.InComparisonExpression;
+import org.voltdb.expressions.NullValueExpression;
+import org.voltdb.expressions.OperatorExpression;
+import org.voltdb.expressions.ParameterValueExpression;
+import org.voltdb.expressions.TupleAddressExpression;
+import org.voltdb.expressions.TupleValueExpression;
 
 /**
  *
@@ -92,7 +105,15 @@ public enum ExpressionType {
     AGGREGATE_SUM                 (AggregateExpression.class, 42),
     AGGREGATE_MIN                 (AggregateExpression.class, 43),
     AGGREGATE_MAX                 (AggregateExpression.class, 44),
-    AGGREGATE_AVG                 (AggregateExpression.class, 45)
+    AGGREGATE_AVG                 (AggregateExpression.class, 45),
+
+    // ----------------------------
+    // Function
+    // ----------------------------
+    //TODO: Should there be multiple classes for function expressions
+    // maybe based on their support for optimization methods?
+    FUNCTION_ABS                  (FunctionExpression.class,  100),
+
     ;
 
     private final int val;
@@ -108,9 +129,9 @@ public enum ExpressionType {
         return this.expressionClass;
     }
 
-    protected static final Map<Integer, ExpressionType> idx_lookup =
+    private static final Map<Integer, ExpressionType> idx_lookup =
         new HashMap<Integer, ExpressionType>();
-    protected static final Map<String, ExpressionType> name_lookup =
+    private static final Map<String, ExpressionType> name_lookup =
         new HashMap<String, ExpressionType>();
 
     static {
@@ -137,14 +158,6 @@ public enum ExpressionType {
         // Let's try this and see what happens
         ExpressionType.name_lookup.put("simplecolumn".intern(),
                                        ExpressionType.VALUE_TUPLE);
-    }
-
-    public static Map<Integer, ExpressionType> getIndexMap() {
-        return idx_lookup;
-    }
-
-    public static Map<String, ExpressionType> getNameMap() {
-        return name_lookup;
     }
 
     public int getValue() {

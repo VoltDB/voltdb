@@ -111,7 +111,7 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   fi
 fi
 
-VOLTDBJAR=`ls $VOLTDB_HOME/voltdb/voltdb-2.*.jar`
+VOLTDBJAR=`ls $VOLTDB_HOME/voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=$VOLTDBJAR
 else
@@ -119,9 +119,7 @@ else
   exit 1
 fi
 
-if [ -d "$VOLTDB_HOME/obj/release/nativelibs" ]; then
-  JAVA_LIBRARY_PATH=${VOLTDB_HOME}/obj/release/nativelibs
-elif [ -d "$VOLTDB_HOME/voltdb" ]; then
+if [ -d "$VOLTDB_HOME/voltdb" ]; then
   JAVA_LIBRARY_PATH=${VOLTDB_HOME}/voltdb
 else
   echo "Couldn't find compiled VoltDB to run."

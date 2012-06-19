@@ -22,34 +22,26 @@ import java.io.FileInputStream;
 import java.io.FileNotFoundException;
 import java.io.FileOutputStream;
 import java.io.IOException;
-import java.io.StringWriter;
 import java.io.SyncFailedException;
-import java.io.UnsupportedEncodingException;
-import java.math.BigDecimal;
-import java.text.SimpleDateFormat;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicReference;
 
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.sysprocs.saverestore.TableSaveFile;
-import org.voltdb.types.TimestampType;
-import org.voltdb.utils.DBBPool.BBContainer;
-
-import au.com.bytecode.opencsv_voltpatches.CSVWriter;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 
 public class CSVTableSaveFile {
     private final AtomicInteger m_availableBytes = new AtomicInteger(0);
     private final int m_maxAvailableBytes = 16777216;
     private final LinkedBlockingQueue<byte[]> m_available = new LinkedBlockingQueue<byte[]>();
-    private final Thread m_converterThreads[] = new Thread[Runtime.getRuntime()
-            .availableProcessors()];
+    private final Thread m_converterThreads[] = new Thread[CoreUtils.availableProcessors()];
     private final AtomicReference<IOException> m_exception = new AtomicReference<IOException>(
             null);
-    private final AtomicInteger m_activeConverters = new AtomicInteger(Runtime
-            .getRuntime().availableProcessors());
+    private final AtomicInteger m_activeConverters = new AtomicInteger(CoreUtils.availableProcessors());
     private final TableSaveFile m_saveFile;
     private final char m_delimiter;
 
@@ -104,10 +96,7 @@ public class CSVTableSaveFile {
 
     private class ConverterThread implements Runnable {
         private void convertChunks() throws IOException, InterruptedException {
-
-            final SimpleDateFormat m_sdf = new SimpleDateFormat(
-                    "yyyy.MM.dd HH:mm:ss:SSS:");
-
+            int lastNumCharacters = 1024 * 64;
             while (!Thread.interrupted() && m_saveFile.hasMoreChunks()) {
                 if (m_availableBytes.get() > m_maxAvailableBytes) {
                     Thread.sleep(5);
@@ -120,77 +109,13 @@ public class CSVTableSaveFile {
                 }
 
                 try {
-                    final int size = c.b.remaining();
                     final VoltTable vt = PrivateVoltTableFactory
                             .createVoltTableFromBuffer(c.b, true);
-                    StringWriter sw = new StringWriter(size * 2);
-                    CSVWriter csv;
-                    if (m_delimiter == '\t')
-                        csv = CSVWriter.getStrictTSVWriter(sw);
-                    else
-                        csv = new CSVWriter(sw, m_delimiter);
-                    String[] fields = new String[vt.getColumnCount()];
-
-                    while (vt.advanceRow()) {
-                        for (int ii = 0; ii < vt.getColumnCount(); ii++) {
-                            final VoltType type = vt.getColumnType(ii);
-                            if (type == VoltType.BIGINT
-                                    || type == VoltType.INTEGER
-                                    || type == VoltType.SMALLINT
-                                    || type == VoltType.TINYINT) {
-                                final long value = vt.getLong(ii);
-                                if (vt.wasNull()) {
-                                    fields[ii] = "NULL";
-                                } else {
-                                    fields[ii] = Long.toString(value);
-                                }
-                            } else if (type == VoltType.FLOAT) {
-                                final double value = vt.getDouble(ii);
-                                if (vt.wasNull()) {
-                                    fields[ii] = "NULL";
-                                } else {
-                                    fields[ii] = Double.toString(value);
-                                }
-                            } else if (type == VoltType.DECIMAL) {
-                                final BigDecimal bd = vt
-                                        .getDecimalAsBigDecimal(ii);
-                                if (vt.wasNull()) {
-                                    fields[ii] = "NULL";
-                                } else {
-                                    fields[ii] = bd.toString();
-                                }
-                            } else if (type == VoltType.STRING) {
-                                final String str = vt.getString(ii);
-                                if (vt.wasNull()) {
-                                    fields[ii] = "NULL";
-                                } else {
-                                    fields[ii] = str;
-                                }
-                            } else if (type == VoltType.TIMESTAMP) {
-                                final TimestampType timestamp = vt
-                                        .getTimestampAsTimestamp(ii);
-                                if (vt.wasNull()) {
-                                    fields[ii] = "NULL";
-                                } else {
-                                    fields[ii] = m_sdf.format(timestamp
-                                            .asApproximateJavaDate());
-                                    fields[ii] += String.valueOf(timestamp
-                                            .getUSec());
-                                }
-                            }
-                        }
-                        csv.writeNext(fields);
-                    }
-                    csv.flush();
-                    byte bytes[] = null;
-                    try {
-                        bytes = sw.toString().getBytes("UTF-8");
-                    } catch (UnsupportedEncodingException e) {
-                        e.printStackTrace();
-                        return;
-                    }
-                    m_availableBytes.addAndGet(bytes.length);
-                    m_available.offer(bytes);
+                    Pair<Integer, byte[]> p = VoltTableUtil.toCSV( vt, m_delimiter, null, lastNumCharacters);
+                    lastNumCharacters = p.getFirst();
+                    byte csvBytes[] = p.getSecond();
+                    m_availableBytes.addAndGet(csvBytes.length);
+                    m_available.offer(csvBytes);
                 } finally {
                     c.discard();
                 }

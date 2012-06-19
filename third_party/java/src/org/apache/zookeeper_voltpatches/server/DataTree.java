@@ -60,6 +60,7 @@ import org.apache.zookeeper_voltpatches.txn.ErrorTxn;
 import org.apache.zookeeper_voltpatches.txn.SetACLTxn;
 import org.apache.zookeeper_voltpatches.txn.SetDataTxn;
 import org.apache.zookeeper_voltpatches.txn.TxnHeader;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class maintains the tree data structure. It doesn't have any networking
@@ -71,7 +72,7 @@ import org.apache.zookeeper_voltpatches.txn.TxnHeader;
  * through the hashtable. The tree is traversed only when serializing to disk.
  */
 public class DataTree {
-    private static final Logger LOG = Logger.getLogger(DataTree.class);
+    private static final VoltLogger LOG = new VoltLogger(DataTree.class.getSimpleName());
 
     /**
      * This hashtable provides a fast lookup to the datanodes. The tree is the
@@ -275,14 +276,14 @@ public class DataTree {
     /**
      * create a /zookeeper filesystem that is the proc filesystem of zookeeper
      */
-    private DataNode procDataNode = new DataNode(root, new byte[0], -1L,
+    private final DataNode procDataNode = new DataNode(root, new byte[0], -1L,
             new StatPersisted());
 
     /**
      * create a /zookeeper/quota node for maintaining quota properties for
      * zookeeper
      */
-    private DataNode quotaDataNode = new DataNode(procDataNode, new byte[0],
+    private final DataNode quotaDataNode = new DataNode(procDataNode, new byte[0],
             -1L, new StatPersisted());
 
     public DataTree() {

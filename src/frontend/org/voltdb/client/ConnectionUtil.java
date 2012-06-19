@@ -20,17 +20,11 @@ package org.voltdb.client;
 import java.io.EOFException;
 import java.io.IOException;
 import java.io.UnsupportedEncodingException;
-import java.net.Inet4Address;
-import java.net.InetAddress;
 import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
-import java.net.UnknownHostException;
 import java.nio.ByteBuffer;
 import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
@@ -42,9 +36,7 @@ import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltdb.ClientInterface;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /**
  * A utility class for opening a connection to a Volt server and authenticating as well
@@ -81,7 +73,7 @@ public class ConnectionUtil {
     }
 
     private static final HashMap<SocketChannel, ExecutorPair> m_executors =
-                                                                             new HashMap<SocketChannel, ExecutorPair>();
+        new HashMap<SocketChannel, ExecutorPair>();
     private static final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
     /**
@@ -121,9 +113,8 @@ public class ConnectionUtil {
      * Integer hostId, Long connectionId, Long timestamp (part of instanceId), Int leaderAddress (part of instanceId).
      * The last object is the build string
      */
-    public static Object[] getAuthenticatedConnection(
-            String host, String username, byte[] hashedPassword, int port) throws IOException
-    {
+    public static Object[] getAuthenticatedConnection(String host, String username,
+                                                      byte[] hashedPassword, int port) throws IOException {
         return getAuthenticatedConnection("database", host, username, hashedPassword, port);
     }
 
@@ -141,67 +132,9 @@ public class ConnectionUtil {
      */
     public static Object[] getAuthenticatedExportConnection(InetSocketAddress address,
             String username, byte[] hashedPassword) throws IOException
-    {
+            {
         return getAuthenticatedConnection("export", address, username, hashedPassword);
-    }
-
-    public static String getHostnameOrAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr.getHostName();
-        } catch (UnknownHostException e) {
-            try {
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return "";
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address.getHostAddress();
-                    }
-                }
-                interfaces = NetworkInterface.getNetworkInterfaces();
-                while (addresses.hasMoreElements()) {
-                    return addresses.nextElement().getHostAddress();
-                }
-                return "";
-            } catch (SocketException e1) {
-                return "";
             }
-        }
-    }
-
-    public static InetAddress getLocalAddress() {
-        try {
-            final InetAddress addr = InetAddress.getLocalHost();
-            return addr;
-        } catch (UnknownHostException e) {
-            try {
-                Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-                if (interfaces == null) {
-                    return null;
-                }
-                NetworkInterface intf = interfaces.nextElement();
-                Enumeration<InetAddress> addresses = intf.getInetAddresses();
-                while (addresses.hasMoreElements()) {
-                    InetAddress address = addresses.nextElement();
-                    if (address instanceof Inet4Address) {
-                        return address;
-                    }
-                }
-                interfaces = NetworkInterface.getNetworkInterfaces();
-                while (addresses.hasMoreElements()) {
-                    return addresses.nextElement();
-                }
-                return null;
-            } catch (SocketException e1) {
-                return null;
-            }
-        }
-    }
 
     private static Object[] getAuthenticatedConnection(
             String service, String host, String username, byte[] hashedPassword, int port)
@@ -209,6 +142,7 @@ public class ConnectionUtil {
         InetSocketAddress address = new InetSocketAddress(host, port);
         return getAuthenticatedConnection(service, address, username, hashedPassword);
     }
+
     private static Object[] getAuthenticatedConnection(
             String service, InetSocketAddress addr, String username, byte[] hashedPassword)
     throws IOException {
@@ -302,7 +236,7 @@ public class ConnectionUtil {
                     throw new IOException("Server has too many connections");
                 case ClientInterface.WIRE_PROTOCOL_TIMEOUT_ERROR:
                     throw new IOException("Connection timed out during authentication. " +
-                            "The VoltDB server may be overloaded.");
+                    "The VoltDB server may be overloaded.");
                 case ClientInterface.EXPORT_DISABLED_REJECTION:
                     throw new IOException("Export not enabled for server");
                 case ClientInterface.WIRE_PROTOCOL_FORMAT_ERROR:
@@ -367,16 +301,18 @@ public class ConnectionUtil {
                 final ProcedureInvocation invocation =
                     new ProcedureInvocation(handle, procName, parameters);
 
-                final FastSerializer fs = new FastSerializer();
-                final BBContainer c = fs.writeObjectForMessaging(invocation);
+                ByteBuffer buf = ByteBuffer.allocate(4 + invocation.getSerializedSize());
+                buf.position(4);
+                invocation.flattenToBuffer(buf);
+                buf.putInt(0, buf.capacity() - 4);
+                buf.flip();
                 do {
-                    channel.write(c.b);
-                    if (c.b.hasRemaining()) {
+                    channel.write(buf);
+                    if (buf.hasRemaining()) {
                         Thread.yield();
                     }
                 }
-                while(c.b.hasRemaining());
-                c.discard();
+                while(buf.hasRemaining());
                 return handle;
             }
         });
@@ -389,37 +325,37 @@ public class ConnectionUtil {
 
     public static Future<ClientResponse> readResponse(final ExecutorService executor, final SocketChannel channel) {
         return executor.submit(new Callable<ClientResponse>() {
-           @Override
-           public ClientResponse call() throws Exception {
-               ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-               do {
-                   final int read = channel.read(lengthBuffer);
-                   if (read == -1) {
-                       throw new EOFException();
-                   }
-                   if (lengthBuffer.hasRemaining()) {
-                       Thread.yield();
-                   }
-               }
-               while (lengthBuffer.hasRemaining());
+            @Override
+            public ClientResponse call() throws Exception {
+                ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
+                do {
+                    final int read = channel.read(lengthBuffer);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                    if (lengthBuffer.hasRemaining()) {
+                        Thread.yield();
+                    }
+                }
+                while (lengthBuffer.hasRemaining());
 
-               lengthBuffer.flip();
-               ByteBuffer message = ByteBuffer.allocate(lengthBuffer.getInt());
-               do {
-                   final int read = channel.read(message);
-                   if (read == -1) {
-                       throw new EOFException();
-                   }
-                   if (lengthBuffer.hasRemaining()) {
-                       Thread.yield();
-                   }
-               }
-               while (message.hasRemaining());
-               message.flip();
-               FastDeserializer fds = new FastDeserializer(message);
-               ClientResponseImpl response = fds.readObject(ClientResponseImpl.class);
-               return response;
-           }
+                lengthBuffer.flip();
+                ByteBuffer message = ByteBuffer.allocate(lengthBuffer.getInt());
+                do {
+                    final int read = channel.read(message);
+                    if (read == -1) {
+                        throw new EOFException();
+                    }
+                    if (lengthBuffer.hasRemaining()) {
+                        Thread.yield();
+                    }
+                }
+                while (message.hasRemaining());
+                message.flip();
+                ClientResponseImpl response = new ClientResponseImpl();
+                response.initFromBuffer(message);
+                return response;
+            }
         });
     }
 }

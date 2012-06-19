@@ -22,7 +22,6 @@ import java.util.List;
 
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.NestLoopPlanNode;
 import org.voltdb.plannodes.NodeSchema;
 import org.voltdb.types.PlanNodeType;
 
@@ -119,6 +118,8 @@ public class CompiledPlan {
      */
     private boolean m_statementIsOrderDeterministic = false;
 
+    private Object m_partitioningKey;
+
     void resetPlanNodeIds() {
         int nextId = 1;
         for (Fragment f : fragments)
@@ -199,6 +200,14 @@ public class CompiledPlan {
             total += apn.findAllNodesOfType(PlanNodeType.SEQSCAN).size();
         }
         return total;
+    }
+
+    public void setPartitioningKey(Object object) {
+        m_partitioningKey = object;
+    }
+
+    public Object getPartitioningKey() {
+        return m_partitioningKey;
     }
 
 }

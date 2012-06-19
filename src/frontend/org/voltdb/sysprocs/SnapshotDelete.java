@@ -23,16 +23,15 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.VoltFile;
 
 @ProcInfo(singlePartition = false)
@@ -68,11 +67,7 @@ public class SnapshotDelete extends VoltSystemProcedure {
         {
             // Choose the lowest site ID on this host to do the deletion.
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 new Thread("Async snapshot deletion thread") {
                     @Override

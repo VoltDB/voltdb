@@ -46,6 +46,8 @@ public class VoltDBFickleCluster extends LocalCluster {
 
     VoltDBFickleCluster() {
         super("fickle1.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        // fickle cluster doesn't yet work with valgrind
+        overrideAnyRequestForValgrind();
     }
 
     public static void killNode() throws Exception {
@@ -53,7 +55,7 @@ public class VoltDBFickleCluster extends LocalCluster {
     }
 
     public static void rejoinNode() throws Exception {
-        m_cluster.recoverOne(1, 0, "localhost");
+        m_cluster.recoverOne(1, 0, "");
     }
 
     public void mutateCatalog() throws Exception {
@@ -117,6 +119,18 @@ public class VoltDBFickleCluster extends LocalCluster {
 
     public static void stop() throws Exception {
         m_cluster.shutDown();
+    }
+
+    public static int getInternalPort(int hostId) {
+        return m_cluster.internalPort(hostId);
+    }
+
+    public static int getPort(int hostId) {
+        return m_cluster.port(hostId);
+    }
+
+    public static int getAdminPort(int hostId) {
+        return m_cluster.adminPort(hostId);
     }
 
 }

@@ -34,7 +34,7 @@ public class MemoryStats extends StatsSource {
         int stringMem = 0;
         long pooledMem = 0;
     }
-    Map<Integer, PartitionMemRow> m_memoryStats = new TreeMap<Integer, PartitionMemRow>();
+    Map<Long, PartitionMemRow> m_memoryStats = new TreeMap<Long, PartitionMemRow>();
 
     public MemoryStats() {
         super(false);
@@ -116,7 +116,7 @@ public class MemoryStats extends StatsSource {
         super.updateStatsRow(rowKey, rowValues);
     }
 
-    public synchronized void eeUpdateMemStats(int siteId,
+    public synchronized void eeUpdateMemStats(long siteId,
                                               long tupleCount,
                                               int tupleDataMem,
                                               int tupleAllocatedMem,

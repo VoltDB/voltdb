@@ -29,6 +29,8 @@ import org.voltdb.client.Client;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
@@ -47,7 +49,6 @@ import org.voltdb.client.ProcedureCallback;
 public class JDBC4ClientConnection implements Closeable {
     private final JDBC4PerfCounterMap statistics;
     private final ArrayList<String> servers;
-    private final int port;
     private final Client client;
 
     /**
@@ -85,9 +86,7 @@ public class JDBC4ClientConnection implements Closeable {
      *            trailing index when the pool decides a new client needs to be created based on the
      *            number of clients).
      * @param servers
-     *            the list of VoltDB servers to connect to.
-     * @param port
-     *            the VoltDB native protocol port to connect to (usually 21212).
+     *            the list of VoltDB servers to connect to in hostname[:port] format.
      * @param user
      *            the user name to use when connecting to the server(s).
      * @param password
@@ -111,21 +110,20 @@ public class JDBC4ClientConnection implements Closeable {
      * @throws UnknownHostException
      */
     protected JDBC4ClientConnection(String clientConnectionKeyBase, String clientConnectionKey,
-            String[] servers, int port, String user, String password, boolean isHeavyWeight,
+            String[] servers, String user, String password, boolean isHeavyWeight,
             int maxOutstandingTxns) throws UnknownHostException, IOException {
         // Save the list of trimmed non-empty server names.
         this.servers = new ArrayList<String>(servers.length);
         for (String server : servers) {
-            String server2 = server.trim();
-            if (!server2.isEmpty()) {
-                this.servers.add(server2);
+            server = server.trim();
+            if (!server.isEmpty()) {
+                this.servers.add(server);
             }
         }
         if (this.servers.isEmpty()) {
             throw new UnknownHostException("JDBC4ClientConnection: no servers provided");
         }
 
-        this.port = port;
         this.keyBase = clientConnectionKeyBase;
         this.key = clientConnectionKey;
         this.statistics = JDBC4ClientConnectionPool.getStatistics(clientConnectionKeyBase);
@@ -140,7 +138,7 @@ public class JDBC4ClientConnection implements Closeable {
         this.client = ClientFactory.createClient(config);
         this.users = 0;
         for (String server : this.servers) {
-            this.client.createConnection(server, this.port);
+            this.client.createConnection(server);
         }
     }
 
@@ -297,18 +295,30 @@ public class JDBC4ClientConnection implements Closeable {
         return future;
     }
 
+
     /**
+     * Gets the new version of the performance statistics for this connection only.
+     * @return A {@link ClientStatsContext} that correctly represents the client statistics.
+     */
+    public ClientStatsContext getClientStatsContext() {
+        return this.client.createStatsContext();
+    }
+
+    /**
+     * @deprecated
      * Gets the global performance statistics for this connection (and all connections with the same
      * parameters).
      *
      * @return the counter map aggregated across all the connections in the pool with the same
      *         parameters as this connection.
      */
+    @Deprecated
     public JDBC4PerfCounterMap getStatistics() {
         return JDBC4ClientConnectionPool.getStatistics(this);
     }
 
     /**
+     * @deprecated
      * Gets the performance statistics for a specific procedure on this connection (and all
      * connections with the same parameters).
      *
@@ -317,11 +327,13 @@ public class JDBC4ClientConnection implements Closeable {
      * @return the counter aggregated across all the connections in the pool with the same
      *         parameters as this connection.
      */
+    @Deprecated
     public JDBC4PerfCounter getStatistics(String procedure) {
         return JDBC4ClientConnectionPool.getStatistics(this).get(procedure);
     }
 
     /**
+     * @deprecated
      * Gets the aggregated performance statistics for a list of procedures on this connection (and
      * all connections with the same parameters).
      *
@@ -330,6 +342,7 @@ public class JDBC4ClientConnection implements Closeable {
      * @return the counter aggregated across all the connections in the pool with the same
      *         parameters as this connection, and across all procedures.
      */
+    @Deprecated
     public JDBC4PerfCounter getStatistics(String... procedures) {
         JDBC4PerfCounterMap map = JDBC4ClientConnectionPool.getStatistics(this);
         JDBC4PerfCounter result = new JDBC4PerfCounter(false);
@@ -352,6 +365,10 @@ public class JDBC4ClientConnection implements Closeable {
             fw.flush();
             fw.close();
         }
+    }
+
+    void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        this.client.writeSummaryCSV(stats, path);
     }
 
     /**

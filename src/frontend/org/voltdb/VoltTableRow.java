@@ -28,8 +28,6 @@ import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
 
 /**
- * <h3>Summary</h3>
- *
  * <p>Represents the interface to a row in a VoltTable result set.</p>
  *
  * <h3>Accessing Row Fields</h3>
@@ -79,47 +77,47 @@ public abstract class VoltTableRow {
     static final int INVALID_ROW_INDEX = -1;
 
     /** Stores the row data (and possibly much more) */
-    protected ByteBuffer m_buffer;
+    ByteBuffer m_buffer;
     /** Was the last value retrieved null? */
-    protected boolean m_wasNull = false;
+    boolean m_wasNull = false;
     /** Where in the buffer is the start of the active row's data */
-    protected int m_position = -1;
+    int m_position = -1;
     /** Offsets of each column in the buffer */
-    protected int[] m_offsets;
+    int[] m_offsets;
     /** Have the offsets been calculated */
-    protected boolean m_hasCalculatedOffsets = false;
+    boolean m_hasCalculatedOffsets = false;
 
-    protected int m_activeRowIndex = INVALID_ROW_INDEX;
+    int m_activeRowIndex = INVALID_ROW_INDEX;
 
-    protected VoltTableRow() {}
+    VoltTableRow() {}
 
     /**
      * Return the {@link VoltType type} of the column with the specified index.
      * @param columnIndex Index of the column
      * @return {@link VoltType VoltType} of the column
      */
-    protected abstract VoltType getColumnType(int columnIndex);
+    abstract VoltType getColumnType(int columnIndex);
 
     /**
      * Return the index of the column with the specified index.
      * @param columnName Name of the column
      * @return Index of the column
      */
-    protected abstract int getColumnIndex(String columnName);
+    abstract int getColumnIndex(String columnName);
 
     /**
      * Returns the number of columns in the table schema
      * @return Number of columns in the table schema
      */
-    protected abstract int getColumnCount();
+    abstract int getColumnCount();
 
     /**
      * Returns the number of rows.
      * @return Number of rows in the table
      */
-    protected abstract int getRowCount();
+    abstract int getRowCount();
 
-    protected abstract int getRowStart();
+    abstract int getRowStart();
 
     /**
      * Clone a row. The new instance returned will have an independent
@@ -152,7 +150,7 @@ public abstract class VoltTableRow {
         m_hasCalculatedOffsets = true;
     }
 
-    protected final int getOffset(int index) {
+    final int getOffset(int index) {
         ensureCalculatedOffsets();
         assert(index >= 0);
         assert(index < m_offsets.length);
@@ -202,8 +200,11 @@ public abstract class VoltTableRow {
      * @return True if a valid row became active. False otherwise.
      */
     public boolean advanceToRow(int rowIndex) {
+        int rows_to_move = rowIndex - m_activeRowIndex;
         m_activeRowIndex = rowIndex;
         if (m_activeRowIndex >= getRowCount())
+            return false;
+        if (rows_to_move < 0) // this is "advance" to row, don't move backwards
             return false;
 
         m_hasCalculatedOffsets = false;
@@ -213,14 +214,27 @@ public abstract class VoltTableRow {
         if (m_activeRowIndex == 0)
             m_position = getRowStart() + ROW_COUNT_SIZE + ROW_HEADER_SIZE;
         else {
-            int rowlength = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
-            if (rowlength <= 0) {
-                throw new RuntimeException("Invalid row length.");
+            // Move n rows - this code assumes rows can be variable size, so we
+            // have to fetch the size of each row in order to advance to the
+            // next row
+            if (rows_to_move > 0 && m_position < 0)
+                throw new RuntimeException(
+                        "VoltTableRow is in an invalid state. Consider calling advanceRow().");
+
+            for (int i = 0; i < rows_to_move; i++) {
+                int rowlength = m_buffer.getInt(m_position - ROW_HEADER_SIZE);
+                if (rowlength <= 0) {
+                    throw new RuntimeException("Invalid row length.");
+                }
+
+                m_position += (rowlength + ROW_HEADER_SIZE);
             }
-            m_position += rowlength + ROW_HEADER_SIZE;
-            if (m_position >= m_buffer.limit())
+
+            if (m_position >= m_buffer.limit()) {
                 throw new RuntimeException("Row length exceeds table boundary.");
+            }
         }
+
         return true;
     }
 
@@ -556,7 +570,7 @@ public abstract class VoltTableRow {
     }
 
     /**
-     * Retrieve the {@link java.util.Date Date} value stored in the column
+     * Retrieve the {@link org.voltdb.types.TimestampType TimestampType} value stored in the column
      * specified by name. Note that VoltDB uses GMT universally within its
      * process space. Date objects sent over the wire from clients may seem
      * to be different times because of this, but it is just a time zone offset.
@@ -574,6 +588,41 @@ public abstract class VoltTableRow {
     }
 
     /**
+     * Retrieve the <tt>java.sql.Timestamp</tt> equivalent to the value stored in the column specified by index.
+     * Note that VoltDB uses GMT universally within its process space. Date objects sent over
+     * the wire from clients may seem to be different times because of this, but it is just
+     * a time zone offset. VoltDB Timestamps are stored as long integer microseconds from epoch.
+     * The resulting value is accurate to no finer than microsecond granularity.
+     * @param columnIndex Index of the column
+     * @return the <tt>java.sql.Timestamp</tt> equivalent to the value stored in the specified column
+     */
+    public final java.sql.Timestamp getTimestampAsSqlTimestamp(int columnIndex) {
+        final long timestamp = getTimestampAsLong(columnIndex);
+        if (m_wasNull) return null;
+        java.sql.Timestamp result = new java.sql.Timestamp(timestamp/1000);
+        // The lower 6 digits of the microsecond timestamp (including the "double-counted" millisecond digits)
+        // must be scaled up to get the 9-digit (rounded) nanosecond value.
+        result.setNanos(((int) (timestamp % 1000000))*1000);
+        return result;
+    }
+
+    /**
+     * Retrieve the <tt>java.sql.Timestamp</tt> equivalent to the value stored in the column specified by name.
+     * Note that VoltDB uses GMT universally within its process space. Date objects sent over
+     * the wire from clients may seem to be different times because of this, but it is just
+     * a time zone offset. VoltDB Timestamps are stored as long integer microseconds from epoch.
+     * The resulting value is accurate to no finer than microsecond granularity.
+     * Avoid retrieving via this method as it is slower than specifying the
+     * column by index. Use {@link #getTimestampAsSqlTimestamp(int)} instead.
+     * @param columnName name of the column
+     * @return the <tt>java.sql.Timestamp</tt> equivalent to the value stored in the specified column
+     */
+    public java.sql.Timestamp getTimestampAsSqlTimestamp(String columnName) {
+        final int colIndex = getColumnIndex(columnName);
+        return getTimestampAsSqlTimestamp(colIndex);
+    }
+
+    /*
      * Retrieve the BigDecimal value stored in the column
      * specified by the index. All DECIMAL types have a fixed
      * scale when represented as BigDecimals.
@@ -675,7 +724,7 @@ public abstract class VoltTableRow {
     }
 
     /** Validates that type and columnIndex match and are valid. */
-    protected final void validateColumnType(int columnIndex, VoltType... types) {
+    final void validateColumnType(int columnIndex, VoltType... types) {
         if (m_position < 0)
             throw new RuntimeException("VoltTableRow is in an invalid state. Consider calling advanceRow().");
 
@@ -690,7 +739,7 @@ public abstract class VoltTableRow {
     }
 
     /** Reads a string from a buffer with a specific encoding. */
-    protected final String readString(int position, String encoding) {
+    final String readString(int position, String encoding) {
         final int len = m_buffer.getInt(position);
         //System.out.println(len);
 
@@ -718,4 +767,5 @@ public abstract class VoltTableRow {
         }
         return retval;
     }
+
 }

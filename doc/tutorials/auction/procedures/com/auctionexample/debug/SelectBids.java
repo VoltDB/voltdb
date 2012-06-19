@@ -22,7 +22,10 @@
  */
 package com.auctionexample.debug;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 /**
  *
@@ -33,7 +36,8 @@ import org.voltdb.*;
 )
 public class SelectBids extends VoltProcedure {
 
-    public final SQLStmt select = new SQLStmt("SELECT * FROM BID;");
+    public final SQLStmt select = new SQLStmt(
+            "SELECT * FROM BID ORDER BY BIDID;");
 
     /**
      *

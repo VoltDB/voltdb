@@ -296,6 +296,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert on closed client port and expect failure
+        pset = new ParameterSet();
         pset.setParameters(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
         System.out.println(responseJSON);
@@ -303,6 +304,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status == ClientResponse.SERVER_UNAVAILABLE);
 
         // open client port
+        pset = new ParameterSet();
         pset.setParameters();
         responseJSON = callProcOverJSON("@Resume", pset, null, null, false, true);
         System.out.println(responseJSON);
@@ -310,6 +312,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // call insert on open client port
+        pset = new ParameterSet();
         pset.setParameters(2, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
         System.out.println(responseJSON);
@@ -317,6 +320,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // call insert on admin port again (now that both ports are open)
+        pset = new ParameterSet();
         pset.setParameters(3, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
         System.out.println(responseJSON);
@@ -324,6 +328,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // put the system in admin mode
+        pset = new ParameterSet();
         pset.setParameters();
         responseJSON = callProcOverJSON("@Pause", pset, null, null, false, true);
         System.out.println(responseJSON);
@@ -331,6 +336,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert on admin port
+        pset = new ParameterSet();
         pset.setParameters(4, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, true);
         System.out.println(responseJSON);
@@ -338,6 +344,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call insert on closed client port and expect failure
+        pset = new ParameterSet();
         pset.setParameters(5, "hello", new TimestampType(System.currentTimeMillis()), 5.0, "5.0");
         responseJSON = callProcOverJSON("Insert", pset, null, null, false, false);
         System.out.println(responseJSON);
@@ -403,6 +410,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(response.status != ClientResponse.SUCCESS);
 
         // Call proc with complex params
+        pset = new ParameterSet();
         pset.setParameters(1,
                            5,
                            new double[] { 1.5, 6.0, 4 },
@@ -414,7 +422,7 @@ public class TestJSONInterface extends TestCase {
         responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, response.status);
 
         // check the JSON itself makes sense
         JSONObject jsonObj = new JSONObject(responseJSON);
@@ -430,7 +438,8 @@ public class TestJSONInterface extends TestCase {
 
         // try to pass a string as a date
         java.sql.Timestamp ts = new java.sql.Timestamp(System.currentTimeMillis());
-        ts.setNanos(123456789);
+        ts.setNanos(123456000);
+        pset = new ParameterSet();
         pset.setParameters(1,
                 5,
                 new double[] { 1.5, 6.0, 4 },
@@ -442,12 +451,13 @@ public class TestJSONInterface extends TestCase {
         responseJSON = callProcOverJSON("CrazyBlahProc", pset, null, null, false);
         System.out.println(responseJSON);
         response = responseFromJSON(responseJSON);
-        assertTrue(response.status == ClientResponse.SUCCESS);
+        assertEquals(ClientResponse.SUCCESS, response.status);
         response.results[3].advanceRow();
         System.out.println(response.results[3].getTimestampAsTimestamp(0).getTime());
         assertEquals(123456, response.results[3].getTimestampAsTimestamp(0).getTime() % 1000000);
 
         // now try a null short value sent as a int  (param expects short)
+        pset = new ParameterSet();
         pset.setParameters(1,
                 VoltType.NULL_SMALLINT,
                 new double[] { 1.5, 6.0, 4 },
@@ -462,6 +472,7 @@ public class TestJSONInterface extends TestCase {
         assertFalse(response.status == ClientResponse.SUCCESS);
 
         // now try an out of range long value (param expects short)
+        pset = new ParameterSet();
         pset.setParameters(1,
                 Long.MAX_VALUE - 100,
                 new double[] { 1.5, 6.0, 4 },
@@ -476,6 +487,7 @@ public class TestJSONInterface extends TestCase {
         assertFalse(response.status == ClientResponse.SUCCESS);
 
         // now try bigdecimal with small value
+        pset = new ParameterSet();
         pset.setParameters(1,
                 4,
                 new double[] { 1.5, 6.0, 4 },
@@ -491,6 +503,7 @@ public class TestJSONInterface extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.status);
 
         // now try null
+        pset = new ParameterSet();
         pset.setParameters(1,
                 4,
                 new double[] { 1.5, 6.0, 4 },
@@ -511,6 +524,7 @@ public class TestJSONInterface extends TestCase {
         assertTrue(responseJSON.startsWith("fooBar("));
 
         // now try adhoc
+        pset = new ParameterSet();
         pset.setParameters("select * from blah");
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
         System.out.println(responseJSON);
@@ -519,6 +533,7 @@ public class TestJSONInterface extends TestCase {
         assertEquals(ClientResponse.SUCCESS, response.status);
 
         // now try adhoc insert with a huge bigint
+        pset = new ParameterSet();
         pset.setParameters("insert into blah values (974599638818488300, NULL, NULL, NULL, NULL);");
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
         System.out.println(responseJSON);
@@ -526,6 +541,7 @@ public class TestJSONInterface extends TestCase {
         System.out.println(response.statusString);
         assertEquals(ClientResponse.SUCCESS, response.status);
 
+        pset = new ParameterSet();
         pset.setParameters("select * from blah where ival = 974599638818488300;");
         responseJSON = callProcOverJSON("@AdHoc", pset, null, null, false);
         System.out.println(responseJSON);

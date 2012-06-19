@@ -23,10 +23,14 @@ import java.io.FileInputStream;
 import java.io.InputStreamReader;
 import java.io.Serializable;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.processtools.ShellTools;
 
 
 public class PlatformProperties implements Serializable {
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /////////////////////////////////
     // ACTUAL PLATFORM PROPERTIES
@@ -65,7 +69,7 @@ public class PlatformProperties implements Serializable {
     protected HardwareInfo getMacHardwareInfo() {
         HardwareInfo hw = new HardwareInfo();
 
-        hw.hardwareThreads = Runtime.getRuntime().availableProcessors();
+        hw.hardwareThreads = CoreUtils.availableProcessors();
 
         String result = ShellTools.cmd("/usr/sbin/system_profiler -detailLevel mini SPHardwareDataType").trim();
         String[] lines = result.split("\n");
@@ -126,7 +130,7 @@ public class PlatformProperties implements Serializable {
             }
         }
         catch (Exception e) {
-            System.err.println("Unable to read /proc/meminfo. Stopping.");
+            hostLog.fatal("Unable to read /proc/meminfo. Exiting.");
             System.exit(-1);
         }
 
@@ -145,7 +149,7 @@ public class PlatformProperties implements Serializable {
             }
         }
         catch (Exception e) {
-            System.err.println("Unable to read /proc/cpuinfo. Stopping.");
+            hostLog.fatal("Unable to read /proc/cpuinfo. Exiting.");
             System.exit(-1);
         }
 

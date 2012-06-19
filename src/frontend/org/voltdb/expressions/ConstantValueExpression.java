@@ -40,11 +40,6 @@ public class ConstantValueExpression extends AbstractValueExpression {
     public ConstantValueExpression() {
         super(ExpressionType.VALUE_CONSTANT);
     }
-    public ConstantValueExpression(AbstractExpression left, AbstractExpression right) {
-        super(ExpressionType.VALUE_CONSTANT, null, null);
-        assert(left == null);
-        assert(right == null);
-    }
 
     @Override
     public Object clone() throws CloneNotSupportedException {
@@ -112,6 +107,17 @@ public class ConstantValueExpression extends AbstractValueExpression {
     }
 
     @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = 0;
+        if (m_isNull) {
+            result += 1;
+        }
+        result += m_value.hashCode();
+        return result += super.hashCode();
+    }
+
+    @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.ISNULL.name());
@@ -176,4 +182,35 @@ public class ConstantValueExpression extends AbstractValueExpression {
             m_isNull = obj.getBoolean(Members.ISNULL.name());
         }
     }
+
+    public static Object extractPartitioningValue(VoltType voltType, AbstractExpression constExpr) {
+        // TODO: There is currently no way to pass back as a partition key value
+        // the constant value resulting from a general constant expression such as
+        // "WHERE a.pk = b.pk AND b.pk = SQRT(3*3+4*4)" because the planner has no expression evaluation capabilities.
+        if (constExpr instanceof ConstantValueExpression) {
+            // ConstantValueExpression exports its value as a string, which is handy for serialization,
+            // but the hashinator wants a partition-key-column-type-appropriate value.
+            // For safety, don't trust the constant's type
+            // -- it's apparently comparable to the column, but may not be an exact match(?).
+            // XXX: Actually, there may need to be additional filtering in the code above to not accept
+            // constant equality filters that would require the COLUMN type to be non-trivially converted (?)
+            // -- it MAY not be safe to limit execution of such a filter on any single partition.
+            // For now, for partitioning purposes, leave constants for string columns as they are,
+            // and process matches for integral columns via constant-to-string-to-bigInt conversion.
+            String stringValue = ((ConstantValueExpression) constExpr).getValue();
+            if (voltType.isInteger()) {
+                try {
+                    return new Long(stringValue);
+                } catch (NumberFormatException nfe) {
+                    // Disqualify this constant by leaving objValue null -- probably should have caught this earlier?
+                    // This causes the statement to fall back to being identified as multi-partition.
+                }
+            } else {
+                return stringValue;
+            }
+        }
+        return null;
+    }
+
+
 }

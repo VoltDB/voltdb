@@ -23,8 +23,6 @@ import java.util.HashMap;
 import java.util.Map;
 import java.util.Map.Entry;
 
-import org.apache.log4j.Logger;
-
 import org.apache.jute_voltpatches.InputArchive;
 import org.apache.jute_voltpatches.OutputArchive;
 import org.apache.jute_voltpatches.Record;
@@ -39,9 +37,10 @@ import org.apache.zookeeper_voltpatches.txn.ErrorTxn;
 import org.apache.zookeeper_voltpatches.txn.SetACLTxn;
 import org.apache.zookeeper_voltpatches.txn.SetDataTxn;
 import org.apache.zookeeper_voltpatches.txn.TxnHeader;
+import org.voltcore.logging.VoltLogger;
 
 public class SerializeUtils {
-    private static final Logger LOG = Logger.getLogger(SerializeUtils.class);
+    private static final VoltLogger LOG = new VoltLogger(SerializeUtils.class.getSimpleName());
 
     public static Record deserializeTxn(InputArchive ia, TxnHeader hdr)
             throws IOException {
@@ -78,11 +77,11 @@ public class SerializeUtils {
     }
 
     public static void deserializeSnapshot(DataTree dt,InputArchive ia,
-            Map<Long, Integer> sessions) throws IOException {
+            Map<Long, Long> sessions) throws IOException {
         int count = ia.readInt("count");
         while (count > 0) {
             long id = ia.readLong("id");
-            int to = ia.readInt("timeout");
+            long to = ia.readLong("timeout");
             sessions.put(id, to);
             if (LOG.isTraceEnabled()) {
                 ZooTrace.logTraceMessage(LOG, ZooTrace.SESSION_TRACE_MASK,
@@ -95,12 +94,12 @@ public class SerializeUtils {
     }
 
     public static void serializeSnapshot(DataTree dt,OutputArchive oa,
-            Map<Long, Integer> sessions) throws IOException {
-        HashMap<Long, Integer> sessSnap = new HashMap<Long, Integer>(sessions);
+            Map<Long, Long> sessions) throws IOException {
+        HashMap<Long, Long> sessSnap = new HashMap<Long, Long>(sessions);
         oa.writeInt(sessSnap.size(), "count");
-        for (Entry<Long, Integer> entry : sessSnap.entrySet()) {
+        for (Entry<Long, Long> entry : sessSnap.entrySet()) {
             oa.writeLong(entry.getKey().longValue(), "id");
-            oa.writeInt(entry.getValue().intValue(), "timeout");
+            oa.writeLong(entry.getValue().longValue(), "timeout");
         }
         dt.serialize(oa, "tree");
     }
