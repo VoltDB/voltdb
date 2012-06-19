@@ -191,6 +191,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private volatile long m_rejoinSnapshotTxnId = -1;
     // The snapshot completion handler will set this to true
     private volatile boolean m_rejoinSnapshotFinished = false;
+    private long m_rejoinSnapshotBytes = 0;
     private long m_rejoinCoordinatorHSId = -1;
     private TaskLog m_rejoinTaskLog = null;
     // Used to track if the site can keep up on rejoin, default is 10 seconds
@@ -484,6 +485,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long transferred = 0;
             if (m_recoveryProcessor != null) {
                 transferred = m_recoveryProcessor.bytesTransferred();
+            } else {
+                transferred = m_rejoinSnapshotBytes;
             }
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
@@ -1120,6 +1123,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
             m_recoveryLog.debug("Rejoin snapshot transfer is finished");
             m_rejoinSnapshotProcessor.close();
+            m_rejoinSnapshotBytes = m_rejoinSnapshotProcessor.bytesTransferred();
             m_rejoinSnapshotProcessor = null;
             m_taskExeStartTime = System.currentTimeMillis();
             /*
