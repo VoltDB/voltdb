@@ -17,7 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,6 +36,8 @@ import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotTableTask;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -50,7 +54,7 @@ import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.utils.LogKeys;
 
-public class Site implements Runnable, SiteProcedureConnection
+public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -76,6 +80,9 @@ public class Site implements Runnable, SiteProcedureConnection
     // Almighty execution engine and its HSQL sidekick
     ExecutionEngine m_ee;
     HsqlBackend m_hsql;
+
+    // Each execution site manages snapshot using a SnapshotSiteProcessor
+    private SnapshotSiteProcessor m_snapshotter;
 
     // Current catalog
     CatalogContext m_context;
@@ -119,6 +126,7 @@ public class Site implements Runnable, SiteProcedureConnection
 
     // Advanced in complete transaction.
     long m_lastCommittedTxnId = 0L;
+    long m_currentTxnId = Long.MIN_VALUE;
 
     SiteProcedureConnection getSiteProcedureConnection()
     {
@@ -148,7 +156,7 @@ public class Site implements Runnable, SiteProcedureConnection
 
         @Override
         public long getCurrentTxnId() {
-            throw new RuntimeException("Not implemented in iv2");
+            return m_currentTxnId;
         }
 
         @Override
@@ -211,7 +219,7 @@ public class Site implements Runnable, SiteProcedureConnection
         @Override
         public SiteSnapshotConnection getSiteSnapshotConnection()
         {
-            throw new RuntimeException("Not implemented in iv2");
+            return Site.this;
         }
 
         @Override
@@ -269,6 +277,15 @@ public class Site implements Runnable, SiteProcedureConnection
             m_hsql = null;
             m_ee = initializeEE(serializedCatalog, txnId);
         }
+        // IZZY- Get me from the deployment file in some sane way somehow some day
+        int snapshotPriority = 6;
+        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
+            @Override
+            public void run() {
+                //m_mailbox.deliver(new PotentialSnapshotWorkMessage());
+            }
+        },
+        snapshotPriority);
     }
 
     /** Create a native VoltDB execution engine */
@@ -350,6 +367,9 @@ public class Site implements Runnable, SiteProcedureConnection
     {
         SiteTasker task = m_scheduler.poll();
         if (task != null) {
+            if (task instanceof TransactionTask) {
+                m_currentTxnId = ((TransactionTask)task).getMpTxnId();
+            }
             task.run(getSiteProcedureConnection());
         }
     }
@@ -371,6 +391,23 @@ public class Site implements Runnable, SiteProcedureConnection
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);
         }
+    }
+
+    //
+    // SiteSnapshotConnection interface
+    //
+    @Override
+    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
+        m_snapshotter.initiateSnapshots(m_ee, tasks, txnId, numLiveHosts);
+    }
+
+    /*
+     * Do snapshot work exclusively until there is no more. Also blocks
+     * until the syncing and closing of snapshot data targets has completed.
+     */
+    @Override
+    public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
+        return m_snapshotter.completeSnapshotWork(m_ee);
     }
 
     //
