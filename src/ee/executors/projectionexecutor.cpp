@@ -57,27 +57,6 @@
 
 namespace voltdb {
 
-namespace detail {
-
-struct ProjectionExecutorState
-{   
-    ProjectionExecutorState(ProjectionPlanNode* node) :
-        m_node(node), m_child(NULL) 
-    {
-        std::vector<AbstractPlanNode*>& children = node->getChildren();
-        assert(children.size() == 1);
-        m_child = children[0];
-    }
-    ProjectionPlanNode* m_node;
-    AbstractPlanNode* m_child;
-};
-
-} // namespace detail
-
-ProjectionExecutor::ProjectionExecutor(VoltDBEngine *engine, AbstractPlanNode* abstractNode)
-    : AbstractExecutor(engine, abstractNode), output_table(NULL), m_state() 
-{}
-
 bool ProjectionExecutor::p_init(AbstractPlanNode *abstractNode,
                                 TempTableLimits* limits)
 {
@@ -203,107 +182,6 @@ bool ProjectionExecutor::p_execute(const NValueArray &params) {
 }
 
 ProjectionExecutor::~ProjectionExecutor() {
-}
-
-
-
-//@TODO pullexec prototype
-TableTuple ProjectionExecutor::p_next_pull(const NValueArray &params, bool& status) 
-{
-    TableTuple tuple = m_state->m_child->getExecutor()->p_next_pull(params, status);
-    if (status == true && tuple.isNullTuple() == false)
-    {
-        //
-        // Project (or replace) values from input tuple
-        //
-        TableTuple &temp_tuple = output_table->tempTuple();    
-        if (all_tuple_array != NULL) {
-            VOLT_TRACE("sweet, all tuples");
-            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, tuple.getNValue(all_tuple_array[ctr]));
-            }
-        } else if (all_param_array != NULL) {
-            VOLT_TRACE("sweet, all params");
-            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, params[all_param_array[ctr]]);
-            }
-        } else {
-            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-                temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&tuple, NULL));
-            }
-        }
-/*
-for (int ctr = 0; ctr < m_columnCount; ctr++)
-{
-    NValue value = m_state->m_node->getOutputColumnExpressions()[ctr]->eval(&tuple, NULL);
-    temp_tuple.setNValue(ctr, value);
-}
-*/
-
-        tuple = temp_tuple;       
-    }
-    return tuple;
-}
-
-bool ProjectionExecutor::p_pre_execute_pull(const NValueArray &params) {
-    ProjectionPlanNode* node = dynamic_cast<ProjectionPlanNode*>(m_abstractNode);
-    assert (node);
-    assert (!node->isInline()); // inline projection's execute() should not be called
-    assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
-    assert (output_table);
-    assert (input_table == node->getInputTables()[0]);
-    assert (input_table);
-
-    // Init children
-    if (AbstractExecutor::p_pre_execute_pull(m_abstractNode, params) != true)
-        return false;
-
-    VOLT_TRACE("INPUT TABLE: %s\n", input_table->debug().c_str());
-    m_state.reset(new detail::ProjectionExecutorState(node));
-
-    //
-    // Since we have the input params, we need to call substitute to change any
-    // nodes in our expression tree to be ready for the projection operations in
-    // execute
-    //
-    assert (m_columnCount == (int)node->getOutputColumnNames().size());
-    if (all_tuple_array == NULL && all_param_array == NULL) {
-        for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
-            assert(expression_array[ctr]);
-            expression_array[ctr]->substitute(params);
-            VOLT_TRACE("predicate[%d]: %s", ctr,
-                       expression_array[ctr]->debug(true).c_str());
-        }
-    }
-    return true;
-}
-
-bool ProjectionExecutor::p_post_execute_pull(const NValueArray &params) 
-{
-    //
-    // Recurs to children.
-    //
-    return AbstractExecutor::p_post_execute_pull(m_abstractNode, params);
-}
-
-bool ProjectionExecutor::p_insert_output_table_pull(TableTuple& tuple)
-{
-    output_table->insertTupleNonVirtual(tuple);
-    /*
-    if (!status) 
-    {
-        // TODO: DEBUG
-        VOLT_ERROR("Failed to insert projection tuple from input table '%s' into output table '%s'", 
-            input_table->name().c_str(), output_table->name().c_str());
-    }
-    return status;
-    */
-    return true;
-}
-
-bool ProjectionExecutor::is_enabled_pull() const
-{
-    return AbstractExecutor::p_is_enabled_pull(m_abstractNode);
 }
 
 }
