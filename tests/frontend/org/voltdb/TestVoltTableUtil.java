@@ -31,6 +31,7 @@ import java.util.ArrayList;
 import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.types.TimestampType;
 import org.voltdb.utils.VoltTableUtil;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;
@@ -67,5 +68,32 @@ public class TestVoltTableUtil {
         for (String v : values) {
             assertEquals("\\N", v);
         }
+    }
+
+    /**
+     * Round-trip the time, see if it's still the same.
+     * @throws IOException
+     */
+    @Test
+    public void testCSVTimestamp() throws IOException {
+        CSVWriter writer = mock(CSVWriter.class);
+        ColumnInfo[] columns = new ColumnInfo[] {new ColumnInfo("", VoltType.TIMESTAMP)};
+        ArrayList<VoltType> columnTypes = new ArrayList<VoltType>();
+        TimestampType ts = new TimestampType(System.currentTimeMillis());
+        VoltTable vt = new VoltTable(columns);
+        vt.addRow(ts);
+
+        for (ColumnInfo ci : columns) {
+            columnTypes.add(ci.type);
+        }
+
+        VoltTableUtil.toCSVWriter(writer, vt, columnTypes);
+
+        ArgumentCaptor<String[]> captor = ArgumentCaptor.forClass(String[].class);
+        verify(writer).writeNext(captor.capture());
+        String[] values = captor.getValue();
+        assertEquals(1, values.length);
+        TimestampType newTs = new TimestampType(values[0]);
+        assertEquals(ts, newTs);
     }
 }

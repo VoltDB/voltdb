@@ -41,7 +41,7 @@ public class VoltTableUtil {
         @Override
         public SimpleDateFormat initialValue() {
             return new SimpleDateFormat(
-                    "yyyy.MM.dd HH:mm:ss:SSS:");
+                    "yyyy-MM-dd HH:mm:ss.SSS");
         }
     };
 
