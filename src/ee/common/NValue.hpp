@@ -395,6 +395,14 @@ class NValue {
         return m_valueType;
     }
 
+    /**
+     * Get the type of the value. This information is private
+     * to prevent code outside of NValue from branching based on the type of a value.
+     */
+    std::string getValueTypeString() const {
+        return getTypeName(m_valueType);
+    }
+
     void setSourceInlined(bool sourceInlined)
     {
         m_sourceInlined = sourceInlined;
@@ -416,12 +424,14 @@ class NValue {
             // length 0. In practice, this code path is often a defect
             // in code not correctly handling null. May favor a more
             // defensive "return 0" in the future? (rtb)
-            throwFatalException("Must not ask  for object length on sql null object.");
+            throw SQLException(SQLException::dynamic_sql_error,
+                    "Must not ask  for object length on sql null object.");
         }
         if ((getValueType() != VALUE_TYPE_VARCHAR) && (getValueType() != VALUE_TYPE_VARBINARY)) {
             // probably want getTupleStorageSize() for non-object types.
             // at the moment, only varchars are using getObjectLength().
-            throwFatalException("Must not ask for object length for non-object types");
+            throw SQLException(SQLException::dynamic_sql_error,
+                    "Must not ask for object length for non-object types");
         }
 
         // now safe to read and return the length preceding value.
@@ -515,7 +525,7 @@ class NValue {
     static void setObjectLengthToLocation(int32_t length, char *location) {
         int32_t beNumber = htonl(length);
         if (length < -1) {
-            throwFatalException("Object length cannot be < -1");
+            throw SQLException(SQLException::dynamic_sql_error, "Object length cannot be < -1");
         } else if (length == -1) {
             location[0] = OBJECT_NULL_BIT;
         } if (length <= OBJECT_MAX_LENGTH_SHORT_LENGTH) {
@@ -1111,7 +1121,10 @@ class NValue {
         case VALUE_TYPE_BIGINT:
             lhsValue = getBigInt(); break;
         default: {
-            throwFatalException("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
+            throwDynamicSQLException(
+                    "non comparable types lhs '%s' rhs '%s'",
+                    getValueTypeString().c_str(),
+                    rhs.getValueTypeString().c_str());
         }
         }
 
@@ -1482,7 +1495,7 @@ class NValue {
         if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
             (rhs.getValueType() != VALUE_TYPE_DECIMAL))
         {
-            throwFatalException("Non-decimal NValue in decimal adder.");
+            throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal adder.");
         }
 
         if (lhs.isNull() || rhs.isNull()) {
@@ -1507,7 +1520,7 @@ class NValue {
         if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
             (rhs.getValueType() != VALUE_TYPE_DECIMAL))
         {
-            throwFatalException("Non-decimal NValue in decimal subtract.");
+            throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal subtract.");
         }
 
         if (lhs.isNull() || rhs.isNull()) {
@@ -1719,7 +1732,7 @@ inline bool NValue::isNegative() const {
         case VALUE_TYPE_DECIMAL:
             return getDecimal().IsSign();
         default: {
-            throwFatalException( "Invalid value type '%s' for checking negativity", getTypeName(type).c_str());
+            throwDynamicSQLException( "Invalid value type '%s' for checking negativity", getValueTypeString().c_str());
         }
         }
     }
@@ -1831,7 +1844,10 @@ inline int NValue::compare(const NValue rhs) const {
       case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
       default: {
-          throwFatalException( "non comparable type '%d'", rhs.getValueType());
+          throwDynamicSQLException(
+                  "non comparable types lhs '%s' rhs '%s'",
+                  getValueTypeString().c_str(),
+                  rhs.getValueTypeString().c_str());
       }
     }
 }
@@ -1870,7 +1886,7 @@ inline void NValue::setNull() {
         getDecimal().SetMin();
         break;
       default: {
-          throwFatalException( "NValue::setNull() called with ValueType '%d'", getValueType());
+          throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
       }
     }
 }
@@ -1942,7 +1958,9 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
         break;
     }
     default:
-        throwFatalException( "NValue::getLength() unrecognized type '%d'", type);
+        throwDynamicSQLException(
+                "NValue::getLength() unrecognized type '%s'",
+                getTypeName(type).c_str());
     }
     return retval;
 }
@@ -2013,7 +2031,9 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         }
         break;
       default: {
-          throwFatalException("NValue::serializeToTupleStorageAllocateForObjects() unrecognized type '%d'", type);
+          throwDynamicSQLException(
+                  "NValue::serializeToTupleStorageAllocateForObjects() unrecognized type '%s'",
+                  getTypeName(type).c_str());
       }
     }
 }
@@ -2060,7 +2080,8 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             if (isNull() || getObjectLength() <= maxLength) {
                 if (m_sourceInlined && !isInlined)
                 {
-                    throwFatalException("Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
+                    throwDynamicSQLException(
+                            "Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
                 }
                 // copy the StringRef pointers
                 *reinterpret_cast<StringRef**>(storage) =
@@ -2068,12 +2089,8 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             }
             else {
                 const int32_t length = getObjectLength();
-                char msg[1024];
-                snprintf(msg, 1024, "In NValue::serializeToTupleStorage(), Object exceeds specified size. Size is %d and max is %d", length, maxLength);
-                throw SQLException(
-                    SQLException::data_exception_string_data_length_mismatch,
-                    msg);
-
+                throwDynamicSQLException(
+                        "In NValue::serializeToTupleStorage(), Object exceeds specified size. Size is %d and max is %d", length, maxLength);
             }
         }
         break;
@@ -2223,7 +2240,9 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
           break;
       }
       default:
-          throwFatalException("NValue::deserializeFromAllocateForStorage() unrecognized type '%d'", type);
+          throwDynamicSQLException(
+                  "NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
+                  getTypeName(type).c_str());
     }
     return retval;
 }
@@ -2243,7 +2262,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
           }
           const int32_t length = getObjectLength();
           if (length < OBJECTLENGTH_NULL) {
-              throwFatalException("Attempted to serialize an NValue with a negative length");
+              throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
           }
           output.writeInt(static_cast<int32_t>(length));
           if (length != OBJECTLENGTH_NULL) {
@@ -2287,8 +2306,8 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
           break;
       }
       default:
-          throwFatalException("NValue::serializeTo() found a column "
-                   "with ValueType '%d' that is not handled", type);
+          throwDynamicSQLException( "NValue::serializeTo() found a column "
+                   "with ValueType '%s' that is not handled", getValueTypeString().c_str());
     }
 }
 
@@ -2367,7 +2386,9 @@ inline bool NValue::isNull() const {
           return getDecimal() == min;
       }
       default:
-          throwFatalException("NValue::isNull() called with ValueType '%d'", getValueType());
+          throwDynamicSQLException(
+                  "NValue::isNull() called with unknown ValueType '%s'",
+                  getValueTypeString().c_str());
     }
     return false;
 }
@@ -2457,7 +2478,7 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_DECIMAL:
         getDecimal().hash(seed); break;
       default:
-          throwFatalException ("unknown type %d", (int) type);
+          throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
     }
 }
 
@@ -2506,7 +2527,9 @@ inline void* NValue::castAsAddress() const {
       case VALUE_TYPE_ADDRESS:
         return *reinterpret_cast<void* const*>(m_data);
       default:
-          throwFatalException ("Type %d not a recognized type for casting as an address", (int) type);
+          throwDynamicSQLException(
+                  "Type %s not a recognized type for casting as an address",
+                  getValueTypeString().c_str());
     }
 }
 
@@ -2542,7 +2565,7 @@ inline NValue NValue::op_increment() const {
         case VALUE_TYPE_DOUBLE:
             retval.getDouble() = getDouble() + 1; break;
         default:
-            throwFatalException ("type %d is not incrementable", (int) type);
+            throwDynamicSQLException( "type %s is not incrementable", getValueTypeString().c_str());
             break;
         }
         return retval;
@@ -2580,7 +2603,7 @@ inline NValue NValue::op_decrement() const {
         case VALUE_TYPE_DOUBLE:
             retval.getDouble() = getDouble() - 1; break;
         default:
-            throwFatalException ("type %d is not decrementable", (int) type);
+            throwDynamicSQLException( "type %s is not decrementable", getValueTypeString().c_str());
             break;
         }
         return retval;
@@ -2601,7 +2624,9 @@ inline bool NValue::isZero() const {
       case VALUE_TYPE_DECIMAL:
         return getDecimal().IsZero();
       default:
-          throwFatalException ("type %d is not a numeric type that implements isZero()", (int) type);
+          throwDynamicSQLException(
+                  "type %s is not a numeric type that implements isZero()",
+                  getValueTypeString().c_str());
     }
 }
 
@@ -2627,7 +2652,7 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
       default:
         break;
     }
-    throwFatalException("Promotion of %s and %s failed in op_subtract.",
+    throwDynamicSQLException("Promotion of %s and %s failed in op_subtract.",
                getTypeName(getValueType()).c_str(),
                getTypeName(rhs.getValueType()).c_str());
 }
@@ -2654,9 +2679,9 @@ inline NValue NValue::op_add(const NValue rhs) const {
       default:
         break;
     }
-    throwFatalException("Promotion of %s and %s failed in op_add.",
-               getTypeName(getValueType()).c_str(),
-               getTypeName(rhs.getValueType()).c_str());
+    throwDynamicSQLException("Promotion of %s and %s failed in op_add.",
+               getValueTypeString().c_str(),
+               getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_multiply(const NValue rhs) const {
@@ -2680,9 +2705,9 @@ inline NValue NValue::op_multiply(const NValue rhs) const {
       default:
         break;
     }
-    throwFatalException("Promotion of %s and %s failed in op_multiply.",
-               getTypeName(getValueType()).c_str(),
-               getTypeName(rhs.getValueType()).c_str());
+    throwDynamicSQLException("Promotion of %s and %s failed in op_multiply.",
+               getValueTypeString().c_str(),
+               rhs.getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_divide(const NValue rhs) const {
@@ -2707,9 +2732,9 @@ inline NValue NValue::op_divide(const NValue rhs) const {
       default:
         break;
     }
-    throwFatalException("Promotion of %s and %s failed in op_divide.",
-               getTypeName(getValueType()).c_str(),
-               getTypeName(rhs.getValueType()).c_str());
+    throwDynamicSQLException("Promotion of %s and %s failed in op_divide.",
+               getValueTypeString().c_str(),
+               rhs.getValueTypeString().c_str());
 }
 
 /*
@@ -2729,12 +2754,18 @@ inline NValue NValue::like(const NValue rhs) const {
      */
     const ValueType mType = getValueType();
     if (mType != VALUE_TYPE_VARCHAR) {
-        throwFatalException("lhs of LIKE expression is %d not VALUE_TYPE_VARCHAR(%d)", mType, VALUE_TYPE_VARCHAR);
+        throwDynamicSQLException(
+                "lhs of LIKE expression is %s not %s",
+                getValueTypeString().c_str(),
+                getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
 
     const ValueType rhsType = rhs.getValueType();
     if (rhsType != VALUE_TYPE_VARCHAR) {
-        throwFatalException("rhs of LIKE expression is %d not VALUE_TYPE_VARCHAR(%d)", mType, VALUE_TYPE_VARCHAR);
+        throwDynamicSQLException(
+                "rhs of LIKE expression is %s not %s",
+                rhs.getValueTypeString().c_str(),
+                getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
 
     const int32_t valueUTF8Length = getObjectLength();
@@ -2894,7 +2925,7 @@ template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const
         retval.getDouble() = std::abs(getDouble()); break;
     case VALUE_TYPE_TIMESTAMP:
     default:
-        throwFatalException ("type %d is not numeric", (int) type);
+        throwDynamicSQLException ("type %s is not numeric", getValueTypeString().c_str());
         break;
     }
     return retval;
