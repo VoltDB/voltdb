@@ -73,7 +73,7 @@ public class CSVLoader {
     private static CSVReader csvReader;
     private static Client csvClient;
     private static ArrayList<String> firstIds = new ArrayList<String>();
-    
+
     protected static final VoltLogger m_log = new VoltLogger("CSVLoader");
 
     private static final class MyCallback implements ProcedureCallback {
