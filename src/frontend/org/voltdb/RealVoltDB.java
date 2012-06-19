@@ -2020,6 +2020,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
+    public SiteTracker getSiteTrackerForSnapshot()
+    {
+        if (isIV2Enabled()) {
+            return new SiteTracker(m_messenger.getHostId(), m_cartographer.getSiteTrackerMailboxMap(), 0);
+        }
+        else {
+            return m_siteTracker;
+        }
+    }
+
+
+    @Override
     public MailboxPublisher getMailboxPublisher() {
         return m_mailboxPublisher;
     }

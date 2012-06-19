@@ -18,7 +18,6 @@ package org.voltdb;
 
 import java.util.ArrayList;
 import java.util.Map;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
 
@@ -81,7 +80,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public MailboxPublisher getMailboxPublisher();
-
+    public SiteTracker getSiteTrackerForSnapshot();
 
     /**
      * Update the global logging context in the server.

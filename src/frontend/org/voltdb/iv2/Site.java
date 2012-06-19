@@ -194,8 +194,7 @@ public class Site implements Runnable, SiteProcedureConnection
 
         @Override
         public SiteTracker getSiteTracker() {
-            throw new RuntimeException("Not implemented in iv2");
-            // return m_tracker;
+            return VoltDB.instance().getSiteTrackerForSnapshot();
         }
 
         @Override

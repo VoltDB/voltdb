@@ -18,8 +18,11 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.Iterator;
 import java.util.List;
+import java.util.Map;
+import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -35,11 +38,13 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheReader;
 
+import org.voltdb.MailboxNodeContent;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.VoltZK;
+import org.voltdb.VoltZK.MailboxType;
 
 import com.google.common.collect.UnmodifiableIterator;
 
@@ -125,6 +130,11 @@ public class Cartographer extends StatsSource
         rowValues[columnNameToIndex.get("Leader")] = CoreUtils.hsIdToString(leader);
     }
 
+    private static int getPartitionIdFromIv2MasterPath(String zkPath)
+    {
+        return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
+    }
+
     /**
      * Take a ZK path of a child in the VoltZK.iv2masters and return
      * all of the HSIDs of the sites replicating that partition
@@ -136,7 +146,7 @@ public class Cartographer extends StatsSource
                     ".  It must be a child of " + VoltZK.iv2masters);
         }
         else {
-            int partId = Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
+            int partId = getPartitionIdFromIv2MasterPath(zkPath);
             retval = getReplicasForPartition(partId);
         }
         return retval;
@@ -170,6 +180,25 @@ public class Cartographer extends StatsSource
      */
     public int getReplicaCountForPartition(int partition) {
         return getReplicasForPartition(partition).size();
+    }
+
+    public Map<MailboxType, List<MailboxNodeContent>> getSiteTrackerMailboxMap()
+    {
+        HashMap<MailboxType, List<MailboxNodeContent>> result =
+            new HashMap<MailboxType, List<MailboxNodeContent>>();
+        List<MailboxNodeContent> sitesList = new ArrayList<MailboxNodeContent>();
+        result.put(MailboxType.ExecutionSite, sitesList);
+
+        Set<String> partitionStrings = m_iv2Masters.pointInTimeCache().keySet();
+        for (String partString : partitionStrings) {
+            int partId = getPartitionIdFromIv2MasterPath(partString);
+            List<Long> hsidsForPart = getReplicasForPartition(partId);
+            for (long hsid : hsidsForPart) {
+                MailboxNodeContent mnc = new MailboxNodeContent(hsid, partId);
+                sitesList.add(mnc);
+            }
+        }
+        return result;
     }
 
     public void shutdown() throws InterruptedException
