@@ -45,6 +45,8 @@
 
 #include <algorithm>
 #include <vector>
+#include <sstream>
+
 #include "orderbyexecutor.h"
 #include "common/debuglog.h"
 #include "common/common.h"
@@ -203,5 +205,97 @@ OrderByExecutor::p_execute(const NValueArray &params)
     return true;
 }
 
+namespace voltdb {
+namespace detail {
+
+    struct OrderByExecutorState
+    {
+        OrderByExecutorState(Table* inputTable) :
+            m_inputSchema(inputTable->schema()),
+            m_inputTableName(inputTable->name()),
+            m_xs(),
+            m_it(m_xs.begin())
+        {}
+
+        const TupleSchema* m_inputSchema;
+        std::string m_inputTableName;
+        vector<TableTuple> m_xs;
+        vector<TableTuple>::iterator m_it;
+    };
+
+} // namespace detail
+} // namespace voltdb
+
+
+OrderByExecutor::OrderByExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node), limit_node(NULL), m_state()
+{}
+
 OrderByExecutor::~OrderByExecutor() {
+}
+
+bool OrderByExecutor::support_pull() const
+{
+    return true;
+}
+
+void OrderByExecutor::p_pre_execute_pull(const NValueArray& params)
+{
+    OrderByPlanNode* node = dynamic_cast<OrderByPlanNode*>(getPlanNode());
+    assert(node);
+    Table* input_table = node->getInputTables()[0];
+    assert(input_table);
+
+    assert(node->getChildren().size() == 1);
+    AbstractExecutor* child_executor = node->getChildren()[0]->getExecutor();
+
+    VOLT_TRACE("Running OrderBy '%s'", getPlanNode()->debug().c_str());
+
+    m_state.reset(new detail::OrderByExecutorState(input_table));
+    while (true)
+    {
+        TableTuple tuple = child_executor->next_pull();
+        if (tuple.isNullTuple()) {
+            break;
+        }
+        assert(tuple.isActive());
+        m_state->m_xs.push_back(tuple);
+    }
+    VOLT_TRACE("\n***** Input Table PreSort:\n '%s'", debug().c_str());
+    sort(m_state->m_xs.begin(), m_state->m_xs.end(), TupleComparer(node->getSortExpressions(),
+                                             node->getSortDirections()));
+    m_state->m_it = m_state->m_xs.begin();
+    VOLT_TRACE("\n***** Input Table PostSort:\n '%s'", debug().c_str());
+}
+
+TableTuple OrderByExecutor::p_next_pull() {
+    if (m_state->m_it != m_state->m_xs.end()) {
+        return *m_state->m_it++;
+    } else {
+        return TableTuple(m_state->m_inputSchema);
+    }
+}
+
+std::string OrderByExecutor::debug() const {
+
+    std::ostringstream buffer;
+    //
+    // Tuples
+    //
+    buffer << "===========================================================\n";
+    buffer << "\tDATA\n";
+
+    if (m_state->m_xs.empty()) {
+        buffer << "\t<NONE>\n";
+    } else {
+        for (vector<TableTuple>::iterator it = m_state->m_xs.begin();
+            it != m_state->m_xs.end(); ++it) {
+            if (it->isActive()) {
+                buffer << "\t" << it->debug(m_state->m_inputTableName.c_str()) << "\n";
+            }
+        }
+    }
+    buffer << "===========================================================\n";
+
+    return std::string(buffer.str());
 }

@@ -46,6 +46,9 @@
 #ifndef HSTOREORDERBYEXECUTOR_H
 #define HSTOREORDERBYEXECUTOR_H
 
+#include <string>
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
@@ -56,23 +59,35 @@ namespace voltdb {
     class ReadWriteSet;
     class LimitPlanNode;
 
+    // Aggregate Struct to keep Executor state in between iteration
+    namespace detail
+    {
+        struct OrderByExecutorState;
+    } //namespace detail
+
     /**
      *
      */
     class OrderByExecutor : public AbstractExecutor {
     public:
-        OrderByExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-            : AbstractExecutor(engine, abstract_node), limit_node(NULL)
-            { }
+        OrderByExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
         ~OrderByExecutor();
+
+        bool support_pull() const;
 
     protected:
         bool p_init(AbstractPlanNode* abstract_node,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
 
+        TableTuple p_next_pull();
+        void p_pre_execute_pull(const NValueArray& params);
+
     private:
+        std::string debug() const;
+
         LimitPlanNode *limit_node;
+        boost::scoped_ptr<detail::OrderByExecutorState> m_state;
     };
 
 }
