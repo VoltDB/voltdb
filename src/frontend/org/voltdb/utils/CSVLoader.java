@@ -72,8 +72,6 @@ public class CSVLoader {
 
     private static CSVReader csvReader;
     private static Client csvClient;
-    private static ArrayList<String> firstIds = new ArrayList<String>();
-    
     protected static final VoltLogger m_log = new VoltLogger("CSVLoader");
 
     private static final class MyCallback implements ProcedureCallback {
@@ -284,7 +282,6 @@ public class CSVLoader {
 
                     queued = csvClient.callProcedure(cb, insertProcedure,
                             (Object[]) correctedLine);
-                    firstIds.add(correctedLine[0]);
 
                     if (queued == false) {
                         ++waits;
@@ -317,10 +314,6 @@ public class CSVLoader {
                 + " seconds");
         produceFiles();
         close_cleanup();
-    }
-
-    public static ArrayList<String> getFirstIds() {
-        return firstIds;
     }
 
     private static String checkparams_trimspace(String[] slot,

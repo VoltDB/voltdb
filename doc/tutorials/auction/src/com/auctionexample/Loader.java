@@ -23,9 +23,14 @@
 
 package com.auctionexample;
 
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import org.voltdb.utils.CSVLoader;
+
+import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 
 /**
@@ -40,9 +45,10 @@ class Loader {
      *
      * @param client Connection to the database.
      * @return An ArrayList of ids of newly inserted objects.
+     * @throws FileNotFoundException 
      * @throws Exception Rethrows any exceptions thrown from within.
        */
-    static ArrayList<Integer> loadItems(){
+    static ArrayList<Integer> loadItems() throws FileNotFoundException{
     	ArrayList<Integer> itemIds = new ArrayList<Integer>();
     	URL url = Loader.class.getResource("datafiles/items.txt");
     	String []myOptions = {
@@ -58,10 +64,14 @@ class Loader {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-    	ArrayList<String> list = CSVLoader.getFirstIds();
-    	for( String id : list) {
-    		itemIds.add( Integer.parseInt( id ) );
-    	}
+    	CSVReader csvReader = new CSVReader(new FileReader( url.getPath() ));
+    	String[] line = null;
+    	try {
+            while( (line = csvReader.readNext()) != null )
+                  itemIds.add( Integer.parseInt( line[0] ));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     	return itemIds;
     }
     
@@ -70,10 +80,11 @@ class Loader {
      *
      * @param client Connection to the database.
      * @return An ArrayList of ids of newly inserted objects.
+     * @throws FileNotFoundException 
      * @throws Exception Rethrows any exceptions thrown from within.
      */
     
-    static ArrayList<Integer> loadCategories() {
+    static ArrayList<Integer> loadCategories() throws FileNotFoundException {
     	ArrayList<Integer> categoryIds = new ArrayList<Integer>();
     	URL url = Loader.class.getResource("datafiles/categories.txt");
     	String []myOptions = {
@@ -89,10 +100,14 @@ class Loader {
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
-    	ArrayList<String> list = CSVLoader.getFirstIds();
-    	for( String id : list) {
-    		categoryIds.add( Integer.parseInt( id ) );
-    	}
+    	CSVReader csvReader = new CSVReader(new FileReader( url.getPath() ));
+        String[] line = null;
+        try {
+            while( (line = csvReader.readNext()) != null )
+                categoryIds.add( Integer.parseInt( line[0] ));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     	return categoryIds;
     }
   
@@ -101,12 +116,13 @@ class Loader {
      *
      * @param client Connection to the database.
      * @return An ArrayList of ids of newly inserted objects.
+     * @throws FileNotFoundException 
      * @throws Exception Rethrows any exceptions thrown from within.
      * 
      * 
      */
     
-    static ArrayList<Integer> loadUsers() {
+    static ArrayList<Integer> loadUsers() throws FileNotFoundException {
     	ArrayList<Integer> userIds = new ArrayList<Integer>();
     	URL url = Loader.class.getResource("datafiles/users.txt");
     	String []myOptions = {
@@ -122,10 +138,14 @@ class Loader {
 		}catch (Exception e) {
             e.printStackTrace();
         }
-    	ArrayList<String> list = CSVLoader.getFirstIds();
-    	for( String id : list) {
-    		userIds.add( Integer.parseInt( id ) );
-    	}
+    	CSVReader csvReader = new CSVReader(new FileReader( url.getPath() ));
+        String[] line = null;
+        try {
+            while( (line = csvReader.readNext()) != null )
+                userIds.add( Integer.parseInt( line[0] ));
+        } catch (Exception e) {
+            e.printStackTrace();
+        }
     	return userIds;
     }
 }

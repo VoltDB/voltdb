@@ -170,7 +170,7 @@ public abstract class CLIConfig {
                                 try {
                                      field.set(this, true);
                                  } catch (Exception e) {
-                                     e.printStackTrace();
+                                     throw new IllegalArgumentException (e);
                                  }
                              }
                              else {
@@ -189,8 +189,6 @@ public abstract class CLIConfig {
                 } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
                         // Deal with --table=BLHA, offer nice error message later
                         leftover++;
-                } else {
-                    throw new Exception ("IllegalArgumentException: undefined options found");
                 }
             }
             if (leftargs != null) {
