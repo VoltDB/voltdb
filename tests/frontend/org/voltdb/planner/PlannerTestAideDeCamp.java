@@ -86,11 +86,7 @@ public class PlannerTestAideDeCamp {
         ddl_compiler.compileToCatalog(catalog, db);
     }
 
-    /**
-     * Cleans up HSQL. Mandatory - call this when done!
-     */
     public void tearDown() {
-        hsql.close();
     }
 
     public Catalog getCatalog() {

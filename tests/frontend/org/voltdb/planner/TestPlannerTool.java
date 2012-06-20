@@ -60,7 +60,7 @@ public class TestPlannerTool extends TestCase {
         catalog.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
 
-        m_pt = new PlannerTool(context);
+        m_pt = new PlannerTool(context.cluster, context.database);
 
         PlannerTool.Result result = null;
         result = m_pt.planSql("select * from warehouse;", false, true);
@@ -153,7 +153,7 @@ public class TestPlannerTool extends TestCase {
         c.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, c, bytes, 0, 0, 0);
 
-        m_pt = new PlannerTool(context);
+        m_pt = new PlannerTool(context.cluster, context.database);
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error

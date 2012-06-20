@@ -47,7 +47,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
-        m_pt = new PlannerTool(context);
+        m_pt = new PlannerTool(context.cluster, context.database);
     }
 
     @Override

@@ -19,10 +19,9 @@ package org.voltdb.compiler;
 
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.CatalogContext;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CompiledPlan.Fragment;
 import org.voltdb.planner.PartitioningForStatement;
@@ -39,7 +38,8 @@ public class PlannerTool {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    final CatalogContext m_context;
+    final Database m_database;
+    final Cluster m_cluster;
     final HSQLInterface m_hsql;
 
     public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
@@ -63,13 +63,16 @@ public class PlannerTool {
         }
     }
 
-    public PlannerTool(final CatalogContext context) {
-        assert(context != null);
-        m_context = context;
+    public PlannerTool(final Cluster cluster, final Database database) {
+        assert(cluster != null);
+        assert(database != null);
+
+        m_database = database;
+        m_cluster = cluster;
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb();
-        String hexDDL = m_context.database.getSchema();
+        String hexDDL = m_database.getSchema();
         String ddl = Encoder.hexDecodeToString(hexDDL);
         String[] commands = ddl.split("\n");
         for (String command : commands) {
@@ -89,12 +92,6 @@ public class PlannerTool {
         hostLog.info("hsql loaded");
     }
 
-    // this is probably not super important, but is probably
-    // a performance win for tests that fire these up all the time
-    public void shutdown() {
-        m_hsql.close();
-    }
-
     public Result planSql(String sqlIn, Object partitionParam, boolean inferSP) {
         if ((sqlIn == null) || (sqlIn.length() == 0)) {
             throw new RuntimeException("Can't plan empty or null SQL.");
@@ -111,7 +108,7 @@ public class PlannerTool {
         TrivialCostModel costModel = new TrivialCostModel();
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
         QueryPlanner planner = new QueryPlanner(
-                m_context.cluster, m_context.database, partitioning, m_hsql, new DatabaseEstimates(), false, true);
+                m_cluster, m_database, partitioning, m_hsql, new DatabaseEstimates(), false, true);
         CompiledPlan plan = null;
         try {
             plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);

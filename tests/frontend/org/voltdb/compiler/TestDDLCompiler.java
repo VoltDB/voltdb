@@ -60,7 +60,6 @@ public class TestDDLCompiler extends TestCase {
         System.out.println(xml);
         assertTrue(xml != null);
 
-        hsql.close();
     }
 
     public void testCharIsNotAllowed() {
@@ -106,7 +105,6 @@ public class TestDDLCompiler extends TestCase {
         System.out.println(xml);
         assertTrue(xml != null);
 
-        hsql.close();
     }
 
     /**
@@ -126,7 +124,6 @@ public class TestDDLCompiler extends TestCase {
         System.out.println(xml);
         assertTrue(xml != null);
 
-        hsql.close();
     }
 
     /**
@@ -145,7 +142,6 @@ public class TestDDLCompiler extends TestCase {
         System.out.println(xml);
         assertTrue(xml != null);
 
-        hsql.close();
     }
 
     /**
