@@ -519,7 +519,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                      */
                     JSONObject obj = new JSONObject(clientResponse.getAppStatusString());
                     final long snapshotTxnId = Long.valueOf(obj.getLong("txnId"));
-                    int hosts = VoltDB.instance().getSiteTracker()
+                    int hosts = VoltDB.instance().getSiteTrackerForSnapshot()
                                       .getAllHosts().size();
                     try {
                         m_zk.delete(VoltZK.request_truncation_snapshot, -1);
