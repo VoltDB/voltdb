@@ -25,7 +25,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -97,7 +96,7 @@ public class CSVLoader {
                     if (errorInfo.size() >= m_config.maxerrors) {
                         m_log.error("The number of Failure row data exceeds " + m_config.maxerrors);
                         close_cleanup();
-                        System.exit(1);
+                        System.exit(-1);
                     }
                 }
                 return;
@@ -209,7 +208,7 @@ public class CSVLoader {
 
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
-            System.exit(1);
+            System.exit(-1);
         }
         // Split server list
         String[] serverlist = config.servers.split(",");
@@ -223,7 +222,7 @@ public class CSVLoader {
         } catch (Exception e) {
             m_log.error("Error to connect to the servers:"
                     + config.servers);
-            System.exit(1);
+            System.exit(-1);
         }
 
         try {
@@ -274,7 +273,7 @@ public class CSVLoader {
                                 m_log.error("The number of Failure row data exceeds "
                                         + config.maxerrors);
                                 close_cleanup();
-                                System.exit(1);
+                                System.exit(-1);
                             }
                         }
                         break;
@@ -357,7 +356,7 @@ public class CSVLoader {
         } catch (Exception x) {
             m_log.error(x.getMessage());
             x.printStackTrace();
-            System.exit(1);
+            System.exit(-1);
         }
 
         String myinsert = insertProcedure;
@@ -375,7 +374,7 @@ public class CSVLoader {
             out_reportfile = new BufferedWriter(new FileWriter(pathReportfile));
         } catch (IOException e) {
             m_log.error(e.getMessage());
-            System.exit(1);
+            System.exit(-1);
         }
     }
 
