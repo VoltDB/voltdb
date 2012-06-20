@@ -415,9 +415,8 @@ public class TestCSVLoader extends TestCase {
             BufferedReader csvreport = new BufferedReader(new FileReader(CSVLoader.pathReportfile));
             int lineCount = 0;
             String line = "";
-            String promptMsg = "Number of acknowledged tuples:";
-
-            String promptFailMsg = "Number of failed tuples:";
+            String promptMsg = "Number of rows successfully inserted:";
+            String promptFailMsg = "Number of rows that could not be inserted:";
             int invalidlinecnt = 0;
 
             while ((line = csvreport.readLine()) != null) {
