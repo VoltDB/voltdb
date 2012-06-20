@@ -252,7 +252,7 @@ public class CSVLoader {
                 while (queued == false) {
                     StringBuilder linedata = new StringBuilder();
                     for (int i = 0; i < line.length; i++) {
-                        linedata.append(line[i]);
+                        linedata.append("\"" + line[i] + "\"");
                         if (i != line.length - 1)
                             linedata.append(",");
                     }
@@ -362,9 +362,9 @@ public class CSVLoader {
         pathInvalidrowfile = config.reportdir + "csvloader_" + myinsert + "_"
                 + "invalidrows.csv";
         pathLogfile = config.reportdir + "csvloader_" + myinsert + "_"
-                + "Log.log";
+                + "log.log";
         pathReportfile = config.reportdir + "csvloader_" + myinsert + "_"
-                + "Report.log";
+                + "report.log";
 
         try {
             out_invaliderowfile = new BufferedWriter(new FileWriter(
