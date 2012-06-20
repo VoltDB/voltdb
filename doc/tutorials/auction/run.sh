@@ -4,9 +4,11 @@ APPNAME="auction"
 VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
 CLASSPATH="$VOLTJAR:../../../lib"
 VOLTDB="../../../bin/voltdb"
+CSVLOADER="../../../bin/csvloader"
 EXPORTTOFILE="../../../bin/exporttofile"
 VOLTCOMPILER="../../../bin/voltcompiler"
 LICENSE="../../../voltdb/license.xml"
+DATAFILES="src/com/auctionexample/datafiles/"
 
 # remove build artifacts
 function clean() {
@@ -39,11 +41,24 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader localhost
+        license $LICENSE leader localhost 
 }
 
 # run the client that drives the example
 function client() {
+    # load the csv files
+    $CSVLOADER -f $DATAFILES/items.txt \
+			-p InsertIntoItemAndBid \
+         		-u program \
+         		-P pass 
+    $CSVLOADER -f $DATAFILES/categories.txt \
+                        -p InsertIntoCategory \
+                        -u program \
+                        -P pass
+    $CSVLOADER -f $DATAFILES/users.txt \
+                        -p InsertIntoUser \
+                        -u program \
+                        -P pass 
     srccompile
     java -classpath obj:$CLASSPATH com.auctionexample.Client
 }
