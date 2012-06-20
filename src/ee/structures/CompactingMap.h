@@ -229,6 +229,7 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
         z->left = z->right = &NIL;
         z->parent = y;
         z->color = RED;
+        z->rank = y->rank + 1;
 
         // stitch it in
         if (y == &NIL) m_root = z;
