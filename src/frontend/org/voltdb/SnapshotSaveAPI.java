@@ -84,7 +84,7 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
+        final int numLocalSites = VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length;
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -133,7 +133,7 @@ public class SnapshotSaveAPI
                 context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
                         txnId,
-                        context.getSiteTracker().getAllHosts().size());
+                        context.getSiteTrackerForSnapshot().getAllHosts().size());
             }
         }
 
@@ -230,7 +230,7 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        int hosts = context.getSiteTracker().getAllHosts().size();
+        int hosts = context.getSiteTrackerForSnapshot().getAllHosts().size();
         createSnapshotCompletionNode( nonce, txnId, isTruncation, hosts);
 
         try {
@@ -300,8 +300,8 @@ public class SnapshotSaveAPI
             long txnId, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
-            final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
-            SiteTracker tracker = context.getSiteTracker();
+            SiteTracker tracker = context.getSiteTrackerForSnapshot();
+            final int numLocalSites = tracker.getLocalSites().length;
 
             MessageDigest digest;
             try {
@@ -407,7 +407,7 @@ public class SnapshotSaveAPI
                                         saveFilePath,
                                         table,
                                         context.getHostId(),
-                                        context.getSiteTracker().m_numberOfPartitions,
+                                        tracker.m_numberOfPartitions,
                                         txnId);
                         }
                         targets.add(sdt);
@@ -502,8 +502,7 @@ public class SnapshotSaveAPI
                 synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
                     boolean aborted = false;
                     if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
-                        SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(
-                                VoltDB.instance().getLocalSites().values().size());
+                        SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(numLocalSites);
                         for (int ii = 0; ii < numLocalSites; ii++) {
                             SnapshotSiteProcessor.m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>());
                         }
@@ -591,7 +590,7 @@ public class SnapshotSaveAPI
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             context.getSiteTracker().getPartitionsForHost(hostId),
+                                             context.getSiteTrackerForSnapshot().getPartitionsForHost(hostId),
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

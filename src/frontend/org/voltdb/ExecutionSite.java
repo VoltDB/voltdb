@@ -607,6 +607,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public SiteTracker getSiteTracker()                   { return m_tracker; }
         @Override
+        public SiteTracker getSiteTrackerForSnapshot()        { return m_tracker; }
+        @Override
         public int getNumberOfPartitions()                    { return m_tracker.m_numberOfPartitions; }
         @Override
         public SiteProcedureConnection getSiteProcedureConnection()
