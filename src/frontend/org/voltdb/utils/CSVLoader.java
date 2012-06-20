@@ -321,10 +321,8 @@ public class CSVLoader {
             return "Error: blank line";
         }
         if (slot.length != columnCnt) {
-            return "Error: # of attributes do not match, # of attributes needed: "
-                    + columnCnt
-                    + "inputed: "
-                    + slot.length;
+            return "Error: Incorrect number of columns. " + slot.length
+                    + " found, " + columnCnt + " expected";
         }
         for (int i = 0; i < slot.length; i++) {
             // trim white space in this line.
@@ -361,11 +359,12 @@ public class CSVLoader {
 
         String myinsert = insertProcedure;
         myinsert = myinsert.replaceAll("\\.", "_");
-        pathInvalidrowfile = config.reportdir + myinsert + "_"
-                + "csvloaderinvalidrows.csv";
-        pathLogfile = config.reportdir + myinsert + "_" + "csvloaderLog.log";
-        pathReportfile = config.reportdir + myinsert + "_"
-                + "csvloaderReport.log";
+        pathInvalidrowfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "invalidrows.csv";
+        pathLogfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "Log.log";
+        pathReportfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "Report.log";
 
         try {
             out_invaliderowfile = new BufferedWriter(new FileWriter(
@@ -399,9 +398,9 @@ public class CSVLoader {
                             .println("internal error, infomation is not enough");
                 linect++;
                 out_invaliderowfile.write(info[0] + "\n");
-                String message = "invalid line " + irow + ":  " + info[0];
+                String message = "Invalid input on line " + irow + ".\n  Contents:" + info[0];
                 m_log.error(message);
-                out_logfile.write(message + "\n" + info[1] + "\n");
+                out_logfile.write(message + "\n  " + info[1] + "\n");
                 if (linect % bulkflush == 0) {
                     out_invaliderowfile.flush();
                     out_logfile.flush();
@@ -409,14 +408,14 @@ public class CSVLoader {
             }
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
-            out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec
+            out_reportfile.write("csvloader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
-            out_reportfile.write("Number of tuples tring to insert:"
+            out_reportfile.write("Number of rows read from input: "
                     + outCount.get() + "\n");
-            out_reportfile.write("Number of failed tuples:" + errorInfo.size()
-                    + "\n");
-            out_reportfile.write("Number of acknowledged tuples:     "
+            out_reportfile.write("Number of rows successfully inserted: "
                     + inCount.get() + "\n");
+            out_reportfile.write("Number of rows that could not be inserted: "
+                    + errorInfo.size() + "\n");
             out_reportfile.write("CSVLoader rate: " + outCount.get()
                     / elapsedTimeSec + " row/s\n");
 
