@@ -52,9 +52,6 @@ public class AsyncCompilerAgent {
     final ExecutorService m_es =
         CoreUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
 
-    // wraps the VoltPlanner and does the actual query planning
-    private PlannerTool m_ptool = null;
-
     // intended for integration test use. finish planning what's in
     // the queue and terminate the TPE.
     public void shutdown() throws InterruptedException {
@@ -120,14 +117,12 @@ public class AsyncCompilerAgent {
 
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
-        CatalogContext context = VoltDB.instance().getCatalogContext();
-        if (m_ptool == null || m_ptool.m_context.catalogVersion != context.catalogVersion) {
-            if (m_ptool != null) {
-                // cleanly shutdown hsql
-                m_ptool.shutdown();
-            }
-            m_ptool = new PlannerTool(context);
+        CatalogContext context = work.catalogContext;
+        if (context == null) {
+            context = VoltDB.instance().getCatalogContext();
         }
+
+        final PlannerTool ptool = context.m_ptool;
 
         AdHocPlannedStmtBatch plannedStmtBatch =
                 new AdHocPlannedStmtBatch(work.sqlBatchText,
@@ -147,7 +142,7 @@ public class AsyncCompilerAgent {
             // Single statement batch.
             try {
                 String sqlStatement = work.sqlStatements[0];
-                PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam,
+                PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
                                                             true);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
@@ -165,7 +160,7 @@ public class AsyncCompilerAgent {
             // Multi-statement batch.
             for (final String sqlStatement : work.sqlStatements) {
                 try {
-                    PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam,
+                    PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
                                                                 false);
 
                     plannedStmtBatch.addStatement(sqlStatement,
