@@ -252,7 +252,7 @@ public class Term
      * recovery, pass the kfactor required to proceed. For fault recovery,
      * pass any negative value as kfactorForStartup.
      */
-    public Future<?> start(int kfactorForStartup)
+    public Future<Boolean> start(int kfactorForStartup)
     {
         try {
             m_babySitter = new BabySitter(m_zk,

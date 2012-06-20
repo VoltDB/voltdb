@@ -80,17 +80,35 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     {
         try {
             long startTime = System.currentTimeMillis();
-            tmLog.info(m_whoami + "starting leader promotion");
-            m_term = new Term(m_messenger.getZK(), m_partitionId,
-                    getInitiatorHSId(), m_initiatorMailbox);
-            m_initiatorMailbox.setTerm(m_term);
-            Future<?> inaugurated = m_term.start(m_kfactorForStartup);
-            inaugurated.get();
-            m_repairLog.setLeaderState(true);
-            m_scheduler.setLeaderState(true);
-            tmLog.info(m_whoami
-                    + "finished leader promotion. Took "
-                    + (System.currentTimeMillis() - startTime) + " ms.");
+            Boolean success = false;
+            while (!success) {
+                tmLog.info(m_whoami + "starting leader promotion");
+                m_term = new Term(m_messenger.getZK(), m_partitionId,
+                        getInitiatorHSId(), m_initiatorMailbox);
+                m_initiatorMailbox.setTerm(m_term);
+                success = m_term.start(m_kfactorForStartup).get();
+                if (success) {
+                    m_repairLog.setLeaderState(true);
+                    m_scheduler.setLeaderState(true);
+                    tmLog.info(m_whoami
+                            + "finished leader promotion. Took "
+                            + (System.currentTimeMillis() - startTime) + " ms.");
+                }
+                else {
+                    // Just start over. Try again. My thinking here is:
+                    // The only known reason to fail is a failed replica during
+                    // recovery; that's a bounded event (by k-safety).
+                    // CrashVoltDB here means one node failure causing another.
+                    // Don't create a cascading failure.
+                    // Another reasonable plan might be to move this SP to
+                    // the end of the leader list; that has more complex ZK
+                    // semantics.
+                    tmLog.info(m_whoami
+                            + "interrupted during leader promotion after "
+                            + (System.currentTimeMillis() - startTime) + " ms. of "
+                            + "trying. Retrying.");
+                }
+            }
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Bad news.", true, e);
         }
