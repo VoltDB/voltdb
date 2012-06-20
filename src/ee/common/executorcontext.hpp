@@ -44,8 +44,8 @@ class ExecutorContext {
                     CatalogId partitionId,
                     UndoQuantum *undoQuantum,
                     Topend* topend,
+                    Pool* tempStringPool,
                     bool exportEnabled,
-                    int64_t epoch,
                     std::string hostname,
                     CatalogId hostId);
 
@@ -89,7 +89,7 @@ class ExecutorContext {
         return m_undoQuantum;
     }
 
-    Topend* getTopend() {
+    Topend* getTopend(void*** SPOILER=0) {
         return m_topEnd;
     }
 
@@ -110,8 +110,11 @@ class ExecutorContext {
 
     static ExecutorContext* getExecutorContext();
 
+    static Pool* getTempStringPool() { return getExecutorContext()->m_tempStringPool; }
+
   private:
     Topend *m_topEnd;
+    Pool *m_tempStringPool;
     UndoQuantum *m_undoQuantum;
     int64_t m_txnId;
 

@@ -11,3 +11,6 @@
 {@optional_fn = "_pick[@FN1 <options=_>]"}
 {@optional_fn2 = "_pick[@FN2 <options=_>]"}
 <advanced-template.sql>
+
+select SUBSTRING ( DESC FROM @value[int:1,10] FOR @value[int:1,10] ) FROM _table WHERE  ( DESC FROM @value[int:1,10] FOR @value[int:1,10] ) > _value[string]
+select DESC FROM _table ORDER BY SUBSTRING ( DESC FROM @value[int:1,10] FOR @value[int:1,10] ), DESC

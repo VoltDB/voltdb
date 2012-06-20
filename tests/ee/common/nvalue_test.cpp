@@ -2082,6 +2082,98 @@ TEST_F(NValueTest, TestLike)
     pattern1.free();
     value.free();
 }
+
+TEST_F(NValueTest, TestSubstring)
+{
+    std::vector<std::string> testData;
+    testData.push_back("abcdefg");
+    testData.push_back("âbcdéfg");
+    testData.push_back("â🀲c一éfԱ");
+
+    NValue startAtOne = ValueFactory::getIntegerValue(1);
+    NValue sureEnd = ValueFactory::getIntegerValue(7);
+    for (int jj = 0; jj < testData.size(); jj++) {
+        std::string& testDatum = testData[jj];
+        NValue testString = ValueFactory::getStringValue(testDatum);
+        size_t testTotalByteLength = testDatum.length();
+        int maxStart = -1;
+        for (int start = 1; start <= 7; start++) {
+            NValue leftLength = ValueFactory::getIntegerValue(start-1);
+            NValue startAt = ValueFactory::getIntegerValue(start);
+            size_t minEnd = testTotalByteLength + 1;
+            size_t nextStart = start;
+            for (int length = 7; length >= 1; length--) {
+                NValue lengthValue = ValueFactory::getIntegerValue(length);
+                NValue endAt = ValueFactory::getIntegerValue(start + length);
+                NValue rightLength = ValueFactory::getIntegerValue(std::max(0, 7 - (start-1 + length)));
+
+                std::vector<NValue> leftArgs(3);
+                leftArgs[0] = testString;
+                leftArgs[1] = startAtOne;
+                leftArgs[2] = leftLength;
+                NValue leftStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(leftArgs);
+
+                std::vector<NValue> midArgs(3);
+                midArgs[0] = testString;
+                midArgs[1] = startAt;
+                midArgs[2] = lengthValue;
+                NValue midStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(midArgs);
+
+                std::vector<NValue> rightArgs(3);
+                rightArgs[0] = testString;
+                rightArgs[1] = endAt;
+                rightArgs[2] = rightLength;
+                NValue rightExactStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(rightArgs);
+
+                // Typically, this extends the substring PAST the end of the string.
+                rightArgs[2] = sureEnd;
+                NValue rightSureStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(rightArgs);
+
+                std::vector<NValue> rightDefaultArgs(2);
+                rightDefaultArgs[0] = testString;
+                rightDefaultArgs[1] = endAt;
+                NValue rightDefaultStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(rightDefaultArgs);
+
+                // specifying a length that goes exactly to or past the end of the input string
+                // should have the same effect as not specifying a length at all.
+                EXPECT_TRUE(rightExactStringValue.compare(rightDefaultStringValue) == 0);
+                EXPECT_TRUE(rightSureStringValue.compare(rightDefaultStringValue) == 0);
+
+                std::string leftString = ValuePeeker::peekStringCopy(leftStringValue);
+                std::string midString = ValuePeeker::peekStringCopy(midStringValue);
+                std::string rightString = ValuePeeker::peekStringCopy(rightExactStringValue);
+                std::string recombined = leftString + midString + rightString;
+                EXPECT_TRUE(testDatum.compare(recombined) == 0);
+
+                if (midString.length() > 0) {
+                    nextStart = testDatum.find(midString);
+                    EXPECT_TRUE(nextStart != std::string::npos);
+                    // The offset for a given value, in number of bytes skipped,
+                    // should be at least start-1, the number of characters skipped.
+                    EXPECT_TRUE(nextStart >= start-1);
+                }
+
+                if (rightString.length() > 0) {
+                    size_t nextEnd = testDatum.find(rightString);
+                    EXPECT_TRUE(nextEnd != std::string::npos);
+                    EXPECT_TRUE(minEnd == 0 || minEnd > nextEnd);
+                    minEnd = nextEnd;
+                }
+
+                rightDefaultStringValue.free();
+                rightSureStringValue.free();
+                rightExactStringValue.free();
+                midStringValue.free();
+                leftStringValue.free();
+            }
+            // The offset for a given value of start should increase (at least by 1) as start increases.
+            EXPECT_TRUE(((int)nextStart) > maxStart);
+            maxStart = (int)nextStart;
+        }
+        testString.free();
+    }
+}
+
 int main() {
     return TestSuite::globalInstance()->runAll();
 }

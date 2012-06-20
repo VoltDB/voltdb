@@ -32,15 +32,15 @@ ExecutorContext::ExecutorContext(int64_t siteId,
                 CatalogId partitionId,
                 UndoQuantum *undoQuantum,
                 Topend* topend,
+                Pool* tempStringPool,
                 bool exportEnabled,
-                int64_t epoch,
                 std::string hostname,
                 CatalogId hostId) :
-    m_topEnd(topend), m_undoQuantum(undoQuantum),
-    m_txnId(0),
+    m_topEnd(topend), m_tempStringPool(tempStringPool),
+    m_undoQuantum(undoQuantum), m_txnId(0),
     m_siteId(siteId), m_partitionId(partitionId),
     m_hostname(hostname), m_hostId(hostId),
-    m_exportEnabled(exportEnabled), m_epoch(epoch)
+    m_exportEnabled(exportEnabled), m_epoch(0) // set later
 {
     (void)pthread_once(&m_keyOnce, createThreadLocalKey);
     pthread_setspecific( m_key, static_cast<const void *>(this));
