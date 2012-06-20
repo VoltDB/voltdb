@@ -322,7 +322,7 @@ public class CSVLoader {
         }
         if (slot.length != columnCnt) {
             return "Error: Incorrect number of columns. " + slot.length
-                    + " found, " + columnCnt + " expected";
+                    + " found, " + columnCnt + " expected.";
         }
         for (int i = 0; i < slot.length; i++) {
             // trim white space in this line.
@@ -414,6 +414,7 @@ public class CSVLoader {
                     + outCount.get() + "\n");
             out_reportfile.write("Number of rows successfully inserted: "
                     + inCount.get() + "\n");
+            // if prompted msg changed, change it also for test case
             out_reportfile.write("Number of rows that could not be inserted: "
                     + errorInfo.size() + "\n");
             out_reportfile.write("CSVLoader rate: " + outCount.get()
