@@ -62,6 +62,17 @@ public class ClusterConfig
         m_errorMsg = "Config is unvalidated";
     }
 
+    // Construct a ClusterConfig object from the JSON topology.  The computations
+    // for this object are currently deterministic given the three values below, so
+    // this all magically works.  If you change that fact, good luck Chuck.
+    public ClusterConfig(JSONObject topo) throws JSONException
+    {
+        m_hostCount = topo.getInt("hostcount");
+        m_sitesPerHost = topo.getInt("sites_per_host");
+        m_replicationFactor = topo.getInt("kfactor");
+        m_errorMsg = "Config is unvalidated";
+    }
+
     public int getHostCount()
     {
         return m_hostCount;

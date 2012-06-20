@@ -61,6 +61,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -398,9 +399,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                  */
                 m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
                 m_mailboxTracker.start();
+                JSONObject topo = getTopology(isRejoin);
 
                 // We need the cartographer to do IV2 rejoin, so get it early
                 m_cartographer = new Cartographer(m_messenger.getZK());
+
                 /*
                  * Will count this down at the right point on regular startup as well as rejoin
                  */
@@ -414,18 +417,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                      */
                     createRejoinBarrierAndWatchdog(rejoinCompleteLatch);
 
-                    p = createMailboxesForSitesRejoin();
-                    // XXX-IZZY NEED TO FIX REJOIN TO ADD THE INITIATOR MAILBOXES
+                    p = createMailboxesForSitesRejoin(topo);
                     ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
                     hostLog.info("Set recovering site count to " + p.getFirst().size());
 
                     // Do IV2 stuff
-                    List<Integer> partitionsToReplace = getIv2PartitionsToReplace(p.getSecond());
+                    List<Integer> partitionsToReplace = getIv2PartitionsToReplace(topo);
                     m_iv2Initiators = createIv2Initiators(partitionsToReplace);
                 } else {
-                    p = createMailboxesForSitesStartup();
-                    // XXX-IZZY HACKY, REFACTOR SOMEHOW TO GET PARTITIONS
-                    JSONObject topo = registerClusterConfig(p.getSecond());
+                    p = createMailboxesForSitesStartup(topo);
                     List<Integer> partitions =
                         ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                     m_iv2Initiators = createIv2Initiators(partitions);
@@ -756,13 +756,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }.start();
     }
 
-    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesRejoin() throws Exception {
+    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesRejoin(JSONObject topology)
+    throws Exception
+    {
         ZooKeeper zk = m_messenger.getZK();
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
 
-        Stat stat = new Stat();
         hostLog.debug(zk.getChildren("/db", false));
-        JSONObject topology = new JSONObject(new String(zk.getData(VoltZK.topology, false, stat), "UTF-8"));
 
         // We're waiting for m_mailboxTracker to start(), which will
         // cause it to do an initial read of the mailboxes from ZK and
@@ -812,14 +812,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         zk.setData(VoltZK.topology, topology.toString(4).getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
-        final int hostcount = topology.getInt("hostcount");
         final int sites_per_host = topology.getInt("sites_per_host");
-        final int kfactor = topology.getInt("kfactor");
-        ClusterConfig clusterConfig =
-            new ClusterConfig(
-                    hostcount,
-                    sites_per_host,
-                    kfactor);
+        ClusterConfig clusterConfig = new ClusterConfig(topology);
         m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
         assert(partitionsToReplicate.size() == sites_per_host);
         for (Integer partition : partitionsToReplicate)
@@ -832,21 +826,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return Pair.of( mailboxes, clusterConfig);
     }
 
-    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesStartup() throws Exception {
+    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesStartup(JSONObject topo)
+    throws Exception
+    {
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
-        int sitesperhost = m_deployment.getCluster().getSitesperhost();
-        int hostcount = m_deployment.getCluster().getHostcount();
-        int kfactor = m_deployment.getCluster().getKfactor();
-        ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+        ClusterConfig clusterConfig = new ClusterConfig(topo);
         if (!clusterConfig.validate()) {
             VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
         }
-        JSONObject topo = registerClusterConfig(clusterConfig);
         List<Integer> partitions =
             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
 
         m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
-        assert(partitions.size() == sitesperhost);
+        assert(partitions.size() == clusterConfig.getSitesPerHost());
         for (Integer partition : partitions)
         {
             Mailbox mailbox = m_messenger.createMailbox();
@@ -857,9 +849,38 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return Pair.of( mailboxes, clusterConfig);
     }
 
-    // IZZY: move this into Cartographer
-    private List<Integer> getIv2PartitionsToReplace(ClusterConfig clusterConfig)
+    // Get topology information.  If rejoining, get it directly from
+    // ZK.  Otherwise, try to do the write/read race to ZK on startup.
+    private JSONObject getTopology(boolean isRejoin)
     {
+        JSONObject topo = null;
+        if (!isRejoin) {
+            int sitesperhost = m_deployment.getCluster().getSitesperhost();
+            int hostcount = m_deployment.getCluster().getHostcount();
+            int kfactor = m_deployment.getCluster().getKfactor();
+            ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+            if (!clusterConfig.validate()) {
+                VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
+            }
+            topo = registerClusterConfig(clusterConfig);
+        }
+        else {
+            Stat stat = new Stat();
+            try {
+                topo =
+                    new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat), "UTF-8"));
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to get topology from ZK", true, e);
+            }
+        }
+        return topo;
+    }
+
+    // IZZY: move this into Cartographer
+    private List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
+    {
+        ClusterConfig clusterConfig = new ClusterConfig(topology);
         hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
         List<Integer> repsPerPart = new ArrayList<Integer>(clusterConfig.getPartitionCount());
         for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
