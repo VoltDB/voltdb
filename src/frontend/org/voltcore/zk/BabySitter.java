@@ -20,6 +20,7 @@ package org.voltcore.zk;
 import java.util.ArrayList;
 import java.util.Collections;
 import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
 import java.util.concurrent.ExecutorService;
@@ -33,6 +34,7 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 
 /**
  * BabySitter watches a zookeeper node and alerts on appearances
@@ -49,14 +51,12 @@ import org.voltcore.utils.CoreUtils;
  */
 public class BabySitter
 {
-    private final String dir; // the directory to monitor
-    private final Callback cb; // the callback when children change
-
-    private final ZooKeeper zk;
-    private final ExecutorService es;
-    private final Object lock = new Object();
-    private List<String> children = new ArrayList<String>();
-    private AtomicBoolean shutdown = new AtomicBoolean(false);
+    private final String m_dir; // the directory to monitor
+    private final Callback m_cb; // the callback when children change
+    private final ZooKeeper m_zk;
+    private final ExecutorService m_es;
+    private List<String> m_children = new ArrayList<String>();
+    private AtomicBoolean m_shutdown = new AtomicBoolean(false);
 
     /**
      * Callback is passed an immutable child list when a child changes.
@@ -68,14 +68,12 @@ public class BabySitter
     }
 
     /** lastSeenChildren returns the last recorded list of children */
-    public List<String> lastSeenChildren()
+    public synchronized List<String> lastSeenChildren()
     {
-        if (shutdown.get()) {
+        if (m_shutdown.get()) {
             throw new RuntimeException("Requested children from shutdown babysitter.");
         }
-        synchronized(lock) {
-            return children;
-        }
+        return m_children;
     }
 
     /**
@@ -83,78 +81,69 @@ public class BabySitter
      * Note that shutting down will churn ephemeral ZK nodes - shutdown
      * allows the programmer to not set watches on nodes from terminated session.
      */
-    public void shutdown()
+    synchronized public void shutdown()
     {
-        shutdown.set(true);
+        m_shutdown.set(true);
+    }
+
+    private BabySitter(ZooKeeper zk, String dir, Callback cb)
+    {
+        m_zk = zk;
+        m_dir = dir;
+        m_cb = cb;
+        m_es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Babysitter-" + dir));
     }
 
     /**
-     * Create a new BabySitter and fetch the current child list.
-     * This ctor performs a blocking ZK transaction.
+     * Create a new BabySitter and block on reading the initial children list.
      */
-    public BabySitter(ZooKeeper zk, String dir, Callback cb, boolean blockOnInitialization)
+    public static Pair<BabySitter, List<String>> blockingFactory(ZooKeeper zk, String dir, Callback cb)
         throws InterruptedException, ExecutionException
     {
-        this.zk = zk;
-        this.dir = dir;
-        this.cb = cb;
-        this.es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Babysitter-" + dir));
-        Future<?> task = es.submit(eventHandler);
-        if (blockOnInitialization) {
-            try {
-                task.get();
-            } catch (ExecutionException e) {
-                org.voltdb.VoltDB.crashLocalVoltDB("Failed to initialize the babysitter watch.", true, e);
-            }
-        }
+        BabySitter bs = new BabySitter(zk, dir, cb);
+        Future<List<String>> task = bs.m_es.submit(bs.m_eventHandler);
+        List<String> initialChildren = task.get();
+        return new Pair<BabySitter, List<String>>(bs, initialChildren);
     }
 
     // eventHandler fetches the new children and resets the watch.
-    // It is always run in this.es.
-    private final Runnable eventHandler = new Runnable() {
+    // It is always run in m_es (the ExecutorService).
+    private final Callable<List<String>> m_eventHandler = new Callable<List<String>>() {
         @Override
-        public void run()
+        public List<String> call() throws InterruptedException, KeeperException
         {
-            if (shutdown.get() == true) {
-                // silently ignore churn in ZK after shutdown.
-                // Don't reset a watch.
-                return;
-            }
-
-            try {
-                watch();
-                if (cb != null) {
-                    cb.run(children);
+            synchronized(BabySitter.this) {
+                // ignore post-shutdown events. don't reset watch.
+                if (m_shutdown.get() == true) {
+                    return null;
                 }
-            } catch (KeeperException e) {
-                org.voltdb.VoltDB.crashLocalVoltDB("KeeperException resetting babysitter watch", true, e);
-            } catch (InterruptedException e) {
-                org.voltdb.VoltDB.crashLocalVoltDB("Interrupted resetting babysitter watch", true, e);
+
+                List<String> newChildren = watch();
+                if (m_cb != null) {
+                    m_cb.run(newChildren);
+                }
+                return newChildren;
             }
         }
     };
 
-    private final Watcher watcher = new Watcher()
+    private final Watcher m_watcher = new Watcher()
     {
         @Override
         public void process(WatchedEvent event)
         {
-            es.submit(eventHandler);
+            m_es.submit(m_eventHandler);
         }
     };
 
-    private void watch() throws InterruptedException, KeeperException
+    private List<String> watch() throws InterruptedException, KeeperException
     {
-        if (shutdown.get() == false) {
-            Stat stat = new Stat();
-            List<String> zkchildren = zk.getChildren(dir, watcher, stat);
-
-            synchronized (lock) {
-                ArrayList<String> tmp = new ArrayList<String>(zkchildren.size());
-                tmp.addAll(zkchildren);
-                ZKUtil.sortSequentialNodes(tmp);
-                children = Collections.unmodifiableList(tmp);
-            }
-        }
+        Stat stat = new Stat();
+        List<String> zkchildren = m_zk.getChildren(m_dir, m_watcher, stat);
+        ArrayList<String> tmp = new ArrayList<String>(zkchildren.size());
+        tmp.addAll(zkchildren);
+        ZKUtil.sortSequentialNodes(tmp);
+        m_children = Collections.unmodifiableList(tmp);
+        return m_children;
     }
 }

@@ -42,6 +42,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
@@ -299,9 +300,10 @@ public class Term
     // that term encapsulates the babysitter...
     protected void makeBabySitter() throws ExecutionException, InterruptedException
     {
-        m_babySitter = new BabySitter(m_zk,
+        Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
                 LeaderElector.electionDirForPartition(m_partitionId),
-                m_replicasChangeHandler, true);
+                m_replicasChangeHandler);
+        m_babySitter = pair.getFirst();
     }
 
     public boolean cancel()
