@@ -586,7 +586,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(params.toArray()[2] != null);
             assert(params.toArray()[3] != null);
             String table_name = (String) params.toArray()[0];
-            int site_id = (Integer) params.toArray()[1];
+            long site_id = (Long) params.toArray()[1];
             int dependency_id = (Integer) params.toArray()[2];
             TRACE_LOG.trace("Distributing replicated table: " + table_name +
                     " to: " + site_id);
