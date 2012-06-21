@@ -179,6 +179,16 @@ public abstract class VoltProcedure {
 //    }
 
     /**
+     * Queue the adhoc SQL statement for execution. The adhoc SQL statement will have
+     * to be planned which is orders of magnitude slower then using a precompiled SQL statements.
+     *
+     * If the query is parameterized it is possible to pass in the parameters
+     */
+    public void voltQueueAdhocSQL(String sql, Object... args) {
+        m_runner.voltQueueSQL(sql, args);
+    }
+
+    /**
      * Queue the SQL {@link org.voltdb.SQLStmt statement} for execution with the specified argument list,
      * and an Expectation describing the expected results. If the Expectation is not met then VoltAbortException
      * will be thrown with a description of the expecation that was not met. This exception must not be

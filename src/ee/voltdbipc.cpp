@@ -101,7 +101,8 @@ typedef struct {
     int64_t undoToken;
     int32_t outputDepId;
     int32_t inputDepId;
-    int32_t length;
+    int32_t planFragLength;
+    int32_t parameterSetLength;
     char data[0];
 }__attribute__((packed)) customplanfrag;
 
@@ -698,9 +699,24 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
     m_engine->setUsedParamcnt(0);
     m_engine->setUndoToken(ntohll(plan->undoToken));
 
+    int32_t planFragLength = ntohl(plan->planFragLength);
+    int32_t parameterSetLength = ntohl(plan->parameterSetLength);
+
     // data as fast serialized string
-    int32_t len = ntohl(plan->length);
-    string plan_str = string(plan->data, len);
+    // skip past the length prefix from fast serializer
+    string plan_str = string(plan->data, planFragLength);
+
+    // ...and fast serialized parameter sets last.
+    void* offset = &plan->data[planFragLength];
+    ReferenceSerializeInput serialize_in(offset, parameterSetLength);
+
+    NValueArray &params = m_engine->getParameterContainer();
+
+    int cnt = serialize_in.readShort();
+    assert(cnt> -1);
+    Pool *pool = m_engine->getStringPool();
+    deserializeParameterSetCommon(cnt, serialize_in, params, pool);
+    m_engine->setUsedParamcnt(cnt);
 
     // deps info
     int32_t outputDepId = ntohl(plan->outputDepId);
@@ -708,10 +724,11 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
 
     // execute
     if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
-                                      ntohll(plan->txnId),
+                                      params, ntohll(plan->txnId),
                                       ntohll(plan->lastCommittedTxnId))) {
         ++errors;
     }
+    pool->purge();
 
     // write the results array back across the wire
     const int8_t successResult = kErrorCode_Success;

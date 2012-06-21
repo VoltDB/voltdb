@@ -539,6 +539,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             collectLocalNetworkMetadata();
+
             /*
              * Configure and start all the IV2 sites
              */
@@ -573,7 +574,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                     m_rejoining,
                                     m_replicationActive,
                                     hostLog,
-                                    m_configuredNumberOfPartitions);
+                                    m_configuredNumberOfPartitions,
+                                    m_asyncCompilerAgent);
                         m_runners.add(runner);
                         Thread runnerThread = new Thread(runner, "Site " +
                                 org.voltcore.utils.CoreUtils.hsIdToString(site));
@@ -596,7 +598,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_rejoining,
                                 m_replicationActive,
                                 m_catalogContext.m_transactionId,
-                                m_configuredNumberOfPartitions);
+                                m_configuredNumberOfPartitions,
+                                m_asyncCompilerAgent);
                     m_localSites.put(localThreadMailbox.getHSId(), siteObj);
                     m_currentThreadSite = siteObj;
                 } catch (Exception e) {

@@ -66,6 +66,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
@@ -757,11 +758,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             boolean recovering,
             boolean replicationActive,
             final long txnId,
-            int configuredNumberOfPartitions) throws Exception
+            int configuredNumberOfPartitions,
+            AsyncCompilerAgent agent) throws Exception
     {
         this(voltdb, mailbox, serializedCatalog, transactionQueue,
              new ProcedureRunnerFactory(), recovering, replicationActive,
-             txnId, configuredNumberOfPartitions);
+             txnId, configuredNumberOfPartitions, agent);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -771,7 +773,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                   boolean recovering,
                   boolean replicationActive,
                   final long txnId,
-                  int configuredNumberOfPartitions) throws Exception
+                  int configuredNumberOfPartitions,
+                  AsyncCompilerAgent agent) throws Exception
     {
         m_siteId = mailbox.getHSId();
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
@@ -821,7 +824,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         // setup the procedure runner wrappers.
         if (runnerFactory != null) {
-            runnerFactory.configure(this, m_systemProcedureContext);
+            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( agent, m_context);
+            runnerFactory.configure(this, m_systemProcedureContext, csp);
         }
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
         m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType());
@@ -2258,7 +2262,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
             VoltTable table = null;
 
-            table = executeCustomPlanFragment(fragmentPlan, inputDepId, txnState.txnId);
+            table = executeCustomPlanFragment(fragmentPlan, inputDepId, txnState.txnId, params);
 
             DependencyPair dep = new DependencyPair(outputDepId, table);
 
@@ -2819,11 +2823,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId)
+                                               long txnId, ParameterSet params)
     {
         return ee.executeCustomPlanFragment(plan, inputDepId, txnId,
                                             lastCommittedTxnId,
-                                            getNextUndoToken());
+                                            getNextUndoToken(),
+                                            params);
     }
 
     @Override
