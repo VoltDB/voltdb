@@ -31,20 +31,20 @@ import org.voltcore.utils.CoreUtils;
  */
 public class Iv2RepairLogRequestMessage extends VoltMessage
 {
-    private int m_requestId = 0;
+    private long m_requestId = 0;
 
     /** Empty constructor for de-serialization */
     Iv2RepairLogRequestMessage() {
         super();
     }
 
-    public Iv2RepairLogRequestMessage(int requestId)
+    public Iv2RepairLogRequestMessage(long requestId)
     {
         super();
         m_requestId = requestId;
     }
 
-    public int getRequestId()
+    public long getRequestId()
     {
         return m_requestId;
     }
@@ -53,7 +53,7 @@ public class Iv2RepairLogRequestMessage extends VoltMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4; // requestId
+        msgsize += 8; // requestId
         return msgsize;
     }
 
@@ -61,7 +61,7 @@ public class Iv2RepairLogRequestMessage extends VoltMessage
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.IV2_REPAIR_LOG_REQUEST);
-        buf.putInt(m_requestId);
+        buf.putLong(m_requestId);
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -69,7 +69,7 @@ public class Iv2RepairLogRequestMessage extends VoltMessage
 
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
-        m_requestId = buf.getInt();
+        m_requestId = buf.getLong();
     }
 
     @Override

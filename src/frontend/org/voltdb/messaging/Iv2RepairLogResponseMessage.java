@@ -31,7 +31,7 @@ import org.voltcore.utils.CoreUtils;
  */
 public class Iv2RepairLogResponseMessage extends VoltMessage
 {
-    private int m_requestId = 0;
+    private long m_requestId = 0;
     private int m_sequence = 0;
     private int m_ofTotal = 0;
     private long m_spHandle = Long.MIN_VALUE;
@@ -49,7 +49,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         super();
     }
 
-    public Iv2RepairLogResponseMessage(int requestId, int sequence,
+    public Iv2RepairLogResponseMessage(long requestId, int sequence,
             int ofTotal, long spHandle, VoltMessage payload)
     {
         super();
@@ -60,7 +60,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_payload = payload;
     }
 
-    public int getRequestId()
+    public long getRequestId()
     {
         return m_requestId;
     }
@@ -89,7 +89,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 4; // requestId
+        msgsize += 8; // requestId
         msgsize += 4; // sequence
         msgsize += 4; // ofTotal
         msgsize += 8; // spHandle
@@ -103,7 +103,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
         buf.put(VoltDbMessageFactory.IV2_REPAIR_LOG_RESPONSE);
-        buf.putInt(m_requestId);
+        buf.putLong(m_requestId);
         buf.putInt(m_sequence);
         buf.putInt(m_ofTotal);
         buf.putLong(m_spHandle);
@@ -123,7 +123,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
 
     @Override
     protected void initFromBuffer(ByteBuffer buf) throws IOException {
-        m_requestId = buf.getInt();
+        m_requestId = buf.getLong();
         m_sequence = buf.getInt();
         m_ofTotal = buf.getInt();
         m_spHandle = buf.getLong();

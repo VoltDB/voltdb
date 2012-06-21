@@ -48,6 +48,12 @@ public class TestTerm extends TestCase
         return m;
     }
 
+    Iv2RepairLogResponseMessage makeStaleResponse(long spHandle, long requestId)
+    {
+        Iv2RepairLogResponseMessage m = makeResponse(spHandle);
+        when(m.getRequestId()).thenReturn(requestId);
+        return m;
+    }
 
     // verify that responses are correctly unioned and ordered.
     @Test
@@ -70,6 +76,17 @@ public class TestTerm extends TestCase
             assertEquals(li.getSpHandle(), expectedUnion[i++]);
         }
     }
+
+    // verify that bad request ids are not submitted to the log.
+    @Test
+    public void testStaleResponse() throws Exception
+    {
+        Term term = new Term(null, 0, 0L, null);
+        term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
+        assertEquals(0L, term.m_repairLogUnion.size());
+    }
+
+
 
     // verify that the all-done logic works on replica repair structs
     @Test

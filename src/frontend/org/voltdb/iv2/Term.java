@@ -88,12 +88,17 @@ public class Term
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
     private final long m_initiatorHSId;
-    private final int m_requestId = 0; // System.nanoTime();
+    private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
     private final String m_whoami;
 
     // Initialized in start() -- when the term begins.
     protected BabySitter m_babySitter;
+
+    long getRequestId()
+    {
+        return m_requestId;
+    }
 
     // scoreboard for responding replica repair log responses (hsid -> response count)
     static class ReplicaRepairStruct
