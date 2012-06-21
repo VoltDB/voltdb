@@ -40,6 +40,13 @@ import org.voltdb.messaging.FragmentTaskMessage;
  *
  */
 public abstract class TransactionState extends OrderableTransaction  {
+
+    public static enum RejoinState {
+        NORMAL,
+        REJOINING,
+        REPLAYING
+    }
+
     public final long coordinatorSiteId;
     protected final boolean m_isReadOnly;
     protected final TransactionInfoBaseMessage m_notice;
@@ -50,7 +57,9 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     protected boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
-    private boolean m_sendResponse = true; // whether or not to send response
+
+    // is this transaction run during a rejoin
+    protected RejoinState m_rejoinState;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -61,7 +70,8 @@ public abstract class TransactionState extends OrderableTransaction  {
      */
     protected TransactionState(Mailbox mbox,
                                ExecutionSite site,
-                               TransactionInfoBaseMessage notice)
+                               TransactionInfoBaseMessage notice,
+                               RejoinState rejoinState)
     {
         super(notice.getTxnId(), notice.getInitiatorHSId());
         m_mbox = mbox;
@@ -70,18 +80,21 @@ public abstract class TransactionState extends OrderableTransaction  {
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
+        m_rejoinState = rejoinState;
+        // this will be set later if needed (in doWork())
+        assert(m_rejoinState != RejoinState.REJOINING);
     }
 
     final public TransactionInfoBaseMessage getNotice() {
         return m_notice;
     }
 
-    public boolean shouldSendResponse() {
-        return m_sendResponse;
+    public TransactionInfoBaseMessage getTransactionInfoBaseMessageForRejoinLog() {
+        return m_notice;
     }
 
-    public void setSendResponse(boolean sendResponse) {
-        m_sendResponse = sendResponse;
+    public RejoinState getRejoinState() {
+        return m_rejoinState;
     }
 
     // Assume that done-ness is a latch.

@@ -32,10 +32,18 @@ import org.voltdb.messaging.InitiateTaskMessage;
 
 public class SinglePartitionTxnState extends TransactionState {
     public SinglePartitionTxnState(Mailbox mbox,
-                                   ExecutionSite site,
-                                   TransactionInfoBaseMessage task)
+            ExecutionSite site,
+            TransactionInfoBaseMessage task)
     {
-        super(mbox, site, task);
+        this(mbox, site, task, RejoinState.NORMAL);
+    }
+
+    public SinglePartitionTxnState(Mailbox mbox,
+                                   ExecutionSite site,
+                                   TransactionInfoBaseMessage task,
+                                   RejoinState rejoinState)
+    {
+        super(mbox, site, task, rejoinState);
         assert(task instanceof InitiateTaskMessage) :
             "Creating single partition txn from invalid membership notice.";
     }
@@ -70,7 +78,8 @@ public class SinglePartitionTxnState extends TransactionState {
 
     @Override
     public boolean doWork(boolean rejoining) {
-        if (rejoining) {
+        if (rejoining && (m_rejoinState != RejoinState.REPLAYING)) {
+            m_rejoinState = RejoinState.REJOINING;
             return doWorkRejoining();
         }
         if (!m_done) {
@@ -81,7 +90,7 @@ public class SinglePartitionTxnState extends TransactionState {
                 m_needsRollback = true;
             }
 
-            if (shouldSendResponse()) {
+            if (m_rejoinState == RejoinState.NORMAL) {
                 m_mbox.send(initiatorHSId, response);
             }
             m_done = true;

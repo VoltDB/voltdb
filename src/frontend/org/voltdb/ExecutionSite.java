@@ -72,6 +72,7 @@ import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.TransactionState.RejoinState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -1154,13 +1155,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             TransactionInfoBaseMessage msg = m_rejoinTaskLog.getNextMessage();
             if (msg != null) {
                 if (msg.isSinglePartition()) {
-                    ts = new SinglePartitionTxnState(m_mailbox, this, msg);
-                    // Don't send response
-                    ts.setSendResponse(false);
+                    ts = new SinglePartitionTxnState(m_mailbox, this, msg, RejoinState.REPLAYING);
                 } else {
-                    // TODO: multi-part is not supported yet
-                    VoltDB.crashLocalVoltDB("Cannot replay multi-part transactions yet",
-                                            false, null);
+                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, msg, RejoinState.REPLAYING);
                 }
             }
         } catch (IOException e) {
@@ -1421,11 +1418,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * log task message for rejoin if it's not a replayed transaction.
              * Replayed transactions do not send responses.
              */
-            if (m_rejoining && txnState.shouldSendResponse() &&
+            if ((txnState.getRejoinState() == RejoinState.NORMAL) &&
                 m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
-                    m_rejoinTaskLog.logTask(txnState.getNotice());
-                    m_loggedTaskCount++;
+                    if (txnState.getNotice() instanceof InitiateTaskMessage) {
+                        // TODO: this is a pretty horrible hack and fixing it is next on my list
+                        // I also need to ensure that fragments of sysprocs run at non-coordinators don't get replayed
+                        if (((InitiateTaskMessage)txnState.getNotice()).getStoredProcedureName().startsWith("@") == false) {
+                            m_rejoinTaskLog.logTask(txnState.getTransactionInfoBaseMessageForRejoinLog());
+                            m_loggedTaskCount++;
+                        }
+                    }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to log task message", true, e);
                 }
@@ -2412,8 +2415,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * during rejoin needs real work to be done, but no response to be
              * sent.
              */
-            boolean rejoining = m_rejoining && currentTxnState.shouldSendResponse();
-            if (currentTxnState.doWork(rejoining)) {
+            if (currentTxnState.doWork(m_rejoining)) {
                 if (currentTxnState.needsRollback())
                 {
                     rollbackTransaction(currentTxnState);
@@ -2704,12 +2706,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
         else {
             TransactionState nextTxn = (TransactionState)m_transactionQueue.peek();
-            boolean rejoining = m_rejoining && nextTxn.shouldSendResponse();
 
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)
             {
-                boolean success = nextTxn.doWork(rejoining);
+                boolean success = nextTxn.doWork(m_rejoining);
                 assert(success);
                 return true;
             }
