@@ -46,7 +46,7 @@
 # limitations under the License.
 
 
-# The VoltDB Application Compiler command script
+# The VoltDB CSV Loader script
 #
 # Environment Variables
 #   JAVA_HOME        The java implementation to use.  Overrides JAVA_HOME.
