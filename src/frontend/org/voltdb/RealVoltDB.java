@@ -257,6 +257,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
+            // check that this is a 64 bit VM
+            if (System.getProperty("java.vm.name").contains("64") == false) {
+                hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
+                System.exit(-1);
+            }
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
             consoleLog.info("ENABLE IV2: " + config.m_enableIV2);
 
@@ -335,12 +340,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 System.exit(-1);
             }
 
-            // check that this is a 64 bit VM
-            if (System.getProperty("java.vm.name").contains("64") == false) {
-                hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
-                System.exit(-1);
-            }
-
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
@@ -401,8 +400,27 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_mailboxTracker.start();
                 JSONObject topo = getTopology(isRejoin);
 
-                // We need the cartographer to do IV2 rejoin, so get it early
-                m_cartographer = new Cartographer(m_messenger.getZK());
+                // IV2 mailbox stuff
+                {
+                    m_cartographer = new Cartographer(m_messenger.getZK());
+                    if (isRejoin) {
+                        List<Integer> partitionsToReplace = m_cartographer.getIv2PartitionsToReplace(topo);
+                        m_iv2Initiators = createIv2Initiators(partitionsToReplace);
+                    }
+                    else {
+                        List<Integer> partitions =
+                            ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
+                        m_iv2Initiators = createIv2Initiators(partitions);
+                        // Create the MPI if we're the correct host
+                        if (topo.getInt("MPI") == m_messenger.getHostId()) {
+                            Initiator initiator = new MpInitiator(m_messenger);
+                            MailboxNodeContent mnc = new MailboxNodeContent(initiator.getInitiatorHSId(),
+                                    null);
+                            m_mailboxPublisher.registerMailbox(MailboxType.MpInitiator, mnc);
+                            m_iv2Initiators.add(initiator);
+                        }
+                    }
+                }
 
                 /*
                  * Will count this down at the right point on regular startup as well as rejoin
@@ -420,23 +438,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     p = createMailboxesForSitesRejoin(topo);
                     ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
                     hostLog.info("Set recovering site count to " + p.getFirst().size());
-
-                    // Do IV2 stuff
-                    List<Integer> partitionsToReplace = getIv2PartitionsToReplace(topo);
-                    m_iv2Initiators = createIv2Initiators(partitionsToReplace);
                 } else {
                     p = createMailboxesForSitesStartup(topo);
-                    List<Integer> partitions =
-                        ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
-                    m_iv2Initiators = createIv2Initiators(partitions);
-                    // Create the MPI if we're the correct host
-                    if (topo.getInt("MPI") == m_messenger.getHostId()) {
-                        Initiator initiator = new MpInitiator(m_messenger);
-                        MailboxNodeContent mnc = new MailboxNodeContent(initiator.getInitiatorHSId(),
-                                                                        null);
-                        m_mailboxPublisher.registerMailbox(MailboxType.MpInitiator, mnc);
-                        m_iv2Initiators.add(initiator);
-                    }
                 }
 
                 siteMailboxes = p.getFirst();
@@ -875,41 +878,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
         }
         return topo;
-    }
-
-    // IZZY: move this into Cartographer
-    private List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
-    {
-        ClusterConfig clusterConfig = new ClusterConfig(topology);
-        hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
-        List<Integer> repsPerPart = new ArrayList<Integer>(clusterConfig.getPartitionCount());
-        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
-            repsPerPart.add(i, m_cartographer.getReplicaCountForPartition(i));
-        }
-        List<Integer> partitions = new ArrayList<Integer>();
-        int freeSites = clusterConfig.getSitesPerHost();
-        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
-            if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
-                partitions.add(i);
-                // pretend to be fully replicated so we don't put two copies of a
-                // partition on this host.
-                repsPerPart.set(i, clusterConfig.getReplicationFactor() + 1);
-                freeSites--;
-                if (freeSites == 0) {
-                    break;
-                }
-            }
-        }
-        if (freeSites > 0) {
-            // double check fully replicated?
-            for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
-                if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
-                    hostLog.error("Partition " + i + " should have been replicated but wasn't");
-                }
-            }
-        }
-        hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
-        return partitions;
     }
 
     private List<Initiator> createIv2Initiators(Collection<Integer> partitions)

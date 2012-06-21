@@ -38,6 +38,8 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheReader;
 
+import org.voltdb.compiler.ClusterConfig;
+
 import org.voltdb.MailboxNodeContent;
 import org.voltdb.StatsSource;
 import org.voltdb.VoltDB;
@@ -180,6 +182,40 @@ public class Cartographer extends StatsSource
      */
     public int getReplicaCountForPartition(int partition) {
         return getReplicasForPartition(partition).size();
+    }
+
+    public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
+    {
+        ClusterConfig clusterConfig = new ClusterConfig(topology);
+        hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
+        List<Integer> repsPerPart = new ArrayList<Integer>(clusterConfig.getPartitionCount());
+        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+            repsPerPart.add(i, getReplicaCountForPartition(i));
+        }
+        List<Integer> partitions = new ArrayList<Integer>();
+        int freeSites = clusterConfig.getSitesPerHost();
+        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+            if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
+                partitions.add(i);
+                // pretend to be fully replicated so we don't put two copies of a
+                // partition on this host.
+                repsPerPart.set(i, clusterConfig.getReplicationFactor() + 1);
+                freeSites--;
+                if (freeSites == 0) {
+                    break;
+                }
+            }
+        }
+        if (freeSites > 0) {
+            // double check fully replicated?
+            for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+                if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
+                    hostLog.error("Partition " + i + " should have been replicated but wasn't");
+                }
+            }
+        }
+        hostLog.info("IV2 Sites will replicate the following partitions: " + partitions);
+        return partitions;
     }
 
     public Map<MailboxType, List<MailboxNodeContent>> getSiteTrackerMailboxMap()
