@@ -159,6 +159,7 @@ protected:
     // debugging and testing methods
     bool isReachableNode(const TreeNode* start, const TreeNode *dest) const;
     int verify(const TreeNode *n) const;
+    int inOrderCounterChecking(const TreeNode *n) const;
     int fullCount(const TreeNode *n) const;
 };
 
