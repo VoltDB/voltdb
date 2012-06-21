@@ -339,6 +339,15 @@ void CompactingMap<Key, Data, Compare>::erase(TreeNode *z) {
         z->key = y->key;
         z->value = y->value;
         delnode = y;
+        // y is the successor of z, delete 1 along the path
+        z->subct--;
+        TreeNode *ct = y;
+        while (ct->parent != z) {
+        	ct->parent->subct--;
+        	ct = ct->parent;
+        }
+    } else {
+    	y->parent->subct--;
     }
 
     if (y->color == BLACK)
