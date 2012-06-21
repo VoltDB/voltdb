@@ -67,6 +67,7 @@ protected:
         TreeNode *parent;
         TreeNode *left;
         TreeNode *right;
+        int32_t rank;
         char color;
     };
 
@@ -170,6 +171,7 @@ CompactingMap<Key, Data, Compare>::CompactingMap(bool unique, Compare comper)
 {
     NIL.left = NIL.right = NIL.parent = &NIL;
     NIL.color = BLACK;
+    NIL.rank = 0;
 }
 
 template<typename Key, typename Data, typename Compare>
@@ -206,7 +208,10 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
         while (x != &NIL) {
             y = x;
             int cmp = m_comper(value.first, x->key);
-            if (cmp < 0) x = x->left;
+            if (cmp < 0) {
+            	x->rank++;
+            	x = x->left;
+            }
             else if (m_unique) {
                 if (cmp == 0) return false;
                 else x = x->right;
@@ -224,6 +229,7 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
         z->left = z->right = &NIL;
         z->parent = y;
         z->color = RED;
+        z->rank = y->rank + 1;
 
         // stitch it in
         if (y == &NIL) m_root = z;
@@ -244,6 +250,7 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
         z->left = z->right = &NIL;
         z->parent = &NIL;
         z->color = BLACK;
+        z->rank = 0;
 
         // make it root
         m_root = z;
