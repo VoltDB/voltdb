@@ -19,6 +19,8 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 import java.util.Comparator;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
@@ -86,15 +88,16 @@ public class Term
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
     private final long m_initiatorHSId;
-    private final int m_requestId = 0; // System.currentTimeMillis();
+    private final int m_requestId = 0; // System.nanoTime();
     private final ZooKeeper m_zk;
     private final String m_whoami;
 
     // Initialized in start() -- when the term begins.
-    private BabySitter m_babySitter;
+    protected BabySitter m_babySitter;
 
     // scoreboard for responding replica repair log responses (hsid -> response count)
-    static class ReplicaRepairStruct {
+    static class ReplicaRepairStruct
+    {
         int m_receivedResponses = 0;
         int m_expectedResponses = -1; // (a log msg cares about this init. value)
         long m_maxSpHandleSeen = Long.MIN_VALUE;
@@ -133,7 +136,9 @@ public class Term
         new HashMap<Long, ReplicaRepairStruct>();
 
     // Determine equal repair responses by the SpHandle of the response.
-    Comparator<Iv2RepairLogResponseMessage> m_unionComparator = new Comparator<Iv2RepairLogResponseMessage>() {
+    Comparator<Iv2RepairLogResponseMessage> m_unionComparator =
+        new Comparator<Iv2RepairLogResponseMessage>()
+    {
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
@@ -180,6 +185,7 @@ public class Term
     private static class InaugurationFuture implements Future<Boolean>
     {
         private CountDownLatch m_doneLatch = new CountDownLatch(1);
+        private AtomicBoolean m_cancelled = new AtomicBoolean(false);
         private ExecutionException m_exception = null;
 
         private void setException(Exception e)
@@ -187,16 +193,35 @@ public class Term
             m_exception = new ExecutionException(e);
         }
 
+        private Boolean result() throws ExecutionException
+        {
+            if (m_exception != null) {
+                throw m_exception;
+            }
+            else if (isCancelled()) {
+                return false;
+            }
+            return true;
+
+        }
+
         @Override
         public boolean cancel(boolean mayInterruptIfRunning)
         {
-            return false;
+            if (isDone()) {
+                return false;
+            }
+            else {
+                m_cancelled.set(true);
+                m_doneLatch.countDown();
+                return true;
+            }
         }
 
         @Override
         public boolean isCancelled()
         {
-            return false;
+            return m_cancelled.get();
         }
 
         @Override
@@ -209,10 +234,7 @@ public class Term
         public Boolean get() throws InterruptedException, ExecutionException
         {
             m_doneLatch.await();
-            if (m_exception != null) {
-                throw m_exception;
-            }
-            return true;
+            return result();
         }
 
         @Override
@@ -220,10 +242,7 @@ public class Term
             throws InterruptedException, ExecutionException, TimeoutException
         {
             m_doneLatch.await(timeout, unit);
-            if (m_exception != null) {
-                throw m_exception;
-            }
-            return true;
+            return result();
         }
     }
 
@@ -255,9 +274,7 @@ public class Term
     public Future<Boolean> start(int kfactorForStartup)
     {
         try {
-            m_babySitter = new BabySitter(m_zk,
-                    LeaderElector.electionDirForPartition(m_partitionId),
-                    m_replicasChangeHandler, true);
+            makeBabySitter();
             if (kfactorForStartup >= 0) {
                 prepareForStartup(kfactorForStartup);
             }
@@ -272,6 +289,15 @@ public class Term
         return m_promotionResult;
     }
 
+    // extract this out so it can be mocked for testcases.
+    // don't want to dep-inject this because the whole point is
+    // that term encapsulates the babysitter...
+    protected void makeBabySitter() throws ExecutionException, InterruptedException
+    {
+        m_babySitter = new BabySitter(m_zk,
+                LeaderElector.electionDirForPartition(m_partitionId),
+                m_replicasChangeHandler, true);
+    }
 
     public boolean cancel()
     {
@@ -284,7 +310,6 @@ public class Term
             m_babySitter.shutdown();
         }
     }
-
 
     /** Block until all replica's are present. */
     void prepareForStartup(int kfactor)
@@ -362,6 +387,14 @@ public class Term
     /** Send missed-messages to survivors. Exciting! */
     public void repairSurvivors()
     {
+        // cancel() and repair() must be synchronized by the caller (the deliver lock,
+        // currently). If cancelled and the last repair message arrives, don't send
+        // out corrections!
+        if (this.m_promotionResult.isCancelled()) {
+            tmLog.debug(m_whoami + "Skipping repair message creation for cancelled Term.");
+            return;
+        }
+
         int queued = 0;
         tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {

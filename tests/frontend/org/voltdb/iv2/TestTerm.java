@@ -24,12 +24,16 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.List;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.mockito.InOrder;
 import static org.mockito.Mockito.*;
+
+import org.voltcore.zk.BabySitter;
 
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import junit.framework.TestCase;
@@ -198,6 +202,51 @@ public class TestTerm extends TestCase
 
         // verify exactly 3 repairs happened.
         verify(mailbox, times(3)).repairReplicasWith(any(repair3.getClass()), any(Iv2RepairLogResponseMessage.class));
+    }
+
+    // Verify that a babysitter update causes the term to be cancelled.
+    @Test
+    public void testMidPromotionReplicaUpdate() throws Exception
+    {
+        final AtomicBoolean promotionResult = new AtomicBoolean(true);
+        final InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
+        final BabySitter babysitter = mock(BabySitter.class);
+
+        // Stub some portions of a concrete Term instance - this is the
+        // object being tested.
+        final Term term = new Term(mock(ZooKeeper.class), 0, 0L, mailbox) {
+            // avoid zookeeper.
+            @Override
+            protected void makeBabySitter() {
+                m_babySitter = babysitter;
+            }
+
+            // there aren't replicas to ask for repair logs
+            @Override
+            void prepareForFaultRecovery() {
+            }
+
+        };
+
+        Thread promotionThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    promotionResult.set(term.start(-1).get());
+                } catch (Exception e) {
+                    System.out.println("Promotion thread threw: " + e);
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+        promotionThread.start();
+
+        // cancel the term as if updateReplica() triggered.
+        term.cancel();
+        promotionThread.join();
+
+        // promotion success must be false after cancel.
+        assertFalse(promotionResult.get());
     }
 
 

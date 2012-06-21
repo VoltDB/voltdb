@@ -75,6 +75,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             + " for partition " + m_partitionId + " ";
     }
 
+    // runs on the leader elector callback thread.
     @Override
     public void becomeLeader()
     {
