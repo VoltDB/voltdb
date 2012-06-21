@@ -711,7 +711,7 @@ int CompactingMap<Key, Data, Compare>::verify(const TreeNode *n) const {
     // check counter for sub tree nodes
     NodeCount ct = 1;
     if (n->left != &NIL) ct += n->left->subct;
-    if (n->right !=n &NIL) ct += n->right->subct;
+    if (n->right != &NIL) ct += n->right->subct;
     if (ct != n->subct) {
     	printf("node counter is not correct");
     	return -1;
