@@ -806,11 +806,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public VoltTable executeCustomPlanFragment(final String plan,
             int inputDepId, final long txnId, final long lastCommittedTxnId,
-            final long undoQuantumToken) throws EEException
+            final long undoQuantumToken,
+            ParameterSet params) throws EEException
     {
         final FastSerializer fser = new FastSerializer();
+        final FastSerializer fser2 = new FastSerializer();
         try {
             fser.writeString(plan);
+            params.writeExternal(fser);
         } catch (final IOException exception) {
             throw new RuntimeException(exception);
         }
@@ -822,7 +825,15 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(undoQuantumToken);
         m_data.putInt(0); // output dep id is not needed
         m_data.putInt(inputDepId);
-        m_data.put(fser.getBuffer());
+        //-4 because the data from fser contains a length prefix
+        m_data.putInt(fser.getBuffer().remaining() - 4);
+        m_data.putInt(fser2.getBuffer().remaining() - 4);
+        ByteBuffer buf = fser.getBuffer();
+        buf.position(4);//skip fser length prefix
+        m_data.put(buf);
+        buf = fser2.getBuffer();
+        buf.position(4);//skip fser length prefix
+        m_data.put(buf);
 
         try {
             m_data.flip();

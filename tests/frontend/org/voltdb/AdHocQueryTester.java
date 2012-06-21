@@ -74,6 +74,12 @@ public abstract class AdHocQueryTester extends TestCase {
         builder.addPartitionInfo("PARTED1", "PARTVAL");
         builder.addPartitionInfo("PARTED2", "PARTVAL");
         builder.addPartitionInfo("PARTED3", "PARTVAL");
+        builder.addProcedures(
+                new Class<?>[] {
+                        org.voltdb_testprocs.adhoc.executeSQLMP.class,
+                        org.voltdb_testprocs.adhoc.executeSQLSP.class,
+                        org.voltdb_testprocs.adhoc.executeSQLMPWRITE.class,
+                        org.voltdb_testprocs.adhoc.executeSQLSPWRITE.class,} );
     }
 
     public static VoltDB.Configuration setUpSPDB() throws IOException, Exception {

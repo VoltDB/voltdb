@@ -29,10 +29,12 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     final String[] sqlStatements;
     final Object partitionParam;
     final CatalogContext catalogContext;
+    final boolean allowParameterization;
 
     public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection, Object clientData,
-            String sqlBatchText, List<String> sqlStatements, Object partitionParam, CatalogContext context)
+            String sqlBatchText, List<String> sqlStatements, Object partitionParam, CatalogContext context,
+            boolean allowParameterization)
     {
         super(replySiteId, shouldShutdown, clientHandle, connectionId, hostname,
               adminConnection, clientData);
@@ -40,6 +42,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
         this.sqlStatements = sqlStatements.toArray(new String[sqlStatements.size()]);
         this.partitionParam = partitionParam;
         this.catalogContext = context;
+        this.allowParameterization = allowParameterization;
     }
 
     @Override

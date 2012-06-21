@@ -17,6 +17,10 @@
 
 package org.voltdb.compiler;
 
+import java.util.List;
+
+import org.voltdb.planner.ParameterInfo;
+
 /**
  * Holds the plan and original SQL source for a single statement.
  *
@@ -31,6 +35,7 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
     public boolean isReplicatedTableDML;
     public Object partitionParam;
     public int catalogVersion;
+    public List<ParameterInfo> params;
 
     /***
      * Constructor

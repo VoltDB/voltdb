@@ -17,6 +17,8 @@
 
 package org.voltdb.compiler;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
@@ -24,6 +26,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.CompiledPlan.Fragment;
+import org.voltdb.planner.ParameterInfo;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
@@ -49,6 +52,7 @@ public class PlannerTool {
         String allPlan = null;
         boolean replicatedDML = false;
         Object partitionParam;
+        List<ParameterInfo> params;
 
         @Override
         public String toString() {
@@ -92,7 +96,7 @@ public class PlannerTool {
         hostLog.info("hsql loaded");
     }
 
-    public Result planSql(String sqlIn, Object partitionParam, boolean inferSP) {
+    public Result planSql(String sqlIn, Object partitionParam, boolean inferSP, boolean allowParameterization) {
         if ((sqlIn == null) || (sqlIn.length() == 0)) {
             throw new RuntimeException("Can't plan empty or null SQL.");
         }
@@ -124,7 +128,8 @@ public class PlannerTool {
                 throw new RuntimeException("ERROR: UNKNOWN PLANNING ERROR\n");
             }
         }
-        if (plan.parameters.size() > 0) {
+
+        if (!allowParameterization && plan.parameters.size() > 0) {
             throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
         }
 
@@ -148,6 +153,11 @@ public class PlannerTool {
         // OUTPUT THE RESULT
         //////////////////////
         Result retval = new Result();
+
+        /*
+         * Copy the parameter information
+         */
+        retval.params = plan.parameters;
         for (Fragment frag : plan.fragments) {
             PlanNodeList planList = new PlanNodeList(frag.planGraph);
             String serializedPlan = planList.toJSONString();

@@ -17,7 +17,10 @@
 
 package org.voltdb;
 
+import java.util.List;
+
 import org.voltdb.catalog.Statement;
+import org.voltdb.planner.ParameterInfo;
 
 /**
  * <p>A simple wrapper of a parameterized SQL statement. VoltDB uses this instead of
@@ -65,14 +68,27 @@ public class SQLStmt {
      * @param aggregatorFragment Compiled aggregator fragment
      * @param collectorFragment Compiled collector fragment
      * @param isReplicatedTableDML Flag set to true if replicated
-     *
+     * @param params Description of parameters expected by the statement
      * @return SQLStmt object with plan added
      */
     static SQLStmt createWithPlan(String sqlText,
                                   String aggregatorFragment,
                                   String collectorFragment,
-                                  boolean isReplicatedTableDML) {
+                                  boolean isReplicatedTableDML,
+                                  List<ParameterInfo> params) {
         SQLStmt stmt = new SQLStmt(sqlText, null);
+
+        /*
+         * Fill out the parameter types
+         */
+        if (params != null) {
+            stmt.statementParamJavaTypes = new byte[params.size()];
+            stmt.numStatementParamJavaTypes = stmt.statementParamJavaTypes.length;
+            for (ParameterInfo pi : params) {
+                stmt.statementParamJavaTypes[pi.index] = pi.type.getValue();
+            }
+        }
+
         stmt.plan = new SQLStmtPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML);
         return stmt;
     }

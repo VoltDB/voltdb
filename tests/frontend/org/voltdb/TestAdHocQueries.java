@@ -43,6 +43,76 @@ public class TestAdHocQueries extends AdHocQueryTester {
     Client m_client;
     private final static boolean m_debug = true;
 
+    public void testProcedureAdhoc() throws Exception {
+        VoltDB.Configuration config = setUpSPDB();
+        ServerThread localServer = new ServerThread(config);
+
+        try {
+            localServer.start();
+            localServer.waitForInitialization();
+
+            // do the test
+            m_client = ClientFactory.createClient();
+            m_client.createConnection("localhost");
+
+            m_client.callProcedure("@AdHoc", "insert into PARTED1 values ( 23, 2 )");
+
+            /*
+             * Test that a basic multipartition select works as well as a parameterized
+             * query (it's in the procedure)
+             */
+            VoltTable results[] = m_client.callProcedure(
+                    "executeSQLSP",
+                    23,
+                    "select * from PARTED1").getResults();
+            assertTrue(
+                    results[0].advanceRow());
+            assertTrue(results[1].advanceRow());
+
+            results = m_client.callProcedure(
+                    "executeSQLMP",
+                    23,
+                    "       select * from PARTED1").getResults();
+            assertTrue(
+                    results[0].advanceRow());
+            assertTrue(results[1].advanceRow());
+
+            /*
+             * Validate that doing an insert from a RO procedure fails
+             */
+            boolean threw = false;
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5)");
+            } catch (ProcCallException e) {
+                threw = true;
+            }
+            assertTrue(threw);
+
+            threw = false;
+            try {
+                m_client.callProcedure("executeSQLMP", 24, "insert into parted1 values (24,5)");
+            } catch (ProcCallException e) {
+                threw = true;
+            }
+            assertTrue(threw);
+
+            /*
+             * Validate that an insert does work from a write procedure
+             */
+        } finally {
+            if (m_client != null) m_client.close();
+            m_client = null;
+
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+    }
     public void testSP() throws Exception {
         VoltDB.Configuration config = setUpSPDB();
         ServerThread localServer = new ServerThread(config);

@@ -589,10 +589,12 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
     env->ReleaseByteArrayElements(plan, str, JNI_ABORT);
 
     // execute
-    engine->setUsedParamcnt(0);
+    NValueArray &params = engine->getParameterContainer();
+    const int paramcnt = deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
+    engine->setUsedParamcnt(paramcnt);
     try {
         retval = engine->executePlanFragment(cppplan, outputDependencyId,
-                                             inputDependencyId, txnId,
+                                             inputDependencyId, params, txnId,
                                              lastCommittedTxnId);
     } catch (FatalException e) {
         topend->crashVoltDB(e);
