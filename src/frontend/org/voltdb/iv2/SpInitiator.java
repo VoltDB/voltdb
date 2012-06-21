@@ -17,9 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-
 import org.apache.zookeeper_voltpatches.KeeperException;
 
 import org.voltcore.logging.VoltLogger;
@@ -44,6 +43,7 @@ import org.voltdb.VoltDB;
 public class SpInitiator implements Initiator, LeaderNoticeHandler
 {
     VoltLogger tmLog = new VoltLogger("TM");
+    private final String m_whoami;
 
     // External references/config
     private HostMessenger m_messenger = null;
@@ -59,11 +59,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     // Only gets set non-null for the leader
     private Thread m_siteThread = null;
     private RepairLog m_repairLog = new RepairLog();
-
-    // need a flag to distinguish first-time-startup from fault recovery.
-    private int m_kfactorForStartup = -1;
-
-    private final String m_whoami;
+    private CountDownLatch m_missingStartupSites;
 
     public SpInitiator(HostMessenger messenger, Integer partition)
     {
@@ -84,10 +80,10 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             Boolean success = false;
             while (!success) {
                 tmLog.info(m_whoami + "starting leader promotion");
-                m_term = new Term(m_messenger.getZK(), m_partitionId,
-                        getInitiatorHSId(), m_initiatorMailbox);
+                m_term = new Term(m_missingStartupSites, m_messenger.getZK(),
+                        m_partitionId, getInitiatorHSId(), m_initiatorMailbox);
                 m_initiatorMailbox.setTerm(m_term);
-                success = m_term.start(m_kfactorForStartup).get();
+                success = m_term.start().get();
                 if (success) {
                     m_repairLog.setLeaderState(true);
                     m_scheduler.setLeaderState(true);
@@ -142,7 +138,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                           SiteTracker siteTracker, int kfactor)
     {
         try {
-            m_kfactorForStartup = kfactor;
+            m_missingStartupSites = new CountDownLatch(kfactor + 1);
             boolean isLeader = joinElectoralCollege();
             if (isLeader) {
                 tmLog.info(m_whoami + "published as leader.");
@@ -150,9 +146,6 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             else {
                 tmLog.info(m_whoami + "running as replica.");
             }
-
-            // Done tracking startup vs. recovery special case.
-            m_kfactorForStartup = -1;
 
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),

@@ -85,13 +85,14 @@ import org.voltdb.VoltZK;
 public class Term
 {
     VoltLogger tmLog = new VoltLogger("TM");
+    private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
     private final long m_initiatorHSId;
     private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
-    private final String m_whoami;
+    private final CountDownLatch m_missingStartupSites;
 
     // Initialized in start() -- when the term begins.
     protected BabySitter m_babySitter;
@@ -259,12 +260,21 @@ public class Term
     /**
      * Setup a new Term but don't take any action to take responsibility.
      */
-    public Term(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox)
+    public Term(CountDownLatch missingStartupSites, ZooKeeper zk,
+            int partitionId, long initiatorHSId, InitiatorMailbox mailbox)
     {
         m_zk = zk;
         m_partitionId = partitionId;
         m_initiatorHSId = initiatorHSId;
         m_mailbox = mailbox;
+
+        if (missingStartupSites != null) {
+            m_missingStartupSites = missingStartupSites;
+        }
+        else {
+            m_missingStartupSites = new CountDownLatch(0);
+        }
+
         m_whoami = "SP " +  CoreUtils.hsIdToString(m_initiatorHSId)
             + " for partition " + m_partitionId + " ";
     }
@@ -277,12 +287,12 @@ public class Term
      * recovery, pass the kfactor required to proceed. For fault recovery,
      * pass any negative value as kfactorForStartup.
      */
-    public Future<Boolean> start(int kfactorForStartup)
+    public Future<Boolean> start()
     {
         try {
             makeBabySitter();
-            if (kfactorForStartup >= 0) {
-                prepareForStartup(kfactorForStartup);
+            if (m_missingStartupSites.getCount() > 0) {
+                prepareForStartup();
             }
             else {
                 prepareForFaultRecovery();
@@ -319,17 +329,15 @@ public class Term
     }
 
     /** Block until all replica's are present. */
-    void prepareForStartup(int kfactor)
+    void prepareForStartup()
+        throws InterruptedException
     {
-        tmLog.info(m_whoami + "starting with " + kfactor + " replicas.");
+        tmLog.info(m_whoami + "starting with " + m_missingStartupSites.getCount() + " replicas.");
         List<String> children = m_babySitter.lastSeenChildren();
-        while (children.size() < kfactor + 1) {
-            try {
-                Thread.sleep(5);
-            } catch (InterruptedException e) {
-            }
-            children = m_babySitter.lastSeenChildren();
+        for (int i=0; i < children.size(); ++i) {
+            m_missingStartupSites.countDown();
         }
+        m_missingStartupSites.await();
         declareReadyAsLeader();
     }
 

@@ -59,7 +59,7 @@ public class TestTerm extends TestCase
     @Test
     public void testUnion() throws Exception
     {
-        Term term = new Term(null, 0, 0L, null);
+        Term term = new Term(null, null, 0, 0L, null);
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -81,7 +81,7 @@ public class TestTerm extends TestCase
     @Test
     public void testStaleResponse() throws Exception
     {
-        Term term = new Term(null, 0, 0L, null);
+        Term term = new Term(null, null, 0, 0L, null);
         term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
         assertEquals(0L, term.m_repairLogUnion.size());
     }
@@ -92,7 +92,7 @@ public class TestTerm extends TestCase
     @Test
     public void testRepairLogsAreComplete()
     {
-        Term term = new Term(null, 0, 0L, null);
+        Term term = new Term(null, null, 0, 0L, null);
         Term.ReplicaRepairStruct notDone1 = new Term.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
@@ -137,7 +137,7 @@ public class TestTerm extends TestCase
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        Term term = new Term(mock(ZooKeeper.class), 0, 0L, mailbox);
+        Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox);
 
         // missing 4, 5
         Term.ReplicaRepairStruct r1 = new Term.ReplicaRepairStruct();
@@ -190,7 +190,7 @@ public class TestTerm extends TestCase
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        Term term = new Term(mock(ZooKeeper.class), 0, 0L, mailbox);
+        Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox);
 
         // missing 3, 4, 5
         Term.ReplicaRepairStruct r3 = new Term.ReplicaRepairStruct();
@@ -231,7 +231,7 @@ public class TestTerm extends TestCase
 
         // Stub some portions of a concrete Term instance - this is the
         // object being tested.
-        final Term term = new Term(mock(ZooKeeper.class), 0, 0L, mailbox) {
+        final Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox) {
             // avoid zookeeper.
             @Override
             protected void makeBabySitter() {
@@ -249,7 +249,7 @@ public class TestTerm extends TestCase
             @Override
             public void run() {
                 try {
-                    promotionResult.set(term.start(-1).get());
+                    promotionResult.set(term.start().get());
                 } catch (Exception e) {
                     System.out.println("Promotion thread threw: " + e);
                     throw new RuntimeException(e);
