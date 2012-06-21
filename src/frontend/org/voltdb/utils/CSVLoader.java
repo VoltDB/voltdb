@@ -25,7 +25,6 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import java.util.ArrayList;
 import java.util.Map;
 import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
@@ -97,7 +96,7 @@ public class CSVLoader {
                     if (errorInfo.size() >= m_config.maxerrors) {
                         m_log.error("The number of Failure row data exceeds " + m_config.maxerrors);
                         close_cleanup();
-                        System.exit(1);
+                        System.exit(-1);
                     }
                 }
                 return;
@@ -209,7 +208,7 @@ public class CSVLoader {
 
         } catch (FileNotFoundException e) {
             m_log.error("CSV file '" + config.file + "' could not be found.");
-            System.exit(1);
+            System.exit(-1);
         }
         // Split server list
         String[] serverlist = config.servers.split(",");
@@ -223,7 +222,7 @@ public class CSVLoader {
         } catch (Exception e) {
             m_log.error("Error to connect to the servers:"
                     + config.servers);
-            System.exit(1);
+            System.exit(-1);
         }
 
         try {
@@ -253,7 +252,7 @@ public class CSVLoader {
                 while (queued == false) {
                     StringBuilder linedata = new StringBuilder();
                     for (int i = 0; i < line.length; i++) {
-                        linedata.append(line[i]);
+                        linedata.append("\"" + line[i] + "\"");
                         if (i != line.length - 1)
                             linedata.append(",");
                     }
@@ -274,7 +273,7 @@ public class CSVLoader {
                                 m_log.error("The number of Failure row data exceeds "
                                         + config.maxerrors);
                                 close_cleanup();
-                                System.exit(1);
+                                System.exit(-1);
                             }
                         }
                         break;
@@ -322,10 +321,8 @@ public class CSVLoader {
             return "Error: blank line";
         }
         if (slot.length != columnCnt) {
-            return "Error: # of attributes do not match, # of attributes needed: "
-                    + columnCnt
-                    + "inputed: "
-                    + slot.length;
+            return "Error: Incorrect number of columns. " + slot.length
+                    + " found, " + columnCnt + " expected.";
         }
         for (int i = 0; i < slot.length; i++) {
             // trim white space in this line.
@@ -357,16 +354,17 @@ public class CSVLoader {
         } catch (Exception x) {
             m_log.error(x.getMessage());
             x.printStackTrace();
-            System.exit(1);
+            System.exit(-1);
         }
 
         String myinsert = insertProcedure;
         myinsert = myinsert.replaceAll("\\.", "_");
-        pathInvalidrowfile = config.reportdir + myinsert + "_"
-                + "csvloaderinvalidrows.csv";
-        pathLogfile = config.reportdir + myinsert + "_" + "csvloaderLog.log";
-        pathReportfile = config.reportdir + myinsert + "_"
-                + "csvloaderReport.log";
+        pathInvalidrowfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "invalidrows.csv";
+        pathLogfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "log.log";
+        pathReportfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "report.log";
 
         try {
             out_invaliderowfile = new BufferedWriter(new FileWriter(
@@ -375,7 +373,7 @@ public class CSVLoader {
             out_reportfile = new BufferedWriter(new FileWriter(pathReportfile));
         } catch (IOException e) {
             m_log.error(e.getMessage());
-            System.exit(1);
+            System.exit(-1);
         }
     }
 
@@ -400,9 +398,9 @@ public class CSVLoader {
                             .println("internal error, infomation is not enough");
                 linect++;
                 out_invaliderowfile.write(info[0] + "\n");
-                String message = "invalid line " + irow + ":  " + info[0];
+                String message = "Invalid input on line " + irow + ".\n  Contents:" + info[0];
                 m_log.error(message);
-                out_logfile.write(message + "\n" + info[1] + "\n");
+                out_logfile.write(message + "\n  " + info[1] + "\n");
                 if (linect % bulkflush == 0) {
                     out_invaliderowfile.flush();
                     out_logfile.flush();
@@ -410,14 +408,15 @@ public class CSVLoader {
             }
             // Get elapsed time in seconds
             float elapsedTimeSec = latency / 1000F;
-            out_reportfile.write("CSVLoader elaspsed: " + elapsedTimeSec
+            out_reportfile.write("csvloader elaspsed: " + elapsedTimeSec
                     + " seconds\n");
-            out_reportfile.write("Number of tuples tring to insert:"
+            out_reportfile.write("Number of rows read from input: "
                     + outCount.get() + "\n");
-            out_reportfile.write("Number of failed tuples:" + errorInfo.size()
-                    + "\n");
-            out_reportfile.write("Number of acknowledged tuples:     "
+            out_reportfile.write("Number of rows successfully inserted: "
                     + inCount.get() + "\n");
+            // if prompted msg changed, change it also for test case
+            out_reportfile.write("Number of rows that could not be inserted: "
+                    + errorInfo.size() + "\n");
             out_reportfile.write("CSVLoader rate: " + outCount.get()
                     / elapsedTimeSec + " row/s\n");
 
