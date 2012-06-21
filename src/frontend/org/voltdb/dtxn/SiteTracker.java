@@ -470,21 +470,6 @@ public class SiteTracker {
         return Collections.min(sites);
     }
 
-    /**
-     * param hostId
-     * @return the ID of the lowest iv2 initiator on the given hostId
-     */
-    public Long getLowestIv2SiteForHost(int hostId)
-    {
-        long result = Long.MAX_VALUE;
-        for (Long hsid : m_allIv2InitiatorsImmutable) {
-            if (getHostForSite(hsid) == hostId) {
-                result = Math.min(result, hsid);
-            }
-        }
-        return result;
-    }
-
     /*
      * Get an array of local sites that need heartbeats. This will get individually generated heartbeats.
      */
@@ -526,24 +511,5 @@ public class SiteTracker {
             return new ArrayList<Long>();
         }
         return hostIdList.get(host);
-    }
-
-    public Long getHSIdForMultiPartitionInitiator() {
-        // There's only one for now, just return it.  We'll need
-        // some leader election/master business when we replicate the MPI
-        return m_allIv2MpInitiatorsImmutable.iterator().next();
-    }
-
-    public long getBuddySiteForMPI(long hsId)
-    {
-        int host = CoreUtils.getHostIdFromHSId(hsId);
-
-        for (long pHsId : m_allIv2InitiatorsImmutable) {
-            if (host == CoreUtils.getHostIdFromHSId(pHsId)) {
-                return pHsId;
-            }
-        }
-        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
-                                   CoreUtils.hsIdToString(hsId));
     }
 }

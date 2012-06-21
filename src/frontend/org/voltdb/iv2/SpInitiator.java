@@ -31,7 +31,6 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
 
@@ -135,7 +134,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          SiteTracker siteTracker, int kfactor)
+                          Cartographer cartographer, int kfactor)
     {
         try {
             m_missingStartupSites = new CountDownLatch(kfactor + 1);
@@ -154,7 +153,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                                        serializedCatalog,
                                        catalogContext.m_transactionId,
                                        m_partitionId,
-                                       siteTracker.m_numberOfPartitions);
+                                       cartographer.getNumberOfPartitions());
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite,
                     m_executionSite.m_sysprocContext);
@@ -162,7 +161,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                                                prf,
                                                m_initiatorMailbox.getHSId(),
                                                0, // this has no meaning
-                                               siteTracker.m_numberOfPartitions);
+                                               cartographer.getNumberOfPartitions());
             m_procSet.loadProcedures(catalogContext, backend);
             m_scheduler.setProcedureSet(m_procSet);
             m_executionSite.setLoadedProcedures(m_procSet);

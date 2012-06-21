@@ -61,6 +61,8 @@ public class Cartographer extends StatsSource
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private final MapCacheReader m_iv2Masters;
     private final ZooKeeper m_zk;
+    private long m_mpiHsid;
+    private final int m_numberOfPartitions;
 
     /**
      * A dummy iterator that wraps an UnmodifiableIterator<String> and provides the
@@ -89,9 +91,10 @@ public class Cartographer extends StatsSource
         }
     }
 
-    public Cartographer(ZooKeeper zk)
+    public Cartographer(ZooKeeper zk, int numberOfPartitions)
     {
         super(false);
+        m_numberOfPartitions = numberOfPartitions;
         m_zk = zk;
         m_iv2Masters = new MapCache(m_zk, VoltZK.iv2masters);
         try {
@@ -135,6 +138,40 @@ public class Cartographer extends StatsSource
     private static int getPartitionIdFromIv2MasterPath(String zkPath)
     {
         return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
+    }
+
+    // Store the HSID of the MPI.  Temporary hack to get this out of SiteTracker.
+    // When we replicate the MPI, it should end up with a leader election ZK dir that
+    // we can use to find it instead.
+    public void setMpiHsid(long mpiHsid)
+    {
+        m_mpiHsid = mpiHsid;
+    }
+
+    public int getNumberOfPartitions()
+    {
+        return m_numberOfPartitions;
+    }
+
+    // This used to be the method to get this on SiteTracker
+    public long getHSIdForMultiPartitionInitiator()
+    {
+        return m_mpiHsid;
+    }
+
+    public long getBuddySiteForMPI()
+    {
+        int host = CoreUtils.getHostIdFromHSId(m_mpiHsid);
+        // We'll be lazy and get the map we'd feed to SiteTracker's
+        // constructor, then go looking for a matching host ID.
+        List<MailboxNodeContent> sitesList = getMailboxNodeContentList();
+        for (MailboxNodeContent site : sitesList) {
+            if (host == CoreUtils.getHostIdFromHSId(site.HSId)) {
+                return site.HSId;
+            }
+        }
+        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
+                                   CoreUtils.hsIdToString(m_mpiHsid));
     }
 
     /**
@@ -187,14 +224,14 @@ public class Cartographer extends StatsSource
     public List<Integer> getIv2PartitionsToReplace(JSONObject topology) throws JSONException
     {
         ClusterConfig clusterConfig = new ClusterConfig(topology);
-        hostLog.info("Computing partitions to replace.  Total partitions: " + clusterConfig.getPartitionCount());
-        List<Integer> repsPerPart = new ArrayList<Integer>(clusterConfig.getPartitionCount());
-        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+        hostLog.info("Computing partitions to replace.  Total partitions: " + m_numberOfPartitions);
+        List<Integer> repsPerPart = new ArrayList<Integer>(m_numberOfPartitions);
+        for (int i = 0; i < m_numberOfPartitions; i++) {
             repsPerPart.add(i, getReplicaCountForPartition(i));
         }
         List<Integer> partitions = new ArrayList<Integer>();
         int freeSites = clusterConfig.getSitesPerHost();
-        for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+        for (int i = 0; i < m_numberOfPartitions; i++) {
             if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
                 partitions.add(i);
                 // pretend to be fully replicated so we don't put two copies of a
@@ -208,7 +245,7 @@ public class Cartographer extends StatsSource
         }
         if (freeSites > 0) {
             // double check fully replicated?
-            for (int i = 0; i < clusterConfig.getPartitionCount(); i++) {
+            for (int i = 0; i < m_numberOfPartitions; i++) {
                 if (repsPerPart.get(i) < clusterConfig.getReplicationFactor() + 1) {
                     hostLog.error("Partition " + i + " should have been replicated but wasn't");
                 }
@@ -218,13 +255,9 @@ public class Cartographer extends StatsSource
         return partitions;
     }
 
-    public Map<MailboxType, List<MailboxNodeContent>> getSiteTrackerMailboxMap()
+    private List<MailboxNodeContent> getMailboxNodeContentList()
     {
-        HashMap<MailboxType, List<MailboxNodeContent>> result =
-            new HashMap<MailboxType, List<MailboxNodeContent>>();
         List<MailboxNodeContent> sitesList = new ArrayList<MailboxNodeContent>();
-        result.put(MailboxType.ExecutionSite, sitesList);
-
         Set<String> partitionStrings = m_iv2Masters.pointInTimeCache().keySet();
         for (String partString : partitionStrings) {
             int partId = getPartitionIdFromIv2MasterPath(partString);
@@ -234,6 +267,15 @@ public class Cartographer extends StatsSource
                 sitesList.add(mnc);
             }
         }
+        return sitesList;
+    }
+
+    public Map<MailboxType, List<MailboxNodeContent>> getSiteTrackerMailboxMap()
+    {
+        HashMap<MailboxType, List<MailboxNodeContent>> result =
+            new HashMap<MailboxType, List<MailboxNodeContent>>();
+        List<MailboxNodeContent> sitesList = getMailboxNodeContentList();
+        result.put(MailboxType.ExecutionSite, sitesList);
         return result;
     }
 

@@ -402,7 +402,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
                 // IV2 mailbox stuff
                 {
-                    m_cartographer = new Cartographer(m_messenger.getZK());
+                    ClusterConfig iv2config = new ClusterConfig(topo);
+                    m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
                     if (isRejoin) {
                         List<Integer> partitionsToReplace = m_cartographer.getIv2PartitionsToReplace(topo);
                         m_iv2Initiators = createIv2Initiators(partitionsToReplace);
@@ -516,7 +517,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              */
             for (Initiator iv2init : m_iv2Initiators) {
                 iv2init.configure(getBackendTargetType(), m_serializedCatalog,
-                                  m_catalogContext, m_siteTracker, m_deployment.getCluster().getKfactor());
+                                  m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor());
             }
 
             /*
@@ -631,6 +632,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_catalogContext,
                                 m_config.m_replicationRole,
                                 initiator,
+                                m_cartographer,
                                 clusterConfig.getPartitionCount(),
                                 config.m_port + portOffset,
                                 config.m_adminPort + portOffset,

@@ -839,7 +839,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     initiatorHSId = master.getLong("hsid");
                 }
                 else {
-                    initiatorHSId = VoltDB.instance().getSiteTracker().getHSIdForMultiPartitionInitiator();
+                    initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
                 }
 
                 Iv2InitiateTaskMessage workRequest =
@@ -886,6 +886,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             CatalogContext context,
             ReplicationRole replicationRole,
             SimpleDtxnInitiator initiator,
+            Cartographer cartographer,
             int partitionCount,
             int port,
             int adminPort,
@@ -902,7 +903,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-           port, adminPort, context, messenger, replicationRole, initiator, allPartitions);
+           port, adminPort, context, messenger, replicationRole, initiator, cartographer, allPartitions);
 
         initiator.setClientInterface(ci);
         return ci;
@@ -910,10 +911,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     ClientInterface(int port, int adminPort, CatalogContext context, HostMessenger messenger,
                     ReplicationRole replicationRole, TransactionInitiator initiator,
-                    int[] allPartitions) throws Exception
+                    Cartographer cartographer, int[] allPartitions) throws Exception
     {
         m_catalogContext.set(context);
         m_initiator = initiator;
+        m_cartographer = cartographer;
 
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
@@ -962,7 +964,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_iv2Masters = new MapCache(messenger.getZK(), VoltZK.iv2masters);
         m_iv2Masters.start(true);
         m_backpressure = new BackpressureTracker(this);
-        m_cartographer = new Cartographer(messenger.getZK());
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
@@ -1734,9 +1735,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         if (m_snapshotDaemon != null) {
             m_snapshotDaemon.shutdown();
-        }
-        if (m_cartographer != null) {
-            m_cartographer.shutdown();
         }
         if (m_iv2Masters != null) {
             m_iv2Masters.shutdown();

@@ -180,8 +180,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         @Override
         public boolean isLowestSiteId()
         {
-            // TODO: should pass this status in at construction.
-            long lowestSiteId = VoltDB.instance().getSiteTracker().getLowestIv2SiteForHost(getHostId());
+            // FUTURE: should pass this status in at construction.
+            long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
             System.out.println("\t\tLowest. Site: " + m_siteId + " lowest: " + lowestSiteId);
             return m_siteId == lowestSiteId;
         }
@@ -189,7 +189,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public int getHostId() {
-            return SiteTracker.getHostForSite(m_siteId);
+            return CoreUtils.getHostIdFromHSId(m_siteId);
         }
 
         @Override
@@ -309,7 +309,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
                         m_partitionId,
-                        SiteTracker.getHostForSite(m_siteId),
+                        CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
@@ -326,7 +326,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                             m_context.cluster.getRelativeIndex(),
                             m_siteId,
                             m_partitionId,
-                            SiteTracker.getHostForSite(m_siteId),
+                            CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
