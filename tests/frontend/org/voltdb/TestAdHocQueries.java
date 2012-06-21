@@ -41,7 +41,7 @@ import org.voltdb.utils.MiscUtils;
 public class TestAdHocQueries extends AdHocQueryTester {
 
     Client m_client;
-    private final static boolean m_debug = true;
+    private final static boolean m_debug = false;
 
     public void testProcedureAdhoc() throws Exception {
         VoltDB.Configuration config = setUpSPDB();
@@ -465,6 +465,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                          BackendTarget.NATIVE_EE_JNI,
                                          LocalCluster.FailureState.ALL_RUNNING,
                                          m_debug, false);
+            // Valgrind and LocalCluster using more than localhost do not get along for now.
+            if (hostCount > 1) {
+                m_cluster.overrideAnyRequestForValgrind();
+            }
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

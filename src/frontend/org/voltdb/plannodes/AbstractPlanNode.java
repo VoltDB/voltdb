@@ -353,7 +353,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
            parent.m_children.remove(this);
        for (AbstractPlanNode child : m_children)
            child.m_parents.remove(this);
-
        m_parents.clear();
        m_children.clear();
     }
