@@ -36,6 +36,7 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.regressionsuites.LocalSingleProcessServer;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdHocQueries extends AdHocQueryTester {
@@ -45,11 +46,12 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     public void testProcedureAdhoc() throws Exception {
         VoltDB.Configuration config = setUpSPDB();
-        ServerThread localServer = new ServerThread(config);
+        String catalogPaths[] = config.m_pathToCatalog.split("/");
+        LocalSingleProcessServer localServer =
+                new LocalSingleProcessServer( catalogPaths[catalogPaths.length - 1 ], 2, BackendTarget.NATIVE_EE_JNI);
 
         try {
-            localServer.start();
-            localServer.waitForInitialization();
+            localServer.startUp(true);
 
             // do the test
             m_client = ClientFactory.createClient();
@@ -104,8 +106,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_client = null;
 
             if (localServer != null) {
-                localServer.shutdown();
-                localServer.join();
+                localServer.shutDown();
             }
             localServer = null;
 
