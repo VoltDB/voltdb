@@ -103,6 +103,7 @@ typedef struct {
     int32_t inputDepId;
     int32_t planFragLength;
     int32_t parameterSetLength;
+    int16_t parameterCount;
     char data[0];
 }__attribute__((packed)) customplanfrag;
 
@@ -701,6 +702,7 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
 
     int32_t planFragLength = ntohl(plan->planFragLength);
     int32_t parameterSetLength = ntohl(plan->parameterSetLength);
+    int16_t parameterCount = ntohs(plan->parameterCount);
 
     // data as fast serialized string
     // skip past the length prefix from fast serializer
@@ -715,7 +717,7 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
     int cnt = serialize_in.readShort();
     assert(cnt> -1);
     Pool *pool = m_engine->getStringPool();
-    deserializeParameterSetCommon(cnt, serialize_in, params, pool);
+    deserializeParameterSetCommon( parameterCount, serialize_in, params, pool);
     m_engine->setUsedParamcnt(cnt);
 
     // deps info
