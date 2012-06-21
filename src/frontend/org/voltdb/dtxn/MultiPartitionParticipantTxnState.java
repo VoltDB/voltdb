@@ -78,14 +78,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     public MultiPartitionParticipantTxnState(Mailbox mbox, ExecutionSite site,
                                              TransactionInfoBaseMessage notice)
     {
-        this(mbox, site, notice, RejoinState.NORMAL);
-    }
-
-    public MultiPartitionParticipantTxnState(Mailbox mbox, ExecutionSite site,
-                                             TransactionInfoBaseMessage notice,
-                                             RejoinState rejoinState)
-    {
-        super(mbox, site, notice, rejoinState);
+        super(mbox, site, notice);
         m_hsId = site.getSiteId();
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
@@ -111,20 +104,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             } else {
                 m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
                 m_task = null;
-            }
-        }
-        // if replaying a rejoining task
-        else if (notice instanceof FragmentTaskLogMessage) {
-            assert(m_rejoinState == RejoinState.REPLAYING); // not rejoining if replaying task
-
-            FragmentTaskLogMessage ftl = (FragmentTaskLogMessage) notice;
-
-            m_task = null;
-            m_durabilityFlag = null;
-            m_invocation = null;
-
-            for (FragmentTaskMessage  ft : ftl.getFragmentTasks()) {
-                processFragmentWork(ft, null);
             }
         }
         else {
@@ -356,12 +335,6 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             // and this was the final task, then we can try to move on after
             // we've finished this work.
             if (!isCoordinator() && isReadOnly() && ftask.isFinalTask()) {
-                m_done = true;
-            }
-
-            // If replaying, the final task means the transaction is complete
-            // note: the final FragmentTaskMessage is guaranteed to be
-            if ((m_rejoinState == RejoinState.REPLAYING) && ftask.isFinalTask()) {
                 m_done = true;
             }
         }

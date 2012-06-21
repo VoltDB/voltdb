@@ -31,19 +31,12 @@ import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 
 public class SinglePartitionTxnState extends TransactionState {
-    public SinglePartitionTxnState(Mailbox mbox,
-            ExecutionSite site,
-            TransactionInfoBaseMessage task)
-    {
-        this(mbox, site, task, RejoinState.NORMAL);
-    }
 
     public SinglePartitionTxnState(Mailbox mbox,
                                    ExecutionSite site,
-                                   TransactionInfoBaseMessage task,
-                                   RejoinState rejoinState)
+                                   TransactionInfoBaseMessage task)
     {
-        super(mbox, site, task, rejoinState);
+        super(mbox, site, task);
         assert(task instanceof InitiateTaskMessage) :
             "Creating single partition txn from invalid membership notice.";
     }

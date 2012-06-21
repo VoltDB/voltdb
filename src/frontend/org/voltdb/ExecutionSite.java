@@ -66,6 +66,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.ReplayedTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.dtxn.SinglePartitionTxnState;
@@ -1154,11 +1155,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         try {
             TransactionInfoBaseMessage msg = m_rejoinTaskLog.getNextMessage();
             if (msg != null) {
-                if (msg.isSinglePartition()) {
-                    ts = new SinglePartitionTxnState(m_mailbox, this, msg, RejoinState.REPLAYING);
-                } else {
-                    ts = new MultiPartitionParticipantTxnState(m_mailbox, this, msg, RejoinState.REPLAYING);
-                }
+                ts = new ReplayedTxnState(this, msg);
             }
         } catch (IOException e) {
             m_recoveryLog.error("Failed to replay logged transactions: " +

@@ -59,7 +59,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected ClientResponseImpl m_response = null;
 
     // is this transaction run during a rejoin
-    protected RejoinState m_rejoinState;
+    protected RejoinState m_rejoinState = RejoinState.NORMAL;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -70,8 +70,7 @@ public abstract class TransactionState extends OrderableTransaction  {
      */
     protected TransactionState(Mailbox mbox,
                                ExecutionSite site,
-                               TransactionInfoBaseMessage notice,
-                               RejoinState rejoinState)
+                               TransactionInfoBaseMessage notice)
     {
         super(notice.getTxnId(), notice.getInitiatorHSId());
         m_mbox = mbox;
@@ -80,9 +79,6 @@ public abstract class TransactionState extends OrderableTransaction  {
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
-        m_rejoinState = rejoinState;
-        // this will be set later if needed (in doWork())
-        assert(m_rejoinState != RejoinState.REJOINING);
     }
 
     final public TransactionInfoBaseMessage getNotice() {
