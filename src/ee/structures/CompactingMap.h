@@ -61,13 +61,14 @@ protected:
     static const char RED = 0;
     static const char BLACK = 1;
 
+    typedef int32_t NodeCount;
     struct TreeNode {
         Key key;
         Data value;
         TreeNode *parent;
         TreeNode *left;
         TreeNode *right;
-        int32_t subct;
+        NodeCount subct;
         char color;
     };
 
@@ -372,9 +373,13 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
 template<typename Key, typename Data, typename Compare>
 void CompactingMap<Key, Data, Compare>::leftRotate(TreeNode *x) {
     TreeNode *y = x->right;
+    NodeCount ctx = x->subct - y->subct, cty = y->subct;
     x->right = y->left;
-    if (y->left != &NIL)
-        y->left->parent = x;
+    if (y->left != &NIL) {
+    	ctx += y->left->subct;
+    	cty -= y->left->subct;
+    	y->left->parent = x;
+    }
     y->parent = x->parent;
     if (x->parent == &NIL)
         m_root = y;
@@ -384,14 +389,20 @@ void CompactingMap<Key, Data, Compare>::leftRotate(TreeNode *x) {
         x->parent->right = y;
     y->left = x;
     x->parent = y;
+    x->subct = ctx;
+    y->subct = cty + ctx;
 }
 
 template<typename Key, typename Data, typename Compare>
 void CompactingMap<Key, Data, Compare>::rightRotate(TreeNode *x) {
     TreeNode *y = x->left;
+    NodeCount ctx = x->subct - y->subct, cty = y->subct;
     x->left = y->right;
-    if (y->right != &NIL)
-        y->right->parent = x;
+    if (y->right != &NIL) {
+    	ctx += y->right->subct;
+    	cty -= y->right->subct;
+    	y->right->parent = x;
+    }
     y->parent = x->parent;
     if (x->parent == &NIL)
         m_root = y;
@@ -401,6 +412,8 @@ void CompactingMap<Key, Data, Compare>::rightRotate(TreeNode *x) {
         x->parent->left = y;
     y->right = x;
     x->parent = y;
+    x->subct = ctx;
+    y->subct = cty + ctx;
 }
 
 template<typename Key, typename Data, typename Compare>
