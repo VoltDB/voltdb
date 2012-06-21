@@ -665,7 +665,22 @@ bool CompactingMap<Key, Data, Compare>::verify() const {
     if (m_root->parent != &NIL) return false;
     if (verify(m_root) < 0) return false;
     if (m_count != fullCount(m_root)) return false;
+
+    // verify the sub tree nodes counter
+    if (inOrderCounterChecking(m_root) < 0) return false;
+
     return true;
+}
+
+template<typename Key, typename Data, typename Compare>
+int CompactingMap<Key, Data, Compare>::inOrderCounterChecking(const TreeNode *n) const {
+	int res = 0;
+	if (n != &NIL) {
+		if ((res = inOrderCounterChecking(n->left)) < 0) return res;
+		if ((res = verify(n)) < 0) return res;
+		if ((res = inOrderCounterChecking(n->right)) < 0) return res;
+	}
+    return 0;
 }
 
 template<typename Key, typename Data, typename Compare>
@@ -691,6 +706,15 @@ int CompactingMap<Key, Data, Compare>::verify(const TreeNode *n) const {
     // check for strict ordering
     if ((n->left != &NIL) && (m_comper(n->key, n->left->key) < 0)) return -1;
     if ((n->right != &NIL) && (m_comper(n->key, n->right->key) > 0)) return -1;
+
+    // check counter for sub tree nodes
+    NodeCount ct = 1;
+    if (n->left != &NIL) ct += n->left->subct;
+    if (n->right !=n &NIL) ct += n->right->subct;
+    if (ct != n->subct) {
+    	printf("node counter is not correct");
+    	return -1;
+    }
 
     // recursive step (compare black height)
     int leftBH = verify(n->left);
