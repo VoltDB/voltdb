@@ -245,6 +245,8 @@ void OrderByExecutor::p_pre_execute_pull(const NValueArray& params)
     assert(node);
     Table* input_table = node->getInputTables()[0];
     assert(input_table);
+    TempTable* output_table = dynamic_cast<TempTable*>(node->getOutputTable());
+    assert(output_table);
 
     assert(node->getChildren().size() == 1);
     AbstractExecutor* child_executor = node->getChildren()[0]->getExecutor();
@@ -259,7 +261,7 @@ void OrderByExecutor::p_pre_execute_pull(const NValueArray& params)
             break;
         }
         assert(tuple.isActive());
-        m_state->m_xs.push_back(tuple);
+        m_state->m_xs.push_back(output_table->insertTupleNonVirtual(tuple));
     }
     VOLT_TRACE("\n***** Input Table PreSort:\n '%s'", debug().c_str());
     sort(m_state->m_xs.begin(), m_state->m_xs.end(), TupleComparer(node->getSortExpressions(),
