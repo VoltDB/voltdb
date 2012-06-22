@@ -97,6 +97,9 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
     @Override
     public void testIdleOnlineSnapshot() {}
 
+    @Override
+    public void testRestoreMissingPartitionFile() {}
+
     /**
      * Build a list of the tests to be run. Use the regression suite
      * helpers to allow multiple back ends.
