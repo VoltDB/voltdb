@@ -669,7 +669,7 @@ bool CompactingMap<Key, Data, Compare>::verify() const {
 
     // verify the sub tree nodes counter
     if (inOrderCounterChecking(m_root) < 0) return false;
-
+    else printf("Tree index counter checking successfully...\n");
     return true;
 }
 
@@ -713,7 +713,7 @@ int CompactingMap<Key, Data, Compare>::verify(const TreeNode *n) const {
     if (n->left != &NIL) ct += n->left->subct;
     if (n->right != &NIL) ct += n->right->subct;
     if (ct != n->subct) {
-    	printf("node counter is not correct");
+    	printf("node counter is not correct, expected %d but get %d\n", ct, n->subct);
     	return -1;
     }
 
