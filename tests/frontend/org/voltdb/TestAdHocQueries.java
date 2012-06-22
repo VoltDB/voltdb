@@ -82,21 +82,29 @@ public class TestAdHocQueries extends AdHocQueryTester {
             /*
              * Validate that doing an insert from a RO procedure fails
              */
-            boolean threw = false;
             try {
                 m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5)");
-            } catch (ProcCallException e) {
-                threw = true;
-            }
-            assertTrue(threw);
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
 
-            threw = false;
             try {
                 m_client.callProcedure("executeSQLMP", 24, "insert into parted1 values (24,5)");
-            } catch (ProcCallException e) {
-                threw = true;
-            }
-            assertTrue(threw);
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+            /*
+             * Validate one sql statement per
+             */
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5); select * from parted1;");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "drop table parted1");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
 
             /*
              * Validate that an insert does work from a write procedure

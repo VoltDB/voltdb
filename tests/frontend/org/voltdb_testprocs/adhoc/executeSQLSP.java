@@ -42,7 +42,7 @@ public class executeSQLSP extends VoltProcedure {
 
     public VoltTable[] run(long partval, String sql) {
         voltQueueAdhocSQL(sql);
-        voltQueueAdhocSQL("select * from PARTED1 where partval = ?", partval);
+        voltQueueAdhocSQL("select * from PARTED1 where partval = ?;", partval);
         return voltExecuteSQL(true);
     }
 }
