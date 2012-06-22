@@ -58,7 +58,6 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
-import org.voltdb.utils.VoltFile;
 import org.voltdb_testprocs.regressionsuites.saverestore.CatalogChangeSingleProcessServer;
 import org.voltdb_testprocs.regressionsuites.saverestore.SaveRestoreTestProjectBuilder;
 
@@ -1640,44 +1639,38 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         }
     }
 
-//
-//    public void testRestoreMissingPartitionFile()
-//    throws IOException, InterruptedException
-//    {
-//        int num_replicated_items = 1000;
-//        int num_partitioned_items = 126;
-//
-//        Client client = getClient();
-//
-//        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0);
-//        // make a TPCC warehouse table
-//        VoltTable partition_table =
-//            createPartitionedTable(num_partitioned_items, 0);
-//
-//        loadTable(client, "REPLICATED_TESTER", repl_table);
-//        loadTable(client, "PARTITION_TESTER", partition_table);
-//        saveTables(client);
-//
-//        // Kill and restart all the execution sites.
-//        m_config.shutDown();
-//
-//        String filename = TESTNONCE + "-PARTITION_TESTER-host_0";
-//        File item_file = new File(TMPDIR, filename);
-//        item_file.delete();
-//
-//        m_config.startUp();
-//        client = getClient();
-//
-//        try {
-//            client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE);
-//        }
-//        catch (Exception e) {
-//            assertTrue(e.getMessage().
-//                       contains("PARTITION_TESTER has some inconsistency"));
-//            return;
-//        }
-//        assertTrue(false);
-//    }
+
+    public void testRestoreMissingPartitionFile()
+    throws Exception
+    {
+        int num_replicated_items = 1000;
+        int num_partitioned_items = 126;
+
+        Client client = getClient();
+
+        VoltTable repl_table = createReplicatedTable(num_replicated_items, 0, null);
+        // make a TPCC warehouse table
+        VoltTable partition_table =
+            createPartitionedTable(num_partitioned_items, 0);
+
+        loadTable(client, "REPLICATED_TESTER", repl_table);
+        loadTable(client, "PARTITION_TESTER", partition_table);
+        saveTables(client);
+
+        // Kill and restart all the execution sites.
+        m_config.shutDown();
+
+        String filename = TESTNONCE + "-PARTITION_TESTER-host_0.vpt";
+        File item_file = new File(TMPDIR, filename);
+        assertTrue(item_file.delete());
+
+        m_config.startUp();
+        client = getClient();
+
+        VoltTable resultTable = client.callProcedure("@SnapshotRestore", TMPDIR, TESTNONCE).getResults()[0];
+        assertTrue(resultTable.advanceRow());
+        assertTrue(resultTable.getString("ERR_MSG").equals("Save data contains no information for table PARTITION_TESTER"));
+    }
 
     public void testRepartition()
     throws Exception
