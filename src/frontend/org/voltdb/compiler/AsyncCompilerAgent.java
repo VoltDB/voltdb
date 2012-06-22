@@ -156,7 +156,7 @@ public class AsyncCompilerAgent {
             try {
                 String sqlStatement = work.sqlStatements[0];
                 PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
-                                                            true, work.allowParameterization);
+                                                            work.inferSinglePartition, work.allowParameterization);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 plannedStmtBatch.partitionParam = result.partitionParam;

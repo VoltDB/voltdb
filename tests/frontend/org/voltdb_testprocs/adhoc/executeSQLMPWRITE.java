@@ -35,13 +35,14 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 @ProcInfo (
-    singlePartition = false
+    singlePartition = false,
+    readOnly = false
 )
 public class executeSQLMPWRITE extends VoltProcedure {
 
     public VoltTable[] run(long partval, String sql) {
         voltQueueSQL(sql);
-        voltQueueSQL("select * from PARTED1 where partval = ?", partval);
+        //voltQueueSQL("select * from PARTED1 where partval = ?", partval);
         return voltExecuteSQL(true);
     }
 }

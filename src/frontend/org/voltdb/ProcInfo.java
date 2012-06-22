@@ -45,4 +45,11 @@ public @interface ProcInfo {
      * @return True if all statements run on the same partition always, false otherwise.
      */
     boolean singlePartition() default false;
+
+    /**
+     * Is the procedure a read only procedure? Usually this will be correctly
+     * derived from the statically defined SQL statements, but a procedure that declared no
+     * SQL statements may still want to do adhoc DML in which case it will have to set this flag.
+     */
+    boolean readOnly() default true;
 }
