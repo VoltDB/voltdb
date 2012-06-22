@@ -1415,7 +1415,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * log task message for rejoin if it's not a replayed transaction.
              * Replayed transactions do not send responses.
              */
-            if ((txnState.getRejoinState() == RejoinState.NORMAL) &&
+            if ((txnState.getRejoinState() == RejoinState.REJOINING) &&
                 m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
                     if (txnState.getNotice() instanceof InitiateTaskMessage) {
