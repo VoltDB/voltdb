@@ -369,18 +369,31 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseFunctionExpression(VoltXMLElement exprNode, Database db) {
         String name = exprNode.attributes.get("name").toLowerCase();
-        // parameterized? (expected?) argument type of function?
-        //TODO: (Figure out whether/how it's OK to only get one type parameter? Is that all SQL needs?)
+        // Parameterized argument type of function. One parameter type is apparently all that SQL ever needs.
         String value_type_name = exprNode.attributes.get("type");
         VoltType value_type = VoltType.typeFromString(value_type_name);
         AbstractExpression expr = null;
 
-        SQLFunction[] overloads = SQLFunction.functionsByName(name);
-        if (overloads == null) {
-            throw new PlanningErrorException("Function '" + name + "' is not supported");
+        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        // This needs to be conditional on an expected/allowed number/type of arguments.
+        for (VoltXMLElement argNode : exprNode.children) {
+            assert(argNode != null);
+            // recursively parse each argument subtree (could be any kind of expression).
+            AbstractExpression argExpr = parseExpressionTree(argNode, db);
+            assert(argExpr != null);
+            args.add(argExpr);
         }
 
-        // Validate/select specific named function overload against supported argument type(s?)
+        List<SQLFunction> overloads = SQLFunction.functionsByNameAndArgumentCount(name, args.size());
+        if (overloads == null) {
+            throw new PlanningErrorException("Function '" + name + "' with " + args.size() + " arguments is not supported");
+        }
+
+        // Validate/select specific named function overload against supported argument type(s?).
+        // This amounts to a not-yet-implemented performance feature that allows the planner to direct the
+        // executor to argument-type-specific functions instead of relying on its current tendency to
+        // type-check every row/value at runtime.
+        // Until that day, overloads can be a singleton list.
         SQLFunction resolved = null;
         for (SQLFunction supportedFunction : overloads) {
             resolved = supportedFunction;
@@ -419,15 +432,6 @@ public abstract class AbstractParsedStmt {
             expr.setValueSize(vt.getMaxLengthInBytes());
         }
 
-        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
-        // This needs to be conditional on an expected/allowed number/type of arguments.
-        for (VoltXMLElement argNode : exprNode.children) {
-            assert(argNode != null);
-            // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(argNode, db);
-            assert(argExpr != null);
-            args.add(argExpr);
-        }
         expr.setArgs(args);
         return expr;
     }
