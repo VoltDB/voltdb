@@ -258,20 +258,43 @@ class NValue {
      */
     NValue like(const NValue rhs) const;
 
+    /*
+     * callConstant, callUnary, and call are templates for arbitrary NValue member functions that implement
+     * SQL "column functions". They differ in how many arguments they accept:
+     * 0 for callConstant, 1 ("this") for callUnary, and any number (packaged in a vector) for call.
+     * The main benefit of these functions being (always explicit) template instantiations for each
+     * ExepressionType "EXPRESSION_TYPE_FUNCTION_*" value instead of a more normal named member function
+     * of NValue is that it allows them to be invoked from the default eval method of the
+     * correspondingly templated expression subclass
+     * (ConstantFunctionExpression, UnaryFunctionExpression, or GeneralFunctionExpression).
+     * The alternative would be to name each function (abs, substring, etc.)
+     * and explicitly implement the eval method for every expression subclass template instantiation
+     * (UnaryFunctionExpression<EXPRESSION_TYPE_FUNCTION_ABS>::eval,
+     * GeneralFunctionExpression<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>::eval, etc.
+     * to call the corresponding NValue member function.
+     * So, these member function templates save a bit of boilerplate for each SQL function and allow
+     * the function expression subclass templates to be implemented completely generically.
+     */
     template <ExpressionType E> // template for SQL functions returning constants (like pi)
     static NValue callConstant();
 
-    template <ExpressionType E> // template for SQL functions of one NValue
+    template <ExpressionType E> // template for SQL functions of one NValue ("this")
     NValue callUnary() const;
 
     template <ExpressionType E> // template for SQL functions of multiple NValues
     static NValue call(const std::vector<NValue>& arguments);
 
+    /// Iterates over UTF8 strings one character "code point" at a time, being careful not to walk off the end.
     class UTF8Iterator {
     public:
         UTF8Iterator(const char *start, const char *end) :
             m_cursor(start),
             m_end(end)
+            // TODO: We could validate up front that the string is well-formed UTF8,
+            // at least to the extent that multi-byte characters have a valid
+            // prefix byte and continuation bytes that will not cause a read
+            // off the end of the buffer.
+            // That done, extractCodePoint could be considerably simpler/faster.
             { assert(m_cursor <= m_end); }
 
         //Construct a one-off with an alternative current cursor position
@@ -286,6 +309,9 @@ class NValue {
 
         const char * skipCodePoints(int64_t skips) {
             while (skips-- > 0 && ! atEnd()) {
+                // TODO: since the returned code point is ignored, it might be better
+                // to call a faster, simpler, skipCodePoint method -- maybe once that
+                // becomes trivial due to up-front validation.
                 extractCodePoint();
             }
             if (atEnd()) {
@@ -298,6 +324,7 @@ class NValue {
          * Go through a lot of trouble to make sure that corrupt
          * utf8 data doesn't result in touching uninitialized memory
          * by copying the character data onto the stack.
+         * That wouldn't be needed if we pre-validated the buffer.
          */
         uint32_t extractCodePoint() {
             assert(m_cursor < m_end); // Caller should have tested and handled atEnd() condition
@@ -328,6 +355,7 @@ class NValue {
         const char * m_cursor;
         const char * const m_end;
     };
+
 
     /* For boost hashing */
     void hashCombine(std::size_t &seed) const;
@@ -1638,7 +1666,7 @@ class NValue {
     }
 
     static Pool* getTempStringPool();
-    
+
     static NValue getTempStringValue(const char* value, size_t size) {
         return getStringValue(value, size, getTempStringPool());
     }
@@ -2404,7 +2432,7 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
       case VALUE_TYPE_ADDRESS:
       case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
           char message[128];
-          snprintf(message, 128, "Invalid type in serializeToExport: %d", getValueType());
+          snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
           throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                         message);
     }
@@ -2922,6 +2950,7 @@ inline NValue NValue::like(const NValue rhs) const {
     return liker.like() ? getTrue() : getFalse();
 }
 
+/** implement the SQL ABS (absolute value) function for all numeric types */
 template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const {
     const ValueType type = getValueType();
     NValue retval(type);
@@ -2944,6 +2973,7 @@ template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const
     return retval;
 }
 
+/** implement the 2-argument SQL SUBSTRING function */
 template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& strValue = arguments[0];
@@ -2970,6 +3000,7 @@ template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(c
     return getTempStringValue(startChar, (int32_t)(valueEnd - startChar));
 }
 
+/** implement the 3-argument SQL SUBSTRING function */
 template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 3);
     const NValue& strValue = arguments[0];

@@ -36,9 +36,7 @@ namespace voltdb {
  */
 class ExecutorContext {
   public:
-    ~ExecutorContext() {
-        // currently does not own any of its pointers
-    }
+    ~ExecutorContext();
 
     ExecutorContext(int64_t siteId,
                     CatalogId partitionId,
@@ -89,7 +87,7 @@ class ExecutorContext {
         return m_undoQuantum;
     }
 
-    Topend* getTopend(void*** SPOILER=0) {
+    Topend* getTopend() {
         return m_topEnd;
     }
 
@@ -110,7 +108,12 @@ class ExecutorContext {
 
     static ExecutorContext* getExecutorContext();
 
-    static Pool* getTempStringPool() { return getExecutorContext()->m_tempStringPool; }
+    static Pool* getTempStringPool() {
+        ExecutorContext* singleton = getExecutorContext();
+        assert(singleton != NULL);
+        assert(singleton->m_tempStringPool != NULL);
+        return singleton->m_tempStringPool;
+    }
 
   private:
     Topend *m_topEnd;

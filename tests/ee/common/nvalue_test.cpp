@@ -26,6 +26,7 @@
 #include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
 #include "common/ThreadLocalPool.h"
+#include "common/executorcontext.hpp"
 
 #include <cfloat>
 #include <limits>
@@ -2085,6 +2086,11 @@ TEST_F(NValueTest, TestLike)
 
 TEST_F(NValueTest, TestSubstring)
 {
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
     std::vector<std::string> testData;
     testData.push_back("abcdefg");
     testData.push_back("âbcdéfg");
@@ -2172,6 +2178,8 @@ TEST_F(NValueTest, TestSubstring)
         }
         testString.free();
     }
+    delete poolHolder;
+    delete testPool;
 }
 
 int main() {

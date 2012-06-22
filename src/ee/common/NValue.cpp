@@ -26,7 +26,7 @@ using namespace voltdb;
 Pool* NValue::getTempStringPool() {
     return ExecutorContext::getTempStringPool();
 }
-    
+
 
 // For x<op>y where x is an integer,
 // promote x and y to s_intPromotionTable[y]

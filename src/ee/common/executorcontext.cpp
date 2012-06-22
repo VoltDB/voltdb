@@ -21,11 +21,11 @@ using namespace std;
 
 namespace voltdb {
 
-static pthread_key_t m_key;
-static pthread_once_t m_keyOnce = PTHREAD_ONCE_INIT;
+static pthread_key_t static_key;
+static pthread_once_t static_keyOnce = PTHREAD_ONCE_INIT;
 
 static void createThreadLocalKey() {
-    (void)pthread_key_create( &m_key, NULL);
+    (void)pthread_key_create( &static_key, NULL);
 }
 
 ExecutorContext::ExecutorContext(int64_t siteId,
@@ -42,13 +42,25 @@ ExecutorContext::ExecutorContext(int64_t siteId,
     m_hostname(hostname), m_hostId(hostId),
     m_exportEnabled(exportEnabled), m_epoch(0) // set later
 {
-    (void)pthread_once(&m_keyOnce, createThreadLocalKey);
-    pthread_setspecific( m_key, static_cast<const void *>(this));
+    (void)pthread_once(&static_keyOnce, createThreadLocalKey);
+    // There can be only one (per thread).
+    assert(pthread_getspecific( static_key) == NULL);
+    pthread_setspecific( static_key, this);
     m_lastCommittedTxnId = 0;
 }
 
+ExecutorContext::~ExecutorContext() {
+    // currently does not own any of its pointers
+
+    // There can be only one (per thread).
+    assert(pthread_getspecific( static_key) == this);
+    // ... or none, now that the one is going away.
+    pthread_setspecific( static_key, NULL);
+}
+
 ExecutorContext* ExecutorContext::getExecutorContext() {
-    return static_cast<ExecutorContext*>(pthread_getspecific(m_key));
+    (void)pthread_once(&static_keyOnce, createThreadLocalKey);
+    return static_cast<ExecutorContext*>(pthread_getspecific( static_key));
 }
 }
 
