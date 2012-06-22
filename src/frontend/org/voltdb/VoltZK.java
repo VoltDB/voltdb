@@ -81,6 +81,7 @@ public class VoltZK {
 
     // leader election
     public static final String iv2masters = "/db/iv2masters";
+    public static final String iv2mpi = "/db/iv2mpi";
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
 
@@ -91,6 +92,7 @@ public class VoltZK {
             cluster_metadata,
             operationMode,
             iv2masters,
+            iv2mpi,
             leaders,
             leaders_initiators
     };

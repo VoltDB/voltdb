@@ -60,8 +60,8 @@ public class Cartographer extends StatsSource
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private final MapCacheReader m_iv2Masters;
+    private final MapCacheReader m_iv2Mpi;
     private final ZooKeeper m_zk;
-    private long m_mpiHsid;
     private final int m_numberOfPartitions;
 
     /**
@@ -97,8 +97,10 @@ public class Cartographer extends StatsSource
         m_numberOfPartitions = numberOfPartitions;
         m_zk = zk;
         m_iv2Masters = new MapCache(m_zk, VoltZK.iv2masters);
+        m_iv2Mpi = new MapCache(m_zk, VoltZK.iv2mpi);
         try {
             m_iv2Masters.start(true);
+            m_iv2Mpi.start(true);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Screwed", true, e);
         }
@@ -140,14 +142,6 @@ public class Cartographer extends StatsSource
         return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
     }
 
-    // Store the HSID of the MPI.  Temporary hack to get this out of SiteTracker.
-    // When we replicate the MPI, it should end up with a leader election ZK dir that
-    // we can use to find it instead.
-    public void setMpiHsid(long mpiHsid)
-    {
-        m_mpiHsid = mpiHsid;
-    }
-
     public int getNumberOfPartitions()
     {
         return m_numberOfPartitions;
@@ -156,22 +150,29 @@ public class Cartographer extends StatsSource
     // This used to be the method to get this on SiteTracker
     public long getHSIdForMultiPartitionInitiator()
     {
-        return m_mpiHsid;
+        try {
+            hostLog.info("PART -1: " + m_iv2Mpi.get(Integer.toString(-1)).toString(2));
+            return m_iv2Mpi.get(Integer.toString(-1)).getLong("hsid");
+        }
+        catch (JSONException je) {
+            // IZZY: Probably need a more coherent failure strategy here later
+            throw new RuntimeException(je);
+        }
     }
 
-    public long getBuddySiteForMPI()
+    public long getBuddySiteForMPI(long hsid)
     {
-        int host = CoreUtils.getHostIdFromHSId(m_mpiHsid);
+        int host = CoreUtils.getHostIdFromHSId(hsid);
         // We'll be lazy and get the map we'd feed to SiteTracker's
         // constructor, then go looking for a matching host ID.
         List<MailboxNodeContent> sitesList = getMailboxNodeContentList();
         for (MailboxNodeContent site : sitesList) {
-            if (host == CoreUtils.getHostIdFromHSId(site.HSId)) {
+            if (site.partitionId != -1 && host == CoreUtils.getHostIdFromHSId(site.HSId)) {
                 return site.HSId;
             }
         }
         throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
-                                   CoreUtils.hsIdToString(m_mpiHsid));
+                                   CoreUtils.hsIdToString(hsid));
     }
 
     /**

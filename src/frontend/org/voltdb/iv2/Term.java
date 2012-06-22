@@ -94,6 +94,7 @@ public class Term
     private final ZooKeeper m_zk;
     private final CountDownLatch m_missingStartupSites;
     private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
+    private final String m_mapCacheNode;
 
     // Initialized in start() -- when the term begins.
     protected BabySitter m_babySitter;
@@ -220,7 +221,8 @@ public class Term
      * Setup a new Term but don't take any action to take responsibility.
      */
     public Term(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox)
+            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            String zkMapCacheNode)
     {
         m_zk = zk;
         m_partitionId = partitionId;
@@ -236,6 +238,7 @@ public class Term
 
         m_whoami = "SP " +  CoreUtils.hsIdToString(m_initiatorHSId)
             + " for partition " + m_partitionId + " ";
+        m_mapCacheNode = zkMapCacheNode;
     }
 
     /**
@@ -404,7 +407,7 @@ public class Term
     void declareReadyAsLeader()
     {
         try {
-            MapCacheWriter iv2masters = new MapCache(m_zk, VoltZK.iv2masters);
+            MapCacheWriter iv2masters = new MapCache(m_zk, m_mapCacheNode);
             iv2masters.put(Integer.toString(m_partitionId),
                     new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
             m_promotionResult.done();

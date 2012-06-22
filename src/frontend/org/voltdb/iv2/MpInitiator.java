@@ -18,8 +18,17 @@
 package org.voltdb.iv2;
 
 import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+
+import org.apache.zookeeper_voltpatches.KeeperException;
+
+import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.messaging.HostMessenger;
+
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltcore.zk.MapCache;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -34,20 +43,29 @@ import org.voltdb.VoltZK;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class MpInitiator implements Initiator
+public class MpInitiator implements Initiator, LeaderNoticeHandler
 {
+    VoltLogger tmLog = new VoltLogger("TM");
+
     // External references/config
     private HostMessenger m_messenger = null;
     private int m_partitionId;
 
     // Encapsulated objects
     private InitiatorMailbox m_initiatorMailbox = null;
+    private Term m_term = null;
     private Site m_executionSite = null;
     private Scheduler m_scheduler = null;
     private LoadedProcedureSet m_procSet = null;
     private Thread m_siteThread = null;
     private MapCache m_iv2masters = null;
+    private LeaderElector m_leaderElector = null;
     private RepairLog m_repairLog = new RepairLog();
+
+    // Need a flag to distinguish first-time-startup from fault recovery.
+    private int m_leaderStartupCount = -1;
+
+    private final String m_whoami;
 
     public MpInitiator(HostMessenger messenger)
     {
@@ -57,6 +75,48 @@ public class MpInitiator implements Initiator
         m_iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
         m_scheduler = new MpScheduler(m_iv2masters);
         m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog);
+        m_whoami = "MP " +  CoreUtils.hsIdToString(getInitiatorHSId())
+            + " for partition " + m_partitionId + " ";
+    }
+
+    @Override
+    public void becomeLeader()
+    {
+        try {
+            long startTime = System.currentTimeMillis();
+            tmLog.info(m_whoami + "starting leader promotion");
+            m_term = new Term(m_messenger.getZK(), m_partitionId,
+                    getInitiatorHSId(), m_initiatorMailbox, VoltZK.iv2mpi);
+            m_initiatorMailbox.setTerm(m_term);
+            Future<?> inaugurated = m_term.start(m_leaderStartupCount);
+            inaugurated.get();
+            m_repairLog.setLeaderState(true);
+            m_scheduler.setLeaderState(true);
+            tmLog.info(m_whoami
+                    + "finished leader promotion. Took "
+                    + (System.currentTimeMillis() - startTime) + " ms.");
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Bad news.", true, e);
+        }
+    }
+
+    /** Register with m_partition's leader elector node */
+    public boolean joinElectoralCollege()
+        throws InterruptedException, ExecutionException
+    {
+        // perform leader election before continuing configuration.
+        m_leaderElector = new LeaderElector(m_messenger.getZK(),
+                LeaderElector.electionDirForPartition(m_partitionId),
+                Long.toString(getInitiatorHSId()), null, this);
+        try {
+            // becomeLeader() will run before start(true) returns (if this is the leader).
+            m_leaderElector.start(true);
+        } catch (Exception ex) {
+            VoltDB.crashLocalVoltDB("Partition " + m_partitionId + " failed to initialize " +
+                    "leader elector. ", false, ex);
+        }
+
+        return m_leaderElector.isLeader();
     }
 
     @Override
@@ -66,37 +126,46 @@ public class MpInitiator implements Initiator
     {
         try {
             m_iv2masters.start(true);
+            m_leaderStartupCount = 0; // Only one MPI right now
+            boolean isLeader = joinElectoralCollege();
+            if (isLeader) {
+                tmLog.info(m_whoami + "published as leader.");
+            }
+            else {
+                tmLog.info(m_whoami + "running as replica.");
+            }
+
+            // Done tracking startup vs. recovery special case.
+            m_leaderStartupCount = -1;
+
+            // ugh
+            ((MpScheduler)m_scheduler).setBuddyHSId(cartographer.getBuddySiteForMPI(m_initiatorMailbox.getHSId()));
+            m_executionSite = new Site(m_scheduler.getQueue(),
+                    m_initiatorMailbox.getHSId(),
+                    backend, catalogContext,
+                    serializedCatalog,
+                    catalogContext.m_transactionId,
+                    m_partitionId,
+                    cartographer.getNumberOfPartitions());
+            ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
+            prf.configure(m_executionSite,
+                    m_executionSite.m_sysprocContext);
+            m_procSet = new LoadedProcedureSet(m_executionSite,
+                    prf,
+                    m_initiatorMailbox.getHSId(),
+                    0, // this has no meaning
+                    cartographer.getNumberOfPartitions());
+            m_procSet.loadProcedures(catalogContext, backend);
+            m_scheduler.setProcedureSet(m_procSet);
+            m_executionSite.setLoadedProcedures(m_procSet);
+
+            m_siteThread = new Thread(m_executionSite);
+            m_siteThread.start(); // Maybe this moves --izzy
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
         } catch (ExecutionException e) {
             VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
         }
-
-        m_scheduler.setLeaderState(true); // Only one MPI right now, always the leader
-        // ugh
-        ((MpScheduler)m_scheduler).setBuddyHSId(cartographer.getBuddySiteForMPI());
-        m_executionSite = new Site(m_scheduler.getQueue(),
-                                   m_initiatorMailbox.getHSId(),
-                                   backend, catalogContext,
-                                   serializedCatalog,
-                                   catalogContext.m_transactionId,
-                                   m_partitionId,
-                                   cartographer.getNumberOfPartitions());
-        ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
-        prf.configure(m_executionSite,
-                m_executionSite.m_sysprocContext);
-        m_procSet = new LoadedProcedureSet(m_executionSite,
-                                           prf,
-                                           m_initiatorMailbox.getHSId(),
-                                           0, // this has no meaning
-                                           cartographer.getNumberOfPartitions());
-        m_procSet.loadProcedures(catalogContext, backend);
-        m_scheduler.setProcedureSet(m_procSet);
-        m_executionSite.setLoadedProcedures(m_procSet);
-
-        m_siteThread = new Thread(m_executionSite);
-        m_siteThread.start(); // Maybe this moves --izzy
-
     }
 
     @Override
@@ -106,6 +175,18 @@ public class MpInitiator implements Initiator
         // than to play java interrupt() games?
         if (m_executionSite != null) {
             m_executionSite.startShutdown();
+        }
+        try {
+            if (m_leaderElector != null) {
+                m_leaderElector.shutdown();
+            }
+            if (m_term != null) {
+                m_term.shutdown();
+            }
+        } catch (InterruptedException e) {
+            // what to do here?
+        } catch (KeeperException e) {
+            // What to do here?
         }
         if (m_siteThread != null) {
             try {

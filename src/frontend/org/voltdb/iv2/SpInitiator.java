@@ -33,6 +33,7 @@ import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -80,7 +81,8 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             while (!success) {
                 tmLog.info(m_whoami + "starting leader promotion");
                 m_term = new Term(m_missingStartupSites, m_messenger.getZK(),
-                        m_partitionId, getInitiatorHSId(), m_initiatorMailbox);
+                        m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                        VoltZK.iv2masters);
                 m_initiatorMailbox.setTerm(m_term);
                 success = m_term.start().get();
                 if (success) {
