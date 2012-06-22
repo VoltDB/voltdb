@@ -184,7 +184,7 @@ public abstract class VoltProcedure {
      *
      * If the query is parameterized it is possible to pass in the parameters
      */
-    public void voltQueueAdhocSQL(String sql, Object... args) {
+    public void voltQueueSQL(String sql, Object... args) {
         m_runner.voltQueueSQL(sql, args);
     }
 
