@@ -1155,7 +1155,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     false, task.clientHandle, handler.connectionId(),
                     handler.m_hostname, handler.isAdmin(), ccxn,
-                    sql, sqlStatements, partitionParam, null, false));
+                    sql, sqlStatements, partitionParam, null, false, true));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1599,7 +1599,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                      plannedStmtBatch.getSQLStatements(),
                                                      plannedStmtBatch.partitionParam,
                                                      null,
-                                                     false));
+                                                     false,
+                                                     true));
 
                         // XXX: Need to know the async mailbox id.
                         m_mailbox.send(Long.MIN_VALUE, work);

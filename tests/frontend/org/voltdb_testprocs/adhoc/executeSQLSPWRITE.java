@@ -36,7 +36,8 @@ import org.voltdb.VoltTable;
 
 @ProcInfo (
     partitionInfo = "PARTED1.PARTVAL:0",
-    singlePartition = true
+    singlePartition = true,
+    readOnly = false
 )
 public class executeSQLSPWRITE extends VoltProcedure {
 

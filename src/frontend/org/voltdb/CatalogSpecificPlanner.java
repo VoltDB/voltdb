@@ -25,7 +25,10 @@ import org.voltdb.compiler.AdHocPlannerWork;
 import com.google.common.util.concurrent.ListenableFuture;
 
 /*
- * Wrapper around a planner tied to a specific catalog version.
+ * Wrapper around a planner tied to a specific catalog version. This planner
+ * is specifically configured to generate plans from within a stored procedure
+ * so it will give a slightly different set of config to the planner
+ * via AdHocPlannerWork
  */
 public class CatalogSpecificPlanner {
     private final AsyncCompilerAgent m_agent;
@@ -37,10 +40,16 @@ public class CatalogSpecificPlanner {
     }
 
     public ListenableFuture<AdHocPlannedStmtBatch> plan(String sql, boolean multipart) {
+        /*
+         * If this is multi-part, don't give the planner a partition param AND
+         * tell it not to infer whether the plan is single part. Those optimizations
+         * are fine for adhoc SQL planned outside a stored proc, but not when those
+         * factors have already been determined by the proc.
+         */
         AdHocPlannerWork work =
             new AdHocPlannerWork(
                     -1, false, 0, 0, "", false, null, //none of the params on this line are used
-                    sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true);
+                    sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true, !multipart);
         return m_agent.compileAdHocPlanFuture(work);
     }
 }

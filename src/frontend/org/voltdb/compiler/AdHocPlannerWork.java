@@ -30,11 +30,12 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     final Object partitionParam;
     final CatalogContext catalogContext;
     final boolean allowParameterization;
+    final boolean inferSinglePartition;
 
     public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection, Object clientData,
             String sqlBatchText, List<String> sqlStatements, Object partitionParam, CatalogContext context,
-            boolean allowParameterization)
+            boolean allowParameterization, final boolean inferSinglePartition)
     {
         super(replySiteId, shouldShutdown, clientHandle, connectionId, hostname,
               adminConnection, clientData);
@@ -43,6 +44,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
         this.partitionParam = partitionParam;
         this.catalogContext = context;
         this.allowParameterization = allowParameterization;
+        this.inferSinglePartition = inferSinglePartition;
     }
 
     @Override

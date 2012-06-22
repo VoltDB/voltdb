@@ -57,7 +57,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_client = ClientFactory.createClient();
             m_client.createConnection("localhost");
 
-            m_client.callProcedure("@AdHoc", "insert into PARTED1 values ( 23, 2 )");
+            m_client.callProcedure("@AdHoc", "insert into PARTED1 values ( 23, 3 )");
 
             /*
              * Test that a basic multipartition select works as well as a parameterized
@@ -109,6 +109,22 @@ public class TestAdHocQueries extends AdHocQueryTester {
             /*
              * Validate that an insert does work from a write procedure
              */
+            m_client.callProcedure("executeSQLSPWRITE", 24, "insert into parted1 values (24, 4);");
+            m_client.callProcedure("executeSQLMPWRITE", 25, "insert into parted1 values (25, 5);");
+
+            results = m_client.callProcedure("executeSQLMP", 24, "select * from parted1 order by partval").getResults();
+
+            assertEquals( 3, results[0].getRowCount());
+            for (int ii = 3; ii < 6; ii++) {
+                assertTrue(results[0].advanceRow());
+                assertEquals(20 + ii, results[0].getLong(0));
+                assertEquals(ii, results[0].getLong(1));
+            }
+            assertEquals( 1, results[1].getRowCount());
+            assertTrue(results[1].advanceRow());
+            assertEquals( 24, results[1].getLong(0));
+            assertEquals( 4, results[1].getLong(1));
+
         } finally {
             if (m_client != null) m_client.close();
             m_client = null;

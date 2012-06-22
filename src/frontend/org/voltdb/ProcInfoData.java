@@ -30,4 +30,6 @@ public class ProcInfoData {
     public String partitionInfo = "";
     /** See ProcInfo.singlePartition() */
     public boolean singlePartition = false;
+    /** See ProcInfo.readOnly */
+    public boolean readOnly = true;
 }

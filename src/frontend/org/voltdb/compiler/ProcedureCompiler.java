@@ -166,6 +166,7 @@ public abstract class ProcedureCompiler {
             if (annotationInfo != null) {
                 info.partitionInfo = annotationInfo.partitionInfo();
                 info.singlePartition = annotationInfo.singlePartition();
+                info.readOnly = annotationInfo.readOnly();
             }
         }
         assert(info != null);
@@ -297,7 +298,17 @@ public abstract class ProcedureCompiler {
         }
 
         // set the read onlyness of a proc
-        procedure.setReadonly(procHasWriteStmts == false);
+        if (procHasWriteStmts) {
+            procedure.setReadonly(true);
+        } else {
+            /*
+             * Allow the user to specify a procedure as a write even
+             * if it contains no statically defined DML statements.
+             * Users will need to do this in order to declare adhoc DML.
+             */
+            procedure.setReadonly(info.readOnly);
+        }
+
 
         procedure.setHasseqscans(procHasSeqScans);
 
