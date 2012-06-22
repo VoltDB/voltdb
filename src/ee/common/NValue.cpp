@@ -149,7 +149,7 @@ std::string NValue::debug() const {
         buffer << createStringFromDecimal();
         break;
       default:
-          throwFatalException ("unknown type %d", (int) type);
+          buffer << getTypeName(type);
     }
     std::string ret(buffer.str());
     return (ret);
@@ -331,7 +331,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
     if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) &&
         (rhs.getValueType() != VALUE_TYPE_DECIMAL))
     {
-        throwFatalException("No decimal NValue in decimal multiply.");
+        throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal multiply");
     }
 
     if (lhs.isNull() || rhs.isNull()) {
@@ -412,7 +412,7 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
         (rhs.getValueType() != VALUE_TYPE_DECIMAL))
     {
-        throwFatalException("Non-decimal NValue in decimal subtract.");
+        throw SQLException(SQLException::dynamic_sql_error, "No decimal NValue in decimal subtract");
     }
 
     if (lhs.isNull() || rhs.isNull()) {
