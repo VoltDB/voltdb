@@ -584,7 +584,6 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
-            assert(params.toArray()[3] != null);
             String table_name = (String) params.toArray()[0];
             long site_id = (Long) params.toArray()[1];
             int dependency_id = (Integer) params.toArray()[2];
@@ -599,7 +598,6 @@ public class SnapshotRestore extends VoltSystemProcedure
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
-            assert(params.toArray()[3] != null);
             String table_name = (String) params.toArray()[0];
             int dependency_id = (Integer) params.toArray()[1];
             byte compressedTable[] = (byte[]) params.toArray()[2];
@@ -1293,7 +1291,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     // there's not a good way to add a unit test for this at the moment,
     // so the emma coverage is weak.
     private VoltTable performDistributeReplicatedTable(String tableName,
-            int siteId)
+            long siteId)
     {
         String hostname = CoreUtils.getHostnameOrAddress();
         TableSaveFile savefile = null;
