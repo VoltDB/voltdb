@@ -173,7 +173,7 @@ CompactingMap<Key, Data, Compare>::CompactingMap(bool unique, Compare comper)
 {
     NIL.left = NIL.right = NIL.parent = &NIL;
     NIL.color = BLACK;
-    NIL.subct = 1;
+    NIL.subct = 0;
 }
 
 template<typename Key, typename Data, typename Compare>
@@ -209,19 +209,24 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
         TreeNode *x = m_root;
         while (x != &NIL) {
             y = x;
-            x->subct++;
             int cmp = m_comper(value.first, x->key);
             if (cmp < 0) {
             	x = x->left;
             }
             else if (m_unique) {
                 if (cmp == 0) {
-                	x->subct--;
+                	while (x != &NIL) {
+                		x = x->parent;
+                		x->subct--;
+                	}
+
                 	return false;
                 }
                 else x = x->right;
             }
             else x = x->right;
+
+            y->subct++;
         }
 
         // create a new node
@@ -383,17 +388,16 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
 template<typename Key, typename Data, typename Compare>
 void CompactingMap<Key, Data, Compare>::leftRotate(TreeNode *x) {
     TreeNode *y = x->right;
-    NodeCount ctxl = 0, ctyr = 0;
+    NodeCount ctxl = 0, ctyr = 0, ctyl = 0;
     if (x->left != &NIL)
     	ctxl = x->left->subct;
     if (y->right != &NIL)
     	ctyr = y->right->subct;
-    x->subct = ctxl + y->subct - ctyr;
-    y->subct = x->subct + ctyr + 1;
 
     x->right = y->left;
     if (y->left != &NIL) {
     	y->left->parent = x;
+    	ctyl = y->left->subct;
     }
     y->parent = x->parent;
     if (x->parent == &NIL)
@@ -404,22 +408,24 @@ void CompactingMap<Key, Data, Compare>::leftRotate(TreeNode *x) {
         x->parent->right = y;
     y->left = x;
     x->parent = y;
+
+    x->subct = ctxl + ctyl + 1;
+    y->subct = x->subct + ctyr + 1;
 }
 
 template<typename Key, typename Data, typename Compare>
 void CompactingMap<Key, Data, Compare>::rightRotate(TreeNode *x) {
     TreeNode *y = x->left;
-    NodeCount ctxr = 0, ctyl = 0;
+    NodeCount ctxr = 0, ctyr = 0, ctyl = 0;
     if (x->right != &NIL)
     	ctxr = x->right->subct;
     if (y->left != &NIL)
     	ctyl = y->left->subct;
-    x->subct = y->subct + ctxr - ctyl;
-    y->subct = x->subct + ctyl + 1;
 
     x->left = y->right;
     if (y->right != &NIL) {
     	y->right->parent = x;
+    	ctyr = y->right->subct;
     }
     y->parent = x->parent;
     if (x->parent == &NIL)
@@ -430,6 +436,9 @@ void CompactingMap<Key, Data, Compare>::rightRotate(TreeNode *x) {
         x->parent->left = y;
     y->right = x;
     x->parent = y;
+
+    x->subct = ctyr + ctxr + 1;
+    y->subct = x->subct + ctyl + 1;
 }
 
 template<typename Key, typename Data, typename Compare>
