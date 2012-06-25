@@ -158,6 +158,8 @@ protected:
 
     // debugging and testing methods
     bool isReachableNode(const TreeNode* start, const TreeNode *dest) const;
+    int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) const;
+    int CompactingMap<Key, Data, Compare>::rankDec(const Key& key) const;
     int verify(const TreeNode *n) const;
     int inOrderCounterChecking(const TreeNode *n) const;
     int fullCount(const TreeNode *n) const;
@@ -655,6 +657,24 @@ bool CompactingMap<Key, Data, Compare>::isReachableNode(const TreeNode* start, c
     if ((start->right) && (isReachableNode(start->right, dest)))
         return true;
     return false;
+}
+
+template<typename Key, typename Data, typename Compare>
+int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) const {
+	TreeNode *node = lookup(key);
+	if (node == &NIL) return -1;
+
+
+	return 1;
+}
+
+template<typename Key, typename Data, typename Compare>
+int CompactingMap<Key, Data, Compare>::rankDec(const Key& key) const {
+	TreeNode *node = lookup(key);
+	if (node == &NIL) return -1;
+
+
+	return 1;
 }
 
 template<typename Key, typename Data, typename Compare>
