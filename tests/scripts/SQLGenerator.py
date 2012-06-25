@@ -565,7 +565,7 @@ class Statement:
         self.__generator_types = (CmpGenerator, MathGenerator, LogicGenerator,
                                   NegationGenerator, DistinctGenerator,
                                   SortOrderGenerator, AggregationGenerator, NumericAggregationGenerator,
-                                  SetGenerator, ConstantGenerator, PickGenerator)
+                                  LikeGenerator, SetGenerator, ConstantGenerator, PickGenerator)
 
         # prepare table generators
         self.__statement = self.__text
