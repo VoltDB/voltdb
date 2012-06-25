@@ -30,6 +30,7 @@ import org.voltdb.planner.ParameterInfo;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
+import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.utils.Encoder;
 
@@ -105,6 +106,9 @@ public class PlannerTool {
 
         hostLog.debug("received sql stmt: " + sql);
 
+        //Reset plan node id counter
+        AbstractPlanNode.resetPlanNodeIds();
+
         //////////////////////
         // PLAN THE STMT
         //////////////////////
@@ -112,7 +116,7 @@ public class PlannerTool {
         TrivialCostModel costModel = new TrivialCostModel();
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
         QueryPlanner planner = new QueryPlanner(
-                m_cluster, m_database, partitioning, m_hsql, new DatabaseEstimates(), false, true);
+                m_cluster, m_database, partitioning, m_hsql, new DatabaseEstimates(), true);
         CompiledPlan plan = null;
         try {
             plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
