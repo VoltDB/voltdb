@@ -346,7 +346,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     FaultType.SITE_FAILURE);
             if (!m_faultManager.testPartitionDetectionDirectory(
                     m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
-                VoltDB.crashLocalVoltDB("Unalbe to create partition detection snapshot directory at" +
+                VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at" +
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"), false, null);
             }
 
