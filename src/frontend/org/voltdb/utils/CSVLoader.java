@@ -253,11 +253,6 @@ public class CSVLoader {
                 close_cleanup();
                 System.exit(-1);
             }
-            if (isProcExist == false) {
-                m_log.error("No matching insert procedure available");
-                close_cleanup();
-                System.exit(-1);
-            }
 
             while ((config.limitrows-- > 0)
                     && (line = csvReader.readNext()) != null) {
