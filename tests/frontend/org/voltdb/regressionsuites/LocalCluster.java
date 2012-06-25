@@ -172,7 +172,8 @@ public class LocalCluster implements VoltServerConfig {
         m_cmdLines = new ArrayList<CommandLine>();
 
         // if the user wants valgrind and it makes sense, give it to 'em
-        if (isMemcheckDefined() && (target == BackendTarget.NATIVE_EE_JNI)) {
+        // For now only one host works.
+        if (isMemcheckDefined() && (target == BackendTarget.NATIVE_EE_JNI) && m_hostCount == 1) {
             m_target = BackendTarget.NATIVE_EE_VALGRIND_IPC;
         }
         else {

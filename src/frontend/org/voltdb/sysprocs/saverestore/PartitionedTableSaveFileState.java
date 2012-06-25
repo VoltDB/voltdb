@@ -118,6 +118,8 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         else
         {
             // XXX Not implemented until we're going to support catalog changes
+            hostLog.error("Unable to convert partitioned table " + getTableName() + " to replicated because " +
+                "the conversion is currently unsupported.");
         }
         return restore_plan;
     }

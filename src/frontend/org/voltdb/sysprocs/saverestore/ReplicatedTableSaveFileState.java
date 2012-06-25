@@ -22,6 +22,7 @@ import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
@@ -31,6 +32,8 @@ import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     ReplicatedTableSaveFileState(String tableName, long txnId)
     {
         super(tableName, txnId);
@@ -76,6 +79,8 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
         else
         {
             // Not implemented until we're going to support catalog changes
+            hostLog.error("Unable to convert replicated table " + getTableName() + " to partitioned because " +
+                    "the conversion is currently unsupported.");
         }
         return restore_plan;
     }

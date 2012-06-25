@@ -32,7 +32,7 @@ SELECT COUNT(*) FROM @from_tables
 --- test comparison operators (<, <=, =, >=, >)
 SELECT * FROM @from_tables WHERE _variable _cmp @cmp_type
 --- test arithmetic operators (+, -, *, /) with comparison ops
-SELECT * FROM @from_tables WHERE (_variable _math _value[int:0,100]) _cmp @cmp_type
+SELECT * FROM @from_tables WHERE (_variable[@col_type] _math _value[int:0,100]) _cmp @cmp_type
 --- test logic operators (AND) with comparison ops
 SELECT * FROM @from_tables WHERE (_variable _cmp @cmp_type) _logic (_variable _cmp _variable)
 -- test GROUP BY
