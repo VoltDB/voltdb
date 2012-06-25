@@ -69,6 +69,13 @@ public class InitiatorMailbox implements Mailbox
         m_msgHandler.setMailbox(this);
     }
 
+    // Provide the starting replica configuration (for startup)
+    public synchronized void setReplicas(List<Long> replicas)
+    {
+        m_msgHandler.updateReplicas(replicas);
+    }
+
+    // Change the replica set configuration (during or after promotion)
     public synchronized void updateReplicas(List<Long> replicas)
     {
         // first cancel any ongoing repair work. must do this with
