@@ -112,12 +112,9 @@ SELECT @optional_fn(_variable / 0.0) AS Q31 FROM @from_tables
 -- comparison with set expression
 UPDATE @from_tables SET @assign_col = @assign_col _math _value[int:0,5] WHERE @optional_fn(_variable) _cmp @cmp_type
 
-
+-- Save more exhaustive LIKE testing for advanced-strings.sql.
+-- This is mostly just to catch the error of applying different forms of LIKE to non-strings.
 SELECT * FROM @from_tables WHERE _variable _like 'abc%'
 SELECT * FROM @from_tables WHERE _variable _like '%'
 SELECT * FROM @from_tables WHERE _variable _like '%' ESCAPE '!' 
 SELECT * FROM @from_tables WHERE _variable _like '!%' ESCAPE '!' 
-SELECT * FROM @from_tables WHERE _variable _like 'abc' ESCAPE '!' 
-SELECT * FROM @from_tables WHERE _variable _like 'abc%' ESCAPE '!' 
-SELECT * FROM @from_tables WHERE _variable _like 'abc!%' ESCAPE '!' 
-SELECT * FROM @from_tables WHERE _variable _like 'abc!%%' ESCAPE '!' 
