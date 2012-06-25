@@ -55,7 +55,7 @@ namespace voltdb {
  *
  */
 
-template<typename Key, typename Data, typename Compare>
+template<typename Key, typename Data, typename Compare, bool supportsRank = false>
 class CompactingMap {
 protected:
     static const char RED = 0;
@@ -68,8 +68,8 @@ protected:
         TreeNode *parent;
         TreeNode *left;
         TreeNode *right;
-        NodeCount subct;
         char color;
+        NodeCount subct;
     };
 
     int64_t m_count;
