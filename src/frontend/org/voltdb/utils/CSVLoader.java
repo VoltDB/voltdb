@@ -245,7 +245,13 @@ public class CSVLoader {
                     }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                m_log.error(e.getMessage(), e);
+                System.exit(-1);
+            }
+            if (isProcExist == false) {
+                m_log.error("No matching insert procedure available");
+                close_cleanup();
+                System.exit(-1);
             }
             if (isProcExist == false) {
                 m_log.error("No matching insert procedure available");
@@ -360,8 +366,7 @@ public class CSVLoader {
                 dir.mkdirs();
             }
         } catch (Exception x) {
-            m_log.error(x.getMessage());
-            x.printStackTrace();
+            m_log.error(x.getMessage(), x);
             System.exit(-1);
         }
 
