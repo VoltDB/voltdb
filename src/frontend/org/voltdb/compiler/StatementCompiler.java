@@ -82,12 +82,9 @@ public abstract class StatementCompiler {
             qtype = QueryType.DELETE;
             catalogStmt.setReadonly(false);
         }
-        else if (stmt.toLowerCase().startsWith("select")) {
+        else {
             qtype = QueryType.SELECT;
             catalogStmt.setReadonly(true);
-        }
-        else {
-            throw compiler.new VoltCompilerException("Unparsable SQL statement: " + stmt);
         }
         catalogStmt.setQuerytype(qtype.getValue());
 

@@ -181,6 +181,10 @@ public class StatementQuery extends StatementDMQL {
     VoltXMLElement voltGetXML(Session session)
     throws HSQLParseException
     {
+        if ( ! (queryExpression instanceof QuerySpecification)) {
+            throw new HSQLParseException(queryExpression.operatorName() + " and similar tuple set operators are not supported.");
+        }
+
         QuerySpecification select = (QuerySpecification) queryExpression;
 
         try {
