@@ -1,4 +1,3 @@
-// future that represents completion of transition to leader.
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2012 VoltDB Inc.
  *
@@ -26,6 +25,7 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
+// future that represents completion of transition to leader.
 class InaugurationFuture implements Future<Boolean>
 {
     private CountDownLatch m_doneLatch = new CountDownLatch(1);

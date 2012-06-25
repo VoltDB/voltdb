@@ -303,7 +303,7 @@ public class Term
         declareReadyAsLeader();
     }
 
-	/** Start fixing survivors: setup scoreboard and request repair logs. */
+    /** Start fixing survivors: setup scoreboard and request repair logs. */
     void prepareForFaultRecovery()
     {
         List<String> survivorsNames = m_babySitter.lastSeenChildren();
