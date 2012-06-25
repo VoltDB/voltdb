@@ -961,7 +961,7 @@ class VoltResponse:
             self.tables.append(table.readFromSerializer())
 
     def __str__(self):
-        tablestr = "\n\n".join([str(i) for i in self.tables])
+        tablestr = "\n\n".join([str(i) for i in self.tables if self.tables != None])
         if self.exception is None:
             return "Status: %d\nInformation: %s\n%s" % (self.status,
                                                         self.statusString,
