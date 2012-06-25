@@ -299,7 +299,7 @@ public abstract class ProcedureCompiler {
 
         // set the read onlyness of a proc
         if (procHasWriteStmts) {
-            procedure.setReadonly(true);
+            procedure.setReadonly(false);
         } else {
             /*
              * Allow the user to specify a procedure as a write even
