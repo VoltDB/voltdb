@@ -3024,7 +3024,7 @@ template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(c
     char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
     const char *valueEnd = valueChars+valueUTF8Length;
 
-    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), 1L);
+    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
 
     UTF8Iterator iter(valueChars, valueEnd);
     const char* startChar = iter.skipCodePoints(start-1);
@@ -3053,7 +3053,7 @@ template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FO
     const int32_t valueUTF8Length = strValue.getObjectLength();
     const char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
     const char *valueEnd = valueChars+valueUTF8Length;
-    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), 1L);
+    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
     int64_t length = lengthArg.castAsBigIntAndGetValue();
     if (length < 0) {
         char message[128];
