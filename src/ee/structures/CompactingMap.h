@@ -346,8 +346,8 @@ void CompactingMap<Key, Data, Compare>::erase(TreeNode *z) {
         z->value = y->value;
         delnode = y;
     }
-    TreeNode *ct = y;
-    while (ct->parent != &NIL) {
+    TreeNode *ct = delnode;
+    while (ct != &NIL) {
     	ct = ct->parent;
     	ct->subct--;
     }
@@ -600,6 +600,7 @@ void CompactingMap<Key, Data, Compare>::fragmentFixup(TreeNode *X) {
     X->color = last->color;
     X->key = last->key;
     X->value = last->value;
+    X->subct = last->subct;
 
     // fix the root pointer if needed
     if (last == m_root) {
