@@ -148,7 +148,7 @@ public:
 };
 
 TEST_F(CompactingMapTest, RandomUniqueRank) {
-    const int ITERATIONS = 101;
+    const int ITERATIONS = 11;
     const int BIGGEST_VAL = 100;
 
     const int INSERT = 0;

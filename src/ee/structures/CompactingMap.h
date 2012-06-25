@@ -138,8 +138,9 @@ public:
      */
     bool verify() const;
 
-    int rankAsc(const Key& key);
-    int rankDec(const Key& key);
+    NodeCount rankAsc(const Key& key);
+    NodeCount rankDec(const Key& key);
+    TreeNode *findRank(NodeCount ith);
 
 protected:
     // main internal functions
@@ -382,7 +383,6 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
         }
     }
     return retval;
-
 }
 
 template<typename Key, typename Data, typename Compare>
@@ -662,7 +662,7 @@ bool CompactingMap<Key, Data, Compare>::isReachableNode(const TreeNode* start, c
 }
 
 template<typename Key, typename Data, typename Compare>
-int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) {
+NodeCount CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) {
 	TreeNode *n = lookup(key);
 	if (n == &NIL) return -1;
 	TreeNode *x = m_root, *p = n;
@@ -699,14 +699,34 @@ int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) {
 }
 
 template<typename Key, typename Data, typename Compare>
-int CompactingMap<Key, Data, Compare>::rankDec(const Key& key) {
+NodeCount CompactingMap<Key, Data, Compare>::rankDec(const Key& key) {
 	return m_count - rankAsc(key);
 }
 
 template<typename Key, typename Data, typename Compare>
-typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Compare>::findRank(const Key &key) {
+typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, Compare>::findRank(NodeCount ith) {
+	TreeNode *x = m_root;
+	TreeNode *retval = &NIL;
+	if (x == &NIL || ith > x->subct || ith <= 0)
+		return retval;
 
-
+	NodeCount rk = ith;
+	NodeCount xl = 0;
+	while (x != &NIL && rk > 0) {
+		if (x->left != &NIL)
+			xl = x->left->subct;
+		if (rk == xl + 1) {
+			retval = x;
+			rk = 0;
+		} else if (rk < xl + 1) {
+			x = x->left;
+		} else {
+			x = x->right;
+			rk = rk - xl - 1;
+		}
+		xl = 0;
+	}
+	return retval;
 }
 
 template<typename Key, typename Data, typename Compare>
@@ -738,11 +758,36 @@ bool CompactingMap<Key, Data, Compare>::verify() const {
 }
 
 template<typename Key, typename Data, typename Compare>
-int CompactingMap<Key, Data, Compare>::inOrderCounterChecking(const TreeNode *n) const {
+int CompactingMap<Key, Data, Compare>::inOrderCounterChecking(const TreeNode *n, NodeCount rk) const {
 	int res = 0;
 	if (n != &NIL) {
 		if ((res = inOrderCounterChecking(n->left)) < 0) return res;
-		if ((res = verify(n)) < 0) return res;
+		//if ((res = verify(n)) < 0) return res;
+		// check counter for sub tree nodes
+		NodeCount ct = 1;
+		if (n->left != &NIL) ct += n->left->subct;
+		if (n->right != &NIL) ct += n->right->subct;
+		if (ct != n->subct) {
+			printf("node counter is not correct, expected %d but get %d\n", ct, n->subct);
+			return -1;
+		}
+		Key k = n->key;
+		NodeCount rkct = rankAsc(k);
+		if (rkct != rk) {
+			printf("node rankAsc is not correct, expected %d but get %d\n", rk, rkct);
+			return -1;
+		}
+		rkct = rankDec(k);
+		if (rkct != m_count - rk) {
+			printf("node rankDes is not correct, expected %d but get %d\n", rk, rkct);
+			return -1;
+		}
+		TreeNode* t= findRank(rk);
+		if (t != n) {
+			printf("node findRank is not correct, expected %d but get %d\n", n->key, t->key);
+			return -1;
+		}
+
 		if ((res = inOrderCounterChecking(n->right)) < 0) return res;
 	}
     return 0;
@@ -771,15 +816,6 @@ int CompactingMap<Key, Data, Compare>::verify(const TreeNode *n) const {
     // check for strict ordering
     if ((n->left != &NIL) && (m_comper(n->key, n->left->key) < 0)) return -1;
     if ((n->right != &NIL) && (m_comper(n->key, n->right->key) > 0)) return -1;
-
-    // check counter for sub tree nodes
-    NodeCount ct = 1;
-    if (n->left != &NIL) ct += n->left->subct;
-    if (n->right != &NIL) ct += n->right->subct;
-    if (ct != n->subct) {
-    	printf("node counter is not correct, expected %d but get %d\n", ct, n->subct);
-    	return -1;
-    }
 
     // recursive step (compare black height)
     int leftBH = verify(n->left);
