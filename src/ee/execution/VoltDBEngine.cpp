@@ -206,8 +206,8 @@ VoltDBEngine::initialize(int32_t clusterIndex,
                                             m_partitionId,
                                             m_currentUndoQuantum,
                                             getTopend(),
+                                            &m_stringPool,
                                             m_isELEnabled,
-                                            0, /* epoch not yet known */
                                             hostname,
                                             hostId);
     return true;

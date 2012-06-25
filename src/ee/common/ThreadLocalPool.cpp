@@ -19,6 +19,7 @@
 #include <boost/unordered_map.hpp>
 #include "common/FatalException.hpp"
 #include <iostream>
+#include "common/SQLException.h"
 
 namespace voltdb {
 /**
@@ -175,7 +176,7 @@ boost::shared_ptr<boost::pool<voltdb_pool_allocator_new_delete> > ThreadLocalPoo
     size_t alloc_size = getAllocationSizeForObject(size);
     if (alloc_size == 0)
     {
-        throwFatalException("Attempted to allocate an object then the 1 meg limit. Requested size was %du",
+        throwDynamicSQLException("Attempted to allocate an object > than the 1 meg limit. Requested size was %du",
             static_cast<int32_t>(size));
     }
     return getExact(alloc_size);

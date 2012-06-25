@@ -2,6 +2,7 @@
 
 {@insert_vals = "_value[id], _value[date], _value[date], _value[int64]"}
 {@from_tables = "_table"}
+{@col_type = "date"}
 {@cmp_type = "_value[date]"}
 {@assign_col = "PAST"}
 {@assign_type = "_value[date]"}

@@ -121,11 +121,20 @@ string getTypeName(ValueType type) {
         case (VALUE_TYPE_DECIMAL):
             ret = "decimal";
             break;
+        case (VALUE_TYPE_BOOLEAN):
+            ret = "boolean";
+            break;
+        case (VALUE_TYPE_ADDRESS):
+            ret = "address";
+            break;
         case (VALUE_TYPE_INVALID):
             ret = "INVALID";
             break;
         case (VALUE_TYPE_NULL):
             ret = "NULL";
+            break;
+        case (VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC):
+            ret = "numeric";
             break;
         default: {
             char buffer[32];
@@ -172,6 +181,9 @@ string valueToString(ValueType type)
       }
       case VALUE_TYPE_DECIMAL: {
           return "DECIMAL";
+      }
+      case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC: {
+          return "NUMERIC";
       }
       default:
           return "INVALID";
@@ -479,6 +491,12 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_FUNCTION_ABS: {
         return "FUNCTION_ABS";
     }
+    case EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM: {
+        return "FUNCTION_SUBSTRING_FROM";
+    }
+    case EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR: {
+        return "FUNCTION_SUBSTRING_FROM_FOR";
+    }
     }
     return "INVALID";
 }
@@ -547,6 +565,10 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_AVG;
     } else if (str == "FUNCTION_ABS") {
         return EXPRESSION_TYPE_FUNCTION_ABS;
+    } else if (str == "FUNCTION_SUBSTRING_FROM") {
+        return EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM;
+    } else if (str == "FUNCTION_SUBSTRING_FROM_FOR") {
+        return EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR;
     }
 
     return EXPRESSION_TYPE_INVALID;

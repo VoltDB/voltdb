@@ -41,7 +41,7 @@ import org.voltdb.utils.MiscUtils;
 public class TestAdHocQueries extends AdHocQueryTester {
 
     Client m_client;
-    private final static boolean m_debug = true;
+    private final static boolean m_debug = false;
 
     public void testSP() throws Exception {
         VoltDB.Configuration config = setUpSPDB();

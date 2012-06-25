@@ -191,7 +191,17 @@ public class TestSnapshotDaemon {
         schedule.setRetain(2);
         SnapshotDaemon d = getSnapshotDaemon();
         d.makeActive(schedule);
+        checkForSnapshotScan(m_initiator);
         return d;
+    }
+
+    private static void checkForSnapshotScan(Initiator initiator) throws Exception {
+        for (int ii = 0; ii < 30; ii++) {
+            Thread.sleep(60);
+            if (initiator.procedureName != null) break;
+        }
+        assertNotNull(initiator.procedureName);
+        assertTrue(initiator.procedureName.equals("@SnapshotScan"));
     }
 
     public ClientResponse getFailureResponse() {
@@ -357,8 +367,6 @@ public class TestSnapshotDaemon {
 
         SnapshotDaemon daemon = getBasicDaemon();
 
-        Thread.sleep(60);
-
         long handle = m_initiator.clientData;
         assertTrue("@SnapshotScan".equals(m_initiator.procedureName));
         assertEquals(1, m_initiator.params.length);
@@ -378,7 +386,6 @@ public class TestSnapshotDaemon {
         assertNull(m_initiator.params);
 
         daemon = getBasicDaemon();
-        Thread.sleep(60);
 
         assertNotNull(m_initiator.params);
         daemon.processClientResponse(getErrMsgResponse(), m_initiator.clientData).get();
@@ -523,8 +530,6 @@ public class TestSnapshotDaemon {
     public void testSuccessfulScan() throws Exception {
         SnapshotDaemon daemon = getBasicDaemon();
 
-        Thread.sleep(60);
-
         long handle = m_initiator.clientData;
         m_initiator.clear();
         daemon.processClientResponse(getSuccessfulScanOneResult(), handle).get();
@@ -532,7 +537,6 @@ public class TestSnapshotDaemon {
         assertNull(m_initiator.procedureName);
 
         daemon = getBasicDaemon();
-        Thread.sleep(60);
 
         handle = m_initiator.clientData;
         daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
@@ -552,7 +556,7 @@ public class TestSnapshotDaemon {
         assertEquals(daemon.getState(), SnapshotDaemon.State.FAILURE);
 
         daemon = getBasicDaemon();
-        Thread.sleep(60);
+
         handle = m_initiator.clientData;
         daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
         daemon.processClientResponse(getErrMsgResponse(), 1);
@@ -563,7 +567,7 @@ public class TestSnapshotDaemon {
     @Test
     public void testDoSnapshot() throws Exception {
         SnapshotDaemon daemon = getBasicDaemon();
-        Thread.sleep(60);
+
         long handle = m_initiator.clientData;
         m_initiator.clear();
         daemon.processClientResponse(getSuccessfulScanOneResult(), handle).get();
@@ -585,7 +589,7 @@ public class TestSnapshotDaemon {
         assertEquals(SnapshotDaemon.State.FAILURE, daemon.getState());
 
         daemon = getBasicDaemon();
-        Thread.sleep(60);
+
         assertNotNull(m_initiator.procedureName);
         handle = m_initiator.clientData;
         m_initiator.clear();
@@ -598,7 +602,7 @@ public class TestSnapshotDaemon {
         assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
 
         daemon = getBasicDaemon();
-        Thread.sleep(60);
+
         assertNotNull(m_initiator.procedureName);
         handle = m_initiator.clientData;
         m_initiator.clear();
