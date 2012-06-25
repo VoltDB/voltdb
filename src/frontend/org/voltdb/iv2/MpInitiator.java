@@ -17,8 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 
@@ -62,9 +62,6 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
     private LeaderElector m_leaderElector = null;
     private RepairLog m_repairLog = new RepairLog();
 
-    // Need a flag to distinguish first-time-startup from fault recovery.
-    private int m_leaderStartupCount = -1;
-
     private final String m_whoami;
 
     public MpInitiator(HostMessenger messenger)
@@ -85,11 +82,13 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
         try {
             long startTime = System.currentTimeMillis();
             tmLog.info(m_whoami + "starting leader promotion");
-            m_term = new Term(m_messenger.getZK(), m_partitionId,
+            m_term = new Term(new CountDownLatch(1), m_messenger.getZK(), m_partitionId,
                     getInitiatorHSId(), m_initiatorMailbox, VoltZK.iv2mpi);
             m_initiatorMailbox.setTerm(m_term);
-            Future<?> inaugurated = m_term.start(m_leaderStartupCount);
-            inaugurated.get();
+            boolean success = m_term.start().get();
+            if (!success) {
+                throw new RuntimeException("Screwed!");
+            }
             m_repairLog.setLeaderState(true);
             m_scheduler.setLeaderState(true);
             tmLog.info(m_whoami
@@ -126,7 +125,6 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
     {
         try {
             m_iv2masters.start(true);
-            m_leaderStartupCount = 0; // Only one MPI right now
             boolean isLeader = joinElectoralCollege();
             if (isLeader) {
                 tmLog.info(m_whoami + "published as leader.");
@@ -134,9 +132,6 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
             else {
                 tmLog.info(m_whoami + "running as replica.");
             }
-
-            // Done tracking startup vs. recovery special case.
-            m_leaderStartupCount = -1;
 
             // ugh
             ((MpScheduler)m_scheduler).setBuddyHSId(cartographer.getBuddySiteForMPI(m_initiatorMailbox.getHSId()));
