@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -388,7 +389,10 @@ public class ProcedureRunner {
             queuedSQL.params = getCleanParams( queuedSQL.stmt, args);
             m_batch.add(queuedSQL);
         } catch (Exception e) {
-            throw new VoltAbortException(e.getMessage());
+            if (e instanceof ExecutionException) {
+                throw new VoltAbortException(e.getCause());
+            }
+            throw new VoltAbortException(e);
         }
     }
 

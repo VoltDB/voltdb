@@ -101,7 +101,7 @@ public abstract class StatementCompiler {
         PlanNodeList node_list = null;
         TrivialCostModel costModel = new TrivialCostModel();
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, true, false);
+                catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, false);
 
         CompiledPlan plan = null;
         try {
