@@ -148,7 +148,7 @@ public:
 };
 
 TEST_F(CompactingMapTest, RandomUniqueRank) {
-    const int ITERATIONS = 1;
+    const int ITERATIONS = 101;
     const int BIGGEST_VAL = 100;
 
     const int INSERT = 0;
@@ -162,7 +162,6 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
     voltdb::CompactingMap<int, int, IntComparator>::iterator volti;
 
     srand(0);
-    printf("Rank Test\n");
     for (int i = 0; i < ITERATIONS; i++) {
         if ((i % 1000) == 0) {
             ASSERT_TRUE(volt.verify());
@@ -186,10 +185,8 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 std::map<int,int>::const_iterator it;
                 for (it = stl.begin(); it != stli; it++) {
                 	ct++;
-                	printf("key : %d", (*it).first);
                 }
                 int rankasc= volt.rankAsc(val);
-                printf("Rank expected %d, got %d\n", ct, rankasc);
                 ASSERT_TRUE(rankasc == ct);
             }
             else {

@@ -663,20 +663,50 @@ bool CompactingMap<Key, Data, Compare>::isReachableNode(const TreeNode* start, c
 
 template<typename Key, typename Data, typename Compare>
 int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) {
-	//TreeNode *node = this.find(key);
-	//if (node == &NIL) return -1;
+	TreeNode *n = lookup(key);
+	if (n == &NIL) return -1;
+	TreeNode *x = m_root, *p = n;
+	NodeCount ct = 0,ctr = 0, ctl = 0;
+	int m = m_comper(key, x->key);
+	if (m == 0) {
+		if (x->right != &NIL)
+			ctr = x->right->subct;
+		ct = n->subct - ctr;
+	} else if (m > 0) {
+		if (p->right != &NIL)
+			ctr = p->right->subct;
+		ct += p->subct - ctr;
+		while (p->parent != &NIL) {
+			if (p->parent->right == p) {
+				ct += p->parent->subct - p->subct;;
+			}
+			p = p->parent;
+		}
+	} else {
+		if (p->left != &NIL)
+			ctl = p->left->subct;
+		ct += p->subct - ctl - 1;
+		while (p->parent != &NIL) {
+			if (p->parent->left == p) {
+				ct += p->parent->subct - p->subct;
+			}
+			p = p->parent;
+		}
+		ct = x->subct - ct;
+	}
 
-
-	return 1;
+	return ct;
 }
 
 template<typename Key, typename Data, typename Compare>
 int CompactingMap<Key, Data, Compare>::rankDec(const Key& key) {
-	//TreeNode *node = this.find(key);
-	//if (node == &NIL) return -1;
+	return m_count - rankAsc(key);
+}
+
+template<typename Key, typename Data, typename Compare>
+typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Compare>::findRank(const Key &key) {
 
 
-	return 1;
 }
 
 template<typename Key, typename Data, typename Compare>
