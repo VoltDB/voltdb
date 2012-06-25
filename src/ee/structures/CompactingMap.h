@@ -138,8 +138,8 @@ public:
      */
     bool verify() const;
 
-    int rankAsc(const Key& key) const;
-    int rankDec(const Key& key) const;
+    int rankAsc(const Key& key);
+    int rankDec(const Key& key);
 
 protected:
     // main internal functions
@@ -662,7 +662,7 @@ bool CompactingMap<Key, Data, Compare>::isReachableNode(const TreeNode* start, c
 }
 
 template<typename Key, typename Data, typename Compare>
-int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) const {
+int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) {
 	//TreeNode *node = this.find(key);
 	//if (node == &NIL) return -1;
 
@@ -671,7 +671,7 @@ int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) const {
 }
 
 template<typename Key, typename Data, typename Compare>
-int CompactingMap<Key, Data, Compare>::rankDec(const Key& key) const {
+int CompactingMap<Key, Data, Compare>::rankDec(const Key& key) {
 	//TreeNode *node = this.find(key);
 	//if (node == &NIL) return -1;
 
