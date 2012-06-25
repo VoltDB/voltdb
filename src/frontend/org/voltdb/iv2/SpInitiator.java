@@ -140,6 +140,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         try {
             m_missingStartupSites = new CountDownLatch(kfactor + 1);
             boolean isLeader = joinElectoralCollege();
+            m_missingStartupSites = null;
             if (isLeader) {
                 tmLog.info(m_whoami + "published as leader.");
             }

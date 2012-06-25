@@ -249,11 +249,12 @@ public class Term
     public Future<Boolean> start()
     {
         try {
-            makeBabySitter();
             if (m_missingStartupSites.getCount() > 0) {
+                makeBabySitter();
                 prepareForStartup();
             }
             else {
+                makeBabySitter();
                 prepareForFaultRecovery();
             }
         } catch (Exception e) {
@@ -291,11 +292,7 @@ public class Term
         throws InterruptedException
     {
         tmLog.info(m_whoami + "starting with " + m_missingStartupSites.getCount() + " replicas.");
-        List<String> children = m_babySitter.lastSeenChildren();
-        m_knownReplicas.addAll(children);
-        for (int i=0; i < children.size(); ++i) {
-            m_missingStartupSites.countDown();
-        }
+
         // block here until the babysitter thread provides all replicas.
         // then initialize the mailbox's replica set and proceed as leader.
         m_missingStartupSites.await();
