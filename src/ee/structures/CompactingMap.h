@@ -138,6 +138,9 @@ public:
      */
     bool verify() const;
 
+    int rankAsc(const Key& key) const;
+    int rankDec(const Key& key) const;
+
 protected:
     // main internal functions
     void erase(TreeNode *z);
@@ -158,8 +161,7 @@ protected:
 
     // debugging and testing methods
     bool isReachableNode(const TreeNode* start, const TreeNode *dest) const;
-    int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) const;
-    int CompactingMap<Key, Data, Compare>::rankDec(const Key& key) const;
+
     int verify(const TreeNode *n) const;
     int inOrderCounterChecking(const TreeNode *n) const;
     int fullCount(const TreeNode *n) const;
@@ -661,8 +663,8 @@ bool CompactingMap<Key, Data, Compare>::isReachableNode(const TreeNode* start, c
 
 template<typename Key, typename Data, typename Compare>
 int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) const {
-	TreeNode *node = lookup(key);
-	if (node == &NIL) return -1;
+	//TreeNode *node = this.find(key);
+	//if (node == &NIL) return -1;
 
 
 	return 1;
@@ -670,8 +672,8 @@ int CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) const {
 
 template<typename Key, typename Data, typename Compare>
 int CompactingMap<Key, Data, Compare>::rankDec(const Key& key) const {
-	TreeNode *node = lookup(key);
-	if (node == &NIL) return -1;
+	//TreeNode *node = this.find(key);
+	//if (node == &NIL) return -1;
 
 
 	return 1;
