@@ -182,9 +182,13 @@ public abstract class VoltProcedure {
      * Queue the adhoc SQL statement for execution. The adhoc SQL statement will have
      * to be planned which is orders of magnitude slower then using a precompiled SQL statements.
      *
-     * If the query is parameterized it is possible to pass in the parameters
+     * If the query is parameterized it is possible to pass in the parameters.
+     *
+     * This method is experimental and not intended for production use yet.
+     * @deprecated
      */
-    public void voltQueueSQL(String sql, Object... args) {
+    @Deprecated
+    public void voltQueueSQLExperimental(String sql, Object... args) {
         m_runner.voltQueueSQL(sql, args);
     }
 

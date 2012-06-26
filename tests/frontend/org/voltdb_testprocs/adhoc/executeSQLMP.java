@@ -40,8 +40,8 @@ import org.voltdb.VoltTable;
 public class executeSQLMP extends VoltProcedure {
 
     public VoltTable[] run(long partval, String sql) {
-        voltQueueSQL(sql);
-        voltQueueSQL("select * from PARTED1 where partval = ?", partval);
+        voltQueueSQLExperimental(sql);
+        voltQueueSQLExperimental("select * from PARTED1 where partval = ?", partval);
         return voltExecuteSQL(true);
     }
 }
