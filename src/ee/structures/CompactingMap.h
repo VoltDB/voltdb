@@ -134,13 +134,14 @@ public:
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
+    int32_t rankAsc(const Key& key);
+    int32_t rankDes(const Key& key);
+
     /**
      * For debugging: verify the RB-tree constraints are met. SLOW.
      */
     bool verify() const;
-
-    int32_t rankAsc(const Key& key);
-    int32_t rankDes(const Key& key);
+    bool verifyRank();
 
 protected:
     // main internal functions
@@ -728,6 +729,48 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
 		xl = 0;
 	}
 	return retval;
+}
+
+template<typename Key, typename Data, typename Compare>
+bool CompactingMap<Key, Data, Compare>::verifyRank() {
+	iterator it;
+	NodeCount rkasc, rkdes;
+	TreeNode * n = &NIL;
+	// iterate rank start from 1 to m_count
+	for (NodeCount i = 1; i <= m_count; i++) {
+		it = findRank(i);
+		if ((n = lookup(it.key())) == &NIL) {
+			printf("Can not find rank %d node with key\n", i);
+			return false;
+		}
+
+		if (m_unique) {
+			if ((rkasc = rankAsc(it.key())) != i) {
+				printf("false: unique_rankAsc expected %d, but got %d\n", i, rkasc);
+				return false;
+			}
+			rkdes = rankDes(it.key());
+			if (rkdes != m_count - rkasc) {
+				printf("false: unique_rankDes %d node with key\n", i);
+				return false;
+			}
+		} else {
+			rkasc = rankAsc(it.key());
+			Key k = it.key();
+			NodeCount nc = 0;
+			it.movePrev();
+			while (k == it.key()) {
+				nc++;
+				it.movePrev();
+			}
+			if (rkasc + nc != i) {
+				printf("false: multi_rankAsc %d keys are the same", nc);
+				printf("false: multi_rankAsc expected %d, but got %d\n", i, rkasc);
+				return false;
+			}
+		}
+	}
+	return true;
 }
 
 template<typename Key, typename Data, typename Compare>

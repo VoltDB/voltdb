@@ -165,10 +165,10 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
     for (int i = 0; i < ITERATIONS; i++) {
         if ((i % 1000) == 0) {
             ASSERT_TRUE(volt.verify());
+            ASSERT_TRUE(volt.verifyRank());
         }
         int op = rand() % 2;
         int val = rand() % BIGGEST_VAL;
-        //op = 0;
 
         if (op == INSERT) {
             stli = stl.find(val);
@@ -201,6 +201,19 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
 
                 bool sucess = volt.insert(std::pair<int,int>(val, val));
                 ASSERT_TRUE(!sucess);
+
+                int ct = 1;
+                std::map<int,int>::const_iterator it;
+                for (it = stl.begin(); it != stli; it++) {
+                	ct++;
+                }
+                int rankasc= volt.rankAsc(val);
+                ASSERT_TRUE(rankasc == ct);
+                int rankdec = volt.rankDes(val);
+                ASSERT_TRUE(rankdec == stl.size() - rankasc);
+                volti = volt.findRank(rankasc);
+                ASSERT_TRUE(volti.key() == val);
+
             }
         }
         if (op == DELETE) {
@@ -210,6 +223,7 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 ASSERT_TRUE(volti.isEnd());
                 bool success = volt.erase(val);
                 ASSERT_TRUE(!success);
+
             }
             else {
                 ASSERT_TRUE(!volti.isEnd());
@@ -222,6 +236,211 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
     }
 
     ASSERT_TRUE(volt.verify());
+    ASSERT_TRUE(volt.verifyRank());
+}
+
+TEST_F(CompactingMapTest, RandomMulti) {
+    const int ITERATIONS  = 1001;
+    const int BIGGEST_VAL = 100;
+
+    const int INSERT = 0;   int countInserts = 0;
+    const int ERASE = 1;    int countErases = 0;
+    const int ERASE_IT = 2; int countEraseIts = 0;
+    const int FIND = 3;     int countFinds = 0; int countFinds_notFound = 0; int countFinds_found = 0; int find_greatestChain = 0;
+    const int SIZE = 4;     int countSizes = 0; int size_greatest = 0;
+    const int LBOUND = 5;   int lowerBounds = 0; int lb_greatestChain = 0;
+    const int UBOUND = 6;   int upperBounds = 0; int ub_greatestChain = 0;
+    const int EQ_RANGE = 7;
+    const int TOTAL_OPS = 8;
+
+    std::multimap<std::string, std::string> stl;
+    voltdb::CompactingMap<std::string, std::string, StringComparator> volt(false, StringComparator());
+
+    std::multimap<std::string, std::string>::iterator stli;
+    voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator volti;
+
+    srand(0);
+
+    // just check that an error can be found
+    // assert(false);
+
+    for (int i = 0; i < ITERATIONS; i++) {
+        if ((i % 1000) == 0) {
+            ASSERT_TRUE(volt.verify());
+            ASSERT_TRUE(volt.verifyRank());
+        }
+
+        int op = rand() % TOTAL_OPS;
+        std::string val = keyFromInt(rand() % BIGGEST_VAL); // the key, really
+
+        //
+        // Insert a new <k,v>.
+        //
+        if (op == INSERT) {
+            for (int i = 0; i < 100; i++) {
+                val = keyFromInt(rand() % BIGGEST_VAL);
+
+                countInserts++;
+
+                stli = stl.find(val);
+                volti = volt.find(val);
+                if (stli == stl.end()) {
+                    ASSERT_TRUE(volti.isEnd());
+                }
+                else {
+                    ASSERT_TRUE(!volti.isEnd());
+                    ASSERT_TRUE(stli->first == volti.key());
+
+                    int stlCount = 0;
+                    for (; (stli != stl.end()) && (stli->first == val); stli++)
+                        stlCount++;
+
+                    int voltCount = 0;
+                    for (; (!volti.isEnd()) && (volti.key() == val); volti.moveNext())
+                        voltCount++;
+
+                    ASSERT_TRUE(stlCount == voltCount);
+                    ASSERT_TRUE(stlCount == stl.count(val));
+                }
+
+                std::string val_value = keyFromInt(rand() % BIGGEST_VAL);
+                stli = stl.insert(std::pair<std::string, std::string>(val, val_value));
+                ASSERT_TRUE(stli != stl.end());
+                bool success = volt.insert(std::pair<std::string, std::string>(val, val_value));
+                assert(success);
+            }
+        }
+        //
+        // Erase a key, by equality or by iterator location.
+        //
+        else if (op == ERASE || op == ERASE_IT) {
+            for (int i = 0; i < 100; i++) {
+                val = keyFromInt(rand() % BIGGEST_VAL);
+
+                if (op == ERASE) countErases++;
+                if (op == ERASE_IT) countEraseIts++;
+
+                stli = stl.find(val);
+                volti = volt.find(val);
+                if (stli == stl.end()) {
+                    ASSERT_TRUE(volti.isEnd());
+                    bool success = volt.erase(val);
+                    ASSERT_TRUE(!success);
+                }
+                else {
+                    ASSERT_TRUE(!volti.isEnd());
+                    ASSERT_TRUE(stli->first == volti.key());
+
+                    // don't know why this is true, but it seems to be invariant.
+                    // if it is suddenly not true, will have to iterate to erase
+                    // the correct value corresponding to the stl.found key.
+                    ASSERT_TRUE(stli->second == volti.value());
+
+                    stl.erase(stli);
+                    if (op == ERASE) {
+                        bool success = volt.erase(val);
+                        ASSERT_TRUE(success);
+                    }
+                    else {
+                        ASSERT_TRUE(op == ERASE_IT);
+                        bool success = volt.erase(volti);
+                        ASSERT_TRUE(success);
+                    }
+                }
+            }
+        }
+        //
+        // Find a key and verify that all corresponding values match
+        //
+        else if (op == FIND) {
+            countFinds++;
+            stli = stl.find(val);
+            volti = volt.find(val);
+            if (stli == stl.end()) {
+                countFinds_notFound++;
+                ASSERT_TRUE(volti.isEnd());
+            }
+            else {
+                countFinds_found++;
+                // show that the same values where found associated to val.
+                verifyIterators(stl, stli, volti, val, &find_greatestChain);
+            }
+        }
+        //
+        // Verify map size (cardinality of member)
+        //
+        else if (op == SIZE) {
+            countSizes++;
+            ASSERT_TRUE(stl.size() == volt.size());
+            if (stl.size() > size_greatest) {
+                size_greatest = (int)stl.size();
+            }
+        }
+        //
+        // Verify lower bounds
+        //
+        else if (op == LBOUND) {
+            lowerBounds++;
+            stli = stl.lower_bound(val);
+            volti = volt.lowerBound(val);
+
+            if (stli == stl.end()) {
+                ASSERT_TRUE(volti.isEnd());
+            }
+            else {
+                // compare all the keys equal to the lowerbound
+                verifyIterators(stl, stli, volti, stli->first, &lb_greatestChain);
+            }
+        }
+        else if (op == UBOUND) {
+            upperBounds++;
+            stli = stl.upper_bound(val);
+            volti = volt.upperBound(val);
+            if (stli == stl.end()) {
+                ASSERT_TRUE(volti.isEnd());
+            }
+            else {
+                verifyIterators(stl, stli, volti, stli->first, &ub_greatestChain);
+            }
+        }
+        //
+        // Verify equal ranges. Checks that the iterator pair returned points to
+        // equal keys, but does not use the returned iterators to do iteration
+        //
+        else if (op == EQ_RANGE) {
+            std::pair<std::multimap<std::string, std::string>::iterator, std::multimap<std::string, std::string>::iterator> stli_pair;
+            std::pair<voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator, voltdb::CompactingMap<std::string, std::string, StringComparator>::iterator> volti_pair;
+            stli_pair = stl.equal_range(val);
+            volti_pair = volt.equalRange(val);
+
+            if (stli_pair.first == stl.end()) {
+                ASSERT_TRUE(volti_pair.first.isEnd());
+            }
+            else {
+                ASSERT_TRUE(!volti_pair.first.isEnd());
+                if(stli_pair.first->first != volti_pair.first.key()) {
+                    //std::cout << "FIRST stl: " << stli_pair.first->first << " volt: " << volti_pair.first.key() << std::endl;
+                    ASSERT_TRUE(false);
+                }
+            }
+            if (stli_pair.second == stl.end()) {
+                ASSERT_TRUE(volti_pair.second.isEnd());
+            }
+            else {
+                ASSERT_TRUE(!volti_pair.second.isEnd());
+                if(stli_pair.second->first != volti_pair.second.key()) {
+                    //std::cout << "SECOND stl: " << stli_pair.second->first << " volt: " << volti_pair.second.key() << std::endl;
+                    ASSERT_TRUE(false);
+                }
+            }
+        }
+        else {
+            ASSERT_TRUE(!"Invalid test operation selected.");
+        }
+    }
+
+    ASSERT_TRUE(volt.verify());
+    ASSERT_TRUE(volt.verifyRank());
 }
 
 
