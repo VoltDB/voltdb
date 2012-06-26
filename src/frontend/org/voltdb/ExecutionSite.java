@@ -1807,7 +1807,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
             VoltTable table = null;
 
-            table = executeCustomPlanFragment(fragmentPlan, inputDepId, txnState.txnId);
+            table = executeCustomPlanFragment(fragmentPlan, inputDepId, txnState.txnId, txnState.isReadOnly());
 
             DependencyPair dep = new DependencyPair(outputDepId, table);
 
@@ -2349,11 +2349,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId)
+                                               long txnId, boolean readOnly)
     {
         return ee.executeCustomPlanFragment(plan, inputDepId, txnId,
                                             lastCommittedTxnId,
-                                            getNextUndoToken());
+                                            readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
     @Override
