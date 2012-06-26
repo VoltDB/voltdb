@@ -151,7 +151,6 @@ public class Cartographer extends StatsSource
     public long getHSIdForMultiPartitionInitiator()
     {
         try {
-            hostLog.info("PART -1: " + m_iv2Mpi.get(Integer.toString(-1)).toString(2));
             return m_iv2Mpi.get(Integer.toString(-1)).getLong("hsid");
         }
         catch (JSONException je) {
