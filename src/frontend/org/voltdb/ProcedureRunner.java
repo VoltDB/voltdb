@@ -1250,7 +1250,7 @@ public class ProcedureRunner {
                    subResults = executor.onExecutePrePlanned(batch.subList(iFrom, iTo),
                                                              iTo == batch.size() - 1);
                    results.addAll(Arrays.asList(subResults));
-                   iFrom = iTo + 1;
+                   iFrom = iTo;
                }
                subResults = executor.onExecuteUnplanned(batch.subList(iTo, iTo + 1),
                                                         iTo == batch.size() - 1);

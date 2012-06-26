@@ -31,6 +31,7 @@
 package org.voltdb_testprocs.adhoc;
 
 import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
@@ -39,10 +40,14 @@ import org.voltdb.VoltTable;
     singlePartition = true
 )
 public class executeSQLSP extends VoltProcedure {
+    public static final SQLStmt testStmt = new SQLStmt("select * from PARTED1");
 
     public VoltTable[] run(long partval, String sql) {
         voltQueueSQLExperimental(sql);
+        voltQueueSQL(testStmt);
         voltQueueSQLExperimental("select * from PARTED1 where partval = ?;", partval);
+        voltQueueSQL(testStmt);
+
         return voltExecuteSQL(true);
     }
 }
