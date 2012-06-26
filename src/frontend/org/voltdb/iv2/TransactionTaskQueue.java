@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
+import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 
@@ -93,6 +94,22 @@ public class TransactionTaskQueue
                         m_backlog.removeFirst();
                     }
                     else {
+                        // Walk the queue and find any other task with the same
+                        // txn ID as the MP transaction we just offered and also
+                        // offer them.
+                        Iterator<TransactionTask> iter = m_backlog.iterator();
+                        // need to skip the head because that's the fragment we're looking
+                        // to match; don't want to add it twice and pull it out of the backlog
+                        iter.next();
+                        while (iter.hasNext()) {
+                            TransactionTask task = iter.next();
+                            if (task.getMpTxnId() == next.getMpTxnId())
+                            {
+                                iter.remove();
+                                m_taskQueue.offer(task);
+                                ++offered;
+                            }
+                        }
                         break;
                     }
                 }
