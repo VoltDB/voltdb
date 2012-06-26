@@ -31,17 +31,17 @@
 package org.voltdb_testprocs.adhoc;
 
 import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 @ProcInfo (
-    singlePartition = false,
-    readOnly = false
+    singlePartition = false
 )
 public class executeSQLMPWRITE extends VoltProcedure {
-
+    public static final SQLStmt marker = new SQLStmt("INSERT into PARTED1 values (?, ?)");
     public VoltTable[] run(long partval, String sql) {
-        voltQueueSQL(sql);
+        voltQueueSQLExperimental(sql);
         //voltQueueSQL("select * from PARTED1 where partval = ?", partval);
         return voltExecuteSQL(true);
     }
