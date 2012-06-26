@@ -112,6 +112,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_client.callProcedure("executeSQLSPWRITE", 24, "insert into parted1 values (24, 4);");
             m_client.callProcedure("executeSQLMPWRITE", 25, "insert into parted1 values (25, 5);");
 
+            /*
+             * Query the inserts and all the rest do it once for singe and once for multi
+             */
             results = m_client.callProcedure("executeSQLMP", 24, "select * from parted1 order by partval").getResults();
 
             assertEquals( 3, results[0].getRowCount());
@@ -120,11 +123,50 @@ public class TestAdHocQueries extends AdHocQueryTester {
                 assertEquals(20 + ii, results[0].getLong(0));
                 assertEquals(ii, results[0].getLong(1));
             }
+
+            //Output from the first preplanned statement
+            assertEquals( 3, results[1].getRowCount());
+            assertTrue(results[1].advanceRow());
+            assertEquals( 24, results[1].getLong(0));
+            assertEquals( 4, results[1].getLong(1));
+
+            //Output from the second adhoc statement
+            assertEquals( 1, results[2].getRowCount());
+            assertTrue(results[2].advanceRow());
+            assertEquals( 24, results[2].getLong(0));
+            assertEquals( 4, results[2].getLong(1));
+
+            //Output from the second preplanned statement
+            assertEquals( 3, results[3].getRowCount());
+            assertTrue(results[3].advanceRow());
+            assertEquals( 24, results[3].getLong(0));
+            assertEquals( 4, results[3].getLong(1));
+
+
+            results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
+
+            assertEquals( 1, results[0].getRowCount());
+            assertTrue(results[0].advanceRow());
+            assertEquals(24, results[0].getLong(0));
+            assertEquals( 4, results[0].getLong(1));
+
+            //Output from the first preplanned statement
             assertEquals( 1, results[1].getRowCount());
             assertTrue(results[1].advanceRow());
             assertEquals( 24, results[1].getLong(0));
             assertEquals( 4, results[1].getLong(1));
 
+            //Output from the second adhoc statement
+            assertEquals( 1, results[2].getRowCount());
+            assertTrue(results[2].advanceRow());
+            assertEquals( 24, results[2].getLong(0));
+            assertEquals( 4, results[2].getLong(1));
+
+            //Output from the second preplanned statement
+            assertEquals( 1, results[3].getRowCount());
+            assertTrue(results[3].advanceRow());
+            assertEquals( 24, results[3].getLong(0));
+            assertEquals( 4, results[3].getLong(1));
         } finally {
             if (m_client != null) m_client.close();
             m_client = null;
