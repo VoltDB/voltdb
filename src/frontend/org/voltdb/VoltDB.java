@@ -430,7 +430,8 @@ public class VoltDB {
                         + "       voltdb recover [leader <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
                         + "       voltdb replica [leader <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n";
             } else {
-                message = "Usage: voltdb [create|recover] [leader <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>";
+                message = "Usage: voltdb create [leader <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>\n"
+                        + "       voltdb recover [leader <hostname>] [deployment <deployment.xml>]\n";
             }
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
