@@ -1087,7 +1087,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * site cannot keep up in a certain period of time, break rejoin.
      */
     private void checkTaskExecutionProgress() {
-        final long remainingTasks = m_executedTaskCount - m_loggedTaskCount;
+        final long remainingTasks = m_loggedTaskCount - m_executedTaskCount;
         final long currTime = System.currentTimeMillis();
         if (m_lastTimeMadeProgress == 0 || remainingTasks < m_remainingTasks) {
             m_lastTimeMadeProgress = currTime;
