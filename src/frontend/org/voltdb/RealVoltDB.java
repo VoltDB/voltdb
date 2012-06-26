@@ -508,7 +508,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             collectLocalNetworkMetadata();
-
             /*
              * Configure and start all the IV2 sites
              */
@@ -518,15 +517,16 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor());
                 }
             }
-
-            /*
-             * Create execution sites runners (and threads) for all exec sites except the first one.
-             * This allows the sites to be set up in the thread that will end up running them.
-             * Cache the first Site from the catalog and only do the setup once the other threads have been started.
-             */
-            Mailbox localThreadMailbox = siteMailboxes.poll();
-            ((org.voltcore.messaging.SiteMailbox)localThreadMailbox).setCommandLog(m_commandLog);
-            if (!isIV2Enabled()) {
+            else {
+                /*
+                 * Create execution sites runners (and threads) for all exec
+                 * sites except the first one.  This allows the sites to be set
+                 * up in the thread that will end up running them.  Cache the
+                 * first Site from the catalog and only do the setup once the
+                 * other threads have been started.
+                 */
+                Mailbox localThreadMailbox = siteMailboxes.poll();
+                ((org.voltcore.messaging.SiteMailbox)localThreadMailbox).setCommandLog(m_commandLog);
                 m_currentThreadSite = null;
                 for (Mailbox mailbox : siteMailboxes) {
                     long site = mailbox.getHSId();
@@ -1964,52 +1964,54 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         SiteTracker oldTracker = m_siteTracker;
         m_siteTracker = new SiteTracker(m_myHostId, mailboxes, oldTracker != null ? oldTracker.m_version + 1 : 0);
 
-        if (m_validateConfiguredNumberOfPartitionsOnMailboxUpdate) {
-            if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
-                VoltDB.crashGlobalVoltDB(
-                        "Configured number of partitions " + m_configuredNumberOfPartitions +
-                        " is not the same as the number of partitions present " + m_siteTracker.m_numberOfPartitions,
-                        true, null);
-            }
-            if (m_siteTracker.m_numberOfPartitions != oldTracker.m_numberOfPartitions) {
-                VoltDB.crashGlobalVoltDB(
-                        "Configured number of partitions in new tracker" + m_siteTracker.m_numberOfPartitions +
-                        " is not the same as the number of partitions present " + oldTracker.m_numberOfPartitions,
-                        true, null);
-            }
-        }
-
-        if (oldTracker != null) {
-            /*
-             * Handle node failures first, then node additions. It is NOT
-             * guaranteed that if a node failure and a node addition happen
-             * concurrently, they'll appear separately in two watch fires,
-             * because the new tracker contains the most up-to-date view of the
-             * mailboxes, which may contain both changes. Consequently, we have
-             * to handle both cases here.
-             */
-            HashSet<Long> deltaRemoved = new HashSet<Long>(oldTracker.m_allSitesImmutable);
-            deltaRemoved.removeAll(m_siteTracker.m_allSitesImmutable);
-            if (!deltaRemoved.isEmpty()) {
-                m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(deltaRemoved)));
-            }
-
-            HashSet<Long> deltaAdded = new HashSet<Long>(m_siteTracker.m_allSitesImmutable);
-            deltaAdded.removeAll(oldTracker.m_allSitesImmutable);
-            if (!deltaAdded.isEmpty()) {
-                for (SimpleDtxnInitiator dtxn : m_dtxns)
-                {
-                    Set<Long> copy = new HashSet<Long>(m_siteTracker.m_allExecutionSitesImmutable);
-                    copy.retainAll(deltaAdded);
-                    dtxn.notifyExecutionSiteRejoin(new ArrayList<Long>(copy));
+        if (!isIV2Enabled()) {
+            if (m_validateConfiguredNumberOfPartitionsOnMailboxUpdate) {
+                if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
+                    VoltDB.crashGlobalVoltDB(
+                            "Configured number of partitions " + m_configuredNumberOfPartitions +
+                            " is not the same as the number of partitions present " + m_siteTracker.m_numberOfPartitions,
+                            true, null);
                 }
-                for (ExecutionSite es : getLocalSites().values()) {
-                    es.notifySitesAdded(m_siteTracker);
+                if (m_siteTracker.m_numberOfPartitions != oldTracker.m_numberOfPartitions) {
+                    VoltDB.crashGlobalVoltDB(
+                            "Configured number of partitions in new tracker" + m_siteTracker.m_numberOfPartitions +
+                            " is not the same as the number of partitions present " + oldTracker.m_numberOfPartitions,
+                            true, null);
+                }
+            }
+
+            if (oldTracker != null) {
+                /*
+                 * Handle node failures first, then node additions. It is NOT
+                 * guaranteed that if a node failure and a node addition happen
+                 * concurrently, they'll appear separately in two watch fires,
+                 * because the new tracker contains the most up-to-date view of the
+                 * mailboxes, which may contain both changes. Consequently, we have
+                 * to handle both cases here.
+                 */
+                HashSet<Long> deltaRemoved = new HashSet<Long>(oldTracker.m_allSitesImmutable);
+                deltaRemoved.removeAll(m_siteTracker.m_allSitesImmutable);
+                if (!deltaRemoved.isEmpty()) {
+                    m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(deltaRemoved)));
                 }
 
-                if (ExportManager.instance() != null) {
-                    //Notify the export manager the cluster topology has changed
-                    ExportManager.instance().notifyOfClusterTopologyChange();
+                HashSet<Long> deltaAdded = new HashSet<Long>(m_siteTracker.m_allSitesImmutable);
+                deltaAdded.removeAll(oldTracker.m_allSitesImmutable);
+                if (!deltaAdded.isEmpty()) {
+                    for (SimpleDtxnInitiator dtxn : m_dtxns)
+                    {
+                        Set<Long> copy = new HashSet<Long>(m_siteTracker.m_allExecutionSitesImmutable);
+                        copy.retainAll(deltaAdded);
+                        dtxn.notifyExecutionSiteRejoin(new ArrayList<Long>(copy));
+                    }
+                    for (ExecutionSite es : getLocalSites().values()) {
+                        es.notifySitesAdded(m_siteTracker);
+                    }
+
+                    if (ExportManager.instance() != null) {
+                        //Notify the export manager the cluster topology has changed
+                        ExportManager.instance().notifyOfClusterTopologyChange();
+                    }
                 }
             }
         }
