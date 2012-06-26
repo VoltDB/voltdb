@@ -49,16 +49,16 @@ function client() {
     # load the csv files
     $CSVLOADER -f $DATAFILES/items.txt \
 			-p InsertIntoItemAndBid \
-         		-u program \
-         		-P pass 
+         		--user program \
+         		--password pass 
     $CSVLOADER -f $DATAFILES/categories.txt \
                         -p InsertIntoCategory \
-                        -u program \
-                        -P pass
+                        --user program \
+                        --password pass
     $CSVLOADER -f $DATAFILES/users.txt \
                         -p InsertIntoUser \
-                        -u program \
-                        -P pass 
+                        --user program \
+                        --passward pass 
     srccompile
     java -classpath obj:$CLASSPATH com.auctionexample.Client
 }
