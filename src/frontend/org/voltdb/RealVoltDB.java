@@ -524,63 +524,64 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              */
             Mailbox localThreadMailbox = siteMailboxes.poll();
             ((org.voltcore.messaging.SiteMailbox)localThreadMailbox).setCommandLog(m_commandLog);
-            m_currentThreadSite = null;
-            for (Mailbox mailbox : siteMailboxes) {
-                long site = mailbox.getHSId();
-                int sitesHostId = SiteTracker.getHostForSite(site);
+            if (!isIV2Enabled()) {
+                m_currentThreadSite = null;
+                for (Mailbox mailbox : siteMailboxes) {
+                    long site = mailbox.getHSId();
+                    int sitesHostId = SiteTracker.getHostForSite(site);
 
-                // start a local site
-                if (sitesHostId == m_myHostId) {
-                    ((org.voltcore.messaging.SiteMailbox)mailbox).setCommandLog(m_commandLog);
-                    ExecutionSiteRunner runner =
-                        new ExecutionSiteRunner(mailbox,
-                                m_catalogContext,
+                    // start a local site
+                    if (sitesHostId == m_myHostId) {
+                        ((org.voltcore.messaging.SiteMailbox)mailbox).setCommandLog(m_commandLog);
+                        ExecutionSiteRunner runner =
+                            new ExecutionSiteRunner(mailbox,
+                                    m_catalogContext,
+                                    m_serializedCatalog,
+                                    m_recovering,
+                                    m_replicationActive,
+                                    hostLog,
+                                    m_configuredNumberOfPartitions);
+                        m_runners.add(runner);
+                        Thread runnerThread = new Thread(runner, "Site " +
+                                org.voltcore.utils.CoreUtils.hsIdToString(site));
+                        runnerThread.start();
+                        log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
+                        m_siteThreads.put(site, runnerThread);
+                    }
+                }
+
+                /*
+                 * Now that the runners have been started and are doing setup of the other sites in parallel
+                 * this thread can set up its own execution site.
+                 */
+                try {
+                    ExecutionSite siteObj =
+                        new ExecutionSite(VoltDB.instance(),
+                                localThreadMailbox,
                                 m_serializedCatalog,
+                                null,
                                 m_recovering,
                                 m_replicationActive,
-                                hostLog,
+                                m_catalogContext.m_transactionId,
                                 m_configuredNumberOfPartitions);
-                    m_runners.add(runner);
-                    Thread runnerThread = new Thread(runner, "Site " +
-                            org.voltcore.utils.CoreUtils.hsIdToString(site));
-                    runnerThread.start();
-                    log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
-                    m_siteThreads.put(site, runnerThread);
+                    m_localSites.put(localThreadMailbox.getHSId(), siteObj);
+                    m_currentThreadSite = siteObj;
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
-            }
-
-            /*
-             * Now that the runners have been started and are doing setup of the other sites in parallel
-             * this thread can set up its own execution site.
-             */
-            try {
-                ExecutionSite siteObj =
-                    new ExecutionSite(VoltDB.instance(),
-                            localThreadMailbox,
-                            m_serializedCatalog,
-                            null,
-                            m_recovering,
-                            m_replicationActive,
-                            m_catalogContext.m_transactionId,
-                            m_configuredNumberOfPartitions);
-                m_localSites.put(localThreadMailbox.getHSId(), siteObj);
-                m_currentThreadSite = siteObj;
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
-
-            /*
-             * Stop and wait for the runners to finish setting up and then put
-             * the constructed ExecutionSites in the local site map.
-             */
-            for (ExecutionSiteRunner runner : m_runners) {
-                try {
-                    runner.m_siteIsLoaded.await();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Unable to wait on starting execution site.", true, e);
+                /*
+                 * Stop and wait for the runners to finish setting up and then put
+                 * the constructed ExecutionSites in the local site map.
+                 */
+                for (ExecutionSiteRunner runner : m_runners) {
+                    try {
+                        runner.m_siteIsLoaded.await();
+                    } catch (InterruptedException e) {
+                        VoltDB.crashLocalVoltDB("Unable to wait on starting execution site.", true, e);
+                    }
+                    assert(runner.m_siteObj != null);
+                    m_localSites.put(runner.m_siteId, runner.m_siteObj);
                 }
-                assert(runner.m_siteObj != null);
-                m_localSites.put(runner.m_siteId, runner.m_siteObj);
             }
 
             /*
