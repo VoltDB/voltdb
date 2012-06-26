@@ -130,7 +130,8 @@ public interface SiteProcedureConnection {
     public long[] getUSOForExportTable(String signature);
 
     public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId, ParameterSet params);
+                                               long txnId, ParameterSet params,
+                                               boolean readOnly);
 
     public void toggleProfiler(int toggle);
 

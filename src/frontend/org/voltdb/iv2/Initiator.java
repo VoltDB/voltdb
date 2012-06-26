@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
+import org.voltdb.compiler.AsyncCompilerAgent;
 
 /**
  * Abstracts the top-level interface to create and configure an Iv2
@@ -29,7 +30,7 @@ public interface Initiator
     /** Configure an Initiator and prepare it for work */
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor);
+                          Cartographer cartographer, int kfactor, AsyncCompilerAgent aca);
 
     /** Shutdown an Initiator and its sub-components. */
     public void shutdown();

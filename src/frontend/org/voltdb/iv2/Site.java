@@ -547,11 +547,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     @Override
     public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId)
+                                               long txnId, ParameterSet params, boolean readOnly)
     {
         return m_ee.executeCustomPlanFragment(plan, inputDepId, txnId,
                                               m_lastCommittedTxnId,
-                                              getNextUndoToken());
+                                              readOnly ? Long.MAX_VALUE : getNextUndoToken(),
+                                              params);
     }
 
     @Override

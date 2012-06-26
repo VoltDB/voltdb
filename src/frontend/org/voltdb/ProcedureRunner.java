@@ -1211,7 +1211,8 @@ public class ProcedureRunner {
                        assert(aggregatorFragment != null);
                        results[i] = m_site.executeCustomPlanFragment(aggregatorFragment,
                                                                      AGG_DEPID, m_txnState.txnId,
-                                                                     queuedSQL.params);
+                                                                     queuedSQL.params,
+                                                                     m_catProc.getReadonly());
                    }
                    return results;
                }

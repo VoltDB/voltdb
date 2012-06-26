@@ -546,7 +546,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (isIV2Enabled()) {
                 for (Initiator iv2init : m_iv2Initiators) {
                     iv2init.configure(getBackendTargetType(), m_serializedCatalog,
-                            m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor());
+                            m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor(),
+                            m_asyncCompilerAgent);
                 }
             }
             else {

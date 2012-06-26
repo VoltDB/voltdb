@@ -29,8 +29,10 @@ import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -47,7 +49,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
 
     // External references/config
     private HostMessenger m_messenger = null;
-    private int m_partitionId;
+    private final int m_partitionId;
 
     // Encapsulated objects
     private InitiatorMailbox m_initiatorMailbox = null;
@@ -58,7 +60,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     private LeaderElector m_leaderElector = null;
     // Only gets set non-null for the leader
     private Thread m_siteThread = null;
-    private RepairLog m_repairLog = new RepairLog();
+    private final RepairLog m_repairLog = new RepairLog();
     private CountDownLatch m_missingStartupSites;
 
     public SpInitiator(HostMessenger messenger, Integer partition)
@@ -136,7 +138,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor)
+                          Cartographer cartographer, int kfactor, AsyncCompilerAgent aca)
     {
         try {
             m_missingStartupSites = new CountDownLatch(kfactor + 1);
@@ -157,8 +159,10 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                                        m_partitionId,
                                        cartographer.getNumberOfPartitions());
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
+            CatalogSpecificPlanner csp = new CatalogSpecificPlanner(aca, catalogContext);
             prf.configure(m_executionSite,
-                    m_executionSite.m_sysprocContext);
+                    m_executionSite.m_sysprocContext,
+                    csp);
             m_procSet = new LoadedProcedureSet(m_executionSite,
                                                prf,
                                                m_initiatorMailbox.getHSId(),

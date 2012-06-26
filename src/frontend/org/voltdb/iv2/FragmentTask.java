@@ -107,7 +107,9 @@ public class FragmentTask extends TransactionTask
                     dependency = siteConnection.executeCustomPlanFragment(
                             m_task.getFragmentPlan(frag),
                             inputDepId,
-                            m_txn.txnId);
+                            m_txn.txnId,
+                            params,
+                            m_txn.isReadOnly());
                 }
                 else {
                     dependency =
