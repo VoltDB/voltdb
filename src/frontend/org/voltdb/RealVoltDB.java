@@ -392,16 +392,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
             try {
-                /*
-                 * Start mailbox tracker early here because it is required
-                 * on rejoin to find the hosts that are missing from the cluster
-                 */
-                m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
-                m_mailboxTracker.start();
                 JSONObject topo = getTopology(isRejoin);
 
                 // IV2 mailbox stuff
-                {
+                if (isIV2Enabled()) {
                     ClusterConfig iv2config = new ClusterConfig(topo);
                     m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
                     if (isRejoin) {
@@ -420,6 +414,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
                 }
 
+                /*
+                 * Start mailbox tracker early here because it is required
+                 * on rejoin to find the hosts that are missing from the cluster
+                 */
+                m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
+                m_mailboxTracker.start();
                 /*
                  * Will count this down at the right point on regular startup as well as rejoin
                  */
@@ -512,9 +512,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             /*
              * Configure and start all the IV2 sites
              */
-            for (Initiator iv2init : m_iv2Initiators) {
-                iv2init.configure(getBackendTargetType(), m_serializedCatalog,
-                                  m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor());
+            if (isIV2Enabled()) {
+                for (Initiator iv2init : m_iv2Initiators) {
+                    iv2init.configure(getBackendTargetType(), m_serializedCatalog,
+                            m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor());
+                }
             }
 
             /*
