@@ -512,7 +512,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_ee.undoUndoToken(token);
         }
         else {
-            m_ee.releaseUndoToken(token);
+            m_ee.releaseUndoToken(latestUndoToken);
             m_lastCommittedTxnId = txnId;
         }
     }
