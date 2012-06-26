@@ -148,7 +148,7 @@ public:
 };
 
 TEST_F(CompactingMapTest, RandomUniqueRank) {
-    const int ITERATIONS = 11;
+    const int ITERATIONS = 1001;
     const int BIGGEST_VAL = 100;
 
     const int INSERT = 0;
@@ -168,7 +168,7 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
         }
         int op = rand() % 2;
         int val = rand() % BIGGEST_VAL;
-        op = 0;
+        //op = 0;
 
         if (op == INSERT) {
             stli = stl.find(val);
@@ -188,6 +188,11 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 }
                 int rankasc= volt.rankAsc(val);
                 ASSERT_TRUE(rankasc == ct);
+                int rankdec = volt.rankDes(val);
+                ASSERT_TRUE(rankdec == stl.size() - rankasc);
+                volti = volt.findRank(rankasc);
+                ASSERT_TRUE(volti.key() == val);
+
             }
             else {
                 ASSERT_TRUE(!volti.isEnd());
