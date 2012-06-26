@@ -655,7 +655,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_memoryStats = new MemoryStats();
             m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
                     0, m_memoryStats);
-            m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+            if (isIV2Enabled()) {
+                m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+            }
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
