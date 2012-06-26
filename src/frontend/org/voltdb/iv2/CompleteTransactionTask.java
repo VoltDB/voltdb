@@ -58,6 +58,8 @@ public class CompleteTransactionTask extends TransactionTask
         sb.append("CompleteTransactionTask:");
         sb.append("  MP TXN ID: ").append(getMpTxnId());
         sb.append("  LOCAL TXN ID: ").append(getLocalTxnId());
+        sb.append("  UNDO TOKEN: ").append(m_txn.getBeginUndoToken());
+        sb.append("  MSG: ").append(m_msg.toString());
         return sb.toString();
     }
 }
