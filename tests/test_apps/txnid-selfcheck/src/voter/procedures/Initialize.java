@@ -26,31 +26,32 @@ package voter.procedures;
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 
 @ProcInfo (
-    partitionInfo = "transactions.pid:0",
-    singlePartition = true
+    singlePartition = false
 )
-public class doTxn extends VoltProcedure {
+public class Initialize extends VoltProcedure
+{
+    // Check if the database has already been initialized
+    public final SQLStmt checkStmt = new SQLStmt("SELECT COUNT(*) FROM replicated;");
 
-    public final SQLStmt getLastTxnId = new SQLStmt(
-            "SELECT txnid, rid FROM transactions WHERE txnid < ? ORDER BY txnid DESC LIMIT 1;");
+    // Insert into the replicated table
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?);");
 
-    public final SQLStmt getReplicated = new SQLStmt(
-            "SELECT * FROM replicated ORDER BY id LIMIT 10;");
+    public long run() {
+        voltQueueSQL(checkStmt, EXPECT_SCALAR_LONG);
+        long currentCount = voltExecuteSQL()[0].asScalarLong();
 
-    public final SQLStmt insertTxnid = new SQLStmt(
-            "INSERT INTO transactions VALUES (?, ?, ?, ?);");
+        // if the data is initialized, return the current count
+        if (currentCount != 0)
+            return currentCount;
 
-    public final SQLStmt deleteOldTxns = new SQLStmt(
-            "DELETE FROM transactions WHERE rid < ? AND rid >= 0;");
+        // initialize the data using the txnId as a base
+        long base = this.getTransactionId();
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), base);
+        voltExecuteSQL(true);
 
-    public VoltTable[] run(byte partition, long rid, long oldestRid, byte[] value) {
-        voltQueueSQL(getLastTxnId, getTransactionId());
-        voltQueueSQL(getReplicated);
-        voltQueueSQL(insertTxnid, getTransactionId(), partition, rid, value);
-        voltQueueSQL(deleteOldTxns, oldestRid);
-        return voltExecuteSQL(true);
+        // return the number of rows added
+        return 1;
     }
 }
