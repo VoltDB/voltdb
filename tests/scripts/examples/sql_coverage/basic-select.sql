@@ -50,4 +50,5 @@ SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@
 -- test GROUP BY ORDER BY COUNT(*) with OFFSET
 SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@order] ORDER BY FOO DESC, _variable[@order] LIMIT _value[int:1,3] OFFSET _value[int:1,3]
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
-SELECT * FROM _table INNER JOIN _table ON _variable = _variable
+SELECT * FROM _table[@lhs] INNER JOIN _table[@rhs] ON __[@lhs]._variable = __[@rhs]._variable
+SELECT * FROM _table[@lhs] INNER JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col

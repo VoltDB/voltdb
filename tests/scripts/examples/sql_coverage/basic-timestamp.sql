@@ -4,6 +4,7 @@
 {@from_tables = "_table"}
 {@col_type = "date"}
 {@cmp_type = "_value[date]"}
+{@id_col = "ID"}
 {@assign_col = "PAST"}
 {@assign_type = "_value[date]"}
 

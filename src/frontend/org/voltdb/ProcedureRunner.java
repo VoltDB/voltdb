@@ -1175,7 +1175,8 @@ public class ProcedureRunner {
                        String aggregatorFragment = batch.get(i).stmt.getPlan().getAggregatorFragment();
                        assert(aggregatorFragment != null);
                        results[i] = m_site.executeCustomPlanFragment(aggregatorFragment,
-                                                                     AGG_DEPID, m_txnState.txnId);
+                                                                     AGG_DEPID, m_txnState.txnId,
+                                                                     m_catProc.getReadonly());
                    }
                    return results;
                }

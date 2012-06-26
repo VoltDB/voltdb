@@ -111,52 +111,52 @@ public class CSVLoader {
     }
 
     private static class CSVConfig extends CLIConfig {
-        @Option(shortOpt = "f", desc = "directory path to produce report files.")
+        @Option(shortOpt = "f", desc = "location of CSV input file")
         String file = "";
 
-        @Option(shortOpt = "p", desc = "procedure name to insert the data into the database.")
+        @Option(shortOpt = "p", desc = "procedure name to insert the data into the database")
         String procedure = "";
 
-        @Option(desc = "maximum rows to be read of the csv file.")
+        @Option(desc = "maximum rows to be read from the CSV file")
         int limitrows = Integer.MAX_VALUE;
 
-        @Option(shortOpt = "r", desc = "directory path to produce report files.")
+        @Option(shortOpt = "r", desc = "directory path for report files")
         String reportdir = System.getProperty("user.dir");
 
-        @Option(shortOpt = "m", desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
+        @Option(shortOpt = "m", desc = "maximum errors allowed")
         int maxerrors = 100;
 
-        @Option(desc = "the delimiter to use for separating entries.")
+        @Option(desc = "delimiter to use for separating entries")
         char separator = CSVParser.DEFAULT_SEPARATOR;
 
-        @Option(desc = "the character to use for quoted elements.")
+        @Option(desc = "character to use for quoted elements (default: \")")
         char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;
 
-        @Option(desc = "the character to use for escaping a separator or quote.")
+        @Option(desc = "character to use for escaping a separator or quote (default: \\)")
         char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
 
-        @Option(desc = "sets if characters outside the quotes are ignored.", hasArg = false)
+        @Option(desc = "require all input values to be enclosed in quotation marks", hasArg = false)
         boolean strictquotes = CSVParser.DEFAULT_STRICT_QUOTES;
 
-        @Option(desc = "the line number to skip for start reading.")
+        @Option(desc = "number of lines to skip before inserting rows into the database")
         int skip = CSVReader.DEFAULT_SKIP_LINES;
 
-        @Option(desc = "the default leading whitespace behavior to use if none is supplied.", hasArg = false)
+        @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
         boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
 
-        @Option(shortOpt = "s", desc = "the servers to be connected")
+        @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
 
-        @Option(shortOpt = "u", desc = "user name that is used to connect to the servers,by defalut null")
+        @Option(desc = "username when connecting to the servers")
         String user = "";
 
-        @Option(shortOpt = "P", desc = "password for this user to use to connect the servers,by defalut null")
+        @Option(desc = "password to use when connecting to servers")
         String password = "";
 
-        @Option(desc = "port to be used for the servers right now")
+        @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
-        @AdditionalArgs(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
+        @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         String table = "";
 
         @Override
@@ -179,7 +179,9 @@ public class CSVLoader {
         @Override
         public void printUsage() {
             System.out
-                    .println("Semantics: csvloader [args] tablename or csvloader [args] -p procedurename");
+                .println("Usage: csvloader [args] tablename");
+            System.out
+                .println("       csvloader [args] -p procedurename");
             super.printUsage();
         }
     }
@@ -246,11 +248,6 @@ public class CSVLoader {
                 }
             } catch (Exception e) {
                 m_log.error(e.getMessage(), e);
-                System.exit(-1);
-            }
-            if (isProcExist == false) {
-                m_log.error("No matching insert procedure available");
-                close_cleanup();
                 System.exit(-1);
             }
             if (isProcExist == false) {

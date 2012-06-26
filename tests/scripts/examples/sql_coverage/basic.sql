@@ -6,6 +6,7 @@
 {@from_tables = "_table"}
 {@col_type = "int"}
 {@cmp_type = "_value[int:0,100]"}
+{@id_col = "ID"}
 {@assign_col = "NUM"}
 {@assign_type = "_value[int:0,100]"}
 
