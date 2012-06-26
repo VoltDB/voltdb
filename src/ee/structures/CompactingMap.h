@@ -15,6 +15,10 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
+#ifndef NodeCount
+#define NodeCount int32_t
+#endif
+
 #ifndef COMPACTINGMAP_H_
 #define COMPACTINGMAP_H_
 
@@ -61,7 +65,7 @@ protected:
     static const char RED = 0;
     static const char BLACK = 1;
 
-    typedef int32_t NodeCount;
+    //typedef int32_t NodeCount;
     struct TreeNode {
         Key key;
         Data value;
