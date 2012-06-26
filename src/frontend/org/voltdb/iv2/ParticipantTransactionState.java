@@ -20,18 +20,15 @@ package org.voltdb.iv2;
 import java.util.HashSet;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
-import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.messaging.FragmentTaskMessage;
+
+import org.voltdb.StoredProcedureInvocation;
 
 public class ParticipantTransactionState extends TransactionState
 {
-    final FragmentTaskMessage m_task;
-
     ParticipantTransactionState(long txnId, TransactionInfoBaseMessage notice)
     {
         super(txnId, null, notice);
-        m_task = (FragmentTaskMessage)notice;
     }
 
     @Override
@@ -49,35 +46,29 @@ public class ParticipantTransactionState extends TransactionState
     @Override
     public boolean isBlocked()
     {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public boolean hasTransactionalWork()
     {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public boolean doWork(boolean recovering)
     {
-        // TODO Auto-generated method stub
         return false;
     }
 
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        // TODO Auto-generated method stub
         return null;
     }
 
     @Override
     public void handleSiteFaults(HashSet<Long> failedSites)
     {
-        // TODO Auto-generated method stub
-
     }
 }
