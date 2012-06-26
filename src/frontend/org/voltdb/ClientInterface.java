@@ -1670,7 +1670,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private long m_tickCounter = 0;
 
     public final void processPeriodicWork() {
-        final long time = m_initiator.tick();
+        long time;
+        if (VoltDB.instance().isIV2Enabled()) {
+            time = System.currentTimeMillis();
+        }
+        else {
+            time = m_initiator.tick();
+        }
         m_tickCounter++;
         if (m_tickCounter % 20 == 0) {
             checkForDeadConnections(time);

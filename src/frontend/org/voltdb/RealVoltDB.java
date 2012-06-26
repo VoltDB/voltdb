@@ -1401,9 +1401,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      */
     @Override
     public void run() {
-        // start the separate EE threads
-        for (ExecutionSiteRunner r : m_runners) {
-            r.m_shouldStartRunning.countDown();
+
+        if (!isIV2Enabled()) {
+            // start the separate EE threads
+            for (ExecutionSiteRunner r : m_runners) {
+                r.m_shouldStartRunning.countDown();
+            }
         }
 
         if (m_restoreAgent != null) {
@@ -1419,7 +1422,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         m_isRunning = true;
         try
         {
-            m_currentThreadSite.run();
+            if (!isIV2Enabled()) {
+                m_currentThreadSite.run();
+            }
+            else {
+                while (m_isRunning) {
+                    Thread.sleep(3000);
+                }
+            }
         }
         catch (Throwable thrown)
         {
@@ -1475,10 +1485,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
 
-                // tell all m_sites to stop their runloops
-                if (m_localSites != null) {
-                    for (ExecutionSite site : m_localSites.values())
-                        site.startShutdown();
+                if (!isIV2Enabled()) {
+                    // tell all m_sites to stop their runloops
+                    if (m_localSites != null) {
+                        for (ExecutionSite site : m_localSites.values())
+                            site.startShutdown();
+                    }
                 }
 
                 // tell the iv2 sites to stop their runloop
@@ -1491,27 +1503,28 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     m_cartographer.shutdown();
                 }
 
-                // try to join all threads but the main one
-                // probably want to check if one of these is the current thread
-                if (m_siteThreads != null) {
-                    for (Thread siteThread : m_siteThreads.values()) {
-                        if (Thread.currentThread().equals(siteThread) == false) {
+                if (!isIV2Enabled()) {
+                    // try to join all threads but the main one
+                    // probably want to check if one of these is the current thread
+                    if (m_siteThreads != null) {
+                        for (Thread siteThread : m_siteThreads.values()) {
+                            if (Thread.currentThread().equals(siteThread) == false) {
+                                // don't interrupt here. the site will start shutdown when
+                                // it sees the shutdown flag set.
+                                siteThread.join();
+                            }
+                        }
+                    }
+
+                    // try to join the main thread (possibly this one)
+                    if (mainSiteThread != null) {
+                        if (Thread.currentThread().equals(mainSiteThread) == false) {
                             // don't interrupt here. the site will start shutdown when
                             // it sees the shutdown flag set.
-                            siteThread.join();
+                            mainSiteThread.join();
                         }
                     }
                 }
-
-                // try to join the main thread (possibly this one)
-                if (mainSiteThread != null) {
-                    if (Thread.currentThread().equals(mainSiteThread) == false) {
-                        // don't interrupt here. the site will start shutdown when
-                        // it sees the shutdown flag set.
-                        mainSiteThread.join();
-                    }
-                }
-
                 // After sites are terminated, shutdown the InvocationBufferServer.
                 // The IBS is shared by all sites; don't kill it while any site is active.
                 PartitionDRGateway.shutdown();
