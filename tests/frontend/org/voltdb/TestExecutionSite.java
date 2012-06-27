@@ -530,7 +530,7 @@ public class TestExecutionSite extends TestCase {
     public static class MockProcedureRunnerFactory extends ProcedureRunnerFactory {
 
         @Override
-        public ProcedureRunner create(VoltProcedure procedure, Procedure catProc) {
+        public ProcedureRunner create(VoltProcedure procedure, Procedure catProc, CatalogSpecificPlanner csp) {
             if (procedure instanceof MockROSPVoltProcedure)
                 return new MockSPProcedureRunner((MockSPVoltProcedure) procedure, (ExecutionSite) super.m_site);
             else if (procedure instanceof MockSPVoltProcedure)
@@ -538,7 +538,7 @@ public class TestExecutionSite extends TestCase {
             else if (procedure instanceof MockMPVoltProcedure)
                 return new MockMPProcedureRunner((MockMPVoltProcedure) procedure, (ExecutionSite) super.m_site);
             else if (procedure instanceof VoltSystemProcedure)
-                return super.create(procedure, catProc);
+                return super.create(procedure, catProc, csp);
             else
                 assert(false);
             return null;

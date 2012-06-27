@@ -23,20 +23,18 @@ public class ProcedureRunnerFactory {
 
     protected SiteProcedureConnection m_site;
     protected SystemProcedureExecutionContext m_context;
-    protected CatalogSpecificPlanner m_csp;
 
     public void configure(SiteProcedureConnection site,
-            SystemProcedureExecutionContext context,
-            CatalogSpecificPlanner csp) {
+            SystemProcedureExecutionContext context) {
         m_site = site;
         m_context = context;
-        m_csp = csp;
     }
 
     public ProcedureRunner create(
             VoltProcedure procedure,
-            Procedure catProc) {
-        return new ProcedureRunner(procedure, m_site, m_context, catProc, m_csp);
+            Procedure catProc,
+            CatalogSpecificPlanner csp) {
+        return new ProcedureRunner(procedure, m_site, m_context, catProc, csp);
     }
 
 }
