@@ -27,7 +27,7 @@ public class AdHocCompilerCache {
 
     static final int MAX_ENTRIES = 100;
 
-    Map<String, AdHocPlannedStatement> m_cache = new LinkedHashMap<String, AdHocPlannedStatement>(200, .75f, true) {
+    Map<String, AdHocPlannedStatement> m_cache = new LinkedHashMap<String, AdHocPlannedStatement>(MAX_ENTRIES * 2, .75f, true) {
         private static final long serialVersionUID = 1L;
 
         // This method is called just after a new entry has been added

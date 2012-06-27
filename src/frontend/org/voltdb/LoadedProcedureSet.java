@@ -68,14 +68,20 @@ public class LoadedProcedureSet {
         }
     }
 
-    public void loadProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
+    public void loadProcedures(
+            CatalogContext catalogContext,
+            BackendTarget backendTarget,
+            CatalogSpecificPlanner csp) {
         procs.clear();
         m_registeredSysProcPlanFragments.clear();
-        loadProceduresFromCatalog(catalogContext, backendTarget);
-        loadSystemProcedures(catalogContext, backendTarget);
+        loadProceduresFromCatalog(catalogContext, backendTarget, csp);
+        loadSystemProcedures(catalogContext, backendTarget, csp);
     }
 
-    private void loadProceduresFromCatalog(CatalogContext catalogContext, BackendTarget backendTarget) {
+    private void loadProceduresFromCatalog(
+            CatalogContext catalogContext,
+            BackendTarget backendTarget,
+            CatalogSpecificPlanner csp) {
         // load up all the stored procedures
         final CatalogMap<Procedure> catalogProcedures = catalogContext.database.getProcedures();
         for (final Procedure proc : catalogProcedures) {
@@ -122,12 +128,15 @@ public class LoadedProcedureSet {
             }
 
             assert(procedure != null);
-            runner = m_runnerFactory.create(procedure, proc);
+            runner = m_runnerFactory.create(procedure, proc, csp);
             procs.put(proc.getTypeName(), runner);
         }
     }
 
-    private void loadSystemProcedures(CatalogContext catalogContext, BackendTarget backendTarget) {
+    private void loadSystemProcedures(
+            CatalogContext catalogContext,
+            BackendTarget backendTarget,
+            CatalogSpecificPlanner csp) {
         Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
         for (Entry<String, Config> entry : entrySet) {
             Config sysProc = entry.getValue();
@@ -165,7 +174,7 @@ public class LoadedProcedureSet {
                         new Object[] { m_siteId, m_siteIndex }, e);
             }
 
-            runner = m_runnerFactory.create(procedure, proc);
+            runner = m_runnerFactory.create(procedure, proc, csp);
             procedure.initSysProc(m_numberOfPartitions, m_site, this, proc, catalogContext.cluster);
             procs.put(entry.getKey(), runner);
         }

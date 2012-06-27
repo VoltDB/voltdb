@@ -43,7 +43,7 @@ public class ExecutionSiteRunner implements Runnable {
     private final long m_txnId;
     private final Mailbox m_mailbox;
     private final int m_configuredNumberOfPartitions;
-    private final AsyncCompilerAgent m_agent;
+    private final CatalogSpecificPlanner m_csp;
 
     public ExecutionSiteRunner(
             Mailbox mailbox,
@@ -53,14 +53,14 @@ public class ExecutionSiteRunner implements Runnable {
             boolean replicationActive,
             VoltLogger hostLog,
             int configuredNumberOfPartitions,
-            AsyncCompilerAgent agent) {
+            CatalogSpecificPlanner csp) {
         m_mailbox = mailbox;
         m_serializedCatalog = serializedCatalog;
         m_recovering = recovering;
         m_replicationActive = replicationActive;
         m_txnId = context.m_transactionId;
         m_configuredNumberOfPartitions = configuredNumberOfPartitions;
-        m_agent = agent;
+        m_csp = csp;
     }
 
     @Override
@@ -76,7 +76,7 @@ public class ExecutionSiteRunner implements Runnable {
                                           m_replicationActive,
                                           m_txnId,
                                           m_configuredNumberOfPartitions,
-                                          m_agent);
+                                          m_csp);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }

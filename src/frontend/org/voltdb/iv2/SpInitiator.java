@@ -32,7 +32,6 @@ import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -138,7 +137,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor, AsyncCompilerAgent aca)
+                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp)
     {
         try {
             m_missingStartupSites = new CountDownLatch(kfactor + 1);
@@ -159,16 +158,14 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                                        m_partitionId,
                                        cartographer.getNumberOfPartitions());
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
-            CatalogSpecificPlanner csp = new CatalogSpecificPlanner(aca, catalogContext);
             prf.configure(m_executionSite,
-                    m_executionSite.m_sysprocContext,
-                    csp);
+                    m_executionSite.m_sysprocContext);
             m_procSet = new LoadedProcedureSet(m_executionSite,
                                                prf,
                                                m_initiatorMailbox.getHSId(),
                                                0, // this has no meaning
                                                cartographer.getNumberOfPartitions());
-            m_procSet.loadProcedures(catalogContext, backend);
+            m_procSet.loadProcedures(catalogContext, backend, csp);
             m_scheduler.setProcedureSet(m_procSet);
             m_executionSite.setLoadedProcedures(m_procSet);
 

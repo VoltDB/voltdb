@@ -31,6 +31,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.HsqlBackend;
 import org.voltdb.LoadedProcedureSet;
@@ -235,7 +236,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context) {
+        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp) {
             throw new RuntimeException("Not implemented in iv2");
         }
     };

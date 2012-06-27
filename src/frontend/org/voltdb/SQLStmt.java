@@ -83,7 +83,7 @@ public class SQLStmt {
          */
         if (params != null) {
             stmt.statementParamJavaTypes = new byte[params.size()];
-            stmt.numStatementParamJavaTypes = stmt.statementParamJavaTypes.length;
+            stmt.numStatementParamJavaTypes = params.size();
             for (ParameterInfo pi : params) {
                 stmt.statementParamJavaTypes[pi.index] = pi.type.getValue();
             }

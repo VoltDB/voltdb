@@ -723,9 +723,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             ExecutionSite.this.updateBackendLogLevels();
         }
         @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context)
+        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
         {
-            return ExecutionSite.this.updateCatalog(diffCmds, context);
+            return ExecutionSite.this.updateCatalog(diffCmds, context, csp);
         }
     }
 
@@ -759,11 +759,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             boolean replicationActive,
             final long txnId,
             int configuredNumberOfPartitions,
-            AsyncCompilerAgent agent) throws Exception
+            CatalogSpecificPlanner csp) throws Exception
     {
         this(voltdb, mailbox, serializedCatalog, transactionQueue,
              new ProcedureRunnerFactory(), recovering, replicationActive,
-             txnId, configuredNumberOfPartitions, agent);
+             txnId, configuredNumberOfPartitions, csp);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -774,7 +774,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                   boolean replicationActive,
                   final long txnId,
                   int configuredNumberOfPartitions,
-                  AsyncCompilerAgent agent) throws Exception
+                  CatalogSpecificPlanner csp) throws Exception
     {
         m_siteId = mailbox.getHSId();
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
@@ -824,11 +824,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         // setup the procedure runner wrappers.
         if (runnerFactory != null) {
-            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( agent, m_context);
-            runnerFactory.configure(this, m_systemProcedureContext, csp);
+            runnerFactory.configure(this, m_systemProcedureContext);
         }
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
-        m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType());
+        m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType(), csp);
 
         int snapshotPriority = 6;
         if (m_context.cluster.getDeployment().get("deployment") != null) {
@@ -935,9 +934,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         return true;
     }
 
-    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context, CatalogSpecificPlanner csp) {
         m_context = context;
-        m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType());
+        m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType(), csp);
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
