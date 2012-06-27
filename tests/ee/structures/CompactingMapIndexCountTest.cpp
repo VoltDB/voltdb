@@ -185,7 +185,7 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 int ct = 1;
                 std::map<int,int>::const_iterator it;
                 for (it = stl.begin(); it != stli; it++) {
-                	ct++;
+                        ct++;
                 }
                 int rankasc= volt.rankAsc(val);
                 ASSERT_TRUE(rankasc == ct);
@@ -206,7 +206,7 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 int ct = 1;
                 std::map<int,int>::const_iterator it;
                 for (it = stl.begin(); it != stli; it++) {
-                	ct++;
+                        ct++;
                 }
                 int rankasc= volt.rankAsc(val);
                 ASSERT_TRUE(rankasc == ct);
