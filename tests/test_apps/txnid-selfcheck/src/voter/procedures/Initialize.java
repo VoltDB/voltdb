@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2011 VoltDB Inc.
+ * Copyright (C) 2008-2012 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -20,41 +20,38 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.auctionexample;
 
+package voter.procedures;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
-import org.voltdb.types.TimestampType;
 
-/**
- *
- *
- */
-@ProcInfo(
-    partitionInfo = "ITEM.ITEMID: 1",
-    singlePartition = true
+@ProcInfo (
+    singlePartition = false
 )
-public class InsertIntoBid extends VoltProcedure {
+public class Initialize extends VoltProcedure
+{
+    // Check if the database has already been initialized
+    public final SQLStmt checkStmt = new SQLStmt("SELECT COUNT(*) FROM replicated;");
 
-    public final SQLStmt insert = new SQLStmt("INSERT INTO BID VALUES (?, ?, ?, ?, ?);");
-    public final SQLStmt insertForExport = new SQLStmt("INSERT INTO BID_EXPORT VALUES (?, ?, ?, ?, ?);");
+    // Insert into the replicated table
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?);");
 
-    /**
-     *
-     * @param bidid
-     * @param itemid
-     * @param bidderid
-     * @param bidtime
-     * @param bidprice
-     * @return The number of rows affected.
-     * @throws VoltAbortException
-     */
-    public VoltTable[] run(int bidid, int itemid, int bidderid, TimestampType bidtime, double bidprice) throws VoltAbortException {
-        voltQueueSQL(insert, bidid, itemid, bidderid, bidtime, bidprice);
-        voltQueueSQL(insertForExport, bidid, itemid, bidderid, bidtime, bidprice);
-        return voltExecuteSQL();
+    public long run() {
+        voltQueueSQL(checkStmt, EXPECT_SCALAR_LONG);
+        long currentCount = voltExecuteSQL()[0].asScalarLong();
+
+        // if the data is initialized, return the current count
+        if (currentCount != 0)
+            return currentCount;
+
+        // initialize the data using the txnId as a base
+        long base = this.getTransactionId();
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), base);
+        voltExecuteSQL(true);
+
+        // return the number of rows added
+        return 1;
     }
 }

@@ -34,12 +34,14 @@ public class VoltDbMessageFactory extends VoltMessageFactory
     final public static byte IV2_REPAIR_LOG_REQUEST = VOLTCORE_MESSAGE_ID_MAX + 10;
     final public static byte IV2_REPAIR_LOG_RESPONSE = VOLTCORE_MESSAGE_ID_MAX + 11;
     final public static byte REJOIN_RESPONSE_ID = VOLTCORE_MESSAGE_ID_MAX + 12;
+    final public static byte FRAGMENT_TASK_LOG_ID = VOLTCORE_MESSAGE_ID_MAX + 13;
 
     /**
      * Overridden by subclasses to create message types unknown by voltcore
      * @param messageType
      * @return
      */
+    @Override
     protected VoltMessage instantiate_local(byte messageType)
     {
         // instantiate a new message instance according to the id
@@ -81,6 +83,9 @@ public class VoltDbMessageFactory extends VoltMessageFactory
             break;
         case REJOIN_RESPONSE_ID:
             message = new RejoinMessage();
+            break;
+        case FRAGMENT_TASK_LOG_ID:
+            message = new FragmentTaskLogMessage();
             break;
         default:
             message = null;

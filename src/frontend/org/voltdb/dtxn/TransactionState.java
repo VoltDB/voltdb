@@ -42,6 +42,13 @@ import org.voltdb.messaging.FragmentTaskMessage;
  *
  */
 public abstract class TransactionState extends OrderableTransaction  {
+
+    public static enum RejoinState {
+        NORMAL,
+        REJOINING,
+        REPLAYING
+    }
+
     public final long coordinatorSiteId;
     protected final boolean m_isReadOnly;
     protected final TransactionInfoBaseMessage m_notice;
@@ -52,7 +59,9 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
-    private boolean m_sendResponse = true; // whether or not to send response
+
+    // is this transaction run during a rejoin
+    protected RejoinState m_rejoinState = RejoinState.NORMAL;
 
     /** Iv2 constructor */
     protected TransactionState(long txnId, Mailbox mbox,
@@ -91,12 +100,12 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_notice;
     }
 
-    public boolean shouldSendResponse() {
-        return m_sendResponse;
+    public TransactionInfoBaseMessage getTransactionInfoBaseMessageForRejoinLog() {
+        return m_notice;
     }
 
-    public void setSendResponse(boolean sendResponse) {
-        m_sendResponse = sendResponse;
+    public RejoinState getRejoinState() {
+        return m_rejoinState;
     }
 
     // Assume that done-ness is a latch.

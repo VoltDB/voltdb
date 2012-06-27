@@ -29,28 +29,35 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 
 @ProcInfo (
-    partitionInfo = "transactions.pid:0",
-    singlePartition = true
+    singlePartition = false
 )
-public class doTxn extends VoltProcedure {
+public class updateReplicated extends VoltProcedure
+{
+    // Delete everything in the replicated table
+    public final SQLStmt deleteStmt = new SQLStmt("DELETE FROM replicated;");
 
-    public final SQLStmt getLastTxnId = new SQLStmt(
-            "SELECT txnid, rid FROM transactions WHERE txnid < ? ORDER BY txnid DESC LIMIT 1;");
+    // Insert into the replicated table
+    public final SQLStmt insertStmt = new SQLStmt("INSERT INTO replicated VALUES (?);");
 
-    public final SQLStmt getReplicated = new SQLStmt(
-            "SELECT * FROM replicated ORDER BY id LIMIT 10;");
+    // Get top 10 from the replicated table
+    public final SQLStmt selectStmt = new SQLStmt("SELECT * FROM replicated ORDER BY id LIMIT 10;");
 
-    public final SQLStmt insertTxnid = new SQLStmt(
-            "INSERT INTO transactions VALUES (?, ?, ?, ?);");
+    public VoltTable run() {
+        voltQueueSQL(selectStmt);
+        voltQueueSQL(deleteStmt, EXPECT_SCALAR_LONG);
 
-    public final SQLStmt deleteOldTxns = new SQLStmt(
-            "DELETE FROM transactions WHERE rid < ? AND rid >= 0;");
+        // initialize the data using the txnId as a base
+        long txnId = this.getTransactionId();
+        voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId);
+        voltQueueSQL(selectStmt);
+        VoltTable[] results = voltExecuteSQL(true);
 
-    public VoltTable[] run(byte partition, long rid, long oldestRid, byte[] value) {
-        voltQueueSQL(getLastTxnId, getTransactionId());
-        voltQueueSQL(getReplicated);
-        voltQueueSQL(insertTxnid, getTransactionId(), partition, rid, value);
-        voltQueueSQL(deleteOldTxns, oldestRid);
-        return voltExecuteSQL(true);
+        // txnId in the table should be smaller than the current txnId
+        if (results[0].asScalarLong() >= txnId) {
+            throw new VoltAbortException("updateReplicated executed out of order");
+        }
+
+        // Return last result
+        return results[results.length - 1];
     }
 }

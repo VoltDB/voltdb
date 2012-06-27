@@ -66,12 +66,14 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.ReplayedTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.TransactionState.RejoinState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
@@ -197,6 +199,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private volatile long m_rejoinSnapshotTxnId = -1;
     // The snapshot completion handler will set this to true
     private volatile boolean m_rejoinSnapshotFinished = false;
+    private long m_rejoinSnapshotBytes = 0;
     private long m_rejoinCoordinatorHSId = -1;
     private TaskLog m_rejoinTaskLog = null;
     // Used to track if the site can keep up on rejoin, default is 10 seconds
@@ -206,6 +209,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private long m_remainingTasks = 0;
     private long m_executedTaskCount = 0;
     private long m_loggedTaskCount = 0;
+    private long m_taskExeStartTime = 0;
     private final SnapshotCompletionInterest m_snapshotCompletionHandler =
             new SnapshotCompletionInterest() {
         @Override
@@ -489,6 +493,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long transferred = 0;
             if (m_recoveryProcessor != null) {
                 transferred = m_recoveryProcessor.bytesTransferred();
+            } else {
+                transferred = m_rejoinSnapshotBytes;
             }
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
@@ -497,8 +503,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * The logged txn count will be greater than the replayed txn count
              * because some logged ones were before the stream snapshot
              */
-            m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks");
+            final long duration = (System.currentTimeMillis() - m_taskExeStartTime) / 1000;
+            final long throughput = duration == 0 ? m_executedTaskCount : m_executedTaskCount / duration;
             m_recoveryLog.info("Logged " + m_loggedTaskCount + " tasks");
+            m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks in " +
+                    duration + " seconds at a rate of " +
+                    throughput + " tasks/second");
             m_recoveryProcessor = null;
             m_rejoinSnapshotProcessor = null;
             m_rejoinSnapshotTxnId = -1;
@@ -509,7 +519,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 m_haveRecoveryPermit = false;
                 m_recoveryPermit.release();
                 m_recoveryLog.info(
-                        "Destination recovery complete for site " + m_siteId +
+                        "Destination recovery complete for site " +
+                        CoreUtils.hsIdToString(m_siteId) +
                         " partition " + m_tracker.getPartitionForSite(m_siteId) +
                         " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
                         " with " + megabytes + " megabytes transferred " +
@@ -1082,7 +1093,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * site cannot keep up in a certain period of time, break rejoin.
      */
     private void checkTaskExecutionProgress() {
-        final long remainingTasks = m_executedTaskCount - m_loggedTaskCount;
+        final long remainingTasks = m_loggedTaskCount - m_executedTaskCount;
         final long currTime = System.currentTimeMillis();
         if (m_lastTimeMadeProgress == 0 || remainingTasks < m_remainingTasks) {
             m_lastTimeMadeProgress = currTime;
@@ -1118,9 +1129,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             loadTable(m_rejoinSnapshotTxnId, tableId, table);
             doneWork = true;
         } else if (m_rejoinSnapshotProcessor.isEOF()) {
-            m_recoveryLog.info("New rejoin snapshot transfer is finished");
+            m_recoveryLog.debug("Rejoin snapshot transfer is finished");
             m_rejoinSnapshotProcessor.close();
+            m_rejoinSnapshotBytes = m_rejoinSnapshotProcessor.bytesTransferred();
             m_rejoinSnapshotProcessor = null;
+            m_taskExeStartTime = System.currentTimeMillis();
             /*
              * Don't notify the rejoin coordinator yet. The stream snapshot may
              * have not finished on all nodes, let the snapshot completion
@@ -1148,15 +1161,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         try {
             TransactionInfoBaseMessage msg = m_rejoinTaskLog.getNextMessage();
             if (msg != null) {
-                if (msg.isSinglePartition()) {
-                    ts = new SinglePartitionTxnState(m_mailbox, this, msg);
-                    // Don't send response
-                    ts.setSendResponse(false);
-                } else {
-                    // TODO: multi-part is not supported yet
-                    VoltDB.crashLocalVoltDB("Cannot replay multi-part transactions yet",
-                                            false, null);
-                }
+                ts = new ReplayedTxnState(this, msg);
             }
         } catch (IOException e) {
             m_recoveryLog.error("Failed to replay logged transactions: " +
@@ -1181,7 +1186,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             }
 
             if (rejoinCompleted) {
-                m_recoveryLog.info("Replay of task messages are done");
                 try {
                     m_rejoinTaskLog.close();
                 } catch (IOException e) {
@@ -1234,7 +1238,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                     true, e);
         }
 
-        m_recoveryLog.info("Initiating new rejoin from " +
+        m_recoveryLog.info("Initiating rejoin from site " +
                 CoreUtils.hsIdToString(getSiteId()));
         initiateRejoinSnapshot(addresses, port);
     }
@@ -1417,11 +1421,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * log task message for rejoin if it's not a replayed transaction.
              * Replayed transactions do not send responses.
              */
-            if (m_rejoining && txnState.shouldSendResponse() &&
+            if ((txnState.getRejoinState() == RejoinState.REJOINING) &&
                 m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
-                    m_rejoinTaskLog.logTask(txnState.getNotice());
-                    m_loggedTaskCount++;
+                    if (txnState.getNotice() instanceof InitiateTaskMessage) {
+                        // TODO: this is a pretty horrible hack and fixing it is next on my list
+                        // I also need to ensure that fragments of sysprocs run at non-coordinators don't get replayed
+                        if (((InitiateTaskMessage)txnState.getNotice()).getStoredProcedureName().startsWith("@") == false) {
+                            m_rejoinTaskLog.logTask(txnState.getTransactionInfoBaseMessageForRejoinLog());
+                            m_loggedTaskCount++;
+                        }
+                    }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to log task message", true, e);
                 }
@@ -2408,8 +2418,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
              * during rejoin needs real work to be done, but no response to be
              * sent.
              */
-            boolean rejoining = m_rejoining && currentTxnState.shouldSendResponse();
-            if (currentTxnState.doWork(rejoining)) {
+            if (currentTxnState.doWork(m_rejoining)) {
                 if (currentTxnState.needsRollback())
                 {
                     rollbackTransaction(currentTxnState);
@@ -2699,12 +2708,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
         else {
             TransactionState nextTxn = (TransactionState)m_transactionQueue.peek();
-            boolean rejoining = m_rejoining && nextTxn.shouldSendResponse();
 
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)
             {
-                boolean success = nextTxn.doWork(rejoining);
+                boolean success = nextTxn.doWork(m_rejoining);
                 assert(success);
                 return true;
             }

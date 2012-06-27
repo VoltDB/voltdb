@@ -26,9 +26,9 @@ package com.auctionexample;
 import java.util.ArrayList;
 import java.util.Date;
 import java.util.Random;
-
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
+import org.voltdb.VoltType;
 import org.voltdb.client.ClientConfig;
 import org.voltdb.client.ClientFactory;
 
@@ -252,12 +252,21 @@ public class Client {
         System.out.println("* Running loader                      *");
         System.out.println("***************************************\n");
 
-        // Load our starting data from our CSV files using the Loader class
+        // get itemId and userId from database
         try {
-            allAuctionIds = Loader.loadItems(client);
-            activeAuctionIds.addAll(allAuctionIds);
-            userIds = Loader.loadUsers(client);
-            Loader.loadCategories(client);
+            VoltTable modCount = client.callProcedure("@AdHoc", "SELECT ITEMID FROM ITEM").getResults()[0];
+            allAuctionIds = new ArrayList<Integer>();
+            userIds = new ArrayList<Integer>();
+            while( modCount.advanceRow() ){
+                Integer i = (Integer) modCount.get(0, VoltType.INTEGER);
+                allAuctionIds.add(i);
+            }
+            modCount = client.callProcedure("@AdHoc", "SELECT USERID FROM USER").getResults()[0];
+            while( modCount.advanceRow() ){
+                Integer i = (Integer) modCount.get(0, VoltType.INTEGER);
+                userIds.add(i);
+            }
+            activeAuctionIds.addAll(allAuctionIds);    
         } catch (Exception e) {
             e.printStackTrace();
         }

@@ -53,6 +53,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotSave;
 
 import com.google.common.base.Throwables;
@@ -526,9 +527,11 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 "Unexpected error deleting truncation snapshot request", true, e);
                     }
 
+                    SiteTracker st = VoltDB.instance().getSiteTracker();
+                    int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
-                                                                      true)) {
-                        SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId);
+                                                                      hostId, true)) {
+                        SnapshotSaveAPI.increaseParticipateHostCount(snapshotTxnId, hostId);
                     }
 
                     try {

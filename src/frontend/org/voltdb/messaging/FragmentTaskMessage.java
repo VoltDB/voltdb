@@ -410,6 +410,16 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     @Override
     public void flattenToBuffer(ByteBuffer buf) throws IOException
     {
+        flattenToSubMessageBuffer(buf);
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
+    }
+
+    /**
+     * Used directly by {@link FragmentTaskLogMessage} to embed FTMs
+     */
+    void flattenToSubMessageBuffer(ByteBuffer buf) throws IOException
+    {
         // See Serialization Format comment above getSerializedSize().
 
         assert(m_items != null);
@@ -488,13 +498,19 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.put(bytes);
             }
         }
-
-        assert(buf.capacity() == buf.position());
-        buf.limit(buf.position());
     }
 
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException
+    {
+        initFromSubMessageBuffer(buf);
+        assert(buf.capacity() == buf.position());
+    }
+
+    /**
+     * Used directly by {@link FragmentTaskLogMessage} to embed FTMs
+     */
+    void initFromSubMessageBuffer(ByteBuffer buf) throws IOException
     {
         // See Serialization Format comment above getSerializedSize().
 
@@ -564,8 +580,6 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 item.m_fragmentPlan = new String(bytes);
             }
         }
-
-        assert(buf.capacity() == buf.position());
     }
 
     @Override

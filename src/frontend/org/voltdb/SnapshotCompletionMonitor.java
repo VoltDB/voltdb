@@ -31,6 +31,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 
@@ -140,12 +141,12 @@ public class SnapshotCompletionMonitor {
         }
         JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
         long txnId = jsonObj.getLong("txnId");
-        int totalNodes = jsonObj.getInt("hosts");
+        JSONArray hosts = jsonObj.getJSONArray("hosts");
         int totalNodesFinished = jsonObj.getInt("finishedHosts");
         String nonce = jsonObj.getString("nonce");
         boolean truncation = jsonObj.getBoolean("isTruncation");
 
-        if (totalNodes == totalNodesFinished) {
+        if (hosts.length() == totalNodesFinished) {
             Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
             while (iter.hasNext()) {
                 SnapshotCompletionInterest interest = iter.next();

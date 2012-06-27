@@ -52,4 +52,10 @@ public interface RejoinSiteProcessor {
      */
     public abstract Pair<Integer, ByteBuffer> poll();
 
+    /**
+     * Return the number of bytes transferred so far.
+     * @return
+     */
+    public abstract long bytesTransferred();
+
 }
