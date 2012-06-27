@@ -2,7 +2,7 @@
 
 APPNAME="auction"
 VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
-CLASSPATH="$VOLTJAR:../../../lib"
+CLASSPATH="$VOLTJAR:`ls -x ../../../lib/*.jar | tr '[:space:]' ':'`"
 VOLTDB="../../../bin/voltdb"
 CSVLOADER="../../../bin/csvloader"
 EXPORTTOFILE="../../../bin/exporttofile"
@@ -49,16 +49,16 @@ function client() {
     # load the csv files
     $CSVLOADER -f $DATAFILES/items.txt \
 			-p InsertIntoItemAndBid \
-         		-u program \
-         		-P pass 
+         		--user program \
+         		--password pass 
     $CSVLOADER -f $DATAFILES/categories.txt \
                         -p InsertIntoCategory \
-                        -u program \
-                        -P pass
+                        --user program \
+                        --password pass
     $CSVLOADER -f $DATAFILES/users.txt \
                         -p InsertIntoUser \
-                        -u program \
-                        -P pass 
+                        --user program \
+                        --password pass 
     srccompile
     java -classpath obj:$CLASSPATH com.auctionexample.Client
 }
