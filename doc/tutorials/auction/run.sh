@@ -2,7 +2,7 @@
 
 APPNAME="auction"
 VOLTJAR=`ls ../../../voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
-CLASSPATH="$VOLTJAR:../../../lib"
+CLASSPATH="$VOLTJAR:`ls -x ../../../lib/*.jar | tr '[:space:]' ':'`"
 VOLTDB="../../../bin/voltdb"
 CSVLOADER="../../../bin/csvloader"
 EXPORTTOFILE="../../../bin/exporttofile"
