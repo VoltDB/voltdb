@@ -410,7 +410,8 @@ public:
     ~AggregateExecutor();
 
     bool support_pull() const;
-    /** Aggregates save tuples in the output table so parent SendExecutor must not save them again*/
+    /** Aggregates save tuples in the output table
+     so parent SendExecutor must not save them again*/
     bool parent_send_need_save_tuple_pull() const;
 
 protected:

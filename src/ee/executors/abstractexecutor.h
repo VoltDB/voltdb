@@ -102,6 +102,10 @@ class AbstractExecutor {
     // Generic behavior wrapping the custom p_pre_execute_pull.
     void clearOutputTables();
 
+    //@TODO need something better than this.
+    // Only required by aggregate executor in case of INSERT
+    virtual bool parent_send_need_save_tuple_pull() const;
+
     /**
      * Returns true if the output table for the plannode must be cleaned up
      * after p_execute().  <b>Default is false</b>. This should be overriden in
@@ -311,6 +315,12 @@ inline void AbstractExecutor::clearOutputTables()
     depth_first_iterate_pull(fcleanup, false);
 }
 
+inline bool AbstractExecutor::parent_send_need_save_tuple_pull() const
+{
+    return true;
 }
+
+}
+
 
 #endif
