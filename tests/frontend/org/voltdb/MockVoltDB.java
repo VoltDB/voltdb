@@ -476,6 +476,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public SiteTracker getSiteTrackerForSnapshot() {
+        return m_siteTracker;
+    }
+
+    @Override
     public MailboxPublisher getMailboxPublisher() {
         return m_mailboxPublisher;
     }

@@ -18,12 +18,12 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Comparator;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
-import java.util.concurrent.TimeoutException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -40,6 +40,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
@@ -50,6 +51,8 @@ import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+
+import com.google.common.collect.Sets;
 
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
@@ -82,19 +85,32 @@ import org.voltdb.VoltZK;
 public class Term
 {
     VoltLogger tmLog = new VoltLogger("TM");
+    private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
     private final long m_initiatorHSId;
-    private final int m_requestId = 0; // System.currentTimeMillis();
+    private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
-    private final String m_whoami;
+    private final CountDownLatch m_missingStartupSites;
+    private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
+    private final String m_mapCacheNode;
 
     // Initialized in start() -- when the term begins.
-    private BabySitter m_babySitter;
+    protected BabySitter m_babySitter;
+
+    // Each Term can process at most one promotion; if promotion fails, make
+    // a new Term and try again (if that's your big plan...)
+    private final InaugurationFuture m_promotionResult = new InaugurationFuture();
+
+    long getRequestId()
+    {
+        return m_requestId;
+    }
 
     // scoreboard for responding replica repair log responses (hsid -> response count)
-    static class ReplicaRepairStruct {
+    static class ReplicaRepairStruct
+    {
         int m_receivedResponses = 0;
         int m_expectedResponses = -1; // (a log msg cares about this init. value)
         long m_maxSpHandleSeen = Long.MIN_VALUE;
@@ -133,7 +149,9 @@ public class Term
         new HashMap<Long, ReplicaRepairStruct>();
 
     // Determine equal repair responses by the SpHandle of the response.
-    Comparator<Iv2RepairLogResponseMessage> m_unionComparator = new Comparator<Iv2RepairLogResponseMessage>() {
+    Comparator<Iv2RepairLogResponseMessage> m_unionComparator =
+        new Comparator<Iv2RepairLogResponseMessage>()
+    {
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
@@ -151,19 +169,41 @@ public class Term
     Callback m_replicasChangeHandler = new Callback()
     {
         @Override
-        public void run(List<String> children) {
-            // make an HSId array out of the children
-            // The list contains the leader, skip it
-            List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, children);
-            tmLog.info(m_whoami
-                    + "replica change handler updating replica list to: "
-                    + CoreUtils.hsIdListToString(replicas));
-            m_mailbox.updateReplicas(replicas);
+        public void run(List<String> children)
+        {
+            // Need to handle startup separately from runtime updates.
+            if (Term.this.m_missingStartupSites.getCount() > 0) {
+                TreeSet<String> updatedReplicas = com.google.common.collect.Sets.newTreeSet(children);
+                // Cancel setup if a previously seen replica disappeared.
+                // I think voltcore might actually terminate before getting here...
+                Sets.SetView<String> removed = Sets.difference(Term.this.m_knownReplicas, updatedReplicas);
+                if (!removed.isEmpty()) {
+                    tmLog.error(m_whoami
+                            + "replica(s) failed during startup. Initialization can not complete."
+                            + " Failed replicas: " + removed);
+                    Term.this.cancel();
+                    return;
+                }
+                Sets.SetView<String> added = Sets.difference(updatedReplicas, Term.this.m_knownReplicas);
+                int newReplicas = added.size();
+                m_knownReplicas.addAll(updatedReplicas);
+                for (int i=0; i < newReplicas; i++) {
+                    Term.this.m_missingStartupSites.countDown();
+                }
+            }
+            else {
+                // remove the leader; convert to hsids; deal with the replica change.
+                List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, children);
+                tmLog.info(m_whoami
+                        + "replica change handler updating replica list to: "
+                        + CoreUtils.hsIdCollectionToString(replicas));
+                m_mailbox.updateReplicas(replicas);
+            }
         }
     };
 
     // conversion helper.
-    static List<Long> childrenToReplicaHSIds(long initiatorHSId, List<String> children)
+    static List<Long> childrenToReplicaHSIds(long initiatorHSId, Collection<String> children)
     {
         List<Long> replicas = new ArrayList<Long>(children.size() - 1);
         for (String child : children) {
@@ -176,72 +216,29 @@ public class Term
         return replicas;
     }
 
-    // future that represents completion of transition to leader.
-    private static class InaugurationFuture implements Future<Boolean>
-    {
-        private CountDownLatch m_doneLatch = new CountDownLatch(1);
-        private ExecutionException m_exception = null;
-
-        private void setException(Exception e)
-        {
-            m_exception = new ExecutionException(e);
-        }
-
-        @Override
-        public boolean cancel(boolean mayInterruptIfRunning)
-        {
-            return false;
-        }
-
-        @Override
-        public boolean isCancelled()
-        {
-            return false;
-        }
-
-        @Override
-        public boolean isDone()
-        {
-            return m_doneLatch.getCount() == 0;
-        }
-
-        @Override
-        public Boolean get() throws InterruptedException, ExecutionException
-        {
-            m_doneLatch.await();
-            if (m_exception != null) {
-                throw m_exception;
-            }
-            return true;
-        }
-
-        @Override
-        public Boolean get(long timeout, TimeUnit unit)
-            throws InterruptedException, ExecutionException, TimeoutException
-        {
-            m_doneLatch.await(timeout, unit);
-            if (m_exception != null) {
-                throw m_exception;
-            }
-            return true;
-        }
-    }
-
-    // Each Term can process at most one promotion; if promotion fails, make
-    // a new Term and try again (if that's your big plan...)
-    private final InaugurationFuture m_promotionResult = new InaugurationFuture();
 
     /**
      * Setup a new Term but don't take any action to take responsibility.
      */
-    public Term(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox)
+    public Term(CountDownLatch missingStartupSites, ZooKeeper zk,
+            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            String zkMapCacheNode)
     {
         m_zk = zk;
         m_partitionId = partitionId;
         m_initiatorHSId = initiatorHSId;
         m_mailbox = mailbox;
+
+        if (missingStartupSites != null) {
+            m_missingStartupSites = missingStartupSites;
+        }
+        else {
+            m_missingStartupSites = new CountDownLatch(0);
+        }
+
         m_whoami = "SP " +  CoreUtils.hsIdToString(m_initiatorHSId)
             + " for partition " + m_partitionId + " ";
+        m_mapCacheNode = zkMapCacheNode;
     }
 
     /**
@@ -252,26 +249,34 @@ public class Term
      * recovery, pass the kfactor required to proceed. For fault recovery,
      * pass any negative value as kfactorForStartup.
      */
-    public Future<?> start(int kfactorForStartup)
+    public Future<Boolean> start()
     {
         try {
-            m_babySitter = new BabySitter(m_zk,
-                    LeaderElector.electionDirForPartition(m_partitionId),
-                    m_replicasChangeHandler, true);
-            if (kfactorForStartup >= 0) {
-                prepareForStartup(kfactorForStartup);
+            if (m_missingStartupSites.getCount() > 0) {
+                makeBabySitter();
+                prepareForStartup();
             }
             else {
+                makeBabySitter();
                 prepareForFaultRecovery();
             }
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.m_doneLatch.countDown();
+            m_promotionResult.done();
         }
         return m_promotionResult;
     }
 
+    // extract this out so it can be mocked for testcases.
+    // don't want to dep-inject - prefer Term encapsulates sitter.
+    protected void makeBabySitter() throws ExecutionException, InterruptedException
+    {
+        Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
+                LeaderElector.electionDirForPartition(m_partitionId),
+                m_replicasChangeHandler);
+        m_babySitter = pair.getFirst();
+    }
 
     public boolean cancel()
     {
@@ -285,19 +290,16 @@ public class Term
         }
     }
 
-
     /** Block until all replica's are present. */
-    void prepareForStartup(int kfactor)
+    void prepareForStartup()
+        throws InterruptedException
     {
-        tmLog.info(m_whoami + "starting with " + kfactor + " replicas.");
-        List<String> children = m_babySitter.lastSeenChildren();
-        while (children.size() < kfactor + 1) {
-            try {
-                Thread.sleep(5);
-            } catch (InterruptedException e) {
-            }
-            children = m_babySitter.lastSeenChildren();
-        }
+        tmLog.info(m_whoami + "starting with " + m_missingStartupSites.getCount() + " replicas.");
+
+        // block here until the babysitter thread provides all replicas.
+        // then initialize the mailbox's replica set and proceed as leader.
+        m_missingStartupSites.await();
+        m_mailbox.setReplicas(childrenToReplicaHSIds(m_initiatorHSId, m_knownReplicas));
         declareReadyAsLeader();
     }
 
@@ -314,7 +316,7 @@ public class Term
 
         tmLog.info(m_whoami + "found (including self) " + survivors.size()
                 + " surviving replicas to repair. "
-                + " Survivors: " + CoreUtils.hsIdListToString(survivors));
+                + " Survivors: " + CoreUtils.hsIdCollectionToString(survivors));
         VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
     }
@@ -362,6 +364,14 @@ public class Term
     /** Send missed-messages to survivors. Exciting! */
     public void repairSurvivors()
     {
+        // cancel() and repair() must be synchronized by the caller (the deliver lock,
+        // currently). If cancelled and the last repair message arrives, don't send
+        // out corrections!
+        if (this.m_promotionResult.isCancelled()) {
+            tmLog.debug(m_whoami + "Skipping repair message creation for cancelled Term.");
+            return;
+        }
+
         int queued = 0;
         tmLog.info(m_whoami + "received all repair logs and is repairing surviving replicas.");
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
@@ -392,17 +402,15 @@ public class Term
         declareLeaderThread.start();
     }
 
-
-
     // with leadership election complete, update the master list
     // for non-initiator components that care.
     void declareReadyAsLeader()
     {
         try {
-            MapCacheWriter iv2masters = new MapCache(m_zk, VoltZK.iv2masters);
+            MapCacheWriter iv2masters = new MapCache(m_zk, m_mapCacheNode);
             iv2masters.put(Integer.toString(m_partitionId),
                     new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
-            m_promotionResult.m_doneLatch.countDown();
+            m_promotionResult.done();
         } catch (KeeperException e) {
             VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
         } catch (InterruptedException e) {

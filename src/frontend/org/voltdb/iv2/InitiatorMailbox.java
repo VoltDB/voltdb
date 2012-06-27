@@ -20,6 +20,8 @@ package org.voltdb.iv2;
 import java.util.concurrent.atomic.AtomicLong;
 
 import java.util.List;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -51,6 +53,8 @@ public class InitiatorMailbox implements Mailbox
     private long m_hsId;
     private Term m_term;
 
+    private Set<Long> m_replicas = null;
+
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
 
@@ -69,14 +73,25 @@ public class InitiatorMailbox implements Mailbox
         m_msgHandler.setMailbox(this);
     }
 
+    // Provide the starting replica configuration (for startup)
+    public synchronized void setReplicas(List<Long> replicas)
+    {
+        m_msgHandler.updateReplicas(replicas);
+    }
+
+    // Change the replica set configuration (during or after promotion)
     public synchronized void updateReplicas(List<Long> replicas)
     {
-        // first cancel any ongoing repair work. must do this with
-        // the deliver lock held.
-        if (m_term != null) {
+        // If a replica set has been configured and it changed during
+        // promotion, must cancel the term
+        if (m_replicas != null && m_term != null) {
             m_term.cancel();
         }
-        m_msgHandler.updateReplicas(replicas);
+        else {
+            m_replicas = new TreeSet<Long>();
+            m_replicas.addAll(replicas);
+            m_msgHandler.updateReplicas(replicas);
+        }
     }
 
     @Override

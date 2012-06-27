@@ -95,7 +95,7 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final int numLocalSites = (VoltDB.instance().getLocalSites().values().size() -
+        final int numLocalSites = (VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length -
                 ExecutionSite.recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating
@@ -145,7 +145,7 @@ public class SnapshotSaveAPI
                 context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
                         txnId,
-                        context.getSiteTracker().getAllHosts().size());
+                        context.getSiteTrackerForSnapshot().getAllHosts().size());
             }
         }
 
@@ -364,9 +364,9 @@ public class SnapshotSaveAPI
             long txnId, String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
+            SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
-                    (VoltDB.instance().getLocalSites().values().size() - ExecutionSite.recoveringSiteCount.get());
-            SiteTracker tracker = context.getSiteTracker();
+                    (tracker.getLocalSites().length - ExecutionSite.recoveringSiteCount.get());
 
             // non-null if targeting only one site (used for rejoin)
             // set later from the "data" JSON string
@@ -530,7 +530,7 @@ public class SnapshotSaveAPI
                                         saveFilePath,
                                         table,
                                         context.getHostId(),
-                                        context.getSiteTracker().m_numberOfPartitions,
+                                        tracker.m_numberOfPartitions,
                                         txnId);
                         }
 
@@ -743,7 +743,7 @@ public class SnapshotSaveAPI
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             context.getSiteTracker().getPartitionsForHost(hostId),
+                                             context.getSiteTrackerForSnapshot().getPartitionsForHost(hostId),
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

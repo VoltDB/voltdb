@@ -154,13 +154,13 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
         TransactionState txnState = m_runner.getTxnState();
 
-        VoltTable[] results = new VoltTable[1];
-        executeSysProcPlanFragmentsAsync(pfs);
-
         // the stack frame drop terminates the recursion and resumes
         // execution of the current stored procedure.
         assert (txnState != null);
         txnState.setupProcedureResume(false, new int[] { aggregatorOutputDependencyId });
+
+        VoltTable[] results = new VoltTable[1];
+        executeSysProcPlanFragmentsAsync(pfs);
 
         // execute the tasks that just got queued.
         // recursively call recurableRun and don't allow it to shutdown

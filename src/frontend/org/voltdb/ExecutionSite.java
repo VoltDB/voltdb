@@ -26,6 +26,8 @@ import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+
+import java.util.concurrent.Future;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -700,6 +702,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public long getCatalogCRC()                           { return m_context.getCatalogCRC(); }
         @Override
         public SiteTracker getSiteTracker()                   { return m_tracker; }
+        @Override
+        public SiteTracker getSiteTrackerForSnapshot()        { return m_tracker; }
         @Override
         public int getNumberOfPartitions()                    { return m_tracker.m_numberOfPartitions; }
         @Override
@@ -2776,6 +2780,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         throw new RuntimeException("Unsupported IV2-only API.");
      }
 
+    @Override
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    {
+        throw new RuntimeException("Unsupported IV2-only API.");
+    }
 
     @Override
     public VoltTable executePlanFragment(long planFragmentId, int inputDepId,

@@ -34,7 +34,6 @@ import org.voltdb.VoltZK.MailboxType;
 import com.google.common.collect.ImmutableList;
 import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.ImmutableSet;
-import com.google.common.collect.ImmutableSet.Builder;
 
 public class SiteTracker {
     private final int m_hostId;
@@ -54,17 +53,11 @@ public class SiteTracker {
 
     public final ImmutableSet<Long> m_allInitiatorsImmutable;
 
-    public final ImmutableSet<Long> m_allIv2InitiatorsImmutable;
-
-    public final ImmutableSet<Long> m_allIv2MpInitiatorsImmutable;
-
     public final ImmutableMap<Integer, ImmutableList<Long>> m_hostsToSitesImmutable;
 
     public final ImmutableMap<Integer, ImmutableList<Integer>> m_hostsToPartitionsImmutable;
 
     public final ImmutableMap<Integer, ImmutableList<Long>> m_partitionsToSitesImmutable;
-
-    public final ImmutableMap<Integer, ImmutableList<Long>> m_partitionToInitiatorsImmutable;
 
     public final ImmutableMap<Long, Integer> m_sitesToPartitionsImmutable;
 
@@ -94,15 +87,12 @@ public class SiteTracker {
         m_allHostsImmutable = null;
         m_allSitesImmutable = null;
         m_allInitiatorsImmutable = null;
-        m_allIv2InitiatorsImmutable = null;
-        m_allIv2MpInitiatorsImmutable = null;
         m_hostsToSitesImmutable = null;
         m_numberOfHosts = 1;
         m_numberOfExecutionSites = 0;
         m_numberOfPartitions = 0;
         m_otherHSIdsImmutable = null;
         m_sitesToPartitionsImmutable = null;
-        m_partitionToInitiatorsImmutable = null;
         m_version = 0;
     }
 
@@ -125,14 +115,10 @@ public class SiteTracker {
             new HashMap<Integer, List<Long>>();
         Map<MailboxType, List<Long>> otherHSIds =
             new HashMap<MailboxType, List<Long>>();
-        Map<Integer, List<Long>> partitionToInitiators =
-            new HashMap<Integer, List<Long>>();
 
         ImmutableSet.Builder<Integer> allHosts = ImmutableSet.<Integer>builder();
         ImmutableSet.Builder<Long> allExecutionSites = ImmutableSet.<Long>builder();
         ImmutableSet.Builder<Long> allInitiators = ImmutableSet.<Long>builder();
-        ImmutableSet.Builder<Long> allIv2Initiators = ImmutableSet.<Long>builder();
-        ImmutableSet.Builder<Long> allIv2MpInitiators = ImmutableSet.<Long>builder();
 
         Map<MailboxType, Map<Integer, List<Long>>> hostsToOtherHSIds =
             new HashMap<MailboxType, Map<Integer, List<Long>>>();
@@ -149,13 +135,9 @@ public class SiteTracker {
             } else if (e.getKey().equals(MailboxType.Initiator)) {
                 populateInitiators(e.getValue(),
                                    hostsToInitiators,
-                                   partitionToInitiators,
-                                   allInitiators,
-                                   allIv2Initiators);
+                                   allInitiators);
             } else if (e.getKey().equals(MailboxType.StatsAgent)) {
                 populateStatsAgents(e.getValue());
-            } else if (e.getKey().equals(MailboxType.MpInitiator)) {
-                populateMpInitiators(e.getValue(), allIv2MpInitiators);
             } else {
                 populateOtherHSIds(e.getKey(), e.getValue(), otherHSIds, hostsToOtherHSIds);
             }
@@ -167,11 +149,8 @@ public class SiteTracker {
         m_sitesToPartitionsImmutable = sitesToPartitions.build();
         m_hostsToInitiatorsImmutable = CoreUtils.unmodifiableMapCopy(hostsToInitiators);
         m_otherHSIdsImmutable = CoreUtils.unmodifiableMapCopy(otherHSIds);
-        m_partitionToInitiatorsImmutable = CoreUtils.unmodifiableMapCopy(partitionToInitiators);
 
         m_allInitiatorsImmutable = allInitiators.build();
-        m_allIv2InitiatorsImmutable = allIv2Initiators.build();
-        m_allIv2MpInitiatorsImmutable = allIv2MpInitiators.build();
         m_allExecutionSitesImmutable = allExecutionSites.build();
         m_allHostsImmutable = allHosts.build();
 
@@ -198,20 +177,10 @@ public class SiteTracker {
         ImmutableSet.Builder<Long> allSites = ImmutableSet.<Long>builder();
         allSites.addAll(m_allExecutionSitesImmutable);
         allSites.addAll(m_allInitiatorsImmutable);
-        allSites.addAll(m_allIv2InitiatorsImmutable);
-        allSites.addAll(m_allIv2MpInitiatorsImmutable);
         for (List<Long> siteIds : otherHSIds.values()) {
             allSites.addAll(siteIds);
         }
         m_allSitesImmutable = allSites.build();
-    }
-
-    private void populateMpInitiators(List<MailboxNodeContent> objs,
-                                      Builder<Long> allIv2MpInitiators)
-    {
-        for (MailboxNodeContent obj : objs) {
-            allIv2MpInitiators.add(obj.HSId);
-        }
     }
 
     public int[] getAllPartitions() {
@@ -279,9 +248,7 @@ public class SiteTracker {
 
     private void populateInitiators(List<MailboxNodeContent> objs,
                                     Map<Integer, List<Long>> hostsToInitiators,
-                                    Map<Integer, List<Long>> partitionToInitiators,
-                                    ImmutableSet.Builder<Long> allInitiators,
-                                    ImmutableSet.Builder<Long> allIv2Initiators)
+                                    ImmutableSet.Builder<Long> allInitiators)
     {
         for (MailboxNodeContent obj : objs) {
             int hostId = CoreUtils.getHostIdFromHSId(obj.HSId);
@@ -295,17 +262,6 @@ public class SiteTracker {
             if (obj.partitionId == null) {
                 initiators.add(obj.HSId);
                 allInitiators.add(obj.HSId);
-            } else {
-                // This builds the IV2 initiator lookup.
-                List<Long> initiators_for_part =
-                    partitionToInitiators.get(obj.partitionId);
-                if (initiators_for_part == null) {
-                    initiators_for_part = new ArrayList<Long>();
-                    partitionToInitiators.put(obj.partitionId,
-                                              initiators_for_part);
-                }
-                initiators_for_part.add(obj.HSId);
-                allIv2Initiators.add(obj.HSId);
             }
         }
     }
@@ -470,21 +426,6 @@ public class SiteTracker {
         return Collections.min(sites);
     }
 
-    /**
-     * param hostId
-     * @return the ID of the lowest iv2 initiator on the given hostId
-     */
-    public Long getLowestIv2SiteForHost(int hostId)
-    {
-        long result = Long.MAX_VALUE;
-        for (Long hsid : m_allIv2InitiatorsImmutable) {
-            if (getHostForSite(hsid) == hostId) {
-                result = Math.min(result, hsid);
-            }
-        }
-        return result;
-    }
-
     /*
      * Get an array of local sites that need heartbeats. This will get individually generated heartbeats.
      */
@@ -526,24 +467,5 @@ public class SiteTracker {
             return new ArrayList<Long>();
         }
         return hostIdList.get(host);
-    }
-
-    public Long getHSIdForMultiPartitionInitiator() {
-        // There's only one for now, just return it.  We'll need
-        // some leader election/master business when we replicate the MPI
-        return m_allIv2MpInitiatorsImmutable.iterator().next();
-    }
-
-    public long getBuddySiteForMPI(long hsId)
-    {
-        int host = CoreUtils.getHostIdFromHSId(hsId);
-
-        for (long pHsId : m_allIv2InitiatorsImmutable) {
-            if (host == CoreUtils.getHostIdFromHSId(pHsId)) {
-                return pHsId;
-            }
-        }
-        throw new RuntimeException("Unable to find a buddy initiator for MPI with HSID: " +
-                                   CoreUtils.hsIdToString(hsId));
     }
 }

@@ -59,8 +59,6 @@ public class MpTransactionState extends TransactionState
     Map<Integer, Set<Long>> m_remoteDeps;
     Map<Integer, List<VoltTable>> m_remoteDepTables =
         new HashMap<Integer, List<VoltTable>>();
-    Map<Integer, Set<Long>> m_localDeps;
-    Set<Integer> m_finalDeps;
     List<Long> m_useHSIds;
     long m_buddyHSId;
     FragmentTaskMessage m_remoteWork = null;
@@ -122,11 +120,11 @@ public class MpTransactionState extends TransactionState
     @Override
     public void setupProcedureResume(boolean isFinal, int[] dependencies)
     {
-        // Create some record of expected dependencies for tracking
-        m_finalDeps = new HashSet<Integer>();
-        for (int dep : dependencies) {
-            m_finalDeps.add(dep);
-        }
+        // Reset state so we can run this batch cleanly
+        m_localWork = null;
+        m_remoteWork = null;
+        m_remoteDeps = null;
+        m_remoteDepTables.clear();
     }
 
     // I met this List at bandcamp...
@@ -140,8 +138,6 @@ public class MpTransactionState extends TransactionState
     public void createLocalFragmentWork(FragmentTaskMessage task, boolean nonTransactional)
     {
         m_localWork = task;
-        // Create some record of expected dependencies for tracking
-        m_localDeps = createTrackedDependenciesFromTask(task, new ArrayList<Long>(0));
     }
 
     @Override

@@ -35,6 +35,8 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import org.voltcore.utils.Pair;
+
 public class TestBabySitter extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 3;
@@ -67,9 +69,11 @@ public class TestBabySitter extends ZKTestBase {
         ZooKeeper zk = getClient(0);
         zk.create("/babysitterroot", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         zk.create("/babysitterroot/c1", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-        BabySitter bs = new BabySitter(zk, "/babysitterroot", cb, true);
+        Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(zk, "/babysitterroot", cb);
+        BabySitter bs = pair.getFirst();
         sem.acquire();
         assertTrue(bs.lastSeenChildren().size() == 1);
+        assertTrue(pair.getSecond().size() == 1);
 
         zk.create("/babysitterroot/c2", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         sem.acquire();

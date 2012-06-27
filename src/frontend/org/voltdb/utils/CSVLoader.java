@@ -233,16 +233,25 @@ public class CSVLoader {
 
             int columnCnt = 0;
             VoltTable procInfo = null;
+            boolean isProcExist = false;
             try {
                 procInfo = csvClient.callProcedure("@SystemCatalog",
                         "PROCEDURECOLUMNS").getResults()[0];
                 while (procInfo.advanceRow()) {
                     if (insertProcedure.matches((String) procInfo.get(
-                            "PROCEDURE_NAME", VoltType.STRING)))
+                            "PROCEDURE_NAME", VoltType.STRING))) {
                         columnCnt++;
+                        isProcExist = true;
+                    }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                m_log.error(e.getMessage(), e);
+                System.exit(-1);
+            }
+            if (isProcExist == false) {
+                m_log.error("No matching insert procedure available");
+                close_cleanup();
+                System.exit(-1);
             }
 
             while ((config.limitrows-- > 0)
@@ -340,7 +349,7 @@ public class CSVLoader {
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {
-            insertProcedure = config.table + ".insert";
+            insertProcedure = config.table.toUpperCase() + ".insert";
         } else {
             insertProcedure = config.procedure;
         }
@@ -352,8 +361,7 @@ public class CSVLoader {
                 dir.mkdirs();
             }
         } catch (Exception x) {
-            m_log.error(x.getMessage());
-            x.printStackTrace();
+            m_log.error(x.getMessage(), x);
             System.exit(-1);
         }
 

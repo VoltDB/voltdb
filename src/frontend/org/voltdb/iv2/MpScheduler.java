@@ -137,9 +137,6 @@ public class MpScheduler extends Scheduler
         }
 
         // Multi-partition initiation (at the MPI)
-        // Figure out the local partition initiator that we can use to do BorrowTask work
-        // on our behalf.
-        // HACK: grab the current sitetracker until we write leader notices.
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
                     m_txnId.incrementAndGet(), m_pendingTasks, message, partitionInitiators,

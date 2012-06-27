@@ -24,6 +24,8 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
+
+import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.List;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -31,7 +33,11 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.mockito.InOrder;
 import static org.mockito.Mockito.*;
 
+import org.voltcore.zk.BabySitter;
+
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+
+import org.voltdb.VoltZK;
 import junit.framework.TestCase;
 import org.junit.Test;
 
@@ -44,12 +50,18 @@ public class TestTerm extends TestCase
         return m;
     }
 
+    Iv2RepairLogResponseMessage makeStaleResponse(long spHandle, long requestId)
+    {
+        Iv2RepairLogResponseMessage m = makeResponse(spHandle);
+        when(m.getRequestId()).thenReturn(requestId);
+        return m;
+    }
 
     // verify that responses are correctly unioned and ordered.
     @Test
     public void testUnion() throws Exception
     {
-        Term term = new Term(null, 0, 0L, null);
+        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters);
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -67,11 +79,22 @@ public class TestTerm extends TestCase
         }
     }
 
+    // verify that bad request ids are not submitted to the log.
+    @Test
+    public void testStaleResponse() throws Exception
+    {
+        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters);
+        term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
+        assertEquals(0L, term.m_repairLogUnion.size());
+    }
+
+
+
     // verify that the all-done logic works on replica repair structs
     @Test
     public void testRepairLogsAreComplete()
     {
-        Term term = new Term(null, 0, 0L, null);
+        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters);
         Term.ReplicaRepairStruct notDone1 = new Term.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
@@ -116,7 +139,7 @@ public class TestTerm extends TestCase
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        Term term = new Term(mock(ZooKeeper.class), 0, 0L, mailbox);
+        Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters);
 
         // missing 4, 5
         Term.ReplicaRepairStruct r1 = new Term.ReplicaRepairStruct();
@@ -169,7 +192,7 @@ public class TestTerm extends TestCase
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        Term term = new Term(mock(ZooKeeper.class), 0, 0L, mailbox);
+        Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters);
 
         // missing 3, 4, 5
         Term.ReplicaRepairStruct r3 = new Term.ReplicaRepairStruct();
@@ -198,6 +221,51 @@ public class TestTerm extends TestCase
 
         // verify exactly 3 repairs happened.
         verify(mailbox, times(3)).repairReplicasWith(any(repair3.getClass()), any(Iv2RepairLogResponseMessage.class));
+    }
+
+    // Verify that a babysitter update causes the term to be cancelled.
+    @Test
+    public void testMidPromotionReplicaUpdate() throws Exception
+    {
+        final AtomicBoolean promotionResult = new AtomicBoolean(true);
+        final InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
+        final BabySitter babysitter = mock(BabySitter.class);
+
+        // Stub some portions of a concrete Term instance - this is the
+        // object being tested.
+        final Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters) {
+            // avoid zookeeper.
+            @Override
+            protected void makeBabySitter() {
+                m_babySitter = babysitter;
+            }
+
+            // there aren't replicas to ask for repair logs
+            @Override
+            void prepareForFaultRecovery() {
+            }
+
+        };
+
+        Thread promotionThread = new Thread() {
+            @Override
+            public void run() {
+                try {
+                    promotionResult.set(term.start().get());
+                } catch (Exception e) {
+                    System.out.println("Promotion thread threw: " + e);
+                    throw new RuntimeException(e);
+                }
+            }
+        };
+        promotionThread.start();
+
+        // cancel the term as if updateReplica() triggered.
+        term.cancel();
+        promotionThread.join();
+
+        // promotion success must be false after cancel.
+        assertFalse(promotionResult.get());
     }
 
 

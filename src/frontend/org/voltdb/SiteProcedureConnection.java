@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.util.concurrent.Future;
+
 import java.util.List;
 import java.util.Map;
 
@@ -142,4 +144,7 @@ public interface SiteProcedureConnection {
 
     public VoltTable[] getStats(SysProcSelector selector, int[] locators,
                                 boolean interval, Long now);
+
+    // Snapshot services provided by the site
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
 }

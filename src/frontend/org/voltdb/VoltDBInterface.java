@@ -79,7 +79,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public MailboxPublisher getMailboxPublisher();
-
+    public SiteTracker getSiteTrackerForSnapshot();
 
     /**
      * Update the global logging context in the server.

@@ -31,7 +31,6 @@ import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.utils.CoreUtils;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 public class LeaderElector {
@@ -51,8 +50,16 @@ public class LeaderElector {
         public void run() {
             try {
                 leader = watchNextLowerNode();
+            } catch (KeeperException.ConnectionLossException e) {
+                // lost the full connection. some test cases do this...
+                // means shutdoown without the elector being
+                // shutdown; ignore.
+                e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
             } catch (Exception e) {
-                VoltDB.crashLocalVoltDB("Failed to get leader", false, e);
+                org.voltdb.VoltDB.crashLocalVoltDB(
+                        "Unexepected failure in LeaderElector.", true, e);
             }
 
             if (node != null && node.equals(leader)) {
@@ -147,7 +154,7 @@ public class LeaderElector {
      * @return The lowest sequential node
      * @throws Exception
      */
-    private String watchNextLowerNode() throws Exception {
+    private String watchNextLowerNode() throws KeeperException, InterruptedException {
         /*
          * Iterate through the sorted list of children and find the given node,
          * then setup a watcher on the previous node if it exists, otherwise the

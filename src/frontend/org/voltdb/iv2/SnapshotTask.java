@@ -17,23 +17,29 @@
 
 package org.voltdb.iv2;
 
-import org.voltdb.BackendTarget;
-import org.voltdb.CatalogContext;
+import org.voltcore.logging.VoltLogger;
 
-/**
- * Abstracts the top-level interface to create and configure an Iv2
- * MP or SP initiator.
- */
-public interface Initiator
+import org.voltdb.SiteProcedureConnection;
+
+public class SnapshotTask extends SiteTasker
 {
-    /** Configure an Initiator and prepare it for work */
-    public void configure(BackendTarget backend, String serializedCatalog,
-                          CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor);
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    /** Shutdown an Initiator and its sub-components. */
-    public void shutdown();
+    public SnapshotTask()
+    {
+    }
 
-    /** Ask for the HSId used to address this Initiator. */
-    public long getInitiatorHSId();
+    @Override
+    public void run(SiteProcedureConnection siteConnection)
+    {
+        hostLog.info("Doing snapshot work, baby!");
+        siteConnection.doSnapshotWork(false);
+    }
+
+    @Override
+    public int priority()
+    {
+        return 0;
+    }
+
 }

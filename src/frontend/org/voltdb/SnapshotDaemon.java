@@ -527,7 +527,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 "Unexpected error deleting truncation snapshot request", true, e);
                     }
 
-                    SiteTracker st = VoltDB.instance().getSiteTracker();
+                    SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
                                                                       hostId, true)) {

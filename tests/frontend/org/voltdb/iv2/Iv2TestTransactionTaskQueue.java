@@ -50,8 +50,11 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         Iv2InitiateTaskMessage init = mock(Iv2InitiateTaskMessage.class);
         when(init.getTxnId()).thenReturn(Iv2InitiateTaskMessage.UNUSED_MP_TXNID);
 
+        InitiatorMailbox mbox = mock(InitiatorMailbox.class);
+        when(mbox.getHSId()).thenReturn(1337l);
+
         SpProcedureTask task =
-            new SpProcedureTask(null, null, localTxnId, queue, init);
+            new SpProcedureTask(mbox, null, localTxnId, queue, init);
         return task;
     }
 
@@ -61,10 +64,12 @@ public class Iv2TestTransactionTaskQueue extends TestCase
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
+        InitiatorMailbox mbox = mock(InitiatorMailbox.class);
+        when(mbox.getHSId()).thenReturn(1337l);
         ParticipantTransactionState pft =
             new ParticipantTransactionState(localTxnId, msg);
         FragmentTask task =
-            new FragmentTask(null, pft, queue, msg, null);
+            new FragmentTask(mbox, pft, queue, msg, null);
         return task;
     }
 
@@ -74,8 +79,10 @@ public class Iv2TestTransactionTaskQueue extends TestCase
     {
         FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
         when(msg.getTxnId()).thenReturn(mpTxnId);
+        InitiatorMailbox mbox = mock(InitiatorMailbox.class);
+        when(mbox.getHSId()).thenReturn(1337l);
         FragmentTask task =
-            new FragmentTask(null, (ParticipantTransactionState)txn, queue, msg, null);
+            new FragmentTask(mbox, (ParticipantTransactionState)txn, queue, msg, null);
         return task;
     }
 
@@ -138,6 +145,13 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         next = createFrag(localTxnId++, mpTxnId++, dut);
         addTask(next, dut, blocked);
         assertEquals(blocked.size() + 1, dut.size());
+
+        // Add a completion for the next blocker, too.  Simulates rollback causing
+        // an additional task for this TXN ID to appear before it's blocking the queue
+        next = createComplete(next.getTransactionState(), next.getMpTxnId(), dut);
+        addTask(next, dut, blocked);
+        assertEquals(blocked.size() + 1, dut.size());
+        System.out.println("blocked: " + blocked);
 
         // now, do more work on the blocked task
         next = createFrag(block.getTransactionState(), blocking_mp_txnid, dut);

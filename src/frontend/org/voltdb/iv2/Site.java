@@ -17,7 +17,11 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.Future;
+
+import java.util.Deque;
 import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -34,6 +38,8 @@ import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.SiteSnapshotConnection;
+import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SnapshotTableTask;
 import org.voltdb.SysProcSelector;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltDB;
@@ -50,7 +56,7 @@ import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
 import org.voltdb.utils.LogKeys;
 
-public class Site implements Runnable, SiteProcedureConnection
+public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConnection
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -76,6 +82,9 @@ public class Site implements Runnable, SiteProcedureConnection
     // Almighty execution engine and its HSQL sidekick
     ExecutionEngine m_ee;
     HsqlBackend m_hsql;
+
+    // Each execution site manages snapshot using a SnapshotSiteProcessor
+    private SnapshotSiteProcessor m_snapshotter;
 
     // Current catalog
     CatalogContext m_context;
@@ -119,6 +128,7 @@ public class Site implements Runnable, SiteProcedureConnection
 
     // Advanced in complete transaction.
     long m_lastCommittedTxnId = 0L;
+    long m_currentTxnId = Long.MIN_VALUE;
 
     SiteProcedureConnection getSiteProcedureConnection()
     {
@@ -148,7 +158,7 @@ public class Site implements Runnable, SiteProcedureConnection
 
         @Override
         public long getCurrentTxnId() {
-            throw new RuntimeException("Not implemented in iv2");
+            return m_currentTxnId;
         }
 
         @Override
@@ -170,8 +180,8 @@ public class Site implements Runnable, SiteProcedureConnection
         @Override
         public boolean isLowestSiteId()
         {
-            // TODO: should pass this status in at construction.
-            long lowestSiteId = VoltDB.instance().getSiteTracker().getLowestIv2SiteForHost(getHostId());
+            // FUTURE: should pass this status in at construction.
+            long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
             System.out.println("\t\tLowest. Site: " + m_siteId + " lowest: " + lowestSiteId);
             return m_siteId == lowestSiteId;
         }
@@ -179,7 +189,7 @@ public class Site implements Runnable, SiteProcedureConnection
 
         @Override
         public int getHostId() {
-            return SiteTracker.getHostForSite(m_siteId);
+            return CoreUtils.getHostIdFromHSId(m_siteId);
         }
 
         @Override
@@ -195,7 +205,11 @@ public class Site implements Runnable, SiteProcedureConnection
         @Override
         public SiteTracker getSiteTracker() {
             throw new RuntimeException("Not implemented in iv2");
-            // return m_tracker;
+        }
+
+        @Override
+        public SiteTracker getSiteTrackerForSnapshot() {
+            return VoltDB.instance().getSiteTrackerForSnapshot();
         }
 
         @Override
@@ -212,7 +226,7 @@ public class Site implements Runnable, SiteProcedureConnection
         @Override
         public SiteSnapshotConnection getSiteSnapshotConnection()
         {
-            throw new RuntimeException("Not implemented in iv2");
+            return Site.this;
         }
 
         @Override
@@ -270,6 +284,16 @@ public class Site implements Runnable, SiteProcedureConnection
             m_hsql = null;
             m_ee = initializeEE(serializedCatalog, txnId);
         }
+        // IZZY- Get me from the deployment file in some sane way somehow some day
+        int snapshotPriority = 6;
+        m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
+            @Override
+            public void run() {
+                hostLog.info("Creating new SnapshotTask");
+                m_scheduler.offer(new SnapshotTask());
+            }
+        },
+        snapshotPriority);
     }
 
     /** Create a native VoltDB execution engine */
@@ -285,7 +309,7 @@ public class Site implements Runnable, SiteProcedureConnection
                         m_context.cluster.getRelativeIndex(),
                         m_siteId,
                         m_partitionId,
-                        SiteTracker.getHostForSite(m_siteId),
+                        CoreUtils.getHostIdFromHSId(m_siteId),
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
                         getSystemsettings().get("systemsettings").getMaxtemptablesize(),
@@ -302,7 +326,7 @@ public class Site implements Runnable, SiteProcedureConnection
                             m_context.cluster.getRelativeIndex(),
                             m_siteId,
                             m_partitionId,
-                            SiteTracker.getHostForSite(m_siteId),
+                            CoreUtils.getHostIdFromHSId(m_siteId),
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
@@ -351,8 +375,13 @@ public class Site implements Runnable, SiteProcedureConnection
     {
         SiteTasker task = m_scheduler.poll();
         if (task != null) {
+            if (task instanceof TransactionTask) {
+                m_currentTxnId = ((TransactionTask)task).getMpTxnId();
+            }
             task.run(getSiteProcedureConnection());
         }
+
+        m_snapshotter.doSnapshotWork(m_ee, true);
     }
 
     public void startShutdown()
@@ -369,9 +398,29 @@ public class Site implements Runnable, SiteProcedureConnection
             if (m_ee != null) {
                 m_ee.release();
             }
+            if (m_snapshotter != null) {
+                m_snapshotter.shutdown();
+            }
         } catch (InterruptedException e) {
             hostLog.warn("Interrupted shutdown execution site.", e);
         }
+    }
+
+    //
+    // SiteSnapshotConnection interface
+    //
+    @Override
+    public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
+        m_snapshotter.initiateSnapshots(m_ee, tasks, txnId, numLiveHosts);
+    }
+
+    /*
+     * Do snapshot work exclusively until there is no more. Also blocks
+     * until the syncing and closing of snapshot data targets has completed.
+     */
+    @Override
+    public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
+        return m_snapshotter.completeSnapshotWork(m_ee);
     }
 
     //
@@ -463,7 +512,7 @@ public class Site implements Runnable, SiteProcedureConnection
             m_ee.undoUndoToken(token);
         }
         else {
-            m_ee.releaseUndoToken(token);
+            m_ee.releaseUndoToken(latestUndoToken);
             m_lastCommittedTxnId = txnId;
         }
     }
@@ -532,5 +581,11 @@ public class Site implements Runnable, SiteProcedureConnection
                                 boolean interval, Long now)
     {
         return m_ee.getStats(selector, locators, interval, now);
+    }
+
+    @Override
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    {
+        return m_snapshotter.doSnapshotWork(m_ee, ignoreQuietPeriod);
     }
 }
