@@ -56,6 +56,8 @@ import org.voltdb.client.ClientStatsContext;
 import org.voltdb.client.ClientStatusListenerExt;
 import org.voltdb.client.ProcedureCallback;
 
+import voter.procedures.updateReplicated;
+
 public class AsyncBenchmark {
 
     // handy, rather than typing this out several times
@@ -331,7 +333,7 @@ public class AsyncBenchmark {
                     crash("updateReplicated executed out of order");
                 }
             }
-            else {
+            else if (response.getAppStatus() != updateReplicated.AbortStatus.NORMAL.ordinal()) {
                 crash(response.getStatusString());
             }
         }
