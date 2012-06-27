@@ -474,6 +474,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             collectLocalNetworkMetadata();
 
             /*
+             * Construct an adhoc planner for the initial catalog
+             */
+            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
+
+            /*
              * Create execution sites runners (and threads) for all exec sites except the first one.
              * This allows the sites to be set up in the thread that will end up running them.
              * Cache the first Site from the catalog and only do the setup once the other threads have been started.
@@ -495,7 +500,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_recovering,
                                 m_replicationActive,
                                 hostLog,
-                                m_configuredNumberOfPartitions);
+                                m_configuredNumberOfPartitions,
+                                csp);
                     m_runners.add(runner);
                     Thread runnerThread = new Thread(runner, "Site " +
                             org.voltcore.utils.CoreUtils.hsIdToString(site));
@@ -518,7 +524,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_recovering,
                             m_replicationActive,
                             m_catalogContext.m_transactionId,
-                            m_configuredNumberOfPartitions);
+                            m_configuredNumberOfPartitions,
+                            csp);
                 m_localSites.put(localThreadMailbox.getHSId(), siteObj);
                 m_currentThreadSite = siteObj;
             } catch (Exception e) {
@@ -1492,12 +1499,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
     /** Struct to associate a context with a counter of served sites */
     private static class ContextTracker {
-        ContextTracker(CatalogContext context) {
+        ContextTracker(CatalogContext context, CatalogSpecificPlanner csp) {
             m_dispensedSites = 1;
             m_context = context;
+            m_csp = csp;
         }
         long m_dispensedSites;
-        CatalogContext m_context;
+        final CatalogContext m_context;
+        final CatalogSpecificPlanner m_csp;
     }
 
     /** Associate transaction ids to contexts */
@@ -1505,7 +1514,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         new HashMap<Long, ContextTracker>();
 
     @Override
-    public CatalogContext catalogUpdate(
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(
             String diffCommands,
             byte[] newCatalogBytes,
             int expectedCatalogVersion,
@@ -1524,7 +1533,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 if (contextTracker.m_dispensedSites == ttlsites) {
                     m_txnIdToContextTracker.remove(currentTxnId);
                 }
-                return contextTracker.m_context;
+                return Pair.of( contextTracker.m_context, contextTracker.m_csp);
             }
             else if (m_catalogContext.catalogVersion != expectedCatalogVersion) {
                 throw new RuntimeException("Trying to update main catalog context with diff " +
@@ -1535,7 +1544,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // 0. A new catalog! Update the global context and the context tracker
             m_catalogContext =
                 m_catalogContext.update(currentTxnId, newCatalogBytes, diffCommands, true, deploymentCRC);
-            m_txnIdToContextTracker.put(currentTxnId, new ContextTracker(m_catalogContext));
+            final CatalogSpecificPlanner csp = new CatalogSpecificPlanner( m_asyncCompilerAgent, m_catalogContext);
+            m_txnIdToContextTracker.put(currentTxnId,
+                    new ContextTracker(
+                            m_catalogContext,
+                            csp));
             m_catalogContext.logDebuggingInfoFromCatalog();
 
             // 1. update the export manager.
@@ -1555,7 +1568,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_adminListener.notifyOfCatalogUpdate();
             }
 
-            return m_catalogContext;
+            return Pair.of(m_catalogContext, csp);
         }
     }
 

@@ -1036,8 +1036,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
-        List<AdHocPlannedStatement> statements = new ArrayList<AdHocPlannedStatement>();
-
         // try the cache
         // For now it's all or nothing on a batch of statements, i.e. all statements must match or
         // none.
@@ -1061,7 +1059,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             planBatch.addStatement(sqlStatement,
                                    plannedStatement.aggregatorFragment,
                                    plannedStatement.collectorFragment,
-                                   plannedStatement.isReplicatedTableDML);
+                                   plannedStatement.isReplicatedTableDML,
+                                   null);
         }
         // All statements retrieved from cache?
         if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
@@ -1074,7 +1073,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     false, task.clientHandle, handler.connectionId(),
                     handler.m_hostname, handler.isAdmin(), ccxn,
-                    sql, sqlStatements, partitionParam));
+                    sql, sqlStatements, partitionParam, null, false, true));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1491,7 +1490,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                      plannedStmtBatch.clientData,
                                                      plannedStmtBatch.sqlBatchText,
                                                      plannedStmtBatch.getSQLStatements(),
-                                                     plannedStmtBatch.partitionParam));
+                                                     plannedStmtBatch.partitionParam,
+                                                     null,
+                                                     false,
+                                                     true));
 
                         // XXX: Need to know the async mailbox id.
                         m_mailbox.send(Long.MIN_VALUE, work);
