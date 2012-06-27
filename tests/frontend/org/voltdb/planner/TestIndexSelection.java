@@ -102,14 +102,20 @@ public class TestIndexSelection extends TestCase {
         assertTrue(pn != null);
 
         pn = pn.getChild(0);
+        int cnt = pn.getChildCount();
+        for( int i = 0; i < cnt; i++ ) {
+        	System.out.println(i);
+        	JSONObject j = new JSONObject(pn.getChild(i).toJSONString());
+        	System.out.println( j.toString(2) );
+        }
         //assertTrue(pn instanceof IndexScanPlanNode);
         //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
 
-        if (pn != null) {
-            JSONObject j = new JSONObject(pn.toJSONString());
-            System.out.println(j.toString(2));
-            System.out.println();
-            System.out.println(pn.toExplainPlanString());
-        }
+//        if (pn != null) {
+//            JSONObject j = new JSONObject(pn.toJSONString());
+//            System.out.println(j.toString(2));
+//            System.out.println();
+//            System.out.println(pn.toExplainPlanString());
+//        }
     }
 }
