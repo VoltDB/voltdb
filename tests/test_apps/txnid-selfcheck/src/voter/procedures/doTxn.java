@@ -35,7 +35,7 @@ import org.voltdb.VoltTable;
 public class doTxn extends VoltProcedure {
 
     public final SQLStmt getLastTxnId = new SQLStmt(
-            "SELECT txnid, rid FROM transactions WHERE txnid < ? ORDER BY txnid DESC LIMIT 1;");
+            "SELECT txnid, rid FROM transactions ORDER BY txnid DESC LIMIT 1;");
 
     public final SQLStmt getReplicated = new SQLStmt(
             "SELECT * FROM replicated ORDER BY id LIMIT 10;");
@@ -47,10 +47,31 @@ public class doTxn extends VoltProcedure {
             "DELETE FROM transactions WHERE rid < ? AND rid >= 0;");
 
     public VoltTable[] run(byte partition, long rid, long oldestRid, byte[] value) {
-        voltQueueSQL(getLastTxnId, getTransactionId());
+        final long txnId = getTransactionId();
+        voltQueueSQL(getLastTxnId);
         voltQueueSQL(getReplicated);
-        voltQueueSQL(insertTxnid, getTransactionId(), partition, rid, value);
+        VoltTable[] results = voltExecuteSQL();
+
+        if (results[0].advanceRow()) {
+            long previousTxnId = results[0].getLong("txnid");
+            long previousRid = results[0].getLong("rid");
+            if (previousTxnId >= txnId || previousRid >= rid) {
+                throw new VoltAbortException("doTxn executed out of order");
+            }
+            results[0].resetRowPosition();
+        }
+        if (results[1].advanceRow()) {
+            long previousTxnId = results[1].getLong("id");
+            if (previousTxnId >= txnId) {
+                throw new VoltAbortException("doTxn and updateReplicated executed out of order");
+            }
+            results[1].resetRowPosition();
+        }
+
+        voltQueueSQL(insertTxnid, txnId, partition, rid, value);
         voltQueueSQL(deleteOldTxns, oldestRid);
-        return voltExecuteSQL(true);
+        voltExecuteSQL(true);
+
+        return results;
     }
 }
