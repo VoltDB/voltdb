@@ -73,7 +73,7 @@ protected:
         TreeNode *right;
         char color;
         NodeCount subct;
-    }__attribute__((__packed__));
+    };
 
     int64_t m_count;
     TreeNode *m_root;
@@ -92,7 +92,7 @@ protected:
 public:
 
     class iterator {
-        friend class CompactingMap<Key, Data, Compare>;
+        friend class CompactingMap<Key, Data, Compare, hasRank>;
     protected:
         const CompactingMap *m_map;
         TreeNode *m_node;
@@ -112,7 +112,7 @@ public:
         }
     };
 
-    CompactingMap(bool unique, Compare comper, bool noRank);
+    CompactingMap(bool unique, Compare comper);
     ~CompactingMap();
 
     bool insert(std::pair<Key, Data> value);
@@ -174,7 +174,7 @@ protected:
 };
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-CompactingMap<Key, Data, Compare>::CompactingMap(bool unique, Compare comper)
+CompactingMap<Key, Data, Compare, hasRank>::CompactingMap(bool unique, Compare comper)
     : m_count(0),
       m_root(&NIL),
       m_allocator(sizeof(TreeNode) - (hasRank ? 0 : sizeof(NodeCount)), 10000),
@@ -188,7 +188,7 @@ CompactingMap<Key, Data, Compare>::CompactingMap(bool unique, Compare comper)
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-CompactingMap<Key, Data, Compare>::~CompactingMap() {
+CompactingMap<Key, Data, Compare, hasRank>::~CompactingMap() {
     iterator iter = begin();
     while (!iter.isEnd()) {
         iter.key().~Key();
@@ -198,7 +198,7 @@ CompactingMap<Key, Data, Compare>::~CompactingMap() {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-bool CompactingMap<Key, Data, Compare>::erase(const Key &key) {
+bool CompactingMap<Key, Data, Compare, hasRank>::erase(const Key &key) {
     TreeNode *node = lookup(key);
     if (node == &NIL) return false;
     erase(node);
@@ -206,14 +206,14 @@ bool CompactingMap<Key, Data, Compare>::erase(const Key &key) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-bool CompactingMap<Key, Data, Compare>::erase(iterator &iter) {
+bool CompactingMap<Key, Data, Compare, hasRank>::erase(iterator &iter) {
     assert(iter.m_node != &NIL);
     erase(iter.m_node);
     return true;
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
+bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> value) {
     if (m_root != &NIL) {
         // find a place to put the new node
         TreeNode *y = &NIL;
@@ -286,7 +286,7 @@ bool CompactingMap<Key, Data, Compare>::insert(std::pair<Key, Data> value) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Compare>::lowerBound(const Key &key) {
+typename CompactingMap<Key, Data, Compare, hasRank>::iterator CompactingMap<Key, Data, Compare, hasRank>::lowerBound(const Key &key) {
     TreeNode *x = m_root;
     TreeNode *y = &NIL;
     while (x != &NIL) {
@@ -303,7 +303,7 @@ typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Co
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Compare>::upperBound(const Key &key) {
+typename CompactingMap<Key, Data, Compare, hasRank>::iterator CompactingMap<Key, Data, Compare, hasRank>::upperBound(const Key &key) {
     TreeNode *x = m_root;
     TreeNode *y = &NIL;
     while (x != &NIL) {
@@ -321,12 +321,12 @@ typename CompactingMap<Key, Data, Compare>::iterator CompactingMap<Key, Data, Co
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename std::pair<typename CompactingMap<Key, Data, Compare>::iterator, typename CompactingMap<Key, Data, Compare>::iterator> CompactingMap<Key, Data, Compare>::equalRange(const Key &key) {
+typename std::pair<typename CompactingMap<Key, Data, Compare, hasRank>::iterator, typename CompactingMap<Key, Data, Compare, hasRank>::iterator> CompactingMap<Key, Data, Compare, hasRank>::equalRange(const Key &key) {
     return std::pair<iterator, iterator>(lowerBound(key), upperBound(key));
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-void CompactingMap<Key, Data, Compare>::erase(TreeNode *z) {
+void CompactingMap<Key, Data, Compare, hasRank>::erase(TreeNode *z) {
     TreeNode *y, *x, *delnode = z;
 
     // find a replacement node to swap with
@@ -379,7 +379,7 @@ void CompactingMap<Key, Data, Compare>::erase(TreeNode *z) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, Compare>::lookup(const Key &key) {
+typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::lookup(const Key &key) {
     TreeNode *x = m_root;
     TreeNode *retval = &NIL;
     while (x != &NIL) {
@@ -399,7 +399,7 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-void CompactingMap<Key, Data, Compare>::leftRotate(TreeNode *x) {
+void CompactingMap<Key, Data, Compare, hasRank>::leftRotate(TreeNode *x) {
     TreeNode *y = x->right;
     NodeCount ctxl = 0, ctyr = 0, ctyl = 0;
 
@@ -433,7 +433,7 @@ void CompactingMap<Key, Data, Compare>::leftRotate(TreeNode *x) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-void CompactingMap<Key, Data, Compare>::rightRotate(TreeNode *x) {
+void CompactingMap<Key, Data, Compare, hasRank>::rightRotate(TreeNode *x) {
     TreeNode *y = x->left;
     NodeCount ctxr = 0, ctyr = 0, ctyl = 0;
     if (hasRank) {
@@ -466,7 +466,7 @@ void CompactingMap<Key, Data, Compare>::rightRotate(TreeNode *x) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-void CompactingMap<Key, Data, Compare>::insertFixup(TreeNode *z) {
+void CompactingMap<Key, Data, Compare, hasRank>::insertFixup(TreeNode *z) {
     TreeNode *y;
 
     while (z->parent->color == RED) {
@@ -514,7 +514,7 @@ void CompactingMap<Key, Data, Compare>::insertFixup(TreeNode *z) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-void CompactingMap<Key, Data, Compare>::deleteFixup(TreeNode *x) {
+void CompactingMap<Key, Data, Compare, hasRank>::deleteFixup(TreeNode *x) {
     TreeNode *w;
 
     while ((x != m_root) && (x->color == BLACK)) {
@@ -577,7 +577,7 @@ void CompactingMap<Key, Data, Compare>::deleteFixup(TreeNode *x) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-void CompactingMap<Key, Data, Compare>::fragmentFixup(TreeNode *X) {
+void CompactingMap<Key, Data, Compare, hasRank>::fragmentFixup(TreeNode *X) {
     // tree is empty now (after the recent delete)
     if (!m_count) {
         X->~TreeNode();
@@ -642,19 +642,19 @@ void CompactingMap<Key, Data, Compare>::fragmentFixup(TreeNode *X) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, Compare>::minimum(const TreeNode *subRoot) const {
+typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::minimum(const TreeNode *subRoot) const {
     while (subRoot->left != &NIL) subRoot = subRoot->left;
     return const_cast<TreeNode*>(subRoot);
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, Compare>::maximum(const TreeNode *subRoot) const {
+typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::maximum(const TreeNode *subRoot) const {
     while (subRoot->right != &NIL) subRoot = subRoot->right;
     return const_cast<TreeNode*>(subRoot);
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, Compare>::successor(const TreeNode *x) const {
+typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::successor(const TreeNode *x) const {
     if (x->right != &NIL) return minimum(x->right);
     TreeNode *y = x->parent;
     while ((y != &NIL) && (x == y->right)) {
@@ -665,7 +665,7 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, Compare>::predecessor(const TreeNode *x) const {
+typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::predecessor(const TreeNode *x) const {
     if (x->left != &NIL) return maximum(x->left);
     TreeNode *y = x->parent;
     while ((y != &NIL) && (x == y->left)) {
@@ -676,7 +676,7 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-bool CompactingMap<Key, Data, Compare>::isReachableNode(const TreeNode* start, const TreeNode *dest) const {
+bool CompactingMap<Key, Data, Compare, hasRank>::isReachableNode(const TreeNode* start, const TreeNode *dest) const {
     if (start == dest)
         return true;
     if ((start->left) && (isReachableNode(start->left, dest)))
@@ -687,7 +687,7 @@ bool CompactingMap<Key, Data, Compare>::isReachableNode(const TreeNode* start, c
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-int32_t CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) {
+int32_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
 	if (!hasRank) return -1;
 
 	TreeNode *n = lookup(key);
@@ -726,13 +726,13 @@ int32_t CompactingMap<Key, Data, Compare>::rankAsc(const Key& key) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-int32_t CompactingMap<Key, Data, Compare>::rankDes(const Key& key) {
+int32_t CompactingMap<Key, Data, Compare, hasRank>::rankDes(const Key& key) {
 	if (!hasRank) return -1;
 	return m_count - rankAsc(key);
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, Compare>::lookupRank(int32_t ith) {
+typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::lookupRank(int32_t ith) {
 	if (!hasRank) return &NIL;
 
 	TreeNode *x = m_root;
@@ -760,7 +760,7 @@ typename CompactingMap<Key, Data, Compare>::TreeNode *CompactingMap<Key, Data, C
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-bool CompactingMap<Key, Data, Compare>::verifyRank() {
+bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
 	if (!hasRank)
 		return true;
 
@@ -805,7 +805,7 @@ bool CompactingMap<Key, Data, Compare>::verifyRank() {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-bool CompactingMap<Key, Data, Compare>::verify() const {
+bool CompactingMap<Key, Data, Compare, hasRank>::verify() const {
     if (NIL.color != BLACK) {
         printf("NIL is red\n");
         return false;
@@ -836,7 +836,7 @@ bool CompactingMap<Key, Data, Compare>::verify() const {
 
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-int CompactingMap<Key, Data, Compare>::inOrderCounterChecking(const TreeNode *n) const {
+int CompactingMap<Key, Data, Compare, hasRank>::inOrderCounterChecking(const TreeNode *n) const {
 	if (hasRank) return 0;
 
 	int res = 0;
@@ -857,7 +857,7 @@ int CompactingMap<Key, Data, Compare>::inOrderCounterChecking(const TreeNode *n)
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-int CompactingMap<Key, Data, Compare>::verify(const TreeNode *n) const {
+int CompactingMap<Key, Data, Compare, hasRank>::verify(const TreeNode *n) const {
     // recursive stopping case
     if (n == NULL) return false;
     if (n == &NIL)
@@ -891,7 +891,7 @@ int CompactingMap<Key, Data, Compare>::verify(const TreeNode *n) const {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-int CompactingMap<Key, Data, Compare>::fullCount(const TreeNode *n) const {
+int CompactingMap<Key, Data, Compare, hasRank>::fullCount(const TreeNode *n) const {
     if (n == &NIL) return 0;
     else return fullCount(n->left) + fullCount(n->right) + 1;
 }
