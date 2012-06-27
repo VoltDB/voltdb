@@ -86,11 +86,7 @@ public class PlannerTestAideDeCamp {
         ddl_compiler.compileToCatalog(catalog, db);
     }
 
-    /**
-     * Cleans up HSQL. Mandatory - call this when done!
-     */
     public void tearDown() {
-        hsql.close();
     }
 
     public Catalog getCatalog() {
@@ -160,7 +156,7 @@ public class PlannerTestAideDeCamp {
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, true, true);
         QueryPlanner planner =
             new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
-                             hsql, estimates, true, false);
+                             hsql, estimates, false);
 
         CompiledPlan plan = null;
         plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),

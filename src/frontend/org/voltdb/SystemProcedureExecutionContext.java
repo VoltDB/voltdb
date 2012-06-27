@@ -57,5 +57,5 @@ public interface SystemProcedureExecutionContext {
 
     public void updateBackendLogLevels();
 
-    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context);
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context, CatalogSpecificPlanner csp);
 }

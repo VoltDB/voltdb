@@ -47,7 +47,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
         Catalog catalog = new Catalog();
         catalog.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
-        m_pt = new PlannerTool(context);
+        m_pt = new PlannerTool(context.cluster, context.database);
     }
 
     @Override
@@ -66,7 +66,7 @@ public class TestAdHocPlans extends AdHocQueryTester {
     public int runQueryTest(String query, int hash, int spPartialSoFar,
             int expected, int validatingSPresult) throws IOException,
             NoConnectionsException, ProcCallException {
-        PlannerTool.Result result = m_pt.planSql(query, null, true);
+        PlannerTool.Result result = m_pt.planSql(query, null, true, false);
         boolean spPlan = result.toString().contains("ALL: null");
         if ((validatingSPresult == VALIDATING_SP_RESULT) != spPlan) {
             System.out.println("Missed: "+ query);

@@ -47,7 +47,6 @@ public class QueryPlanner {
     Cluster m_cluster;
     Database m_db;
     String m_recentErrorMsg;
-    boolean m_useGlobalIds;
     boolean m_quietPlanner;
     final boolean m_fullDebug;
 
@@ -62,7 +61,7 @@ public class QueryPlanner {
      */
     public QueryPlanner(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning,
                         HSQLInterface HSQL, DatabaseEstimates estimates,
-                        boolean useGlobalIds, boolean suppressDebugOutput) {
+                        boolean suppressDebugOutput) {
         assert(HSQL != null);
         assert(catalogCluster != null);
         assert(catalogDb != null);
@@ -72,7 +71,6 @@ public class QueryPlanner {
         m_db = catalogDb;
         m_cluster = catalogCluster;
         m_estimates = estimates;
-        m_useGlobalIds = useGlobalIds;
         m_quietPlanner = suppressDebugOutput;
         m_fullDebug = System.getProperties().contains("compilerdebug");
     }
@@ -105,8 +103,8 @@ public class QueryPlanner {
         // reset any error message
         m_recentErrorMsg = null;
 
-        // set the usage of global ids in the plan assembler
-        AbstractPlanNode.setUseGlobalIds(m_useGlobalIds);
+        // Reset plan node ids to start at 1 for this plan
+        AbstractPlanNode.resetPlanNodeIds();
 
         // use HSQLDB to get XML that describes the semantics of the statement
         // this is much easier to parse than SQL and is checked against the catalog

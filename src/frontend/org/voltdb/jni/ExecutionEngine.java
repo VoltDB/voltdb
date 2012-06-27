@@ -279,7 +279,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Run a plan fragment */
     abstract public VoltTable executeCustomPlanFragment(
             String plan, int inputDepId, long txnId,
-            long lastCommittedTxnId, long undoQuantumToken) throws EEException;
+            long lastCommittedTxnId, long undoQuantumToken, ParameterSet params) throws EEException;
 
     /** Run multiple query plan fragments */
     abstract public VoltTable[] executeQueryPlanFragmentsAndGetResults(long[] planFragmentIds,
