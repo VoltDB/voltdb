@@ -63,7 +63,7 @@ public:
     ~CompactingMapTest() {
     }
 
-    void print(voltdb::CompactingMap<int, int, IntComparator> &m, true) {
+    void print(voltdb::CompactingMap<int, int, IntComparator, true> &m) {
         voltdb::CompactingMap<int, int, IntComparator, true>::iterator iter;
 
         printf(" compactmap [ ");
@@ -147,7 +147,7 @@ public:
     }
 };
 
-TEST_F(CompactingMapIndexCountTest, RandomUniqueRank) {
+TEST_F(CompactingMapTest, RandomUniqueRank) {
     const int ITERATIONS = 1001;
     const int BIGGEST_VAL = 100;
 
@@ -240,7 +240,7 @@ TEST_F(CompactingMapIndexCountTest, RandomUniqueRank) {
     ASSERT_TRUE(volt.verifyRank());
 }
 
-TEST_F(CompactingMapIndexCountTest, RandomMulti) {
+TEST_F(CompactingMapTest, RandomMultiRank) {
     const int ITERATIONS  = 1001;
     const int BIGGEST_VAL = 100;
 
@@ -256,7 +256,7 @@ TEST_F(CompactingMapIndexCountTest, RandomMulti) {
 
     std::multimap<std::string, std::string> stl;
     // Start the counting index feature
-    voltdb::CompactingMap<std::string, std::string, StringComparator,true> volt(false, StringComparator());
+    voltdb::CompactingMap<std::string, std::string, StringComparator, true> volt(false, StringComparator());
 
     std::multimap<std::string, std::string>::iterator stli;
     voltdb::CompactingMap<std::string, std::string, StringComparator, true>::iterator volti;
