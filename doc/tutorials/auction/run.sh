@@ -58,7 +58,7 @@ function client() {
     $CSVLOADER -f $DATAFILES/users.txt \
                         -p InsertIntoUser \
                         --user program \
-                        --passward pass 
+                        --password pass 
     srccompile
     java -classpath obj:$CLASSPATH com.auctionexample.Client
 }
