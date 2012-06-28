@@ -68,11 +68,18 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         m_messenger = messenger;
         m_partitionId = partition;
         m_scheduler = new SpScheduler(taskQueue);
+        RejoinProducer rejoinProducer = new RejoinProducer(m_partitionId, taskQueue);
         m_initiatorMailbox = new InitiatorMailbox(
                 m_scheduler,
                 m_messenger,
                 m_repairLog,
-                new RejoinProducer(taskQueue));
+                rejoinProducer);
+
+        // Now publish the initiator mailbox to friends and family
+        m_messenger.createMailbox(null, m_initiatorMailbox);
+        rejoinProducer.setMailbox(m_initiatorMailbox);
+        m_scheduler.setMailbox(m_initiatorMailbox);
+
         m_whoami = "SP " +  CoreUtils.hsIdToString(getInitiatorHSId())
             + " for partition " + m_partitionId + " ";
     }

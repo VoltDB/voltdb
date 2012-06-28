@@ -470,8 +470,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         m_rejoinCoordinator =
                                 (RejoinCoordinator) constructor.newInstance(m_messenger, hsidsToRejoin);
                         m_messenger.registerMailbox(m_rejoinCoordinator);
-                        m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
-                                                           new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
+                        // Probably don't need to do this!? Maybe?
+                        // m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
+                        //                                   new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
                         hostLog.info("Using iv2 community rejoin");
                     } catch (Exception e) {
                         VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",

@@ -19,9 +19,13 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.atomic.AtomicLong;
 
+import java.util.concurrent.ExecutionException;
+
 import java.util.List;
 import java.util.Set;
 import java.util.TreeSet;
+
+import org.json_voltpatches.JSONObject;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -31,10 +35,16 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.utils.CoreUtils;
 
+import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCacheReader;
+
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.messaging.RejoinMessage;
+
+import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -52,6 +62,7 @@ public class InitiatorMailbox implements Mailbox
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
     private final RejoinProducer m_rejoinProducer;
+    private final MapCacheReader m_masterMapCache;
     private long m_hsId;
     private Term m_term;
 
@@ -72,9 +83,17 @@ public class InitiatorMailbox implements Mailbox
         m_msgHandler = msgHandler;
         m_messenger = messenger;
         m_repairLog = repairLog;
-        m_messenger.createMailbox(null, this);
-        m_msgHandler.setMailbox(this);
         m_rejoinProducer = rejoinProducer;
+
+        m_masterMapCache = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
+        try {
+            m_masterMapCache.start(false);
+        } catch (InterruptedException ignored) {
+            // not blocking. shouldn't interrupt.
+        } catch (ExecutionException crashme) {
+            // this on the other hand seems tragic.
+            VoltDB.crashLocalVoltDB("Error constructiong InitiatorMailbox.", false, crashme);
+        }
     }
 
     // Provide the starting replica configuration (for startup)
@@ -96,6 +115,19 @@ public class InitiatorMailbox implements Mailbox
             m_replicas.addAll(replicas);
             m_msgHandler.updateReplicas(replicas);
         }
+    }
+
+    public long getMasterHsId(int partitionId)
+    {
+        try {
+            JSONObject master = m_masterMapCache.get(Integer.toString(partitionId));
+            long masterHsId = Long.valueOf(master.getLong("hsid"));
+            return masterHsId;
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to deserialize map cache reader object.", false, e);
+        }
+        // unreachable.
+        return Long.MIN_VALUE;
     }
 
     @Override

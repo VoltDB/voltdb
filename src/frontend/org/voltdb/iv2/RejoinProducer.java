@@ -17,7 +17,40 @@
 
 package org.voltdb.iv2;
 
+import java.io.File;
+
+import java.lang.reflect.Constructor;
+
+import java.net.InetAddress;
+
+import java.util.ArrayList;
+import java.util.List;
+
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
+
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
+
+import org.voltdb.client.ClientResponse;
+
+import org.voltdb.ClientResponseImpl;
+
 import org.voltdb.messaging.RejoinMessage;
+
+import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.TaskLog;
+
+import org.voltdb.SnapshotFormat;
+
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
+
+import org.voltdb.utils.MiscUtils;
+
+import org.voltdb.VoltDB;
+import org.voltdb.VoltTable;
 
 /**
  * Manages the lifecycle of snapshot serialization to a site
@@ -26,13 +59,159 @@ import org.voltdb.messaging.RejoinMessage;
 public class RejoinProducer
 {
     private final SiteTaskerQueue m_taskQueue;
+    private final int m_partitionId;
+    private InitiatorMailbox m_mailbox;
+    private long m_rejoinCoordinatorHsId;
+    private RejoinSiteProcessor m_rejoinSiteProcessor;
 
-    public RejoinProducer(SiteTaskerQueue taskQueue)
+    /*
+     * The handler will be called when a SnapshotUtil.requestSnapshot response comes
+     * back. It could potentially take a long time to successfully queue the
+     * snapshot request, or it may fail.
+     *
+     * This runs on the snapshot daemon thread.
+     */
+    SnapshotResponseHandler m_handler = new SnapshotResponseHandler() {
+        @Override
+        public void handleResponse(ClientResponse resp) {
+            if (resp == null) {
+                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
+                        false, null);
+            } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: " +
+                        resp.getStatusString(), false, null);
+            }
+
+            VoltTable[] results = resp.getResults();
+            if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                long txnId = -1;
+                String appStatus = resp.getAppStatusString();
+                if (appStatus == null) {
+                    VoltDB.crashLocalVoltDB("Rejoin snapshot request failed: " +
+                            resp.getStatusString(), false, null);
+                }
+
+                try {
+                    JSONObject jsObj = new JSONObject(appStatus);
+                    txnId = jsObj.getLong("txnId");
+                } catch (JSONException e) {
+                    VoltDB.crashLocalVoltDB("Failed to get the rejoin snapshot txnId",
+                            true, e);
+                    return;
+                }
+
+                // Send a message to self to avoid synchronization
+//                RejoinMessage msg = new RejoinMessage(txnId);
+//                m_mailbox.send(getSiteId(), msg);
+            } else {
+                VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
+                        false, null);
+            }
+        }
+    };
+
+    // m_handler sends this message when a non-blocking snapshot is
+    // completed.
+    void doRequestResponse(RejoinMessage message)
     {
+        /*
+            m_rejoinSnapshotTxnId = rm.getSnapshotTxnId();
+            if (m_rejoinTaskLog != null) {
+                m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
+            }
+            VoltDB.instance().getSnapshotCompletionMonitor()
+                  .addInterest(m_snapshotCompletionHandler);
+        */
+    }
+
+    public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
+    {
+        m_partitionId = partitionId;
         m_taskQueue = taskQueue;
+    }
+
+    public void setMailbox(InitiatorMailbox mailbox)
+    {
+        m_mailbox = mailbox;
     }
 
     public void deliver(RejoinMessage message)
     {
+        if (message.getType() == RejoinMessage.Type.INITIATION) {
+            doInitiation(message);
+        }
+        else if (message.getType() == RejoinMessage.Type.REQUEST_RESPONSE) {
+            doRequestResponse(message);
+        }
+        else {
+            VoltDB.crashLocalVoltDB("Unknown rejoin message type: " +
+                    message.getType(), false, null);
+        }
     }
+
+    void doInitiation(RejoinMessage message)
+    {
+        m_rejoinCoordinatorHsId = message.m_sourceHSId;
+        m_rejoinSiteProcessor = makeSnapshotProcessor();
+
+        // MUST choose the leader as the source.
+        long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
+        Pair<List<byte[]>, Integer> endPoints = m_rejoinSiteProcessor.initialize();
+
+        // Initiate a snapshot with stream snapshot target
+        String data = makeSnapshotRequest(endPoints, sourceSite);
+        String nonce = "Rejoin_" + m_mailbox.getHSId() + "_" + System.currentTimeMillis();
+
+        // request a blocking snapshot.
+        SnapshotUtil.requestSnapshot(0l, "", nonce, true,
+                                     SnapshotFormat.STREAM, data, m_handler);
+
+
+    }
+
+    private RejoinSiteProcessor makeSnapshotProcessor()
+    {
+        RejoinSiteProcessor rejoinSiteProcessor = null;
+        Class<?> klass =
+                MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotSink",
+                                       "Rejoin", false);
+        Constructor<?> constructor;
+        try {
+            constructor = klass.getConstructor(long.class);
+            rejoinSiteProcessor = (RejoinSiteProcessor) constructor.newInstance(m_mailbox.getHSId());
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to construct stream snapshot receiver",
+                                    true, e);
+        }
+        return rejoinSiteProcessor;
+    }
+
+    private String makeSnapshotRequest(Pair<List<byte[]>, Integer> endPoints, long sourceSite)
+    {
+        List<byte[]> addresses = endPoints.getFirst();
+        int port = endPoints.getSecond();
+
+        try {
+            JSONStringer jsStringer = new JSONStringer();
+            jsStringer.object();
+            jsStringer.key("addresses").array();
+            for (byte[] addr : addresses) {
+                InetAddress inetAddress = InetAddress.getByAddress(addr);
+                jsStringer.value(inetAddress.getHostAddress());
+            }
+            jsStringer.endArray();
+            jsStringer.key("port").value(port);
+            // make this snapshot only contain data from this site
+            // m_recoveryLog.debug("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
+            //                   " is " + CoreUtils.hsIdToString(sourceSite));
+            jsStringer.key("target_hsid").value(sourceSite);
+            jsStringer.endObject();
+            return jsStringer.toString();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
+        }
+        // unreachable;
+        return null;
+    }
+
 }
