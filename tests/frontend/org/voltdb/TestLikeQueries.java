@@ -133,7 +133,6 @@ public class TestLikeQueries extends TestCase {
             new LikeTest("%de%", 1),
             new LikeTest("â🀲x", 1),
             new LikeTest("â🀲x一xxéyyԱ", 1),
-            new LikeTest("â_x一xxéyyԱ", 1),
             new LikeTest("â🀲x_xxéyyԱ", 1),
             new LikeTest("â🀲x一xxéyy_", 1),
             new LikeTest("â🀲x一xéyyԱ", 0),
