@@ -27,8 +27,6 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
 
-import org.voltdb.VoltDB;
-
 /**
  * Implements the Single-partition everywhere procedure ProcedureTask.
  * Creates one SP transaction per partition. These are produced on
@@ -59,6 +57,12 @@ public class EveryPartitionTask extends TransactionTask
         m_queue.flush();
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
+    }
+
+    @Override
+    public void runForRejoin(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException("MPI asked to execute everysite proc. while rejoining.");
     }
 
     @Override

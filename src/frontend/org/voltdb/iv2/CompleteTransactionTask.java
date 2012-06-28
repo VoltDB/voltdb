@@ -50,6 +50,14 @@ public class CompleteTransactionTask extends TransactionTask
     }
 
     @Override
+    public void runForRejoin(SiteProcedureConnection siteConnection)
+    {
+        // future: offer to siteConnection.IBS for replay.
+        m_txn.setDone();
+        m_queue.flush();
+    }
+
+    @Override
     public long getMpTxnId()
     {
         return m_msg.getTxnId();

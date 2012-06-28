@@ -37,6 +37,7 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
     static class Task extends SiteTasker
     {
         boolean run = false;
+        boolean runForRejoin = false;
         final int priority;
 
         Task(int priority)
@@ -55,6 +56,13 @@ public class Iv2TestSiteTaskerScheduler extends TestCase
         {
             return priority;
         }
+
+        @Override
+        public void runForRejoin(SiteProcedureConnection ee)
+        {
+            runForRejoin = true;
+        }
+
     }
 
     @Test

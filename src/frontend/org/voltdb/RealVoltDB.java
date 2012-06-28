@@ -454,8 +454,34 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 hostLog.info("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
-                // Construct and publish rejoin coordinator mailbox
-                if (isRejoin && m_config.m_newRejoin) {
+                if (isRejoin && isIV2Enabled()) {
+                    // Make a list of HDIds to rejoin
+                    List<Long> hsidsToRejoin = new ArrayList<Long>();
+                    for (Initiator init : m_iv2Initiators) {
+                        hsidsToRejoin.add(init.getInitiatorHSId());
+                    }
+
+                    // Do a blocking iv2 rejoin
+                    Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
+                                                            "Rejoin", false);
+                    Constructor<?> constructor;
+                    try {
+                        constructor = klass.getConstructor(HostMessenger.class, List.class);
+                        m_rejoinCoordinator =
+                                (RejoinCoordinator) constructor.newInstance(m_messenger, hsidsToRejoin);
+                        m_messenger.registerMailbox(m_rejoinCoordinator);
+                        m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
+                                                           new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
+                        hostLog.info("Using iv2 community rejoin");
+                    } catch (Exception e) {
+                        VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
+                                                true, e);
+                    }
+
+
+                }
+                else if (isRejoin && m_config.m_newRejoin) {
+                    // Construct and publish rejoin coordinator mailbox
                     ArrayList<Long> sites = new ArrayList<Long>();
                     for (Mailbox siteMailbox : siteMailboxes) {
                         sites.add(siteMailbox.getHSId());
@@ -555,7 +581,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 for (Initiator iv2init : m_iv2Initiators) {
                     iv2init.configure(getBackendTargetType(), m_serializedCatalog,
                             m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor(),
-                            csp);
+                            csp, false);
                 }
             }
             else {

@@ -137,7 +137,8 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp)
+                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp,
+                          boolean createForRejoin)
     {
         try {
             m_missingStartupSites = new CountDownLatch(kfactor + 1);
@@ -156,7 +157,8 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                                        serializedCatalog,
                                        catalogContext.m_transactionId,
                                        m_partitionId,
-                                       cartographer.getNumberOfPartitions());
+                                       cartographer.getNumberOfPartitions(),
+                                       createForRejoin);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite,
                     m_executionSite.m_sysprocContext);

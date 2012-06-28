@@ -17,10 +17,13 @@
 
 package org.voltdb.iv2;
 
-
 import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
+
+import org.voltdb.client.ClientResponse;
+
+import org.voltdb.ClientResponseImpl;
 
 import org.voltdb.iv2.Site;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -28,6 +31,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
+
+import org.voltdb.VoltTable;
 
 /**
  * Implements the single partition procedure ProcedureTask.
@@ -59,6 +64,24 @@ public class SpProcedureTask extends ProcedureTask
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
+    }
+
+    @Override
+    public void runForRejoin(SiteProcedureConnection siteConnection)
+    {
+        SpTransactionState txn = (SpTransactionState)m_txn;
+        final InitiateResponseMessage response =
+            new InitiateResponseMessage(txn.m_task);
+        response.m_sourceHSId = m_initiator.getHSId();
+        response.setRecovering(true);
+
+        // add an empty dummy response
+        response.setResults(new ClientResponseImpl(
+                    ClientResponse.SUCCESS,
+                    new VoltTable[0],
+                    null));
+
+        m_initiator.deliver(response);
     }
 
     @Override

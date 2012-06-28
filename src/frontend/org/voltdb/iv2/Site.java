@@ -73,6 +73,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // What type of EE is controlled
     final BackendTarget m_backend;
 
+    // Is the site in a rejoining mode.
+    boolean m_isRejoining;
+
     // Enumerate execution sites by host.
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
     private final int m_siteIndex = siteIndexCounter.getAndIncrement();
@@ -250,7 +253,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             String serializedCatalog,
             long txnId,
             int partitionId,
-            int numPartitions)
+            int numPartitions,
+            boolean createForRejoin)
     {
         m_siteId = siteId;
         m_context = context;
@@ -258,6 +262,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_numberOfPartitions = numPartitions;
         m_scheduler = scheduler;
         m_backend = backend;
+        m_isRejoining = createForRejoin;
 
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, txnId);
@@ -379,7 +384,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             if (task instanceof TransactionTask) {
                 m_currentTxnId = ((TransactionTask)task).getMpTxnId();
             }
-            task.run(getSiteProcedureConnection());
+            if (m_isRejoining) {
+                task.runForRejoin(getSiteProcedureConnection());
+            }
+            else {
+                task.run(getSiteProcedureConnection());
+            }
         }
 
         m_snapshotter.doSnapshotWork(m_ee, true);

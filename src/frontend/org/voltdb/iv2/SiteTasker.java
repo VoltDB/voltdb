@@ -28,6 +28,11 @@ public abstract class SiteTasker {
     abstract public void run(SiteProcedureConnection siteConnection);
 
     /**
+     * Run the task on an inconsistent/rejoining EE.
+     */
+    abstract public void runForRejoin(SiteProcedureConnection siteConnection);
+
+    /**
      * Priority returns the relative task priority. 0 is the highest
      * priority.
      */

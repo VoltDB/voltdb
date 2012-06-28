@@ -70,6 +70,20 @@ public class SysprocFragmentTask extends TransactionTask
         m_initiator.deliver(response);
     }
 
+    /**
+     * Produce a rejoining response.
+     */
+    @Override
+    public void runForRejoin(SiteProcedureConnection siteConnection)
+    {
+        final FragmentResponseMessage response =
+            new FragmentResponseMessage(m_task, m_initiator.getHSId());
+        response.setRecovering(true);
+        response.setStatus(FragmentResponseMessage.SUCCESS, null);
+        m_initiator.deliver(response);
+    }
+
+
     // Extracted the sysproc portion of ExecutionSite processFragmentTask(), then
     // modifed to work in the new world
     public FragmentResponseMessage processFragmentTask(SiteProcedureConnection siteConnection)

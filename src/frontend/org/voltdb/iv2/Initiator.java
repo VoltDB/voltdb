@@ -30,7 +30,8 @@ public interface Initiator
     /** Configure an Initiator and prepare it for work */
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp);
+                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp,
+                          boolean createForRejoin);
 
     /** Shutdown an Initiator and its sub-components. */
     public void shutdown();

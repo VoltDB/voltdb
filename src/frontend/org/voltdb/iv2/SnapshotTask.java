@@ -37,6 +37,12 @@ public class SnapshotTask extends SiteTasker
     }
 
     @Override
+    public void runForRejoin(SiteProcedureConnection siteConnection)
+    {
+        throw new RuntimeException("Snapshot task attempted snapshot on partial rejoin state.");
+    }
+
+    @Override
     public int priority()
     {
         return 0;

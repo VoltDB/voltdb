@@ -122,8 +122,11 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp)
+                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp,
+                          boolean createForRejoin)
     {
+        assert(createForRejoin == false);
+
         try {
             m_iv2masters.start(true);
             boolean isLeader = joinElectoralCollege();
@@ -142,7 +145,8 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
                     serializedCatalog,
                     catalogContext.m_transactionId,
                     m_partitionId,
-                    cartographer.getNumberOfPartitions());
+                    cartographer.getNumberOfPartitions(),
+                    createForRejoin);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite,
                     m_executionSite.m_sysprocContext);
