@@ -23,6 +23,8 @@ import java.lang.reflect.Constructor;
 
 import java.net.InetAddress;
 
+import java.nio.ByteBuffer;
+
 import java.util.ArrayList;
 import java.util.List;
 
@@ -39,6 +41,8 @@ import org.voltdb.ClientResponseImpl;
 
 import org.voltdb.messaging.RejoinMessage;
 
+import org.voltdb.PrivateVoltTableFactory;
+
 import org.voltdb.rejoin.RejoinSiteProcessor;
 import org.voltdb.rejoin.TaskLog;
 
@@ -49,6 +53,7 @@ import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 
 import org.voltdb.utils.MiscUtils;
 
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 
@@ -56,7 +61,7 @@ import org.voltdb.VoltTable;
  * Manages the lifecycle of snapshot serialization to a site
  * for the purposes of rejoin.
  */
-public class RejoinProducer
+public class RejoinProducer extends SiteTasker
 {
     private final SiteTaskerQueue m_taskQueue;
     private final int m_partitionId;
@@ -166,7 +171,8 @@ public class RejoinProducer
         SnapshotUtil.requestSnapshot(0l, "", nonce, true,
                                      SnapshotFormat.STREAM, data, m_handler);
 
-
+        // run the rejoin task (ourself) in the Site
+        m_taskQueue.offer(this);
     }
 
     private RejoinSiteProcessor makeSnapshotProcessor()
@@ -214,4 +220,43 @@ public class RejoinProducer
         return null;
     }
 
+    /**
+     * SiteTasker run -- load this site!
+     */
+	@Override
+	public void run(SiteProcedureConnection siteConnection) {
+        while (!m_rejoinSiteProcessor.isEOF()) {
+            Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
+            if (rejoinWork != null) {
+                int tableId = rejoinWork.getFirst();
+                ByteBuffer buffer = rejoinWork.getSecond();
+                VoltTable table =
+                    PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
+                            true);
+                //m_recoveryLog.info("table " + tableId + ": " + table.toString());
+                // loadTable(m_rejoinSnapshotTxnId, tableId, table);
+                // siteConnection.loadTable(tableId, buffer, txnId, lastCommittedTxnId, undo_token);
+            } else if (m_rejoinSiteProcessor.isEOF()) {
+                // m_recoveryLog.debug("Rejoin snapshot transfer is finished");
+                m_rejoinSiteProcessor.close();
+                // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
+                m_rejoinSiteProcessor = null;
+                // m_taskExeStartTime = System.currentTimeMillis();
+                /*
+                 * Don't notify the rejoin coordinator yet. The stream snapshot may
+                 * have not finished on all nodes, let the snapshot completion
+                 * monitor tell the rejoin coordinator.
+                 */
+            }
+        }
+	}
+
+	@Override
+	public void runForRejoin(SiteProcedureConnection siteConnection) {
+	}
+
+	@Override
+	public int priority() {
+		return 0;
+	}
 }
