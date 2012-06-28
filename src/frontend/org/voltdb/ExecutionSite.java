@@ -152,7 +152,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     protected SiteTracker m_tracker;
 
     final long m_siteId;
-    public final long getSiteId() {
+    public long getSiteId() {
         return m_siteId;
     }
 
@@ -2496,7 +2496,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * when the transaction ID changes.
      */
     @Override
-    public final void beginNewTxn(TransactionState txnState)
+    public void beginNewTxn(TransactionState txnState)
     {
         if (m_txnlog.isTraceEnabled())
         {
@@ -2512,7 +2512,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
     }
 
-    public final void rollbackTransaction(TransactionState txnState)
+    public void rollbackTransaction(TransactionState txnState)
     {
         if (m_txnlog.isTraceEnabled())
         {

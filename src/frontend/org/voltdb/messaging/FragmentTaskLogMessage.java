@@ -116,26 +116,7 @@ public class FragmentTaskLogMessage extends TransactionInfoBaseMessage {
         m_fragmentTasks.add(ft);
     }
 
-    private boolean checkForOutOfPlaceFinalTask() {
-        // make sure all tasks not at the end are non-final
-        for (int i = 0; i < m_fragmentTasks.size() - 1; i++) {
-            if (m_fragmentTasks.get(i).isFinalTask()) {
-                return false;
-            }
-        }
-        return true;
-    }
-
     public List<FragmentTaskMessage> getFragmentTasks() {
-        int fragTaskCount = m_fragmentTasks.size();
-        if (fragTaskCount > 0) {
-            assert(checkForOutOfPlaceFinalTask());
-            // set the last fragment to final (overwrite if already final)
-            // during rejoin replay, completion messages are not logged,
-            // so the final task is used to end a transaction, so it must
-            // be present.
-            m_fragmentTasks.get(m_fragmentTasks.size() - 1).m_isFinal = true;
-        }
         return m_fragmentTasks;
     }
 }

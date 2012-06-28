@@ -33,6 +33,9 @@ import org.voltdb.VoltTable;
 )
 public class updateReplicated extends VoltProcedure
 {
+    // Different reasons for abort
+    public static enum AbortStatus {NORMAL, OUT_OF_ORDER};
+
     // Delete everything in the replicated table
     public final SQLStmt deleteStmt = new SQLStmt("DELETE FROM replicated;");
 
@@ -43,19 +46,28 @@ public class updateReplicated extends VoltProcedure
     public final SQLStmt selectStmt = new SQLStmt("SELECT * FROM replicated ORDER BY id LIMIT 10;");
 
     public VoltTable run() {
-        voltQueueSQL(selectStmt);
-        voltQueueSQL(deleteStmt, EXPECT_SCALAR_LONG);
-
         // initialize the data using the txnId as a base
         long txnId = this.getTransactionId();
+
+        voltQueueSQL(selectStmt);
+        voltQueueSQL(deleteStmt, EXPECT_SCALAR_LONG);
+        VoltTable[] previousResults = voltExecuteSQL();
+
+        // some percent of this will rollback
+        if (txnId % 10 < 1) {
+            setAppStatusCode((byte) AbortStatus.NORMAL.ordinal());
+            throw new VoltAbortException("Normal abort");
+        }
+
+        // txnId in the table should be smaller than the current txnId
+        if (previousResults[0].asScalarLong() >= txnId) {
+            setAppStatusCode((byte) AbortStatus.OUT_OF_ORDER.ordinal());
+            throw new VoltAbortException("updateReplicated executed out of order");
+        }
+
         voltQueueSQL(insertStmt, EXPECT_SCALAR_MATCH(1), txnId);
         voltQueueSQL(selectStmt);
         VoltTable[] results = voltExecuteSQL(true);
-
-        // txnId in the table should be smaller than the current txnId
-        if (results[0].asScalarLong() >= txnId) {
-            throw new VoltAbortException("updateReplicated executed out of order");
-        }
 
         // Return last result
         return results[results.length - 1];

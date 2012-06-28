@@ -362,6 +362,13 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         }
 
         m_mbox.send(response.getDestinationSiteId(), response);
+
+        // If we're not the coordinator, the transaction is read-only,
+        // and this was the final task, then we can try to move on after
+        // we've finished this work.
+        if (!isCoordinator() && isReadOnly() && ftask.isFinalTask()) {
+            m_done = true;
+        }
     }
 
     @Override
