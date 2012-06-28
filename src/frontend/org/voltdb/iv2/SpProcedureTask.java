@@ -76,10 +76,7 @@ public class SpProcedureTask extends ProcedureTask
             // legacy interaces don't work this way and IV2 hasn't changed this
             // ownership yet. But truncateUndoLog is written assuming the right
             // eventual encapsulation.
-            final long token = m_txn.needsRollback() ?
-                m_txn.getBeginUndoToken() : siteConnection.getLatestUndoToken();
-
-            siteConnection.truncateUndoLog(m_txn.needsRollback(), token, m_txn.txnId);
+            siteConnection.truncateUndoLog(m_txn.needsRollback(), m_txn.getBeginUndoToken(), m_txn.txnId);
         }
         m_txn.setDone();
         m_queue.flush();

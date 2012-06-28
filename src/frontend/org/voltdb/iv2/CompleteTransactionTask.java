@@ -37,9 +37,13 @@ public class CompleteTransactionTask extends TransactionTask
     public void run(SiteProcedureConnection siteConnection)
     {
         hostLog.debug("STARTING: " + this);
-        siteConnection.truncateUndoLog(m_msg.isRollback(),
-                                       m_txn.getBeginUndoToken(),
-                                       m_msg.getTxnId());
+        if (!m_txn.isReadOnly()) {
+            // the truncation point token SHOULD be part of m_txn. However, the
+            // legacy interaces don't work this way and IV2 hasn't changed this
+            // ownership yet. But truncateUndoLog is written assuming the right
+            // eventual encapsulation.
+            siteConnection.truncateUndoLog(m_msg.isRollback(), m_txn.getBeginUndoToken(), m_txn.txnId);
+        }
         m_txn.setDone();
         m_queue.flush();
         hostLog.debug("COMPLETE: " + this);

@@ -507,13 +507,17 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId)
     {
         if (rollback) {
-            m_ee.undoUndoToken(token);
+            m_ee.undoUndoToken(beginUndoToken);
         }
         else {
-            m_ee.releaseUndoToken(latestUndoToken);
+            assert(latestUndoToken != Site.kInvalidUndoToken);
+            assert(latestUndoToken >= beginUndoToken);
+            if (latestUndoToken > beginUndoToken) {
+                m_ee.releaseUndoToken(latestUndoToken);
+            }
             m_lastCommittedTxnId = txnId;
         }
     }

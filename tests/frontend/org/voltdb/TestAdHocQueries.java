@@ -127,8 +127,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             //Output from the first preplanned statement
             assertEquals( 3, results[1].getRowCount());
             assertTrue(results[1].advanceRow());
-            assertEquals( 24, results[1].getLong(0));
-            assertEquals( 4, results[1].getLong(1));
+            assertEquals( 23, results[1].getLong(0));
+            assertEquals( 3, results[1].getLong(1));
 
             //Output from the second adhoc statement
             assertEquals( 1, results[2].getRowCount());
@@ -139,8 +139,8 @@ public class TestAdHocQueries extends AdHocQueryTester {
             //Output from the second preplanned statement
             assertEquals( 3, results[3].getRowCount());
             assertTrue(results[3].advanceRow());
-            assertEquals( 24, results[3].getLong(0));
-            assertEquals( 4, results[3].getLong(1));
+            assertEquals( 23, results[3].getLong(0));
+            assertEquals( 3, results[3].getLong(1));
 
 
             results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
