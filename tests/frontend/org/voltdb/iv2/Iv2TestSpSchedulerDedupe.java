@@ -31,8 +31,6 @@ import org.json_voltpatches.JSONException;
 import org.mockito.ArgumentCaptor;
 import static org.mockito.Mockito.*;
 
-import java.nio.ByteBuffer;
-
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.zk.MapCache;
@@ -89,7 +87,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         when(runner.isSystemProcedure()).thenReturn(false);
         when(procs.getProcByName(MockSPName)).thenReturn(runner);
 
-        dut = new SpScheduler();
+        dut = new SpScheduler(new SiteTaskerQueue());
         dut.setMailbox(mbox);
         dut.setProcedureSet(procs);
     }

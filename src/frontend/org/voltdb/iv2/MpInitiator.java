@@ -71,8 +71,9 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
         // MPI currently pretends to have partition ID -1 just as a placeholder value
         m_partitionId = -1;
         m_iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
-        m_scheduler = new MpScheduler(m_iv2masters);
-        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog);
+        m_scheduler = new MpScheduler(new SiteTaskerQueue(), m_iv2masters);
+        // don't create a rejoin producer for the MPI quite yet.
+        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog, null);
         m_whoami = "MP " +  CoreUtils.hsIdToString(getInitiatorHSId())
             + " for partition " + m_partitionId + " ";
     }

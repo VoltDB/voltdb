@@ -34,6 +34,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
+import org.voltdb.messaging.RejoinMessage;
 
 /**
  * InitiatorMailbox accepts initiator work and proxies it to the
@@ -50,6 +51,7 @@ public class InitiatorMailbox implements Mailbox
     private final InitiatorMessageHandler m_msgHandler;
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
+    private final RejoinProducer m_rejoinProducer;
     private long m_hsId;
     private Term m_term;
 
@@ -64,13 +66,15 @@ public class InitiatorMailbox implements Mailbox
     }
 
     public InitiatorMailbox(InitiatorMessageHandler msgHandler,
-            HostMessenger messenger, RepairLog repairLog)
+            HostMessenger messenger, RepairLog repairLog,
+            RejoinProducer rejoinProducer)
     {
         m_msgHandler = msgHandler;
         m_messenger = messenger;
         m_repairLog = repairLog;
         m_messenger.createMailbox(null, this);
         m_msgHandler.setMailbox(this);
+        m_rejoinProducer = rejoinProducer;
     }
 
     // Provide the starting replica configuration (for startup)
@@ -120,6 +124,10 @@ public class InitiatorMailbox implements Mailbox
         }
         else if (message instanceof Iv2RepairLogResponseMessage) {
             m_term.deliver(message);
+            return;
+        }
+        else if (message instanceof RejoinMessage) {
+            m_rejoinProducer.deliver((RejoinMessage)message);
             return;
         }
         m_repairLog.deliver(message);

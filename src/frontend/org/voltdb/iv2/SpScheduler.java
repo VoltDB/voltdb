@@ -32,6 +32,8 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -53,8 +55,9 @@ public class SpScheduler extends Scheduler
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    SpScheduler()
+    SpScheduler(SiteTaskerQueue taskQueue)
     {
+        super(taskQueue);
     }
 
     // This is going to run in the BabySitter's thread.  This and deliver are synchronized by

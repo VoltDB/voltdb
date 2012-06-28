@@ -64,10 +64,15 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
 
     public SpInitiator(HostMessenger messenger, Integer partition)
     {
+        SiteTaskerQueue taskQueue = new SiteTaskerQueue();
         m_messenger = messenger;
         m_partitionId = partition;
-        m_scheduler = new SpScheduler();
-        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog);
+        m_scheduler = new SpScheduler(taskQueue);
+        m_initiatorMailbox = new InitiatorMailbox(
+                m_scheduler,
+                m_messenger,
+                m_repairLog,
+                new RejoinProducer(taskQueue));
         m_whoami = "SP " +  CoreUtils.hsIdToString(getInitiatorHSId())
             + " for partition " + m_partitionId + " ";
     }
@@ -170,7 +175,6 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             m_procSet.loadProcedures(catalogContext, backend, csp);
             m_scheduler.setProcedureSet(m_procSet);
             m_executionSite.setLoadedProcedures(m_procSet);
-
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();

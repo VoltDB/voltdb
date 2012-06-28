@@ -52,9 +52,9 @@ public class MpScheduler extends Scheduler
     private AtomicLong m_txnId = new AtomicLong(1l << 40);
     private long m_buddyHSId;
 
-    MpScheduler(MapCache iv2masters)
+    MpScheduler(SiteTaskerQueue taskQueue, MapCache iv2masters)
     {
-        super();
+        super(taskQueue);
         m_iv2Masters = iv2masters;
     }
 

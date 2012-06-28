@@ -56,9 +56,9 @@ abstract public class Scheduler implements InitiatorMessageHandler
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
 
-    Scheduler()
+    Scheduler(SiteTaskerQueue taskQueue)
     {
-        m_tasks = new SiteTaskerQueue();
+        m_tasks = taskQueue;
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
     }
 
