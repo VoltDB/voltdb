@@ -23,6 +23,7 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import junit.framework.TestCase;
@@ -102,20 +103,32 @@ public class TestIndexSelection extends TestCase {
         assertTrue(pn != null);
 
         pn = pn.getChild(0);
-        int cnt = pn.getChildCount();
-        for( int i = 0; i < cnt; i++ ) {
-        	System.out.println(i);
-        	JSONObject j = new JSONObject(pn.getChild(i).toJSONString());
-        	System.out.println( j.toString(2) );
-        }
         //assertTrue(pn instanceof IndexScanPlanNode);
         //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
 
-//        if (pn != null) {
-//            JSONObject j = new JSONObject(pn.toJSONString());
-//            System.out.println(j.toString(2));
-//            System.out.println();
-//            System.out.println(pn.toExplainPlanString());
-//        }
+        if (pn != null) {
+            JSONObject j = new JSONObject(pn.toJSONString());
+            System.out.println(j.toString(2));
+            System.out.println();
+            System.out.println(pn.toExplainPlanString());
+        }
+    }
+    
+    public void testGetLeafLists() {
+    	AbstractPlanNode pn = null;
+        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+        assertTrue(pn != null);
+        while( pn.getChild(0) != null )
+        {
+        	System.out.println( pn );
+        	pn = pn.getChild(0);
+        }
+        System.out.println( pn );
+        
+//        ArrayList<AbstractPlanNode> collected = pn.getLeafLists();
+//        System.out.println( collected);
+//        System.out.println( collected.size() );
+//        for( AbstractPlanNode n : collected )
+//           System.out.println( n.toExplainPlanString() );
     }
 }
