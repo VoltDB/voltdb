@@ -1175,6 +1175,8 @@ TEST CASES
                 <exclude name="**/TestRestoreWithReplay.class" />
                 <exclude name="**/TestVoltLicense.class" />
                 <exclude name="**/TestPrimary.class" />
+                <exclude name="**/TestSecondaryRejoin.class" />
+                <exclude name="**/TestInvocationBufferServer.class" />
                 <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" />
                 <exclude name="**/TestSnapshotSaveTruncation.class" />
                 <!-- community tests -->
@@ -1208,6 +1210,7 @@ TEST CASES
 <!--                <exclude name="**/TestMaterializedViewSuite.class" /> -->
 <!--                <exclude name="**/TestMultiPartitionSuite.class" /> -->
 <!--                <exclude name="**/TestOrderBySuite.class" /> -->
+                <exclude name="**/TestPartitionDetection.class" />
 <!--                <exclude name="**/TestPlansGroupBySuite.class" /> -->
                 <exclude name="**/TestReplicatedSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestReplicationSuite.class" />
