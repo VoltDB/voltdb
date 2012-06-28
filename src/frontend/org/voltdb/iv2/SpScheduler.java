@@ -23,7 +23,6 @@ import java.util.Collections;
 import java.util.concurrent.atomic.AtomicLong;
 
 import java.util.HashMap;
-import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
@@ -32,8 +31,6 @@ import org.voltcore.messaging.VoltMessage;
 
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.RejoinMessage;
-import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;

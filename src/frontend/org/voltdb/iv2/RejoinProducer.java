@@ -223,8 +223,8 @@ public class RejoinProducer extends SiteTasker
     /**
      * SiteTasker run -- load this site!
      */
-	@Override
-	public void run(SiteProcedureConnection siteConnection) {
+    @Override
+    public void run(SiteProcedureConnection siteConnection) {
         while (!m_rejoinSiteProcessor.isEOF()) {
             Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
             if (rejoinWork != null) {
@@ -249,14 +249,14 @@ public class RejoinProducer extends SiteTasker
                  */
             }
         }
-	}
+    }
 
-	@Override
-	public void runForRejoin(SiteProcedureConnection siteConnection) {
-	}
+    @Override
+    public void runForRejoin(SiteProcedureConnection siteConnection) {
+    }
 
-	@Override
-	public int priority() {
-		return 0;
-	}
+    @Override
+    public int priority() {
+        return 0;
+    }
 }

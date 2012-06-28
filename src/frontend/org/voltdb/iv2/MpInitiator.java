@@ -74,6 +74,11 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
         m_scheduler = new MpScheduler(new SiteTaskerQueue(), m_iv2masters);
         // don't create a rejoin producer for the MPI quite yet.
         m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog, null);
+
+        // Now publish the initiator mailbox to friends and family
+        m_messenger.createMailbox(null, m_initiatorMailbox);
+        m_scheduler.setMailbox(m_initiatorMailbox);
+
         m_whoami = "MP " +  CoreUtils.hsIdToString(getInitiatorHSId())
             + " for partition " + m_partitionId + " ";
     }
