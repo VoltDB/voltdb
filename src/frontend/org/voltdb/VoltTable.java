@@ -1310,7 +1310,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 return CompressionService.compressBuffer(m_buffer);
             } else {
                 assert(m_buffer.hasArray());
-                return CompressionService.compressBytes(m_buffer.array(), m_buffer.position(), m_buffer.limit());
+                return CompressionService.compressBytes(m_buffer.array(), m_buffer.arrayOffset() + m_buffer.position(), m_buffer.limit());
             }
         } finally {
             m_buffer.position(startPosition);
@@ -1325,7 +1325,7 @@ public final class VoltTable extends VoltTableRow implements FastSerializable, J
                 return CompressionService.compressBufferAsync(m_buffer.duplicate());
             } else {
                 assert(m_buffer.hasArray());
-                return CompressionService.compressBytesAsync(m_buffer.array(), m_buffer.position(), m_buffer.limit());
+                return CompressionService.compressBytesAsync(m_buffer.array(),m_buffer.arrayOffset() + m_buffer.position(), m_buffer.limit());
             }
         } finally {
             m_buffer.position(startPosition);
