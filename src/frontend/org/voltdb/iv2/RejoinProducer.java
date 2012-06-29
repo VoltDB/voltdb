@@ -17,22 +17,18 @@
 
 package org.voltdb.iv2;
 
-import java.io.File;
-
 import java.lang.reflect.Constructor;
 
 import java.net.InetAddress;
 
 import java.nio.ByteBuffer;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
 import org.voltdb.client.ClientResponse;
@@ -40,11 +36,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientResponseImpl;
 
 import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RejoinMessage.Type;
 
 import org.voltdb.PrivateVoltTableFactory;
 
 import org.voltdb.rejoin.RejoinSiteProcessor;
-import org.voltdb.rejoin.TaskLog;
 
 import org.voltdb.SnapshotFormat;
 
@@ -106,8 +102,8 @@ public class RejoinProducer extends SiteTasker
                 }
 
                 // Send a message to self to avoid synchronization
-//                RejoinMessage msg = new RejoinMessage(txnId);
-//                m_mailbox.send(getSiteId(), msg);
+                RejoinMessage msg = new RejoinMessage(txnId);
+                m_mailbox.send(m_mailbox.getHSId(), msg);
             } else {
                 VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
                         false, null);
@@ -127,6 +123,10 @@ public class RejoinProducer extends SiteTasker
             VoltDB.instance().getSnapshotCompletionMonitor()
                   .addInterest(m_snapshotCompletionHandler);
         */
+        RejoinMessage snap_complete = new RejoinMessage(m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+        RejoinMessage replay_complete = new RejoinMessage(m_mailbox.getHSId(), Type.REPLAY_FINISHED);
+        m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
+        m_mailbox.send(m_rejoinCoordinatorHsId, replay_complete);
     }
 
     public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
