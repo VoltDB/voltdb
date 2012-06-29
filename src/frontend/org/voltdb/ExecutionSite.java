@@ -2859,4 +2859,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     {
         return ee.getStats(selector, locators, interval, now);
     }
+
+    @Override
+    public void setRejoinComplete() {
+        throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
+    }
 }

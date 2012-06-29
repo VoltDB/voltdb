@@ -619,4 +619,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     {
         return m_snapshotter.doSnapshotWork(m_ee, ignoreQuietPeriod);
     }
+
+    @Override
+    public void setRejoinComplete() {
+        m_isRejoining = false;
+    }
 }

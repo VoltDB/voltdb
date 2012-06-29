@@ -248,6 +248,7 @@ public class RejoinProducer extends SiteTasker
                  * have not finished on all nodes, let the snapshot completion
                  * monitor tell the rejoin coordinator.
                  */
+                siteConnection.setRejoinComplete();
             }
         }
     }

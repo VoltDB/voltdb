@@ -134,6 +134,8 @@ public interface SiteProcedureConnection {
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params);
 
+    public void setRejoinComplete();
+
     public long[] getUSOForExportTable(String signature);
 
     public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
