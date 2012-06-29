@@ -179,6 +179,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             if (!m_isReadOnly) {
                 m_loggedFragments = new FragmentTaskLogMessage(
                         m_notice.getInitiatorHSId(), m_notice.getCoordinatorHSId(), m_notice.getTxnId());
+                assert(m_loggedFragments.getTxnId() == getNotice().getTxnId());
             }
         }
 

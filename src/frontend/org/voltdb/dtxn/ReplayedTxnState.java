@@ -25,7 +25,6 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskLogMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 
 /**
@@ -85,10 +84,7 @@ public class ReplayedTxnState extends TransactionState {
             m_site.beginNewTxn(this);
             if (m_notice instanceof InitiateTaskMessage) {
                 InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
-                InitiateResponseMessage response = m_site.processInitiateTask(this, task);
-                // we shouldn't replay transactions that rollback
-                // if it rolls back here... that's non-deterministic and sad
-                assert (response.shouldCommit() == true);
+                m_site.processInitiateTask(this, task);
             }
             else if (m_notice instanceof FragmentTaskLogMessage) {
                 FragmentTaskLogMessage taskLog = (FragmentTaskLogMessage) m_notice;

@@ -91,6 +91,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskLogMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -1418,13 +1419,35 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if ((txnState.getRejoinState() == RejoinState.REJOINING) &&
                 m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
-                    if (txnState.getNotice() instanceof InitiateTaskMessage) {
-                        // TODO: this is a pretty horrible hack and fixing it is next on my list
-                        // I also need to ensure that fragments of sysprocs run at non-coordinators don't get replayed
-                        if (((InitiateTaskMessage)txnState.getNotice()).getStoredProcedureName().startsWith("@") == false) {
-                            m_rejoinTaskLog.logTask(txnState.getTransactionInfoBaseMessageForRejoinLog());
-                            m_loggedTaskCount++;
+                    TransactionInfoBaseMessage base = txnState.getTransactionInfoBaseMessageForRejoinLog();
+                    if (base != null) {
+                        // this is for multi-partition only
+                        // sysproc frags should be exempt
+                        if (base instanceof FragmentTaskLogMessage) {
+                            FragmentTaskLogMessage ftlm = (FragmentTaskLogMessage) base;
+                            if (ftlm.getFragmentTasks().size() > 0) {
+                                m_rejoinTaskLog.logTask(ftlm);
+                                m_loggedTaskCount++;
+                            }
                         }
+                        // this is for single-partition only
+                        else if (base instanceof InitiateTaskMessage) {
+                            InitiateTaskMessage itm = (InitiateTaskMessage) base;
+                            // TODO: this is a pretty horrible hack
+                            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
+                                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
+                                m_rejoinTaskLog.logTask(itm);
+                                m_loggedTaskCount++;
+                            }
+                        }
+                        // the base message should hit one of the ifs above
+                        else {
+                            hostLog.error("Logged a notice of type: " + base.getClass().getCanonicalName() + "for replay.");
+                            assert(false);
+                        }
+                    }
+                    else {
+                        hostLog.info("not logging transaction that didn't write");
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to log task message", true, e);
