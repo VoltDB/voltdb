@@ -62,8 +62,8 @@ namespace voltdb {
 // ==================================================================
 
 // ------------------------------------------------------------------
-// StoredProcedureId
-// This just needs to be a unique indentifier for a store procedure
+// CatalogId
+// This just needs to be a unique indentifier for a Catalog
 // ------------------------------------------------------------------
 typedef int32_t CatalogId;
 
