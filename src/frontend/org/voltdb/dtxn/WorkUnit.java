@@ -24,6 +24,7 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -168,6 +169,9 @@ class WorkUnit
     int m_stackCount = 0;
     boolean commitEvenIfDirty = false;
     boolean nonTransactional = false;
+    final boolean m_isReadOnly;
+
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
 
     /**
      * Get the "payload" for this <code>WorkUnit</code>. The payload is
@@ -242,10 +246,12 @@ class WorkUnit
     WorkUnit(SiteTracker siteTracker, VoltMessage payload,
              int[] dependencyIds, long HSId,
              long[] nonCoordinatingHSIds,
-             boolean shouldResumeProcedure)
+             boolean shouldResumeProcedure,
+             boolean isReadOnly)
     {
         this.m_payload = payload;
         m_shouldResumeProcedure = shouldResumeProcedure;
+        m_isReadOnly = isReadOnly;
         if (payload != null && payload instanceof FragmentTaskMessage)
         {
             m_taskType = ((FragmentTaskMessage) payload).getFragmentTaskType();
@@ -296,6 +302,8 @@ class WorkUnit
         // If not same, kill entire cluster and hide the bodies.
         // In all seriousness, we have no valid way to recover from a non-deterministic event
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
+        // ENG-3288 - Allow read-only transactions to have mismatched results (but log a
+        // warning) so that LIMIT queries without ORDER BY clauses work.
         boolean duplicate_okay =
             m_dependencies.get(dependencyId).addResult(HSId, map_id, payload);
         if (!duplicate_okay)
@@ -304,9 +312,15 @@ class WorkUnit
             msg += "\n  from execution site: " + HSId;
             msg += "\n  Original results: " + m_dependencies.get(dependencyId).getResult(map_id).toString();
             msg += "\n  Mismatched results: " + payload.toString();
-            // die die die (German: the the the)
-            VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
-            throw new RuntimeException(msg); // gets called only by test code
+            msg += "\n  Read-only: " + new Boolean(m_isReadOnly).toString();
+            if (m_isReadOnly) {
+            	hostLog.warn(msg);
+            }
+            else {
+	            // die die die (German: the the the)
+	            VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+	            throw new RuntimeException(msg); // gets called only by test code
+            }
         }
     }
 
