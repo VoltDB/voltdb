@@ -956,15 +956,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * readiness. If it is time, create a recovery processor and send
                  * the initiate message.
                  */
-                if (m_rejoining && !m_haveRecoveryPermit) {
+                if (m_rejoining && !m_haveRecoveryPermit && !VoltDB.instance().getConfig().m_newRejoin) {
                     Long safeTxnId = m_transactionQueue.safeToRecover();
                     if (safeTxnId != null && m_recoveryPermit.tryAcquire()) {
                         m_haveRecoveryPermit = true;
                         m_recoveryStartTime = System.currentTimeMillis();
 
-                        if (!VoltDB.instance().getConfig().m_newRejoin) {
-                            m_recoveryProcessor =
-                                    RecoverySiteProcessorDestination.createProcessor(
+                        m_recoveryProcessor =
+                                RecoverySiteProcessorDestination.createProcessor(
                                         m_context.database,
                                         m_tracker,
                                         ee,
@@ -972,7 +971,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                         m_siteId,
                                         m_onRejoinCompletion,
                                         m_recoveryMessageHandler);
-                        }
                     }
                 }
 
@@ -1201,6 +1199,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     private void initiateRejoin(long rejoinCoordinatorHSId) {
         m_rejoinCoordinatorHSId = rejoinCoordinatorHSId;
+
+        // Set rejoin permit
+        m_haveRecoveryPermit = true;
+        m_recoveryStartTime = System.currentTimeMillis();
 
         // Construct a snapshot stream receiver
         Class<?> klass =
