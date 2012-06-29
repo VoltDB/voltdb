@@ -30,11 +30,11 @@ SELECT _agg(_variable) FROM @from_tables
 SELECT COUNT(*) FROM @from_tables
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT * FROM @from_tables WHERE _variable _cmp @cmp_type
+SELECT * FROM @from_tables WHERE _variable[@col_type] _cmp @cmp_type
 --- test arithmetic operators (+, -, *, /) with comparison ops
 SELECT * FROM @from_tables WHERE (_variable[@col_type] _math _value[int:0,100]) _cmp @cmp_type
 --- test logic operators (AND) with comparison ops
-SELECT * FROM @from_tables WHERE (_variable _cmp @cmp_type) _logic (_variable _cmp _variable)
+SELECT * FROM @from_tables WHERE (_variable[@col_type] _cmp @cmp_type) _logic (_variable _cmp _variable)
 -- test GROUP BY
 SELECT _variable FROM @from_tables GROUP BY _variable
 -- test ORDER BY
