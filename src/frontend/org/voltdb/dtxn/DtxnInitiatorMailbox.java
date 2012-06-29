@@ -225,6 +225,7 @@ public class DtxnInitiatorMailbox implements Mailbox
             }
             // otherwise update the InFlightTxnState with the response
             else {
+            	System.out.printf("!!!!! message class: %s\n", message.getClass().getName());
                 toSend = state.addResponse(r.getCoordinatorHSId(), r.getClientResponseData());
             }
 

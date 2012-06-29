@@ -100,7 +100,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 }
                 m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
                                                   null, m_hsId,
-                                                  null, false));
+                                                  null, false, m_isReadOnly));
             } else {
                 m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
                 m_task = null;
@@ -378,7 +378,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         assert(dependencies.length > 0);
 
         WorkUnit w = new WorkUnit(m_site.getSiteTracker(), null, dependencies,
-                                  m_hsId, m_nonCoordinatingSites, true);
+                                  m_hsId, m_nonCoordinatingSites, true, m_isReadOnly);
         if (isFinal)
             w.nonTransactional = true;
         for (int depId : dependencies) {
@@ -420,7 +420,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
         WorkUnit w = new WorkUnit(m_site.getSiteTracker(), task,
                                   task.getAllUnorderedInputDepIds(),
-                                  m_hsId, m_nonCoordinatingSites, false);
+                                  m_hsId, m_nonCoordinatingSites, false, m_isReadOnly);
         w.nonTransactional = nonTransactional;
 
         for (int i = 0; i < task.getFragmentCount(); i++) {
