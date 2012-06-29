@@ -1419,11 +1419,12 @@ public class SnapshotRestore extends VoltSystemProcedure
                 ArrayList<SynthesizedPlanFragment[]> restorePlans =
                         new ArrayList<SynthesizedPlanFragment[]>();
 
+                //SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                 for (Table t : tables_to_restore) {
                     TableSaveFileState table_state =
                             savefileState.getTableState(t.getTypeName());
                     SynthesizedPlanFragment[] restore_plan =
-                            table_state.generateRestorePlan(t);
+                            table_state.generateRestorePlan( t, st);
                     if (restore_plan == null) {
                         HOST_LOG.error(
                                 "Unable to generate restore plan for " + t.getTypeName() + " table not restored");
@@ -1593,7 +1594,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         // LoadMultipartitionTable.  Consider ways to consolidate later
         Map<Long, Integer> sites_to_partitions =
                 new HashMap<Long, Integer>();
-        SiteTracker tracker = ctx.getSiteTracker();
+        SiteTracker tracker = VoltDB.instance().getSiteTrackerForSnapshot();
         sites_to_partitions.putAll(tracker.getSitesToPartitions());
 
         try
