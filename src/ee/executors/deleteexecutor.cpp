@@ -62,6 +62,36 @@
 using namespace std;
 using namespace voltdb;
 
+namespace voltdb {
+namespace detail {
+
+    struct DeleteExecutorState
+    {
+        DeleteExecutorState(AbstractExecutor* childExec, Table* outputTable) :
+            m_childExecutor(childExec),
+            m_outputTable(outputTable),
+            m_outputTableName(outputTable->name()),
+            m_modifiedTuples(0),
+            m_done(false)
+        {}
+
+        AbstractExecutor* m_childExecutor;
+        Table* m_outputTable;
+        std::string m_outputTableName;
+        long m_modifiedTuples;
+        bool m_done;
+    };
+
+} // namespace detail
+} // namespace voltdb
+
+DeleteExecutor::DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node),
+    m_node(NULL), m_truncate(), m_inputTable(NULL), m_targetTable(NULL),
+    m_inputTuple(), m_targetTuple(), m_engine(engine), m_state()
+{}
+
+
 bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
                             TempTableLimits* limits)
 {
@@ -156,3 +186,94 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
 
     return true;
 }
+
+bool DeleteExecutor::support_pull() const
+{
+    return true;
+}
+
+void DeleteExecutor::p_pre_execute_pull(const NValueArray &params)
+{
+    assert(m_targetTable);
+    std::vector<AbstractPlanNode*>& children = m_node->getChildren();
+    assert(children.size() == 1);
+    AbstractExecutor* childExec = children[0]->getExecutor();
+
+    Table* outputTable = m_node->getOutputTable();
+    assert(outputTable);
+
+    m_state.reset(new detail::DeleteExecutorState(childExec, outputTable));
+}
+
+TableTuple DeleteExecutor::p_next_pull()
+{
+    if (m_state->m_done) {
+        return TableTuple(m_node->getOutputTable()->schema());
+    }
+    else if (m_truncate) {
+        VOLT_TRACE("truncating table %s...", m_targetTable->name().c_str());
+        // count the truncated tuples as deleted
+        m_state->m_modifiedTuples = m_targetTable->activeTupleCount();
+        // actually delete all the tuples
+        m_targetTable->deleteAllTuples(true);
+    }
+    else
+    {
+        while (true)
+        {
+            TableTuple tuple = m_state->m_childExecutor->next_pull();
+            if (tuple.isNullTuple())
+            {
+                break;
+            }
+            //
+            // OPTIMIZATION: Single-Sited Query Plans
+            // If our beloved DeletePlanNode is apart of a single-site query plan,
+            // then the first column in the input table will be the address of a
+            // tuple on the target table that we will want to blow away. This saves
+            // us the trouble of having to do an index lookup
+            //
+// @TODO doesn't work. Error message:
+// Type 5 not a recognized type for casting as an address
+// In ../../src/ee/common/NValue.hpp:2485
+//void *targetAddress = tuple.getNValue(0).castAsAddress();
+//m_targetTuple.move(targetAddress);
+
+            // Delete from target table
+            if (!m_targetTable->deleteTuple(tuple, true)) {
+                char message[128];
+                snprintf(message, 128, "Failed to delete tuple from table '%s'",
+                   m_targetTable->name().c_str());
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            }
+            ++m_state->m_modifiedTuples;
+        }
+    }
+
+    m_state->m_done = true;
+    TableTuple countTuple = m_node->getOutputTable()->tempTuple();
+    countTuple.setNValue(0, ValueFactory::getBigIntValue(m_state->m_modifiedTuples));
+
+    return countTuple;
+}
+
+void DeleteExecutor::p_post_execute_pull()
+{
+    // add to the planfragments count of modified tuples
+    m_engine->m_tuplesModified += m_state->m_modifiedTuples;
+    VOLT_INFO("Finished deleting tuples");
+}
+
+void DeleteExecutor::p_insert_output_table_pull(TableTuple& tuple)
+{
+    // try to put the tuple into the output table
+    if (!m_state->m_outputTable->insertTuple(tuple))
+    {
+        char message[128];
+        snprintf(message, 128, "Failed to insert tuple count (%ld) into"
+           " output table '%s'",
+           static_cast<long int>(m_state->m_modifiedTuples), m_state->m_outputTableName.c_str());
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+    }
+}
+
