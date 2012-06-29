@@ -237,7 +237,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
                 DependencyPair dp =
                         m_runner.executePlanFragment(
-                                null,
+                                m_runner.getTxnState(),
                                 null,
                                 ftm.getFragmentId(0),
                                 ftm.getParameterSetForFragment(0));
@@ -258,7 +258,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
         results[0] =
                 m_runner.executePlanFragment(
-                        null,
+                        m_runner.getTxnState(),
                         receivedDependencyIds,
                         pfs[pfs.length - 1].fragmentId,
                         pfs[pfs.length - 1].parameters).dependency;
