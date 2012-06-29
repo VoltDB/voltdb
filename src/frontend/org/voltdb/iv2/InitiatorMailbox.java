@@ -96,6 +96,11 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
+    public void shutdown() throws InterruptedException
+    {
+        m_masterMapCache.shutdown();
+    }
+
     // Provide the starting replica configuration (for startup)
     public synchronized void setReplicas(List<Long> replicas)
     {

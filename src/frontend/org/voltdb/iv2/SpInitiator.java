@@ -206,6 +206,9 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             if (m_term != null) {
                 m_term.shutdown();
             }
+            if (m_initiatorMailbox != null) {
+                m_initiatorMailbox.shutdown();
+            }
         } catch (InterruptedException e) {
             // what to do here?
         } catch (KeeperException e) {
