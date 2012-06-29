@@ -241,7 +241,7 @@ public class RejoinProducer extends SiteTasker
                 // m_recoveryLog.debug("Rejoin snapshot transfer is finished");
                 m_rejoinSiteProcessor.close();
                 // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
-                m_rejoinSiteProcessor = null;
+                // m_rejoinSiteProcessor = null;
                 // m_taskExeStartTime = System.currentTimeMillis();
                 /*
                  * Don't notify the rejoin coordinator yet. The stream snapshot may
