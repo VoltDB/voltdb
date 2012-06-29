@@ -2365,7 +2365,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * @param data
      * @param table
      */
-    private void loadTable(long txnId, int tableId, VoltTable data) {
+    public void loadTable(long txnId, int tableId, VoltTable data) {
         long undo_token = getNextUndoToken();
         ee.loadTable(tableId, data,
                      txnId,

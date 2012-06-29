@@ -234,8 +234,9 @@ public class RejoinProducer extends SiteTasker
                     PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
                             true);
                 //m_recoveryLog.info("table " + tableId + ": " + table.toString());
-                // loadTable(m_rejoinSnapshotTxnId, tableId, table);
-                // siteConnection.loadTable(tableId, buffer, txnId, lastCommittedTxnId, undo_token);
+                // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
+                // doesn't yet care about export, just use Long.MIN_VALUE
+                siteConnection.loadTable(Long.MIN_VALUE, tableId, table);
             } else if (m_rejoinSiteProcessor.isEOF()) {
                 // m_recoveryLog.debug("Rejoin snapshot transfer is finished");
                 m_rejoinSiteProcessor.close();
@@ -253,6 +254,7 @@ public class RejoinProducer extends SiteTasker
 
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection) {
+        run(siteConnection);
     }
 
     @Override
