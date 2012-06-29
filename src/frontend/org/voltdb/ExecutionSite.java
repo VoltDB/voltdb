@@ -64,7 +64,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
@@ -1450,7 +1449,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         }
                     }
                     else {
-                        hostLog.info("not logging transaction that didn't write");
+                        //hostLog.info("not logging transaction that didn't write");
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to log task message", true, e);

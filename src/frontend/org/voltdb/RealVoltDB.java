@@ -208,7 +208,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     private volatile boolean m_isRunning = false;
 
     @Override
-    public boolean recovering() { return m_rejoining; }
+    public boolean rejoining() { return m_rejoining; }
 
     private long m_recoveryStartTime;
 

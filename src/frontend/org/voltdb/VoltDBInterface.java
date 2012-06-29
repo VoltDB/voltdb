@@ -34,7 +34,7 @@ import com.google.common.util.concurrent.ListeningExecutorService;
 
 public interface VoltDBInterface
 {
-    public boolean recovering();
+    public boolean rejoining();
 
     /*
      * Invoked from the command log once this node is marked unfaulted.

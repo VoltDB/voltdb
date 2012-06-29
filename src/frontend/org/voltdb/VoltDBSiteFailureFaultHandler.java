@@ -60,7 +60,7 @@ class VoltDBSiteFailureFaultHandler implements FaultHandler {
                 VoltDB.crashGlobalVoltDB(message, false, null);
             }
         }
-        if (m_rvdb.recovering()) {
+        if (m_rvdb.rejoining()) {
             VoltDB.crashLocalVoltDB("Detected a node failure during recovery", false, null);
         }
         /*

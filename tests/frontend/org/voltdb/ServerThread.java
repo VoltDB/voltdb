@@ -120,6 +120,14 @@ public class ServerThread extends Thread {
         }
     }
 
+    public void waitForRejoin() {
+        while (!VoltDB.instance().isRunning() ||
+               VoltDB.instance().getMode() == OperationMode.INITIALIZING ||
+               VoltDB.instance().rejoining()) {
+            Thread.yield();
+        }
+    }
+
     public void shutdown() throws InterruptedException {
         assert Thread.currentThread() != this;
         VoltDB.instance().shutdown(this);
