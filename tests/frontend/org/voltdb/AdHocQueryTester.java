@@ -27,6 +27,7 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.PortGenerator;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
@@ -93,7 +94,7 @@ public abstract class AdHocQueryTester extends TestCase {
         assertTrue(success);
         MiscUtils.copyFile(builder.getPathToDeployment(), pathToDeployment);
 
-        VoltDB.Configuration config = new VoltDB.Configuration();
+        VoltDB.Configuration config = new VoltDB.Configuration(new PortGenerator());
         config.m_pathToCatalog = pathToCatalog;
         config.m_pathToDeployment = pathToDeployment;
         return config;
