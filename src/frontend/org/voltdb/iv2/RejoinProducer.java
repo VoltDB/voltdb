@@ -185,6 +185,9 @@ public class RejoinProducer extends SiteTasker
             @Override
             public void run()
             {
+                try {
+                Thread.sleep(30000);
+                } catch (Exception e) { }
                 Pair<Integer, ByteBuffer> rejoinWork;
                 do {
                     rejoinWork = m_rejoinSiteProcessor.poll();
