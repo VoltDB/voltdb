@@ -181,7 +181,7 @@ public class TestCSVLoader extends TestCase {
                 "); ";
      String []myOptions = {
                 "-f" + reportDir + "/test.csv",
-                //"--procedure=BLAH.insert",
+                //"--procedure=blah.insert",
                 "--reportdir=" + reportDir,
                 //"--table=BLAH",
                 "--maxerrors=50",
@@ -195,7 +195,7 @@ public class TestCSVLoader extends TestCase {
                 "--skip=0",
                 "--nowhitespace",
                 //"--strictquotes",
-                "BLAH"
+                "BlAh"
                 };
        String currentTime = new TimestampType().toString();
             String []myData = { "1,1,1,11111111,first,1.10,1.11,"+currentTime,

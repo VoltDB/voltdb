@@ -24,15 +24,15 @@ INSERT INTO _table VALUES (@insert_vals)
 INSERT INTO _table VALUES (@insert_vals)
 -- test where expressions
 --- test logic operators (AND) with comparison ops
-DELETE FROM _table WHERE (_variable _cmp _variable) _logic (_variable _cmp @cmp_type)
+DELETE FROM _table WHERE (_variable _cmp _variable) _logic (_variable[@col_type] _cmp @cmp_type)
 INSERT INTO _table VALUES (@insert_vals)
 INSERT INTO _table VALUES (@insert_vals)
 INSERT INTO _table VALUES (@insert_vals)
 --- test arithmetic operators (+, -, *, /) with comparison ops
 -- XXX COMMENTING THIS OUT UNTIL TICKET 201 IS RESOLVED
-DELETE FROM _table WHERE (_variable _math _value[int:0,100]) _cmp @cmp_type
+DELETE FROM _table WHERE (_variable[@col_type] _math _value[int:0,100]) _cmp @cmp_type
 INSERT INTO _table VALUES (@insert_vals)
 INSERT INTO _table VALUES (@insert_vals)
 INSERT INTO _table VALUES (@insert_vals)
 --- test comparison ops (<, <=, =, >=, >)
-DELETE FROM _table WHERE _variable _cmp @cmp_type
+DELETE FROM _table WHERE _variable[@col_type] _cmp @cmp_type

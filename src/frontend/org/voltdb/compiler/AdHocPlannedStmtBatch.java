@@ -20,6 +20,8 @@ package org.voltdb.compiler;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.planner.ParameterInfo;
+
 /**
  * Holds a batch of planned SQL statements.
  *
@@ -35,8 +37,9 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     public final int catalogVersion;
 
     // The planned statements.
-    // Keep private so that isReadOnly can be maintained by methods of this class.
-    private final List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
+    // Do not add statements directly. Use addStatement so that the readOnly flag
+    // is updated
+    public final List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
 
     // Assume the batch is read-only until we see the first non-select statement.
     private boolean readOnly = true;
@@ -162,7 +165,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      * @return                      statement object
      */
     public void addStatement(String sqlStatement, String aggregatorFragment,
-                             String collectorFragment, boolean isReplicatedTableDML) {
+                             String collectorFragment, boolean isReplicatedTableDML,
+                             List<ParameterInfo> params) {
         AdHocPlannedStatement plannedStmt = new AdHocPlannedStatement(
                                                         sqlStatement,
                                                         aggregatorFragment,
@@ -180,6 +184,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         plannedStmt.hostname = hostname;
         plannedStmt.adminConnection = adminConnection;
         plannedStmt.clientData = clientData;
+        plannedStmt.params = params;
         plannedStatements.add(plannedStmt);
     }
 

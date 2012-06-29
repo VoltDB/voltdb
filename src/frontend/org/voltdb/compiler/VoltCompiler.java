@@ -679,7 +679,6 @@ public class VoltCompiler {
             addClassToJar( classDependency, this );
         }
 
-        m_hsql.close();
     }
 
 

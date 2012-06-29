@@ -321,14 +321,18 @@ public class TestSqlAggregateSuite extends RegressionSuite {
                 results[0].advanceRow();
                 @SuppressWarnings("unused")
                 long long_val = results[0].getLong(0);
-                assert(results[0].wasNull());
+                if ( ! isHSQL()) {
+                    assert(results[0].wasNull());
+                }
                 query = String.format("select %s(%s.RATIO) from %s",
-                                             aggs[i], table, table);
+                        aggs[i], table, table);
                 results = client.callProcedure("@AdHoc", query).getResults();
                 results[0].advanceRow();
                 @SuppressWarnings("unused")
                 double doub_val = results[0].getDouble(0);
-                assert(results[0].wasNull());
+                if ( ! isHSQL()) {
+                    assert(results[0].wasNull());
+                }
             }
             // and finish up with count(*) for good measure
             query = String.format("select count(*) from %s", table);
@@ -435,7 +439,12 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        // hsql isn't currently working. This is worrysome, but it hasn't been working for a while
+        // HSQL backend testing fails a few cases,
+        // probably due to differences in null representation -- it doesn't support MIN_VALUE as null
+        // These specific cases are qualified with if ( ! isHSQL()).
+        config = new LocalCluster("sqlaggregate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
 
         return builder;
     }

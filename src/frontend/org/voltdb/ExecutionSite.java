@@ -64,6 +64,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
@@ -713,9 +714,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             ExecutionSite.this.updateBackendLogLevels();
         }
         @Override
-        public boolean updateCatalog(String diffCmds, CatalogContext context)
+        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
         {
-            return ExecutionSite.this.updateCatalog(diffCmds, context);
+            return ExecutionSite.this.updateCatalog(diffCmds, context, csp);
         }
     }
 
@@ -748,11 +749,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             boolean recovering,
             boolean replicationActive,
             final long txnId,
-            int configuredNumberOfPartitions) throws Exception
+            int configuredNumberOfPartitions,
+            CatalogSpecificPlanner csp) throws Exception
     {
         this(voltdb, mailbox, serializedCatalog, transactionQueue,
              new ProcedureRunnerFactory(), recovering, replicationActive,
-             txnId, configuredNumberOfPartitions);
+             txnId, configuredNumberOfPartitions, csp);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -762,7 +764,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                   boolean recovering,
                   boolean replicationActive,
                   final long txnId,
-                  int configuredNumberOfPartitions) throws Exception
+                  int configuredNumberOfPartitions,
+                  CatalogSpecificPlanner csp) throws Exception
     {
         m_siteId = mailbox.getHSId();
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
@@ -815,7 +818,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             runnerFactory.configure(this, m_systemProcedureContext);
         }
         m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
-        m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType());
+        m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType(), csp);
 
         int snapshotPriority = 6;
         if (m_context.cluster.getDeployment().get("deployment") != null) {
@@ -922,9 +925,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         return true;
     }
 
-    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context, CatalogSpecificPlanner csp) {
         m_context = context;
-        m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType());
+        m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType(), csp);
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
@@ -2271,7 +2274,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
             VoltTable table = null;
 
-            table = executeCustomPlanFragment(fragmentPlan, inputDepId, txnState.txnId);
+            table = executeCustomPlanFragment(fragmentPlan, inputDepId, txnState.txnId, params, txnState.isReadOnly());
 
             DependencyPair dep = new DependencyPair(outputDepId, table);
 
@@ -2828,11 +2831,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId)
+                                               long txnId, ParameterSet params, boolean readOnly)
     {
         return ee.executeCustomPlanFragment(plan, inputDepId, txnId,
                                             lastCommittedTxnId,
-                                            getNextUndoToken());
+                                            readOnly ? Long.MAX_VALUE : getNextUndoToken(),
+                                            params);
     }
 
     @Override

@@ -17,7 +17,9 @@
 
 package org.voltdb.planner;
 
+import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import org.voltdb.VoltType;
@@ -26,12 +28,14 @@ import org.voltdb.types.ExpressionType;
 public class SQLFunction {
     private final ExpressionType m_exprType;
     private final String m_sqlName;
+    private final int m_nArguments;
     private final VoltType m_valueType;
     private final VoltType m_paramType;
 
-    private SQLFunction(ExpressionType exprType, String sqlName, VoltType valueType, VoltType paramType) {
+    private SQLFunction(ExpressionType exprType, String sqlName, int nArguments, VoltType valueType, VoltType paramType) {
         m_exprType = exprType;
         m_sqlName = sqlName;
+        m_nArguments = nArguments;
         m_valueType = valueType;
         m_paramType = paramType;
     }
@@ -39,8 +43,18 @@ public class SQLFunction {
     private static final Map<String, SQLFunction[]> name_lookup =
             new HashMap<String, SQLFunction[]>();
 
-    public static SQLFunction[] functionsByName(String name) {
-        return name_lookup.get(name.intern());
+    public static List<SQLFunction> functionsByNameAndArgumentCount(String name, int nArguments) {
+        List<SQLFunction> result = new ArrayList<SQLFunction>();
+        SQLFunction[] overloads = name_lookup.get(name.intern());
+        if (overloads != null) {
+            for (SQLFunction fn : overloads) {
+                if (fn.m_nArguments != nArguments) {
+                    continue;
+                }
+                result.add(fn);
+            }
+        }
+        return result;
     }
 
     public static void nameFunctions(SQLFunction[] overloads) {
@@ -49,9 +63,13 @@ public class SQLFunction {
 
     static {
         // Initialize functions grouped by their SQL names to (someday) support type-specific overloads.
-        final SQLFunction abs[] = {new SQLFunction(ExpressionType.FUNCTION_ABS, "abs", null, VoltType.NUMERIC),
-                                  };
+        final SQLFunction abs[] = {new SQLFunction(ExpressionType.FUNCTION_ABS, "abs", 1, null, VoltType.NUMERIC),
+        };
         nameFunctions(abs);
+        final SQLFunction substring[] = {new SQLFunction(ExpressionType.FUNCTION_SUBSTRING_FROM,     "substring", 2, VoltType.STRING, null),
+                                         new SQLFunction(ExpressionType.FUNCTION_SUBSTRING_FROM_FOR, "substring", 3, VoltType.STRING, null),
+        };
+        nameFunctions(substring);
     }
 
     public VoltType getValueType() {
@@ -77,5 +95,6 @@ public class SQLFunction {
     public ExpressionType getExpressionType() {
         return m_exprType;
     }
+
 }
 

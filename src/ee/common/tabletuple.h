@@ -172,7 +172,9 @@ public:
                 break;
               default:
                 // let caller handle this error
-                throwFatalException("Unknown ValueType found during Export serialization.");
+                throwDynamicSQLException(
+                        "Unknown ValueType %s found during Export serialization.",
+                        valueToString(getType(i)).c_str() );
                 return (size_t)0;
             }
         }

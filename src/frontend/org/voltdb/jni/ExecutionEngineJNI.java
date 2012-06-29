@@ -270,9 +270,25 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     @Override
     public VoltTable executeCustomPlanFragment(final String plan,
             final int inputDepId, final long txnId, final long lastCommittedTxnId,
-            final long undoQuantumToken) throws EEException
+            final long undoQuantumToken,
+            ParameterSet params) throws EEException
     {
-        fsForParameterSet.clear();
+        // serialize the param set
+        // This should have been serialized sanely by VoltProcedure.slowPath()
+        // or failed and rolled back at that point.  This parameter set serialization
+        // had better not fail.
+        try {
+            fsForParameterSet.clear();
+            if (params != null) {
+                params.writeExternal(fsForParameterSet);
+            } else {
+                //No params
+                fsForParameterSet.writeShort(0);
+            }
+        } catch (final IOException exception) {
+            throw new RuntimeException(exception); // can't happen
+        }
+
         deserializer.clear();
         //C++ JSON deserializer is not thread safe, must synchronize
         int errorCode = 0;
