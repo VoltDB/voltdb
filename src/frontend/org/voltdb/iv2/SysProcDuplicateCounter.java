@@ -53,20 +53,21 @@ public class SysProcDuplicateCounter extends DuplicateCounter
     int offer(FragmentResponseMessage message)
     {
         long hash = 0;
-        for (int i = 0; i < message.getTableCount(); i++) {
-            hash ^= MiscUtils.cheesyBufferCheckSum(message.getTableAtIndex(i).getBuffer());
-            int depId = message.getTableDependencyIdAtIndex(i);
-            VoltTable dep = message.getTableAtIndex(i);
-            List<VoltTable> tables = m_alldeps.get(depId);
-            if (tables == null)
-            {
-                tables = new ArrayList<VoltTable>();
-                m_alldeps.put(depId, tables);
+        if (!message.isRecovering()) {
+            for (int i = 0; i < message.getTableCount(); i++) {
+                hash ^= MiscUtils.cheesyBufferCheckSum(message.getTableAtIndex(i).getBuffer());
+                int depId = message.getTableDependencyIdAtIndex(i);
+                VoltTable dep = message.getTableAtIndex(i);
+                List<VoltTable> tables = m_alldeps.get(depId);
+                if (tables == null)
+                {
+                    tables = new ArrayList<VoltTable>();
+                    m_alldeps.put(depId, tables);
+                }
+                tables.add(dep);
             }
-            tables.add(dep);
         }
-        m_lastResponse = message;
-        return checkCommon(hash, message.m_sourceHSId);
+        return checkCommon(hash, message.isRecovering(), message);
     }
 
     @Override
