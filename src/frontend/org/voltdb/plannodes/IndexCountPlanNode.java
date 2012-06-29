@@ -38,7 +38,6 @@ import org.voltdb.planner.StatsField;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
-import org.voltdb.types.SortDirectionType;
 
 public class IndexCountPlanNode extends AbstractScanPlanNode {
 
@@ -48,12 +47,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         SEARCHKEY_EXPRESSIONS,
         KEY_ITERATE,
         LOOKUP_TYPE,
-        SORT_DIRECTION;
     }
 
     /**
      * Attributes
-     * NOTE: The IndexCountPlanNode will use AbstractScanPlanNode's m_predicate
+     * NOTE: The IndexCountPlanNode will use AbstractPlanNode's m_predicate
      * as the "Post-Scan Predicate Expression". When this is defined, the EE will
      * run a tuple through an additional predicate to see whether it qualifies.
      * This is necessary when we have a predicate that includes columns that are not
@@ -76,9 +74,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // The overall index lookup operation type
     protected IndexLookupType m_lookupType = IndexLookupType.EQ;
 
-    // The sorting direction
-    protected SortDirectionType m_sortDirection = SortDirectionType.INVALID;
-
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
     protected Index m_catalogIndex = null;
@@ -89,7 +84,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     @Override
     public PlanNodeType getPlanNodeType() {
-        return PlanNodeType.INDEXSCAN;
+        return PlanNodeType.INDEXCOUNT;
     }
 
     @Override
@@ -169,26 +164,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     /**
-     * @return The sorting direction.
-     */
-    public SortDirectionType getSortDirection() {
-        return m_sortDirection;
-    }
-
-    /**
      *
      * @param lookupType
      */
     public void setLookupType(IndexLookupType lookupType) {
         m_lookupType = lookupType;
-    }
-
-    /**
-     * @param sortDirection
-     *            the sorting direction
-     */
-    public void setSortDirection(SortDirectionType sortDirection) {
-        m_sortDirection = sortDirection;
     }
 
     /**
@@ -352,7 +332,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
-        stringer.key(Members.SORT_DIRECTION.name()).value(m_sortDirection.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
         stringer.key(Members.END_EXPRESSION.name());
         stringer.value(m_endExpression);
@@ -384,7 +363,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         if (keySize == 0)
             usageInfo = "(for sort order only)";
 
-        String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
+        String retval = "INDEX COUNT of \"" + m_targetTableName + "\"";
         retval += " using \"" + m_targetIndexName + "\"";
         retval += " " + usageInfo;
         return retval;
