@@ -25,6 +25,7 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskLogMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 
 /**
@@ -84,7 +85,10 @@ public class ReplayedTxnState extends TransactionState {
             m_site.beginNewTxn(this);
             if (m_notice instanceof InitiateTaskMessage) {
                 InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
-                m_site.processInitiateTask(this, task);
+                InitiateResponseMessage response = m_site.processInitiateTask(this, task);
+                if (response.shouldCommit() == false) {
+                    m_needsRollback = true;
+                }
             }
             else if (m_notice instanceof FragmentTaskLogMessage) {
                 FragmentTaskLogMessage taskLog = (FragmentTaskLogMessage) m_notice;
