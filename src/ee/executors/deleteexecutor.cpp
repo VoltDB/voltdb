@@ -233,14 +233,11 @@ TableTuple DeleteExecutor::p_next_pull()
             // tuple on the target table that we will want to blow away. This saves
             // us the trouble of having to do an index lookup
             //
-// @TODO doesn't work. Error message:
-// Type 5 not a recognized type for casting as an address
-// In ../../src/ee/common/NValue.hpp:2485
-//void *targetAddress = tuple.getNValue(0).castAsAddress();
-//m_targetTuple.move(targetAddress);
+            void *targetAddress = tuple.address();
+            m_targetTuple.move(targetAddress);
 
             // Delete from target table
-            if (!m_targetTable->deleteTuple(tuple, true)) {
+            if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
                 char message[128];
                 snprintf(message, 128, "Failed to delete tuple from table '%s'",
                    m_targetTable->name().c_str());
@@ -276,4 +273,3 @@ void DeleteExecutor::p_insert_output_table_pull(TableTuple& tuple)
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
     }
 }
-
