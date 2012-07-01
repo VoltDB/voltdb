@@ -243,6 +243,26 @@ public enum VoltType {
         return typeFromClass(cls);
     }
 
+/**
+     * Currently we do not allow arrays as inputs to procedures
+     * except byte arrays. This method returns true if the type
+     * of an object is array, except byte array. To fix ENG-933.
+     */
+
+    public static boolean checkIfArrayType(Class<?> c)
+    {
+      if (c.isArray())
+      {
+        String componentType = c.getComponentType().toString();
+        if (!"byte".equals(componentType))
+        {
+           return true;
+        }
+      }
+      return false;
+    }
+
+
     /**
      * Ascertain the most appropriate <tt>VoltType</tt> given a
      * java class.
@@ -252,6 +272,11 @@ public enum VoltType {
      * @see #classFromType
      */
     public static VoltType typeFromClass(Class<?> cls) {
+
+        if (checkIfArrayType(cls))
+        {
+          throw new VoltTypeException("Arrays are not allowed as inputs to procedures, except byte arrays");
+        }
         VoltType type = s_classes.get(cls);
         if (type == null) {
             throw new VoltTypeException("Unimplemented Object Type: " + cls);

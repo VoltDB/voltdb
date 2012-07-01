@@ -1,0 +1,5 @@
+This test app is to test the fix for ENG-933, where the application was crashing without a suitable error 
+message when an array was passed as an input parameter to a stored procedure. Now, in this situation, an 
+appropriate error message will be thrown. The method checkIfArrayType() is added to org.voltdb.VoltType and is 
+called from typeFromClass in the same class.
+

@@ -1,0 +1,14 @@
+<?xml version="1.0"?>
+<project>
+    <database name='database'>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='eng933.procedures.Insert'/>
+        </procedures>
+        <partitions>
+           <partition table='HELLOWORLD' column='DIALECT' />
+        </partitions>
+    </database>
+</project>
