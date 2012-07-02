@@ -96,24 +96,24 @@ public class TestIndexSelection extends TestCase {
         }
     }*/
 
-//    public void testEng2541Plan() throws JSONException
-//    {
-//        AbstractPlanNode pn = null;
-//        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-//        assertTrue(pn != null);
-//
-//        while( pn.getChildCount() > 0 )
-//        	pn = pn.getChild(0);
-//        //assertTrue(pn instanceof IndexScanPlanNode);
-//        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
-//
-//        if (pn != null) {
-//            JSONObject j = new JSONObject(pn.toJSONString());
-//            System.out.println(j.toString(2));
-//            System.out.println();
-//            System.out.println(pn.toExplainPlanString());
-//        }
-//    }
+    public void testEng2541Plan() throws JSONException
+    {
+        AbstractPlanNode pn = null;
+        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+        assertTrue(pn != null);
+
+        while( pn.getChildCount() > 0 )
+        	pn = pn.getChild(0);
+        //assertTrue(pn instanceof IndexScanPlanNode);
+        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
+
+        if (pn != null) {
+            JSONObject j = new JSONObject(pn.toJSONString());
+            System.out.println(j.toString(2));
+            System.out.println();
+            System.out.println(pn.toExplainPlanString());
+        }
+    }
     
 //    public void testGetLeafLists() {
 //    	AbstractPlanNode pn = null;
@@ -138,13 +138,14 @@ public class TestIndexSelection extends TestCase {
 //        //assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("LIMIT") = 1 );
 //    }
     
-    public void testDiffLeaves() {
-    	AbstractPlanNode pn1 = null;
-    	AbstractPlanNode pn2 = null;
-        pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-        pn2 = compile("select * from l where lname=? and b=0 limit ?;", 3, true);
-        assertTrue(pn1 != null);
-        assertTrue(pn2 != null);
-        plannerTester.diffLeaves(pn1, pn2);
-    }
+//    public void testDiffLeaves() {
+//    	AbstractPlanNode pn1 = null;
+//    	AbstractPlanNode pn2 = null;
+//        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+//    	pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+//        pn2 = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
+//        assertTrue(pn1 != null);
+//        assertTrue(pn2 != null);
+//        plannerTester.diffLeaves(pn1, pn2);
+//    }
 }
