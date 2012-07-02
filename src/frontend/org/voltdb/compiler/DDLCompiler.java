@@ -586,6 +586,9 @@ public class DDLCompiler {
                 throw m_compiler.new VoltCompilerException(msg);
             }
         }
+        else if (indexNameNoCase.contains("counter")) {
+            index.setType(IndexType.BALANCED_TREE_COUNTER.getValue());
+        }
         else
         {
             index.setType(IndexType.BALANCED_TREE.getValue());
