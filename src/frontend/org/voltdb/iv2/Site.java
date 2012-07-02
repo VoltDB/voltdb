@@ -463,6 +463,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
+    public void loadTable(long txnId, int tableId, VoltTable data)
+    {
+        long undo_token = getNextUndoToken();
+        m_ee.loadTable(tableId, data,
+                txnId,
+                m_lastCommittedTxnId,
+                undo_token);
+        m_ee.releaseUndoToken(undo_token);
+        // I don't think this call is strictly necessary, but undo token
+        // management is so scrod in general that I'm going to leave it since
+        // it supposedly 'works'  --izzy
+        getNextUndoToken();
+    }
+
+    @Override
     public void updateBackendLogLevels()
     {
         m_ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
@@ -603,5 +618,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
     {
         return m_snapshotter.doSnapshotWork(m_ee, ignoreQuietPeriod);
+    }
+
+    @Override
+    public void setRejoinComplete() {
+        m_isRejoining = false;
     }
 }

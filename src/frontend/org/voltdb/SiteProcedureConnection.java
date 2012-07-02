@@ -61,6 +61,9 @@ public interface SiteProcedureConnection {
      */
     public void updateBackendLogLevels();
 
+    /**
+     * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
+     */
     public void loadTable(
             long txnId,
             String clusterName,
@@ -69,6 +72,10 @@ public interface SiteProcedureConnection {
             VoltTable data)
     throws VoltAbortException;
 
+    /**
+     * loadTable method used internally by ExecutionSite/Site clients
+     */
+    public void loadTable(long txnId, int tableId, VoltTable data);
 
     public VoltTable[] executeQueryPlanFragmentsAndGetResults(
             long[] planFragmentIds,
@@ -126,6 +133,8 @@ public interface SiteProcedureConnection {
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params);
+
+    public void setRejoinComplete();
 
     public long[] getUSOForExportTable(String signature);
 

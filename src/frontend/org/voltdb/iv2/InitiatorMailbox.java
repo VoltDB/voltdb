@@ -96,6 +96,11 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
+    public void shutdown() throws InterruptedException
+    {
+        m_masterMapCache.shutdown();
+    }
+
     // Provide the starting replica configuration (for startup)
     public synchronized void setReplicas(List<Long> replicas)
     {
@@ -110,11 +115,9 @@ public class InitiatorMailbox implements Mailbox
         if (m_replicas != null && m_term != null) {
             m_term.cancel();
         }
-        else {
-            m_replicas = new TreeSet<Long>();
-            m_replicas.addAll(replicas);
-            m_msgHandler.updateReplicas(replicas);
-        }
+        m_replicas = new TreeSet<Long>();
+        m_replicas.addAll(replicas);
+        m_msgHandler.updateReplicas(replicas);
     }
 
     public long getMasterHsId(int partitionId)

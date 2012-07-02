@@ -41,6 +41,14 @@ function server() {
 }
 
 # run the voltdb server locally
+function rejoin() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB deployment deployment.xml \
+        license $LICENSE rejoinhost $LEADER enableiv2
+}
+
 function serverlegacy() {
     # if a catalog doesn't exist, build one
     if [ ! -f $APPNAME.jar ]; then catalog; fi

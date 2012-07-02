@@ -73,17 +73,19 @@ public class DuplicateCounter
         }
     }
 
-    protected int checkCommon(long hash, long srcHSId)
+    protected int checkCommon(long hash, boolean rejoining, VoltMessage message)
     {
-        if (m_responseHash == null) {
-            m_responseHash = Long.valueOf(hash);
+        if (!rejoining) {
+            if (m_responseHash == null) {
+                m_responseHash = Long.valueOf(hash);
+            }
+            else if (!m_responseHash.equals(hash)) {
+                System.out.printf("COMPARING: %d to %d\n", hash, m_responseHash);
+                return MISMATCH;
+            }
+            m_lastResponse = message;
         }
-        else if (!m_responseHash.equals(hash)) {
-            System.out.printf("COMPARING: %d to %d\n", hash, m_responseHash);
-            return MISMATCH;
-        }
-
-        m_expectedHSIds.remove(srcHSId);
+        m_expectedHSIds.remove(message.m_sourceHSId);
         if (m_expectedHSIds.size() == 0) {
             return DONE;
         }
@@ -95,8 +97,7 @@ public class DuplicateCounter
     int offer(InitiateResponseMessage message)
     {
         long hash = message.getClientResponseData().getHashOfTableResults();
-        m_lastResponse = message;
-        return checkCommon(hash, message.m_sourceHSId);
+        return checkCommon(hash, message.isRecovering(), message);
     }
 
     int offer(FragmentResponseMessage message)
@@ -105,8 +106,7 @@ public class DuplicateCounter
         for (int i = 0; i < message.getTableCount(); i++) {
             hash ^= MiscUtils.cheesyBufferCheckSum(message.getTableAtIndex(i).getBuffer());
         }
-        m_lastResponse = message;
-        return checkCommon(hash, message.m_sourceHSId);
+        return checkCommon(hash, message.isRecovering(), message);
     }
 
     VoltMessage getLastResponse()

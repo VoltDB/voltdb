@@ -17,22 +17,18 @@
 
 package org.voltdb.iv2;
 
-import java.io.File;
-
 import java.lang.reflect.Constructor;
 
 import java.net.InetAddress;
 
 import java.nio.ByteBuffer;
 
-import java.util.ArrayList;
 import java.util.List;
-
+import java.util.concurrent.atomic.AtomicReference;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 
 import org.voltdb.client.ClientResponse;
@@ -40,11 +36,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.ClientResponseImpl;
 
 import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RejoinMessage.Type;
 
 import org.voltdb.PrivateVoltTableFactory;
 
 import org.voltdb.rejoin.RejoinSiteProcessor;
-import org.voltdb.rejoin.TaskLog;
 
 import org.voltdb.SnapshotFormat;
 
@@ -106,8 +102,8 @@ public class RejoinProducer extends SiteTasker
                 }
 
                 // Send a message to self to avoid synchronization
-//                RejoinMessage msg = new RejoinMessage(txnId);
-//                m_mailbox.send(getSiteId(), msg);
+                RejoinMessage msg = new RejoinMessage(txnId);
+                m_mailbox.send(m_mailbox.getHSId(), msg);
             } else {
                 VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
                         false, null);
@@ -127,6 +123,10 @@ public class RejoinProducer extends SiteTasker
             VoltDB.instance().getSnapshotCompletionMonitor()
                   .addInterest(m_snapshotCompletionHandler);
         */
+        RejoinMessage snap_complete = new RejoinMessage(m_mailbox.getHSId(), Type.SNAPSHOT_FINISHED);
+        RejoinMessage replay_complete = new RejoinMessage(m_mailbox.getHSId(), Type.REPLAY_FINISHED);
+        m_mailbox.send(m_rejoinCoordinatorHsId, snap_complete);
+        m_mailbox.send(m_rejoinCoordinatorHsId, replay_complete);
     }
 
     public RejoinProducer(int partitionId, SiteTaskerQueue taskQueue)
@@ -154,6 +154,9 @@ public class RejoinProducer extends SiteTasker
         }
     }
 
+    final AtomicReference<Pair<Integer, ByteBuffer>> firstWork =
+        new AtomicReference<Pair<Integer, ByteBuffer>>();
+
     void doInitiation(RejoinMessage message)
     {
         m_rejoinCoordinatorHsId = message.m_sourceHSId;
@@ -171,8 +174,34 @@ public class RejoinProducer extends SiteTasker
         SnapshotUtil.requestSnapshot(0l, "", nonce, true,
                                      SnapshotFormat.STREAM, data, m_handler);
 
-        // run the rejoin task (ourself) in the Site
-        m_taskQueue.offer(this);
+        // There are problems here, Chester. First, the site thread needs
+        // to stay unblocked until the first data block is available. So,
+        // do a messy blocking poll on the first unit of work (by spinning!).
+        // Safe that first unit in "firstWork" and then enter the taskQueue.
+        // Future: need a blocking peek on rejoinSiteProcessor(); then firstWork
+        // can go away and the weird special casing of the first block in
+        // run() can also go away.
+        Thread firstSnapshotBlock = new Thread() {
+            @Override
+            public void run()
+            {
+                try {
+                Thread.sleep(30000);
+                } catch (Exception e) { }
+                Pair<Integer, ByteBuffer> rejoinWork;
+                do {
+                    rejoinWork = m_rejoinSiteProcessor.poll();
+                    if (rejoinWork != null) {
+                        firstWork.set(rejoinWork);
+                    }
+                }
+                while (rejoinWork == null);
+
+                // run the rejoin task (ourself) in the Site
+                m_taskQueue.offer(RejoinProducer.this);
+            }
+        };
+        firstSnapshotBlock.start();
     }
 
     private RejoinSiteProcessor makeSnapshotProcessor()
@@ -225,34 +254,44 @@ public class RejoinProducer extends SiteTasker
      */
     @Override
     public void run(SiteProcedureConnection siteConnection) {
+        restoreBlock(firstWork.get(), siteConnection);
+
         while (!m_rejoinSiteProcessor.isEOF()) {
             Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
             if (rejoinWork != null) {
-                int tableId = rejoinWork.getFirst();
-                ByteBuffer buffer = rejoinWork.getSecond();
-                VoltTable table =
-                    PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
-                            true);
-                //m_recoveryLog.info("table " + tableId + ": " + table.toString());
-                // loadTable(m_rejoinSnapshotTxnId, tableId, table);
-                // siteConnection.loadTable(tableId, buffer, txnId, lastCommittedTxnId, undo_token);
-            } else if (m_rejoinSiteProcessor.isEOF()) {
-                // m_recoveryLog.debug("Rejoin snapshot transfer is finished");
-                m_rejoinSiteProcessor.close();
-                // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
-                m_rejoinSiteProcessor = null;
-                // m_taskExeStartTime = System.currentTimeMillis();
-                /*
-                 * Don't notify the rejoin coordinator yet. The stream snapshot may
-                 * have not finished on all nodes, let the snapshot completion
-                 * monitor tell the rejoin coordinator.
-                 */
+                restoreBlock(rejoinWork, siteConnection);
             }
         }
+        // m_recoveryLog.debug("Rejoin snapshot transfer is finished");
+        m_rejoinSiteProcessor.close();
+        // m_rejoinSnapshotBytes = m_rejoinSiteProcessor.bytesTransferred();
+        // m_rejoinSiteProcessor = null;
+        // m_taskExeStartTime = System.currentTimeMillis();
+        /*
+         * Don't notify the rejoin coordinator yet. The stream snapshot may
+         * have not finished on all nodes, let the snapshot completion
+         * monitor tell the rejoin coordinator.
+         */
+        siteConnection.setRejoinComplete();
     }
+
+    void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork, SiteProcedureConnection siteConnection)
+    {
+        int tableId = rejoinWork.getFirst();
+        ByteBuffer buffer = rejoinWork.getSecond();
+        VoltTable table =
+            PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
+                    true);
+        //m_recoveryLog.info("table " + tableId + ": " + table.toString());
+        // Currently, only export cares about this TXN ID.  Since we don't have one handy, and IV2
+        // doesn't yet care about export, just use Long.MIN_VALUE
+        siteConnection.loadTable(Long.MIN_VALUE, tableId, table);
+    }
+
 
     @Override
     public void runForRejoin(SiteProcedureConnection siteConnection) {
+        run(siteConnection);
     }
 
     @Override
