@@ -114,12 +114,12 @@ public class InFlightTxnState implements Serializable {
                 msg += "\n  Mismatched number of results: " + curr_results.length;
                 msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
                 if (isReadOnly) {
-                	hostLog.warn(msg);
+                    hostLog.warn(msg);
                 }
                 else {
-	                // die die die
-	                VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
-	                throw new RuntimeException(msg); // gets called only by test code
+                    // die die die
+                    VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                    throw new RuntimeException(msg); // gets called only by test code
                 }
             }
             for (int i = 0; i < resultsForComparison.length; ++i)
@@ -133,12 +133,12 @@ public class InFlightTxnState implements Serializable {
                     msg += "\n  Mismatched results: " + curr_results[i].toString();
                     msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
                     if (isReadOnly) {
-                    	hostLog.warn(msg);
+                        hostLog.warn(msg);
                     }
                     else {
-	                    // die die die
-	                    VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
-	                    throw new RuntimeException(msg); // gets called only by test code
+                        // die die die
+                        VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                        throw new RuntimeException(msg); // gets called only by test code
                     }
                 }
             }
