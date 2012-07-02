@@ -174,9 +174,10 @@ public class SnapshotRestore extends VoltSystemProcedure
             final File f = getSaveFileForPartitionedTable(filePath, fileNonce,
                     tableName,
                     originalHostId);
+            SiteTracker st = org.voltdb.VoltDB.instance().getSiteTrackerForSnapshot();
             TableSaveFile savefile = getTableSaveFile(
                     f,
-                    org.voltdb.VoltDB.instance().getLocalSites().size() * 4,
+                    st.getLocalSites().length * 4,
                     relevantPartitionSet.toArray(new Integer[relevantPartitionSet.size()]));
 
             m_saveFiles.offer(savefile);
@@ -1757,7 +1758,7 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private Mailbox m_mbox;
-    private Map<Long, Long> m_actualToGenerated = new HashMap<Long, Long>();
+    private final Map<Long, Long> m_actualToGenerated = new HashMap<Long, Long>();
     private Database m_database;
     private long m_siteId;
     private int m_hostId;
