@@ -565,6 +565,7 @@ public class DDLCompiler {
         }
 
         Index index = table.getIndexes().add(name);
+        index.setCountable(false);
 
         // set the type of the index based on the index name and column types
         // Currently, only int types can use hash or array indexes
@@ -587,7 +588,8 @@ public class DDLCompiler {
             }
         }
         else if (indexNameNoCase.contains("counter")) {
-            index.setType(IndexType.BALANCED_TREE_COUNTER.getValue());
+            index.setType(IndexType.BALANCED_TREE.getValue());
+            index.setCountable(true);
         }
         else
         {

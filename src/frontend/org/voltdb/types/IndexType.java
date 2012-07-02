@@ -28,8 +28,7 @@ public enum IndexType {
     INVALID         (0),
     BALANCED_TREE   (1),
     HASH_TABLE      (2),
-    BTREE           (3),
-    BALANCED_TREE_COUNTER   (4);
+    BTREE           (3);
 
     IndexType(int val) {
         assert (this.ordinal() == val) :

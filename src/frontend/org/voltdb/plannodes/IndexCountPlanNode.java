@@ -39,7 +39,7 @@ import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 
-public class IndexCountPlanNode extends AbstractScanPlanNode {
+public class IndexCountPlanNode extends AbstractPlanNode {
 
     public enum Members {
         TARGET_INDEX_NAME,
