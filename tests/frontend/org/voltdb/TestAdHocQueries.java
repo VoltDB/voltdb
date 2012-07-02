@@ -36,7 +36,6 @@ import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
-import org.voltdb.regressionsuites.LocalSingleProcessServer;
 import org.voltdb.utils.MiscUtils;
 
 public class TestAdHocQueries extends AdHocQueryTester {
@@ -46,16 +45,15 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     public void testProcedureAdhoc() throws Exception {
         VoltDB.Configuration config = setUpSPDB();
-        String catalogPaths[] = config.m_pathToCatalog.split("/");
-        LocalSingleProcessServer localServer =
-                new LocalSingleProcessServer( catalogPaths[catalogPaths.length - 1 ], 2, BackendTarget.NATIVE_EE_JNI);
+        ServerThread localServer = new ServerThread(config);
 
         try {
-            localServer.startUp(true);
+            localServer.start();
+            localServer.waitForInitialization();
 
             // do the test
             m_client = ClientFactory.createClient();
-            m_client.createConnection("localhost");
+            m_client.createConnection("localhost", config.m_port);
 
             m_client.callProcedure("@AdHoc", "insert into PARTED1 values ( 23, 3 )");
 
@@ -167,12 +165,18 @@ public class TestAdHocQueries extends AdHocQueryTester {
             assertTrue(results[3].advanceRow());
             assertEquals( 24, results[3].getLong(0));
             assertEquals( 4, results[3].getLong(1));
-        } finally {
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+        finally {
             if (m_client != null) m_client.close();
             m_client = null;
 
             if (localServer != null) {
-                localServer.shutDown();
+                localServer.shutdown();
+                localServer.join();
             }
             localServer = null;
 
@@ -190,7 +194,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             // do the test
             m_client = ClientFactory.createClient();
-            m_client.createConnection("localhost");
+            m_client.createConnection("localhost", config.m_port);
 
             VoltTable modCount;
 
