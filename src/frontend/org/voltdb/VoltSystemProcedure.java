@@ -185,11 +185,23 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     }
 
     /*
-     * A helper method for snapshot restore that manages a mailbox run loop and dependency tracking
+     * A helper method for snapshot restore that manages a mailbox run loop and dependency tracking.
+     * The mailbox is a dedicated mailbox for snapshot restore. This assumes a very specific plan fragment
+     * worklow where fragments 0 - (N - 1) all have a single output dependency that is aggregated
+     * by fragment N which uses their output dependencies as it's input dependencies.
+     *
+     * This matches the workflow of snapshot restore
      */
     public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[], Mailbox m) {
         Set<Integer> dependencyIds = new HashSet<Integer>();
         VoltTable results[] = new VoltTable[1];
+
+        /*
+         * Iterate the plan fragments and distribute them. Each
+         * plan fragment goes to an individual site.
+         * The output dependency of each fragment is added to the
+         * set of expected dependencies
+         */
         for (int ii = 0; ii < pfs.length - 1; ii++) {
             SynthesizedPlanFragment pf = pfs[ii];
             dependencyIds.add(pf.outputDepId);
@@ -210,7 +222,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
             /*
              * The only real data is the fragment id, output dep id,
-             * and parameters
+             * and parameters. Transactions ids, readonly-ness, and finality-ness
+             * are unused.
              */
             FragmentTaskMessage ftm =
                     FragmentTaskMessage.createWithOneFragment(
@@ -224,15 +237,24 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                             false);
             m.send(pf.siteId, ftm);
         }
+
+        /*
+         * Track the received dependencies. Stored as a list because executePlanFragment for
+         * the aggregator plan fragment expects the tables as a list in the dependency map,
+         * but sysproc fragments only every have a single output dependency.
+         */
         Map<Integer, List<VoltTable>> receivedDependencyIds = new HashMap<Integer, List<VoltTable>>();
 
         /*
          * This loop will wait for all the responses to the fragment that was sent out,
-         * but will also respond to incoming fragment tasks by executing them
+         * but will also respond to incoming fragment tasks by executing them.
          */
         while (true) {
+            //Lightly spinning makes debugging easier by allowing inspection
+            //of stuff on the stack
             VoltMessage vm = m.recvBlocking(1000);
             if (vm == null) continue;
+
             if (vm instanceof FragmentTaskMessage) {
                 FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
                 DependencyPair dp =
@@ -256,6 +278,9 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             }
         }
 
+        /*
+         * Executing the last aggregator plan fragment in the list produces the result
+         */
         results[0] =
                 m_runner.executePlanFragment(
                         m_runner.getTxnState(),
