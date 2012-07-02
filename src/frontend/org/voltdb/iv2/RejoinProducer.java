@@ -45,6 +45,7 @@ import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.rejoin.RejoinSiteProcessor;
 
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotSaveAPI;
 
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
@@ -275,6 +276,7 @@ public class RejoinProducer extends SiteTasker
          * monitor tell the rejoin coordinator.
          */
         siteConnection.setRejoinComplete();
+        SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
     }
 
     void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork, SiteProcedureConnection siteConnection)

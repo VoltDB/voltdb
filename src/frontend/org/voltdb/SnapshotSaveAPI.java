@@ -74,7 +74,7 @@ public class SnapshotSaveAPI
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
     // ugh, ick, ugh
-    static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
+    public static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
 
     /**
      * The only public method: do all the work to start a snapshot.
