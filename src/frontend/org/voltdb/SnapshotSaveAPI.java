@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -53,12 +52,11 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.MiscUtils;
-
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
@@ -485,14 +483,7 @@ public class SnapshotSaveAPI
                             List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
                             // if the target site is local to this node...
                             if (localHSids.contains(targetHSid)) {
-                                Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotDataTarget",
-                                        "Rejoin", false);
-                                if (klass != null) {
-                                    Constructor<?> constructor =
-                                            klass.getConstructor(List.class, int.class,
-                                                                 Map.class);
-                                    sdt = (SnapshotDataTarget) constructor.newInstance(addresses, port, schemas);
-                                }
+                                sdt = new StreamSnapshotDataTarget(addresses, port, schemas);
                             }
                             else {
                                 sdt = new DevNullSnapshotTarget();

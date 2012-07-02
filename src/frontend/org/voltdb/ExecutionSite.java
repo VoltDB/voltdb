@@ -102,6 +102,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
@@ -1223,17 +1224,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         m_recoveryStartTime = System.currentTimeMillis();
 
         // Construct a snapshot stream receiver
-        Class<?> klass =
-                MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotSink",
-                                       "Rejoin", false);
-        Constructor<?> constructor;
-        try {
-            constructor = klass.getConstructor(long.class);
-            m_rejoinSnapshotProcessor = (RejoinSiteProcessor) constructor.newInstance(getSiteId());
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to construct stream snapshot receiver",
-                                    true, e);
-        }
+        m_rejoinSnapshotProcessor = new StreamSnapshotSink(getSiteId());
 
         Pair<List<byte[]>, Integer> endPoints = m_rejoinSnapshotProcessor.initialize();
         List<byte[]> addresses = endPoints.getFirst();
