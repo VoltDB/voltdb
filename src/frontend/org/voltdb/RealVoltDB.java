@@ -411,9 +411,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         List<Integer> partitions =
                             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                         m_iv2Initiators = createIv2Initiators(partitions);
+                        long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
                         // Create the MPI if we're the correct host
                         if (topo.getInt("MPI") == m_messenger.getHostId()) {
-                            Initiator initiator = new MpInitiator(m_messenger);
+                            Initiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
                             m_iv2Initiators.add(initiator);
                         }
                     }
@@ -580,9 +581,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              */
             if (isIV2Enabled()) {
                 for (Initiator iv2init : m_iv2Initiators) {
-                    iv2init.configure(getBackendTargetType(), m_serializedCatalog,
-                            m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor(),
-                            csp, m_rejoining);
+                    iv2init.configure(
+                            getBackendTargetType(),
+                            m_serializedCatalog,
+                            m_catalogContext,
+                            m_deployment.getCluster().getKfactor(),
+                            csp,
+                            clusterConfig.getPartitionCount(),
+                            m_rejoining);
                 }
             }
             else {
