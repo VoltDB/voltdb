@@ -512,7 +512,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             m_rejoining = false;
             if (m_haveRecoveryPermit) {
                 m_haveRecoveryPermit = false;
-                m_recoveryPermit.release();
+                /*
+                 * If it's not using pauseless rejoin, no need to release the
+                 * permit here because it was never set. Pauseless rejoin has
+                 * its own coordinator that makes sure only one site is doing
+                 * snapshot streaming at any point of time.
+                 */
+                if (!newRejoin) {
+                    m_recoveryPermit.release();
+                }
                 m_recoveryLog.info(
                         "Destination recovery complete for site " +
                         CoreUtils.hsIdToString(m_siteId) +
