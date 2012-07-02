@@ -420,7 +420,8 @@ public class TestDtxnInitiatorMailbox extends TestCase
         dim.setHSId(INITIATOR_SITE_ID);
 
         m_testStream.reset();
-        // Single-partition read-only txn
+
+        // Single-partition read-only txn (ENG-3288 - r/o non-deterministic succeeds)
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, false, createResultSet("dude")));
         assertTrue(m_testStream.gotResponse());
@@ -437,8 +438,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
                 caught = true;
             }
         }
-        assertTrue(caught);
+        assertTrue(!caught);
         m_testStream.reset();
+
         // Single-partition read-write txn
         dim.addPendingTxn(createTxnState(2, new int[] {0,1}, false, true));
         dim.deliver(createInitiateResponse(2, 0, false, true, false, createResultSet("dude")));
