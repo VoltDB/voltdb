@@ -23,7 +23,9 @@ import java.util.List;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.types.ExpressionType;
 
 public class ReplaceWithIndexCounter implements MicroOptimization {
 
@@ -43,10 +45,10 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         assert(plan != null);
 
         // depth first:
-        //     find LimitPlanNodes with exactly one child
-        //     where that child is an AbstractScanPlanNode
-        //     disconnect the LimitPlanNode
-        //     and inline the LimitPlanNode in to the AbstractScanPlanNode
+        //     find AggregatePlanNode with exactly one child
+        //     where that child is an AbstractScanPlanNode.
+        //     Replace the AggregatePlanNode and AbstractScanPlanNode
+        //     with IndexCountPlanNode
 
         ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
 
@@ -61,21 +63,30 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
             plan.addAndLinkChild(child);
         }
 
-        if ((plan instanceof LimitPlanNode) == false)
+        if ((plan instanceof AggregatePlanNode) == false)
             return plan;
-
         if (plan.getChildCount() != 1)
             return plan;
 
         AbstractPlanNode child = plan.getChild(0);
         if ((child instanceof AbstractScanPlanNode) == false)
             return plan;
+        // TODO: check index type
 
-        plan.clearChildren();
-        child.clearParents();
-        child.addInlinePlanNode(plan);
+        AggregatePlanNode apn = (AggregatePlanNode) plan;
+        if ((apn.getM_aggregateTypes().size() == 1 &&
+                apn.getM_aggregateTypes().get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR)) == false)
+            return plan;
 
-        return child;
+        IndexCountPlanNode icpn = new IndexCountPlanNode();
+        if (plan.getParent(0) != null) {
+            plan.addAndLinkChild(icpn);
+        }
+
+        plan.removeFromGraph();
+        child.removeFromGraph();
+
+        return icpn;
     }
 
 }

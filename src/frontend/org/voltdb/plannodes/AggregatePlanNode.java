@@ -64,6 +64,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         super();
     }
 
+    public List<ExpressionType> getM_aggregateTypes() {
+        return m_aggregateTypes;
+    }
+
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.AGGREGATE;

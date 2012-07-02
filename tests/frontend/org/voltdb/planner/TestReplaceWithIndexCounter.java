@@ -34,6 +34,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.types.ExpressionType;
 
 public class TestReplaceWithIndexCounter extends TestCase {
@@ -81,7 +82,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
 
     public void testCountStarOnReplicatedTable() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ?", 1, true);
-        checkPushedDown(pn, false,
+        checkIndexCounter(pn, false,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
                         null);
     }
@@ -108,7 +109,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
      *            The expected aggregate types for the top aggregate node after
      *            pushing the original aggregate node down.
      */
-    private void checkPushedDown(List<AbstractPlanNode> pn, boolean isMultiPart,
+    private void checkIndexCounter(List<AbstractPlanNode> pn, boolean isMultiPart,
                                  ExpressionType[] aggTypes, ExpressionType[] pushDownTypes) {
         assertTrue(pn.size() > 0);
 
@@ -127,7 +128,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
 
 
 
-        assertTrue(p instanceof HashAggregatePlanNode);
+        assertTrue(p instanceof IndexCountPlanNode);
         if (pushDownTypes != null) {
             for (ExpressionType type : pushDownTypes) {
                 assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
