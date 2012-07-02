@@ -53,6 +53,16 @@ public interface RejoinSiteProcessor {
     public abstract Pair<Integer, ByteBuffer> poll();
 
     /**
+     * Poll the next block to be sent to EE, wait for the next available block
+     * if necessary. This method blocks.
+     *
+     * @return The next block of snapshot data. null indicates there's no more
+     *         data to come.
+     * @throws InterruptedException
+     */
+    public abstract Pair<Integer, ByteBuffer> take() throws InterruptedException;
+
+    /**
      * Return the number of bytes transferred so far.
      * @return
      */
