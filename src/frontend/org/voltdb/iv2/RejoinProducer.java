@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.lang.reflect.Constructor;
-
 import java.net.InetAddress;
 
 import java.nio.ByteBuffer;
@@ -43,14 +41,13 @@ import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.PrivateVoltTableFactory;
 
 import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.StreamSnapshotSink;
 
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
-
-import org.voltdb.utils.MiscUtils;
 
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
@@ -165,7 +162,7 @@ public class RejoinProducer extends SiteTasker
     void doInitiation(RejoinMessage message)
     {
         m_rejoinCoordinatorHsId = message.m_sourceHSId;
-        m_rejoinSiteProcessor = makeSnapshotProcessor();
+        m_rejoinSiteProcessor = new StreamSnapshotSink(m_mailbox.getHSId());
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
@@ -203,23 +200,6 @@ public class RejoinProducer extends SiteTasker
             }
         };
         firstSnapshotBlock.start();
-    }
-
-    private RejoinSiteProcessor makeSnapshotProcessor()
-    {
-        RejoinSiteProcessor rejoinSiteProcessor = null;
-        Class<?> klass =
-                MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotSink",
-                                       "Rejoin", false);
-        Constructor<?> constructor;
-        try {
-            constructor = klass.getConstructor(long.class);
-            rejoinSiteProcessor = (RejoinSiteProcessor) constructor.newInstance(m_mailbox.getHSId());
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to construct stream snapshot receiver",
-                                    true, e);
-        }
-        return rejoinSiteProcessor;
     }
 
     private String makeSnapshotRequest(Pair<List<byte[]>, Integer> endPoints, long sourceSite)

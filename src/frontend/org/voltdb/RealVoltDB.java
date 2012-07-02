@@ -462,25 +462,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
                     hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
 
-                    // Do a blocking iv2 rejoin
-                    Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
-                                                            "Rejoin", false);
-                    Constructor<?> constructor;
-                    try {
-                        constructor = klass.getConstructor(HostMessenger.class, List.class);
-                        m_rejoinCoordinator =
-                                (RejoinCoordinator) constructor.newInstance(m_messenger, hsidsToRejoin);
-                        m_messenger.registerMailbox(m_rejoinCoordinator);
-                        // Probably don't need to do this!? Maybe?
-                        // m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
-                        //                                   new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
-                        hostLog.info("Using iv2 community rejoin");
-                    } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
-                                                true, e);
-                    }
-
-
+                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, hsidsToRejoin);
+                    m_messenger.registerMailbox(m_rejoinCoordinator);
+                    hostLog.info("Using iv2 community rejoin");
                 }
                 else if (isRejoin && m_config.m_newRejoin) {
                     SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
