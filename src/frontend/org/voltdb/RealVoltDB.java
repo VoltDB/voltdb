@@ -27,7 +27,6 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.Constructor;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -97,6 +96,7 @@ import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.RejoinCoordinator;
+import org.voltdb.rejoin.SequentialRejoinCoordinator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -425,22 +425,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         sites.add(siteMailbox.getHSId());
                     }
 
-                    Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
-                                                            "Rejoin", false);
-                    Constructor<?> constructor;
-                    try {
-                        constructor = klass.getConstructor(HostMessenger.class, List.class);
-                        m_rejoinCoordinator =
-                                (RejoinCoordinator) constructor.newInstance(m_messenger,
-                                                                            sites);
-                        m_messenger.registerMailbox(m_rejoinCoordinator);
-                        m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
-                                                           new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
-                        hostLog.info("Using pauseless rejoin");
-                    } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
-                                                true, e);
-                    }
+                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, sites);
+                    m_messenger.registerMailbox(m_rejoinCoordinator);
+                    m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
+                                                       new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
                 }
 
                 // All mailboxes should be set up, publish it
