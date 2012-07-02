@@ -84,8 +84,9 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
             return plan;
         
         IndexCountPlanNode icpn = new IndexCountPlanNode();
+        // TODO: I am not sure if there is a null case or not
         if (plan.getParent(0) != null) {
-            plan.addAndLinkChild(icpn);
+            plan.getParent(0).addAndLinkChild(icpn);
         }
 
         plan.removeFromGraph();
