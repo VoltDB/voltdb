@@ -219,7 +219,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     private volatile boolean m_isRunning = false;
 
     @Override
-    public boolean recovering() { return m_rejoining; }
+    public boolean rejoining() { return m_rejoining; }
 
     private long m_recoveryStartTime;
 
@@ -366,7 +366,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     FaultType.SITE_FAILURE);
             if (!m_faultManager.testPartitionDetectionDirectory(
                     m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
-                VoltDB.crashLocalVoltDB("Unalbe to create partition detection snapshot directory at" +
+                VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at" +
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"), false, null);
             }
 
@@ -574,9 +574,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             /*
              * Configure and start all the IV2 sites
-             * Create execution sites runners (and threads) for all exec sites except the first one.
-             * This allows the sites to be set up in the thread that will end up running them.
-             * Cache the first Site from the catalog and only do the setup once the other threads have been started.
              */
             if (isIV2Enabled()) {
                 for (Initiator iv2init : m_iv2Initiators) {

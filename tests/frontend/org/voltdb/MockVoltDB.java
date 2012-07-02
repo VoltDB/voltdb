@@ -401,7 +401,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean recovering() {
+    public boolean rejoining() {
         return false;
     }
 

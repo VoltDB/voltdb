@@ -373,6 +373,14 @@ public class VoltDB {
                     m_leaderPort = m_internalPort;
                 }
             }
+
+            // ENG-3035 Warn if 'recover' action has a catalog since we won't
+            // be using it. Only cover the 'recover' action since 'start' sometimes
+            // acts as 'recover' and other times as 'create'.
+            if (m_startAction == START_ACTION.RECOVER && m_pathToCatalog != null) {
+                hostLog.warn("Catalog is ignored for 'recover' action.");
+            }
+
             // ENG-2815 If deployment is null (the user wants the default) and
             // leader is null, supply the only valid leader value ("localhost").
             if (m_leader == null && m_pathToDeployment == null) {
@@ -451,16 +459,16 @@ public class VoltDB {
             // GettingStarted.pdf).
             String message = "";
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb [create|recover|replica] [leader <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>";
-                os.println(message);
-                // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
-                hostLog.info(message);
+                message = "Usage: voltdb create [leader <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
+                        + "       voltdb recover [leader <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
+                        + "       voltdb replica [leader <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n";
             } else {
-                message = "Usage: voltdb [create|recover] [leader <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>";
-                os.println(message);
-                // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
-                hostLog.info(message);
+                message = "Usage: voltdb create [leader <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>\n"
+                        + "       voltdb recover [leader <hostname>] [deployment <deployment.xml>]\n";
             }
+            os.print(message);
+            // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
+            hostLog.info(message);
             // Don't bother logging these for log4j, only dump them to the designated stream.
             os.println("If action is not specified the default is to 'recover' the database if a snapshot is present otherwise 'create'.");
             os.println("If no deployment is specified, a default 1 node cluster deployment will be configured.");
