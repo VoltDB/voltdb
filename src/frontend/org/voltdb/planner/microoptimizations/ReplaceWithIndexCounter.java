@@ -48,6 +48,8 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         //     disconnect the LimitPlanNode
         //     and inline the LimitPlanNode in to the AbstractScanPlanNode
 
+        // replace
+
         ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
         for (int i = 0; i < plan.getChildCount(); i++)
             children.add(plan.getChild(i));
