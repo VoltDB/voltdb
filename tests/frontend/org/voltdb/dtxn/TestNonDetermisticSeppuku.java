@@ -52,8 +52,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
             builder.addLiteralSchema(SCHEMA);
             builder.addPartitionInfo("kv", "key");
             builder.addProcedures(NonDeterministicSPProc.class,
-            					  NonDeterministic_RO_MP.class,
-            					  NonDeterministic_RO_SP.class);
+                                  NonDeterministic_RO_MP.class,
+                                  NonDeterministic_RO_SP.class);
 
             cluster = new LocalCluster("det1.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
             cluster.overrideAnyRequestForValgrind();

@@ -314,12 +314,12 @@ class WorkUnit
             msg += "\n  Mismatched results: " + payload.toString();
             msg += "\n  Read-only: " + new Boolean(m_isReadOnly).toString();
             if (m_isReadOnly) {
-            	hostLog.warn(msg);
+                hostLog.warn(msg);
             }
             else {
-	            // die die die (German: the the the)
-	            VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
-	            throw new RuntimeException(msg); // gets called only by test code
+                // die die die (German: the the the)
+                VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                throw new RuntimeException(msg); // gets called only by test code
             }
         }
     }
