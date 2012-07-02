@@ -439,8 +439,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     createRejoinBarrierAndWatchdog(rejoinCompleteLatch);
 
                     p = createMailboxesForSitesRejoin(topo);
-                    ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
-                    hostLog.info("Set recovering site count to " + p.getFirst().size());
                 } else {
                     p = createMailboxesForSitesStartup(topo);
                 }
@@ -460,6 +458,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     for (Initiator init : m_iv2Initiators) {
                         hsidsToRejoin.add(init.getInitiatorHSId());
                     }
+                    SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
+                    hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
 
                     // Do a blocking iv2 rejoin
                     Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
@@ -482,6 +482,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
                 }
                 else if (isRejoin && m_config.m_newRejoin) {
+                    SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
+                    hostLog.info("Set recovering site count to " + siteMailboxes.size());
                     // Construct and publish rejoin coordinator mailbox
                     ArrayList<Long> sites = new ArrayList<Long>();
                     for (Mailbox siteMailbox : siteMailboxes) {

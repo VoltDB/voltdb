@@ -73,6 +73,9 @@ public class SnapshotSaveAPI
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSaveAPI.class.getName());
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
+    // ugh, ick, ugh
+    static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
+
     /**
      * The only public method: do all the work to start a snapshot.
      * Assumes that a snapshot is feasible, that the caller has validated it can
@@ -96,7 +99,7 @@ public class SnapshotSaveAPI
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
         final int numLocalSites = (VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length -
-                ExecutionSite.recoveringSiteCount.get());
+                recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -366,7 +369,7 @@ public class SnapshotSaveAPI
         {
             SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
-                    (tracker.getLocalSites().length - ExecutionSite.recoveringSiteCount.get());
+                    (tracker.getLocalSites().length - recoveringSiteCount.get());
 
             // non-null if targeting only one site (used for rejoin)
             // set later from the "data" JSON string

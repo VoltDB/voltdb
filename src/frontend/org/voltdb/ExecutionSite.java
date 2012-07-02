@@ -122,7 +122,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
-    static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
         new ExecutionSiteNodeFailureFaultHandler();
@@ -537,7 +536,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
                         " with " + megabytes + " megabytes transferred " +
                         " at a rate of " + megabytesPerSecond + " megabytes/sec");
-                int remaining = recoveringSiteCount.decrementAndGet();
+                int remaining = SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
                     ee.toggleProfiler(0);
 
