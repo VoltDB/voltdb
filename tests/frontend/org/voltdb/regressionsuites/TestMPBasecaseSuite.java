@@ -105,7 +105,12 @@ public class TestMPBasecaseSuite extends RegressionSuite {
     public void testOneshotPartitionViolationAllSites() throws Exception
     {
         // Restrict to clustered tests (configured with > 1 partition)
-        if (!this.isLocalCluster()) {
+        LocalCluster config = (LocalCluster)this.getServerConfig();
+        int sites = config.m_siteCount;
+        int nodes = config.m_hostCount;
+        int k = config.m_kfactor;
+        int parts = (nodes * sites) / (k + 1);
+        if (parts == 1) {
             return;
         }
 
