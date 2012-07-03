@@ -32,7 +32,6 @@ public class SnapshotTask extends SiteTasker
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        hostLog.info("Doing snapshot work, baby!");
         siteConnection.doSnapshotWork(false);
     }
 

@@ -296,7 +296,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
             @Override
             public void run() {
-                hostLog.info("Creating new SnapshotTask");
                 m_scheduler.offer(new SnapshotTask());
             }
         },
