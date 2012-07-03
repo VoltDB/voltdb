@@ -39,7 +39,7 @@ using namespace voltdb;
 bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                                TempTableLimits* limits)
 {
-    VOLT_TRACE("init IndexScan Executor");
+    VOLT_TRACE("init IndexCount Executor");
 
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
     assert(m_node);
@@ -158,7 +158,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
     assert(m_targetTable);
     assert(m_targetTable == m_node->getTargetTable());
-    VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(),
+    VOLT_DEBUG("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
                m_index->getName().c_str());
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
@@ -229,7 +229,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     }
     assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
-
 
     //
     // END EXPRESSION

@@ -33,7 +33,7 @@ class AbstractExpression;
 /**
  *
  */
-class IndexCountPlanNode : public AbstractCountPlanNode {
+class IndexCountPlanNode : public AbstractScanPlanNode {
     public:
         IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
             this->key_iterate = false;
@@ -46,7 +46,7 @@ class IndexCountPlanNode : public AbstractCountPlanNode {
             this->end_expression = NULL;
         }
         ~IndexCountPlanNode();
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXSCAN); }
+        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXCOUNT); }
 
         void setKeyIterate(bool val);
         bool getKeyIterate() const;
