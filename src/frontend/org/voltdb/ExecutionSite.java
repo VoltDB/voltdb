@@ -94,6 +94,7 @@ import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskLogMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
@@ -101,6 +102,7 @@ import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.StreamSnapshotSink;
 import org.voltdb.rejoin.TaskLog;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
@@ -121,7 +123,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
-    static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
         new ExecutionSiteNodeFailureFaultHandler();
@@ -520,7 +521,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             m_rejoining = false;
             if (m_haveRecoveryPermit) {
                 m_haveRecoveryPermit = false;
-                m_recoveryPermit.release();
+                /*
+                 * If it's not using pauseless rejoin, no need to release the
+                 * permit here because it was never set. Pauseless rejoin has
+                 * its own coordinator that makes sure only one site is doing
+                 * snapshot streaming at any point of time.
+                 */
+                if (!newRejoin) {
+                    m_recoveryPermit.release();
+                }
                 m_recoveryLog.info(
                         "Destination recovery complete for site " +
                         CoreUtils.hsIdToString(m_siteId) +
@@ -528,7 +537,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
                         " with " + megabytes + " megabytes transferred " +
                         " at a rate of " + megabytesPerSecond + " megabytes/sec");
-                int remaining = recoveringSiteCount.decrementAndGet();
+                int remaining = SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
                     ee.toggleProfiler(0);
 
@@ -966,15 +975,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * readiness. If it is time, create a recovery processor and send
                  * the initiate message.
                  */
-                if (m_rejoining && !m_haveRecoveryPermit) {
+                if (m_rejoining && !m_haveRecoveryPermit && !VoltDB.instance().getConfig().m_newRejoin) {
                     Long safeTxnId = m_transactionQueue.safeToRecover();
                     if (safeTxnId != null && m_recoveryPermit.tryAcquire()) {
                         m_haveRecoveryPermit = true;
                         m_recoveryStartTime = System.currentTimeMillis();
 
-                        if (!VoltDB.instance().getConfig().m_newRejoin) {
-                            m_recoveryProcessor =
-                                    RecoverySiteProcessorDestination.createProcessor(
+                        m_recoveryProcessor =
+                                RecoverySiteProcessorDestination.createProcessor(
                                         m_context.database,
                                         m_tracker,
                                         ee,
@@ -982,7 +990,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                         m_siteId,
                                         m_onRejoinCompletion,
                                         m_recoveryMessageHandler);
-                        }
                     }
                 }
 
@@ -1212,18 +1219,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private void initiateRejoin(long rejoinCoordinatorHSId) {
         m_rejoinCoordinatorHSId = rejoinCoordinatorHSId;
 
+        // Set rejoin permit
+        m_haveRecoveryPermit = true;
+        m_recoveryStartTime = System.currentTimeMillis();
+
         // Construct a snapshot stream receiver
-        Class<?> klass =
-                MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotSink",
-                                       "Rejoin", false);
-        Constructor<?> constructor;
-        try {
-            constructor = klass.getConstructor(long.class);
-            m_rejoinSnapshotProcessor = (RejoinSiteProcessor) constructor.newInstance(getSiteId());
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to construct stream snapshot receiver",
-                                    true, e);
-        }
+        m_rejoinSnapshotProcessor = new StreamSnapshotSink(getSiteId());
 
         Pair<List<byte[]>, Integer> endPoints = m_rejoinSnapshotProcessor.initialize();
         List<byte[]> addresses = endPoints.getFirst();
@@ -1431,13 +1432,35 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if ((txnState.getRejoinState() == RejoinState.REJOINING) &&
                 m_rejoinTaskLog != null && !txnState.needsRollback()) {
                 try {
-                    if (txnState.getNotice() instanceof InitiateTaskMessage) {
-                        // TODO: this is a pretty horrible hack and fixing it is next on my list
-                        // I also need to ensure that fragments of sysprocs run at non-coordinators don't get replayed
-                        if (((InitiateTaskMessage)txnState.getNotice()).getStoredProcedureName().startsWith("@") == false) {
-                            m_rejoinTaskLog.logTask(txnState.getTransactionInfoBaseMessageForRejoinLog());
-                            m_loggedTaskCount++;
+                    TransactionInfoBaseMessage base = txnState.getTransactionInfoBaseMessageForRejoinLog();
+                    if (base != null) {
+                        // this is for multi-partition only
+                        // sysproc frags should be exempt
+                        if (base instanceof FragmentTaskLogMessage) {
+                            FragmentTaskLogMessage ftlm = (FragmentTaskLogMessage) base;
+                            if (ftlm.getFragmentTasks().size() > 0) {
+                                m_rejoinTaskLog.logTask(ftlm);
+                                m_loggedTaskCount++;
+                            }
                         }
+                        // this is for single-partition only
+                        else if (base instanceof InitiateTaskMessage) {
+                            InitiateTaskMessage itm = (InitiateTaskMessage) base;
+                            // TODO: this is a pretty horrible hack
+                            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
+                                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
+                                m_rejoinTaskLog.logTask(itm);
+                                m_loggedTaskCount++;
+                            }
+                        }
+                        // the base message should hit one of the ifs above
+                        else {
+                            hostLog.error("Logged a notice of type: " + base.getClass().getCanonicalName() + "for replay.");
+                            assert(false);
+                        }
+                    }
+                    else {
+                        //hostLog.info("not logging transaction that didn't write");
                     }
                 } catch (IOException e) {
                     VoltDB.crashLocalVoltDB("Failed to log task message", true, e);

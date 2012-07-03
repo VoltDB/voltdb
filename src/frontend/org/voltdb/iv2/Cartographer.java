@@ -142,11 +142,6 @@ public class Cartographer extends StatsSource
         return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
     }
 
-    public int getNumberOfPartitions()
-    {
-        return m_numberOfPartitions;
-    }
-
     // This used to be the method to get this on SiteTracker
     public long getHSIdForMultiPartitionInitiator()
     {

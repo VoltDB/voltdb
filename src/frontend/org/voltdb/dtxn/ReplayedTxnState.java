@@ -86,9 +86,9 @@ public class ReplayedTxnState extends TransactionState {
             if (m_notice instanceof InitiateTaskMessage) {
                 InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
                 InitiateResponseMessage response = m_site.processInitiateTask(this, task);
-                // we shouldn't replay transactions that rollback
-                // if it rolls back here... that's non-deterministic and sad
-                assert (response.shouldCommit() == true);
+                if (response.shouldCommit() == false) {
+                    m_needsRollback = true;
+                }
             }
             else if (m_notice instanceof FragmentTaskLogMessage) {
                 FragmentTaskLogMessage taskLog = (FragmentTaskLogMessage) m_notice;

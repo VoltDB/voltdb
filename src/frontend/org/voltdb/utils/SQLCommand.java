@@ -566,7 +566,13 @@ public class SQLCommand
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
                         else
-                            objectParams[i] = hexStringToByteArray(Unquote.matcher(param).replaceAll("").replace("''","'"));
+                        {
+                            // Make sure we have an even amount of characters, otherwise it is an invalid hex string
+                            if (param.length() % 2 == 1)
+                                throw new Exception("Invalid varbinary value: input must have an even amount of characters to be a valid hex string.");
+                            String val = Unquote.matcher(param).replaceAll("").replace("''","'");
+                            objectParams[i] = hexStringToByteArray(val);
+                        }
                     }
                     else
                         throw new Exception("Unsupported Data Type: " + paramType);
@@ -616,6 +622,7 @@ public class SQLCommand
         }
         return hexString.toString();
     }
+
     private static byte[] hexStringToByteArray(String s)
     {
         int len = s.length();
@@ -678,8 +685,16 @@ public class SQLCommand
                     for (int i = 0; i < columnCount; i++)
                     {
                         Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull()) v = "NULL";
-                        int l = t.getColumnType(i) == VoltType.VARBINARY ? ((byte[])v).length*2 : v.toString().length();
+                        if (t.wasNull())
+                            v = "NULL";
+                        int l = 0;  // length
+                        if (t.getColumnType(i) == VoltType.VARBINARY && !t.wasNull()) {
+                            l = ((byte[])v).length*2;
+                        }
+                        else {
+                            l= v.toString().length();
+                        }
+
                         if (padding[i] < l)
                             padding[i] = l;
                     }

@@ -105,7 +105,12 @@ public class TestMPBasecaseSuite extends RegressionSuite {
     public void testOneshotPartitionViolationAllSites() throws Exception
     {
         // Restrict to clustered tests (configured with > 1 partition)
-        if (!this.isLocalCluster()) {
+        LocalCluster config = (LocalCluster)this.getServerConfig();
+        int sites = config.m_siteCount;
+        int nodes = config.m_hostCount;
+        int k = config.m_kfactor;
+        int parts = (nodes * sites) / (k + 1);
+        if (parts == 1) {
             return;
         }
 
@@ -203,12 +208,12 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         }
 
         // JNI
-        config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
 
-        config = new LocalSingleProcessServer("sqltypes-onesite.jar", 3, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t3 = config.compile(project);
         assertTrue(t3);
         builder.addServerConfig(config);

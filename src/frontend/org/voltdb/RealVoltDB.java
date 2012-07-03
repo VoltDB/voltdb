@@ -27,7 +27,6 @@ import java.io.InputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.lang.management.ManagementFactory;
-import java.lang.reflect.Constructor;
 import java.net.Inet4Address;
 import java.net.Inet6Address;
 import java.net.InetAddress;
@@ -104,6 +103,7 @@ import org.voltdb.iv2.MpInitiator;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.RejoinCoordinator;
+import org.voltdb.rejoin.SequentialRejoinCoordinator;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -219,7 +219,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     private volatile boolean m_isRunning = false;
 
     @Override
-    public boolean recovering() { return m_rejoining; }
+    public boolean rejoining() { return m_rejoining; }
 
     private long m_recoveryStartTime;
 
@@ -366,7 +366,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     FaultType.SITE_FAILURE);
             if (!m_faultManager.testPartitionDetectionDirectory(
                     m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"))) {
-                VoltDB.crashLocalVoltDB("Unalbe to create partition detection snapshot directory at" +
+                VoltDB.crashLocalVoltDB("Unable to create partition detection snapshot directory at" +
                         m_catalogContext.cluster.getFaultsnapshots().get("CLUSTER_PARTITION"), false, null);
             }
 
@@ -411,9 +411,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         List<Integer> partitions =
                             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                         m_iv2Initiators = createIv2Initiators(partitions);
+                        long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
                         // Create the MPI if we're the correct host
                         if (topo.getInt("MPI") == m_messenger.getHostId()) {
-                            Initiator initiator = new MpInitiator(m_messenger);
+                            Initiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
                             m_iv2Initiators.add(initiator);
                         }
                     }
@@ -439,8 +440,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     createRejoinBarrierAndWatchdog(rejoinCompleteLatch);
 
                     p = createMailboxesForSitesRejoin(topo);
-                    ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
-                    hostLog.info("Set recovering site count to " + p.getFirst().size());
                 } else {
                     p = createMailboxesForSitesStartup(topo);
                 }
@@ -460,50 +459,26 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     for (Initiator init : m_iv2Initiators) {
                         hsidsToRejoin.add(init.getInitiatorHSId());
                     }
+                    SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
+                    hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
 
-                    // Do a blocking iv2 rejoin
-                    Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
-                                                            "Rejoin", false);
-                    Constructor<?> constructor;
-                    try {
-                        constructor = klass.getConstructor(HostMessenger.class, List.class);
-                        m_rejoinCoordinator =
-                                (RejoinCoordinator) constructor.newInstance(m_messenger, hsidsToRejoin);
-                        m_messenger.registerMailbox(m_rejoinCoordinator);
-                        // Probably don't need to do this!? Maybe?
-                        // m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
-                        //                                   new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
-                        hostLog.info("Using iv2 community rejoin");
-                    } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
-                                                true, e);
-                    }
-
-
+                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, hsidsToRejoin);
+                    m_messenger.registerMailbox(m_rejoinCoordinator);
+                    hostLog.info("Using iv2 community rejoin");
                 }
                 else if (isRejoin && m_config.m_newRejoin) {
+                    SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
+                    hostLog.info("Set recovering site count to " + siteMailboxes.size());
                     // Construct and publish rejoin coordinator mailbox
                     ArrayList<Long> sites = new ArrayList<Long>();
                     for (Mailbox siteMailbox : siteMailboxes) {
                         sites.add(siteMailbox.getHSId());
                     }
 
-                    Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.SequentialRejoinCoordinator",
-                                                            "Rejoin", false);
-                    Constructor<?> constructor;
-                    try {
-                        constructor = klass.getConstructor(HostMessenger.class, List.class);
-                        m_rejoinCoordinator =
-                                (RejoinCoordinator) constructor.newInstance(m_messenger,
-                                                                            sites);
-                        m_messenger.registerMailbox(m_rejoinCoordinator);
-                        m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
-                                                           new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
-                        hostLog.info("Using pauseless rejoin");
-                    } catch (Exception e) {
-                        VoltDB.crashLocalVoltDB("Unable to construct rejoin coordinator",
-                                                true, e);
-                    }
+                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, sites);
+                    m_messenger.registerMailbox(m_rejoinCoordinator);
+                    m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
+                                                       new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
                 }
 
                 // All mailboxes should be set up, publish it
@@ -574,15 +549,17 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             /*
              * Configure and start all the IV2 sites
-             * Create execution sites runners (and threads) for all exec sites except the first one.
-             * This allows the sites to be set up in the thread that will end up running them.
-             * Cache the first Site from the catalog and only do the setup once the other threads have been started.
              */
             if (isIV2Enabled()) {
                 for (Initiator iv2init : m_iv2Initiators) {
-                    iv2init.configure(getBackendTargetType(), m_serializedCatalog,
-                            m_catalogContext, m_cartographer, m_deployment.getCluster().getKfactor(),
-                            csp, m_rejoining);
+                    iv2init.configure(
+                            getBackendTargetType(),
+                            m_serializedCatalog,
+                            m_catalogContext,
+                            m_deployment.getCluster().getKfactor(),
+                            csp,
+                            clusterConfig.getPartitionCount(),
+                            m_rejoining);
                 }
             }
             else {

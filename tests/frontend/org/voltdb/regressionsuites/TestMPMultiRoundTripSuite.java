@@ -270,12 +270,12 @@ public class TestMPMultiRoundTripSuite extends RegressionSuite {
         }
 
         // JNI
-        config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
 
-        config = new LocalSingleProcessServer("sqltypes-onesite.jar", 3, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t3 = config.compile(project);
         assertTrue(t3);
         builder.addServerConfig(config);

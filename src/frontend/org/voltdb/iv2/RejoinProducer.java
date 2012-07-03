@@ -17,8 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.lang.reflect.Constructor;
-
 import java.net.InetAddress;
 
 import java.nio.ByteBuffer;
@@ -28,6 +26,8 @@ import java.util.concurrent.atomic.AtomicReference;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+
+import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.utils.Pair;
 
@@ -41,13 +41,13 @@ import org.voltdb.messaging.RejoinMessage.Type;
 import org.voltdb.PrivateVoltTableFactory;
 
 import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.StreamSnapshotSink;
 
 import org.voltdb.SnapshotFormat;
+import org.voltdb.SnapshotSaveAPI;
 
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
-
-import org.voltdb.utils.MiscUtils;
 
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
@@ -59,6 +59,8 @@ import org.voltdb.VoltTable;
  */
 public class RejoinProducer extends SiteTasker
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     private final SiteTaskerQueue m_taskQueue;
     private final int m_partitionId;
     private InitiatorMailbox m_mailbox;
@@ -160,7 +162,7 @@ public class RejoinProducer extends SiteTasker
     void doInitiation(RejoinMessage message)
     {
         m_rejoinCoordinatorHsId = message.m_sourceHSId;
-        m_rejoinSiteProcessor = makeSnapshotProcessor();
+        m_rejoinSiteProcessor = new StreamSnapshotSink(m_mailbox.getHSId());
 
         // MUST choose the leader as the source.
         long sourceSite = m_mailbox.getMasterHsId(m_partitionId);
@@ -185,40 +187,19 @@ public class RejoinProducer extends SiteTasker
             @Override
             public void run()
             {
+                Pair<Integer, ByteBuffer> rejoinWork = null;
                 try {
-                Thread.sleep(30000);
-                } catch (Exception e) { }
-                Pair<Integer, ByteBuffer> rejoinWork;
-                do {
-                    rejoinWork = m_rejoinSiteProcessor.poll();
-                    if (rejoinWork != null) {
-                        firstWork.set(rejoinWork);
-                    }
+                    rejoinWork = m_rejoinSiteProcessor.take();
+                } catch (InterruptedException e) {
+                    VoltDB.crashLocalVoltDB("Interrupted in take()ing first snapshot block for rejoin",
+                                            true, e);
                 }
-                while (rejoinWork == null);
-
+                firstWork.set(rejoinWork);
                 // run the rejoin task (ourself) in the Site
                 m_taskQueue.offer(RejoinProducer.this);
             }
         };
         firstSnapshotBlock.start();
-    }
-
-    private RejoinSiteProcessor makeSnapshotProcessor()
-    {
-        RejoinSiteProcessor rejoinSiteProcessor = null;
-        Class<?> klass =
-                MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotSink",
-                                       "Rejoin", false);
-        Constructor<?> constructor;
-        try {
-            constructor = klass.getConstructor(long.class);
-            rejoinSiteProcessor = (RejoinSiteProcessor) constructor.newInstance(m_mailbox.getHSId());
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to construct stream snapshot receiver",
-                                    true, e);
-        }
-        return rejoinSiteProcessor;
     }
 
     private String makeSnapshotRequest(Pair<List<byte[]>, Integer> endPoints, long sourceSite)
@@ -254,12 +235,14 @@ public class RejoinProducer extends SiteTasker
      */
     @Override
     public void run(SiteProcedureConnection siteConnection) {
-        restoreBlock(firstWork.get(), siteConnection);
-
-        while (!m_rejoinSiteProcessor.isEOF()) {
-            Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSiteProcessor.poll();
-            if (rejoinWork != null) {
-                restoreBlock(rejoinWork, siteConnection);
+        Pair<Integer, ByteBuffer> rejoinWork = firstWork.get();
+        while (rejoinWork != null) {
+            restoreBlock(rejoinWork, siteConnection);
+            try {
+                rejoinWork = m_rejoinSiteProcessor.take();
+            } catch (InterruptedException e) {
+                hostLog.warn("RejoinProducer interrupted at take()");
+                rejoinWork = null;
             }
         }
         // m_recoveryLog.debug("Rejoin snapshot transfer is finished");
@@ -273,6 +256,7 @@ public class RejoinProducer extends SiteTasker
          * monitor tell the rejoin coordinator.
          */
         siteConnection.setRejoinComplete();
+        SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
     }
 
     void restoreBlock(Pair<Integer, ByteBuffer> rejoinWork, SiteProcedureConnection siteConnection)

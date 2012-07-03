@@ -552,7 +552,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Don't use the auth system during recovery. Not safe to use
              * the node to initiate multi-partition txns during recovery
              */
-            if (!VoltDB.instance().recovering()) {
+            if (!VoltDB.instance().rejoining()) {
                 /*
                  * Authenticate the user.
                  */

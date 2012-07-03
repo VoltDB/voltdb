@@ -149,7 +149,8 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp,
+                          int kfactor, CatalogSpecificPlanner csp,
+                          int numberOfPartitions,
                           boolean createForRejoin)
     {
         try {
@@ -169,7 +170,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                                        serializedCatalog,
                                        catalogContext.m_transactionId,
                                        m_partitionId,
-                                       cartographer.getNumberOfPartitions(),
+                                       numberOfPartitions,
                                        createForRejoin);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite,
@@ -178,7 +179,7 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                                                prf,
                                                m_initiatorMailbox.getHSId(),
                                                0, // this has no meaning
-                                               cartographer.getNumberOfPartitions());
+                                               numberOfPartitions);
             m_procSet.loadProcedures(catalogContext, backend, csp);
             m_scheduler.setProcedureSet(m_procSet);
             m_executionSite.setLoadedProcedures(m_procSet);

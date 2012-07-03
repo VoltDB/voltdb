@@ -31,6 +31,7 @@ import org.voltdb.regressionsuites.LocalSingleProcessServer;
  * Implementation of a LocalSingleProcessServer that supports changing the
  * VoltProjectBuilder used to construct the catalog
  */
+@SuppressWarnings("deprecation")
 public class CatalogChangeSingleProcessServer extends LocalSingleProcessServer
 {
     VoltProjectBuilder m_origBuilder;

@@ -65,13 +65,14 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
 
     private final String m_whoami;
 
-    public MpInitiator(HostMessenger messenger)
+    public MpInitiator(HostMessenger messenger, long buddyHSId)
     {
         m_messenger = messenger;
         // MPI currently pretends to have partition ID -1 just as a placeholder value
         m_partitionId = -1;
         m_iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
         m_scheduler = new MpScheduler(new SiteTaskerQueue(), m_iv2masters);
+        ((MpScheduler)m_scheduler).setBuddyHSId(buddyHSId);
         // don't create a rejoin producer for the MPI quite yet.
         m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog, null);
 
@@ -128,7 +129,8 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          Cartographer cartographer, int kfactor, CatalogSpecificPlanner csp,
+                          int kfactor, CatalogSpecificPlanner csp,
+                          int numberOfPartitions,
                           boolean createForRejoin)
     {
         assert(createForRejoin == false);
@@ -143,15 +145,13 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
                 tmLog.info(m_whoami + "running as replica.");
             }
 
-            // ugh
-            ((MpScheduler)m_scheduler).setBuddyHSId(cartographer.getBuddySiteForMPI(m_initiatorMailbox.getHSId()));
             m_executionSite = new Site(m_scheduler.getQueue(),
                     m_initiatorMailbox.getHSId(),
                     backend, catalogContext,
                     serializedCatalog,
                     catalogContext.m_transactionId,
                     m_partitionId,
-                    cartographer.getNumberOfPartitions(),
+                    numberOfPartitions,
                     createForRejoin);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite,
@@ -160,7 +160,7 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
                     prf,
                     m_initiatorMailbox.getHSId(),
                     0, // this has no meaning
-                    cartographer.getNumberOfPartitions());
+                    numberOfPartitions);
             m_procSet.loadProcedures(catalogContext, backend, csp);
             m_scheduler.setProcedureSet(m_procSet);
             m_executionSite.setLoadedProcedures(m_procSet);

@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.lang.reflect.Constructor;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
@@ -53,12 +52,11 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.MiscUtils;
-
 import com.google.common.primitives.Ints;
 import com.google.common.primitives.Longs;
 
@@ -72,6 +70,9 @@ public class SnapshotSaveAPI
 {
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSaveAPI.class.getName());
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
+
+    // ugh, ick, ugh
+    public static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
 
     /**
      * The only public method: do all the work to start a snapshot.
@@ -96,7 +97,7 @@ public class SnapshotSaveAPI
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
         final int numLocalSites = (context.getSiteTrackerForSnapshot().getLocalSites().length -
-                ExecutionSite.recoveringSiteCount.get());
+                recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -366,7 +367,7 @@ public class SnapshotSaveAPI
         {
             SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
-                    (tracker.getLocalSites().length - ExecutionSite.recoveringSiteCount.get());
+                    (tracker.getLocalSites().length - recoveringSiteCount.get());
 
             // non-null if targeting only one site (used for rejoin)
             // set later from the "data" JSON string
@@ -482,14 +483,7 @@ public class SnapshotSaveAPI
                             List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
                             // if the target site is local to this node...
                             if (localHSids.contains(targetHSid)) {
-                                Class<?> klass = MiscUtils.loadProClass("org.voltdb.rejoin.StreamSnapshotDataTarget",
-                                        "Rejoin", false);
-                                if (klass != null) {
-                                    Constructor<?> constructor =
-                                            klass.getConstructor(List.class, int.class,
-                                                                 Map.class);
-                                    sdt = (SnapshotDataTarget) constructor.newInstance(addresses, port, schemas);
-                                }
+                                sdt = new StreamSnapshotDataTarget(addresses, port, schemas);
                             }
                             else {
                                 sdt = new DevNullSnapshotTarget();
