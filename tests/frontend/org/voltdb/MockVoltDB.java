@@ -391,7 +391,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onExecutionSiteRecoveryCompletion(long transferred) {
+    public void onExecutionSiteRejoinCompletion(long transferred) {
     }
 
     @Override
@@ -400,7 +400,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean recovering() {
+    public boolean rejoining() {
         return false;
     }
 

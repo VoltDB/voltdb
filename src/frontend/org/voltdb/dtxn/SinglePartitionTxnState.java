@@ -32,8 +32,6 @@ import org.voltdb.messaging.InitiateTaskMessage;
 
 public class SinglePartitionTxnState extends TransactionState {
 
-    InitiateTaskMessage m_task = null;
-
     public SinglePartitionTxnState(Mailbox mbox,
                                    ExecutionSite site,
                                    TransactionInfoBaseMessage task)
@@ -41,7 +39,6 @@ public class SinglePartitionTxnState extends TransactionState {
         super(mbox, site, task);
         assert(task instanceof InitiateTaskMessage) :
             "Creating single partition txn from invalid membership notice.";
-        m_task = (InitiateTaskMessage)task;
     }
 
     @Override
@@ -73,26 +70,31 @@ public class SinglePartitionTxnState extends TransactionState {
     }
 
     @Override
-    public boolean doWork(boolean recovering) {
-        if (recovering) {
-            return doWorkRecovering();
+    public boolean doWork(boolean rejoining) {
+        if (rejoining && (m_rejoinState != RejoinState.REPLAYING)) {
+            m_rejoinState = RejoinState.REJOINING;
+            return doWorkRejoining();
         }
         if (!m_done) {
             m_site.beginNewTxn(this);
-            InitiateResponseMessage response = m_site.processInitiateTask(this, m_task);
+            InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
+            InitiateResponseMessage response = m_site.processInitiateTask(this, task);
             if (response.shouldCommit() == false) {
                 m_needsRollback = true;
             }
 
-            m_mbox.send(initiatorHSId, response);
+            if (m_rejoinState == RejoinState.NORMAL) {
+                m_mbox.send(initiatorHSId, response);
+            }
             m_done = true;
         }
         return m_done;
     }
 
-    private boolean doWorkRecovering() {
+    private boolean doWorkRejoining() {
         if (!m_done) {
-            InitiateResponseMessage response = new InitiateResponseMessage(m_task);
+            InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
+            InitiateResponseMessage response = new InitiateResponseMessage(task);
 
             // add an empty dummy response
             response.setResults(new ClientResponseImpl(
@@ -121,16 +123,18 @@ public class SinglePartitionTxnState extends TransactionState {
 
     @Override
     public boolean isDurable() {
-        java.util.concurrent.atomic.AtomicBoolean durableFlag = m_task.getDurabilityFlagIfItExists();
+        InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
+        java.util.concurrent.atomic.AtomicBoolean durableFlag = task.getDurabilityFlagIfItExists();
         return durableFlag == null ? true : durableFlag.get();
     }
 
     public InitiateTaskMessage getInitiateTaskMessage() {
-        return m_task;
+        return (InitiateTaskMessage) m_notice;
     }
 
     @Override
     public StoredProcedureInvocation getInvocation() {
-        return m_task.getStoredProcedureInvocation();
+        InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
+        return task.getStoredProcedureInvocation();
     }
 }

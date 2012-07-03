@@ -57,6 +57,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_internalInterface = m_internalInterface;
         cl.m_drAgentPortStart = m_drAgentPortStart;
         cl.m_rejoinToHostAndPort = m_rejoinToHostAndPort;
+        cl.m_newRejoin = m_newRejoin;
         cl.m_httpPort = m_httpPort;
         // final in baseclass: cl.m_isEnterprise = m_isEnterprise;
         cl.m_deadHostTimeoutMS = m_deadHostTimeoutMS;
@@ -189,6 +190,11 @@ public class CommandLine extends VoltDB.Configuration
 
     public CommandLine rejoinHostAndPort(String rejoinHostAndPort) {
         this.m_rejoinToHostAndPort = rejoinHostAndPort;
+        return this;
+    }
+
+    public CommandLine isPauselessRejoin(boolean isPauseless) {
+        this.m_newRejoin = isPauseless;
         return this;
     }
 
@@ -450,6 +456,10 @@ public class CommandLine extends VoltDB.Configuration
         }
         else {
             cmdline.add("rejoinhost"); cmdline.add(m_rejoinToHostAndPort);
+
+            if (m_newRejoin) {
+                cmdline.add("newrejoin");
+            }
         }
 
         if (includeTestOpts)
