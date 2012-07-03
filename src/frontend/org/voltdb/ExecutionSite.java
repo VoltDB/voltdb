@@ -1242,7 +1242,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                     true, e);
         }
 
-        m_recoveryLog.info("Initiating rejoin from site " +
+        m_recoveryLog.info("Initiating rejoin for site " +
                 CoreUtils.hsIdToString(getSiteId()));
         initiateRejoinSnapshot(addresses, port);
     }
@@ -1279,8 +1279,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             jsStringer.endArray();
             jsStringer.key("port").value(port);
             // make this snapshot only contain data from this site
-            m_recoveryLog.debug("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
-                                " is " + CoreUtils.hsIdToString(sourceSite));
+            m_recoveryLog.info("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
+                               " is " + CoreUtils.hsIdToString(sourceSite));
             jsStringer.key("target_hsid").value(sourceSite);
             jsStringer.endObject();
             data = jsStringer.toString();
