@@ -31,12 +31,9 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ExpressionUtil;
-import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.IndexLookupType;
-import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 
 public class IndexCountPlanNode extends AbstractScanPlanNode {
@@ -80,6 +77,18 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     public IndexCountPlanNode() {
         super();
+    }
+
+    public IndexCountPlanNode(IndexScanPlanNode isp) {
+        super();
+
+        m_tableScanSchema = isp.m_tableScanSchema.clone();
+        m_targetTableName = isp.m_targetTableName;
+        m_catalogIndex = isp.m_catalogIndex;
+        m_targetTableAlias = isp.m_targetTableAlias;
+        m_targetIndexName = isp.m_targetIndexName;
+        m_lookupType = isp.m_lookupType;
+        m_searchkeyExpressions = isp.m_searchkeyExpressions;
     }
 
     @Override
@@ -258,26 +267,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     @Override
     public void resolveColumnIndexes()
     {
-        // IndexCountPlanNode has TVEs that need index resolution in:
-        // m_searchkeyExpressions
-        // m_endExpression
 
-        // Collect all the TVEs in the end expression and search key expressions
-        List<TupleValueExpression> index_tves =
-            new ArrayList<TupleValueExpression>();
-        index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
-        for (AbstractExpression search_exp : m_searchkeyExpressions)
-        {
-            index_tves.addAll(ExpressionUtil.getTupleValueExpressions(search_exp));
-        }
-        // and update their indexes against the table schema
-        for (TupleValueExpression tve : index_tves)
-        {
-            int index = m_tableSchema.getIndexOfTve(tve);
-            tve.setColumnIndex(index);
-        }
-        // now do the common scan node work
-        super.resolveColumnIndexes();
     }
 
     @Override
@@ -296,44 +286,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
         stats.incrementStatistic(0, StatsField.TREE_INDEX_LEVELS_TRAVERSED, (long)(Math.log(tableEstimates.maxTuples)));
 
-        // get the width of the index and number of columns used
-        int colCount = m_catalogIndex.getColumns().size();
-        int keyWidth = m_searchkeyExpressions.size();
-        assert(keyWidth <= colCount);
 
-        // need a double for math
-        double keyWidthFl = keyWidth;
-        // count a scan as a half cover
-        if (m_lookupType != IndexLookupType.EQ)
-            keyWidthFl -= 0.5;
-        // when choosing between multiple matched indexes with 10 or more columns,
-        // we won't always pick the optimal one.
-        // if you hit this, you're probably in a silly use case
-        final double MAX_INTERESTING_INDEX_WIDTH = 10.0;
-        if (keyWidthFl > MAX_INTERESTING_INDEX_WIDTH)
-            keyWidthFl = MAX_INTERESTING_INDEX_WIDTH;
-
-        // estimate cost of scan
-        int tuplesToRead = 0;
-
-        // minor priorities for index types (tiebreakers)
-        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue())
-            tuplesToRead = 2;
-        if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
-            (m_catalogIndex.getType() == IndexType.BTREE.getValue()))
-            tuplesToRead = 3;
-        assert(tuplesToRead > 0);
-
-        // if not a unique, covering index, pick the choice with the most columns
-        if (!m_catalogIndex.getUnique() || (colCount != keyWidth)) {
-            assert(keyWidthFl <= MAX_INTERESTING_INDEX_WIDTH);
-            // cost starts at 100 and goes down by 10 for each column used
-            final double MAX_TUPLES_READ = MAX_INTERESTING_INDEX_WIDTH * 10.0;
-            tuplesToRead += (int) (10.0 * (MAX_TUPLES_READ - keyWidthFl));
-        }
-
-        stats.incrementStatistic(0, StatsField.TUPLES_READ, tuplesToRead);
-        m_estimatedOutputTupleCount = tuplesToRead;
+        stats.incrementStatistic(0, StatsField.TUPLES_READ, 1);
+        m_estimatedOutputTupleCount = 1;
 
         return true;
     }

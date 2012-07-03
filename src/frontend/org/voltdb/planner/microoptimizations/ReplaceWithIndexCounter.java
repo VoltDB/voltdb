@@ -69,7 +69,7 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if (plan.getChildCount() != 1)
             return plan;
         // check aggregation type
-        List <ExpressionType> et = ((AggregatePlanNode) plan).getM_aggregateTypes();
+        List <ExpressionType> et = ((AggregatePlanNode) plan).getAggregateTypes();
         if ((et.size() == 1 &&
              et.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR)) == false)
             return plan;
@@ -82,12 +82,14 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if (idx.getCountable() == false)
             return plan;
 
-        IndexCountPlanNode icpn = new IndexCountPlanNode();
+        IndexCountPlanNode icpn = new IndexCountPlanNode((IndexScanPlanNode)child);
         icpn.setOutputSchema(plan.getOutputSchema());
+
         // TODO: I am not sure if there is a null case or not
         if (plan.getParent(0) != null) {
-            plan.getParent(0).addAndLinkChild(icpn);
+            plan.addIntermediary(plan.getParent(0));
         }
+
         // TODO: set schema using plan's schema
         //plan.getOutputSchema()
         plan.removeFromGraph();

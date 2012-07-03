@@ -32,8 +32,6 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
-import org.voltdb.plannodes.HashAggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.types.ExpressionType;
 
@@ -126,36 +124,34 @@ public class TestReplaceWithIndexCounter extends TestCase {
             System.out.println("Parent " + i + " :" + p.getParent(i).toExplainPlanString());
         }
 
-
-
         assertTrue(p instanceof IndexCountPlanNode);
-        if (pushDownTypes != null) {
-            for (ExpressionType type : pushDownTypes) {
-                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-                                                     type.toString() + "\""));
-            }
-        } else {
-            for (ExpressionType type : aggTypes) {
-                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-                                                     type.toString() + "\""));
-            }
-        }
-
-        if (isMultiPart) {
-            assertTrue(pn.size() == 2);
-            p = pn.get(1).getChild(0);
-        } else {
-            p = p.getChild(0);
-        }
-
-        if (pushDownTypes != null) {
-            assertTrue(p instanceof HashAggregatePlanNode);
-            for (ExpressionType type : aggTypes) {
-                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-                                                     type.toString() + "\""));
-            }
-        } else {
-            assertTrue(p instanceof AbstractScanPlanNode);
-        }
+//        if (pushDownTypes != null) {
+//            for (ExpressionType type : pushDownTypes) {
+//                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
+//                                                     type.toString() + "\""));
+//            }
+//        } else {
+//            for (ExpressionType type : aggTypes) {
+//                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
+//                                                     type.toString() + "\""));
+//            }
+//        }
+//
+//        if (isMultiPart) {
+//            assertTrue(pn.size() == 2);
+//            p = pn.get(1).getChild(0);
+//        } else {
+//            p = p.getChild(0);
+//        }
+//
+//        if (pushDownTypes != null) {
+//            assertTrue(p instanceof HashAggregatePlanNode);
+//            for (ExpressionType type : aggTypes) {
+//                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
+//                                                     type.toString() + "\""));
+//            }
+//        } else {
+//            assertTrue(p instanceof AbstractScanPlanNode);
+//        }
     }
 }

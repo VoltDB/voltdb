@@ -88,6 +88,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
+    public List<ExpressionType> getAggregateTypes() {
+        return m_aggregateTypes;
+    }
+
     public void setOutputSchema(NodeSchema schema)
     {
         // aggregates currently have their output schema specified
