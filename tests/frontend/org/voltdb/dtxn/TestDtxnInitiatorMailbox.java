@@ -123,6 +123,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEveryPartition,
+                                      boolean isNonDeterministic,
                                       int[] partitions, int numPartitions,
                                       Object clientData, int messageSize,
                                       long now)
@@ -139,6 +140,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
+                                      boolean isNonDeterministic,
                                       int[] partitions,
                                       int numPartitions,
                                       Object clientData,
@@ -216,7 +218,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
         long now = EstTime.currentTimeMillis();
         InFlightTxnState retval = new InFlightTxnState(
                 txnId, coordIds[0], null, new long[]{}, readOnly,
-                isSinglePart, new StoredProcedureInvocation(),
+                isSinglePart, false, new StoredProcedureInvocation(),
                 m_testConnect, MESSAGE_SIZE, now, 0, "", false);
         if (coordIds.length > 1) {
             for (int i = 1; i < coordIds.length; i++)

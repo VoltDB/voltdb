@@ -1110,6 +1110,7 @@ SnapshotCompletionInterest {
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
+                                          false,
                                           m_allPartitions, m_allPartitions.length,
                                           m_restoreAdapter, 0,
                                           EstTime.currentTimeMillis());
@@ -1119,6 +1120,7 @@ SnapshotCompletionInterest {
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
+                                          false,
                                           m_allPartitions, m_allPartitions.length,
                                           m_restoreAdapter, 0,
                                           EstTime.currentTimeMillis());

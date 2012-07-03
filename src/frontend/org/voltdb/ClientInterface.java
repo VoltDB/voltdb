@@ -68,6 +68,7 @@ import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocCompilerCache;
@@ -798,6 +799,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean isReadOnly,
             final boolean isSinglePartition,
             final boolean isEveryPartition,
+            final boolean isNonDeterministic,
             final int partitions[],
             final int numPartitions,
             final Object clientData,
@@ -812,6 +814,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 isReadOnly,
                 isSinglePartition,
                 isEveryPartition,
+                isNonDeterministic,
                 partitions,
                 numPartitions,
                 clientData,
@@ -1060,6 +1063,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                    plannedStatement.aggregatorFragment,
                                    plannedStatement.collectorFragment,
                                    plannedStatement.isReplicatedTableDML,
+                                   plannedStatement.isNonDeterministic,
                                    null);
         }
         // All statements retrieved from cache?
@@ -1137,6 +1141,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 false, // read only
                 true,  // single partition
                 false, // every site
+                false, // non-deterministic
                 involvedPartitions, involvedPartitions.length,
                 ccxn, buf.capacity(),
                 System.currentTimeMillis());
@@ -1163,6 +1168,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sysProc.getReadonly(),
                     sysProc.getSinglepartition(),
                     sysProc.getEverysite(),
+                    false,  // non-deterministic
                     involvedPartitions, involvedPartitions.length,
                     ccxn, buf.capacity(),
                     System.currentTimeMillis());
@@ -1192,6 +1198,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                           sysProc.getReadonly(),
                           sysProc.getSinglepartition(),
                           sysProc.getEverysite(),
+                          false,  // non-deterministic
                           involvedPartitions, involvedPartitions.length,
                           ccxn, buf.capacity(),
                           System.currentTimeMillis());
@@ -1313,6 +1320,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sysProc.getReadonly(),
                     sysProc.getSinglepartition(),
                     sysProc.getEverysite(),
+                    false,  // non-deterministic
                     involvedPartitions, involvedPartitions.length,
                     ccxn, buf.capacity(),
                     now);
@@ -1360,6 +1368,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         catProc.getReadonly(),
                         catProc.getSinglepartition(),
                         catProc.getEverysite(),
+                        isProcedureNonDeterministic(catProc),
                         involvedPartitions, involvedPartitions.length,
                         ccxn, buf.capacity(),
                         now);
@@ -1375,6 +1384,24 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
         return null;
+    }
+
+    /**
+     * Determine if a procedure is non-deterministic by examining all its statements.
+     *
+     * @param proc  catalog procedure
+     * @return  true if it has any non-deterministic statements
+     */
+    static boolean isProcedureNonDeterministic(Procedure proc) {
+        CatalogMap<Statement> stmts = proc.getStatements();
+        if (stmts != null) {
+            for (Statement stmt : stmts) {
+                if (stmt.getIscontentdeterministic() || stmt.getIsorderdeterministic()) {
+                    return true;
+                }
+            }
+        }
+        return false;
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) {
@@ -1445,10 +1472,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // initiate the transaction
+        boolean isNonDeterministic = false;
+        for (AdHocPlannedStatement stmt : plannedStmtBatch.plannedStatements) {
+            if (stmt.isNonDeterministic) {
+                isNonDeterministic = true;
+                break;
+            }
+        }
         createTransaction(plannedStmtBatch.connectionId, plannedStmtBatch.hostname,
-                plannedStmtBatch.adminConnection,
-                task, plannedStmtBatch.isReadOnly(), isSinglePartition, false, partitions,
-                partitions.length, plannedStmtBatch.clientData,
+                plannedStmtBatch.adminConnection, task,
+                plannedStmtBatch.isReadOnly(), isSinglePartition, false, isNonDeterministic,
+                partitions, partitions.length, plannedStmtBatch.clientData,
                 0, EstTime.currentTimeMillis());
 
         // cache the plans, but don't hold onto the connection object
@@ -1534,7 +1568,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     // procedure are horrible, horrible, horrible.
                     createTransaction(changeResult.connectionId, changeResult.hostname,
                             changeResult.adminConnection,
-                            task, false, true, true, m_allPartitions,
+                            task, false, true, true, false, m_allPartitions,
                             m_allPartitions.length, changeResult.clientData, 0,
                             EstTime.currentTimeMillis());
                 }
@@ -1706,6 +1740,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
+                isProcedureNonDeterministic(catProc),
                 m_allPartitions, m_allPartitions.length,
                 m_snapshotDaemonAdapter,
                 0, EstTime.currentTimeMillis());

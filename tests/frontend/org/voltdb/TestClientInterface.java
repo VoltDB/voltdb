@@ -207,7 +207,7 @@ public class TestClientInterface {
                                                    boolean isEverySite) throws IOException {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
                                            any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
+                                           anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(),
                                            any(int[].class), anyInt(), anyObject(),
                                            anyInt(), anyLong())).thenReturn(true);
 
@@ -221,7 +221,8 @@ public class TestClientInterface {
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
                                               invocationCaptor.capture(),
                                               boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(), partitionCaptor.capture(),
+                                              boolCaptor.capture(), boolCaptor.capture(),
+                                              partitionCaptor.capture(),
                                               anyInt(), anyObject(), anyInt(), anyLong());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertEquals(isAdmin, boolValues.get(0)); // is admin
@@ -267,14 +268,14 @@ public class TestClientInterface {
     public void testFinishedAdHocPlanning() {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
                                            any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
+                                           anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(),
                                            any(int[].class), anyInt(), anyObject(),
                                            anyInt(), anyLong())).thenReturn(true);
 
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, 0, "localhost", false, null);
-        plannedStmtBatch.addStatement("select * from a", null, null, false, null);
+        plannedStmtBatch.addStatement("select * from a", null, null, false, false, null);
         m_mb.deliver(new LocalObjectMessage(plannedStmtBatch));
         m_ci.checkForFinishedCompilerWork();
 
@@ -284,8 +285,9 @@ public class TestClientInterface {
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
                                               invocationCaptor.capture(),
                                               boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(), any(int[].class),
-                                              anyInt(), anyObject(), anyInt(), anyLong());
+                                              boolCaptor.capture(), boolCaptor.capture(),
+                                              any(int[].class), anyInt(),
+                                              anyObject(), anyInt(), anyLong());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
         assertTrue(boolValues.get(1));  // readonly
@@ -328,7 +330,7 @@ public class TestClientInterface {
     public void testFinishedCatalogDiffing() {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
                                            any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
+                                           anyBoolean(), anyBoolean(), anyBoolean(), anyBoolean(),
                                            any(int[].class), anyInt(), anyObject(),
                                            anyInt(), anyLong())).thenReturn(true);
 
@@ -353,7 +355,8 @@ public class TestClientInterface {
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
                                               invocationCaptor.capture(),
                                               boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(), any(int[].class),
+                                              boolCaptor.capture(), boolCaptor.capture(),
+                                              any(int[].class),
                                               anyInt(), anyObject(), anyInt(), anyLong());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin

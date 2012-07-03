@@ -181,6 +181,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
+                                      boolean isNonDeterministic,
                                       int[] partitions,
                                       int numPartitions,
                                       Object clientData,
@@ -188,7 +189,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       long now) {
             createTransaction(connectionId, connectionHostname, adminConnection,
                               0, invocation, isReadOnly, isSinglePartition,
-                              isEverySite, partitions, numPartitions,
+                              isEverySite, isNonDeterministic, partitions, numPartitions,
                               clientData, messageSize, now);
             return true;
         }
@@ -202,6 +203,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
+                                      boolean isNonDeterministic,
                                       int[] partitions,
                                       int numPartitions,
                                       Object clientData,
