@@ -23,7 +23,6 @@ import java.util.List;
 import org.voltdb.catalog.Index;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
@@ -74,16 +73,17 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if ((et.size() == 1 &&
              et.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR)) == false)
             return plan;
-        
+
         AbstractPlanNode child = plan.getChild(0);
         if ((child instanceof IndexScanPlanNode) == false)
             return plan;
         // check index type
         Index idx = ((IndexScanPlanNode)child).getCatalogIndex();
-        if (idx.getCountable() == false) 
+        if (idx.getCountable() == false)
             return plan;
-        
+
         IndexCountPlanNode icpn = new IndexCountPlanNode();
+        icpn.setOutputSchema(plan.getOutputSchema());
         // TODO: I am not sure if there is a null case or not
         if (plan.getParent(0) != null) {
             plan.getParent(0).addAndLinkChild(icpn);

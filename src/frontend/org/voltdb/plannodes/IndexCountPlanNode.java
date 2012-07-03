@@ -39,19 +39,19 @@ import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 
-public class IndexCountPlanNode extends AbstractPlanNode {
+public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     public enum Members {
         TARGET_INDEX_NAME,
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
         KEY_ITERATE,
-        LOOKUP_TYPE,
+        LOOKUP_TYPE;
     }
 
     /**
      * Attributes
-     * NOTE: The IndexCountPlanNode will use AbstractPlanNode's m_predicate
+     * NOTE: The IndexCountPlanNode will use AbstractScanPlanNode's m_predicate
      * as the "Post-Scan Predicate Expression". When this is defined, the EE will
      * run a tuple through an additional predicate to see whether it qualifies.
      * This is necessary when we have a predicate that includes columns that are not
@@ -242,6 +242,17 @@ public class IndexCountPlanNode extends AbstractPlanNode {
     // addSearchKeyExpression() so that the expression gets cloned
     public List<AbstractExpression> getSearchKeyExpressions() {
         return Collections.unmodifiableList(m_searchkeyExpressions);
+    }
+
+    public void setOutputSchema(NodeSchema schema)
+    {
+        // set output schema according to aggregate plan node's output schema
+        m_outputSchema = schema.clone();
+    }
+
+    @Override
+    public void generateOutputSchema(Database db) {
+
     }
 
     @Override

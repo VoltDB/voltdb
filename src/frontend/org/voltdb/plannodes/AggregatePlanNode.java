@@ -64,10 +64,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         super();
     }
 
-    public List<ExpressionType> getM_aggregateTypes() {
-        return m_aggregateTypes;
-    }
-
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.AGGREGATE;
@@ -97,6 +93,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
     }
+
 
     @Override
     public void generateOutputSchema(Database db)
