@@ -52,6 +52,7 @@ public class PlannerTool {
         String onePlan = null;
         String allPlan = null;
         boolean replicatedDML = false;
+        boolean nonDeterministic = false;
         Object partitionParam;
         List<ParameterInfo> params;
 
@@ -177,6 +178,7 @@ public class PlannerTool {
         }
 
         retval.replicatedDML = plan.replicatedTableDML;
+        retval.nonDeterministic = plan.isContentDeterministic() || plan.isOrderDeterministic();
         retval.partitionParam = partitioning.effectivePartitioningValue();
         return retval;
     }

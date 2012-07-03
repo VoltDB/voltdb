@@ -24,7 +24,6 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
@@ -171,8 +170,6 @@ class WorkUnit
     boolean nonTransactional = false;
     final boolean m_isReadOnly;
 
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     /**
      * Get the "payload" for this <code>WorkUnit</code>. The payload is
      * an subclass of VoltMessage that contains instructions on what to
@@ -313,10 +310,7 @@ class WorkUnit
             msg += "\n  Original results: " + m_dependencies.get(dependencyId).getResult(map_id).toString();
             msg += "\n  Mismatched results: " + payload.toString();
             msg += "\n  Read-only: " + new Boolean(m_isReadOnly).toString();
-            if (m_isReadOnly) {
-                hostLog.warn(msg);
-            }
-            else {
+            if (!m_isReadOnly) {
                 // die die die (German: the the the)
                 VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
                 throw new RuntimeException(msg); // gets called only by test code

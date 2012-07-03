@@ -42,6 +42,7 @@ public class InFlightTxnState implements Serializable {
             long otherSiteIds[],
             boolean isReadOnly,
             boolean isSinglePartition,
+            boolean isNonDeterministic,
             StoredProcedureInvocation invocation,
             Object clientData,
             int messageSize,
@@ -56,6 +57,7 @@ public class InFlightTxnState implements Serializable {
         this.invocation = invocation;
         this.isReadOnly = isReadOnly;
         this.isSinglePartition = isSinglePartition;
+        this.isNonDeterministic = isNonDeterministic;
         this.clientData = clientData;
         this.otherSiteIds = otherSiteIds;
         this.messageSize = messageSize;
@@ -113,10 +115,7 @@ public class InFlightTxnState implements Serializable {
                 msg += "\n  Expected number of results: " + resultsForComparison.length;
                 msg += "\n  Mismatched number of results: " + curr_results.length;
                 msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
-                if (isReadOnly) {
-                    hostLog.warn(msg);
-                }
-                else {
+                if (!isReadOnly || !isNonDeterministic) {
                     // die die die
                     VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
                     throw new RuntimeException(msg); // gets called only by test code
@@ -248,6 +247,7 @@ public class InFlightTxnState implements Serializable {
     public final long otherSiteIds[];
     public final boolean isReadOnly;
     public final boolean isSinglePartition;
+    public final boolean isNonDeterministic;
     transient public final StoredProcedureInvocation invocation;
     transient public final Object clientData;
     public final int messageSize;

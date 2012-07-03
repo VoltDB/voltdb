@@ -133,6 +133,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final boolean isReadOnly,
                                   final boolean isSinglePartition,
                                   final boolean isEveryPartition,
+                                  final boolean isNonDeterministic,
                                   final int partitions[],
                                   final int numPartitions,
                                   final Object clientData,
@@ -142,8 +143,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         long txnId;
         txnId = m_idManager.getNextUniqueTransactionId();
         boolean retval =
-            createTransaction(connectionId, connectionHostname, adminConnection, txnId,
-                              invocation, isReadOnly, isSinglePartition, isEveryPartition,
+            createTransaction(connectionId, connectionHostname, adminConnection, txnId, invocation,
+                              isReadOnly, isSinglePartition, isEveryPartition, isNonDeterministic,
                               partitions, numPartitions, clientData, messageSize, now);
         return retval;
     }
@@ -158,6 +159,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final boolean isReadOnly,
                                   final boolean isSinglePartition,
                                   final boolean isEveryPartition,
+                                  final boolean isNonDeterministic,
                                   final int partitions[],
                                   final int numPartitions,
                                   final Object clientData,
@@ -241,6 +243,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         otherSiteIdsArr,
                                                         isReadOnly,
                                                         false,
+                                                        isNonDeterministic,
                                                         invocation,
                                                         clientData,
                                                         messageSize,
@@ -345,6 +348,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                  null,
                                  isReadOnly,
                                  true,
+                                 false,
                                  invocation.getShallowCopy(),
                                  clientData,
                                  messageSize,
