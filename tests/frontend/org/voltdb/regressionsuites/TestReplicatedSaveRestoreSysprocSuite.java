@@ -78,7 +78,7 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
 
     @Override
     public void testRestore12Snapshot() {}
-
+//
     @Override
     public void testQueueUserSnapshot() {}
 

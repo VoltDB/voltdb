@@ -28,6 +28,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
 import org.voltdb.TheHashinator;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -248,7 +249,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 partitionedTables[p].add(table);
             }
 
-            SiteTracker tracker = ctx.getSiteTracker();
+            SiteTracker tracker = ctx.getSiteTrackerForSnapshot();
             Map<Long, Integer> sitesToPartitions = tracker.getSitesToPartitions();
             int num_exec_sites = sitesToPartitions.size();
             pfs = new SynthesizedPlanFragment[num_exec_sites + 1];

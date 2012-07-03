@@ -19,12 +19,17 @@ package org.voltdb.utils;
 import java.io.IOException;
 import java.io.StringWriter;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 import java.text.SimpleDateFormat;
 import java.util.ArrayList;
 
 import org.voltcore.utils.Pair;
+import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
+import org.voltdb.messaging.FastDeserializer;
+import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
 
 import au.com.bytecode.opencsv_voltpatches.CSVWriter;

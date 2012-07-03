@@ -48,6 +48,7 @@ import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.exceptions.EEException;
@@ -459,7 +460,20 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void loadTable(long txnId, String clusterName, String databaseName,
             String tableName, VoltTable data) throws VoltAbortException
     {
-        throw new RuntimeException("Ain't gonna do it.");
+        Cluster cluster = m_context.cluster;
+        if (cluster == null) {
+            throw new VoltAbortException("cluster '" + clusterName + "' does not exist");
+        }
+        Database db = cluster.getDatabases().get(databaseName);
+        if (db == null) {
+            throw new VoltAbortException("database '" + databaseName + "' does not exist in cluster " + clusterName);
+        }
+        Table table = db.getTables().getIgnoreCase(tableName);
+        if (table == null) {
+            throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
+        }
+
+        loadTable(txnId, table.getRelativeIndex(), data);
     }
 
     @Override
