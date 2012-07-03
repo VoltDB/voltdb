@@ -550,25 +550,21 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 }
 
 /*
- * Executes a plan fragment of an adhoc query.
  * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeExecuteCustomPlanFragment
- * Signature: (JLjava/lang/String;JJJ)I
+ * Method:    nativeLoadPlanFragment
+ * Signature: (JJ[B)I
  */
 SHAREDLIB_JNIEXPORT jint JNICALL
-Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
+Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
     JNIEnv *env,
     jobject obj,
     jlong engine_ptr,
-    jbyteArray plan,
-    jint outputDependencyId,
-    jint inputDependencyId,
-    jlong txnId,
-    jlong lastCommittedTxnId,
-    jlong undoToken) {
+    jlong fragment_id,
+    jbyteArray plan) {
+
     int retval = org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 
-    VOLT_DEBUG("nativeExecuteCustomPlanFragment() start");
+    VOLT_DEBUG("nativeUnloadPlanFragment() start");
 
     // setup
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -577,10 +573,6 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
 
     //JNIEnv pointer can change between calls, must be updated
     updateJNILogProxy(engine);
-    engine->resetReusedResultOutputBuffer();
-    engine->setUndoToken(undoToken);
-    static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-    Pool *stringPool = engine->getStringPool();
 
     // convert java plan string to stdc++ string plan
     jbyte *str = env->GetByteArrayElements(plan, NULL);
@@ -588,19 +580,46 @@ Java_org_voltdb_jni_ExecutionEngine_nativeExecuteCustomPlanFragment (
     string cppplan( reinterpret_cast<char *>(str), env->GetArrayLength(plan));
     env->ReleaseByteArrayElements(plan, str, JNI_ABORT);
 
-    // execute
-    NValueArray &params = engine->getParameterContainer();
-    const int paramcnt = deserializeParameterSet(engine->getParameterBuffer(), engine->getParameterBufferCapacity(), params, engine->getStringPool());
-    engine->setUsedParamcnt(paramcnt);
+    // load
     try {
-        retval = engine->executePlanFragment(cppplan, outputDependencyId,
-                                             inputDependencyId, params, txnId,
-                                             lastCommittedTxnId);
+        retval = engine->loadFragment(cppplan, fragment_id);
     } catch (FatalException e) {
         topend->crashVoltDB(e);
     }
-    // cleanup
-    stringPool->purge();
+
+    return retval;
+}
+
+/*
+ * Class:     org_voltdb_jni_ExecutionEngine
+ * Method:    nativeUnloadPlanFragment
+ * Signature: (JJ)I
+ */
+SHAREDLIB_JNIEXPORT jint JNICALL
+Java_org_voltdb_jni_ExecutionEngine_nativeUnloadPlanFragment (
+    JNIEnv *env,
+    jobject obj,
+    jlong engine_ptr,
+    jlong fragment_id) {
+
+    int retval = org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+
+    VOLT_DEBUG("nativeUnloadPlanFragment() start");
+
+    // setup
+    VoltDBEngine *engine = castToEngine(engine_ptr);
+    assert(engine);
+    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
+
+    //JNIEnv pointer can change between calls, must be updated
+    updateJNILogProxy(engine);
+
+    // load
+    try {
+        retval = engine->unloadFragment(fragment_id);
+    } catch (FatalException e) {
+        topend->crashVoltDB(e);
+    }
 
     return retval;
 }

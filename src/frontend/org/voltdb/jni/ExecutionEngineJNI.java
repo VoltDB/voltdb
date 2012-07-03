@@ -268,6 +268,29 @@ public class ExecutionEngineJNI extends ExecutionEngine {
     }
 
     @Override
+    public void loadPlanFragment(long planFragmentId, String plan) throws EEException
+    {
+        deserializer.clear();
+
+        //C++ JSON deserializer is not thread safe, must synchronize
+        int errorCode = 0;
+        synchronized (ExecutionEngineJNI.class) {
+            errorCode = nativeLoadPlanFragment(pointer, planFragmentId, getStringBytes(plan));
+        }
+        checkErrorCode(errorCode);
+    }
+
+    @Override
+    public void unloadPlanFragment(long planFragmentId) throws EEException
+    {
+        int errorCode = 0;
+        synchronized (ExecutionEngineJNI.class) {
+            errorCode = nativeUnloadPlanFragment(pointer, planFragmentId);
+        }
+        checkErrorCode(errorCode);
+    }
+
+    /*@Override
     public VoltTable executeCustomPlanFragment(final String plan,
             final int inputDepId, final long txnId, final long lastCommittedTxnId,
             final long undoQuantumToken,
@@ -309,7 +332,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 assert(numDependencies == 1);
                 final VoltTable dependencies[] = new VoltTable[numDependencies];
                 for (int i = 0; i < numDependencies; ++i) {
-                    /*int depId =*/ fds.readInt();
+                    fds.readInt();
                     dependencies[i] = fds.readObject(VoltTable.class);
                 }
                 return dependencies[0];
@@ -320,7 +343,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         } finally {
             fallbackBuffer = null;
         }
-    }
+    }*/
 
     private static byte[] getStringBytes(String string) {
         try {

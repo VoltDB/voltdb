@@ -158,8 +158,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         // -------------------------------------------------
         int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
                          const NValueArray &params, int64_t txnId, int64_t lastCommittedTxnId, bool first, bool last);
-        int executePlanFragment(std::string fragmentString, int32_t outputDependencyId, int32_t inputDependencyId,
-                                const NValueArray &params, int64_t txnId, int64_t lastCommittedTxnId);
+
+        int loadFragment(std::string fragmentString, int64_t planfragmentId);
+        int unloadFragment(int64_t planfragmentId);
 
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}

@@ -805,6 +805,18 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
+    public void loadPlanFragment(long planFragmentId, String plan) throws EEException
+    {
+
+    }
+
+    @Override
+    public void unloadPlanFragment(long planFragmentId) throws EEException
+    {
+
+    }
+
+    /*@Override
     public VoltTable executeCustomPlanFragment(final String plan,
             int inputDepId, final long txnId, final long lastCommittedTxnId,
             final long undoQuantumToken,
@@ -864,7 +876,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             return resultTables[0];
         }
         return null;
-    }
+    }*/
 
     @Override
     public VoltTable[] executeQueryPlanFragmentsAndGetResults(

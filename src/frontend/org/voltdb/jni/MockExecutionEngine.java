@@ -100,14 +100,10 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable executeCustomPlanFragment(
-            final String plan,
-            int inputDepId, final long txnId,
-            final long lastCommittedTxnId, final long undoQuantumToken,
-            ParameterSet params)
-            throws EEException {
-        return null;
-    }
+    public void loadPlanFragment(long planFragmentId, String plan) throws EEException {}
+
+    @Override
+    public void unloadPlanFragment(long planFragmentId) throws EEException {}
 
     @Override
     public VoltTable[] executeQueryPlanFragmentsAndGetResults(final long[] planFragmentIds, final int numFragmentIds, final ParameterSet[] parameterSets,

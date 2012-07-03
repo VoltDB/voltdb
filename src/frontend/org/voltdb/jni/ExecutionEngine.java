@@ -276,10 +276,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
         long txnId, long lastCommittedTxnId, long undoQuantumToken)
       throws EEException;
 
-    /** Run a plan fragment */
-    abstract public VoltTable executeCustomPlanFragment(
-            String plan, int inputDepId, long txnId,
-            long lastCommittedTxnId, long undoQuantumToken, ParameterSet params) throws EEException;
+    abstract public void loadPlanFragment(long planFragmentId, String plan) throws EEException;
+    abstract public void unloadPlanFragment(long planFragmentId) throws EEException;
 
     /** Run multiple query plan fragments */
     abstract public VoltTable[] executeQueryPlanFragmentsAndGetResults(long[] planFragmentIds,
@@ -488,9 +486,8 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
             int outputDepId, // outputDepId is unused, can set to 0
             int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
 
-    protected native int nativeExecuteCustomPlanFragment(long pointer, byte plan[],
-            int outputDepId, // outputDepId is unused, can set to 0
-            int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
+    protected native int nativeLoadPlanFragment(long pointer, long planFragmentId, byte plan[]);
+    protected native int nativeUnloadPlanFragment(long pointer, long planFragmentId);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.

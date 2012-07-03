@@ -430,67 +430,48 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
-/*
- * Execute the supplied fragment in the context of the specified
- * cluster and database with the supplied parameters as arguments. A
- * catalog with all the necessary tables needs to already have been
- * loaded.
- */
-int VoltDBEngine::executePlanFragment(string fragmentString,
-                                      int32_t outputDependencyId,
-                                      int32_t inputDependencyId,
-                                      const NValueArray &params,
-                                      int64_t txnId,
-                                      int64_t lastCommittedTxnId)
+int VoltDBEngine::loadFragment(std::string fragmentString, int64_t planfragmentId)
 {
     int retval = ENGINE_ERRORCODE_ERROR;
 
-    m_currentOutputDepId = outputDependencyId;
-    m_currentInputDepId = inputDependencyId;
-
-    // how many current plans (too see if we added any)
-    size_t frags = m_planFragments.size();
-
     try
     {
-        if (initPlanFragment(AD_HOC_FRAG_ID, fragmentString))
+        if (initPlanFragment(planfragmentId, fragmentString))
         {
-            retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId,
-                                  inputDependencyId, params,
-                                  txnId, lastCommittedTxnId, true, true);
+            retval = ENGINE_ERRORCODE_SUCCESS;
         }
         else
         {
             char message[128];
-            snprintf(message, 128, "Unable to load ad-hoc plan fragment for"
-                    " transaction %jd.", (intmax_t)txnId);
+            snprintf(message, 128, "Unable to load plan fragment for"
+                    " fragment id %jd.", (intmax_t)planfragmentId);
             throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                           message);
         }
     }
     catch (SerializableEEException &e)
     {
-        VOLT_TRACE("executePlanFragment: failed to initialize "
-                   "ad-hoc plan fragment");
-        resetReusedResultOutputBuffer();
+        VOLT_TRACE("loadFragment: failed to initialize plan fragment");
         e.serialize(getExceptionOutputSerializer());
         retval = ENGINE_ERRORCODE_ERROR;
     }
 
-    // clean up stuff
-    m_executorMap.erase(AD_HOC_FRAG_ID);
+    return retval;
+}
 
-    // delete any generated plan
-    size_t nowFrags = m_planFragments.size();
-    if (nowFrags > frags) {
-        assert ((nowFrags - frags) == 1);
+int VoltDBEngine::unloadFragment(int64_t planfragmentId)
+{
+    int retval = ENGINE_ERRORCODE_ERROR;
+
+    std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
+    iter = m_executorMap.find(planfragmentId);
+    if (iter != m_executorMap.end()) {
+        // clean up stuff
+        m_executorMap.erase(planfragmentId);
         delete m_planFragments.back();
         m_planFragments.pop_back();
+        retval = ENGINE_ERRORCODE_SUCCESS;
     }
-
-    // set these back to -1 for error handling
-    m_currentOutputDepId = -1;
-    m_currentInputDepId = -1;
 
     return retval;
 }

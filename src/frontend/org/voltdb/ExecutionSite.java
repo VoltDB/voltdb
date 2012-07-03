@@ -58,7 +58,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
@@ -2354,10 +2353,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
                                                long txnId, ParameterSet params, boolean readOnly)
     {
-        return ee.executeCustomPlanFragment(plan, inputDepId, txnId,
-                                            lastCommittedTxnId,
-                                            readOnly ? Long.MAX_VALUE : getNextUndoToken(),
-                                            params);
+        VoltTable retval = null;
+        try {
+            ee.loadPlanFragment(-1, plan);
+            retval = ee.executePlanFragment(-1, inputDepId, params, txnId,
+                                   lastCommittedTxnId,
+                                   readOnly ? Long.MAX_VALUE : getNextUndoToken());
+        }
+        finally {
+            ee.unloadPlanFragment(-1);
+        }
+        return retval;
     }
 
     @Override
