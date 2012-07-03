@@ -23,6 +23,7 @@ import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
@@ -1106,6 +1107,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         if (currTime > (m_lastTimeMadeProgress + MAX_BEHIND_DURATION)) {
             int duration = (int) (currTime - m_lastTimeMadeProgress) / 1000;
+            m_recoveryLog.debug("Current remaining task is " + m_remainingTasks +
+                                " snapshot finished " + m_rejoinSnapshotFinished);
             VoltDB.crashLocalVoltDB("Site " + CoreUtils.hsIdToString(getSiteId()) +
                                     " has not made any progress in " + duration +
                                     " seconds, please reduce workload and " +
@@ -1231,6 +1234,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         try {
             taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
             m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(partition, overflowDir);
+        } catch (InvocationTargetException e) {
+            VoltDB.crashLocalVoltDB("Unable to construct rejoin task log",
+                                    true, e.getCause());
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to construct rejoin task log",
                                     true, e);
