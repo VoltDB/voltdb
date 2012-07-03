@@ -120,4 +120,16 @@ public class TestRepairLog extends TestCase
         assertEquals(m2, rl.contents().get(1).getMessage());
     }
 
+    @Test
+    public void testTruncationAfterPromotion()
+    {
+        RepairLog rl = new RepairLog();
+        VoltMessage m1 = truncInitMsg(0L, 1L);
+        rl.deliver(m1);
+        VoltMessage m2 = truncInitMsg(0L, 2L);
+        rl.deliver(m2);
+        assertEquals(2, rl.contents().size());
+        rl.setLeaderState(true);
+        assertEquals(0, rl.contents().size());
+    }
 }
