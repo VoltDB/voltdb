@@ -150,6 +150,9 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
     public static final int STATS_SITE_ID = -2;
     public static final int ASYNC_COMPILER_SITE_ID = -3;
 
+    // we should never hand out this site ID.  Use it as an empty message destination
+    public static final int VALHALLA = Integer.MIN_VALUE;
+
     int m_localHostId;
 
     private final Config m_config;

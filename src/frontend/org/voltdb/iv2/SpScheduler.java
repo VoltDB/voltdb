@@ -27,6 +27,7 @@ import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltdb.messaging.BorrowTaskMessage;
@@ -201,15 +202,13 @@ public class SpScheduler extends Scheduler
         // set up duplicate counter. expect exactly the responses corresponding
         // to needsRepair. These may, or may not, include the local site.
 
-        // note that a site should never need to repair itself; so
-        // the repair message must be from a different surviving replica;
-        // that means message.initHSId|coordHSId will be the values of
-        // the original leader. It would be more useful to have the original
-        // ClienInterface HSId somewhere handy.
+        // We currently send the final response into the ether, since we don't
+        // have the original ClientInterface HSID stored.  It would be more
+        // useful to have the original ClienInterface HSId somewhere handy.
 
         List<Long> expectedHSIds = new ArrayList<Long>(needsRepair);
         DuplicateCounter counter = new DuplicateCounter(
-                message.getInitiatorHSId(),
+                HostMessenger.VALHALLA,
                 message.getTxnId(), expectedHSIds);
         m_duplicateCounters.put(message.getSpHandle(), counter);
 
