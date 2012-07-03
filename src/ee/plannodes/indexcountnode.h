@@ -38,13 +38,11 @@ class IndexCountPlanNode : public AbstractCountPlanNode {
         IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->sort_direction = SORT_DIRECTION_TYPE_INVALID;
             this->end_expression = NULL;
         }
         IndexCountPlanNode() : AbstractScanPlanNode() {
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->sort_direction = SORT_DIRECTION_TYPE_INVALID;
             this->end_expression = NULL;
         }
         ~IndexCountPlanNode();
@@ -55,9 +53,6 @@ class IndexCountPlanNode : public AbstractCountPlanNode {
 
         void setLookupType(IndexLookupType val);
         IndexLookupType getLookupType() const;
-
-        void setSortDirection(SortDirectionType val);
-        SortDirectionType getSortDirection() const;
 
         void setTargetIndexName(std::string name);
         std::string getTargetIndexName() const;
@@ -93,10 +88,6 @@ class IndexCountPlanNode : public AbstractCountPlanNode {
         // Index Lookup Type
         //
         IndexLookupType lookup_type;
-        //
-        // Sorting Direction
-        //
-        SortDirectionType sort_direction;
 };
 
 }

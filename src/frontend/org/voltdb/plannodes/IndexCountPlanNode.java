@@ -260,14 +260,13 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
-    public void generateOutputSchema(Database db) {
-
+    public void generateOutputSchema(Database db)
+    {
     }
 
     @Override
     public void resolveColumnIndexes()
     {
-
     }
 
     @Override

@@ -56,13 +56,6 @@ IndexLookupType IndexCountPlanNode::getLookupType() const {
     return lookup_type;
 }
 
-void IndexCountPlanNode::setSortDirection(SortDirectionType val) {
-    this->sort_direction = val;
-}
-SortDirectionType IndexCountPlanNode::getSortDirection() const {
-    return sort_direction;
-}
-
 void IndexCountPlanNode::setTargetIndexName(std::string name) {
     this->target_index_name = name;
 }
@@ -99,7 +92,6 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
     buffer << spacer << "TargetIndexName[" << this->target_index_name << "]\n";
     buffer << spacer << "EnableKeyIteration[" << std::boolalpha << this->key_iterate << "]\n";
     buffer << spacer << "IndexLookupType[" << this->lookup_type << "]\n";
-    buffer << spacer << "SortDirection[" << this->sort_direction << "]\n";
 
     buffer << spacer << "SearchKey Expressions:\n";
     for (int ctr = 0, cnt = (int)this->searchkey_expressions.size(); ctr < cnt; ctr++) {
@@ -141,15 +133,6 @@ void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     }
     std::string lookupTypeString = lookupTypeValue.get_str();
     lookup_type = stringToIndexLookup(lookupTypeString);
-
-    json_spirit::Value sortDirectionValue = json_spirit::find_value( obj, "SORT_DIRECTION");
-    if (sortDirectionValue == json_spirit::Value::null) {
-        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                      "IndexCountPlanNode::loadFromJSONObject:"
-                                      " Can't find SORT_DIRECTION");
-    }
-    std::string sortDirectionString = sortDirectionValue.get_str();
-    sort_direction = stringToSortDirection(sortDirectionString);
 
     json_spirit::Value targetIndexNameValue = json_spirit::find_value( obj, "TARGET_INDEX_NAME");
     if (targetIndexNameValue == json_spirit::Value::null) {

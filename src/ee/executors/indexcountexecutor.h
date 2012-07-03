@@ -68,11 +68,6 @@ protected:
     int m_numOfColumns;
     int m_numOfSearchkeys;
 
-    // Inline Projection
-    ProjectionPlanNode* m_projectionNode;
-    int* m_projectionAllTupleArray; // projection_all_tuple_array_ptr[]
-    AbstractExpression** m_projectionExpressions;
-
     // Search key
     TableTuple m_searchKey;
     // search_key_beforesubstitute_array_ptr[]
@@ -84,11 +79,6 @@ protected:
 
     IndexLookupType m_lookupType;
     SortDirectionType m_sortDirection;
-
-    // Inline Limit
-    LimitPlanNode* m_limitNode;
-    int m_limitSize;
-    int m_limitOffset;
 
     // IndexScan Information
     TempTable* m_outputTable;

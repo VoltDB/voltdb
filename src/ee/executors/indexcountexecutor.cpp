@@ -28,11 +28,6 @@
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 
-// Inline PlanNodes
-#include "plannodes/indexcountnode.h"
-#include "plannodes/projectionnode.h"
-#include "plannodes/limitnode.h"
-
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
@@ -45,9 +40,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                                TempTableLimits* limits)
 {
     VOLT_TRACE("init IndexScan Executor");
-
-    m_projectionNode = NULL;
-    m_limitNode = NULL;
 
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
     assert(m_node);
@@ -67,54 +59,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                                                       column_names,
                                                       limits));
     delete[] column_names;
-
-    //
-    // INLINE PROJECTION
-    //
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION) != NULL)
-    {
-        m_projectionNode =
-            static_cast<ProjectionPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_PROJECTION));
-
-        m_projectionExpressions =
-            new AbstractExpression*[m_node->getOutputTable()->columnCount()];
-
-        ::memset(m_projectionExpressions, 0,
-                 (sizeof(AbstractExpression*) *
-                  m_node->getOutputTable()->columnCount()));
-
-        m_projectionAllTupleArrayPtr = ExpressionUtil::convertIfAllTupleValues(m_projectionNode->getOutputColumnExpressions());
-
-        m_projectionAllTupleArray = m_projectionAllTupleArrayPtr.get();
-
-        m_needsSubstituteProjectPtr =
-            boost::shared_array<bool>
-            (new bool[m_node->getOutputTable()->columnCount()]);
-        m_needsSubstituteProject = m_needsSubstituteProjectPtr.get();
-
-        for (int ctr = 0;
-             ctr < m_node->getOutputTable()->columnCount();
-             ctr++)
-        {
-            assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
-            m_needsSubstituteProjectPtr[ctr] =
-              m_projectionNode->
-                getOutputColumnExpressions()[ctr]->hasParameter();
-            m_projectionExpressions[ctr] =
-              m_projectionNode->getOutputColumnExpressions()[ctr];
-        }
-    }
-
-    //
-    // INLINE LIMIT
-    //
-    if (m_node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT) != NULL)
-    {
-        m_limitNode =
-            static_cast<LimitPlanNode*>
-            (m_node->getInlinePlanNode(PLAN_NODE_TYPE_LIMIT));
-    }
 
     //
     // Make sure that we have search keys and that they're not null
@@ -139,7 +83,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         {
             VOLT_ERROR("The search key expression at position '%d' is NULL for"
                        " PlanNode '%s'", ctr, m_node->debug().c_str());
-            delete [] m_projectionExpressions;
             return false;
         }
         m_needsSubstituteSearchKeyPtr[ctr] =
@@ -172,7 +115,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                    " '%s'", m_node->getTargetIndexName().c_str(),
                    m_targetTable->name().c_str(), m_node->debug().c_str());
         delete [] m_searchKeyBackingStore;
-        delete [] m_projectionExpressions;
         return false;
     }
     VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
@@ -194,7 +136,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // Miscellanous Information
     //
     m_lookupType = m_node->getLookupType();
-    m_sortDirection = m_node->getSortDirection();
 
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // the planner sometimes lies in this case: index_lookup_type_eq is incorrect.
@@ -222,32 +163,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
-    SortDirectionType localSortDirection = m_sortDirection;
-
-    // INLINE PROJECTION
-    // Set params to expression tree via substitute()
-    assert(m_numOfColumns == m_outputTable->columnCount());
-    if (m_projectionNode != NULL && m_projectionAllTupleArray == NULL)
-    {
-        for (int ctr = 0; ctr < m_numOfColumns; ctr++)
-        {
-            assert(m_projectionNode->getOutputColumnExpressions()[ctr]);
-            if (m_needsSubstituteProject[ctr])
-            {
-                m_projectionExpressions[ctr]->substitute(params);
-            }
-            assert(m_projectionExpressions[ctr]);
-        }
-    }
-
-    //
-    // INLINE LIMIT
-    //
-    if (m_limitNode != NULL)
-    {
-        m_limitNode->getLimitAndOffsetByReference(params, m_limitSize, m_limitOffset);
-    }
-
 
     //
     // SEARCH KEY
@@ -304,13 +219,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                     }
                 }
 
-                // if here, means all tuples with the previous searchkey
-                // columns need to be scaned. Note, if only one column,
-                // then all tuples will be scanned
-                activeNumOfSearchKeys--;
-                if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
-                    localSortDirection = SORT_DIRECTION_TYPE_ASC;
-                }
             }
             // if a EQ comparison is out of range, then return no tuples
             else {
@@ -383,24 +291,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
     }
 
-    if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
-        bool order_by_asc = true;
-
-        if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
-            // nothing now
-        }
-        else {
-            order_by_asc = false;
-        }
-
-        if (activeNumOfSearchKeys == 0) {
-            m_index->moveToEnd(order_by_asc);
-        }
-    }
-    else if (localSortDirection == SORT_DIRECTION_TYPE_INVALID && activeNumOfSearchKeys == 0) {
-        return false;
-    }
-
     //
     // We have to different nextValue() methods for different lookup types
     //
@@ -425,57 +315,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         if (post_expression == NULL ||
             post_expression->eval(&m_tuple, NULL).isTrue())
         {
-            //
-            // INLINE OFFSET
-            //
-            if (m_limitNode != NULL && tuples_skipped < m_limitOffset)
-            {
-                tuples_skipped++;
-                continue;
-            }
-
-            if (m_projectionNode != NULL)
-            {
-                TableTuple &temp_tuple = m_outputTable->tempTuple();
-                if (m_projectionAllTupleArray != NULL)
-                {
-                    VOLT_TRACE("sweet, all tuples");
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr)
-                    {
-                        temp_tuple.setNValue(ctr,
-                                             m_tuple.getNValue(m_projectionAllTupleArray[ctr]));
-                    }
-                }
-                else
-                {
-                    for (int ctr = m_numOfColumns - 1; ctr >= 0; --ctr)
-                    {
-                        temp_tuple.setNValue(ctr,
-                                             m_projectionExpressions[ctr]->eval(&m_tuple, NULL));
-                    }
-                }
-                m_outputTable->insertTupleNonVirtual(temp_tuple);
-                tuples_written++;
-            }
-            else
-                //
-                // Straight Insert
-                //
-            {
-                //
-                // Try to put the tuple into our output table
-                //
-                m_outputTable->insertTupleNonVirtual(m_tuple);
-                tuples_written++;
-            }
-
-            //
-            // INLINE LIMIT
-            //
-            if (m_limitNode != NULL && tuples_written >= m_limitSize)
-            {
-                break;
-            }
+        	// Straight Insert
+        	//
+        	// Try to put the tuple into our output table
+        	//
+        	m_outputTable->insertTupleNonVirtual(m_tuple);
+        	tuples_written++;
         }
     }
 
@@ -485,5 +330,4 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
 IndexCountExecutor::~IndexCountExecutor() {
     delete [] m_searchKeyBackingStore;
-    delete [] m_projectionExpressions;
 }
