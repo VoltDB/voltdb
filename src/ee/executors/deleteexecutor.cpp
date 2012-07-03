@@ -68,13 +68,14 @@ namespace detail {
     struct DeleteExecutorState
     {
         DeleteExecutorState(AbstractExecutor* childExec, Table* outputTable) :
+            m_tuplesToDelete(),
             m_childExecutor(childExec),
             m_outputTable(outputTable),
             m_outputTableName(outputTable->name()),
-            m_modifiedTuples(0),
             m_done(false)
         {}
 
+        std::vector<void*> m_tuplesToDelete;
         AbstractExecutor* m_childExecutor;
         Table* m_outputTable;
         std::string m_outputTableName;
@@ -226,30 +227,34 @@ TableTuple DeleteExecutor::p_next_pull()
             {
                 break;
             }
-            //
-            // OPTIMIZATION: Single-Sited Query Plans
-            // If our beloved DeletePlanNode is apart of a single-site query plan,
-            // then the first column in the input table will be the address of a
-            // tuple on the target table that we will want to blow away. This saves
-            // us the trouble of having to do an index lookup
-            //
-            void *targetAddress = tuple.address();
-            m_targetTuple.move(targetAddress);
-
-            // Delete from target table
-            if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
-                char message[128];
-                snprintf(message, 128, "Failed to delete tuple from table '%s'",
-                   m_targetTable->name().c_str());
-                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
-            }
-            ++m_state->m_modifiedTuples;
+            // We can't delete the tuple while iterating the table because
+            // that would invalidate table iterator. Save the tuple address
+            // to be used after the iteration is complete
+            m_state->m_tuplesToDelete.push_back(tuple.address());
         }
     }
 
+    size_t tupleCount = m_state->m_tuplesToDelete.size();
+    for (size_t i = 0; i < tupleCount; ++i) {
+        //
+        // OPTIMIZATION: Single-Sited Query Plans
+        // If our beloved DeletePlanNode is apart of a single-site query plan,
+        // then the first column in the input table will be the address of a
+        // tuple on the target table that we will want to blow away. This saves
+        // us the trouble of having to do an index lookup
+        //
+        // Delete from target table
+        m_targetTuple.move(m_state->m_tuplesToDelete[i]);
+        if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
+            char message[128];
+            snprintf(message, 128, "Failed to delete tuple from table '%s'",
+               m_targetTable->name().c_str());
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
+    }
     m_state->m_done = true;
     TableTuple countTuple = m_node->getOutputTable()->tempTuple();
-    countTuple.setNValue(0, ValueFactory::getBigIntValue(m_state->m_modifiedTuples));
+    countTuple.setNValue(0, ValueFactory::getBigIntValue(tupleCount));
 
     return countTuple;
 }
@@ -257,7 +262,7 @@ TableTuple DeleteExecutor::p_next_pull()
 void DeleteExecutor::p_post_execute_pull()
 {
     // add to the planfragments count of modified tuples
-    m_engine->m_tuplesModified += m_state->m_modifiedTuples;
+    m_engine->m_tuplesModified += m_state->m_tuplesToDelete.size();
     VOLT_INFO("Finished deleting tuples");
 }
 

@@ -61,8 +61,20 @@ class TempTableLimits;
 class VoltDBEngine;
 
 namespace detail {
-struct AbstractExecutorState;
-} //namespace detail
+// must be in the header file to be visible from other executors
+struct AbstractExecutorState
+{
+    AbstractExecutorState(Table* table) :
+        m_iterator(table->makeIterator()),
+        m_nextTuple(table->schema()),
+        m_nullTuple(table->schema())
+    {}
+    boost::scoped_ptr<TableIterator> m_iterator;
+    TableTuple m_nextTuple;
+    TableTuple m_nullTuple;
+};
+
+} // namespace detail
 
 /**
  * AbstractExecutor provides the API for initializing and invoking executors.
