@@ -130,7 +130,10 @@ public class AuthSystem {
         private final HashSet<Connector> m_authorizedConnectors = new HashSet<Connector>();
 
         /**
-         *
+         * The constructor accepts the password as either sha1 or bcrypt. In practice
+         * there will be only one passed in depending on the format of the password in the catalog.
+         * The other will be null and that is used to determine how to hash the supplied password
+         * for auth
          * @param shadowPassword SHA-1 double hashed copy of the users clear text password
          * @param name Name of the user
          * @param sysproc Whether this user is granted permission to invoke system procedures (can also be granted by group membership)
