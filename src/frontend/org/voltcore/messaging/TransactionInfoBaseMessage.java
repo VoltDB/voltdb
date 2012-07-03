@@ -55,6 +55,18 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_spHandle = Long.MIN_VALUE;
     }
 
+    protected TransactionInfoBaseMessage(long initiatorHSId,
+            long coordinatorHSId,
+            TransactionInfoBaseMessage rhs)
+    {
+        m_initiatorHSId = initiatorHSId;
+        m_coordinatorHSId = coordinatorHSId;
+        m_txnId = rhs.m_txnId;
+        m_isReadOnly = rhs.m_isReadOnly;
+        m_subject = rhs.m_subject;
+        m_spHandle = rhs.m_spHandle;
+    }
+
     public long getInitiatorHSId() {
         return m_initiatorHSId;
     }

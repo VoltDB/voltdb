@@ -87,7 +87,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     public Iv2InitiateTaskMessage(long initiatorHSId,
             long coordinatorHSId, Iv2InitiateTaskMessage rhs)
     {
-        super(initiatorHSId, coordinatorHSId, rhs.m_txnId, rhs.isReadOnly());
+        super(initiatorHSId, coordinatorHSId, (TransactionInfoBaseMessage)rhs);
         m_isSinglePartition = rhs.m_isSinglePartition;
         m_invocation = rhs.m_invocation;
         m_truncationHandle = rhs.m_truncationHandle;
