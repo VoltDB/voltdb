@@ -88,7 +88,8 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if (plan.getParent(0) != null) {
             plan.getParent(0).addAndLinkChild(icpn);
         }
-
+        // TODO: set schema using plan's schema
+        //plan.getOutputSchema()
         plan.removeFromGraph();
         child.removeFromGraph();
 
