@@ -44,6 +44,7 @@ public class LeaderElector {
     private volatile String leader = null;
     private volatile boolean isLeader = false;
     private final ExecutorService es;
+    private boolean m_done = false;
 
     private final Runnable eventHandler = new Runnable() {
         @Override
@@ -75,7 +76,11 @@ public class LeaderElector {
     private final Watcher watcher = new Watcher() {
         @Override
         public void process(WatchedEvent event) {
-            es.submit(eventHandler);
+            synchronized (LeaderElector.this) {
+                if (!m_done) {
+                    es.submit(eventHandler);
+                }
+            }
         }
     };
 
@@ -141,7 +146,8 @@ public class LeaderElector {
      * @throws InterruptedException
      * @throws KeeperException
      */
-    public void shutdown() throws InterruptedException, KeeperException {
+    synchronized public void shutdown() throws InterruptedException, KeeperException {
+        m_done = true;
         zk.delete(node, -1);
         es.shutdown();
         es.awaitTermination(356, TimeUnit.DAYS);
