@@ -70,6 +70,7 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
         cl.m_leaderPort = m_leaderPort;
+        cl.m_enableIV2 = m_enableIV2;
         cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
 
@@ -348,6 +349,12 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine enableIV2(boolean enable)
+    {
+        m_enableIV2 = enable;
+        return this;
+    }
+
     // user-customizable string appeneded to commandline.
     // useful to allow customization of VEM/REST cmdlns.
     // Please don't abuse this by shoving lots of long-term
@@ -495,6 +502,11 @@ public class CommandLine extends VoltDB.Configuration
         if (m_internalInterface != null && !m_externalInterface.isEmpty())
         {
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
+        }
+
+        if (m_enableIV2)
+        {
+            cmdline.add("enableiv2");
         }
 
         if (customCmdLn != null && !customCmdLn.isEmpty())

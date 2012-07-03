@@ -71,6 +71,9 @@ public class SnapshotSaveAPI
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSaveAPI.class.getName());
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
+    // ugh, ick, ugh
+    public static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
+
     /**
      * The only public method: do all the work to start a snapshot.
      * Assumes that a snapshot is feasible, that the caller has validated it can
@@ -93,8 +96,8 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final int numLocalSites = (VoltDB.instance().getLocalSites().values().size() -
-                ExecutionSite.recoveringSiteCount.get());
+        final int numLocalSites = (context.getSiteTrackerForSnapshot().getLocalSites().length -
+                recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -143,7 +146,7 @@ public class SnapshotSaveAPI
                 context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
                         txnId,
-                        context.getSiteTracker().getAllHosts().size());
+                        context.getSiteTrackerForSnapshot().getAllHosts().size());
             }
         }
 
@@ -362,9 +365,9 @@ public class SnapshotSaveAPI
             long txnId, String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
+            SiteTracker tracker = context.getSiteTrackerForSnapshot();
             final int numLocalSites =
-                    (VoltDB.instance().getLocalSites().values().size() - ExecutionSite.recoveringSiteCount.get());
-            SiteTracker tracker = context.getSiteTracker();
+                    (tracker.getLocalSites().length - recoveringSiteCount.get());
 
             // non-null if targeting only one site (used for rejoin)
             // set later from the "data" JSON string
@@ -521,7 +524,7 @@ public class SnapshotSaveAPI
                                         saveFilePath,
                                         table,
                                         context.getHostId(),
-                                        context.getSiteTracker().m_numberOfPartitions,
+                                        tracker.m_numberOfPartitions,
                                         txnId);
                         }
 
@@ -734,7 +737,7 @@ public class SnapshotSaveAPI
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             context.getSiteTracker().getPartitionsForHost(hostId),
+                                             context.getSiteTrackerForSnapshot().getPartitionsForHost(hostId),
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

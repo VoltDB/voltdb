@@ -543,7 +543,9 @@ SnapshotCompletionInterest {
     void enterRestore() {
         try {
             m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
+                                                "restore",
                                                 new byte[0], null);
+            m_leaderElector.start(true);
             m_isLeader = m_leaderElector.isLeader();
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -590,7 +592,7 @@ SnapshotCompletionInterest {
         }
 
         try {
-            m_leaderElector.done();
+            m_leaderElector.shutdown();
         } catch (Exception ignore) {}
 
         // Clean up the ZK snapshot ID node so that we're good for next time.

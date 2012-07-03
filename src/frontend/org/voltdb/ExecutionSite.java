@@ -27,6 +27,8 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
+
+import java.util.concurrent.Future;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -65,6 +67,7 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
+import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
@@ -121,7 +124,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
-    static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
         new ExecutionSiteNodeFailureFaultHandler();
@@ -183,6 +185,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     public final static long kInvalidUndoToken = -1L;
     private long latestUndoToken = 0L;
 
+    @Override
+    public long getLatestUndoToken() {
+        return latestUndoToken;
+    }
+
+    @Override
     public long getNextUndoToken() {
         return ++latestUndoToken;
     }
@@ -530,7 +538,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
                         " with " + megabytes + " megabytes transferred " +
                         " at a rate of " + megabytesPerSecond + " megabytes/sec");
-                int remaining = recoveringSiteCount.decrementAndGet();
+                int remaining = SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
                     ee.toggleProfiler(0);
 
@@ -705,6 +713,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public long getCatalogCRC()                           { return m_context.getCatalogCRC(); }
         @Override
         public SiteTracker getSiteTracker()                   { return m_tracker; }
+        @Override
+        public SiteTracker getSiteTrackerForSnapshot()        { return m_tracker; }
         @Override
         public int getNumberOfPartitions()                    { return m_tracker.m_numberOfPartitions; }
         @Override
@@ -2384,7 +2394,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * @param data
      * @param table
      */
-    private void loadTable(long txnId, int tableId, VoltTable data) {
+    public void loadTable(long txnId, int tableId, VoltTable data) {
         long undo_token = getNextUndoToken();
         ee.loadTable(tableId, data,
                      txnId,
@@ -2567,7 +2577,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         {
             if (dependencies != null)
             {
-                ee.stashWorkUnitDependencies(dependencies);
+                stashWorkUnitDependencies(dependencies);
             }
         }
 
@@ -2615,12 +2625,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * No roll back support.
                  */
                 try {
-                    final VoltTable dependency = ee.executePlanFragment(fragmentId,
-                                                                        inputDepId,
-                                                                        params,
-                                                                        txnState.txnId,
-                                                                        lastCommittedTxnId,
-                                                                        txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken());
+                    final VoltTable dependency = executePlanFragment(fragmentId,
+                                                                     inputDepId,
+                                                                     params,
+                                                                     txnState.txnId,
+                                                                     txnState.isReadOnly());
 
                     sendDependency(currentFragResponse, outputDepId, dependency);
 
@@ -2688,7 +2697,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     // call the proc
                     runner.setupTransaction(txnState);
                     cr = runner.call(txnId, itask.getParameters());
-                    response.setResults(cr, itask);
+                    response.setResults(cr);
 
                     // record the results of write transactions to the transaction state
                     // this may be used to verify the DR replica cluster gets the same value
@@ -2803,6 +2812,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         throw new RuntimeException("Unsupported IV2-only API.");
      }
 
+    @Override
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    {
+        throw new RuntimeException("Unsupported IV2-only API.");
+    }
 
     @Override
     public VoltTable executePlanFragment(long planFragmentId, int inputDepId,
@@ -2873,5 +2887,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                 boolean interval, Long now)
     {
         return ee.getStats(selector, locators, interval, now);
+    }
+
+    @Override
+    public void setRejoinComplete() {
+        throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 }

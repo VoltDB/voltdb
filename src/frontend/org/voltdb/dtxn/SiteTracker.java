@@ -23,8 +23,8 @@ import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.MailboxNodeContent;
@@ -55,15 +55,11 @@ public class SiteTracker {
 
     public final ImmutableMap<Integer, ImmutableList<Long>> m_hostsToSitesImmutable;
 
-
     public final ImmutableMap<Integer, ImmutableList<Integer>> m_hostsToPartitionsImmutable;
-
 
     public final ImmutableMap<Integer, ImmutableList<Long>> m_partitionsToSitesImmutable;
 
-
     public final ImmutableMap<Long, Integer> m_sitesToPartitionsImmutable;
-
 
     public final ImmutableMap<Integer, ImmutableList<Long>> m_hostsToInitiatorsImmutable;
 
@@ -119,6 +115,7 @@ public class SiteTracker {
             new HashMap<Integer, List<Long>>();
         Map<MailboxType, List<Long>> otherHSIds =
             new HashMap<MailboxType, List<Long>>();
+
         ImmutableSet.Builder<Integer> allHosts = ImmutableSet.<Integer>builder();
         ImmutableSet.Builder<Long> allExecutionSites = ImmutableSet.<Long>builder();
         ImmutableSet.Builder<Long> allInitiators = ImmutableSet.<Long>builder();
@@ -136,8 +133,10 @@ public class SiteTracker {
                         allHosts,
                         allExecutionSites);
             } else if (e.getKey().equals(MailboxType.Initiator)) {
-                populateInitiators(e.getValue(), hostsToInitiators, allInitiators);
-            } if (e.getKey().equals(MailboxType.StatsAgent)) {
+                populateInitiators(e.getValue(),
+                                   hostsToInitiators,
+                                   allInitiators);
+            } else if (e.getKey().equals(MailboxType.StatsAgent)) {
                 populateStatsAgents(e.getValue());
             } else {
                 populateOtherHSIds(e.getKey(), e.getValue(), otherHSIds, hostsToOtherHSIds);
@@ -150,6 +149,7 @@ public class SiteTracker {
         m_sitesToPartitionsImmutable = sitesToPartitions.build();
         m_hostsToInitiatorsImmutable = CoreUtils.unmodifiableMapCopy(hostsToInitiators);
         m_otherHSIdsImmutable = CoreUtils.unmodifiableMapCopy(otherHSIds);
+
         m_allInitiatorsImmutable = allInitiators.build();
         m_allExecutionSitesImmutable = allExecutionSites.build();
         m_allHostsImmutable = allHosts.build();
@@ -246,10 +246,10 @@ public class SiteTracker {
         m_isFirstHost = (m_hostId == firstHostId);
     }
 
-    private void populateInitiators(
-            List<MailboxNodeContent> objs,
-            Map<Integer, List<Long>> hostsToInitiators,
-            ImmutableSet.Builder<Long> allInitiators) {
+    private void populateInitiators(List<MailboxNodeContent> objs,
+                                    Map<Integer, List<Long>> hostsToInitiators,
+                                    ImmutableSet.Builder<Long> allInitiators)
+    {
         for (MailboxNodeContent obj : objs) {
             int hostId = CoreUtils.getHostIdFromHSId(obj.HSId);
 
@@ -258,10 +258,11 @@ public class SiteTracker {
                 initiators = new ArrayList<Long>();
                 hostsToInitiators.put(hostId, initiators);
             }
-            initiators.add(obj.HSId);
 
-            allInitiators.add(obj.HSId);
-            // TODO: needs to determine if it's the master or replica
+            if (obj.partitionId == null) {
+                initiators.add(obj.HSId);
+                allInitiators.add(obj.HSId);
+            }
         }
     }
 

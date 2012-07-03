@@ -34,6 +34,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -60,6 +61,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -69,7 +71,10 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.iv2.Cartographer;
+import org.voltdb.iv2.SpInitiator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -93,6 +98,8 @@ import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.iv2.Initiator;
+import org.voltdb.iv2.MpInitiator;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.RejoinCoordinator;
@@ -171,6 +178,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     boolean m_jsonEnabled;
     DeploymentType m_deployment;
 
+    // IV2 things
+    List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
+    Cartographer m_cartographer = null;
+
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
     // If CL is enabled this will be set to true
@@ -240,6 +251,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return m_licenseApi;
     }
 
+    @Override
+    public boolean isIV2Enabled() {
+        return m_config.m_enableIV2;
+    }
 
     /**
      * Initialize all the global components, then initialize all the m_sites.
@@ -247,7 +262,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public void initialize(VoltDB.Configuration config) {
         synchronized(m_startAndStopLock) {
+            // check that this is a 64 bit VM
+            if (System.getProperty("java.vm.name").contains("64") == false) {
+                hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
+                System.exit(-1);
+            }
             consoleLog.l7dlog( Level.INFO, LogKeys.host_VoltDB_StartupString.name(), null);
+            consoleLog.info("ENABLE IV2: " + config.m_enableIV2);
 
             // If there's no deployment provide a default and put it under voltdbroot.
             if (config.m_pathToDeployment == null) {
@@ -324,12 +345,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 System.exit(-1);
             }
 
-            // check that this is a 64 bit VM
-            if (System.getProperty("java.vm.name").contains("64") == false) {
-                hostLog.fatal("You are running on an unsupported (probably 32 bit) JVM. Exiting.");
-                System.exit(-1);
-            }
-
             m_snapshotCompletionMonitor = new SnapshotCompletionMonitor();
 
             readBuildInfo(config.m_isEnterprise ? "Enterprise Edition" : "Community Edition");
@@ -382,13 +397,35 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
             try {
+                JSONObject topo = getTopology(isRejoin);
+
+                // IV2 mailbox stuff
+                if (isIV2Enabled()) {
+                    ClusterConfig iv2config = new ClusterConfig(topo);
+                    m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
+                    if (isRejoin) {
+                        List<Integer> partitionsToReplace = m_cartographer.getIv2PartitionsToReplace(topo);
+                        m_iv2Initiators = createIv2Initiators(partitionsToReplace);
+                    }
+                    else {
+                        List<Integer> partitions =
+                            ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
+                        m_iv2Initiators = createIv2Initiators(partitions);
+                        long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
+                        // Create the MPI if we're the correct host
+                        if (topo.getInt("MPI") == m_messenger.getHostId()) {
+                            Initiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
+                            m_iv2Initiators.add(initiator);
+                        }
+                    }
+                }
+
                 /*
                  * Start mailbox tracker early here because it is required
                  * on rejoin to find the hosts that are missing from the cluster
                  */
                 m_mailboxTracker = new MailboxTracker(m_messenger.getZK(), this);
                 m_mailboxTracker.start();
-
                 /*
                  * Will count this down at the right point on regular startup as well as rejoin
                  */
@@ -402,11 +439,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                      */
                     createRejoinBarrierAndWatchdog(rejoinCompleteLatch);
 
-                    p = createMailboxesForSitesRejoin();
-                    ExecutionSite.recoveringSiteCount.set(p.getFirst().size());
-                    hostLog.info("Set recovering site count to " + p.getFirst().size());
+                    p = createMailboxesForSitesRejoin(topo);
                 } else {
-                    p = createMailboxesForSitesStartup();
+                    p = createMailboxesForSitesStartup(topo);
                 }
 
                 siteMailboxes = p.getFirst();
@@ -418,8 +453,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 hostLog.info("Registering stats mailbox id " + CoreUtils.hsIdToString(statsHSId));
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
-                // Construct and publish rejoin coordinator mailbox
-                if (isRejoin && m_config.m_newRejoin) {
+                if (isRejoin && isIV2Enabled()) {
+                    // Make a list of HDIds to rejoin
+                    List<Long> hsidsToRejoin = new ArrayList<Long>();
+                    for (Initiator init : m_iv2Initiators) {
+                        hsidsToRejoin.add(init.getInitiatorHSId());
+                    }
+                    SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
+                    hostLog.info("Set recovering site count to " + hsidsToRejoin.size());
+
+                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, hsidsToRejoin);
+                    m_messenger.registerMailbox(m_rejoinCoordinator);
+                    hostLog.info("Using iv2 community rejoin");
+                }
+                else if (isRejoin && m_config.m_newRejoin) {
+                    SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
+                    hostLog.info("Set recovering site count to " + siteMailboxes.size());
+                    // Construct and publish rejoin coordinator mailbox
                     ArrayList<Long> sites = new ArrayList<Long>();
                     for (Mailbox siteMailbox : siteMailboxes) {
                         sites.add(siteMailbox.getHSId());
@@ -498,71 +548,89 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             final CatalogSpecificPlanner csp = new CatalogSpecificPlanner(m_asyncCompilerAgent, m_catalogContext);
 
             /*
-             * Create execution sites runners (and threads) for all exec sites except the first one.
-             * This allows the sites to be set up in the thread that will end up running them.
-             * Cache the first Site from the catalog and only do the setup once the other threads have been started.
+             * Configure and start all the IV2 sites
              */
-            Mailbox localThreadMailbox = siteMailboxes.poll();
-            ((org.voltcore.messaging.SiteMailbox)localThreadMailbox).setCommandLog(m_commandLog);
-            m_currentThreadSite = null;
-            for (Mailbox mailbox : siteMailboxes) {
-                long site = mailbox.getHSId();
-                int sitesHostId = SiteTracker.getHostForSite(site);
+            if (isIV2Enabled()) {
+                for (Initiator iv2init : m_iv2Initiators) {
+                    iv2init.configure(
+                            getBackendTargetType(),
+                            m_serializedCatalog,
+                            m_catalogContext,
+                            m_deployment.getCluster().getKfactor(),
+                            csp,
+                            clusterConfig.getPartitionCount(),
+                            m_rejoining);
+                }
+            }
+            else {
+                /*
+                 * Create execution sites runners (and threads) for all exec
+                 * sites except the first one.  This allows the sites to be set
+                 * up in the thread that will end up running them.  Cache the
+                 * first Site from the catalog and only do the setup once the
+                 * other threads have been started.
+                 */
+                Mailbox localThreadMailbox = siteMailboxes.poll();
+                ((org.voltcore.messaging.SiteMailbox)localThreadMailbox).setCommandLog(m_commandLog);
+                m_currentThreadSite = null;
+                for (Mailbox mailbox : siteMailboxes) {
+                    long site = mailbox.getHSId();
+                    int sitesHostId = SiteTracker.getHostForSite(site);
 
-                // start a local site
-                if (sitesHostId == m_myHostId) {
-                    ((org.voltcore.messaging.SiteMailbox)mailbox).setCommandLog(m_commandLog);
-                    ExecutionSiteRunner runner =
-                        new ExecutionSiteRunner(mailbox,
-                                m_catalogContext,
+                    // start a local site
+                    if (sitesHostId == m_myHostId) {
+                        ((org.voltcore.messaging.SiteMailbox)mailbox).setCommandLog(m_commandLog);
+                        ExecutionSiteRunner runner =
+                            new ExecutionSiteRunner(mailbox,
+                                    m_catalogContext,
+                                    m_serializedCatalog,
+                                    m_rejoining,
+                                    m_replicationActive,
+                                    hostLog,
+                                    m_configuredNumberOfPartitions,
+                                    csp);
+                        m_runners.add(runner);
+                        Thread runnerThread = new Thread(runner, "Site " +
+                                org.voltcore.utils.CoreUtils.hsIdToString(site));
+                        runnerThread.start();
+                        log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
+                        m_siteThreads.put(site, runnerThread);
+                    }
+                }
+
+                /*
+                 * Now that the runners have been started and are doing setup of the other sites in parallel
+                 * this thread can set up its own execution site.
+                 */
+                try {
+                    ExecutionSite siteObj =
+                        new ExecutionSite(VoltDB.instance(),
+                                localThreadMailbox,
                                 m_serializedCatalog,
+                                null,
                                 m_rejoining,
                                 m_replicationActive,
-                                hostLog,
+                                m_catalogContext.m_transactionId,
                                 m_configuredNumberOfPartitions,
                                 csp);
-                    m_runners.add(runner);
-                    Thread runnerThread = new Thread(runner, "Site " +
-                            org.voltcore.utils.CoreUtils.hsIdToString(site));
-                    runnerThread.start();
-                    log.l7dlog(Level.TRACE, LogKeys.org_voltdb_VoltDB_CreatingThreadForSite.name(), new Object[] { site }, null);
-                    m_siteThreads.put(site, runnerThread);
+                    m_localSites.put(localThreadMailbox.getHSId(), siteObj);
+                    m_currentThreadSite = siteObj;
+                } catch (Exception e) {
+                    VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
                 }
-            }
-
-            /*
-             * Now that the runners have been started and are doing setup of the other sites in parallel
-             * this thread can set up its own execution site.
-             */
-            try {
-                ExecutionSite siteObj =
-                    new ExecutionSite(VoltDB.instance(),
-                            localThreadMailbox,
-                            m_serializedCatalog,
-                            null,
-                            m_rejoining,
-                            m_replicationActive,
-                            m_catalogContext.m_transactionId,
-                            m_configuredNumberOfPartitions,
-                            csp);
-                m_localSites.put(localThreadMailbox.getHSId(), siteObj);
-                m_currentThreadSite = siteObj;
-            } catch (Exception e) {
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
-
-            /*
-             * Stop and wait for the runners to finish setting up and then put
-             * the constructed ExecutionSites in the local site map.
-             */
-            for (ExecutionSiteRunner runner : m_runners) {
-                try {
-                    runner.m_siteIsLoaded.await();
-                } catch (InterruptedException e) {
-                    VoltDB.crashLocalVoltDB("Unable to wait on starting execution site.", true, e);
+                /*
+                 * Stop and wait for the runners to finish setting up and then put
+                 * the constructed ExecutionSites in the local site map.
+                 */
+                for (ExecutionSiteRunner runner : m_runners) {
+                    try {
+                        runner.m_siteIsLoaded.await();
+                    } catch (InterruptedException e) {
+                        VoltDB.crashLocalVoltDB("Unable to wait on starting execution site.", true, e);
+                    }
+                    assert(runner.m_siteObj != null);
+                    m_localSites.put(runner.m_siteId, runner.m_siteObj);
                 }
-                assert(runner.m_siteObj != null);
-                m_localSites.put(runner.m_siteId, runner.m_siteObj);
             }
 
             /*
@@ -611,6 +679,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_catalogContext,
                                 m_config.m_replicationRole,
                                 initiator,
+                                m_cartographer,
                                 clusterConfig.getPartitionCount(),
                                 config.m_port + portOffset,
                                 config.m_adminPort + portOffset,
@@ -633,6 +702,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_memoryStats = new MemoryStats();
             m_statsAgent.registerStatsSource(SysProcSelector.MEMORY,
                     0, m_memoryStats);
+            if (isIV2Enabled()) {
+                m_statsAgent.registerStatsSource(SysProcSelector.TOPO, 0, m_cartographer);
+            }
             // Create the statistics manager and register it to JMX registry
             m_statsManager = null;
             try {
@@ -738,13 +810,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }.start();
     }
 
-    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesRejoin() throws Exception {
+    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesRejoin(JSONObject topology)
+    throws Exception
+    {
         ZooKeeper zk = m_messenger.getZK();
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
 
-        Stat stat = new Stat();
         hostLog.debug(zk.getChildren("/db", false));
-        JSONObject topology = new JSONObject(new String(zk.getData(VoltZK.topology, false, stat), "UTF-8"));
 
         // We're waiting for m_mailboxTracker to start(), which will
         // cause it to do an initial read of the mailboxes from ZK and
@@ -794,14 +866,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
 
         zk.setData(VoltZK.topology, topology.toString(4).getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
-        final int hostcount = topology.getInt("hostcount");
         final int sites_per_host = topology.getInt("sites_per_host");
-        final int kfactor = topology.getInt("kfactor");
-        ClusterConfig clusterConfig =
-            new ClusterConfig(
-                    hostcount,
-                    sites_per_host,
-                    kfactor);
+        ClusterConfig clusterConfig = new ClusterConfig(topology);
         m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
         assert(partitionsToReplicate.size() == sites_per_host);
         for (Integer partition : partitionsToReplicate)
@@ -814,21 +880,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return Pair.of( mailboxes, clusterConfig);
     }
 
-    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesStartup() throws Exception {
+    private Pair<ArrayDeque<Mailbox>, ClusterConfig> createMailboxesForSitesStartup(JSONObject topo)
+    throws Exception
+    {
         ArrayDeque<Mailbox> mailboxes = new ArrayDeque<Mailbox>();
-        int sitesperhost = m_deployment.getCluster().getSitesperhost();
-        int hostcount = m_deployment.getCluster().getHostcount();
-        int kfactor = m_deployment.getCluster().getKfactor();
-        ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+        ClusterConfig clusterConfig = new ClusterConfig(topo);
         if (!clusterConfig.validate()) {
             VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
         }
-        JSONObject topo = registerClusterConfig(clusterConfig);
         List<Integer> partitions =
             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
 
         m_configuredNumberOfPartitions = clusterConfig.getPartitionCount();
-        assert(partitions.size() == sitesperhost);
+        assert(partitions.size() == clusterConfig.getSitesPerHost());
         for (Integer partition : partitions)
         {
             Mailbox mailbox = m_messenger.createMailbox();
@@ -837,6 +901,45 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_mailboxPublisher.registerMailbox(MailboxType.ExecutionSite, mnc);
         }
         return Pair.of( mailboxes, clusterConfig);
+    }
+
+    // Get topology information.  If rejoining, get it directly from
+    // ZK.  Otherwise, try to do the write/read race to ZK on startup.
+    private JSONObject getTopology(boolean isRejoin)
+    {
+        JSONObject topo = null;
+        if (!isRejoin) {
+            int sitesperhost = m_deployment.getCluster().getSitesperhost();
+            int hostcount = m_deployment.getCluster().getHostcount();
+            int kfactor = m_deployment.getCluster().getKfactor();
+            ClusterConfig clusterConfig = new ClusterConfig(hostcount, sitesperhost, kfactor);
+            if (!clusterConfig.validate()) {
+                VoltDB.crashLocalVoltDB(clusterConfig.getErrorMsg(), false, null);
+            }
+            topo = registerClusterConfig(clusterConfig);
+        }
+        else {
+            Stat stat = new Stat();
+            try {
+                topo =
+                    new JSONObject(new String(m_messenger.getZK().getData(VoltZK.topology, false, stat), "UTF-8"));
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to get topology from ZK", true, e);
+            }
+        }
+        return topo;
+    }
+
+    private List<Initiator> createIv2Initiators(Collection<Integer> partitions)
+    {
+        List<Initiator> initiators = new ArrayList<Initiator>();
+        for (Integer partition : partitions)
+        {
+            Initiator initiator = new SpInitiator(m_messenger, partition);
+            initiators.add(initiator);
+        }
+        return initiators;
     }
 
     private JSONObject registerClusterConfig(ClusterConfig config)
@@ -1345,9 +1448,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      */
     @Override
     public void run() {
-        // start the separate EE threads
-        for (ExecutionSiteRunner r : m_runners) {
-            r.m_shouldStartRunning.countDown();
+
+        if (!isIV2Enabled()) {
+            // start the separate EE threads
+            for (ExecutionSiteRunner r : m_runners) {
+                r.m_shouldStartRunning.countDown();
+            }
         }
 
         if (m_restoreAgent != null) {
@@ -1368,7 +1474,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         m_isRunning = true;
         try
         {
-            m_currentThreadSite.run();
+            if (!isIV2Enabled()) {
+                m_currentThreadSite.run();
+            }
+            else {
+                while (m_isRunning) {
+                    Thread.sleep(3000);
+                }
+            }
         }
         catch (Throwable thrown)
         {
@@ -1424,33 +1537,46 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 // shut down Export and its connectors.
                 ExportManager.instance().shutdown();
 
-                // tell all m_sites to stop their runloops
-                if (m_localSites != null) {
-                    for (ExecutionSite site : m_localSites.values())
-                        site.startShutdown();
+                if (!isIV2Enabled()) {
+                    // tell all m_sites to stop their runloops
+                    if (m_localSites != null) {
+                        for (ExecutionSite site : m_localSites.values())
+                            site.startShutdown();
+                    }
                 }
 
-                // try to join all threads but the main one
-                // probably want to check if one of these is the current thread
-                if (m_siteThreads != null) {
-                    for (Thread siteThread : m_siteThreads.values()) {
-                        if (Thread.currentThread().equals(siteThread) == false) {
+                // tell the iv2 sites to stop their runloop
+                if (m_iv2Initiators != null) {
+                    for (Initiator init : m_iv2Initiators)
+                        init.shutdown();
+                }
+
+                if (m_cartographer != null) {
+                    m_cartographer.shutdown();
+                }
+
+                if (!isIV2Enabled()) {
+                    // try to join all threads but the main one
+                    // probably want to check if one of these is the current thread
+                    if (m_siteThreads != null) {
+                        for (Thread siteThread : m_siteThreads.values()) {
+                            if (Thread.currentThread().equals(siteThread) == false) {
+                                // don't interrupt here. the site will start shutdown when
+                                // it sees the shutdown flag set.
+                                siteThread.join();
+                            }
+                        }
+                    }
+
+                    // try to join the main thread (possibly this one)
+                    if (mainSiteThread != null) {
+                        if (Thread.currentThread().equals(mainSiteThread) == false) {
                             // don't interrupt here. the site will start shutdown when
                             // it sees the shutdown flag set.
-                            siteThread.join();
+                            mainSiteThread.join();
                         }
                     }
                 }
-
-                // try to join the main thread (possibly this one)
-                if (mainSiteThread != null) {
-                    if (Thread.currentThread().equals(mainSiteThread) == false) {
-                        // don't interrupt here. the site will start shutdown when
-                        // it sees the shutdown flag set.
-                        mainSiteThread.join();
-                    }
-                }
-
                 // After sites are terminated, shutdown the InvocationBufferServer.
                 // The IBS is shared by all sites; don't kill it while any site is active.
                 PartitionDRGateway.shutdown();
@@ -1915,52 +2041,54 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         SiteTracker oldTracker = m_siteTracker;
         m_siteTracker = new SiteTracker(m_myHostId, mailboxes, oldTracker != null ? oldTracker.m_version + 1 : 0);
 
-        if (m_validateConfiguredNumberOfPartitionsOnMailboxUpdate) {
-            if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
-                VoltDB.crashGlobalVoltDB(
-                        "Configured number of partitions " + m_configuredNumberOfPartitions +
-                        " is not the same as the number of partitions present " + m_siteTracker.m_numberOfPartitions,
-                        true, null);
-            }
-            if (m_siteTracker.m_numberOfPartitions != oldTracker.m_numberOfPartitions) {
-                VoltDB.crashGlobalVoltDB(
-                        "Configured number of partitions in new tracker" + m_siteTracker.m_numberOfPartitions +
-                        " is not the same as the number of partitions present " + oldTracker.m_numberOfPartitions,
-                        true, null);
-            }
-        }
-
-        if (oldTracker != null) {
-            /*
-             * Handle node failures first, then node additions. It is NOT
-             * guaranteed that if a node failure and a node addition happen
-             * concurrently, they'll appear separately in two watch fires,
-             * because the new tracker contains the most up-to-date view of the
-             * mailboxes, which may contain both changes. Consequently, we have
-             * to handle both cases here.
-             */
-            HashSet<Long> deltaRemoved = new HashSet<Long>(oldTracker.m_allSitesImmutable);
-            deltaRemoved.removeAll(m_siteTracker.m_allSitesImmutable);
-            if (!deltaRemoved.isEmpty()) {
-                m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(deltaRemoved)));
-            }
-
-            HashSet<Long> deltaAdded = new HashSet<Long>(m_siteTracker.m_allSitesImmutable);
-            deltaAdded.removeAll(oldTracker.m_allSitesImmutable);
-            if (!deltaAdded.isEmpty()) {
-                for (SimpleDtxnInitiator dtxn : m_dtxns)
-                {
-                    Set<Long> copy = new HashSet<Long>(m_siteTracker.m_allExecutionSitesImmutable);
-                    copy.retainAll(deltaAdded);
-                    dtxn.notifyExecutionSiteRejoin(new ArrayList<Long>(copy));
+        if (!isIV2Enabled()) {
+            if (m_validateConfiguredNumberOfPartitionsOnMailboxUpdate) {
+                if (m_siteTracker.m_numberOfPartitions != m_configuredNumberOfPartitions) {
+                    VoltDB.crashGlobalVoltDB(
+                            "Configured number of partitions " + m_configuredNumberOfPartitions +
+                            " is not the same as the number of partitions present " + m_siteTracker.m_numberOfPartitions,
+                            true, null);
                 }
-                for (ExecutionSite es : getLocalSites().values()) {
-                    es.notifySitesAdded(m_siteTracker);
+                if (m_siteTracker.m_numberOfPartitions != oldTracker.m_numberOfPartitions) {
+                    VoltDB.crashGlobalVoltDB(
+                            "Configured number of partitions in new tracker" + m_siteTracker.m_numberOfPartitions +
+                            " is not the same as the number of partitions present " + oldTracker.m_numberOfPartitions,
+                            true, null);
+                }
+            }
+
+            if (oldTracker != null) {
+                /*
+                 * Handle node failures first, then node additions. It is NOT
+                 * guaranteed that if a node failure and a node addition happen
+                 * concurrently, they'll appear separately in two watch fires,
+                 * because the new tracker contains the most up-to-date view of the
+                 * mailboxes, which may contain both changes. Consequently, we have
+                 * to handle both cases here.
+                 */
+                HashSet<Long> deltaRemoved = new HashSet<Long>(oldTracker.m_allSitesImmutable);
+                deltaRemoved.removeAll(m_siteTracker.m_allSitesImmutable);
+                if (!deltaRemoved.isEmpty()) {
+                    m_faultManager.reportFault(new SiteFailureFault(new ArrayList<Long>(deltaRemoved)));
                 }
 
-                if (ExportManager.instance() != null) {
-                    //Notify the export manager the cluster topology has changed
-                    ExportManager.instance().notifyOfClusterTopologyChange();
+                HashSet<Long> deltaAdded = new HashSet<Long>(m_siteTracker.m_allSitesImmutable);
+                deltaAdded.removeAll(oldTracker.m_allSitesImmutable);
+                if (!deltaAdded.isEmpty()) {
+                    for (SimpleDtxnInitiator dtxn : m_dtxns)
+                    {
+                        Set<Long> copy = new HashSet<Long>(m_siteTracker.m_allExecutionSitesImmutable);
+                        copy.retainAll(deltaAdded);
+                        dtxn.notifyExecutionSiteRejoin(new ArrayList<Long>(copy));
+                    }
+                    for (ExecutionSite es : getLocalSites().values()) {
+                        es.notifySitesAdded(m_siteTracker);
+                    }
+
+                    if (ExportManager.instance() != null) {
+                        //Notify the export manager the cluster topology has changed
+                        ExportManager.instance().notifyOfClusterTopologyChange();
+                    }
                 }
             }
         }
@@ -1970,6 +2098,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     public SiteTracker getSiteTracker() {
         return m_siteTracker;
     }
+
+    @Override
+    public SiteTracker getSiteTrackerForSnapshot()
+    {
+        if (isIV2Enabled()) {
+            return new SiteTracker(m_messenger.getHostId(), m_cartographer.getSiteTrackerMailboxMap(), 0);
+        }
+        else {
+            return m_siteTracker;
+        }
+    }
+
 
     @Override
     public MailboxPublisher getMailboxPublisher() {

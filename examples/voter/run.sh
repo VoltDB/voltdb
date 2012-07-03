@@ -37,6 +37,23 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
+        license $LICENSE leader $LEADER enableiv2
+}
+
+# run the voltdb server locally
+function rejoin() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB deployment deployment.xml \
+        license $LICENSE rejoinhost $LEADER enableiv2
+}
+
+function serverlegacy() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
         license $LICENSE leader $LEADER
 }
 
@@ -65,6 +82,12 @@ function async-benchmark() {
         --ratelimit=100000 \
         --autotune=true \
         --latencytarget=6
+}
+
+function simple-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.SimpleBenchmark localhost
 }
 
 # Multi-threaded synchronous benchmark sample

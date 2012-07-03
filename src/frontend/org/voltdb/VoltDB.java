@@ -170,6 +170,19 @@ public class VoltDB {
         // the leaderport.
         public Integer m_leaderPort = DEFAULT_INTERNAL_PORT;
 
+        /** set to true to run with iv2 initiation. Good Luck! */
+        public boolean m_enableIV2 = false;
+
+        public Configuration() {
+            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
+            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
+            if (iv2 != null && iv2.equals("true"))
+            {
+                m_enableIV2 = true;
+            }
+        }
+
         /** Behavior-less arg used to differentiate command lines from "ps" */
         public String m_tag;
 
@@ -177,9 +190,14 @@ public class VoltDB {
             return MiscUtils.getPortFromHostnameColonPort(m_zkInterface, VoltDB.DEFAULT_ZK_PORT);
         }
 
-        public Configuration() { }
-
         public Configuration(PortGenerator ports) {
+            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
+            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
+            if (iv2 != null && iv2.equals("true"))
+            {
+                m_enableIV2 = true;
+            }
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
@@ -342,6 +360,8 @@ public class VoltDB {
                     for (String port : ports) {
                         m_ipcPorts.add(Integer.valueOf(port));
                     }
+                } else if (arg.equals("enableiv2")) {
+                    m_enableIV2 = true;
                 } else {
                     hostLog.fatal("Unrecognized option to VoltDB: " + arg);
                     usage();
@@ -365,6 +385,13 @@ public class VoltDB {
             // leader is null, supply the only valid leader value ("localhost").
             if (m_leader == null && m_pathToDeployment == null) {
                 m_leader = "localhost";
+            }
+            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
+            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
+            if (iv2 != null && iv2.equals("true"))
+            {
+                m_enableIV2 = true;
             }
         }
 

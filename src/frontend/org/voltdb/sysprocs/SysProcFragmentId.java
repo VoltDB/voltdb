@@ -98,6 +98,8 @@ public class SysProcFragmentId
     public static final long PF_restoreDigestScanResults = 72;
     public static final long PF_restoreDistributeExportSequenceNumbers = 73;
     public static final long PF_restoreDistributeExportSequenceNumbersResults = 74;
+    public static final long PF_restoreAsyncRunLoop = 75;
+    public static final long PF_restoreAsyncRunLoopResults = 76;
 
     // @StartSampler
     public static final long PF_startSampler = 80;

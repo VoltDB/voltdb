@@ -16,10 +16,13 @@
  */
 package org.voltcore.zk;
 
+import java.util.concurrent.ExecutionException;
 import java.util.List;
 import java.util.ListIterator;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
+import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -27,67 +30,68 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltZK;
 
 public class LeaderElector {
-    private final static VoltLogger LOG = new VoltLogger("HOST");
-
     private final ZooKeeper zk;
     private final String dir;
+    private final String prefix;
     private final byte[] data;
-    private final Runnable cb;
+    private final LeaderNoticeHandler cb;
     private String node = null;
 
+    private volatile String leader = null;
     private volatile boolean isLeader = false;
-    private static final ExecutorService es =
-        Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Leader elector", 1024 * 128));
+    private final ExecutorService es;
 
     private final Runnable eventHandler = new Runnable() {
         @Override
         public void run() {
-            String lowestNode = null;
             try {
-                lowestNode = watchNextLowerNode();
-                LOG.debug("Watching elector node: " + lowestNode);
-            } catch (Exception e) {
+                leader = watchNextLowerNode();
+            } catch (KeeperException.ConnectionLossException e) {
+                // lost the full connection. some test cases do this...
+                // means shutdoown without the elector being
+                // shutdown; ignore.
                 e.printStackTrace();
+            } catch (InterruptedException e) {
+                e.printStackTrace();
+            } catch (Exception e) {
+                org.voltdb.VoltDB.crashLocalVoltDB(
+                        "Unexepected failure in LeaderElector.", true, e);
             }
 
-            if (node.equals(lowestNode)) {
+            if (node != null && node.equals(leader)) {
                 // become the leader
-                LOG.debug("I am the new leader: " + node);
                 isLeader = true;
                 if (cb != null) {
-                    cb.run();
+                    cb.becomeLeader();
                 }
             }
         }
     };
 
-    public LeaderElector(ZooKeeper zk, String path, byte[] data, Runnable cb)
-    throws Exception {
+    private final Watcher watcher = new Watcher() {
+        @Override
+        public void process(WatchedEvent event) {
+            es.submit(eventHandler);
+        }
+    };
+
+    public LeaderElector(ZooKeeper zk, String dir, String prefix, byte[] data,
+                         LeaderNoticeHandler cb) {
         this.zk = zk;
-        this.dir = path;
+        this.dir = dir;
+        this.prefix = prefix;
         this.data = data;
         this.cb = cb;
-
-        createAndElectLeader();
-    }
-
-    public boolean isLeader() {
-        return isLeader;
-    }
-
-    public String getNode() {
-        return node;
-    }
-
-    public void done() throws InterruptedException, KeeperException {
-        zk.delete(node, -1);
+        es = Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Leader elector-" + dir));
     }
 
     /**
+     * Start leader election.
+     *
      * Creates an ephemeral sequential node under the given directory and check
      * if we are the first one who created it.
      *
@@ -95,12 +99,52 @@ public class LeaderElector {
      * "http://zookeeper.apache.org/doc/trunk/recipes.html#sc_leaderElection"
      * >Zookeeper Leader Election</a>
      *
+     * @param block true for blocking operation, false for nonblocking
      * @throws Exception
      */
-    private void createAndElectLeader() throws Exception {
-        node = zk.create(ZKUtil.joinZKPath(dir, "node"), data,
+    public void start(boolean block) throws KeeperException, InterruptedException, ExecutionException
+    {
+        // create the election root node if it doesn't exist.
+        try {
+            zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            // expected on all nodes that don't start() first.
+        }
+
+        node = zk.create(ZKUtil.joinZKPath(dir, prefix + "_"), data,
                          Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
-        eventHandler.run();
+        Future<?> task = es.submit(eventHandler);
+        if (block) {
+            task.get();
+        }
+    }
+
+    public boolean isLeader() {
+        return isLeader;
+    }
+
+    /**
+     * Get the current leader node
+     * @return
+     */
+    public String leader() {
+        return leader;
+    }
+
+    public String getNode() {
+        return node;
+    }
+
+    /**
+     * Deletes the ephemeral node. Make sure that no future watches will fire.
+     *
+     * @throws InterruptedException
+     * @throws KeeperException
+     */
+    public void shutdown() throws InterruptedException, KeeperException {
+        zk.delete(node, -1);
+        es.shutdown();
+        es.awaitTermination(356, TimeUnit.DAYS);
     }
 
     /**
@@ -110,9 +154,7 @@ public class LeaderElector {
      * @return The lowest sequential node
      * @throws Exception
      */
-    private String watchNextLowerNode() throws Exception {
-        Watcher watcher = createLeaderWatcher();
-
+    private String watchNextLowerNode() throws KeeperException, InterruptedException {
         /*
          * Iterate through the sorted list of children and find the given node,
          * then setup a watcher on the previous node if it exists, otherwise the
@@ -154,13 +196,15 @@ public class LeaderElector {
         return lowest;
     }
 
-    private Watcher createLeaderWatcher() {
-        Watcher watcher = new Watcher() {
-            @Override
-            public void process(WatchedEvent event) {
-                es.submit(eventHandler);
-            }
-        };
-        return watcher;
+    public static String electionDirForPartition(int partition) {
+        return ZKUtil.path(VoltZK.leaders_initiators, "partition_" + partition);
+    }
+
+    public static int getPartitionFromElectionDir(String partitionDir) {
+        return Integer.parseInt(partitionDir.substring("partition_".length()));
+    }
+
+    public static String getPrefixFromChildName(String childName) {
+        return childName.split("_")[0];
     }
 }

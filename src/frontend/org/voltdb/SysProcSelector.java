@@ -36,6 +36,7 @@ public enum SysProcSelector {
      * Externally the selector is just "DR"
      */
     DRPARTITION,
-    DRNODE;
+    DRNODE,
 
+    TOPO;     // return leader and site info for iv2
 }

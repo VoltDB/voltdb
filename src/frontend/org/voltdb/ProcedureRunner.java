@@ -145,10 +145,17 @@ public class ProcedureRunner {
         reflect();
     }
 
-    boolean isSystemProcedure() {
+    public boolean isSystemProcedure() {
         return m_isSysProc;
     }
 
+    public boolean isEverySite() {
+        boolean retval = false;
+        if (isSystemProcedure()) {
+            retval = m_catProc.getEverysite();
+        }
+        return retval;
+    }
     /**
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
@@ -166,7 +173,7 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
-    ClientResponseImpl call(long txnId, Object... paramListIn) {
+    public ClientResponseImpl call(long txnId, Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_txnId == -1);
         assert(m_statusCode == Byte.MIN_VALUE);
@@ -450,18 +457,8 @@ public class ProcedureRunner {
 
         VoltTable[] results = null;
 
-        if (batchSize == 0)
+        if (batchSize == 0) {
             return new VoltTable[] {};
-
-        boolean slowPath = false;
-        for (int i = 0; i < batchSize; ++i) {
-            final SQLStmt stmt = batch.get(i).stmt;
-            // if any stmt is not single sited in this batch, the
-            // full batch must take the slow path through the dtxn
-            if (!stmt.isSinglePartition()) {
-                slowPath = true;
-                break;
-            }
         }
 
         // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
@@ -484,15 +481,11 @@ public class ProcedureRunner {
                                                                 qs.stmt, qs.params, sparams);
             }
         }
-
-        // FOR MP-TXNS
-        else if (slowPath) {
-            results = slowPath(batch, isFinalSQL);
-        }
-
-        // FOR SP-TXNS (or all replicated read MPs)
-        else {
+        else if (m_catProc.getSinglepartition()) {
             results = fastPath(batch);
+        }
+        else {
+            results = slowPath(batch, isFinalSQL);
         }
 
         // check expectations
@@ -525,7 +518,7 @@ public class ProcedureRunner {
         }
     }
 
-    DependencyPair executePlanFragment(
+    public DependencyPair executePlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params) {

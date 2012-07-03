@@ -30,7 +30,9 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.net.URL;
 import java.net.UnknownHostException;
+import java.util.ArrayList;
 import java.util.Collection;
+import java.util.Collections;
 import java.util.Enumeration;
 import java.util.List;
 import java.util.Map;
@@ -171,15 +173,21 @@ public class CoreUtils {
     }
 
     public static String hsIdCollectionToString(Collection<Long> ids) {
+        List<String> idstrings = new ArrayList<String>();
+        for (Long id : ids) {
+            idstrings.add(hsIdToString(id));
+        }
+        // Easy hack, sort hsIds lexically.
+        Collections.sort(idstrings);
         StringBuilder sb = new StringBuilder();
         boolean first = false;
-        for (Long id : ids) {
+        for (String id : idstrings) {
             if (!first) {
                 first = true;
             } else {
                 sb.append(", ");
             }
-            sb.append(id.intValue()).append(':').append((int)(id.longValue() >> 32));
+            sb.append(id);
         }
         return sb.toString();
     }

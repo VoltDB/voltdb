@@ -203,6 +203,14 @@ public class LocalCluster implements VoltServerConfig {
             log4j = "file://" + System.getProperty("user.dir") + "/tests/log4j-allconsole.xml";
         }
 
+        boolean enable_iv2 = false;
+        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+        System.out.println("LOCALCLUSTER ENABLE IV2: " + iv2);
+        if (iv2 != null && iv2.equals("true"))
+        {
+            enable_iv2 = true;
+        }
+
         m_procBuilder = new ProcessBuilder();
 
         // set the working directory to obj/release/prod
@@ -223,7 +231,8 @@ public class LocalCluster implements VoltServerConfig {
             javaLibraryPath(java_library_path).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
-            log4j(log4j);
+            log4j(log4j).
+            enableIV2(enable_iv2);
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
         // "tag" this command line so it's clear which test started it
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;

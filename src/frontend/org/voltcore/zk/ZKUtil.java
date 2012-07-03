@@ -62,6 +62,18 @@ public class ZKUtil {
         }
     }
 
+    /**
+     * Helper to produce a valid path from variadic strings.
+     */
+    public static String path(String... components)
+    {
+        String path = components[0];
+        for (int i=1; i < components.length; i++) {
+            path = ZKUtil.joinZKPath(path, components[i]);
+        }
+        return path;
+    }
+
     public static File getUploadAsTempFile( ZooKeeper zk, String path, String prefix) throws Exception {
         byte data[] = retrieveChunksAsBytes(zk, path, prefix, false).getFirst();
         File tempFile = File.createTempFile("foo", "bar");

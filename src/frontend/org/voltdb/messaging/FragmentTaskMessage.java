@@ -22,10 +22,14 @@ import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
+import org.voltdb.utils.LogKeys;
+import org.voltdb.VoltDB;
 
 /**
  * Message from a stored procedure coordinator to an execution site
@@ -35,6 +39,8 @@ import org.voltdb.ParameterSet;
  */
 public class FragmentTaskMessage extends TransactionInfoBaseMessage
 {
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
     public static final byte USER_PROC = 0;
     public static final byte SYS_PROC_PER_PARTITION = 1;
     public static final byte SYS_PROC_PER_SITE = 2;
@@ -116,6 +122,24 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         m_isFinal = isFinal;
         m_subject = Subject.DEFAULT.getId();
+        assert(selfCheck());
+    }
+
+    // The parameter sets are .duplicate()'d in flattenToBuffer,
+    // so we can make a shallow copy here and still be thread-safe
+    // when we serialize the copy.
+    public FragmentTaskMessage(long initiatorHSId,
+            long coordinatorHSId,
+            FragmentTaskMessage ftask)
+    {
+        super(initiatorHSId, coordinatorHSId, ftask.m_txnId, ftask.m_isReadOnly);
+
+        m_spHandle = ftask.m_spHandle;
+        m_taskType = ftask.m_taskType;
+        m_isFinal = ftask.m_isFinal;
+        m_subject = ftask.m_subject;
+        m_inputDepCount = ftask.m_inputDepCount;
+        m_items = ftask.m_items;
         assert(selfCheck());
     }
 
@@ -271,6 +295,26 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         FragmentData item = m_items.get(index);
         assert(item != null);
         return item.m_parameterSet.asReadOnlyBuffer();
+    }
+
+    public ParameterSet getParameterSetForFragment(int index) {
+        ParameterSet params = null;
+        final ByteBuffer paramData = m_items.get(index).m_parameterSet.asReadOnlyBuffer();
+        if (paramData != null) {
+            final FastDeserializer fds = new FastDeserializer(paramData);
+            try {
+                params = fds.readObject(ParameterSet.class);
+            }
+            catch (final IOException e) {
+                hostLog.l7dlog(Level.FATAL,
+                        LogKeys.host_ExecutionSite_FailedDeserializingParamsForFragmentTask.name(), e);
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+        }
+        else {
+            params = new ParameterSet();
+        }
+        return params;
     }
 
     public String getFragmentPlan(int index) {
@@ -546,7 +590,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
-
+        sb.append(", SP HANDLE: ").append(m_spHandle);
         sb.append("\n");
         if (m_isReadOnly)
             sb.append("  READ, COORD ");
@@ -555,9 +599,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
 
         for (FragmentData item : m_items) {
-            sb.append("\n");
-            sb.append("=====");
-            sb.append("\n");
+            sb.append("\n=====\n");
             sb.append(item.toString());
         }
 
@@ -566,7 +608,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         if (m_taskType == USER_PROC)
         {
-            sb.append("\n  THIS IS A SYSPROC TASK");
+            sb.append("\n  THIS IS A USER TASK");
         }
         else if (m_taskType == SYS_PROC_PER_PARTITION)
         {

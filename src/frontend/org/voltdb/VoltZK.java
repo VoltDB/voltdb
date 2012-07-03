@@ -60,7 +60,8 @@ public class VoltZK {
      * "partitionId" field.
      */
     public static enum MailboxType {
-        ClientInterface, ExecutionSite, Initiator, StatsAgent, OTHER
+        ClientInterface, ExecutionSite, Initiator, StatsAgent,
+        OTHER
     }
     public static final String mailboxes = "/db/mailboxes";
 
@@ -78,12 +79,22 @@ public class VoltZK {
     public static final String user_snapshot_response = "/db/user_snapshot_response";
     public static final String initial_catalog_txnid = "/db/initial_catalog_txnid";
 
+    // leader election
+    public static final String iv2masters = "/db/iv2masters";
+    public static final String iv2mpi = "/db/iv2mpi";
+    public static final String leaders = "/db/leaders";
+    public static final String leaders_initiators = "/db/leaders/initiators";
+
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
             root,
             mailboxes,
             cluster_metadata,
             operationMode,
+            iv2masters,
+            iv2mpi,
+            leaders,
+            leaders_initiators
     };
 
     /**
