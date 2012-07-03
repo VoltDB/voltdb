@@ -249,7 +249,7 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
                 partitionedTables[p].add(table);
             }
 
-            SiteTracker tracker = VoltDB.instance().getSiteTrackerForSnapshot();
+            SiteTracker tracker = ctx.getSiteTrackerForSnapshot();
             Map<Long, Integer> sitesToPartitions = tracker.getSitesToPartitions();
             int num_exec_sites = sitesToPartitions.size();
             pfs = new SynthesizedPlanFragment[num_exec_sites + 1];

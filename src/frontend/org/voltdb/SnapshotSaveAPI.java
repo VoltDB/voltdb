@@ -95,7 +95,7 @@ public class SnapshotSaveAPI
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final int numLocalSites = (VoltDB.instance().getSiteTrackerForSnapshot().getLocalSites().length -
+        final int numLocalSites = (context.getSiteTrackerForSnapshot().getLocalSites().length -
                 ExecutionSite.recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating

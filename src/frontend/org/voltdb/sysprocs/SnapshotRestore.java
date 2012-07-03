@@ -41,7 +41,6 @@ import java.util.concurrent.Callable;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.FutureTask;
 import java.util.concurrent.TimeUnit;
 
 import org.apache.zookeeper_voltpatches.AsyncCallback.StringCallback;
@@ -145,7 +144,8 @@ public class SnapshotRestore extends VoltSystemProcedure
             String fileNonce,
             String tableName,
             int originalHostIds[],
-            int relevantPartitionIds[]) throws IOException {
+            int relevantPartitionIds[],
+            SiteTracker st) throws IOException {
         // This check ensures that only one site per host attempts to
         // distribute this table.  @SnapshotRestore sends plan fragments
         // to every site on this host with the tables and partition ID that
@@ -175,7 +175,6 @@ public class SnapshotRestore extends VoltSystemProcedure
             final File f = getSaveFileForPartitionedTable(filePath, fileNonce,
                     tableName,
                     originalHostId);
-            SiteTracker st = org.voltdb.VoltDB.instance().getSiteTrackerForSnapshot();
             TableSaveFile savefile = getTableSaveFile(
                     f,
                     st.getLocalSites().length * 4,
@@ -1027,7 +1026,7 @@ public class SnapshotRestore extends VoltSystemProcedure
             }
         }
 
-        results = performTableRestoreWork(savefile_state);
+        results = performTableRestoreWork(savefile_state, ctx.getSiteTrackerForSnapshot());
 
         final long endTime = System.currentTimeMillis();
         final double duration = (endTime - startTime) / 1000.0;
@@ -1366,7 +1365,9 @@ public class SnapshotRestore extends VoltSystemProcedure
     }
 
     private VoltTable[]
-            performTableRestoreWork(final ClusterSaveFileState savefileState) throws Exception
+            performTableRestoreWork(
+                    final ClusterSaveFileState savefileState,
+                    final SiteTracker st) throws Exception
     {
         /*
          * Create a mailbox to use to send fragment work to execution sites
@@ -1384,7 +1385,6 @@ public class SnapshotRestore extends VoltSystemProcedure
         Future<VoltTable[]> ft = es.submit(new Callable<VoltTable[]>() {
             @Override
             public VoltTable[] call() throws Exception {
-                SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
                 int discoveredMailboxes = 0;
                 int totalMailboxes = st.m_numberOfExecutionSites;
 
@@ -1613,7 +1613,7 @@ public class SnapshotRestore extends VoltSystemProcedure
         // LoadMultipartitionTable.  Consider ways to consolidate later
         Map<Long, Integer> sites_to_partitions =
                 new HashMap<Long, Integer>();
-        SiteTracker tracker = VoltDB.instance().getSiteTrackerForSnapshot();
+        SiteTracker tracker = ctx.getSiteTrackerForSnapshot();
         sites_to_partitions.putAll(tracker.getSitesToPartitions());
 
         try
@@ -1623,7 +1623,8 @@ public class SnapshotRestore extends VoltSystemProcedure
                     m_fileNonce,
                     tableName,
                     originalHostIds,
-                    relevantPartitionIds);
+                    relevantPartitionIds,
+                    tracker);
         }
         catch (IOException e)
         {
