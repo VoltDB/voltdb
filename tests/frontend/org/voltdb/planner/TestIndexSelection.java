@@ -23,17 +23,26 @@
 
 package org.voltdb.planner;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.PlanNodeList;
+import org.voltdb.plannodes.PlanNodeTree;
 
 public class TestIndexSelection extends TestCase {
 
@@ -96,24 +105,24 @@ public class TestIndexSelection extends TestCase {
         }
     }*/
 
-    public void testEng2541Plan() throws JSONException
-    {
-        AbstractPlanNode pn = null;
-        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-        assertTrue(pn != null);
-
-        while( pn.getChildCount() > 0 )
-        	pn = pn.getChild(0);
-        //assertTrue(pn instanceof IndexScanPlanNode);
-        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
-
-        if (pn != null) {
-            JSONObject j = new JSONObject(pn.toJSONString());
-            System.out.println(j.toString(2));
-            System.out.println();
-            System.out.println(pn.toExplainPlanString());
-        }
-    }
+//    public void testEng2541Plan() throws JSONException
+//    {
+//        AbstractPlanNode pn = null;
+//        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+//        assertTrue(pn != null);
+//
+//        while( pn.getChildCount() > 0 )
+//        	pn = pn.getChild(0);
+//        //assertTrue(pn instanceof IndexScanPlanNode);
+//        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
+//
+//        if (pn != null) {
+//            JSONObject j = new JSONObject(pn.toJSONString());
+//            System.out.println(j.toString(2));
+//            System.out.println();
+//            System.out.println(pn.toExplainPlanString());
+//        }
+//    }
     
 //    public void testGetLeafLists() {
 //    	AbstractPlanNode pn = null;
@@ -138,14 +147,74 @@ public class TestIndexSelection extends TestCase {
 //        //assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("LIMIT") = 1 );
 //    }
     
-//    public void testDiffLeaves() {
-//    	AbstractPlanNode pn1 = null;
-//    	AbstractPlanNode pn2 = null;
-//        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-//    	pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-//        pn2 = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
-//        assertTrue(pn1 != null);
-//        assertTrue(pn2 != null);
-//        plannerTester.diffLeaves(pn1, pn2);
-//    }
+    public void testDiffLeaves() {
+    	AbstractPlanNode pn1 = null;
+    	AbstractPlanNode pn2 = null;
+        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+    	pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+        pn2 = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
+        assertTrue(pn1 != null);
+        assertTrue(pn2 != null);
+        //plannerTester.diffLeaves(pn1, pn2);
+        PlanNodeList nodelist1 = new PlanNodeList( pn1);
+        try {
+			nodelist1.constructList();
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+        //System.out.println( nodelist1.toJSONString() );
+        PlanNodeTree pnt = new PlanNodeTree( pn1 );
+       
+        JSONObject jobj;
+        String prettyJson = null;
+//		try {
+//			jobj = new JSONObject(pnt.toJSONString());
+//			prettyJson = jobj.toString(4);
+//		} catch (JSONException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+        
+        prettyJson = pnt.toJSONString();
+        System.out.println( prettyJson );
+        try {
+			jobj = new JSONObject( prettyJson );
+			
+			JSONArray values = jobj.getJSONArray("PLAN_NODES");
+			System.out.println( values.getJSONObject(0).toString() );
+			System.out.println( jobj.toString() );
+		} catch (JSONException e1) {
+			// TODO Auto-generated catch block
+			e1.printStackTrace();
+		}
+        
+//        try {
+//			BufferedWriter writer = new BufferedWriter( new FileWriter("/home/zhengli/prettyJson.txt") );
+//			writer.write( prettyJson );
+//			writer.flush();
+//			writer.close();
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+        
+        prettyJson = "";
+        String line = null;
+        try {
+			BufferedReader reader = new BufferedReader( new FileReader( "/home/zhengli/prettyJson.txt" ));
+				while( (line = reader.readLine() ) != null ){
+					line = line.trim();
+					prettyJson += line;
+				}
+			}
+        catch (IOException e) {
+    		// TODO Auto-generated catch block
+    		e.printStackTrace();
+    	}
+			System.out.println( prettyJson );
+        
+    }
+    
 }
+

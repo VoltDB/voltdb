@@ -79,7 +79,6 @@ public class plannerTester {
 		}
 		else 
 			System.out.println("same size");
-		
 		}
 		catch (JSONException e) {
 			// TODO Auto-generated catch block
