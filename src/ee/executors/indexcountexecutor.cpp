@@ -298,7 +298,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
            ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
             !(m_tuple = m_index->nextValue()).isNullTuple()))
     {
-        VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
+        VOLT_TRACE("LOOPING in indexcount: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
         //
         // First check whether the end_expression is now false
         //
