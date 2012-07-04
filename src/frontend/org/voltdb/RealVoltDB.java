@@ -425,7 +425,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         sites.add(siteMailbox.getHSId());
                     }
 
-                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, sites);
+                    m_rejoinCoordinator =
+                        new SequentialRejoinCoordinator(m_messenger, sites, m_catalogContext.cluster.getVoltroot());
                     m_messenger.registerMailbox(m_rejoinCoordinator);
                     m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
                                                        new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
