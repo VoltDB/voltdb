@@ -44,10 +44,10 @@ public class MpInitiator extends BaseInitiator
                 messenger,
                 MP_INIT_PID,
                 new MpScheduler(
+                    buddyHSId,
                     new SiteTaskerQueue(),
                     new MapCache(messenger.getZK(), VoltZK.iv2masters)),
                 "MP");
-        ((MpScheduler)m_scheduler).setBuddyHSId(buddyHSId);
         m_iv2masters = ((MpScheduler)m_scheduler).m_iv2Masters;
     }
 
