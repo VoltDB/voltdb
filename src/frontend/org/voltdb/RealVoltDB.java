@@ -1266,7 +1266,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         if (m_config.m_startAction == START_ACTION.START) {
             startActionLog += " Will create a new database if there is nothing to recover from.";
         }
-        hostLog.info(startActionLog);
+        if (!m_rejoining) {
+            hostLog.info(startActionLog);
+        }
 
         // print out awesome network stuff
         hostLog.info(String.format("Listening for native wire protocol clients on port %d.", m_config.m_port));
