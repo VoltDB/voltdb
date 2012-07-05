@@ -33,7 +33,7 @@ import org.voltdb.VoltTable;
 )
 public class CountingIndexFeature extends VoltProcedure {
 
-    public final SQLStmt countstar = new SQLStmt("SELECT * FROM IndexCount WHERE POINTS > ?");
+    public final SQLStmt countstar = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE T3.POINTS > ?");
 
     public VoltTable[] run(int pt) {
         voltQueueSQL(countstar, pt);

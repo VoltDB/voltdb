@@ -37,7 +37,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.TimestampType;
 import org.voltdb_testprocs.regressionsuites.failureprocs.InsertLotsOfData;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.CountingIndexFeature;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.FeaturesSelectAll;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassAllArgTypes;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.PassByteArrayArg;
@@ -46,6 +45,7 @@ import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelectWithJoinOrder
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.SelfJoinTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.UpdateTests;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.WorkWithBigString;
+
 public class TestSQLFeaturesSuite extends RegressionSuite {
 
     /*
@@ -57,8 +57,7 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         FeaturesSelectAll.class, UpdateTests.class,
         SelfJoinTest.class, SelectOrderLineByDistInfo.class,
         BatchedMultiPartitionTest.class, WorkWithBigString.class, PassByteArrayArg.class,
-        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class,
-        CountingIndexFeature.class
+        PassAllArgTypes.class, InsertLotsOfData.class, SelectWithJoinOrder.class
     };
 
     /**
@@ -67,23 +66,6 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
      */
     public TestSQLFeaturesSuite(String name) {
         super(name);
-    }
-
-    public void testIndexCount() throws Exception {
-        Client client = getClient();
-
-        client.callProcedure("IndexCount.insert", 1, 1);
-        client.callProcedure("IndexCount.insert", 2, 2);
-        client.callProcedure("IndexCount.insert", 3, 3);
-        VoltTable[] results = client.callProcedure("CountingIndexFeature", 1).getResults();
-
-        assertEquals(1, results.length);
-
-        VoltTable table = results[0];
-        assertEquals(table.getColumnName(0), "2");
-        assertTrue(table.getRowCount() == 1);
-
-        assertTrue(true);
     }
 
     public void testUpdates() throws Exception {
