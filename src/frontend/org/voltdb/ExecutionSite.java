@@ -1024,6 +1024,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     } else {
                         //idle, do snapshot work
                         m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        // do some rejoin work
+                        doRejoinWork();
                     }
                 }
                 if (currentTxnState != null) {
