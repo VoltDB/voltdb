@@ -43,22 +43,22 @@ import org.voltdb.VoltDB;
 public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
 {
     VoltLogger tmLog = new VoltLogger("TM");
-    protected final String m_whoami;
 
     // External references/config
-    protected HostMessenger m_messenger = null;
+    protected final HostMessenger m_messenger;
     protected final int m_partitionId;
+    private CountDownLatch m_missingStartupSites;
+    private final String m_zkMailboxNode;
+    protected final String m_whoami;
 
     // Encapsulated objects
-    protected InitiatorMailbox m_initiatorMailbox = null;
+    protected final Scheduler m_scheduler;
+    protected final InitiatorMailbox m_initiatorMailbox;
     protected Term m_term = null;
     protected Site m_executionSite = null;
-    protected Scheduler m_scheduler = null;
     protected LeaderElector m_leaderElector = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
-    private CountDownLatch m_missingStartupSites;
-    private final String m_zkMailboxNode;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix)
@@ -101,15 +101,15 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                                        numberOfPartitions,
                                        createForRejoin);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
-            prf.configure(m_executionSite,
-                    m_executionSite.m_sysprocContext);
-            LoadedProcedureSet procSet = new LoadedProcedureSet(m_executionSite,
+            prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
+
+            LoadedProcedureSet procSet = new LoadedProcedureSet(
+                    m_executionSite,
                     prf,
                     m_initiatorMailbox.getHSId(),
                     0, // this has no meaning
                     numberOfPartitions);
             procSet.loadProcedures(catalogContext, backend, csp);
-            m_scheduler.setProcedureSet(procSet);
             m_executionSite.setLoadedProcedures(procSet);
 
             m_scheduler.start();
@@ -122,37 +122,35 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             // FUTURE: Consider possibly returning this and the
             // m_siteThread.start() in a Runnable which RealVoltDB can use for
             // configure/run sequencing in the future.
-            m_missingStartupSites = new CountDownLatch(kfactor + 1);
-            boolean isLeader = joinElectoralCollege();
-            m_missingStartupSites = null;
-            if (isLeader) {
-                tmLog.info(m_whoami + "published as leader.");
-            }
-            else {
-                tmLog.info(m_whoami + "running as replica.");
-            }
+            joinElectoralCollege(kfactor);
+
+            // Leader elector chains are built, let scheduler do final
+            // initialization (the MPI needs to setup its MapCache)
+            m_scheduler.setProcedureSet(procSet);
         }
         catch (Exception e) {
            VoltDB.crashLocalVoltDB("Failed to configure initiator", true, e);
         }
     }
 
-    /** Register with m_partition's leader elector node */
-    boolean joinElectoralCollege() throws InterruptedException, ExecutionException
+    // Register with m_partition's leader elector node
+    // On the leader, becomeLeader() will run before joinElectoralCollage returns.
+    boolean joinElectoralCollege(int kfactor) throws InterruptedException, ExecutionException, KeeperException
     {
-        // perform leader election before continuing configuration.
+        m_missingStartupSites = new CountDownLatch(kfactor + 1);
         m_leaderElector = new LeaderElector(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null, this);
-        try {
-            // becomeLeader() will run before start(true) returns (if this is the leader).
-            m_leaderElector.start(true);
-        } catch (Exception ex) {
-            VoltDB.crashLocalVoltDB("Partition " + m_partitionId + " failed to initialize " +
-                    "leader elector. ", false, ex);
+        m_leaderElector.start(true);
+        m_missingStartupSites = null;
+        boolean isLeader = m_leaderElector.isLeader();
+        if (isLeader) {
+            tmLog.info(m_whoami + "published as leader.");
         }
-
-        return m_leaderElector.isLeader();
+        else {
+            tmLog.info(m_whoami + "running as replica.");
+        }
+        return isLeader;
     }
 
     // runs on the leader elector callback thread.
@@ -177,14 +175,10 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                             + (System.currentTimeMillis() - startTime) + " ms.");
                 }
                 else {
-                    // Just start over. Try again. My thinking here is:
                     // The only known reason to fail is a failed replica during
                     // recovery; that's a bounded event (by k-safety).
                     // CrashVoltDB here means one node failure causing another.
-                    // Don't create a cascading failure.
-                    // Another reasonable plan might be to move this SP to
-                    // the end of the leader list; that has more complex ZK
-                    // semantics.
+                    // Don't create a cascading failure - just try again.
                     tmLog.info(m_whoami
                             + "interrupted during leader promotion after "
                             + (System.currentTimeMillis() - startTime) + " ms. of "
