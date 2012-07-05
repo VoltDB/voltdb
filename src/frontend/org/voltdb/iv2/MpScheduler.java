@@ -20,10 +20,14 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 
 import java.util.concurrent.atomic.AtomicLong;
+
+import java.util.concurrent.ExecutionException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
+
+import org.apache.zookeeper_voltpatches.KeeperException;
 
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -49,7 +53,7 @@ public class MpScheduler extends Scheduler
     private Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
 
-    /* private  */ final MapCache m_iv2Masters;
+    private final MapCache m_iv2Masters;
     private AtomicLong m_txnId = new AtomicLong(1l << 40);
     private final long m_buddyHSId;
 
@@ -72,6 +76,21 @@ public class MpScheduler extends Scheduler
             }
         }
         return results;
+    }
+
+    @Override
+    public void start() throws KeeperException, InterruptedException, ExecutionException
+    {
+        m_iv2Masters.start(true);
+    }
+
+    @Override
+    public void shutdown()
+    {
+        try {
+            m_iv2Masters.shutdown();
+        } catch (Exception ignored) {
+        }
     }
 
     @Override

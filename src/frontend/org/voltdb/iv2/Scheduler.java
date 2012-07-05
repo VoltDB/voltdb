@@ -17,7 +17,11 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.ExecutionException;
+
 import java.util.List;
+
+import org.apache.zookeeper_voltpatches.KeeperException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -81,6 +85,15 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public SiteTaskerQueue getQueue()
     {
         return m_tasks;
+    }
+
+    /** Start. Block until it is acceptable to receive requests. */
+    public void start() throws KeeperException, InterruptedException, ExecutionException
+    {
+    }
+
+    public void shutdown()
+    {
     }
 
     @Override

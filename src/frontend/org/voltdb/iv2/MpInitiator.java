@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.ExecutionException;
 
 import org.voltcore.messaging.HostMessenger;
 
@@ -25,7 +24,6 @@ import org.voltcore.zk.MapCache;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 /**
@@ -36,7 +34,6 @@ import org.voltdb.VoltZK;
 public class MpInitiator extends BaseInitiator
 {
     private static final int MP_INIT_PID = -1;
-    private MapCache m_iv2masters = null;
 
     public MpInitiator(HostMessenger messenger, long buddyHSId)
     {
@@ -48,7 +45,6 @@ public class MpInitiator extends BaseInitiator
                     new SiteTaskerQueue(),
                     new MapCache(messenger.getZK(), VoltZK.iv2masters)),
                 "MP");
-        m_iv2masters = ((MpScheduler)m_scheduler).m_iv2Masters;
     }
 
     @Override
@@ -58,27 +54,8 @@ public class MpInitiator extends BaseInitiator
                           int numberOfPartitions,
                           boolean createForRejoin)
     {
-        try {
-            m_iv2masters.start(true);
-            // for now, lie - kfactor for MPI is always 0.
-            super.configure(backend, serializedCatalog, catalogContext,
-                    /* kfactor */ 0, csp, numberOfPartitions, createForRejoin);
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
-        } catch (ExecutionException e) {
-            VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
-        }
-    }
-
-    @Override
-    public void shutdown()
-    {
-        super.shutdown();
-        if (m_iv2masters != null) {
-            try {
-                m_iv2masters.shutdown();
-            } catch (Exception ignored) {
-            }
-        }
+        // for now, lie - kfactor for MPI is always 0.
+        super.configure(backend, serializedCatalog, catalogContext,
+                /* kfactor */ 0, csp, numberOfPartitions, createForRejoin);
     }
 }
