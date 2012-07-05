@@ -137,13 +137,6 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
 
         try {
             m_iv2masters.start(true);
-            boolean isLeader = joinElectoralCollege();
-            if (isLeader) {
-                tmLog.info(m_whoami + "published as leader.");
-            }
-            else {
-                tmLog.info(m_whoami + "running as replica.");
-            }
 
             m_executionSite = new Site(m_scheduler.getQueue(),
                     m_initiatorMailbox.getHSId(),
@@ -167,6 +160,20 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start(); // Maybe this moves --izzy
+
+            // Join the leader election process after the object is fully
+            // configured.  If we do this earlier, rejoining sites will be
+            // given transactions before they're ready to handle them.
+            // FUTURE: Consider possibly returning this and the
+            // m_siteThread.start() in a Runnable which RealVoltDB can use for
+            // configure/run sequencing in the future.
+            boolean isLeader = joinElectoralCollege();
+            if (isLeader) {
+                tmLog.info(m_whoami + "published as leader.");
+            }
+            else {
+                tmLog.info(m_whoami + "running as replica.");
+            }
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
         } catch (ExecutionException e) {

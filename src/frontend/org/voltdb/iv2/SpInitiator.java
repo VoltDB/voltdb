@@ -154,16 +154,6 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
                           boolean createForRejoin)
     {
         try {
-            m_missingStartupSites = new CountDownLatch(kfactor + 1);
-            boolean isLeader = joinElectoralCollege();
-            m_missingStartupSites = null;
-            if (isLeader) {
-                tmLog.info(m_whoami + "published as leader.");
-            }
-            else {
-                tmLog.info(m_whoami + "running as replica.");
-            }
-
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -186,6 +176,22 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
+
+            // Join the leader election process after the object is fully
+            // configured.  If we do this earlier, rejoining sites will be
+            // given transactions before they're ready to handle them.
+            // FUTURE: Consider possibly returning this and the
+            // m_siteThread.start() in a Runnable which RealVoltDB can use for
+            // configure/run sequencing in the future.
+            m_missingStartupSites = new CountDownLatch(kfactor + 1);
+            boolean isLeader = joinElectoralCollege();
+            m_missingStartupSites = null;
+            if (isLeader) {
+                tmLog.info(m_whoami + "published as leader.");
+            }
+            else {
+                tmLog.info(m_whoami + "running as replica.");
+            }
         }
         catch (Exception e) {
            VoltDB.crashLocalVoltDB("Failed to configure initiator", true, e);
