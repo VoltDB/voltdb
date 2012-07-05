@@ -84,68 +84,6 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
             + " for partition " + m_partitionId + " ";
     }
 
-    // runs on the leader elector callback thread.
-    @Override
-    public void becomeLeader()
-    {
-        try {
-            long startTime = System.currentTimeMillis();
-            Boolean success = false;
-            while (!success) {
-                tmLog.info(m_whoami + "starting leader promotion");
-                m_term = new Term(m_missingStartupSites, m_messenger.getZK(),
-                        m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
-                        VoltZK.iv2masters);
-                m_initiatorMailbox.setTerm(m_term);
-                success = m_term.start().get();
-                if (success) {
-                    m_repairLog.setLeaderState(true);
-                    m_scheduler.setLeaderState(true);
-                    tmLog.info(m_whoami
-                            + "finished leader promotion. Took "
-                            + (System.currentTimeMillis() - startTime) + " ms.");
-                }
-                else {
-                    // Just start over. Try again. My thinking here is:
-                    // The only known reason to fail is a failed replica during
-                    // recovery; that's a bounded event (by k-safety).
-                    // CrashVoltDB here means one node failure causing another.
-                    // Don't create a cascading failure.
-                    // Another reasonable plan might be to move this SP to
-                    // the end of the leader list; that has more complex ZK
-                    // semantics.
-                    tmLog.info(m_whoami
-                            + "interrupted during leader promotion after "
-                            + (System.currentTimeMillis() - startTime) + " ms. of "
-                            + "trying. Retrying.");
-                }
-            }
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Bad news.", true, e);
-        }
-    }
-
-
-    /** Register with m_partition's leader elector node */
-    public boolean joinElectoralCollege()
-        throws InterruptedException, ExecutionException
-    {
-        // perform leader election before continuing configuration.
-        m_leaderElector = new LeaderElector(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
-                Long.toString(getInitiatorHSId()), null, this);
-        try {
-            // becomeLeader() will run before start(true) returns (if this is the leader).
-            m_leaderElector.start(true);
-        } catch (Exception ex) {
-            VoltDB.crashLocalVoltDB("Partition " + m_partitionId + " failed to initialize " +
-                    "leader elector. ", false, ex);
-        }
-
-        return m_leaderElector.isLeader();
-    }
-
-
     @Override
     public void configure(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
@@ -195,6 +133,65 @@ public class SpInitiator implements Initiator, LeaderNoticeHandler
         }
         catch (Exception e) {
            VoltDB.crashLocalVoltDB("Failed to configure initiator", true, e);
+        }
+    }
+
+    /** Register with m_partition's leader elector node */
+    boolean joinElectoralCollege() throws InterruptedException, ExecutionException
+    {
+        // perform leader election before continuing configuration.
+        m_leaderElector = new LeaderElector(m_messenger.getZK(),
+                LeaderElector.electionDirForPartition(m_partitionId),
+                Long.toString(getInitiatorHSId()), null, this);
+        try {
+            // becomeLeader() will run before start(true) returns (if this is the leader).
+            m_leaderElector.start(true);
+        } catch (Exception ex) {
+            VoltDB.crashLocalVoltDB("Partition " + m_partitionId + " failed to initialize " +
+                    "leader elector. ", false, ex);
+        }
+
+        return m_leaderElector.isLeader();
+    }
+
+    // runs on the leader elector callback thread.
+    @Override
+    public void becomeLeader()
+    {
+        try {
+            long startTime = System.currentTimeMillis();
+            Boolean success = false;
+            while (!success) {
+                tmLog.info(m_whoami + "starting leader promotion");
+                m_term = new Term(m_missingStartupSites, m_messenger.getZK(),
+                        m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                        VoltZK.iv2masters);
+                m_initiatorMailbox.setTerm(m_term);
+                success = m_term.start().get();
+                if (success) {
+                    m_repairLog.setLeaderState(true);
+                    m_scheduler.setLeaderState(true);
+                    tmLog.info(m_whoami
+                            + "finished leader promotion. Took "
+                            + (System.currentTimeMillis() - startTime) + " ms.");
+                }
+                else {
+                    // Just start over. Try again. My thinking here is:
+                    // The only known reason to fail is a failed replica during
+                    // recovery; that's a bounded event (by k-safety).
+                    // CrashVoltDB here means one node failure causing another.
+                    // Don't create a cascading failure.
+                    // Another reasonable plan might be to move this SP to
+                    // the end of the leader list; that has more complex ZK
+                    // semantics.
+                    tmLog.info(m_whoami
+                            + "interrupted during leader promotion after "
+                            + (System.currentTimeMillis() - startTime) + " ms. of "
+                            + "trying. Retrying.");
+                }
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Bad news.", true, e);
         }
     }
 
