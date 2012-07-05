@@ -60,12 +60,12 @@ public abstract class TransactionInitiator {
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            boolean isNonDeterministic,
             int partitions[],
             int numPartitions,
             Object clientData,
             int messageSize,
-            long now);
+            long now,
+            boolean allowMismatchedResults);
 
     /**
      * <p>
@@ -108,12 +108,12 @@ public abstract class TransactionInitiator {
             boolean isReadOnly,
             boolean isSinglePartition,
             boolean isEverySite,
-            boolean isNonDeterministic,
             int partitions[],
             int numPartitions,
             Object clientData,
             int messageSize,
-            long now);
+            long now,
+            boolean allowMismatchedResults);
 
     /**
      * This method should be called every X ms or so, where X is probably

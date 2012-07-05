@@ -181,7 +181,8 @@ public class TestSimpleWorkUnit extends TestCase
                                   new long[]{
                                         CoreUtils.getHSIdFromHostAndSite( 0, 1),
                                         CoreUtils.getHSIdFromHostAndSite( 1, 2),
-                                        CoreUtils.getHSIdFromHostAndSite( 1, 3)}, false, false);
+                                        CoreUtils.getHSIdFromHostAndSite( 1, 3)},
+                                  false, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -244,7 +245,7 @@ public class TestSimpleWorkUnit extends TestCase
                                       CoreUtils.getHSIdFromHostAndSite( 0, 1),
                                       CoreUtils.getHSIdFromHostAndSite( 1, 2),
                                       CoreUtils.getHSIdFromHostAndSite( 1, 3)},
-                                      false, false);
+                                  false, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);

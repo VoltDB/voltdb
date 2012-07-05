@@ -133,19 +133,19 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final boolean isReadOnly,
                                   final boolean isSinglePartition,
                                   final boolean isEveryPartition,
-                                  final boolean isNonDeterministic,
                                   final int partitions[],
                                   final int numPartitions,
                                   final Object clientData,
                                   final int messageSize,
-                                  final long now)
+                                  final long now,
+                                  final boolean allowMismatchedResults)
     {
         long txnId;
         txnId = m_idManager.getNextUniqueTransactionId();
         boolean retval =
             createTransaction(connectionId, connectionHostname, adminConnection, txnId, invocation,
-                              isReadOnly, isSinglePartition, isEveryPartition, isNonDeterministic,
-                              partitions, numPartitions, clientData, messageSize, now);
+                              isReadOnly, isSinglePartition, isEveryPartition, partitions,
+                              numPartitions, clientData, messageSize, now, allowMismatchedResults);
         return retval;
     }
 
@@ -159,12 +159,12 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final boolean isReadOnly,
                                   final boolean isSinglePartition,
                                   final boolean isEveryPartition,
-                                  final boolean isNonDeterministic,
                                   final int partitions[],
                                   final int numPartitions,
                                   final Object clientData,
                                   final int messageSize,
-                                  final long now)
+                                  final long now,
+                                  final boolean allowMismatchedResults)
     {
         assert(invocation != null);
         assert(partitions != null);
@@ -243,14 +243,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                                         otherSiteIdsArr,
                                                         isReadOnly,
                                                         false,
-                                                        isNonDeterministic,
                                                         invocation,
                                                         clientData,
                                                         messageSize,
                                                         now,
                                                         connectionId,
                                                         connectionHostname,
-                                                        adminConnection);
+                                                        adminConnection,
+                                                        allowMismatchedResults);
             dispatchMultiPartitionTxn(txn);
             return true;
         }
@@ -348,14 +348,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                  null,
                                  isReadOnly,
                                  true,
-                                 false,
                                  invocation.getShallowCopy(),
                                  clientData,
                                  messageSize,
                                  now,
                                  connectionId,
                                  connectionHostname,
-                                 adminConnection);
+                                 adminConnection,
+                                 false);
 
         for (long siteId : siteIds) {
             state.addCoordinator(siteId);

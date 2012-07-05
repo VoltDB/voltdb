@@ -22,7 +22,6 @@ import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.StoredProcedureInvocation;
@@ -42,14 +41,14 @@ public class InFlightTxnState implements Serializable {
             long otherSiteIds[],
             boolean isReadOnly,
             boolean isSinglePartition,
-            boolean isNonDeterministic,
             StoredProcedureInvocation invocation,
             Object clientData,
             int messageSize,
             long initiateTime,
             long connectionId,
             String connectionHostname,
-            boolean isAdmin)
+            boolean isAdmin,
+            boolean allowMismatchedResults)
     {
         this.txnId = txnId;
         this.firstCoordinatorId = firstCoordinatorId;
@@ -57,7 +56,6 @@ public class InFlightTxnState implements Serializable {
         this.invocation = invocation;
         this.isReadOnly = isReadOnly;
         this.isSinglePartition = isSinglePartition;
-        this.isNonDeterministic = isNonDeterministic;
         this.clientData = clientData;
         this.otherSiteIds = otherSiteIds;
         this.messageSize = messageSize;
@@ -65,6 +63,7 @@ public class InFlightTxnState implements Serializable {
         this.connectionId = connectionId;
         this.connectionHostname = connectionHostname;
         this.isAdmin = isAdmin;
+        this.allowMismatchedResults = allowMismatchedResults;
 
         outstandingResponses = 1;
 
@@ -84,8 +83,6 @@ public class InFlightTxnState implements Serializable {
         return outstandingResponses;
     }
 
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
-
     public ClientResponseImpl addResponse(long coordinatorHSId, ClientResponseImpl r) {
         // ensure response to send isn't null
         if (responseToSend == null) responseToSend = r;
@@ -103,11 +100,11 @@ public class InFlightTxnState implements Serializable {
         // If not same, kill entire cluster and hide the bodies.
         // In all seriousness, we have no valid way to recover from a non-deterministic event
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
-        // ENG-3288 - Allow read-only transactions to have mismatched results (but log a
-        // warning) so that LIMIT queries without ORDER BY clauses work.
+        // ENG-3288 - Allow non-deterministic read-only transactions to have mismatched results
+        // so that LIMIT queries without ORDER BY clauses work.
         if (resultsForComparison != null) {
             VoltTable[] curr_results = r.getResults();
-            if (resultsForComparison.length != curr_results.length)
+            if (resultsForComparison.length != curr_results.length && !allowMismatchedResults)
             {
                 String msg = "Mismatched result count received for transaction ID: " + txnId;
                 msg += "\n  while executing stored procedure: " + invocation.getProcName();
@@ -115,15 +112,14 @@ public class InFlightTxnState implements Serializable {
                 msg += "\n  Expected number of results: " + resultsForComparison.length;
                 msg += "\n  Mismatched number of results: " + curr_results.length;
                 msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
-                if (!isReadOnly || !isNonDeterministic) {
-                    // die die die
-                    VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
-                    throw new RuntimeException(msg); // gets called only by test code
-                }
+                // die die die
+                VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                throw new RuntimeException(msg); // gets called only by test code
             }
             for (int i = 0; i < resultsForComparison.length; ++i)
             {
-                if (!curr_results[i].hasSameContents(resultsForComparison[i]))
+                if (!curr_results[i].hasSameContents(resultsForComparison[i]) &&
+                    !allowMismatchedResults)
                 {
                     String msg = "Mismatched results received for transaction ID: " + txnId;
                     msg += "\n  while executing stored procedure: " + invocation.getProcName();
@@ -131,14 +127,9 @@ public class InFlightTxnState implements Serializable {
                     msg += "\n  Expected results: " + resultsForComparison[i].toString();
                     msg += "\n  Mismatched results: " + curr_results[i].toString();
                     msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
-                    if (isReadOnly) {
-                        hostLog.warn(msg);
-                    }
-                    else {
-                        // die die die
-                        VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
-                        throw new RuntimeException(msg); // gets called only by test code
-                    }
+                    // die die die
+                    VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                    throw new RuntimeException(msg); // gets called only by test code
                 }
             }
         }
@@ -247,7 +238,6 @@ public class InFlightTxnState implements Serializable {
     public final long otherSiteIds[];
     public final boolean isReadOnly;
     public final boolean isSinglePartition;
-    public final boolean isNonDeterministic;
     transient public final StoredProcedureInvocation invocation;
     transient public final Object clientData;
     public final int messageSize;
@@ -255,6 +245,7 @@ public class InFlightTxnState implements Serializable {
     public final long connectionId;
     public final String connectionHostname;
     public final boolean isAdmin;
+    public final boolean allowMismatchedResults;
 
     // in multipartition txns, the coord id goes here
     // in single partition txns:
