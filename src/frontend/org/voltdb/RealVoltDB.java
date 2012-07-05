@@ -1721,10 +1721,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
         }
-        consoleLog.info(
-                "Node data recovery completed after " + delta + " seconds with " + megabytes +
-                " megabytes transferred at a rate of " +
-                megabytesPerSecond + " megabytes/sec");
+
+        if (!m_config.m_newRejoin) {
+            consoleLog.info(
+                    "Node data recovery completed after " + delta + " seconds with " + megabytes +
+                    " megabytes transferred at a rate of " +
+                    megabytesPerSecond + " megabytes/sec");
+        }
+
         try {
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
