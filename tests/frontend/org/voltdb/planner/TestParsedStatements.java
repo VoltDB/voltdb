@@ -71,7 +71,6 @@ public class TestParsedStatements extends TestCase {
     @Override
     protected void tearDown() throws Exception {
         super.tearDown();
-        m_hsql.close();
     }
 
     void runSQLTest(String stmtName, String stmtSQL) {

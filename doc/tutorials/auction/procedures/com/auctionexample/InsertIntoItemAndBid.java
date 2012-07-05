@@ -63,10 +63,10 @@ public class InsertIntoItemAndBid extends VoltProcedure {
         int duration = oneMinuteOfMillis + random.nextInt(oneMinuteOfMillis);
         TimestampType endTime = new TimestampType(startTime.getTime() + duration);
 
-        voltQueueSQL(insert, itemId, itemName, itemDescription, sellerId, categoryId, 0, startPrice, startTime, endTime);
-        voltQueueSQL(insertForExport, itemId, itemName, itemDescription, sellerId, categoryId, 0, startPrice, startTime, endTime);
-        voltQueueSQL(insert_Bid, itemId, itemId, -1, startTime, startPrice);
-        voltQueueSQL(insertForExport_Bid, itemId, itemId, -1, startTime, startPrice);
+        voltQueueSQL(insert, itemId, itemName, itemDescription, sellerId, categoryId, itemId, startPrice, startTime, endTime);
+        voltQueueSQL(insertForExport, itemId, itemName, itemDescription, sellerId, categoryId, itemId, startPrice, startTime, endTime);
+        voltQueueSQL(insert_Bid, itemId, itemId, -1, 0L, startPrice);
+        voltQueueSQL(insertForExport_Bid, itemId, itemId, -1, 0L, startPrice);
         VoltTable[]res = voltExecuteSQL();
         assert(res == null);
         return res;

@@ -39,7 +39,6 @@ import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
@@ -47,7 +46,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.utils.CatalogUtil;
-
 
 import com.google.common.util.concurrent.Callables;
 import com.google.common.util.concurrent.ListenableFuture;
@@ -233,7 +231,7 @@ public class SnapshotSiteProcessor {
         m_snapshotTargets = new ArrayList<SnapshotDataTarget>();
         m_snapshotTargetTerminators = new ArrayList<Thread>();
         for (final SnapshotTableTask task : tasks) {
-            if (!task.m_isReplicated) {
+            if ((!task.m_isReplicated) || (!task.m_target.getFormat().isTableBased())) {
                 assert(task != null);
                 assert(m_snapshotTargets != null);
                 m_snapshotTargets.add(task.m_target);
@@ -299,7 +297,7 @@ public class SnapshotSiteProcessor {
                  * is responsible for closing the data target. Done in a separate
                  * thread so the EE can continue working.
                  */
-                if (t.m_isReplicated) {
+                if (t.m_isReplicated && t.m_target.getFormat().isTableBased()) {
                     final Thread terminatorThread =
                         new Thread("Replicated SnapshotDataTarget terminator ") {
                         @Override
@@ -330,8 +328,7 @@ public class SnapshotSiteProcessor {
             for (SnapshotDataFilter filter : currentTask.m_filters) {
                 valueForTarget = filter.filter(valueForTarget);
             }
-
-            retval = currentTask.m_target.write(valueForTarget);
+            retval = currentTask.m_target.write(valueForTarget, currentTask);
             if (retval != null) {
                 final ListenableFuture<?> retvalFinal = retval;
                 retvalFinal.addListener(new Runnable() {
@@ -454,9 +451,6 @@ public class SnapshotSiteProcessor {
                 JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
                 if (jsonObj.getLong("txnId") != txnId) {
                     VoltDB.crashLocalVoltDB("TxnId should match", false, null);
-                }
-                if (jsonObj.getInt("hosts") != numHosts) {
-                    VoltDB.crashLocalVoltDB("Num hosts should match", false, null);
                 }
                 int numHostsFinished = jsonObj.getInt("finishedHosts") + 1;
                 jsonObj.put("finishedHosts", numHostsFinished);

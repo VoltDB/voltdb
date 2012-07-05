@@ -23,8 +23,10 @@ import java.util.List;
 import java.util.Map;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.DependencyPair;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
@@ -93,9 +95,14 @@ public class UpdateApplicationCatalog extends VoltSystemProcedure {
         zk.setData(VoltZK.catalogbytes, versionAndBytes.array(), -1, new ZKUtil.StatCallback(), null);
         versionAndBytes = null;
         zk.setData(VoltZK.deploymentBytes, deploymentString.getBytes("UTF-8"), -1, new ZKUtil.StatCallback(), null);
-        CatalogContext context =
-            VoltDB.instance().catalogUpdate(commands, catalogBytes, expectedCatalogVersion, getTransactionId(), deploymentCRC);
-        ctx.updateCatalog(commands, context);
+        Pair<CatalogContext, CatalogSpecificPlanner> p =
+                VoltDB.instance().catalogUpdate(
+                        commands,
+                        catalogBytes,
+                        expectedCatalogVersion,
+                        getTransactionId(),
+                        deploymentCRC);
+        ctx.updateCatalog(commands, p.getFirst(), p.getSecond());
 
         VoltTable result = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         result.addRow(VoltSystemProcedure.STATUS_OK);
