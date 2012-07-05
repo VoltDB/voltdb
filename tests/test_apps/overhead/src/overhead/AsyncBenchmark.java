@@ -203,7 +203,7 @@ public class AsyncBenchmark
             System.exit(1);
         }
     }
-    
+
     public static void runNoArgs( boolean readOnly) throws Exception {
         Random r = new java.util.Random();
         // Run the benchmark loop for the requested duration
@@ -221,7 +221,7 @@ public class AsyncBenchmark
             limiter.throttle();
         }
     }
-    
+
     public static void runBinaryPayload( boolean readOnly) throws Exception {
         Random r = new java.util.Random();
         byte param[] = new byte[paramSize];
