@@ -496,16 +496,18 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
             final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
-            /*
-             * The logged txn count will be greater than the replayed txn count
-             * because some logged ones were before the stream snapshot
-             */
-            final long duration = (System.currentTimeMillis() - m_taskExeStartTime) / 1000;
-            final long throughput = duration == 0 ? m_executedTaskCount : m_executedTaskCount / duration;
-            m_recoveryLog.info("Logged " + m_loggedTaskCount + " tasks");
-            m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks in " +
-                    duration + " seconds at a rate of " +
-                    throughput + " tasks/second");
+            if (newRejoin) {
+                /*
+                 * The logged txn count will be greater than the replayed txn count
+                 * because some logged ones were before the stream snapshot
+                 */
+                final long duration = (System.currentTimeMillis() - m_taskExeStartTime) / 1000;
+                final long throughput = duration == 0 ? m_executedTaskCount : m_executedTaskCount / duration;
+                m_recoveryLog.info("Logged " + m_loggedTaskCount + " tasks");
+                m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks in " +
+                        duration + " seconds at a rate of " +
+                        throughput + " tasks/second");
+            }
             m_recoveryProcessor = null;
             m_rejoinSnapshotProcessor = null;
             m_rejoinSnapshotTxnId = -1;
