@@ -61,7 +61,7 @@ public class TestTerm extends TestCase
     @Test
     public void testUnion() throws Exception
     {
-        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters);
+        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters, "Test");
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -83,7 +83,7 @@ public class TestTerm extends TestCase
     @Test
     public void testStaleResponse() throws Exception
     {
-        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters);
+        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters, "Test");
         term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
         assertEquals(0L, term.m_repairLogUnion.size());
     }
@@ -94,7 +94,7 @@ public class TestTerm extends TestCase
     @Test
     public void testRepairLogsAreComplete()
     {
-        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters);
+        Term term = new Term(null, null, 0, 0L, null, VoltZK.iv2masters, "Test");
         Term.ReplicaRepairStruct notDone1 = new Term.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
@@ -139,7 +139,7 @@ public class TestTerm extends TestCase
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters);
+        Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters, "Test");
 
         // missing 4, 5
         Term.ReplicaRepairStruct r1 = new Term.ReplicaRepairStruct();
@@ -192,7 +192,7 @@ public class TestTerm extends TestCase
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters);
+        Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters, "Test");
 
         // missing 3, 4, 5
         Term.ReplicaRepairStruct r3 = new Term.ReplicaRepairStruct();
@@ -233,7 +233,7 @@ public class TestTerm extends TestCase
 
         // Stub some portions of a concrete Term instance - this is the
         // object being tested.
-        final Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters) {
+        final Term term = new Term(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters, "Test") {
             // avoid zookeeper.
             @Override
             protected void makeBabySitter() {

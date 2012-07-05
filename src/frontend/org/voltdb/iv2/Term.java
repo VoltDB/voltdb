@@ -222,7 +222,7 @@ public class Term
      */
     public Term(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String zkMapCacheNode)
+            String zkMapCacheNode, String whoami)
     {
         m_zk = zk;
         m_partitionId = partitionId;
@@ -236,8 +236,7 @@ public class Term
             m_missingStartupSites = new CountDownLatch(0);
         }
 
-        m_whoami = "SP " +  CoreUtils.hsIdToString(m_initiatorHSId)
-            + " for partition " + m_partitionId + " ";
+        m_whoami = whoami;
         m_mapCacheNode = zkMapCacheNode;
     }
 

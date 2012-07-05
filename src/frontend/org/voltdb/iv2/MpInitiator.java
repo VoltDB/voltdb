@@ -17,25 +17,14 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-
-import org.apache.zookeeper_voltpatches.KeeperException;
-
-import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.messaging.HostMessenger;
 
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.zk.LeaderElector;
-import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltcore.zk.MapCache;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-import org.voltdb.LoadedProcedureSet;
-import org.voltdb.ProcedureRunnerFactory;
-import org.voltdb.iv2.Site;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -44,86 +33,22 @@ import org.voltdb.VoltZK;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class MpInitiator implements Initiator, LeaderNoticeHandler
+public class MpInitiator extends BaseInitiator
 {
-    VoltLogger tmLog = new VoltLogger("TM");
-
-    // External references/config
-    private HostMessenger m_messenger = null;
-    private final int m_partitionId;
-
-    // Encapsulated objects
-    private InitiatorMailbox m_initiatorMailbox = null;
-    private Term m_term = null;
-    private Site m_executionSite = null;
-    private Scheduler m_scheduler = null;
-    private LoadedProcedureSet m_procSet = null;
-    private Thread m_siteThread = null;
+    private static final int MP_INIT_PID = -1;
     private MapCache m_iv2masters = null;
-    private LeaderElector m_leaderElector = null;
-    private final RepairLog m_repairLog = new RepairLog();
-
-    private final String m_whoami;
 
     public MpInitiator(HostMessenger messenger, long buddyHSId)
     {
-        m_messenger = messenger;
-        // MPI currently pretends to have partition ID -1 just as a placeholder value
-        m_partitionId = -1;
-        m_iv2masters = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
-        m_scheduler = new MpScheduler(new SiteTaskerQueue(), m_iv2masters);
+        super(VoltZK.iv2mpi,
+                messenger,
+                MP_INIT_PID,
+                new MpScheduler(
+                    new SiteTaskerQueue(),
+                    new MapCache(messenger.getZK(), VoltZK.iv2masters)),
+                "MP");
         ((MpScheduler)m_scheduler).setBuddyHSId(buddyHSId);
-        // don't create a rejoin producer for the MPI quite yet.
-        m_initiatorMailbox = new InitiatorMailbox(m_scheduler, m_messenger, m_repairLog, null);
-
-        // Now publish the initiator mailbox to friends and family
-        m_messenger.createMailbox(null, m_initiatorMailbox);
-        m_scheduler.setMailbox(m_initiatorMailbox);
-
-        m_whoami = "MP " +  CoreUtils.hsIdToString(getInitiatorHSId())
-            + " for partition " + m_partitionId + " ";
-    }
-
-    @Override
-    public void becomeLeader()
-    {
-        try {
-            long startTime = System.currentTimeMillis();
-            tmLog.info(m_whoami + "starting leader promotion");
-            m_term = new Term(new CountDownLatch(1), m_messenger.getZK(), m_partitionId,
-                    getInitiatorHSId(), m_initiatorMailbox, VoltZK.iv2mpi);
-            m_initiatorMailbox.setTerm(m_term);
-            boolean success = m_term.start().get();
-            if (!success) {
-                throw new RuntimeException("Screwed!");
-            }
-            m_repairLog.setLeaderState(true);
-            m_scheduler.setLeaderState(true);
-            tmLog.info(m_whoami
-                    + "finished leader promotion. Took "
-                    + (System.currentTimeMillis() - startTime) + " ms.");
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Bad news.", true, e);
-        }
-    }
-
-    /** Register with m_partition's leader elector node */
-    public boolean joinElectoralCollege()
-        throws InterruptedException, ExecutionException
-    {
-        // perform leader election before continuing configuration.
-        m_leaderElector = new LeaderElector(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
-                Long.toString(getInitiatorHSId()), null, this);
-        try {
-            // becomeLeader() will run before start(true) returns (if this is the leader).
-            m_leaderElector.start(true);
-        } catch (Exception ex) {
-            VoltDB.crashLocalVoltDB("Partition " + m_partitionId + " failed to initialize " +
-                    "leader elector. ", false, ex);
-        }
-
-        return m_leaderElector.isLeader();
+        m_iv2masters = ((MpScheduler)m_scheduler).m_iv2Masters;
     }
 
     @Override
@@ -133,47 +58,11 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
                           int numberOfPartitions,
                           boolean createForRejoin)
     {
-        assert(createForRejoin == false);
-
         try {
             m_iv2masters.start(true);
-
-            m_executionSite = new Site(m_scheduler.getQueue(),
-                    m_initiatorMailbox.getHSId(),
-                    backend, catalogContext,
-                    serializedCatalog,
-                    catalogContext.m_transactionId,
-                    m_partitionId,
-                    numberOfPartitions,
-                    createForRejoin);
-            ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
-            prf.configure(m_executionSite,
-                    m_executionSite.m_sysprocContext);
-            m_procSet = new LoadedProcedureSet(m_executionSite,
-                    prf,
-                    m_initiatorMailbox.getHSId(),
-                    0, // this has no meaning
-                    numberOfPartitions);
-            m_procSet.loadProcedures(catalogContext, backend, csp);
-            m_scheduler.setProcedureSet(m_procSet);
-            m_executionSite.setLoadedProcedures(m_procSet);
-
-            m_siteThread = new Thread(m_executionSite);
-            m_siteThread.start(); // Maybe this moves --izzy
-
-            // Join the leader election process after the object is fully
-            // configured.  If we do this earlier, rejoining sites will be
-            // given transactions before they're ready to handle them.
-            // FUTURE: Consider possibly returning this and the
-            // m_siteThread.start() in a Runnable which RealVoltDB can use for
-            // configure/run sequencing in the future.
-            boolean isLeader = joinElectoralCollege();
-            if (isLeader) {
-                tmLog.info(m_whoami + "published as leader.");
-            }
-            else {
-                tmLog.info(m_whoami + "running as replica.");
-            }
+            // for now, lie - kfactor for MPI is always 0.
+            super.configure(backend, serializedCatalog, catalogContext,
+                    /* kfactor */ 0, csp, numberOfPartitions, createForRejoin);
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Error initializing MP initiator.", true, e);
         } catch (ExecutionException e) {
@@ -184,46 +73,12 @@ public class MpInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void shutdown()
     {
-        // rtb: better to schedule a shutdown SiteTasker?
-        // than to play java interrupt() games?
-        if (m_executionSite != null) {
-            m_executionSite.startShutdown();
-        }
-        try {
-            if (m_leaderElector != null) {
-                m_leaderElector.shutdown();
-            }
-            if (m_term != null) {
-                m_term.shutdown();
-            }
-            if (m_initiatorMailbox != null) {
-                m_initiatorMailbox.shutdown();
-            }
-        } catch (InterruptedException e) {
-            // what to do here?
-        } catch (KeeperException e) {
-            // What to do here?
-        }
-        if (m_siteThread != null) {
-            try {
-                m_siteThread.interrupt();
-                m_siteThread.join();
-            }
-            catch (InterruptedException giveup) {
-            }
-        }
+        super.shutdown();
         if (m_iv2masters != null) {
             try {
                 m_iv2masters.shutdown();
-            } catch (Exception e) {
-                // nobody cares at shutdown.
+            } catch (Exception ignored) {
             }
         }
-    }
-
-    @Override
-    public long getInitiatorHSId()
-    {
-        return m_initiatorMailbox.getHSId();
     }
 }

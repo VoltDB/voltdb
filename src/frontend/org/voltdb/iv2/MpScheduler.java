@@ -48,7 +48,8 @@ public class MpScheduler extends Scheduler
         new HashMap<Long, TransactionState>();
     private Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
-    private final MapCache m_iv2Masters;
+
+    /* private  */ final MapCache m_iv2Masters;
     private AtomicLong m_txnId = new AtomicLong(1l << 40);
     private long m_buddyHSId;
 
