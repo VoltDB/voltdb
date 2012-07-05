@@ -91,21 +91,17 @@ typedef struct {
     char data[0];
 }__attribute__((packed)) planfrag;
 
-/*
- * Header of an execute custom plan fragment request. Contains no fragmentId, just the custom plan string.
- */
 typedef struct {
     struct ipc_command cmd;
-    int64_t txnId;
-    int64_t lastCommittedTxnId;
-    int64_t undoToken;
-    int32_t outputDepId;
-    int32_t inputDepId;
+    int64_t fragmentId;
     int32_t planFragLength;
-    int32_t parameterSetLength;
-    int16_t parameterCount;
     char data[0];
-}__attribute__((packed)) customplanfrag;
+}__attribute__((packed)) loadfrag;
+
+typedef struct {
+    struct ipc_command cmd;
+    int64_t fragmentId;
+}__attribute__((packed)) unloadfrag;
 
 /*
  * Header for a load table request.
@@ -313,10 +309,6 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
       case 11:
         result = undoUndoToken(cmd);
         break;
-      case 12:
-        executeCustomPlanFragmentAndGetResults(cmd);
-        result = kErrorCode_None;
-        break;
       case 13:
         result = setLogLevels(cmd);
         break;
@@ -350,6 +342,14 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           break;
       case 24:
           threadLocalPoolAllocations();
+          result = kErrorCode_None;
+          break;
+      case 26:
+          loadFragment(cmd);
+          result = kErrorCode_None;
+          break;
+      case 27:
+          unloadFragment(cmd);
           result = kErrorCode_None;
           break;
       default:
@@ -690,57 +690,56 @@ void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (unsigned char*)exceptionData, expectedSize);
 }
 
-void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) {
+void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
     int errors = 0;
 
-    customplanfrag *plan = (customplanfrag*)cmd;
+    loadfrag *load = (loadfrag*)cmd;
 
-    // setup
-    m_engine->resetReusedResultOutputBuffer();
-    m_engine->setUndoToken(ntohll(plan->undoToken));
-
-    int32_t planFragLength = ntohl(plan->planFragLength);
-    int32_t parameterSetLength = ntohl(plan->parameterSetLength);
-    int16_t parameterCount = ntohs(plan->parameterCount);
+    int64_t planFragId = ntohll(load->fragmentId);
+    int32_t planFragLength = ntohl(load->planFragLength);
 
     // data as fast serialized string
     // skip past the length prefix from fast serializer
-    string plan_str = string(plan->data, planFragLength);
-
-    // ...and fast serialized parameter sets last.
-    void* offset = plan->data + planFragLength;
-    ReferenceSerializeInput serialize_in(offset, parameterSetLength);
-
-    NValueArray &params = m_engine->getParameterContainer();
-
-    Pool *pool = m_engine->getStringPool();
-    deserializeParameterSetCommon( parameterCount, serialize_in, params, pool);
-    m_engine->setUsedParamcnt(parameterCount);
-
-    // deps info
-    int32_t outputDepId = ntohl(plan->outputDepId);
-    int32_t inputDepId = ntohl(plan->inputDepId);
+    string plan_str = string(load->data, planFragLength);
 
     try {
         // execute
-        if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
-                                          params, ntohll(plan->txnId),
-                                          ntohll(plan->lastCommittedTxnId))) {
+        if (m_engine->loadFragment(plan_str, planFragId)) {
             ++errors;
         }
     } catch (FatalException e) {
         crashVoltDB(e);
     }
-    pool->purge();
 
     // write the results array back across the wire
     const int8_t successResult = kErrorCode_Success;
     if (errors == 0) {
         writeOrDie(m_fd, (unsigned char*)&successResult, sizeof(int8_t));
-        const int32_t size = m_engine->getResultsSize();
+    } else {
+        sendException(kErrorCode_Error);
+    }
+}
 
-        // write the dependency tables back across the wire
-        writeOrDie(m_fd, (unsigned char*)(m_engine->getReusedResultBuffer()), size);
+void VoltDBIPC::unloadFragment(struct ipc_command *cmd) {
+    int errors = 0;
+
+    unloadfrag *unload = (unloadfrag*)cmd;
+
+    int64_t planFragId = ntohll(unload->fragmentId);
+
+    try {
+        // execute
+        if (m_engine->unloadFragment(planFragId)) {
+            ++errors;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
+    }
+
+    // write the results array back across the wire
+    const int8_t successResult = kErrorCode_Success;
+    if (errors == 0) {
+        writeOrDie(m_fd, (unsigned char*)&successResult, sizeof(int8_t));
     } else {
         sendException(kErrorCode_Error);
     }
@@ -1213,7 +1212,7 @@ int main(int argc, char **argv) {
     /* max message size that can be read from java */
     int max_ipc_message_size = (1024 * 1024 * 2);
 
-    int port = 0;
+    int port = 10000;
 
     if (argc == 2) {
         printf("Binding to a specific socket is no longer supported\n");

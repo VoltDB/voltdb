@@ -115,7 +115,9 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         TableHashCode(22),
         Hashinate(23),
         GetPoolAllocations(24),
-        GetUSOs(25);
+        GetUSOs(25),
+        LoadFragment(26),
+        UnloadFragment(27);
         Commands(final int id) {
             m_id = id;
         }
@@ -807,47 +809,22 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public void loadPlanFragment(long planFragmentId, String plan) throws EEException
     {
-
-    }
-
-    @Override
-    public void unloadPlanFragment(long planFragmentId) throws EEException
-    {
-
-    }
-
-    /*@Override
-    public VoltTable executeCustomPlanFragment(final String plan,
-            int inputDepId, final long txnId, final long lastCommittedTxnId,
-            final long undoQuantumToken,
-            ParameterSet params) throws EEException
-    {
         final FastSerializer fser = new FastSerializer();
-        final FastSerializer fser2 = new FastSerializer();
         try {
             fser.writeString(plan);
-            params.writeExternal(fser2);
         } catch (final IOException exception) {
             throw new RuntimeException(exception);
         }
 
         m_data.clear();
-        m_data.putInt(Commands.CustomPlanFragment.m_id);
-        m_data.putLong(txnId);
-        m_data.putLong(lastCommittedTxnId);
-        m_data.putLong(undoQuantumToken);
-        m_data.putInt(0); // output dep id is not needed
-        m_data.putInt(inputDepId);
+        m_data.putInt(Commands.LoadFragment.m_id);
+        m_data.putLong(planFragmentId);
         //-4 because the data from fser contains a length prefix
         ByteBuffer fragBuf = fser.getBuffer();
-        ByteBuffer paramBuf = fser2.getBuffer();
         fragBuf.position(4);//skip string length prefix
         //Put all lengths and counts in fixed size portion
         m_data.putInt(fragBuf.remaining());
-        m_data.putInt(paramBuf.remaining() - 2);
-        m_data.putShort(paramBuf.getShort());
         m_data.put(fragBuf);
-        m_data.put(paramBuf);
 
         try {
             m_data.flip();
@@ -864,19 +841,37 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
-        if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-            final VoltTable resultTables[] = new VoltTable[1];
-            resultTables[0] = PrivateVoltTableFactory.createUninitializedVoltTable();
-            try {
-                m_connection.readResultTables(resultTables);
-            } catch (final IOException e) {
-                throw new EEException(
-                        ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
-            }
-            return resultTables[0];
+        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
+            throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
         }
-        return null;
-    }*/
+    }
+
+    @Override
+    public void unloadPlanFragment(long planFragmentId) throws EEException
+    {
+        m_data.clear();
+        m_data.putInt(Commands.UnloadFragment.m_id);
+        m_data.putLong(planFragmentId);
+
+        try {
+            m_data.flip();
+            m_connection.write();
+        } catch (final Exception e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+
+        int result = ExecutionEngine.ERRORCODE_ERROR;
+        try {
+            result = m_connection.readStatusByte();
+        } catch (final IOException e) {
+            System.out.println("Exception: " + e.getMessage());
+            throw new RuntimeException(e);
+        }
+        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
+            throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
+        }
+    }
 
     @Override
     public VoltTable[] executeQueryPlanFragmentsAndGetResults(

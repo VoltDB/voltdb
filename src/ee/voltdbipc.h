@@ -111,7 +111,9 @@ private:
 
     void executePlanFragmentAndGetResults(struct ipc_command *cmd);
 
-    void executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd);
+    void loadFragment(struct ipc_command *cmd);
+
+    void unloadFragment(struct ipc_command *cmd);
 
     void getStats(struct ipc_command *cmd);
 
