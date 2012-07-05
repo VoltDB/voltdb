@@ -300,7 +300,7 @@ string planNodeToString(PlanNodeType type)
         return "INDEXSCAN";
     }
     case PLAN_NODE_TYPE_INDEXCOUNT: {
-    	return "INDEXCOUNT";
+        return "INDEXCOUNT";
     }
     case PLAN_NODE_TYPE_NESTLOOP: {
         return "NESTLOOP";

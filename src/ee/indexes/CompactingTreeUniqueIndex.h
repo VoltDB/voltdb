@@ -239,8 +239,8 @@ public:
     }
 
     int32_t getRank(const KeyType &key) const {
-    	if (!hasRank) return -1;
-    	return m_entries.rankAsc(key);
+        if (!hasRank) return -1;
+        return m_entries.rankAsc(key);
     }
 
     size_t getSize() const { return static_cast<size_t>(m_entries.size()); }

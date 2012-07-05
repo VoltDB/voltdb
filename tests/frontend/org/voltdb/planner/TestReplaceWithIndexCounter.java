@@ -23,7 +23,6 @@
 
 package org.voltdb.planner;
 
-import java.util.ArrayList;
 import java.util.List;
 
 import junit.framework.TestCase;
@@ -112,17 +111,22 @@ public class TestReplaceWithIndexCounter extends TestCase {
         assertTrue(pn.size() > 0);
 
         AbstractPlanNode p = pn.get(0).getChild(0);
+        for (AbstractPlanNode ap: pn) {
+            System.out.println("Explan tree:\n" + ap.toExplainPlanString());
+        }
+
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explanined:\n" + nd.toDOTString() + "\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode DOT string:\n" + nd.toDOTString());
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
 
         }
-        ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
-        for (int i = 0; i < p.getChildCount(); i++) {
-            children.add(p.getChild(i));
-            System.out.println("Child " + i + " :" + p.getChild(i).toExplainPlanString());
-            System.out.println("Parent " + i + " :" + p.getParent(i).toExplainPlanString());
-        }
+//        ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
+//        for (int i = 0; i < p.getChildCount(); i++) {
+//            children.add(p.getChild(i));
+//            System.out.println("Child " + i + " :" + p.getChild(i).toExplainPlanString());
+//            System.out.println("Parent " + i + " :" + p.getParent(i).toExplainPlanString());
+//        }
 
         assertTrue(p instanceof IndexCountPlanNode);
 //        if (pushDownTypes != null) {
