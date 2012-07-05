@@ -55,7 +55,7 @@ TableIndex::TableIndex(const TableIndexScheme &scheme) :
     column_types_vector_ = scheme.columnTypes;
     colCount_ = (int)column_indices_vector_.size();
     is_unique_index_ = scheme.unique;
-    is_countable_index = schema.countable;
+    is_countable_index_ = scheme.countable;
     m_tupleSchema = scheme.tupleSchema;
     assert(column_types_vector_.size() == column_indices_vector_.size());
     column_indices_ = new int[colCount_];

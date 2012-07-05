@@ -68,8 +68,8 @@ struct TableIndexScheme {
         tupleSchema = keySchema = NULL;
     }
     TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                     std::vector<ValueType> columnTypes, bool unique, bool intsOnly,
-                     TupleSchema *tupleSchema, bool countable=false) {
+                     std::vector<ValueType> columnTypes, bool unique, bool countable,
+                     bool intsOnly, TupleSchema *tupleSchema) {
         this->name = name; this->type = type; this->columnIndices = columnIndices;
         this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
         this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = countable;
@@ -289,7 +289,7 @@ public:
      */
     inline bool isCountableIndex() const
     {
-    	return is_Countable_index_;
+    	return is_countable_index_;
     }
 
     virtual size_t getSize() const = 0;
