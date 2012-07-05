@@ -800,9 +800,16 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 result.resetRowPosition();
                                 hostLog.info(result);
                             } else {
-                            /*
-                             * Snapshot was started no problem, reset the watch for new requests
-                             */
+                                /*
+                                 * Snapshot was started no problem, reset the watch for new requests
+                                 */
+                                ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                m_zk.create(
+                                        VoltZK.user_snapshot_response + requestId,
+                                        rimpl.flattenToBuffer(buf).array(),
+                                        Ids.OPEN_ACL_UNSAFE,
+                                        CreateMode.PERSISTENT);
                                 userSnapshotRequestExistenceCheck();
                                 return;
                             }
@@ -1455,7 +1462,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                 throw new Exception("Provided nonce " + nonce + " contains a prohibited character (- or ,)");
             }
 
-            createAndWatchRequestNode(invocation.clientHandle, c, path, nonce, blocking, format, null);
+            createAndWatchRequestNode(invocation.clientHandle, c, path, nonce, blocking, format, null, false);
         } catch (Exception e) {
             VoltTable tables[] = new VoltTable[0];
             byte status = ClientResponseImpl.GRACEFUL_FAILURE;
@@ -1494,14 +1501,15 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                           String nonce,
                                           boolean blocking,
                                           SnapshotFormat format,
-                                          String data) throws ForwardClientException {
+                                          String data,
+                                          boolean notifyChanges) throws ForwardClientException {
         boolean requestExists = false;
         final String requestId = createRequestNode(path, nonce, blocking, format, data);
         if (requestId == null) {
             requestExists = true;
         } else {
             try {
-                registerUserSnapshotResponseWatch(requestId, clientHandle, c);
+                registerUserSnapshotResponseWatch(requestId, clientHandle, c, notifyChanges);
             } catch (Exception e) {
                 VoltDB.crashLocalVoltDB("Failed to register ZK watch on snapshot response", true, e);
             }
@@ -1558,8 +1566,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     private void registerUserSnapshotResponseWatch(
             final String requestId,
             final long clientHandle,
-            final Connection c
-            ) throws Exception {
+            final Connection c,
+            final boolean notifyChanges) throws Exception {
         final String responseNode = VoltZK.user_snapshot_response + requestId;
         Stat exists = m_zk.exists(responseNode, new Watcher() {
             @Override
@@ -1574,7 +1582,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 processUserSnapshotRequestResponse(
                                             event,
                                             clientHandle,
-                                            c);
+                                            c,
+                                            notifyChanges);
                             } catch (Exception e) {
                                 VoltDB.crashLocalVoltDB(
                                         "Error retrieving user snapshot request response from ZK",
@@ -1584,7 +1593,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         }
                     });
                     break;
-                    default:
+                default:
                 }
             }
         });
@@ -1596,15 +1605,49 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                         KeeperState.SyncConnected,
                         responseNode),
                         clientHandle,
-                        c);
+                        c,
+                        notifyChanges);
         }
     }
 
     void processUserSnapshotRequestResponse(
             final WatchedEvent event,
             final long clientHandle,
-            final Connection c) throws Exception {
-        byte responseBytes[] = m_zk.getData(event.getPath(), false, null);
+            final Connection c,
+            final boolean notifyChanges) throws Exception {
+        Watcher watcher = null;
+        if (notifyChanges) {
+            watcher = new Watcher() {
+                @Override
+                public void process(final WatchedEvent event) {
+                    if (event.getState() == KeeperState.Disconnected) return;
+                    switch (event.getType()) {
+                    case NodeCreated:
+                        m_es.submit(new Runnable() {
+                            @Override
+                            public void run() {
+                                try {
+                                    processUserSnapshotRequestResponse(
+                                                event,
+                                                clientHandle,
+                                                c,
+                                                notifyChanges);
+                                } catch (Exception e) {
+                                    VoltDB.crashLocalVoltDB(
+                                                "Error retrieving user snapshot request response from ZK",
+                                                true,
+                                                e);
+                                }
+                            }
+                        });
+                        break;
+                    default:
+                    }
+                }
+            };
+        }
+
+        byte responseBytes[] = m_zk.getData(event.getPath(), watcher, null);
         try {
             m_zk.delete(event.getPath(), -1, null, null);
         } catch (Exception e) {

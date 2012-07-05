@@ -851,6 +851,22 @@ public class SnapshotUtil {
         return inprogress;
     }
 
+    public static boolean isSnapshotQueued(VoltTable results[]) {
+        final VoltTable result = results[0];
+        result.resetRowPosition();
+        if (result.getColumnCount() == 1) {
+            return false;
+        }
+
+        boolean queued = false;
+        while (result.advanceRow()) {
+            if (result.getString("ERR_MSG").contains("SNAPSHOT REQUEST QUEUED")) {
+                queued = true;
+            }
+        }
+        return queued;
+    }
+
     /**
      * Handles response from asynchronous snapshot requests.
      */
@@ -885,7 +901,8 @@ public class SnapshotUtil {
                                        final boolean blocking,
                                        final SnapshotFormat format,
                                        final String data,
-                                       final SnapshotResponseHandler handler) {
+                                       final SnapshotResponseHandler handler,
+                                       final boolean notifyChanges) {
         final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
         final Connection c = new Connection() {
             @Override
@@ -983,7 +1000,8 @@ public class SnapshotUtil {
                 final long startTime = System.currentTimeMillis();
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
                     try {
-                        sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking, format, data);
+                        sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking,
+                                                     format, data, notifyChanges);
                         response = responseExchanger.exchange(null);
                         VoltTable[] results = response.getResults();
                         if (response.getStatus() != ClientResponse.SUCCESS) {

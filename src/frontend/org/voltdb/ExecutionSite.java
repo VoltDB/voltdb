@@ -1306,6 +1306,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                 VoltTable[] results = resp.getResults();
                 if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                    if (SnapshotUtil.isSnapshotQueued(results)) {
+                        m_recoveryLog.debug("Rejoin snapshot queued, waiting...");
+                        return;
+                    }
+
                     long txnId = -1;
                     String appStatus = resp.getAppStatusString();
                     if (appStatus == null) {
@@ -1334,7 +1339,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         String nonce = "Rejoin_" + getSiteId() + "_" + System.currentTimeMillis();
         SnapshotUtil.requestSnapshot(0l, "", nonce, false,
-                                     SnapshotFormat.STREAM, data, handler);
+                                     SnapshotFormat.STREAM, data, handler, true);
 
         return null;
     }
@@ -1353,6 +1358,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (m_rejoinTaskLog != null) {
                 m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
             }
+            m_rejoinSnapshotProcessor.startCountDown();
             VoltDB.instance().getSnapshotCompletionMonitor()
                   .addInterest(m_snapshotCompletionHandler);
         } else {
