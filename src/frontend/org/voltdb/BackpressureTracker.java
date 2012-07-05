@@ -42,7 +42,7 @@ public class BackpressureTracker
         m_pendingTxnCount++;
         if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
             if (!m_hadBackPressure) {
-                hostLog.info("TXN back pressure began");
+                hostLog.debug("TXN back pressure began");
                 m_hadBackPressure = true;
                 m_ci.onBackPressure();
             }
@@ -57,7 +57,7 @@ public class BackpressureTracker
             m_pendingTxnCount < (MAX_DESIRED_PENDING_TXNS * .8))
         {
             if (m_hadBackPressure) {
-                hostLog.info("TXN backpressure ended");
+                hostLog.debug("TXN backpressure ended");
                 m_hadBackPressure = false;
                 m_ci.offBackPressure();
             }
