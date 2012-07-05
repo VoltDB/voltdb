@@ -1459,7 +1459,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         //hostLog.info("not logging transaction that didn't write");
                     }
                 } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Failed to log task message", true, e);
+                    VoltDB.crashLocalVoltDB("Failed to log task message", false, e);
                 }
             }
 
