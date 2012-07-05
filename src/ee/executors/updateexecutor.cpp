@@ -66,6 +66,42 @@
 using namespace std;
 using namespace voltdb;
 
+namespace voltdb {
+namespace detail {
+
+struct UpdateExecutorState
+{
+    UpdateExecutorState(AbstractExecutor* childExec, TempTable* inputTable, TempTable* outputTable) :
+//        m_tempInputTable(),
+        m_tempInputTable(inputTable),
+        m_childExecutor(childExec),
+        m_outputTable(outputTable),
+        m_done(false)
+    {
+//        m_tempInputTable.reset(TableFactory::getCopiedTempTable(
+//            inputTable->databaseId(), std::string("temp_input"),
+//            inputTable, inputTable->m_limits));
+
+    }
+
+//    boost::scoped_ptr<TempTable> m_tempInputTable;
+    TempTable* m_tempInputTable;
+    AbstractExecutor* m_childExecutor;
+    TempTable* m_outputTable;
+    bool m_done;
+};
+
+} // namespace detail
+} // namespace voltdb
+
+UpdateExecutor::UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node),
+    m_node(NULL), m_inputTargetMap(), m_inputTargetMapSize(-1),
+    m_inputTable(NULL), m_targetTable(NULL), m_inputTuple(),
+    m_targetTuple(), m_partitionColumn(-1), m_partitionColumnIsString(),
+    m_updatesIndexes(), m_engine(engine), m_state()
+{}
+
 bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
                             TempTableLimits* limits)
 {
@@ -222,4 +258,135 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
     m_engine->m_tuplesModified += m_inputTable->activeTupleCount();
 
     return true;
+}
+
+bool UpdateExecutor::support_pull() const
+{
+    return true;
+}
+
+void UpdateExecutor::p_pre_execute_pull(const NValueArray &params)
+{
+    assert(m_inputTable);
+    assert(m_targetTable);
+
+    VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
+    VOLT_TRACE("TARGET TABLE - BEFORE: %s\n", m_targetTable->debug().c_str());
+
+    assert(m_inputTuple.sizeInValues() == m_inputTable->columnCount());
+    assert(m_targetTuple.sizeInValues() == m_targetTable->columnCount());
+
+    std::vector<AbstractPlanNode*>& children = m_node->getChildren();
+    assert(children.size() == 1);
+    AbstractExecutor* childExec = children[0]->getExecutor();
+
+    TempTable* outputTable = dynamic_cast<TempTable*>(m_node->getOutputTable());
+    assert(outputTable);
+    m_state.reset(new detail::UpdateExecutorState(childExec, m_inputTable, outputTable));
+}
+
+TableTuple UpdateExecutor::p_next_pull()
+{
+    if (m_state->m_done) {
+        return TableTuple(m_state->m_outputTable->schema());
+    }
+
+    while (true)
+    {
+        TableTuple tuple = m_state->m_childExecutor->next_pull();
+        if (tuple.isNullTuple())
+        {
+            break;
+        }
+
+        // We can't update the tuple while iterating the table because
+        // that may invalidate input table iterator. Save the tuple into the
+        // temp table to be used after the iteration is complete
+        m_state->m_tempInputTable->insertTupleNonVirtual(tuple);
+    }
+
+    // Now iterate over the temp input table and update tuples
+    // in the target table
+    TableIterator input_iterator = m_state->m_tempInputTable->iterator();
+    while (input_iterator.next(m_inputTuple)) {
+        //
+        // OPTIMIZATION: Single-Sited Query Plans
+        // If our beloved UpdatePlanNode is apart of a single-site query plan,
+        // then the first column in the input table will be the address of a
+        // tuple on the target table that we will want to update. This saves us
+        // the trouble of having to do an index lookup
+        //
+        void *target_address = m_inputTuple.getNValue(0).castAsAddress();
+        m_targetTuple.move(target_address);
+
+        // Loop through INPUT_COL_IDX->TARGET_COL_IDX mapping and only update
+        // the values that we need to. The key thing to note here is that we
+        // grab a temp tuple that is a copy of the target tuple (i.e., the tuple
+        // we want to update). This insures that if the input tuple is somehow
+        // bringing garbage with it, we're only going to copy what we really
+        // need to into the target tuple.
+        //
+        TableTuple &tempTuple = m_targetTable->getTempTupleInlined(m_targetTuple);
+        for (int map_ctr = 0; map_ctr < m_inputTargetMapSize; map_ctr++) {
+            tempTuple.setNValue(m_inputTargetMap[map_ctr].second,
+                                m_inputTuple.getNValue(m_inputTargetMap[map_ctr].first));
+        }
+
+        // if there is a partition column for the target table
+        if (m_partitionColumn != -1) {
+            // check for partition problems
+            // get the value for the partition column
+            NValue value = tempTuple.getNValue(m_partitionColumn);
+            bool isLocal = m_engine->isLocalSite(value);
+
+            // if it doesn't map to this site
+            if (!isLocal) {
+                char message[128];
+                snprintf(message, 128, "Mispartitioned tuple in single-partition plan for"
+                               " table '%s'", m_targetTable->name().c_str());
+                VOLT_INFO(message);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            }
+        }
+
+        if (!m_targetTable->updateTuple(tempTuple, m_targetTuple,
+                                        m_updatesIndexes)) {
+                char message[128];
+                snprintf(message, 128, "Failed to update tuple from table '%s'",
+                      m_targetTable->name().c_str());
+                VOLT_INFO(message);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+        }
+    }
+
+    m_state->m_done = true;
+    TableTuple& count_tuple = m_state->m_outputTable->tempTuple();
+    count_tuple.setNValue(0, ValueFactory::getBigIntValue(m_state->m_tempInputTable->activeTupleCount()));
+    return count_tuple;
+}
+
+void UpdateExecutor::p_post_execute_pull()
+{
+    VOLT_TRACE("TARGET TABLE - AFTER: %s\n", m_targetTable->debug().c_str());
+    // TODO lets output result table here, not in result executor. same thing in
+    // delete/insert
+
+    // add to the planfragments count of modified tuples
+    m_engine->m_tuplesModified += m_state->m_tempInputTable->activeTupleCount();
+
+}
+
+void UpdateExecutor::p_insert_output_table_pull(TableTuple& tuple)
+{
+    // try to put the tuple into the output table
+    if (!m_state->m_outputTable->insertTuple(tuple))
+    {
+        char message[128];
+        snprintf(message, 128, "Failed to insert tuple count (%ld) into"
+                   " output table '%s'",
+                   static_cast<long int>(m_state->m_tempInputTable->activeTupleCount()),
+                   m_state->m_outputTable->name().c_str());
+        VOLT_INFO(message);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+    }
 }

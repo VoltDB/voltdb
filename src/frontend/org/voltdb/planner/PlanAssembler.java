@@ -564,10 +564,13 @@ public class PlanAssembler {
             // The call here to generateOutputSchema() will recurse down to
             // the scan node and cause it to update appropriately.
             assert(subSelectRoot instanceof AbstractScanPlanNode);
-            subSelectRoot.addInlinePlanNode(projectionNode);
+            //subSelectRoot.addInlinePlanNode(projectionNode);
+            subSelectRoot.clearParents();
+            projectionNode.addAndLinkChild(subSelectRoot);
 
             // connect the nodes to build the graph
-            updateNode.addAndLinkChild(subSelectRoot);
+            //updateNode.addAndLinkChild(subSelectRoot);
+            updateNode.addAndLinkChild(projectionNode);
             updateNode.generateOutputSchema(m_catalogDb);
 
             return updateNode;
@@ -590,8 +593,11 @@ public class PlanAssembler {
 
             // link in the update node
             assert (scanNode instanceof AbstractScanPlanNode);
-            scanNode.addInlinePlanNode(projectionNode);
-            updateNode.addAndLinkChild(scanNode);
+            scanNode.clearParents();
+            projectionNode.addAndLinkChild(scanNode);
+            updateNode.addAndLinkChild(projectionNode);
+            //scanNode.addInlinePlanNode(projectionNode);
+            //updateNode.addAndLinkChild(scanNode);
             updateNode.generateOutputSchema(m_catalogDb);
             sendNode.addAndLinkChild(updateNode);
             sendNode.generateOutputSchema(m_catalogDb);
