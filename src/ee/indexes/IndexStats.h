@@ -106,6 +106,7 @@ private:
     voltdb::NValue m_indexType;
 
     int8_t m_isUnique;
+    int8_t m_isCountable;
 
     int64_t m_lastTupleCount;
     int64_t m_lastMemEstimate;

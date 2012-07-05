@@ -36,6 +36,7 @@ vector<string> IndexStats::generateIndexStatsColumnNames() {
     columnNames.push_back("TABLE_NAME");
     columnNames.push_back("INDEX_TYPE");
     columnNames.push_back("IS_UNIQUE");
+    columnNames.push_back("IS_COUNTABLE");
     columnNames.push_back("ENTRY_COUNT");
     columnNames.push_back("MEMORY_ESTIMATE");
 
@@ -64,6 +65,11 @@ void IndexStats::populateIndexStatsSchema(
     allowNull.push_back(false);
 
     // is unique
+    types.push_back(VALUE_TYPE_TINYINT);
+    columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
+    allowNull.push_back(false);
+
+    // is countable
     types.push_back(VALUE_TYPE_TINYINT);
     columnLengths.push_back(NValue::getTupleStorageSize(VALUE_TYPE_TINYINT));
     allowNull.push_back(false);
@@ -109,7 +115,7 @@ IndexStats::generateEmptyIndexStatsTable()
  * Constructor caches reference to the table that will be generating the statistics
  */
 IndexStats::IndexStats(TableIndex* index)
-    : StatsSource(), m_index(index), m_isUnique(0),
+    : StatsSource(), m_index(index), m_isUnique(0), m_countable(0),
       m_lastTupleCount(0), m_lastMemEstimate(0)
 {
 }
@@ -138,6 +144,7 @@ void IndexStats::configure(
     m_tableName = ValueFactory::getStringValue(tableName);
     m_indexType = ValueFactory::getStringValue(m_index->getTypeName());
     m_isUnique = static_cast<int8_t>(m_index->isUniqueIndex() ? 1 : 0);
+    m_countable = static_cast<int8_t>(m_index->isCountableIndex() ? 1 : 0);
 }
 
 /**
@@ -175,6 +182,9 @@ void IndexStats::updateStatsTuple(TableTuple *tuple) {
     tuple->setNValue(
             StatsSource::m_columnName2Index["IS_UNIQUE"],
             ValueFactory::getTinyIntValue(m_isUnique));
+    tuple->setNValue(
+                StatsSource::m_columnName2Index["IS_COUNTABLE"],
+                ValueFactory::getTinyIntValue(m_isCountable));
     tuple->setNValue( StatsSource::m_columnName2Index["ENTRY_COUNT"],
             ValueFactory::getBigIntValue(count));
     tuple->setNValue(StatsSource::m_columnName2Index["MEMORY_ESTIMATE"],
