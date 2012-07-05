@@ -176,7 +176,7 @@ public class SpScheduler extends Scheduler
             }
             else {
                 newSpHandle = msg.getSpHandle();
-                // FUTURE: update SP handle state on replicas based on value from primary
+                m_txnId.set(newSpHandle);
             }
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, runner,
@@ -312,6 +312,7 @@ public class SpScheduler extends Scheduler
         }
         else {
             newSpHandle = msg.getSpHandle();
+            m_txnId.set(newSpHandle);
         }
 
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
