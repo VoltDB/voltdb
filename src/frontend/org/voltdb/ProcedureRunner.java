@@ -33,6 +33,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Random;
+import java.util.concurrent.ExecutionException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.VoltProcedure.VoltAbortException;
@@ -43,6 +44,8 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.AdHocPlannedStatement;
+import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.ProcedureCompiler;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.TransactionState;
@@ -97,6 +100,7 @@ public class ProcedureRunner {
     //
     protected final SiteProcedureConnection m_site;
     protected final SystemProcedureExecutionContext m_systemProcedureContext;
+    protected final CatalogSpecificPlanner m_csp;
 
     // per procedure state and catalog info
     //
@@ -117,13 +121,15 @@ public class ProcedureRunner {
     ProcedureRunner(VoltProcedure procedure,
                     SiteProcedureConnection site,
                     SystemProcedureExecutionContext sysprocContext,
-                    Procedure catProc) {
+                    Procedure catProc,
+                    CatalogSpecificPlanner csp) {
         m_procedureName = procedure.getClass().getSimpleName();
         m_procedure = procedure;
         m_isSysProc = procedure instanceof VoltSystemProcedure;
         m_catProc = catProc;
         m_site = site;
         m_systemProcedureContext = sysprocContext;
+        m_csp = csp;
 
         m_procedure.init(this);
 
@@ -354,6 +360,40 @@ public class ProcedureRunner {
 
     public void voltQueueSQL(final SQLStmt stmt, Object... args) {
         voltQueueSQL(stmt, (Expectation) null, args);
+    }
+
+    public void voltQueueSQL(final String sql, Object... args) {
+        if (sql == null || sql.isEmpty()) {
+            throw new IllegalArgumentException("SQL statement '" + sql + "' is null or the empty string");
+        }
+
+        try {
+            AdHocPlannedStmtBatch paw = m_csp.plan( sql, !m_catProc.getSinglepartition()).get();
+            if (paw.errorMsg != null) {
+                throw new VoltAbortException("Failed to plan sql '" + sql + "' error: " + paw.errorMsg);
+            }
+
+            if (m_catProc.getReadonly() && !paw.isReadOnly()) {
+                throw new VoltAbortException("Attempted to queue DML adhoc sql '" + sql + "' from read only procedure");
+            }
+
+            assert(1 == paw.plannedStatements.size());
+
+            QueuedSQL queuedSQL = new QueuedSQL();
+            AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
+            queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan( plannedStatement.sql,
+                    plannedStatement.aggregatorFragment,
+                    plannedStatement.collectorFragment,
+                    plannedStatement.isReplicatedTableDML,
+                    plannedStatement.params);
+            queuedSQL.params = getCleanParams( queuedSQL.stmt, args);
+            m_batch.add(queuedSQL);
+        } catch (Exception e) {
+            if (e instanceof ExecutionException) {
+                throw new VoltAbortException(e.getCause());
+            }
+            throw new VoltAbortException(e);
+        }
     }
 
     public VoltTable[] voltExecuteSQL(boolean isFinalSQL) {
@@ -1170,12 +1210,15 @@ public class ProcedureRunner {
 
                @Override
                public VoltTable[] onExecuteUnplanned(final List<QueuedSQL> batch, final boolean last) {
-                   VoltTable[] results = new VoltTable[batch.size()];
+                   final VoltTable[] results = new VoltTable[batch.size()];
                    for (int i = 0; i < batch.size(); i++) {
-                       String aggregatorFragment = batch.get(i).stmt.getPlan().getAggregatorFragment();
+                       final QueuedSQL queuedSQL = batch.get(i);
+                       final SQLStmt stmt = queuedSQL.stmt;
+                       final String aggregatorFragment = stmt.getPlan().getAggregatorFragment();
                        assert(aggregatorFragment != null);
                        results[i] = m_site.executeCustomPlanFragment(aggregatorFragment,
                                                                      AGG_DEPID, m_txnState.txnId,
+                                                                     queuedSQL.params,
                                                                      m_catProc.getReadonly());
                    }
                    return results;
@@ -1208,7 +1251,7 @@ public class ProcedureRunner {
                    subResults = executor.onExecutePrePlanned(batch.subList(iFrom, iTo),
                                                              iTo == batch.size() - 1);
                    results.addAll(Arrays.asList(subResults));
-                   iFrom = iTo + 1;
+                   iFrom = iTo;
                }
                subResults = executor.onExecuteUnplanned(batch.subList(iTo, iTo + 1),
                                                         iTo == batch.size() - 1);

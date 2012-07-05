@@ -52,7 +52,7 @@ public class TestRejoinFuzz extends RejoinTestBase {
         final LocalCluster cluster =
             new LocalCluster(
                     "rejoin.jar",
-                    2,
+                    4,
                     numHosts,
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,

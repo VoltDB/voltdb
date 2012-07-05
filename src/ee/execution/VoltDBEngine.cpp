@@ -439,6 +439,7 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
 int VoltDBEngine::executePlanFragment(string fragmentString,
                                       int32_t outputDependencyId,
                                       int32_t inputDependencyId,
+                                      const NValueArray &params,
                                       int64_t txnId,
                                       int64_t lastCommittedTxnId)
 {
@@ -454,9 +455,8 @@ int VoltDBEngine::executePlanFragment(string fragmentString,
     {
         if (initPlanFragment(AD_HOC_FRAG_ID, fragmentString))
         {
-            NValueArray parameterValueArray(0);
             retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId,
-                                  inputDependencyId, parameterValueArray,
+                                  inputDependencyId, params,
                                   txnId, lastCommittedTxnId, true, true);
         }
         else

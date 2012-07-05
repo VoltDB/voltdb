@@ -40,8 +40,16 @@ import org.voltdb.messaging.FragmentTaskMessage;
  *
  */
 public abstract class TransactionState extends OrderableTransaction  {
+
+    public static enum RejoinState {
+        NORMAL,
+        REJOINING,
+        REPLAYING
+    }
+
     public final long coordinatorSiteId;
     protected final boolean m_isReadOnly;
+    protected final TransactionInfoBaseMessage m_notice;
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
     protected final SiteTransactionConnection m_site;
@@ -49,6 +57,9 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     protected boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
+
+    // is this transaction run during a rejoin
+    protected RejoinState m_rejoinState = RejoinState.NORMAL;
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -64,9 +75,22 @@ public abstract class TransactionState extends OrderableTransaction  {
         super(notice.getTxnId(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = site;
+        m_notice = notice;
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
+    }
+
+    final public TransactionInfoBaseMessage getNotice() {
+        return m_notice;
+    }
+
+    public TransactionInfoBaseMessage getTransactionInfoBaseMessageForRejoinLog() {
+        return m_notice;
+    }
+
+    public RejoinState getRejoinState() {
+        return m_rejoinState;
     }
 
     // Assume that done-ness is a latch.
@@ -100,7 +124,7 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract boolean hasTransactionalWork();
 
-    public abstract boolean doWork(boolean recovering);
+    public abstract boolean doWork(boolean rejoining);
 
     public void storeResults(ClientResponseImpl response) {
         m_response = response;
