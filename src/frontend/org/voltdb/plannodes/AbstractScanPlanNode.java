@@ -23,7 +23,6 @@ import java.util.List;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.*;
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.*;
 import org.voltdb.types.PlanNodeType;
@@ -305,7 +304,5 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.value(m_predicate);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
     }
-    
-    @Override
-    public void loadFromJSONObject( JSONObject jobj ) {}
+
 }

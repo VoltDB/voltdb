@@ -17,6 +17,8 @@
 
 package org.voltdb.plannodes;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
@@ -60,5 +62,19 @@ public class SeqScanPlanNode extends AbstractScanPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         return "SEQUENTIAL SCAN of \"" + m_targetTableName + "\"";
+    }
+    
+    @Override
+    public void loadFromJSONObject( JSONObject jobj ) {
+    	try {
+			if ( !jobj.getString("PLAN_NODE_TYPE").equalsIgnoreCase("SEQSCAN") ) {
+				System.err.println("JSONObject is not of type SEQSCAN");
+				return;
+			}
+			
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
 }

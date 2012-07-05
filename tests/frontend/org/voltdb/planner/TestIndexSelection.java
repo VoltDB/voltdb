@@ -183,6 +183,14 @@ public class TestIndexSelection extends TestCase {
 			
 			JSONArray values = jobj.getJSONArray("PLAN_NODES");
 			System.out.println( values.getJSONObject(0).toString() );
+			System.out.println( values.getJSONObject(0).getString("OUTPUT_SCHEMA") );
+			for( int i = 0; i < 6; i++ )
+				System.out.println( values.getJSONObject(i).getString("PLAN_NODE_TYPE") );
+			String str = values.getJSONObject(3).getString("CHILDREN_IDS");
+			System.out.println(str);
+			System.out.println( str.split(",")[1] );
+			System.out.println( values.getJSONObject(0).getJSONArray("CHILDREN_IDS").get(0));
+			//ArrayList<Integer> intlist =  
 			System.out.println( jobj.toString() );
 		} catch (JSONException e1) {
 			// TODO Auto-generated catch block
@@ -213,6 +221,18 @@ public class TestIndexSelection extends TestCase {
     		e.printStackTrace();
     	}
 			System.out.println( prettyJson );
+		JSONObject jobj1;
+		try {
+			jobj1 = new JSONObject( prettyJson );
+			JSONArray jarray = 	jobj1.getJSONArray("PLAN_NODES");
+			PlanNodeTree pnt1 = new PlanNodeTree();
+			pnt1.loadFromJSONArray(jarray);
+			System.out.println( pnt1.toJSONString() );
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+		
         
     }
     

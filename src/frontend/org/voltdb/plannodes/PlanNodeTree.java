@@ -19,7 +19,10 @@ package org.voltdb.plannodes;
 
 import java.util.*;
 import org.voltdb.VoltType;
+import org.voltdb.types.PlanNodeType;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
@@ -107,5 +110,41 @@ public class PlanNodeTree implements JSONString {
             stringer.array().value(parameter.getFirst()).value(parameter.getSecond().name()).endArray();
         }
         stringer.endArray();
+    }
+    
+    public void loadFromJSONArray( JSONArray jArray ) {
+    	int size = jArray.length();
+    	
+		try {
+			for( int i = 0; i < size; i++ ) {
+		    	JSONObject jobj;
+				jobj = jArray.getJSONObject(i);
+				String nodeType = jobj.getString("PLAN_NODE_TYPE");
+				int nodeTypeInt = PlanNodeType.get( nodeType ).getValue();
+	    		AbstractPlanNode apn = null;
+	    		
+	    		if( nodeTypeInt == PlanNodeType.SEQSCAN.getValue() ) {
+	    			apn = new SeqScanPlanNode();
+	    			apn.loadFromJSONObject(jobj);
+	    		}
+	    		else {
+	    			apn = new SeqScanPlanNode();
+	    		}
+	    		m_planNodes.add(apn);
+			}
+			//link children and parents
+			for( int i = 0; i < size; i++ ) {
+				JSONObject jobj;
+				jobj = jArray.getJSONObject(i);
+				JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
+				for( int j = 0; j < children.length(); j++ ) {
+					m_planNodes.get(i).addAndLinkChild( m_planNodes.get(j) );
+				}
+			}
+    	}
+		catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}	
     }
 }

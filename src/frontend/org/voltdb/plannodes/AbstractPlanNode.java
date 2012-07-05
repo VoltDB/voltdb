@@ -27,7 +27,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
@@ -659,6 +661,21 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
         stringer.endArray();
     }
+    
+    public void loadFromJSONObject( JSONObject jobj ) {
+    	if( jobj == null ) {
+    		System.err.println("JSONObject is null");
+    		return;
+    	}
+    	try {
+			m_id = Integer.getInteger( jobj.getString( Members.ID.name() ) );
+			//todo : need to set up output_schema, inline_nodes
+						
+		} catch (JSONException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
 
     public String toExplainPlanString() {
         StringBuilder sb = new StringBuilder();
@@ -694,4 +711,5 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     protected abstract String explainPlanForNode(String indent);
+
 }
