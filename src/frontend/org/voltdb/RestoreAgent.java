@@ -1110,20 +1110,20 @@ SnapshotCompletionInterest {
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          false,
                                           m_allPartitions, m_allPartitions.length,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis());
+                                          EstTime.currentTimeMillis(),
+                                          false);
         } else {
             m_initiator.createTransaction(-1, "CommandLog", true,
                                           txnId, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
-                                          false,
                                           m_allPartitions, m_allPartitions.length,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis());
+                                          EstTime.currentTimeMillis(),
+                                          false);
         }
     }
 

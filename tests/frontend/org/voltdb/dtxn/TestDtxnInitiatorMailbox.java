@@ -123,10 +123,10 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEveryPartition,
-                                      boolean isNonDeterministic,
                                       int[] partitions, int numPartitions,
                                       Object clientData, int messageSize,
-                                      long now)
+                                      long now,
+                                      boolean allowMismatchedResults)
         {
             return true;
         }
@@ -140,12 +140,12 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
-                                      boolean isNonDeterministic,
                                       int[] partitions,
                                       int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now)
+                                      long now,
+                                      boolean allowMismatchedResults)
         {
             return true;
         }
@@ -218,8 +218,8 @@ public class TestDtxnInitiatorMailbox extends TestCase
         long now = EstTime.currentTimeMillis();
         InFlightTxnState retval = new InFlightTxnState(
                 txnId, coordIds[0], null, new long[]{}, readOnly,
-                isSinglePart, false, new StoredProcedureInvocation(),
-                m_testConnect, MESSAGE_SIZE, now, 0, "", false);
+                isSinglePart, new StoredProcedureInvocation(),
+                m_testConnect, MESSAGE_SIZE, now, 0, "", false, false);
         if (coordIds.length > 1) {
             for (int i = 1; i < coordIds.length; i++)
                 retval.addCoordinator(coordIds[i]);
@@ -423,7 +423,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
 
         m_testStream.reset();
 
-        // Single-partition read-only txn (ENG-3288 - r/o non-deterministic succeeds)
+        // Single-partition read-only txn
         dim.addPendingTxn(createTxnState(0, new int[] {0,1}, true, true));
         dim.deliver(createInitiateResponse(0, 0, true, true, false, createResultSet("dude")));
         assertTrue(m_testStream.gotResponse());
@@ -440,7 +440,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
                 caught = true;
             }
         }
-        assertTrue(!caught);
+        assertTrue(caught);
         m_testStream.reset();
 
         // Single-partition read-write txn

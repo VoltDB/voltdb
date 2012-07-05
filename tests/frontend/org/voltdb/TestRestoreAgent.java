@@ -181,16 +181,16 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
-                                      boolean isNonDeterministic,
                                       int[] partitions,
                                       int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now) {
+                                      long now,
+                                      boolean allowMismatchedResults) {
             createTransaction(connectionId, connectionHostname, adminConnection,
                               0, invocation, isReadOnly, isSinglePartition,
-                              isEverySite, isNonDeterministic, partitions, numPartitions,
-                              clientData, messageSize, now);
+                              isEverySite, partitions, numPartitions,
+                              clientData, messageSize, now, allowMismatchedResults);
             return true;
         }
 
@@ -203,12 +203,12 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
                                       boolean isEverySite,
-                                      boolean isNonDeterministic,
                                       int[] partitions,
                                       int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now) {
+                                      long now,
+                                      boolean allowMismatchedResults) {
             String procName = invocation.procName;
             if (!procCounts.containsKey(procName)) {
                 m_unexpectedSPIs.add(procName);
