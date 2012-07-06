@@ -1615,9 +1615,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final long clientHandle,
             final Connection c,
             final boolean notifyChanges) throws Exception {
-        Watcher watcher = null;
         if (notifyChanges) {
-            watcher = new Watcher() {
+            Watcher watcher = new Watcher() {
                 @Override
                 public void process(final WatchedEvent event) {
                     if (event.getState() == KeeperState.Disconnected) return;
@@ -1645,9 +1644,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                     }
                 }
             };
+
+            // Set the watcher
+            m_zk.exists(event.getPath(), watcher);
         }
 
-        byte responseBytes[] = m_zk.getData(event.getPath(), watcher, null);
+        byte responseBytes[] = m_zk.getData(event.getPath(), false, null);
         try {
             m_zk.delete(event.getPath(), -1, null, null);
         } catch (Exception e) {
