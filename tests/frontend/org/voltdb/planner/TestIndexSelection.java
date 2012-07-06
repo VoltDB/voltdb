@@ -232,9 +232,6 @@ public class TestIndexSelection extends TestCase {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-		
-        
     }
-    
 }
 

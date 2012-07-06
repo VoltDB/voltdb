@@ -109,8 +109,15 @@ public class testPlannerTester extends TestCase {
 //	
 //        //assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("LIMIT") = 1 );
 //    }
+    public void testWriteAndLoad() {
+    	AbstractPlanNode pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+    	String path = "/home/zhengli/prettyJson.txt";
+    	plannerTester.writePlanToFile(pn, path);
+    	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path);
+    	System.out.println( pnt.toJSONString() );
+    }
     
-    public void testLoadPlan() {
+    public void testLoadFromJSON() {
     	AbstractPlanNode pn1 = null;
         //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
     	pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
@@ -188,6 +195,5 @@ public class testPlannerTester extends TestCase {
         assertTrue(pn2 != null);
         plannerTester.diffLeaves(pn1, pn2);
     }
-    
 }
 

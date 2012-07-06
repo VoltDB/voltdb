@@ -657,7 +657,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     	try {
     		String str = jobj.getString( Members.ID.name() );
 			m_id = (int)Integer.parseInt( str );
-			//todo : need to set up output_schema, inline_nodes
+			
+			//todo : need to set up output_schema, inline_nodes and members in various plannodes
+			
 			m_outputSchema = new NodeSchema();
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block

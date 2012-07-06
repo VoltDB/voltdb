@@ -1,22 +1,94 @@
 package org.voltdb.planner;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map.Entry;
 
 import org.eclipse.jetty.util.ajax.JSON;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlanNodeType;
 
 public class plannerTester {
-	public static void writeToFile( AbstractPlanNode pn, String path ) {
+	private static PlannerTestAideDeCamp aide;
+	private static String m_ddl = "testplans-plannerTester-ddl.sql";
+
+    protected void setUpSchema( String ddl, String basename ) throws Exception {
+        aide = new PlannerTestAideDeCamp(TestIndexSelection.class.getResource(ddl),
+        		basename);
+
+        // Set all tables to non-replicated.
+        Cluster cluster = aide.getCatalog().getClusters().get("cluster");
+        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
+        for (Table t : tmap) {
+            t.setIsreplicated(false);
+        }
+    }
+
+    protected void tearDown() throws Exception {
+        aide.tearDown();
+    }
+    
+	public static AbstractPlanNode compile( String sql, int paramCount,
+            boolean singlePartition ) throws Exception {
+		List<AbstractPlanNode> pn = null;
+        pn =  aide.compile(sql, paramCount, singlePartition);
+        return pn.get(0);
+	}
+	
+	public static void writePlanToFile( AbstractPlanNode pn, String path ) {
 		if( pn == null ) {
 			System.err.println("the plan node is null, nothing to write");
 			System.exit(-1);
 		}
-	//	while( pn.getChild(index))
+		PlanNodeTree pnt = new PlanNodeTree( pn );
+		String prettyJson = pnt.toJSONString();
+        try {
+		    	BufferedWriter writer = new BufferedWriter( new FileWriter( path ) );
+		    	writer.write( prettyJson );
+		    	writer.flush();
+		    	writer.close();
+	   	} catch (IOException e) {
+			e.printStackTrace();
+		}
+	}
+	
+	public static PlanNodeTree loadPlanFromFile( String path ) {
+		PlanNodeTree pnt = new PlanNodeTree();
+		String prettyJson = "";
+		String line = null;
+		 try {
+				BufferedReader reader = new BufferedReader( new FileReader( path ));
+				while( (line = reader.readLine() ) != null ){
+					line = line.trim();
+					prettyJson += line;
+				}
+			}
+	        catch (IOException e) {
+	    		e.printStackTrace();
+	    	}
+			JSONObject jobj;
+			try {
+				jobj = new JSONObject( prettyJson );
+				JSONArray jarray = 	jobj.getJSONArray("PLAN_NODES");
+				pnt.loadFromJSONArray(jarray);
+			} catch (JSONException e) {
+				e.printStackTrace();
+			}
+		return pnt;
 	}
 	
 	
