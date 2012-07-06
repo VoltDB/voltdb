@@ -1337,6 +1337,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         return;
                     }
 
+                    m_recoveryLog.debug("Received rejoin snapshot txnId " + txnId);
+
                     // Send a message to self to avoid synchronization
                     RejoinMessage msg = new RejoinMessage(txnId);
                     m_mailbox.send(getSiteId(), msg);
