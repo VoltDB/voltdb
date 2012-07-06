@@ -1394,15 +1394,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @return  true if it has any non-deterministic statements
      */
     static boolean isProcedureNonDeterministic(Procedure proc) {
+        boolean isNonDeterministic = false;
         CatalogMap<Statement> stmts = proc.getStatements();
         if (stmts != null) {
             for (Statement stmt : stmts) {
-                if (stmt.getIscontentdeterministic() || stmt.getIsorderdeterministic()) {
-                    return true;
+                if (!stmt.getIscontentdeterministic() || !stmt.getIsorderdeterministic()) {
+                    isNonDeterministic = true;
+                    break;
                 }
             }
         }
-        return false;
+        return isNonDeterministic;
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) {

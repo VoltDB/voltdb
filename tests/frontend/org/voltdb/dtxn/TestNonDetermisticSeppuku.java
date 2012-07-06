@@ -53,7 +53,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
             builder.addPartitionInfo("kv", "key");
             builder.addProcedures(NonDeterministicSPProc.class,
                                   NonDeterministic_RO_MP.class,
-                                  NonDeterministic_RO_SP.class);
+                                  NonDeterministic_RO_SP.class,
+                                  Deterministic_RO_MP.class);
 
             cluster = new LocalCluster("det1.jar", 1, 2, 1, BackendTarget.NATIVE_EE_JNI);
             cluster.overrideAnyRequestForValgrind();
@@ -174,7 +175,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
 
     /**
      * Do a non-deterministic insertion followed by a single partition ad hoc read-only operation.
-     * ENG-3288 - Expect non-deterministic read-only queries to succeed.
+     * ENG-3288 - Expect non-deterministic read-only single partition queries to succeed.
      */
     public void testNonDeterministicAdHoc_RO_SP() throws Exception {
         client.callProcedure(
@@ -187,6 +188,42 @@ public class TestNonDetermisticSeppuku extends TestCase {
         }
         catch (ProcCallException e) {
             fail("Ad hoc R/O SP mismatch failed?! " + e.toString());
+        }
+    }
+
+    /**
+     * For now ad hoc succeeds because we don't have adequate information and we
+     * assume it's non-deterministic.
+     */
+    public void testDeterministicProc() throws Exception {
+        client.callProcedure(
+                "NonDeterministicSPProc",
+                0,
+                NonDeterministicSPProc.MISMATCH_INSERTION);
+        try {
+            client.callProcedure("Deterministic_RO_MP");
+            fail("Deterministic procedure succeeded for non-deterministic results?");
+        }
+        catch (ProcCallException e) {
+            // success!!
+        }
+    }
+
+    /**
+     * For now ad hoc succeeds because we don't have adequate information and we
+     * assume it's non-deterministic.
+     */
+    public void testDeterministicAdHoc() throws Exception {
+        client.callProcedure(
+                "NonDeterministicSPProc",
+                0,
+                NonDeterministicSPProc.MISMATCH_INSERTION);
+        try {
+            client.callProcedure("@AdHoc", "select * from kv order by key");
+            // success!!
+        }
+        catch (ProcCallException e) {
+            fail("Deterministic ad hoc query succeeded for non-deterministic results?");
         }
     }
 
