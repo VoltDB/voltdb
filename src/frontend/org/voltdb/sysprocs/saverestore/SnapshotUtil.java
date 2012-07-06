@@ -998,15 +998,26 @@ public class SnapshotUtil {
                 ClientResponse response = null;
                 // abort if unable to succeed in 2 hours
                 final long startTime = System.currentTimeMillis();
+                boolean hasRequested = false;
                 while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
                     try {
-                        sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking,
-                                                     format, data, notifyChanges);
+                        if (!hasRequested) {
+                            sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking,
+                                                         format, data, notifyChanges);
+                            hasRequested = true;
+                        }
+
                         response = responseExchanger.exchange(null);
                         VoltTable[] results = response.getResults();
                         if (response.getStatus() != ClientResponse.SUCCESS) {
                             break;
                         } else if (isSnapshotInProgress(results)) {
+                            // retry after a second
+                            Thread.sleep(1000);
+                            // Request again
+                            hasRequested = false;
+                            continue;
+                        } else if (isSnapshotQueued(results) && notifyChanges) {
                             // retry after a second
                             Thread.sleep(1000);
                             continue;

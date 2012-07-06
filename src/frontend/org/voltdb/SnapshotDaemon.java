@@ -808,6 +808,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 result.resetRowPosition();
                                 hostLog.info(result);
                             } else {
+                                hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
+                                        VoltZK.user_snapshot_response + requestId);
                                 /*
                                  * Snapshot was started no problem, reset the watch for new requests
                                  */
@@ -1633,13 +1635,18 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         ClientResponseImpl response = new ClientResponseImpl();
         response.initFromBuffer(buf);
         response.setClientHandle(clientHandle);
+
         // Not sure if we need to preserve the original byte buffer here, playing it safe
         ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf2.putInt(buf2.capacity() - 4);
         response.flattenToBuffer(buf2).flip();
         c.writeStream().enqueue(buf2);
 
-        if (notifyChanges && SnapshotUtil.isSnapshotInProgress(response.getResults())) {
+        /*
+         * If the caller wants to be notified of final results for the snapshot
+         * request, set up a watcher only if the snapshot is queued.
+         */
+        if (notifyChanges && SnapshotUtil.isSnapshotQueued(response.getResults())) {
             Watcher watcher = new Watcher() {
                 @Override
                 public void process(final WatchedEvent event) {
@@ -1670,7 +1677,9 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             };
 
             // Set the watcher
-            m_zk.exists(event.getPath(), watcher);
+            if (m_zk.exists(event.getPath(), watcher) != null) {
+                processUserSnapshotRequestResponse(event, clientHandle, c, false);
+            }
         }
     }
 
