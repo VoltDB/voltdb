@@ -280,6 +280,7 @@ public class InitiatorMailbox implements Mailbox
 
     void logRxMessage(VoltMessage message)
     {
+        Iv2Trace.logInitiatorRxMsg(message, m_hsId);
         if (LOG_RX) {
             hostLog.info("RX HSID: " + CoreUtils.hsIdToString(m_hsId) +
                     ": " + message);

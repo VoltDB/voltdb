@@ -71,6 +71,7 @@ import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheReader;
 
 import org.voltdb.iv2.Cartographer;
+import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltZK.MailboxType;
@@ -851,6 +852,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             invocation,
                             handle);
 
+                Iv2Trace.logCreateTransaction(workRequest);
                 m_mailbox.send(initiatorHSId, workRequest);
             } catch (JSONException e) {
                 m_ciHandles.removeHandle(handle);
@@ -932,6 +934,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (message instanceof InitiateResponseMessage) {
                         // forward response; copy is annoying. want slice of response.
                         InitiateResponseMessage response = (InitiateResponseMessage)message;
+                        Iv2Trace.logFinishTransaction(response);
                         ClientInterfaceHandleManager.Iv2InFlight clientData =
                             m_ciHandles.findHandle(response.getClientInterfaceHandle());
                         response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
