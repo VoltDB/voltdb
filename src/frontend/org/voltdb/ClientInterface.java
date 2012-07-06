@@ -851,7 +851,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             invocation,
                             handle);
 
-                        m_mailbox.send(initiatorHSId, workRequest);
+                m_mailbox.send(initiatorHSId, workRequest);
             } catch (JSONException e) {
                 m_ciHandles.removeHandle(handle);
                 throw new RuntimeException(e);
