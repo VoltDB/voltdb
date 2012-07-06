@@ -643,7 +643,7 @@ public class VoltProjectBuilder {
             compiler.enableDetailedCapture();
         }
         boolean success = compiler.compile(projectPath, jarPath);
-        m_diagnostics = compiler.harvestCapturedDetail(false);
+        m_diagnostics = compiler.harvestCapturedDetail();
         if (m_compilerDebugPrintStream != null) {
             if (success) {
                 compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
@@ -1059,15 +1059,17 @@ public class VoltProjectBuilder {
         return new File(m_voltRootPath);
     }
 
+    /** Provide a feedback path to monitor the VoltCompiler's plan output via harvestDiagnostics */
     public void enableDiagnostics() {
-        m_diagnostics = new ArrayList<String>(); // empty dummy enables feature
+        // This empty dummy value enables the feature and provides a default fallback return value,
+        // but gets replaced in the normal code path.
+        m_diagnostics = new ArrayList<String>();
     }
 
-    public List<String> harvestDiagnostics(boolean keepEnabled) {
+    /** Access the VoltCompiler's recent plan output, for diagnostic purposes */
+    public List<String> harvestDiagnostics() {
         List<String> result = m_diagnostics;
-        if (keepEnabled == false) {
-            m_diagnostics = null;
-        }
+        m_diagnostics = null;
         return result;
     }
 

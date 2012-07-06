@@ -1402,7 +1402,7 @@ public class TestVoltCompiler extends TestCase {
         // pb.addStmtProcedure("declaredspquery2", "select strval SODECLARED2 from blah where pkey = 12", "blah.pkey=12");
         boolean success = pb.compile(Configuration.getPathToCatalogForTest("test3324.jar"));
         assertTrue(success);
-        List<String> diagnostics = pb.harvestDiagnostics(true);
+        List<String> diagnostics = pb.harvestDiagnostics();
         // Enable to test ENG-3324, still at large: assertEquals(2, countStringsMatching(diagnostics, ".*\"UNDECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
         assertEquals(0, countStringsMatching(diagnostics, ".*\"SODECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
         // System.out.println("test3324MPPlan");

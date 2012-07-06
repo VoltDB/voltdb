@@ -166,13 +166,14 @@ public abstract class StatementCompiler {
         partitioning.setIsReplicatedTableDML(plan.replicatedTableDML);
 
         // output the explained plan to disk (or caller) for debugging
-        String planDescription =
-                "SQL: " + plan.sql
-                + "\nCOST: " + Double.toString(plan.cost)
-                + "\nPLAN:\n"
-                + plan.explainedPlan;
-        BuildDirectoryUtils.writeFile("statement-winner-plans", name + ".txt", planDescription);
-        compiler.captureDiagnosticContext(planDescription);
+        StringBuilder planDescription = new StringBuilder(1000); // Initial capacity estimate.
+        planDescription.append("SQL: ").append(plan.sql);
+        planDescription.append("\nCOST: ").append(plan.cost);
+        planDescription.append("\nPLAN:\n");
+        planDescription.append(plan.explainedPlan);
+        String planString = planDescription.toString();
+        BuildDirectoryUtils.writeFile("statement-winner-plans", name + ".txt", planString);
+        compiler.captureDiagnosticContext(planString);
 
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));

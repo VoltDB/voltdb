@@ -684,20 +684,19 @@ public class VoltCompiler {
     }
 
 
+    /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
     public void enableDetailedCapture() {
         m_capturedDiagnosticDetail = new ArrayList<String>();
     }
 
-    public List<String> harvestCapturedDetail(boolean keepCapturing) {
+    /** Access recent plan output, for diagnostic purposes */
+    public List<String> harvestCapturedDetail() {
         List<String> harvested = m_capturedDiagnosticDetail;
-        if (keepCapturing) {
-            m_capturedDiagnosticDetail = new ArrayList<String>();
-        } else {
-            m_capturedDiagnosticDetail = null;
-        }
+        m_capturedDiagnosticDetail = null;
         return harvested;
     }
 
+    /** Capture plan context info -- statement, cost, high-level "explain". */
     public void captureDiagnosticContext(String planDescription) {
         if (m_capturedDiagnosticDetail == null) {
             return;
@@ -705,6 +704,7 @@ public class VoltCompiler {
         m_capturedDiagnosticDetail.add(planDescription);
     }
 
+    /** Capture plan content in terse json format. */
     public void captureDiagnosticJsonFragment(String json) {
         if (m_capturedDiagnosticDetail == null) {
             return;
