@@ -144,6 +144,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 }
             }
             try {
+                System.out.println("Connecting to localhost:" + port);
                 m_socketChannel = SocketChannel.open(new InetSocketAddress(
                         "localhost", port));
                 m_socketChannel.configureBlocking(true);
@@ -806,11 +807,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     @Override
     public VoltTable executeCustomPlanFragment(final String plan,
             int inputDepId, final long txnId, final long lastCommittedTxnId,
-            final long undoQuantumToken) throws EEException
+            final long undoQuantumToken,
+            ParameterSet params) throws EEException
     {
         final FastSerializer fser = new FastSerializer();
+        final FastSerializer fser2 = new FastSerializer();
         try {
             fser.writeString(plan);
+            params.writeExternal(fser2);
         } catch (final IOException exception) {
             throw new RuntimeException(exception);
         }
@@ -822,7 +826,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putLong(undoQuantumToken);
         m_data.putInt(0); // output dep id is not needed
         m_data.putInt(inputDepId);
-        m_data.put(fser.getBuffer());
+        //-4 because the data from fser contains a length prefix
+        ByteBuffer fragBuf = fser.getBuffer();
+        ByteBuffer paramBuf = fser2.getBuffer();
+        fragBuf.position(4);//skip string length prefix
+        //Put all lengths and counts in fixed size portion
+        m_data.putInt(fragBuf.remaining());
+        m_data.putInt(paramBuf.remaining() - 2);
+        m_data.putShort(paramBuf.getShort());
+        m_data.put(fragBuf);
+        m_data.put(paramBuf);
 
         try {
             m_data.flip();

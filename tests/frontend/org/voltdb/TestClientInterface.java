@@ -274,7 +274,7 @@ public class TestClientInterface {
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, 0, "localhost", false, null);
-        plannedStmtBatch.addStatement("select * from a", null, null, false);
+        plannedStmtBatch.addStatement("select * from a", null, null, false, null);
         m_mb.deliver(new LocalObjectMessage(plannedStmtBatch));
         m_ci.checkForFinishedCompilerWork();
 
