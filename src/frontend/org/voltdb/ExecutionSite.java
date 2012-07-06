@@ -34,6 +34,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -1262,10 +1263,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         int partition = getCorrespondingPartitionId();
         long sourceSite = 0;
         List<Long> sourceSites = new ArrayList<Long>(m_tracker.getSitesForPartition(partition));
-        sourceSites.remove(getSiteId());
-        try {
-            sourceSite = sourceSites.get(0);
-        } catch (ArrayIndexOutOfBoundsException e) {
+        // Order the sites by host ID so that we won't get one that's still rejoining
+        TreeMap<Integer, Long> orderedSourceSites = new TreeMap<Integer, Long>();
+        for (long HSId : sourceSites) {
+            orderedSourceSites.put(CoreUtils.getHostIdFromHSId(HSId), HSId);
+        }
+        orderedSourceSites.remove(CoreUtils.getHostIdFromHSId(getSiteId()));
+        if (!orderedSourceSites.isEmpty()) {
+            sourceSite = orderedSourceSites.pollFirstEntry().getValue();
+        } else {
             VoltDB.crashLocalVoltDB("No source for partition " + partition,
                                     false, null);
         }
