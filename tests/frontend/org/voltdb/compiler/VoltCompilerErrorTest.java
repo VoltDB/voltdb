@@ -32,7 +32,7 @@ import org.voltdb.VoltDB.Configuration;
 
 public class VoltCompilerErrorTest extends TestCase {
 
-    public void statementErrorTest(String feature, String statement) throws Exception {
+    public void statementTest(String statement, String feature, boolean expectError) throws Exception {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
@@ -53,11 +53,18 @@ public class VoltCompilerErrorTest extends TestCase {
         builder.addLiteralSchema(simpleSchema);
         builder.addStmtProcedure(feature, statement);
         boolean success = builder.compile(Configuration.getPathToCatalogForTest("errors.jar"));
-        assertFalse(success);
+        assertEquals(expectError, ! success);
         String captured = capturer.toString("UTF-8");
         String[] lines = captured.split("\n");
+        assertEquals(expectError, foundLineMatching(lines, ".*[Ee]rror.*" + feature + ".*"));
+    }
 
-        assertTrue(foundLineMatching(lines, ".*[Ee]rror.*" + feature + ".*"));
+    public void statementErrorTest(String feature, String statement) throws Exception {
+        statementTest(statement, feature, true);
+    }
+
+    public void statementNonErrorTest(String feature, String statement) throws Exception {
+        statementTest(statement, feature, false);
     }
 
     private boolean foundLineMatching(String[] lines, String pattern) {
