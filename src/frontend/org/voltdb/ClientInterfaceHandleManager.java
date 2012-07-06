@@ -19,13 +19,14 @@ package org.voltdb;
 
 import java.util.ArrayDeque;
 import java.util.Deque;
-import java.util.HashMap;
 import java.util.Iterator;
-import java.util.Map;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.network.Connection;
+import org.voltcore.utils.Pair;
+
+import com.google.common.collect.ImmutableMap;
+import com.google.common.collect.ImmutableMap.Builder;
 
 /**
  * This manages per-partition handles used to identify responses for
@@ -43,6 +44,10 @@ public class ClientInterfaceHandleManager
     static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
     static final int PART_ID_SHIFT = 54;
     static final int SEQNUM_MAX = (1 << PART_ID_SHIFT) - 1;
+
+    private long m_outstandingTxns;
+    public final boolean isAdmin;
+    public final Connection connection;
 
     private static class HandleGenerator
     {
@@ -79,29 +84,25 @@ public class ClientInterfaceHandleManager
     {
         final long m_ciHandle;
         final long m_clientHandle;
-        final Connection m_connection;
-        final boolean m_isAdmin;
         final int m_messageSize;
         final long m_creationTime;
-        Iv2InFlight(long ciHandle, long clientHandle, Connection conn, boolean admin,
+        Iv2InFlight(long ciHandle, long clientHandle,
                 int messageSize, long creationTime)
         {
             m_ciHandle = ciHandle;
             m_clientHandle = clientHandle;
-            m_connection = conn;
-            m_isAdmin = admin;
             m_messageSize = messageSize;
             m_creationTime = creationTime;
         }
     }
 
-    private Map<Integer, HandleGenerator> m_handleGenerators =
-        new HashMap<Integer, HandleGenerator>();
-    private Map<Integer, Deque<Iv2InFlight>> m_partitionTxns =
-        new HashMap<Integer, Deque<Iv2InFlight>>();
+    private ImmutableMap<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>> m_partitionStuff =
+            new Builder<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>>().build();
 
-    ClientInterfaceHandleManager()
+    ClientInterfaceHandleManager(boolean isAdmin, Connection connection)
     {
+        this.isAdmin = isAdmin;
+        this.connection = connection;
     }
 
     /**
@@ -111,29 +112,31 @@ public class ClientInterfaceHandleManager
      * high-order non-sign bits (where the MP partition ID is the max value),
      * and a 53 bit sequence number in the low 53 bits.
      */
-    synchronized long getHandle(boolean isSinglePartition, int partitionId,
-            long clientHandle, Connection clientConnection, boolean adminConnection,
+    long getHandle(boolean isSinglePartition, int partitionId,
+            long clientHandle,
             int messageSize, long creationTime)
     {
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
         }
         HandleGenerator generator;
-        generator = m_handleGenerators.get(partitionId);
-        if (generator == null)
-        {
+        Deque<Iv2InFlight> perPartDeque;
+        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
+        if (partitionStuff == null) {
+            perPartDeque = new ArrayDeque<Iv2InFlight>();
             generator = new HandleGenerator(partitionId);
-            m_handleGenerators.put(partitionId, generator);
+            m_partitionStuff =
+                    new Builder<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>>().
+                        putAll(m_partitionStuff).
+                        put(partitionId, Pair.of(generator, perPartDeque)).build();
+        } else {
+            generator = partitionStuff.getFirst();
+            perPartDeque = partitionStuff.getSecond();
         }
         long ciHandle = generator.getNextHandle();
-        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle,
-               clientConnection, adminConnection, messageSize, creationTime);
-        Deque<Iv2InFlight> perPartDeque = m_partitionTxns.get(partitionId);
-        if (perPartDeque == null) {
-            perPartDeque = new ArrayDeque<Iv2InFlight>();
-            m_partitionTxns.put(partitionId, perPartDeque);
-        }
+        Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime);
         perPartDeque.addLast(inFlight);
+        m_outstandingTxns++;
         return ciHandle;
     }
 
@@ -142,19 +145,23 @@ public class ClientInterfaceHandleManager
      * cases.  Returns true or false depending on whether the given handle was
      * actually present and removed.
      */
-    synchronized boolean removeHandle(long ciHandle)
+    boolean removeHandle(long ciHandle)
     {
         int partitionId = getPartIdFromHandle(ciHandle);
-        Deque<Iv2InFlight> perPartDeque = m_partitionTxns.get(partitionId);
-        if (perPartDeque == null) {
+        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
+        if (partitionStuff == null) {
             return false;
         }
+
+        Deque<Iv2InFlight> perPartDeque = partitionStuff.getSecond();
         Iterator<Iv2InFlight> iter = perPartDeque.iterator();
         while (iter.hasNext())
         {
             Iv2InFlight inflight = iter.next();
             if (inflight.m_ciHandle == ciHandle) {
-                perPartDeque.remove(inflight);
+
+                iter.remove();
+                m_outstandingTxns--;
                 return true;
             }
         }
@@ -164,15 +171,18 @@ public class ClientInterfaceHandleManager
     /**
      * Retrieve the client information for the specified handle
      */
-    synchronized Iv2InFlight findHandle(long ciHandle)
+    Iv2InFlight findHandle(long ciHandle)
     {
         int partitionId = getPartIdFromHandle(ciHandle);
-        Deque<Iv2InFlight> perPartDeque = m_partitionTxns.get(partitionId);
-        if (perPartDeque == null) {
+        Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
+        if (partitionStuff == null) {
             // whoa, bad
             tmLog.error("Unable to find handle list for partition: " + partitionId);
             return null;
         }
+
+        Deque<Iv2InFlight> perPartDeque = partitionStuff.getSecond();
+
         while (perPartDeque.peekFirst() != null) {
             Iv2InFlight inFlight = perPartDeque.pollFirst();
             if (inFlight.m_ciHandle < ciHandle) {
@@ -180,6 +190,7 @@ public class ClientInterfaceHandleManager
                 tmLog.info("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
                         " for partition: " + partitionId + " while searching for handle " +
                         ciHandle);
+                m_outstandingTxns--;
             }
             else if (inFlight.m_ciHandle > ciHandle) {
                 // we've gone too far, need to jam this back into the front of the deque and run away.
@@ -189,6 +200,7 @@ public class ClientInterfaceHandleManager
                 break;
             }
             else {
+                m_outstandingTxns--;
                 return inFlight;
             }
         }
@@ -197,21 +209,8 @@ public class ClientInterfaceHandleManager
     }
 
     /** Return a map of ConnectionId::(adminmode, txn count) */
-    synchronized Map<Long, long[]> getIv2OutstandingTxnStats()
+    long getOutstandingTxns()
     {
-        HashMap<Long, long[]> retval = new HashMap<Long, long[]>();
-        for (Deque<Iv2InFlight> perPart : m_partitionTxns.values()) {
-            Iterator<Iv2InFlight> iter = perPart.iterator();
-            while (iter.hasNext()) {
-                Iv2InFlight inFlight = iter.next();
-                long connId = inFlight.m_connection.connectionId();
-                if (!retval.containsKey(connId)) {
-                    retval.put(connId, new long[]{0,0});
-                }
-                retval.get(connId)[0] = (inFlight.m_isAdmin ? 1 : 0);
-                retval.get(connId)[1]++;
-            }
-        }
-        return retval;
+        return m_outstandingTxns;
     }
 }

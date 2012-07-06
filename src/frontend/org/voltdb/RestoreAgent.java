@@ -362,7 +362,7 @@ SnapshotCompletionInterest {
 
         @Override
         public long connectionId() {
-            return -1;
+            return Long.MIN_VALUE + 1;
         }
 
         @Override

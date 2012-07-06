@@ -307,6 +307,11 @@ class VoltNetwork implements Runnable
                             invokeCallbacks();
                         }
 
+                        task = null;
+                        while ((task = m_tasks.poll()) != null) {
+                            task.run();
+                        }
+
                         if (m_networkId == 0) {
                             EstTimeUpdater.update(System.currentTimeMillis());
                         }

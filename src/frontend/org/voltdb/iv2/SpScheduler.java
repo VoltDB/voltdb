@@ -44,11 +44,11 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class SpScheduler extends Scheduler
 {
     List<Long> m_replicaHSIds = new ArrayList<Long>();
-    private Map<Long, TransactionState> m_outstandingTxns =
+    private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
-    private Map<Long, DuplicateCounter> m_duplicateCounters =
+    private final Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
-    private AtomicLong m_txnId = new AtomicLong(0);
+    private final AtomicLong m_txnId = new AtomicLong(0);
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -144,7 +144,8 @@ public class SpScheduler extends Scheduler
                         message.isReadOnly(),
                         message.isSinglePartition(),
                         message.getStoredProcedureInvocation(),
-                        message.getClientInterfaceHandle());
+                        message.getClientInterfaceHandle(),
+                        message.getConnectionId());
                 newSpHandle = m_txnId.incrementAndGet();
                 msg.setSpHandle(newSpHandle);
                 // Also, if this is a vanilla single-part procedure, make the TXNID
@@ -161,7 +162,8 @@ public class SpScheduler extends Scheduler
                                 msg.isReadOnly(),
                                 msg.isSinglePartition(),
                                 msg.getStoredProcedureInvocation(),
-                                msg.getClientInterfaceHandle());
+                                msg.getClientInterfaceHandle(),
+                                msg.getConnectionId());
                     // Update the handle in the copy
                     replmsg.setSpHandle(newSpHandle);
                     m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),

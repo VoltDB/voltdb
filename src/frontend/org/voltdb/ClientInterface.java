@@ -64,7 +64,9 @@ import org.voltcore.network.QueueMonitor;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
+import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.MapCache;
@@ -151,9 +153,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * IV2 stuff
      */
     private final MapCacheReader m_iv2Masters;
-    private ClientInterfaceHandleManager m_ciHandles =
-        new ClientInterfaceHandleManager();
-    private final BackpressureTracker m_backpressure;
+    private final COWMap<Long, ClientInterfaceHandleManager> m_ciHandles =
+            new COWMap<Long, ClientInterfaceHandleManager>();
     private final Cartographer m_cartographer;
 
     /**
@@ -396,6 +397,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             m_backpressureLock.lock();
                                             try {
                                                 if (!m_hasDTXNBackPressure) {
+                                                    if (VoltDB.instance().isIV2Enabled()) {
+                                                        m_ciHandles.put(c.connectionId(),
+                                                                new ClientInterfaceHandleManager( m_isAdmin, c));
+                                                    }
                                                     c.enableReadSelection();
                                                 }
                                                 m_connections.add(c);
@@ -709,6 +714,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void stopping(Connection c) {
             m_connections.remove(c);
+            m_ciHandles.remove(c.connectionId());
         }
 
         @Override
@@ -824,8 +830,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final long now)
     {
         if (VoltDB.instance().isIV2Enabled()) {
-            long handle = m_ciHandles.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
-                    (Connection)clientData, adminConnection, messageSize, now);
+            final ClientInterfaceHandleManager cihm = m_ciHandles.get(connectionId);
+            long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
+                    messageSize, now);
             try {
                 long initiatorHSId;
                 if (isSinglePartition) {
@@ -833,7 +840,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (master == null) {
                         hostLog.error("Failed to find master initiator for partition: "
                                 + Integer.toString(partitions[0]) + ". Transaction not initiated.");
-                        m_ciHandles.removeHandle(handle);
+                        cihm.removeHandle(handle);
                         return false;
                     }
                     initiatorHSId = master.getLong("hsid");
@@ -849,14 +856,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             isReadOnly,
                             isSinglePartition,
                             invocation,
-                            handle);
+                            handle,
+                            connectionId);
 
                 m_mailbox.send(initiatorHSId, workRequest);
             } catch (JSONException e) {
-                m_ciHandles.removeHandle(handle);
+                cihm.removeHandle(handle);
                 throw new RuntimeException(e);
             }
-            m_backpressure.increaseBackpressure(messageSize);
             return true;
         } else {
             return m_initiator.createTransaction(connectionId,
@@ -917,6 +924,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_initiator = initiator;
         m_cartographer = cartographer;
 
+        m_ciHandles.put(
+                m_snapshotDaemonAdapter.connectionId(),
+                new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter));
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
         m_acceptor = new ClientAcceptor(port, messenger.getNetwork(), false);
@@ -931,20 +941,39 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (VoltDB.instance().isIV2Enabled()) {
                     if (message instanceof InitiateResponseMessage) {
                         // forward response; copy is annoying. want slice of response.
-                        InitiateResponseMessage response = (InitiateResponseMessage)message;
-                        ClientInterfaceHandleManager.Iv2InFlight clientData =
-                            m_ciHandles.findHandle(response.getClientInterfaceHandle());
-                        response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
-                        final long now = System.currentTimeMillis();
-                        final int delta = (int)(now - clientData.m_creationTime);
-                        response.getClientResponseData().setClusterRoundtrip(delta);
+                        final InitiateResponseMessage response = (InitiateResponseMessage)message;
+                        final ClientInterfaceHandleManager cihm = m_ciHandles.get(response.getClientConnectionId());
+                        //Can be null on hangup
+                        if (cihm != null) {
+                            //Pass it to the network thread like a ninja
+                            //Only the network can use the CIHM
+                            cihm.connection.writeStream().enqueue(
+                                    new DeferredSerialization() {
 
-                        ByteBuffer results = ByteBuffer.allocate(response.getClientResponseData().getSerializedSize() + 4);
-                        results.putInt(results.capacity() - 4);
-                        response.getClientResponseData().flattenToBuffer(results);
-                        results.flip();
-                        clientData.m_connection.writeStream().enqueue(results);
-                        m_backpressure.reduceBackpressure(clientData.m_messageSize);
+                                        @Override
+                                        public ByteBuffer[] serialize()
+                                                throws IOException {
+                                            ClientInterfaceHandleManager.Iv2InFlight clientData =
+                                                    cihm.findHandle(response.getClientInterfaceHandle());
+                                            response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
+                                            final long now = System.currentTimeMillis();
+                                            final int delta = (int)(now - clientData.m_creationTime);
+                                            response.getClientResponseData().setClusterRoundtrip(delta);
+
+                                            ByteBuffer results =
+                                                    ByteBuffer.allocate(
+                                                            response.getClientResponseData().getSerializedSize() + 4);
+                                            results.putInt(results.capacity() - 4);
+                                            response.getClientResponseData().flattenToBuffer(results);
+                                            return new ByteBuffer[] { results };
+                                        }
+
+                                        @Override
+                                        public void cancel() {
+                                        }
+
+                            });
+                        }
                     } else {
                         m_d.offer(message);
                     }
@@ -963,7 +992,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_siteId = m_mailbox.getHSId();
         m_iv2Masters = new MapCache(messenger.getZK(), VoltZK.iv2masters);
         m_iv2Masters.start(true);
-        m_backpressure = new BackpressureTracker(this);
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
 
@@ -1882,7 +1910,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public long connectionId()
         {
-            return -1;
+            return Long.MIN_VALUE;
         }
 
         @Override
@@ -1894,7 +1922,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void enqueue(org.voltcore.utils.DeferredSerialization ds)
         {
-            throw new UnsupportedOperationException();
+            ClientResponseImpl resp = new ClientResponseImpl();
+            try
+            {
+                ByteBuffer b = ds.serialize()[0];
+                b.position(4);
+                resp.initFromBuffer(b);
+            }
+            catch (IOException ioe)
+            {
+                hostLog.error("Unable to deserialize ClientResponse from snapshot",
+                              ioe);
+                return;
+            }
+            m_snapshotDaemon.processClientResponse(resp,
+                                                   resp.getClientHandle());
         }
 
         @Override
@@ -1937,9 +1979,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Map<Long, Pair<String, long[]>> client_stats =
             new HashMap<Long, Pair<String, long[]>>();
 
-        Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
-        Map<Long, long[]> inflight_iv2_stats = m_ciHandles.getIv2OutstandingTxnStats();
-        inflight_txn_stats.putAll(inflight_iv2_stats);
+        Map<Long, long[]> inflight_txn_stats;
+        if (VoltDB.instance().isIV2Enabled()) {
+            inflight_txn_stats = new HashMap<Long, long[]>();
+            for (Map.Entry<Long, ClientInterfaceHandleManager> e : m_ciHandles.entrySet()) {
+                long values[] = new long[2];
+                values[0] = e.getValue().isAdmin ? 1 : 0;
+                values[1] = e.getValue().getOutstandingTxns();
+                inflight_txn_stats.put(e.getKey(), values);
+            }
+        } else {
+            inflight_txn_stats = m_initiator.getOutstandingTxnStats();
+        }
 
         // put all the live connections in the stats map, then fill in admin and
         // outstanding txn info from the inflight stats
