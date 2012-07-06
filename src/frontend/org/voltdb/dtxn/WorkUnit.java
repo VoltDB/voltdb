@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.ClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -43,6 +45,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 class WorkUnit
 {
+private static final VoltLogger log = new VoltLogger(WorkUnit.class.getName());
+
     class DependencyTracker
     {
         // needs to be a TreeMap so iterator has deterministic order

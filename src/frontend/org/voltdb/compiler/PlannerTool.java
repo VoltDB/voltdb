@@ -178,7 +178,7 @@ public class PlannerTool {
         }
 
         retval.replicatedDML = plan.replicatedTableDML;
-        retval.nonDeterministic = plan.isContentDeterministic() || plan.isOrderDeterministic();
+        retval.nonDeterministic = !plan.isContentDeterministic() || !plan.isOrderDeterministic();
         retval.partitionParam = partitioning.effectivePartitioningValue();
         return retval;
     }
