@@ -55,6 +55,7 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SnapshotSave;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 import com.google.common.base.Throwables;
 
@@ -794,6 +795,13 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                         false);
                             } else if (haveFailure) {
                                 hostLog.info("Queued user snapshot was attempted, but there was a failure.");
+                                ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                m_zk.create(
+                                        VoltZK.user_snapshot_response + requestId,
+                                        rimpl.flattenToBuffer(buf).array(),
+                                        Ids.OPEN_ACL_UNSAFE,
+                                        CreateMode.PERSISTENT);
                                 //Reset the watch, in case this is recoverable
                                 userSnapshotRequestExistenceCheck();
                                 //Log the details of the failure, after resetting the watch in case of some odd NPE
@@ -1615,7 +1623,23 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             final long clientHandle,
             final Connection c,
             final boolean notifyChanges) throws Exception {
-        if (notifyChanges) {
+        byte responseBytes[] = m_zk.getData(event.getPath(), false, null);
+        try {
+            m_zk.delete(event.getPath(), -1, null, null);
+        } catch (Exception e) {
+            hostLog.error("Error cleaning up user snapshot request response in ZK", e);
+        }
+        ByteBuffer buf = ByteBuffer.wrap(responseBytes);
+        ClientResponseImpl response = new ClientResponseImpl();
+        response.initFromBuffer(buf);
+        response.setClientHandle(clientHandle);
+        // Not sure if we need to preserve the original byte buffer here, playing it safe
+        ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize() + 4);
+        buf2.putInt(buf2.capacity() - 4);
+        response.flattenToBuffer(buf2).flip();
+        c.writeStream().enqueue(buf2);
+
+        if (notifyChanges && SnapshotUtil.isSnapshotInProgress(response.getResults())) {
             Watcher watcher = new Watcher() {
                 @Override
                 public void process(final WatchedEvent event) {
@@ -1630,7 +1654,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                                 event,
                                                 clientHandle,
                                                 c,
-                                                notifyChanges);
+                                                false);
                                 } catch (Exception e) {
                                     VoltDB.crashLocalVoltDB(
                                                 "Error retrieving user snapshot request response from ZK",
@@ -1648,22 +1672,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
             // Set the watcher
             m_zk.exists(event.getPath(), watcher);
         }
-
-        byte responseBytes[] = m_zk.getData(event.getPath(), false, null);
-        try {
-            m_zk.delete(event.getPath(), -1, null, null);
-        } catch (Exception e) {
-            hostLog.error("Error cleaning up user snapshot request response in ZK", e);
-        }
-        ByteBuffer buf = ByteBuffer.wrap(responseBytes);
-        ClientResponseImpl response = new ClientResponseImpl();
-        response.initFromBuffer(buf);
-        response.setClientHandle(clientHandle);
-        // Not sure if we need to preserve the original byte buffer here, playing it safe
-        ByteBuffer buf2 = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf2.putInt(buf2.capacity() - 4);
-        response.flattenToBuffer(buf2).flip();
-        c.writeStream().enqueue(buf2);
     }
 
     @Override
