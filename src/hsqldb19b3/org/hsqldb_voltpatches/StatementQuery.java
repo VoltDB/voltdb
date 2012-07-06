@@ -181,6 +181,14 @@ public class StatementQuery extends StatementDMQL {
     VoltXMLElement voltGetXML(Session session)
     throws HSQLParseException
     {
+        // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
+        // The only other instances of QueryExpression are direct QueryExpression instances instantiated in XreadSetOperation
+        // to represent UNION, etc.
+        // The latter are not yet supported in VoltDB.
+        if ( ! (queryExpression instanceof QuerySpecification)) {
+            throw new HSQLParseException(queryExpression.operatorName() + " and similar tuple set operators are not supported.");
+        }
+
         QuerySpecification select = (QuerySpecification) queryExpression;
 
         try {

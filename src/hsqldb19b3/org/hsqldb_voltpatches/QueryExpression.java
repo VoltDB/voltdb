@@ -71,6 +71,24 @@ public class QueryExpression {
                             EXCEPT        = 6,
                             UNION_TERM    = 7;
 
+    private static final String[] m_setOperatorNames = new String[] {
+        "NOUNION",
+        "UNION",
+        "UNION_ALL",
+        "INTERSECT",
+        "INTERSECT_ALL",
+        "EXCEPT_ALL",
+        "EXCEPT",
+        "UNION_TERM",
+        };
+
+    public final String operatorName() {
+        if (unionType < 0 || unionType >= m_setOperatorNames.length ) {
+            return "INVALID";
+        }
+        return m_setOperatorNames[unionType];
+    }
+
     //
     int                     columnCount;
     private QueryExpression leftQueryExpression;
