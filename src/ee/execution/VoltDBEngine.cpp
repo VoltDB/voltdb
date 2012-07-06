@@ -233,10 +233,6 @@ VoltDBEngine::~VoltDBEngine() {
     // strings and deallocated it.
     m_undoLog.clear();
 
-    for (int ii = 0; ii < m_planFragments.size(); ii++) {
-        delete m_planFragments[ii];
-    }
-
     // clean up memory for the template memory for the single long (int) table
     if (m_templateSingleLongTable) {
         delete[] m_templateSingleLongTable;
@@ -468,8 +464,6 @@ int VoltDBEngine::unloadFragment(int64_t planfragmentId)
     if (iter != m_executorMap.end()) {
         // clean up stuff
         m_executorMap.erase(planfragmentId);
-        delete m_planFragments.back();
-        m_planFragments.pop_back();
         retval = ENGINE_ERRORCODE_SUCCESS;
     }
 
@@ -792,9 +786,6 @@ bool VoltDBEngine::rebuildTableCollections() {
  * Delete and rebuild all plan fragments.
  */
 bool VoltDBEngine::rebuildPlanFragmentCollections() {
-    for (int ii = 0; ii < m_planFragments.size(); ii++)
-        delete m_planFragments[ii];
-    m_planFragments.clear();
     m_executorMap.clear();
 
     // initialize all the planfragments.
@@ -857,7 +848,6 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
 
     // catalog method plannodetree returns PlanNodeList.java
     PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree);
-    m_planFragments.push_back(pnf);
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
     assert(pnf->getRootNode());
 
@@ -879,7 +869,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
 
     boost::shared_ptr<ExecutorVector> ev =
         boost::shared_ptr<ExecutorVector>
-        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit));
+        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit, pnf));
 
     // Initialize each node!
     for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();

@@ -68,6 +68,7 @@
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
+#include "plannodes/plannodefragment.h"
 #include "stats/StatsAgent.h"
 #include "storage/TempTableLimits.h"
 #include "common/ThreadLocalPool.h"
@@ -410,11 +411,13 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          */
         struct ExecutorVector {
             ExecutorVector(int64_t logThreshold,
-                           int64_t memoryLimit)
+                           int64_t memoryLimit,
+                           PlanNodeFragment *fragment) : planFragment(fragment)
             {
                 limits.setLogThreshold(logThreshold);
                 limits.setMemoryLimit(memoryLimit);
             }
+            boost::shared_ptr<PlanNodeFragment> planFragment;
             std::vector<AbstractExecutor*> list;
             TempTableLimits limits;
         };
@@ -518,11 +521,6 @@ class __attribute__((visibility("default"))) VoltDBEngine {
          * that have been serialized into the m_resultOutput
          */
         int32_t m_numResultDependencies;
-
-        /*
-         * Cache plan node fragments in order to allow for deletion.
-         */
-        std::vector<PlanNodeFragment*> m_planFragments;
 
         LogManager m_logManager;
 
