@@ -258,6 +258,8 @@ public class VoltProjectBuilder {
 
     private Integer m_maxTempTableMemory = 100;
 
+    private List<String> m_diagnostics;
+
     public void configureLogging(String internalSnapshotPath, String commandLogPath, Boolean commandLogSync,
             Boolean commandLogEnabled, Integer fsyncInterval, Integer maxTxnsBeforeFsync, Integer logSize) {
         m_internalSnapshotPath = internalSnapshotPath;
@@ -637,7 +639,11 @@ public class VoltProjectBuilder {
             writeStringToTempFile(result.getWriter().toString());
         final String projectPath = projectFile.getPath();
         compiler.setProcInfoOverrides(m_procInfoOverrides);
+        if (m_diagnostics != null) {
+            compiler.enableDetailedCapture();
+        }
         boolean success = compiler.compile(projectPath, jarPath);
+        m_diagnostics = compiler.harvestCapturedDetail(false);
         if (m_compilerDebugPrintStream != null) {
             if (success) {
                 compiler.summarizeSuccess(m_compilerDebugPrintStream, m_compilerDebugPrintStream);
@@ -1051,6 +1057,18 @@ public class VoltProjectBuilder {
 
     public File getPathToVoltRoot() {
         return new File(m_voltRootPath);
+    }
+
+    public void enableDiagnostics() {
+        m_diagnostics = new ArrayList<String>(); // empty dummy enables feature
+    }
+
+    public List<String> harvestDiagnostics(boolean keepEnabled) {
+        List<String> result = m_diagnostics;
+        if (keepEnabled == false) {
+            m_diagnostics = null;
+        }
+        return result;
     }
 
 }

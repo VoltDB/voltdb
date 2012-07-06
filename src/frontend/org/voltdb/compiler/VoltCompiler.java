@@ -115,6 +115,8 @@ public class VoltCompiler {
 
     DatabaseEstimates m_estimates = new DatabaseEstimates();
 
+    private List<String> m_capturedDiagnosticDetail = null;
+
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     @SuppressWarnings("unused")
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
@@ -681,6 +683,34 @@ public class VoltCompiler {
 
     }
 
+
+    public void enableDetailedCapture() {
+        m_capturedDiagnosticDetail = new ArrayList<String>();
+    }
+
+    public List<String> harvestCapturedDetail(boolean keepCapturing) {
+        List<String> harvested = m_capturedDiagnosticDetail;
+        if (keepCapturing) {
+            m_capturedDiagnosticDetail = new ArrayList<String>();
+        } else {
+            m_capturedDiagnosticDetail = null;
+        }
+        return harvested;
+    }
+
+    public void captureDiagnosticContext(String planDescription) {
+        if (m_capturedDiagnosticDetail == null) {
+            return;
+        }
+        m_capturedDiagnosticDetail.add(planDescription);
+    }
+
+    public void captureDiagnosticJsonFragment(String json) {
+        if (m_capturedDiagnosticDetail == null) {
+            return;
+        }
+        m_capturedDiagnosticDetail.add(json);
+    }
 
     /**
      * Create INSERT, UPDATE, DELETE and SELECT procedure descriptors for all partitioned,

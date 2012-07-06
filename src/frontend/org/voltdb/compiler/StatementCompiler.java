@@ -17,7 +17,6 @@
 
 package org.voltdb.compiler;
 
-import java.io.PrintStream;
 import java.util.Collections;
 
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -33,6 +32,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParameterInfo;
 import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -107,6 +107,9 @@ public abstract class StatementCompiler {
         try {
             plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
                     catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(), DEFAULT_MAX_JOIN_TABLES, null);
+        } catch (PlanningErrorException e) {
+            // These are normal expectable errors -- don't normally need a stack-trace.
+            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         } catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
@@ -162,14 +165,14 @@ public abstract class StatementCompiler {
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
         partitioning.setIsReplicatedTableDML(plan.replicatedTableDML);
 
-        // output the explained plan to disk for debugging
-        PrintStream plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                "statement-winner-plans", name + ".txt");
-        plansOut.println("SQL: " + plan.sql);
-        plansOut.println("COST: " + Double.toString(plan.cost));
-        plansOut.println("PLAN:\n");
-        plansOut.println(plan.explainedPlan);
-        plansOut.close();
+        // output the explained plan to disk (or caller) for debugging
+        String planDescription =
+                "SQL: " + plan.sql
+                + "\nCOST: " + Double.toString(plan.cost)
+                + "\nPLAN:\n"
+                + plan.explainedPlan;
+        BuildDirectoryUtils.writeFile("statement-winner-plans", name + ".txt", planDescription);
+        compiler.captureDiagnosticContext(planDescription);
 
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
@@ -190,6 +193,7 @@ public abstract class StatementCompiler {
             planFragment.setMultipartition(fragment.multiPartition);
 
             String json = node_list.toJSONString();
+            compiler.captureDiagnosticJsonFragment(json);
 
             // if we're generating more than just explain plans
             if (compilerDebug) {
@@ -203,17 +207,13 @@ public abstract class StatementCompiler {
                     throw compiler.new VoltCompilerException(e2.getMessage());
                 }
 
-                // output the plan to disk for debugging
-                plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                        "statement-winner-plan-fragments", name + "-" + String.valueOf(i) + ".txt");
-                plansOut.println(prettyJson);
-                plansOut.close();
+                // output the plan to disk as pretty json for debugging
+                BuildDirectoryUtils.writeFile("statement-winner-plan-fragments", name + "-" + String.valueOf(i) + ".txt",
+                                              prettyJson);
 
                 // output the plan to disk for debugging
-                plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                        "statement-winner-plan-fragments", name + String.valueOf(i) + ".dot");
-                plansOut.println(node_list.toDOTString(name + "-" + String.valueOf(i)));
-                plansOut.close();
+                BuildDirectoryUtils.writeFile("statement-winner-plan-fragments", name + String.valueOf(i) + ".dot",
+                                              node_list.toDOTString(name + "-" + String.valueOf(i)));
             }
 
             // Place serialized version of PlanNodeTree into a PlanFragment
