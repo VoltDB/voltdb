@@ -68,6 +68,11 @@ struct TableIndexScheme {
         tupleSchema = keySchema = NULL;
     }
     TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
+                         std::vector<ValueType> columnTypes, bool unique,
+                         bool intsOnly, TupleSchema *tupleSchema) {
+        TableIndexScheme(name, type,columnIndices,columnTypes, unique, false, intsOnly, tupleSchema);
+    }
+    TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
                      std::vector<ValueType> columnTypes, bool unique, bool countable,
                      bool intsOnly, TupleSchema *tupleSchema) {
         this->name = name; this->type = type; this->columnIndices = columnIndices;

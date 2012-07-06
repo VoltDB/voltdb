@@ -28,7 +28,7 @@ public class MicroOptimizationRunner {
     static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
     static {
         optimizations.add(new PushdownLimitsIntoScans());
-        optimizations.add(new ReplaceWithIndexCounter());
+        //optimizations.add(new ReplaceWithIndexCounter());
         // optimizations.add(new PushdownReceiveDominators());
     }
 
