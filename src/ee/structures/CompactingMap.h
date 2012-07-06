@@ -829,7 +829,6 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verify() const {
     // verify the sub tree nodes counter
     if (hasRank) {
         if (inOrderCounterChecking(m_root) < 0) return false;
-        else printf("Tree index counter checking successfully...\n");
     }
     return true;
 }
