@@ -668,9 +668,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     		return;
     	}
     	try {
-			m_id = Integer.getInteger( jobj.getString( Members.ID.name() ) );
+    		String str = jobj.getString( Members.ID.name() );
+			m_id = (int)Integer.parseInt( str );
 			//todo : need to set up output_schema, inline_nodes
-						
+			m_outputSchema = new NodeSchema();
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -682,7 +683,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         explainPlan_recurse(sb, "");
         return sb.toString();
     }
-
+    
     public void explainPlan_recurse(StringBuilder sb, String indent) {
         // skip projection nodes basically (they're boring as all get out)
         String extraIndent = " ";
