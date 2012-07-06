@@ -37,8 +37,9 @@ public interface SnapshotDataTarget {
      * Write a block of tuple data to this target
      * @param tupleData Tuple data in a <code>ByteBuffer</code> with the required number of bytes available
      * for a header
+     * @param context A context that contains some information about the table
      */
-    public ListenableFuture<?> write(Callable<BBContainer> tupleData);
+    public ListenableFuture<?> write(Callable<BBContainer> tupleData, SnapshotTableTask context);
 
     /**
      * Close this target releasing any held resources and writing any footer info
@@ -54,4 +55,9 @@ public interface SnapshotDataTarget {
      * Get last cached exception that occurred during writes
      */
     public Throwable getLastWriteException();
+
+    /**
+     * Get the snapshot format this target uses
+     */
+    public SnapshotFormat getFormat();
 }

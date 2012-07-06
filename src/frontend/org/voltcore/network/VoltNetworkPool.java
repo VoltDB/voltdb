@@ -105,9 +105,9 @@ public class VoltNetworkPool {
             if (globalStats == null) {
                 globalStats = stats.get(-1L).getSecond();
             } else {
-                int ii = 0;
-                for (long stat : stats.get(-1L).getSecond()) {
-                    globalStats[ii] += stat;
+                final long localStats[] = stats.get(-1L).getSecond();
+                for (int ii = 0; ii < localStats.length; ii++) {
+                    globalStats[ii] += localStats[ii];
                 }
             }
             retval.putAll(stats);
