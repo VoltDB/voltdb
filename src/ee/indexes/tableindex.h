@@ -70,10 +70,13 @@ struct TableIndexScheme {
     TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
                          std::vector<ValueType> columnTypes, bool unique,
                          bool intsOnly, TupleSchema *tupleSchema) {
-        TableIndexScheme(name, type,columnIndices,columnTypes, unique, false, intsOnly, tupleSchema);
+        this->name = name; this->type = type; this->columnIndices = columnIndices;
+        this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
+        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = false;
     }
+
     TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                     std::vector<ValueType> columnTypes, bool unique, bool countable,
+                     std::vector<ValueType> columnTypes, bool unique,  bool countable,
                      bool intsOnly, TupleSchema *tupleSchema) {
         this->name = name; this->type = type; this->columnIndices = columnIndices;
         this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
