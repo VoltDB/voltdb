@@ -256,7 +256,8 @@ void InsertExecutor::p_pre_execute_pull(const NValueArray &params) {
     assert(m_inputTable);
     assert(m_targetTable);
     VOLT_TRACE("INPUT TABLE: %s\n", m_inputTable->debug().c_str());
-    assert (m_inputTable->activeTupleCount() > 0);
+    // m_inputTable will be empty in pull mode
+    //assert (m_inputTable->activeTupleCount() > 0);
     assert (m_tuple.sizeInValues() == m_inputTable->columnCount());
 
     std::vector<AbstractPlanNode*>& children = m_node->getChildren();

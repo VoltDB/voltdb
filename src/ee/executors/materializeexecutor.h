@@ -47,12 +47,20 @@
 #define HSTOREMATERIALIZEEXECUTOR_H
 
 #include <vector>
+#include <boost/scoped_ptr.hpp>
+
 #include "boost/shared_array.hpp"
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
+
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct MaterializeExecutorState;
+} //namespace detail
 
 class AbstractExpression;
 class TempTable;
@@ -64,20 +72,18 @@ class MaterializePlanNode;
  */
 class MaterializeExecutor : public AbstractExecutor {
   public:
-    MaterializeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) :
-        AbstractExecutor(engine, abstract_node)
-    {
-        node = NULL;
-        output_table = NULL;
-        input_table = NULL;
-        expression_array = NULL;
-        this->engine = engine;
-    }
-    ~MaterializeExecutor();
+    MaterializeExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+
+    bool support_pull() const;
+
   protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+
+    TableTuple p_next_pull();
+    void p_pre_execute_pull(const NValueArray& params);
+    void p_insert_output_table_pull(TableTuple& tuple);
 
   private:
     MaterializePlanNode* node;
@@ -98,6 +104,8 @@ class MaterializeExecutor : public AbstractExecutor {
 
     bool batched;
     VoltDBEngine *engine;
+
+    boost::scoped_ptr<detail::MaterializeExecutorState> m_state;
 };
 
 }
