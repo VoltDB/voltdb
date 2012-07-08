@@ -19,7 +19,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#ifndef HSTOREINDEXSCANEXECUTOR_H
+#ifndef HSTOREINDEXCOUNTEXECUTOR_H
 #define HSTOREINDEXSCANEXECUTOR_H
 
 #include "common/valuevector.h"
@@ -36,29 +36,20 @@ namespace voltdb {
 
 class TempTable;
 class PersistentTable;
-
 class AbstractExpression;
-
-//
-// Inline PlanNodes
-//
 class IndexCountPlanNode;
-class ProjectionPlanNode;
-class LimitPlanNode;
 
-class IndexScanExecutor : public AbstractExecutor
+class IndexCountExecutor : public AbstractExecutor
 {
 public:
-    IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
+    IndexCountExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
         : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL)
     {
-        m_projectionExpressions = NULL;
     }
-    ~IndexScanExecutor();
+    ~IndexCountExecutor();
 
 protected:
-    bool p_init(AbstractPlanNode*,
-                TempTableLimits* limits);
+    bool p_init(AbstractPlanNode*);
     bool p_execute(const NValueArray &params);
 
     // Data in this class is arranged roughly in the order it is read for
@@ -72,15 +63,13 @@ protected:
     TableTuple m_searchKey;
     // search_key_beforesubstitute_array_ptr[]
     AbstractExpression** m_searchKeyBeforeSubstituteArray;
-    bool* m_needsSubstituteProject; // needs_substitute_project_ptr[]
     bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
     bool m_needsSubstitutePostExpression;
     bool m_needsSubstituteEndExpression;
 
     IndexLookupType m_lookupType;
-    SortDirectionType m_sortDirection;
 
-    // IndexScan Information
+    // IndexCount Information
     TempTable* m_outputTable;
     PersistentTable* m_targetTable;
 
@@ -91,8 +80,6 @@ protected:
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)
     boost::shared_array<bool> m_needsSubstituteSearchKeyPtr;
-    boost::shared_array<bool> m_needsSubstituteProjectPtr;
-    boost::shared_array<int> m_projectionAllTupleArrayPtr;
     boost::shared_array<AbstractExpression*>
         m_searchKeyBeforeSubstituteArrayPtr;
     // So Valgrind doesn't complain:

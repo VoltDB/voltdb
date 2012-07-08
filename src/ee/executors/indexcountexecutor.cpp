@@ -36,8 +36,7 @@
 
 using namespace voltdb;
 
-bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
-                               TempTableLimits* limits)
+bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode)
 {
     VOLT_TRACE("init IndexCount Executor");
 
@@ -46,18 +45,22 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node->getTargetTable());
 
     // Create output table based on output schema from the plan
+
+    // FIXME(xin): think about how to fix it
     TupleSchema* schema = m_node->generateTupleSchema(true);
     int column_count = static_cast<int>(m_node->getOutputSchema().size());
+    assert(column_count == 1);
+
     std::string* column_names = new std::string[column_count];
     for (int ctr = 0; ctr < column_count; ctr++)
     {
         column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
     }
+    // FIXME(xin):
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       m_node->getTargetTable()->name(),
                                                       schema,
-                                                      column_names,
-                                                      limits));
+                                                      column_names));
     delete[] column_names;
 
     //
@@ -106,6 +109,11 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // We'll throw an error if the index is missing
     //
     m_index = m_targetTable->index(m_node->getTargetIndexName());
+    // This index should have a true countable flag
+    // FIXME(xin):
+    assert(m_index->is_countable_index_);
+
+
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
     m_searchKey.moveNoHeader(m_searchKeyBackingStore);
@@ -136,6 +144,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // Miscellanous Information
     //
     m_lookupType = m_node->getLookupType();
+
+    // FIXME(xin):
 
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // the planner sometimes lies in this case: index_lookup_type_eq is incorrect.
@@ -290,6 +300,15 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
     }
 
+    // Fixme(xin):
+    // I think I should answer COUNT(*) query just from here
+
+    assert(m_index->is_countable_index_);
+    assert(m_index->getRank(&m_searchKey) != -1);
+    // seems to be like this semantics... still need to fix it
+    m_outputTablem_outputTable->insertTupleNonVirtual(m_index->getRank(&m_searchKey));
+
+    /*
     //
     // We have to different nextValue() methods for different lookup types
     //
@@ -321,9 +340,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         	m_outputTable->insertTupleNonVirtual(m_tuple);
         	tuples_written++;
         }
-    }
+    }*/
 
-    VOLT_DEBUG ("Index Scanned :\n %s", m_outputTable->debug().c_str());
+    VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug().c_str());
     return true;
 }
 

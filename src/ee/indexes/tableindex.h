@@ -300,6 +300,13 @@ public:
     	return is_countable_index_;
     }
 
+    // FIXME(xin): still need to think about what parameter I should use
+    virtual int getRank(const TableTuple *searchKey) const
+    {
+        return -1;
+    }
+
+
     virtual size_t getSize() const = 0;
 
     // Return the amount of memory we think is allocated for this
