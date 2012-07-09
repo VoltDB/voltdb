@@ -65,7 +65,7 @@ struct ipc_command {
 }__attribute__((packed));
 
 /*
- * Structure describing an executeQueryPlanFragment message header.
+ * Structure describing an executePlanFragments message header.
  */
 typedef struct {
     struct ipc_command cmd;
@@ -73,23 +73,8 @@ typedef struct {
     int64_t lastCommittedTxnId;
     int64_t undoToken;
     int32_t numFragmentIds;
-    int32_t numParameterSets;
     char data[0];
 }__attribute__((packed)) querypfs;
-
-/*
- * Header of an execute plan fragment request. Contains the single fragmentId followed by the parameter set.
- */
-typedef struct {
-    struct ipc_command cmd;
-    int64_t txnId;
-    int64_t lastCommittedTxnId;
-    int64_t undoToken;
-    int64_t fragmentId;
-    int32_t outputDepId;
-    int32_t inputDepId;
-    char data[0];
-}__attribute__((packed)) planfrag;
 
 typedef struct {
     struct ipc_command cmd;
@@ -292,12 +277,7 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
         break;
       case 6:
         // also writes results directly
-        executeQueryPlanFragmentsAndGetResults(cmd);
-        result = kErrorCode_None;
-        break;
-      case 7:
-        // also writes results (if any) directly
-        executePlanFragmentAndGetResults(cmd);
+        executePlanFragments(cmd);
         result = kErrorCode_None;
         break;
       case 9:
@@ -563,24 +543,27 @@ int8_t VoltDBIPC::quiesce(struct ipc_command *cmd) {
     return kErrorCode_Success;
 }
 
-
-void VoltDBIPC::executeQueryPlanFragmentsAndGetResults(struct ipc_command *cmd) {
+void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
     int errors = 0;
     NValueArray &params = m_engine->getParameterContainer();
 
     querypfs *queryCommand = (querypfs*) cmd;
 
+    int32_t numFrags = ntohl(queryCommand->numFragmentIds);
+
     if (0)
         std::cout << "querypfs:" << " txnId=" << ntohll(queryCommand->txnId)
+                  << " txnId=" << ntohll(queryCommand->txnId)
                   << " lastCommitted=" << ntohll(queryCommand->lastCommittedTxnId)
-                  << " numFragIds=" << ntohl(queryCommand->numFragmentIds)
-                  << " numParamSets=" << ntohl(queryCommand->numParameterSets) << std::endl;
+                  << " undoToken=" << ntohll(queryCommand->undoToken)
+                  << " numFragIds=" << numFrags << std::endl;
 
     // data has binary packed fragmentIds first
     int64_t *fragmentId = (int64_t*) (&(queryCommand->data));
+    int64_t *inputDepId = fragmentId + numFrags;
 
     // ...and fast serialized parameter sets last.
-    void* offset = queryCommand->data + (sizeof(int64_t) * ntohl(queryCommand->numFragmentIds));
+    void* offset = queryCommand->data + (sizeof(int64_t) * numFrags * 2);
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(querypfs) - sizeof(int32_t) * ntohl(queryCommand->numFragmentIds));
     ReferenceSerializeInput serialize_in(offset, sz);
 
@@ -588,14 +571,13 @@ void VoltDBIPC::executeQueryPlanFragmentsAndGetResults(struct ipc_command *cmd) 
         // and reset to space for the results output
         m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
         m_engine->setUndoToken(ntohll(queryCommand->undoToken));
-        int numFrags = ntohl(queryCommand->numFragmentIds);
         for (int i = 0; i < numFrags; ++i) {
             int cnt = serialize_in.readShort();
             assert(cnt> -1);
             Pool *pool = m_engine->getStringPool();
             deserializeParameterSetCommon(cnt, serialize_in, params, pool);
             m_engine->setUsedParamcnt(cnt);
-            if (m_engine->executeQuery(ntohll(fragmentId[i]), 1, -1,
+            if (m_engine->executeQuery(ntohll(fragmentId[i]), 1, ntohll(inputDepId[i]),
                                        params, ntohll(queryCommand->txnId),
                                        ntohll(queryCommand->lastCommittedTxnId),
                                        i == 0 ? true : false, //first
@@ -611,62 +593,6 @@ void VoltDBIPC::executeQueryPlanFragmentsAndGetResults(struct ipc_command *cmd) 
     // write the results array back across the wire
     if (errors == 0) {
         // write the results array back across the wire
-        const int32_t size = m_engine->getResultsSize();
-        char *resultBuffer = m_engine->getReusedResultBuffer();
-        resultBuffer[0] = kErrorCode_Success;
-        writeOrDie(m_fd, (unsigned char*)resultBuffer, size);
-    } else {
-        sendException(kErrorCode_Error);
-    }
-}
-
-void VoltDBIPC::executePlanFragmentAndGetResults(struct ipc_command *cmd) {
-    int errors = 0;
-    NValueArray &params = m_engine->getParameterContainer();
-
-    planfrag *planfragCommand = (planfrag*) cmd;
-
-    if (0)
-        std::cout << "planfrag:" << " txnId=" << ntohll(planfragCommand->txnId)
-                  << " lastCommitted=" << ntohll(planfragCommand->lastCommittedTxnId)
-                  << " fragmentId=" << ntohll(planfragCommand->fragmentId) << std::endl;
-
-    // data has binary packed fragmentIds/deps first
-    int64_t fragmentId = ntohll(planfragCommand->fragmentId);
-    int32_t outputDepId = ntohl(planfragCommand->outputDepId);
-    int32_t inputDepId = ntohl(planfragCommand->inputDepId);
-
-    // ...and fast serialized parameter set last.
-    void* offset = planfragCommand->data;
-    int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(planfrag));
-    ReferenceSerializeInput serialize_in(offset, sz);
-
-    try {
-        // and reset to space for the results output
-        m_engine->resetReusedResultOutputBuffer(1);
-
-        int cnt = serialize_in.readShort();
-        assert(cnt> -1);
-        Pool *pool = m_engine->getStringPool();
-        deserializeParameterSetCommon(cnt, serialize_in, params, pool);
-        m_engine->setUsedParamcnt(cnt);
-        m_engine->setUndoToken(ntohll(planfragCommand->undoToken));
-        if (m_engine->executeQuery(fragmentId, outputDepId, inputDepId, params,
-                                   ntohll(planfragCommand->txnId),
-                                   ntohll(planfragCommand->lastCommittedTxnId),
-                                   true, true)) {
-    //        assert(!"Do not expect errors executing Query");
-            ++errors;
-        }
-        pool->purge();
-    } catch (FatalException e) {
-        crashVoltDB(e);
-    }
-
-    // write the results array back across the wire
-    if (errors == 0) {
-        // write the dependency tables back across the wire
-        // the result set includes the total serialization size
         const int32_t size = m_engine->getResultsSize();
         char *resultBuffer = m_engine->getReusedResultBuffer();
         resultBuffer[0] = kErrorCode_Success;

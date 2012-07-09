@@ -2255,57 +2255,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         return currentFragResponse;
     }
 
-
-    private FragmentResponseMessage processCustomFragmentTask(TransactionState txnState,
-            HashMap<Integer, List<VoltTable>> dependencies,
-            FragmentResponseMessage currentFragResponse, ParameterSet params,
-            String fragmentPlan, int outputDepId) {
-
-        assert(fragmentPlan != null);
-
-        // assume success. errors correct this assumption as they occur
-        currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
-
-        try {
-            int inputDepId = -1;
-
-            // make dependency ids available to the execution engine
-            if ((dependencies != null) && (dependencies.size() > 0)) {
-                assert(dependencies.size() <= 1);
-                if (dependencies.size() == 1) {
-                    inputDepId = dependencies.keySet().iterator().next();
-                }
-                stashWorkUnitDependencies(dependencies);
-            }
-
-            VoltTable table = null;
-
-            table = executeCustomPlanFragment(fragmentPlan, inputDepId, txnState.txnId, params, txnState.isReadOnly());
-
-            DependencyPair dep = new DependencyPair(outputDepId, table);
-
-            sendDependency(currentFragResponse, dep.depId, dep.dependency);
-        }
-        catch (final EEException e)
-        {
-            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), e);
-            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-        }
-        catch (final SQLException e)
-        {
-            hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), e);
-            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
-        }
-        catch (final Exception e)
-        {
-            // Just indicate that we failed completely
-            currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, new SerializableException(e));
-        }
-
-        return currentFragResponse;
-    }
-
-
     private void sendDependency(
             final FragmentResponseMessage currentFragResponse,
             final int dependencyId,
@@ -2395,19 +2344,31 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     @Override
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
-            long[] planFragmentIds,
+    public void loadPlanFragment(long planFragmentId, String plan) throws EEException
+    {
+        ee.loadPlanFragment(planFragmentId, plan);
+    }
+
+    @Override
+    public void unloadPlanFragment(long planFragmentId) throws EEException
+    {
+        ee.unloadPlanFragment(planFragmentId);
+    }
+
+    @Override
+    public VoltTable[] executePlanFragments(
             int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
             ParameterSet[] parameterSets,
-            int numParameterSets,
             long txnId,
             boolean readOnly) throws EEException
     {
-        return ee.executeQueryPlanFragmentsAndGetResults(
-            planFragmentIds,
+        return ee.executePlanFragments(
             numFragmentIds,
+            planFragmentIds,
+            inputDepIds,
             parameterSets,
-            numParameterSets,
             txnId,
             lastCommittedTxnId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
@@ -2573,7 +2534,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         for (int frag = 0; frag < ftask.getFragmentCount(); frag++)
         {
-            final long fragmentId = ftask.getFragmentId(frag);
+            long fragmentId = ftask.getFragmentId(frag);
             final int outputDepId = ftask.getOutputDepId(frag);
 
             // this is a horrible performance hack, and can be removed with small changes
@@ -2596,11 +2557,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             }
 
             String fragmentPlan = ftask.getFragmentPlan(frag);
-            if (fragmentPlan != null) {
-                return processCustomFragmentTask(txnState, dependencies, currentFragResponse,
-                                                 params, fragmentPlan, outputDepId);
-            }
-            else if (ftask.isSysProcTask()) {
+            if (ftask.isSysProcTask()) {
                 return processSysprocFragmentTask(txnState, dependencies, fragmentId,
                                                   currentFragResponse, params);
             }
@@ -2615,12 +2572,20 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * No roll back support.
                  */
                 try {
-                    final VoltTable dependency = ee.executePlanFragment(fragmentId,
-                                                                        inputDepId,
-                                                                        params,
-                                                                        txnState.txnId,
-                                                                        lastCommittedTxnId,
-                                                                        txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken());
+                    // if custom fragment, load the plan
+                    if (fragmentPlan != null) {
+                        fragmentId = -1;
+                        ee.loadPlanFragment(-1, fragmentPlan);
+                    }
+
+                    final VoltTable dependency = ee.executePlanFragments(
+                            1,
+                            new long[] { fragmentId },
+                            new long[] { inputDepId },
+                            new ParameterSet[] { params },
+                            txnState.txnId,
+                            lastCommittedTxnId,
+                            txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken())[0];
 
                     sendDependency(currentFragResponse, outputDepId, dependency);
 
@@ -2632,6 +2597,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
                     currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                     break;
+                }
+                finally {
+                    if (fragmentPlan != null) {
+                        ee.unloadPlanFragment(-1);
+                    }
                 }
             }
         }
@@ -2796,25 +2766,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     // do-nothing implementation of IV2 sysproc fragment API.
     @Override
-    public DependencyPair executePlanFragment(
+    public DependencyPair executeSysProcPlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params) {
         throw new RuntimeException("Unsupported IV2-only API.");
-     }
-
-
-    @Override
-    public VoltTable executePlanFragment(long planFragmentId, int inputDepId,
-                                         ParameterSet parameterSet, long txnId,
-                                         boolean readOnly) throws EEException
-    {
-        return ee.executePlanFragment(planFragmentId,
-                                      inputDepId,
-                                      parameterSet,
-                                      txnId,
-                                      lastCommittedTxnId,
-                                      readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
     @Override
@@ -2833,23 +2789,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     public long[] getUSOForExportTable(String signature)
     {
         return ee.getUSOForExportTable(signature);
-    }
-
-    @Override
-    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId, ParameterSet params, boolean readOnly)
-    {
-        VoltTable retval = null;
-        try {
-            ee.loadPlanFragment(-1, plan);
-            retval = ee.executePlanFragment(-1, inputDepId, params, txnId,
-                                   lastCommittedTxnId,
-                                   readOnly ? Long.MAX_VALUE : getNextUndoToken());
-        }
-        finally {
-            ee.unloadPlanFragment(-1);
-        }
-        return retval;
     }
 
     @Override

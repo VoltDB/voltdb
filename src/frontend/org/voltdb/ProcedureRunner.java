@@ -1199,11 +1199,11 @@ public class ProcedureRunner {
                        params[i] = qs.params;
                        i++;
                    }
-                   return m_site.executeQueryPlanFragmentsAndGetResults(
+                   return m_site.executePlanFragments(
+                       batchSize,
                        fragmentIds,
-                       batchSize,   // 1 frag per stmt
-                       params,      // 1 frag per stmt
-                       batchSize,   // 1 frag per stmt
+                       null,
+                       params,
                        m_txnState.txnId,
                        m_catProc.getReadonly());
                }
@@ -1216,10 +1216,20 @@ public class ProcedureRunner {
                        final SQLStmt stmt = queuedSQL.stmt;
                        final String aggregatorFragment = stmt.getPlan().getAggregatorFragment();
                        assert(aggregatorFragment != null);
-                       results[i] = m_site.executeCustomPlanFragment(aggregatorFragment,
-                                                                     AGG_DEPID, m_txnState.txnId,
-                                                                     queuedSQL.params,
-                                                                     m_catProc.getReadonly());
+
+                       try {
+                           m_site.loadPlanFragment(-1, aggregatorFragment);
+                           results[i] = m_site.executePlanFragments(
+                               1,
+                               new long[] { -1 },
+                               new long[] { AGG_DEPID },
+                               new ParameterSet[] {queuedSQL.params},
+                               m_txnState.txnId,
+                               m_catProc.getReadonly())[0];
+                       }
+                       finally {
+                           m_site.unloadPlanFragment(-1);
+                       }
                    }
                    return results;
                }

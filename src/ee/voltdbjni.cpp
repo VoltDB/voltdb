@@ -632,16 +632,17 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUnloadPlanFragment (
  * @param outputCapacity maximum number of bytes to write to buffer.
  * @return error code
 */
-SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecuteQueryPlanFragmentsAndGetResults
+SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecutePlanFragments
 (JNIEnv *env,
         jobject obj,
         jlong engine_ptr,
-        jlongArray plan_fragment_ids,
         jint num_fragments,
+        jlongArray plan_fragment_ids,
+        jlongArray input_dep_ids,
         jlong txnId,
         jlong lastCommittedTxnId,
         jlong undoToken) {
-    //VOLT_DEBUG("nativeExecuteQueryPlanFragmentAndGetResults() start");
+    //VOLT_DEBUG("nativeExecutePlanFragments() start");
 
     // setup
     VoltDBEngine *engine = castToEngine(engine_ptr);
@@ -676,8 +677,14 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
             deserializeParameterSetCommon(cnt, serialize_in, params, stringPool);
 
             engine->setUsedParamcnt(cnt);
+
+            long input_dep_id = -1;
+            if (input_dep_ids) {
+                env->GetLongArrayRegion(input_dep_ids, i, 1, (jlong*) &input_dep_id);
+            }
+
             // success is 0 and error is 1.
-            if (engine->executeQuery(fragment_ids_buffer[i], 1, -1,
+            if (engine->executeQuery(fragment_ids_buffer[i], 1, input_dep_id,
                                      params, txnId, lastCommittedTxnId, i == 0,
                                      i == (batch_size - 1)))
             {

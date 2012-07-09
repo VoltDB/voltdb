@@ -19,6 +19,7 @@ package org.voltdb.jni;
 
 import java.nio.ByteBuffer;
 import java.util.ArrayDeque;
+import java.util.Arrays;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
@@ -236,7 +237,12 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     public byte[] nextDependencyAsBytes(final int dependencyId) {
         final VoltTable vt =  m_dependencyTracker.nextDependency(dependencyId);
         if (vt != null) {
-            final byte[]  bytes = vt.getTableDataReference().array();
+            final ByteBuffer buf2 = vt.getTableDataReference();
+            byte[] bytes = buf2.array();
+            // if a buffer has an offset, just getting the array will give you the wrong thing
+            if (buf2.arrayOffset() != 0) {
+                bytes = Arrays.copyOfRange(bytes, buf2.arrayOffset(), bytes.length);
+            }
             return bytes;
         }
         else {
@@ -270,22 +276,20 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     /** Pass diffs to apply to the EE's catalog to update it */
     abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
 
-    /** Run a plan fragment */
-    abstract public VoltTable executePlanFragment(
-        long planFragmentId, int inputDepId, ParameterSet parameterSet,
-        long txnId, long lastCommittedTxnId, long undoQuantumToken)
-      throws EEException;
-
+    /** Load a fragment, given a plan, into the EE with a specific fragment id */
     abstract public void loadPlanFragment(long planFragmentId, String plan) throws EEException;
+
+    /** Unload a fragment with a specific id. Use carefully. Will mostly silently fail. */
     abstract public void unloadPlanFragment(long planFragmentId) throws EEException;
 
-    /** Run multiple query plan fragments */
-    abstract public VoltTable[] executeQueryPlanFragmentsAndGetResults(long[] planFragmentIds,
-                                                                       int numFragmentIds,
-                                                                       ParameterSet[] parameterSets,
-                                                                       int numParameterSets,
-                                                                       long txnId, long lastCommittedTxnId,
-                                                                       long undoQuantumToken) throws EEException;
+    /** Run multiple plan fragments */
+    abstract public VoltTable[] executePlanFragments(int numFragmentIds,
+                                                     long[] planFragmentIds,
+                                                     long[] inputDepIds,
+                                                     ParameterSet[] parameterSets,
+                                                     long txnId,
+                                                     long lastCommittedTxnId,
+                                                     long undoQuantumToken) throws EEException;
 
     /** Used for test code only (AFAIK jhugg) */
     abstract public VoltTable serializeTable(int tableId) throws EEException;
@@ -476,16 +480,6 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     //Execution
 
-    /**
-     * Executes a plan fragment with the given parameter set.
-     * @param pointer the VoltDBEngine pointer
-     * @param plan_fragment_id ID of the plan fragment to be executed.
-     * @return error code
-     */
-    protected native int nativeExecutePlanFragment(long pointer, long planFragmentId,
-            int outputDepId, // outputDepId is unused, can set to 0
-            int inputDepId, long txnId, long lastCommittedTxnId, long undoToken);
-
     protected native int nativeLoadPlanFragment(long pointer, long planFragmentId, byte plan[]);
     protected native int nativeUnloadPlanFragment(long pointer, long planFragmentId);
 
@@ -493,10 +487,15 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * Executes multiple plan fragments with the given parameter sets and gets the results.
      * @param pointer the VoltDBEngine pointer
      * @param planFragmentIds ID of the plan fragment to be executed.
+     * @param inputDepIds list of input dependency ids or null if no deps expected
      * @return error code
      */
-    protected native int nativeExecuteQueryPlanFragmentsAndGetResults(long pointer,
-            long[] planFragmentIds, int numFragments, long txnId, long lastCommittedTxnId, long undoToken);
+    protected native int nativeExecutePlanFragments(
+            long pointer,
+            int numFragments,
+            long[] planFragmentIds,
+            long[] inputDepIds,
+            long txnId, long lastCommittedTxnId, long undoToken);
 
     /**
      * Serialize the result temporary table.

@@ -29,7 +29,6 @@ import java.util.logging.Logger;
 
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
@@ -438,55 +437,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             }
         }
 
-        /**
-         * Read the result dependencies returned from the execution of a plan fragment.
-         * Returns a list of pairs of dependency ids and dependency tables.
-         */
-        public DependencyPair readDependencies() throws IOException {
-            // read the result set size, which doesn't include this 4 byte
-            // length notification!
-            final ByteBuffer resultSetSizeBuff = ByteBuffer.allocate(4);
-            resultSetSizeBuff.rewind();
-            while (resultSetSizeBuff.hasRemaining()) {
-                int read = m_socketChannel.read(resultSetSizeBuff);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-
-            resultSetSizeBuff.rewind();
-            final int resultsSize = resultSetSizeBuff.getInt();
-
-            // read the serialized dependencies
-            final ByteBuffer depsBuff = ByteBuffer.allocate(resultsSize);
-            depsBuff.clear().rewind();
-            while (depsBuff.hasRemaining()) {
-                int read = m_socketChannel.read(depsBuff);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-
-            // deserialize the dependencies
-            depsBuff.rewind();
-            final boolean dirty = depsBuff.get() > 0;
-            if (dirty) {
-                m_dirty = true;
-            }
-            final int numDependencies = depsBuff.getInt();
-            final int[] depIds = new int[numDependencies];
-            final VoltTable[] dependencies = new VoltTable[numDependencies];
-            final FastDeserializer fds = new FastDeserializer(depsBuff);
-            for (int ii = 0; ii < numDependencies; ++ii) {
-                depIds[ii] = fds.readInt();
-                dependencies[ii] = fds.readObject(VoltTable.class);
-            }
-            assert(depIds.length == 1);
-
-            // and finally return the constructed dependency set
-            return new DependencyPair(depIds[0], dependencies[0]);
-        }
-
         public void throwException(final int errorCode) throws IOException {
             final ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
             while (lengthBuffer.hasRemaining()) {
@@ -719,9 +669,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     private void sendPlanFragmentsInvocation(final Commands cmd,
-            final long[] planFragmentIds, final int numFragmentIds,
-            final ParameterSet[] parameterSets, final int numParameterSets, final long txnId,
-            final long lastCommittedTxnId, final long undoToken) {
+            final int numFragmentIds,
+            final long[] planFragmentIds,
+            long[] inputDepIds,
+            final ParameterSet[] parameterSets,
+            final long txnId,
+            final long lastCommittedTxnId,
+            final long undoToken)
+    {
         // big endian, not direct
         final FastSerializer fser = new FastSerializer();
         try {
@@ -732,16 +687,26 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException(exception);
         }
 
+        // if inputDepIds is null, make a bunch of dummies
+        if (inputDepIds == null) {
+            inputDepIds = new long[numFragmentIds];
+            for (int i = 0; i < inputDepIds.length; i++) {
+                inputDepIds[0] = -1;
+            }
+        }
+
         m_data.clear();
         m_data.putInt(cmd.m_id);
         m_data.putLong(txnId);
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoToken);
         m_data.putInt(numFragmentIds);
-        m_data.putInt(numParameterSets);
         for (int i = 0; i < numFragmentIds; ++i) {
             m_data.putLong(planFragmentIds[i]);
         }
+        for (int i = 0; i < numFragmentIds; ++i) {
+            m_data.putLong(inputDepIds[i]);
+        }
         m_data.put(fser.getBuffer());
 
         try {
@@ -751,59 +716,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
-    }
-
-    @Override
-    public VoltTable executePlanFragment(final long planFragmentId,
-            final int inputDepId, final ParameterSet parameterSet, final long txnId,
-            final long lastCommittedTxnId, final long undoToken)
-            throws EEException {
-        // big endian, not direct
-        final FastSerializer fser = new FastSerializer();
-        try {
-            parameterSet.writeExternal(fser);
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception);
-        }
-
-        m_data.clear();
-        m_data.putInt(Commands.PlanFragment.m_id);
-        m_data.putLong(txnId);
-        m_data.putLong(lastCommittedTxnId);
-        m_data.putLong(undoToken);
-        m_data.putLong(planFragmentId);
-        m_data.putInt(0); // output dep id is not needed
-        m_data.putInt(inputDepId);
-        m_data.put(fser.getBuffer());
-
-        try {
-            m_data.flip();
-            m_connection.write();
-        } catch (final Exception e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        int result = ExecutionEngine.ERRORCODE_ERROR;
-        try {
-            result = m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-            throw new EEException(result);
-        } else {
-            try {
-                DependencyPair dp = m_connection.readDependencies();
-                return dp.dependency;
-            } catch (final IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
-        return null;
     }
 
     @Override
@@ -874,13 +786,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
-            final long[] planFragmentIds, final int numFragmentIds,
-            final ParameterSet[] parameterSets, final int numParameterSets, final long txnId,
-            final long lastCommittedTxnId, final long undoToken) throws EEException {
+    public VoltTable[] executePlanFragments(
+            final int numFragmentIds,
+            final long[] planFragmentIds,
+            final long[] inputDepIds,
+            final ParameterSet[] parameterSets,
+            final long txnId,
+            final long lastCommittedTxnId,
+            final long undoToken) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                planFragmentIds, numFragmentIds, parameterSets,
-                numParameterSets, txnId, lastCommittedTxnId, undoToken);
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
+                txnId, lastCommittedTxnId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
         try {
             result = m_connection.readStatusByte();

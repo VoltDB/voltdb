@@ -64,12 +64,27 @@ public interface SiteProcedureConnection {
             VoltTable data)
     throws VoltAbortException;
 
+    /**
+     * Load a JSON planfragment into a specific ID in the EE.
+     */
+    public void loadPlanFragment(long planFragmentId, String plan) throws EEException;
 
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
-            long[] planFragmentIds,
+    /**
+     * Unload a plan fragment with a specific ID from the EE. Dangerous.
+     * Might fail silently if ID isn't actually a loaded fragment.
+     */
+    public void unloadPlanFragment(long planFragmentId) throws EEException;
+
+    /**
+     * Execute a set of plan fragments.
+     * Note: it's ok to pass null for inputDepIds if the fragments
+     * have no dependencies.
+     */
+    public VoltTable[] executePlanFragments(
             int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
             ParameterSet[] parameterSets,
-            int numParameterSets,
             long txnId,
             boolean readOnly) throws EEException;
 
@@ -93,20 +108,6 @@ public interface SiteProcedureConnection {
     public void truncateUndoLog(boolean rollback, long token, long txnId);
 
     /**
-     * IV2: Run a plan fragment
-     * @param planFragmentId
-     * @param inputDepId
-     * @param parameterSet
-     * @param txnId
-     * @param readOnly
-     * @return
-     * @throws EEException
-     */
-    public VoltTable executePlanFragment(
-        long planFragmentId, int inputDepId, ParameterSet parameterSet,
-        long txnId, boolean readOnly) throws EEException;
-
-    /**
      * IV2: send dependencies to the EE
      */
     public void stashWorkUnitDependencies(final Map<Integer, List<VoltTable>> dependencies);
@@ -114,15 +115,12 @@ public interface SiteProcedureConnection {
     /**
      * IV2: run a system procedure plan fragment
      */
-    public DependencyPair executePlanFragment(
+    public DependencyPair executeSysProcPlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params);
 
     public long[] getUSOForExportTable(String signature);
-
-    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId, ParameterSet params, boolean readOnly);
 
     public void toggleProfiler(int toggle);
 
