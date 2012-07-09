@@ -19,7 +19,6 @@ package org.voltdb.sysprocs;
 
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 
 import org.voltdb.DependencyPair;
 import org.voltdb.SystemProcedureExecutionContext;
@@ -27,8 +26,6 @@ import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SQLStmt;
-import org.voltdb.TheHashinator;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
@@ -36,7 +33,6 @@ import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.SiteTracker;
 
 /**
  * Given as input a VoltTable with a schema corresponding to a persistent table,
@@ -151,8 +147,6 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
     public long run(SystemProcedureExecutionContext ctx,
             String tableName, VoltTable table)
             throws VoltAbortException {
-        VoltTable[] results;
-        SynthesizedPlanFragment pfs[];
 
         // if tableName is replicated, just send table everywhere.
         // otherwise, create a VoltTable for each partition and
@@ -222,64 +216,8 @@ public class LoadMultipartitionTable extends VoltSystemProcedure
             return executed;
         }
         else {
-            // find the index and type of the partitioning attribute
-            int partitionCol = catTable.getPartitioncolumn().getIndex();
-            int intType = catTable.getPartitioncolumn().getType();
-            VoltType partitionType = VoltType.get((byte) intType);
-
-            // create a table for each partition
-            int numPartitions = ctx.getNumberOfPartitions();
-            VoltTable partitionedTables[] = new VoltTable[numPartitions];
-            for (int i = 0; i < partitionedTables.length; i++) {
-                partitionedTables[i] = table.clone(1024 * 1024);
-            }
-
-            // split the input table into per-partition units
-            while (table.advanceRow()) {
-                int p = 0;
-                try {
-                    p = TheHashinator.hashToPartition(
-                        table.get(partitionCol, partitionType));
-                }
-                catch (Exception e) {
-                    e.printStackTrace();
-                    throw new RuntimeException(e.getMessage());
-                }
-                // this adds the active row from table
-                partitionedTables[p].add(table);
-            }
-
-            SiteTracker tracker = ctx.getSiteTrackerForSnapshot();
-            Map<Long, Integer> sitesToPartitions = tracker.getSitesToPartitions();
-            int num_exec_sites = sitesToPartitions.size();
-            pfs = new SynthesizedPlanFragment[num_exec_sites + 1];
-            int site_index = 0;
-            for (Entry<Long, Integer> e : sitesToPartitions.entrySet()) {
-                long site = e.getKey();
-                int partition = e.getValue();
-
-                ParameterSet params = new ParameterSet();
-                params.setParameters(tableName, partitionedTables[partition]);
-                pfs[site_index] = new SynthesizedPlanFragment();
-                pfs[site_index].fragmentId = SysProcFragmentId.PF_distribute;
-                pfs[site_index].outputDepId = DEP_distribute;
-                pfs[site_index].inputDepIds = new int[] {};
-                pfs[site_index].multipartition = false;
-                pfs[site_index].siteId = site;
-                pfs[site_index].parameters = params;
-                site_index++;
-            }
-            // a final plan fragment to aggregate the results
-            pfs[num_exec_sites] = new SynthesizedPlanFragment();
-            pfs[num_exec_sites].fragmentId = SysProcFragmentId.PF_aggregate;
-            pfs[num_exec_sites].inputDepIds = new int[] { DEP_distribute };
-            pfs[num_exec_sites].outputDepId = DEP_aggregate;
-            pfs[num_exec_sites].multipartition = false;
-            pfs[num_exec_sites].parameters = new ParameterSet();
-
-            // send these forth in to the world .. and wait
-            results = executeSysProcPlanFragments(pfs, DEP_aggregate);
-            return results[0].asScalarLong();
+            throw new VoltAbortException("LoadMultipartitionTable no longer supports loading partitioned tables" +
+                                         " use CRUD procs instead");
         }
     }
 

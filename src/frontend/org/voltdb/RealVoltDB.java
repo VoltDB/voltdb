@@ -411,13 +411,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         List<Integer> partitions =
                             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
                         m_iv2Initiators = createIv2Initiators(partitions);
-                        long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                        // Create the MPI if we're the correct host
-                        if (topo.getInt("MPI") == m_messenger.getHostId()) {
-                            Initiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
-                            m_iv2Initiators.add(initiator);
-                        }
                     }
+                    // each node has an MPInitiator (and exactly 1 node has the master MPI).
+                    long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
+                    Initiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
+                    m_iv2Initiators.add(initiator);
                 }
 
                 /*

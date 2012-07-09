@@ -56,6 +56,6 @@ public class MpInitiator extends BaseInitiator
     {
         // for now, lie - kfactor for MPI is always 0.
         super.configure(backend, serializedCatalog, catalogContext,
-                /* kfactor */ 0, csp, numberOfPartitions, createForRejoin);
+                kfactor, csp, numberOfPartitions, createForRejoin);
     }
 }

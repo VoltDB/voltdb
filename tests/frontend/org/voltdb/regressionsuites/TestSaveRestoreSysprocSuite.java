@@ -34,6 +34,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -52,6 +53,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -260,14 +262,31 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         return partition_table;
     }
 
-    private VoltTable[] loadTable(Client client, String tableName,
+    private VoltTable[] loadTable(Client client, String tableName, boolean replicated,
                                   VoltTable table)
     {
         VoltTable[] results = null;
         try
         {
-            client.callProcedure("@LoadMultipartitionTable", tableName,
-                                 table);
+            if (replicated) {
+                client.callProcedure("@LoadMultipartitionTable", tableName,
+                            table);
+            } else {
+                ArrayList<SyncCallback> callbacks = new ArrayList<SyncCallback>();
+                VoltType columnTypes[] = new VoltType[table.getColumnCount()];
+                for (int ii = 0; ii < columnTypes.length; ii++) {
+                    columnTypes[ii] = table.getColumnType(ii);
+                }
+                while (table.advanceRow()) {
+                    SyncCallback cb = new SyncCallback();
+                    callbacks.add(cb);
+                    Object params[] = new Object[table.getColumnCount()];
+                    for (int ii = 0; ii < columnTypes.length; ii++) {
+                        params[ii] = table.get(ii, columnTypes[ii]);
+                    }
+                    client.callProcedure(cb, tableName + ".insert", params);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -289,7 +308,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             VoltTable repl_table =
                 createReplicatedTable(itemsPerChunk, i * itemsPerChunk, expectedText, generateCSV);
-            loadTable(client, tableName, repl_table);
+            loadTable(client, tableName, true, repl_table);
         }
     }
 
@@ -300,7 +319,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             VoltTable part_table =
                 createPartitionedTable(itemsPerChunk, i * itemsPerChunk);
-            loadTable(client, tableName, part_table);
+            loadTable(client, tableName, false, part_table);
         }
     }
 
@@ -411,8 +430,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 VoltTable partition_table =
                     createPartitionedTable(num_partitioned_items, 0);
 
-                loadTable(client, "REPLICATED_TESTER", repl_table);
-                loadTable(client, "PARTITION_TESTER", partition_table);
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
                 saveTables(client);
 
                 boolean skipFirst = true;
@@ -1502,8 +1521,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable partition_table =
             createPartitionedTable(num_partitioned_items, 0);
 
-        loadTable(client, "REPLICATED_TESTER", repl_table);
-        loadTable(client, "PARTITION_TESTER", partition_table);
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
         saveTables(client);
 
         validateSnapshot(true);
@@ -1542,8 +1561,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             VoltTable partition_table =
                 createPartitionedTable(num_partitioned_items, 0);
 
-            loadTable(client, "REPLICATED_TESTER", repl_table);
-            loadTable(client, "PARTITION_TESTER", partition_table);
+            loadTable(client, "REPLICATED_TESTER", true, repl_table);
+            loadTable(client, "PARTITION_TESTER", false, partition_table);
             VoltTable results[] = saveTables(client);
             validateSnapshot(true);
             while (results[0].advanceRow()) {
@@ -1602,8 +1621,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             VoltTable partition_table =
                 createPartitionedTable(num_partitioned_items, 0);
 
-            loadTable(client, "REPLICATED_TESTER", repl_table);
-            loadTable(client, "PARTITION_TESTER", partition_table);
+            loadTable(client, "REPLICATED_TESTER", true, repl_table);
+            loadTable(client, "PARTITION_TESTER", false, partition_table);
             saveTables(client);
             validateSnapshot(true);
             releaseClient(client);
@@ -1653,8 +1672,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable partition_table =
             createPartitionedTable(num_partitioned_items, 0);
 
-        loadTable(client, "REPLICATED_TESTER", repl_table);
-        loadTable(client, "PARTITION_TESTER", partition_table);
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
         saveTables(client);
 
         // Kill and restart all the execution sites.
@@ -1763,8 +1782,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             eng_2025_table.addRow(new Object[] {Integer.toString(i), new byte[64]});
         }
 
-        loadTable(client, "CHANGE_COLUMNS", change_table);
-        loadTable(client, "ENG_2025", eng_2025_table);
+        loadTable(client, "CHANGE_COLUMNS", false, change_table);
+        loadTable(client, "ENG_2025", true, eng_2025_table);
 
         VoltTable[] results = null;
         results = saveTables(client);
@@ -1851,7 +1870,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         change_types.addRow(1, VoltType.NULL_TINYINT, VoltType.NULL_INTEGER,
                             VoltType.NULL_INTEGER);
 
-        loadTable(client, "CHANGE_TYPES", change_types);
+        loadTable(client, "CHANGE_TYPES", true, change_types);
 
         saveTables(client);
         validateSnapshot(true);
@@ -1919,7 +1938,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         change_types.addRow(0, 100, 100, 100000);
 
-        loadTable(client, "CHANGE_TYPES", change_types);
+        loadTable(client, "CHANGE_TYPES", true, change_types);
 
         VoltTable[] results = null;
         results = saveTables(client);
