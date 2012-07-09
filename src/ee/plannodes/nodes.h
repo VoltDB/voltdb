@@ -53,6 +53,7 @@
 #include "plannodes/deletenode.h"
 #include "plannodes/distinctnode.h"
 #include "plannodes/indexscannode.h"
+#include "plannodes/indexcountnode.h"
 #include "plannodes/insertnode.h"
 #include "plannodes/limitnode.h"
 #include "plannodes/materializenode.h"

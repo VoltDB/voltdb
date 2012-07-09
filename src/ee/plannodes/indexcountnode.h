@@ -36,11 +36,13 @@ class AbstractExpression;
 class IndexCountPlanNode : public AbstractScanPlanNode {
     public:
         IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
+            printf("IndexCountPlanNode runs...1");
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
             this->end_expression = NULL;
         }
         IndexCountPlanNode() : AbstractScanPlanNode() {
+            printf("IndexCountPlanNode runs...");
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
             this->end_expression = NULL;

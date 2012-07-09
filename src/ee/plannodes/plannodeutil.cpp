@@ -181,6 +181,12 @@ std::string getTypeName(voltdb::PlanNodeType type) {
             ret = "INDEXSCAN";
             break;
         // ------------------------------------------------------------------
+        // IndexScan
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_INDEXCOUNT):
+            ret = "INDEXCOUNT";
+            break;
+        // ------------------------------------------------------------------
         // NestLoop
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_NESTLOOP):

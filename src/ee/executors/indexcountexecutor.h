@@ -49,7 +49,8 @@ public:
     ~IndexCountExecutor();
 
 protected:
-    bool p_init(AbstractPlanNode*);
+    bool p_init(AbstractPlanNode*,
+            TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
 
     // Data in this class is arranged roughly in the order it is read for

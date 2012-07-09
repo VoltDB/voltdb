@@ -87,11 +87,13 @@ void JNILogProxy::log(LoggerId loggerId, LogLevel level, const char *statement) 
     jstring jStatement = m_env->NewStringUTF(statement);
     if (jStatement == NULL) {
         m_env->ExceptionDescribe();
+        printf("nothing xin....");
         exit(-1);
     }
     m_env->CallStaticVoidMethod(m_eeLoggersClass, m_logMethodID, static_cast<jint>(loggerId), static_cast<jint>(level), jStatement);
     if (m_env->ExceptionCheck()) {
         m_env->ExceptionDescribe();
+        printf("nothing xin....");
         exit(-1);
     }
     m_env->DeleteLocalRef(jStatement);
