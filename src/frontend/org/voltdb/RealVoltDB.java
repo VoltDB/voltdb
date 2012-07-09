@@ -455,7 +455,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     // Make a list of HDIds to rejoin
                     List<Long> hsidsToRejoin = new ArrayList<Long>();
                     for (Initiator init : m_iv2Initiators) {
-                        hsidsToRejoin.add(init.getInitiatorHSId());
+                        if (init.isRejoinable()) {
+                            hsidsToRejoin.add(init.getInitiatorHSId());
+                        }
                     }
                     SnapshotSaveAPI.recoveringSiteCount.set(hsidsToRejoin.size());
                     hostLog.info("Set recovering site count to " + hsidsToRejoin.size());

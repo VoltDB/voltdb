@@ -34,4 +34,13 @@ public class SpInitiator extends BaseInitiator
                 new SpScheduler(new SiteTaskerQueue()),
                 "SP");
     }
+
+    /**
+     * SpInitiator has userdata that must be rejoined.
+     */
+    @Override
+    public boolean isRejoinable()
+    {
+        return true;
+    }
 }

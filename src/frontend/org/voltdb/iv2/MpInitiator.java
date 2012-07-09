@@ -58,4 +58,13 @@ public class MpInitiator extends BaseInitiator
         super.configure(backend, serializedCatalog, catalogContext,
                 kfactor, csp, numberOfPartitions, createForRejoin);
     }
+
+    /**
+     * The MPInitiator does not have user data to rejoin.
+     */
+    @Override
+    public boolean isRejoinable()
+    {
+        return false;
+    }
 }

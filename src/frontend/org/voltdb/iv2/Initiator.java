@@ -39,4 +39,7 @@ public interface Initiator
 
     /** Ask for the HSId used to address this Initiator. */
     public long getInitiatorHSId();
+
+    /** This initiator participates in rejoin processing */
+    public boolean isRejoinable();
 }
