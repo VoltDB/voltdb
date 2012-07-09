@@ -419,7 +419,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
                 // Construct and publish rejoin coordinator mailbox
-                if (isRejoin && m_config.m_newRejoin) {
+                if (isRejoin && m_config.m_liveRejoin) {
                     ArrayList<Long> sites = new ArrayList<Long>();
                     for (Mailbox siteMailbox : siteMailboxes) {
                         sites.add(siteMailbox.getHSId());
@@ -1722,7 +1722,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
         }
 
-        if (!m_config.m_newRejoin) {
+        if (!m_config.m_liveRejoin) {
             consoleLog.info(
                     "Node data recovery completed after " + delta + " seconds with " + megabytes +
                     " megabytes transferred at a rate of " +

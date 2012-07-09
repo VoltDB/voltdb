@@ -487,7 +487,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public void run() {
             final long now = System.currentTimeMillis();
-            final boolean newRejoin = m_recoveryProcessor == null;
+            final boolean liveRejoin = m_recoveryProcessor == null;
             long transferred = 0;
             if (m_recoveryProcessor != null) {
                 transferred = m_recoveryProcessor.bytesTransferred();
@@ -497,7 +497,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
             final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
-            if (newRejoin) {
+            if (liveRejoin) {
                 /*
                  * The logged txn count will be greater than the replayed txn count
                  * because some logged ones were before the stream snapshot
@@ -523,7 +523,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * its own coordinator that makes sure only one site is doing
                  * snapshot streaming at any point of time.
                  */
-                if (!newRejoin) {
+                if (!liveRejoin) {
                     m_recoveryPermit.release();
                 }
                 m_recoveryLog.info(
@@ -541,7 +541,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                      * If it's the new rejoin code, the rejoin coordinator
                      * handles this.
                      */
-                    if (!newRejoin) {
+                    if (!liveRejoin) {
                         VoltDB.instance().onExecutionSiteRejoinCompletion(bytesTransferredTotal);
                     }
                 }
@@ -550,7 +550,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * New rejoin is site independent, so don't have to look at the
                  * remaining count
                  */
-                if (newRejoin) {
+                if (liveRejoin) {
                     // Notify the rejoin coordinator that this site has finished
                     if (m_rejoinCoordinatorHSId != -1) {
                         RejoinMessage msg =
@@ -969,7 +969,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * readiness. If it is time, create a recovery processor and send
                  * the initiate message.
                  */
-                if (m_rejoining && !m_haveRecoveryPermit && !VoltDB.instance().getConfig().m_newRejoin) {
+                if (m_rejoining && !m_haveRecoveryPermit && !VoltDB.instance().getConfig().m_liveRejoin) {
                     Long safeTxnId = m_transactionQueue.safeToRecover();
                     if (safeTxnId != null && m_recoveryPermit.tryAcquire()) {
                         m_haveRecoveryPermit = true;
@@ -1117,8 +1117,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             VoltDB.crashLocalVoltDB("Site " + CoreUtils.hsIdToString(getSiteId()) +
                                     " has not made any progress in " + duration +
                                     " seconds, please reduce workload and " +
-                                    "try pauseless rejoin again, or use " +
-                                    "paused rejoin",
+                                    "try live rejoin again, or use " +
+                                    "blocking rejoin",
                                     false, null);
         }
     }

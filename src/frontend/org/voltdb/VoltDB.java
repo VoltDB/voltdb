@@ -121,7 +121,7 @@ public class VoltDB {
         public String m_rejoinToHostAndPort = null;
 
         /** Use the new rejoin code */
-        public boolean m_newRejoin = false;
+        public boolean m_liveRejoin = false;
 
         /** HTTP port can't be set here, but eventually value will be reflected here */
         public int m_httpPort = Integer.MAX_VALUE;
@@ -290,8 +290,8 @@ public class VoltDB {
                 else if (arg.startsWith("rejoinhost ")) {
                     m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
                 }
-                else if (arg.equals("newrejoin")) {
-                    m_newRejoin = true;
+                else if (arg.equals("live")) {
+                    m_liveRejoin = true;
                 }
 
                 else if (arg.equals("create")) {
@@ -414,10 +414,10 @@ public class VoltDB {
                     }
                 }
             } else {
-                if (!m_isEnterprise && m_newRejoin) {
+                if (!m_isEnterprise && m_liveRejoin) {
                     // pauseless rejoin is only available in pro
                     isValid = false;
-                    hostLog.fatal("Pauseless rejoin is only available in the Enterprise Edition");
+                    hostLog.fatal("Live rejoin is only available in the Enterprise Edition");
                 }
             }
 
