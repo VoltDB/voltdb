@@ -33,7 +33,7 @@ import org.voltdb.VoltTable;
 )
 public class Deterministic_RO_MP extends VoltProcedure {
 
-    public static final SQLStmt sql = new SQLStmt("select * from kv order by key");
+    public static final SQLStmt sql = new SQLStmt("select nondetval from kv order by nondetval");
 
     public VoltTable run() {
         voltQueueSQL(sql);
