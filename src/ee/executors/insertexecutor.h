@@ -71,7 +71,8 @@ class TempTable;
 class InsertExecutor : public AbstractExecutor
 {
 public:
-    InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        InsertExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        bool support_pull() const;
 
     protected:
         bool p_init(AbstractPlanNode*,
@@ -79,6 +80,11 @@ public:
         bool p_execute(const NValueArray &params);
 
         virtual bool needsOutputTableClear() { return true; };
+
+        TableTuple p_next_pull();
+        void p_pre_execute_pull(const NValueArray& params);
+        void p_post_execute_pull();
+        void p_insert_output_table_pull(TableTuple& tuple);
 
         InsertPlanNode* m_node;
 
@@ -93,18 +99,6 @@ public:
 
         /** reference to the engine/context to store the number of modified tuples */
         VoltDBEngine* m_engine;
-
-
-    //@TODO pullexec prototype
-    public:
-        TableTuple p_next_pull();
-        bool support_pull() const;
-
-    protected:
-
-        void p_pre_execute_pull(const NValueArray& params);
-        void p_post_execute_pull();
-        void p_insert_output_table_pull(TableTuple& tuple);
 
     private:
 

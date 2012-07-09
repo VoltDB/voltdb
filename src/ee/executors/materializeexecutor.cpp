@@ -57,6 +57,32 @@
 
 namespace voltdb {
 
+namespace detail {
+
+struct MaterializeExecutorState
+{
+    MaterializeExecutorState(int tupleCnt, const NValueArray &params) :
+        m_tupleCnt(tupleCnt),
+        m_tupleIdx(0),
+        m_params(params)
+    {}
+
+    int m_tupleCnt;
+    int m_tupleIdx;
+    NValueArray m_params;
+};
+
+} // namespace detail
+
+MaterializeExecutor::MaterializeExecutor(VoltDBEngine *engineIn, AbstractPlanNode* abstract_node) :
+    AbstractExecutor(engine, abstract_node),
+    node(NULL), output_table(NULL), input_table(NULL),
+    m_columnCount(0), all_param_array_ptr(),  all_param_array(NULL),
+    needs_substitute_ptr(), needs_substitute(NULL),
+    expression_array_ptr(), expression_array(NULL), batched(false),
+    engine(engineIn), m_state()
+{}
+
 bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
                                  TempTableLimits* limits)
 {
@@ -165,7 +191,82 @@ bool MaterializeExecutor::p_execute(const NValueArray &params) {
     return true;
 }
 
-MaterializeExecutor::~MaterializeExecutor() {
+
+bool MaterializeExecutor::support_pull() const
+{
+    return true;
 }
+
+void MaterializeExecutor::p_pre_execute_pull(const NValueArray &params)
+{
+    assert (node == dynamic_cast<MaterializePlanNode*>(getPlanNode()));
+    assert(node);
+    assert (!node->isInline()); // inline projection's execute() should not be called
+    assert (output_table == dynamic_cast<TempTable*>(node->getOutputTable()));
+    assert (output_table);
+    assert (m_columnCount == (int)node->getOutputColumnNames().size());
+
+    int tupleCnt = 1;
+    if (batched) {
+        tupleCnt = engine->getUsedParamcnt() / m_columnCount;
+        VOLT_TRACE("batched insertion with %d params. %d for each tuple.", paramcnt, m_columnCount);
+    } else {
+
+        // substitute parameterized values in expression trees.
+        if (all_param_array == NULL) {
+            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+                assert(expression_array[ctr]);
+                expression_array[ctr]->substitute(params);
+                VOLT_TRACE("predicate[%d]: %s", ctr, expression_array[ctr]->debug(true).c_str());
+            }
+        }
+    }
+    m_state.reset(new detail::MaterializeExecutorState(tupleCnt, params));
+}
+
+TableTuple MaterializeExecutor::p_next_pull()
+{
+    if (m_state->m_tupleIdx == m_state->m_tupleCnt) {
+        return TableTuple(output_table->schema());
+    }
+
+    TableTuple &temp_tuple = output_table->tempTuple();
+    if (batched) {
+        for (int j = m_columnCount - 1; j >= 0; --j) {
+            temp_tuple.setNValue(j, m_state->m_params[m_state->m_tupleIdx * m_columnCount + j]);
+        }
+
+    } else {
+
+        // For now a MaterializePlanNode can make at most one new tuple We
+        // should think about whether we would ever want to materialize
+        // more than one tuple and whether such a thing is possible with
+        // the AbstractExpression scheme
+        if (all_param_array != NULL) {
+            VOLT_TRACE("sweet, all params\n");
+            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+                temp_tuple.setNValue(ctr, m_state->m_params[all_param_array[ctr]]);
+            }
+        }
+        else {
+            TableTuple dummy;
+            // add the generated value to the temp tuple. it must have the
+            // same value type as the output column.
+            for (int ctr = m_columnCount - 1; ctr >= 0; --ctr) {
+                temp_tuple.setNValue(ctr, expression_array[ctr]->eval(&dummy, NULL));
+            }
+        }
+    }
+    ++m_state->m_tupleIdx;
+
+    VOLT_TRACE ("Materialized :\n %s", temp_tuple.debug(this->output_table->name()));
+    return temp_tuple;
+}
+
+void MaterializeExecutor::p_insert_output_table_pull(TableTuple& tuple)
+{
+    this->output_table->insertTupleNonVirtual(tuple);
+}
+
 
 }

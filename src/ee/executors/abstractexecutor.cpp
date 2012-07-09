@@ -144,25 +144,6 @@ bool AbstractExecutor::init(VoltDBEngine* engine,
     return true;
 }
 
-namespace voltdb {
-namespace detail {
-struct AbstractExecutorState
-{
-    AbstractExecutorState(Table* table) :
-        m_iterator(table->makeIterator()),
-        m_nextTuple(table->schema()),
-        m_nullTuple(table->schema())
-    {}
-    boost::scoped_ptr<TableIterator> m_iterator;
-    TableTuple m_nextTuple;
-    TableTuple m_nullTuple;
-};
-
-} // namespace detail
-} // namespace voltdb
-
-using namespace voltdb::detail;
-
 AbstractExecutor::AbstractExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode):
     m_abstractNode(abstractNode), m_tmpOutputTable(NULL), m_absState()
 {}
