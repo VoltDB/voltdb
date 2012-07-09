@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.List;
+
 import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.messaging.VoltMessage;
@@ -35,6 +37,15 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class Iv2Trace
 {
     private static VoltLogger iv2log = new VoltLogger("IV2TRACE");
+
+    public static void logTopology(long leaderHSId, List<Long> replicas, int partitionId)
+    {
+        if (iv2log.isTraceEnabled()) {
+            String logmsg = new String("topology partition %d leader %s replicas (%s)");
+            iv2log.trace(String.format(logmsg, partitionId, CoreUtils.hsIdToString(leaderHSId),
+                    CoreUtils.hsIdCollectionToString(replicas)));
+        }
+    }
 
     public static void logCreateTransaction(Iv2InitiateTaskMessage msg)
     {

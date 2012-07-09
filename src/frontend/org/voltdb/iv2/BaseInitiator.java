@@ -70,6 +70,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         RejoinProducer rejoinProducer =
             new RejoinProducer(m_partitionId, scheduler.m_tasks);
         m_initiatorMailbox = new InitiatorMailbox(
+                m_partitionId,
                 m_scheduler,
                 m_messenger,
                 m_repairLog,

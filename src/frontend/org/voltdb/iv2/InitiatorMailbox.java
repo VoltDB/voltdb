@@ -58,6 +58,7 @@ public class InitiatorMailbox implements Mailbox
     VoltLogger hostLog = new VoltLogger("HOST");
     VoltLogger tmLog = new VoltLogger("TM");
 
+    private final int m_partitionId;
     private final InitiatorMessageHandler m_msgHandler;
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
@@ -76,10 +77,12 @@ public class InitiatorMailbox implements Mailbox
         m_term = term;
     }
 
-    public InitiatorMailbox(InitiatorMessageHandler msgHandler,
+    public InitiatorMailbox(int partitionId,
+            InitiatorMessageHandler msgHandler,
             HostMessenger messenger, RepairLog repairLog,
             RejoinProducer rejoinProducer)
     {
+        m_partitionId = partitionId;
         m_msgHandler = msgHandler;
         m_messenger = messenger;
         m_repairLog = repairLog;
@@ -110,6 +113,7 @@ public class InitiatorMailbox implements Mailbox
     // Change the replica set configuration (during or after promotion)
     public synchronized void updateReplicas(List<Long> replicas)
     {
+        Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
         // promotion, must cancel the term
         if (m_replicas != null && m_term != null) {
