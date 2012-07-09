@@ -178,6 +178,7 @@ public class SpScheduler extends Scheduler
                 newSpHandle = msg.getSpHandle();
                 m_txnId.set(newSpHandle);
             }
+            Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, runner,
                         newSpHandle, m_pendingTasks, msg);
@@ -314,7 +315,7 @@ public class SpScheduler extends Scheduler
             newSpHandle = msg.getSpHandle();
             m_txnId.set(newSpHandle);
         }
-
+        Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, (inputDeps != null));
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have

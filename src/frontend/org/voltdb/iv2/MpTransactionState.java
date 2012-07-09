@@ -210,6 +210,7 @@ public class MpTransactionState extends TransactionState
         m_remoteWork = null;
 
         BorrowTaskMessage borrowmsg = new BorrowTaskMessage(m_localWork);
+        m_localWork.m_sourceHSId = m_mbox.getHSId();
         borrowmsg.addInputDepMap(m_remoteDepTables);
         m_mbox.send(m_buddyHSId, borrowmsg);
 

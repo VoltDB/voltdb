@@ -68,6 +68,8 @@ public class MpProcedureTask extends ProcedureTask
             txn.setNeedsRollback();
         }
         completeInitiateTask(siteConnection);
+        // Set the source HSId (ugh) to ourselves so we track the message path correctly
+        response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
