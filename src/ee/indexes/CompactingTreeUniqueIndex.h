@@ -238,7 +238,7 @@ public:
         return !m_match.isNullTuple();
     }
 
-    int32_t getRank(const KeyType &key) const {
+    int32_t rank(const KeyType &key) const {
         if (!hasRank) return -1;
         return m_entries.rankAsc(key);
     }

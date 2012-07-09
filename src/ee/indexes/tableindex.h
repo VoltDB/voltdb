@@ -301,7 +301,7 @@ public:
     }
 
     // FIXME(xin): still need to think about what parameter I should use
-    virtual int getRank(const TableTuple *searchKey) const
+    virtual int32_t getRank(const TableTuple *searchKey) const
     {
         return -1;
     }

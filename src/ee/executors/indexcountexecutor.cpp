@@ -38,7 +38,10 @@ using namespace voltdb;
 
 bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode)
 {
-    VOLT_TRACE("init IndexCount Executor");
+    //VOLT_TRACE("init IndexCount Executor");
+    VOLT_ERROR("init IndexCount Executor");
+    printf("init IndexCount Executor");
+    LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, "init IndexCount Executor");
 
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
     assert(m_node);
@@ -162,6 +165,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode)
 
 bool IndexCountExecutor::p_execute(const NValueArray &params)
 {
+    printf("execute IndexCount Executor");
+
     assert(m_node);
     assert(m_node == dynamic_cast<IndexCountPlanNode*>(m_abstractNode));
     assert(m_outputTable);

@@ -82,11 +82,14 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public IndexCountPlanNode(IndexScanPlanNode isp) {
         super();
 
-        m_tableScanSchema = isp.m_tableScanSchema.clone();
-        m_targetTableName = isp.m_targetTableName;
         m_catalogIndex = isp.m_catalogIndex;
+
+        m_tableScanSchema = isp.m_tableScanSchema.clone();
         m_targetTableAlias = isp.m_targetTableAlias;
+
+        m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
+
         m_lookupType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
     }
@@ -316,9 +319,9 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         int indexSize = m_catalogIndex.getColumns().size();
         int keySize = m_searchkeyExpressions.size();
 
-        String scanType = "unique-scan";
+        String scanType = "tree-counter";
         if (m_lookupType != IndexLookupType.EQ)
-            scanType = "range-scan";
+            scanType = "tree-counter";
 
         String cover = "covering";
         if (indexSize > keySize)
