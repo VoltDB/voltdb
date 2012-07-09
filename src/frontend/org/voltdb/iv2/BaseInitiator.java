@@ -80,8 +80,12 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         rejoinProducer.setMailbox(m_initiatorMailbox);
         m_scheduler.setMailbox(m_initiatorMailbox);
 
-        m_whoami = whoamiPrefix +  " " + CoreUtils.hsIdToString(getInitiatorHSId())
-            + " for partition " + m_partitionId + " ";
+        String partitionString = " ";
+        if (m_partitionId != -1) {
+            partitionString = " for partition " + m_partitionId + " ";
+        }
+        m_whoami = whoamiPrefix +  " " +
+            CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
     }
 
     @Override
