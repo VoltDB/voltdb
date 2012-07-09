@@ -36,8 +36,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
 
     static final String SCHEMA =
             "create table kv (" +
-            "key bigint default 0 not null, " +
-            "value bigint default 0 not null, " +
+            "key bigint not null, " +
+            "nondetval bigint unique not null, " +  // non-deterministic value (host ID)
             "PRIMARY KEY(key));";
 
     LocalCluster cluster;
@@ -210,8 +210,8 @@ public class TestNonDetermisticSeppuku extends TestCase {
     }
 
     /**
-     * For now ad hoc succeeds because we don't have adequate information and we
-     * assume it's non-deterministic.
+     * For now ad hoc succeeds regardless because we don't have adequate information
+     * and always assume ad hoc is non-deterministic.
      */
     public void testDeterministicAdHoc() throws Exception {
         client.callProcedure(
@@ -219,7 +219,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
                 0,
                 NonDeterministicSPProc.MISMATCH_INSERTION);
         try {
-            client.callProcedure("@AdHoc", "select * from kv order by key");
+            client.callProcedure("@AdHoc", "select nondetval from kv order by nondetval");
             // success!!
         }
         catch (ProcCallException e) {
