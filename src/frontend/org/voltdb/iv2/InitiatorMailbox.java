@@ -107,6 +107,7 @@ public class InitiatorMailbox implements Mailbox
     // Provide the starting replica configuration (for startup)
     public synchronized void setReplicas(List<Long> replicas)
     {
+        Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         m_msgHandler.updateReplicas(replicas);
     }
 
