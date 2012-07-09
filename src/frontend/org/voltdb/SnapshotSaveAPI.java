@@ -146,6 +146,8 @@ public class SnapshotSaveAPI
             } catch (InterruptedException e) {
                 status = "FAILURE";
                 err = e.toString();
+                failures = new HashSet<Exception>();
+                failures.add(e);
             }
             final VoltTable blockingResult = SnapshotSave.constructPartitionResultsTable();
 
@@ -385,6 +387,7 @@ public class SnapshotSaveAPI
                      * host.
                      */
                     if (csv && table.getIsreplicated() && !tracker.isFirstHost()) {
+                        snapshotRecord.removeTable(table.getTypeName());
                         continue;
                     }
                     String canSnapshot = "SUCCESS";
@@ -413,6 +416,7 @@ public class SnapshotSaveAPI
                         targets.add(sdt);
                         final SnapshotDataTarget sdtFinal = sdt;
                         final Runnable onClose = new Runnable() {
+                            @SuppressWarnings("synthetic-access")
                             @Override
                             public void run() {
                                 snapshotRecord.updateTable(table.getTypeName(),

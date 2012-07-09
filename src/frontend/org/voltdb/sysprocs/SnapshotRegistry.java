@@ -120,6 +120,12 @@ public class SnapshotRegistry {
             }
         }
 
+        public void removeTable(String name) {
+            synchronized (tables) {
+                assert(tables.remove(name) != null);
+            }
+        }
+
         public class Table {
             public final String name;
             public final String filename;
