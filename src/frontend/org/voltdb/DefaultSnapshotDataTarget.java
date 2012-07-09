@@ -43,6 +43,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.SnapshotTableTask;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CompressionService;
 
@@ -406,7 +407,7 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     }
 
     @Override
-    public ListenableFuture<?> write(final Callable<BBContainer> tupleData) {
+    public ListenableFuture<?> write(final Callable<BBContainer> tupleData, SnapshotTableTask context) {
         return write(tupleData, true);
     }
 
@@ -423,6 +424,11 @@ public class DefaultSnapshotDataTarget implements SnapshotDataTarget {
     @Override
     public IOException getLastWriteException() {
         return m_writeException;
+    }
+
+    @Override
+    public SnapshotFormat getFormat() {
+        return SnapshotFormat.NATIVE;
     }
 
     @Override

@@ -102,7 +102,7 @@ public class TestTableSaveFile extends TestCase {
 
             }
 
-        }));
+        }), null);
     }
 
     private Pair<VoltTable, File> generateTestTable(int numberOfItems)
