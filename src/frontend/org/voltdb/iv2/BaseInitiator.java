@@ -165,7 +165,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             long startTime = System.currentTimeMillis();
             Boolean success = false;
             while (!success) {
-                tmLog.info(m_whoami + "starting leader promotion");
+                // term syslogs the start of leader promotion.
                 m_term = new Term(m_missingStartupSites, m_messenger.getZK(),
                         m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                         m_zkMailboxNode, m_whoami);
