@@ -22,7 +22,6 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.LineNumberReader;
-import java.io.PrintStream;
 import java.math.BigDecimal;
 import java.util.ArrayList;
 import java.util.HashMap;
@@ -148,10 +147,7 @@ public class DDLCompiler {
         }
 
         // output the xml catalog to disk
-        PrintStream ddlXmlOutput = BuildDirectoryUtils.getDebugOutputPrintStream(
-                "schema-xml", "hsql-catalog-output.xml");
-        ddlXmlOutput.println(xmlCatalog);
-        ddlXmlOutput.close();
+        BuildDirectoryUtils.writeFile("schema-xml", "hsql-catalog-output.xml", xmlCatalog.toString());
 
         // build the local catalog from the xml catalog
         fillCatalogFromXML(catalog, db, xmlCatalog);
