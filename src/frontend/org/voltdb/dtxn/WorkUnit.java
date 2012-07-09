@@ -64,7 +64,7 @@ private static final VoltLogger log = new VoltLogger(WorkUnit.class.getName());
             m_expectedSites = expectedSites;
         }
 
-        boolean addResult(long HSId, long mapId, VoltTable result)
+        boolean addResult(long HSId, long mapId, VoltTable result, boolean allowMismatchedResults)
         {
             boolean retval = true;
             if (!(m_results.containsKey(mapId)))
@@ -73,7 +73,8 @@ private static final VoltLogger log = new VoltLogger(WorkUnit.class.getName());
             }
             else
             {
-                if (!m_results.get(mapId).hasSameContents(result))
+                // Look for a mismatch unless we're being lenient.
+                if (!allowMismatchedResults && !m_results.get(mapId).hasSameContents(result))
                 {
                     retval = false;
                 }
@@ -307,9 +308,9 @@ private static final VoltLogger log = new VoltLogger(WorkUnit.class.getName());
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
         // ENG-3288 - Allow non-deterministic read-only transactions to have mismatched results
         // so that LIMIT queries without ORDER BY clauses work.
-        boolean duplicate_okay =
-            m_dependencies.get(dependencyId).addResult(HSId, map_id, payload);
-        if (!duplicate_okay && !m_allowMismatchedResults) {
+        boolean addOkay =
+            m_dependencies.get(dependencyId).addResult(HSId, map_id, payload, m_allowMismatchedResults);
+        if (!addOkay) {
             String msg = "Mismatched results received for partition: " + partition;
             msg += "\n  from execution site: " + HSId;
             msg += "\n  Original results: " + m_dependencies.get(dependencyId).getResult(map_id).toString();

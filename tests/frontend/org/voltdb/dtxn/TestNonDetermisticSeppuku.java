@@ -192,8 +192,7 @@ public class TestNonDetermisticSeppuku extends TestCase {
     }
 
     /**
-     * For now ad hoc succeeds because we don't have adequate information and we
-     * assume it's non-deterministic.
+     * Negative test that expects a deterministic proc to fail due to mismatched results.
      */
     public void testDeterministicProc() throws Exception {
         client.callProcedure(
