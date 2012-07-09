@@ -80,6 +80,16 @@
         <appender-ref ref="console"/>
     </logger>
 
+    <logger name="TM">
+        <level value="INFO"/>
+        <appender-ref ref="console"/>
+    </logger>
+    
+    <logger name="REJOIN">
+        <level value="INFO"/>
+        <appender-ref ref="console"/>
+    </logger>
+
     <!-- logger to route specific informational messages to the console. -->
     <logger name="CONSOLE">
         <level value="INFO"/>
