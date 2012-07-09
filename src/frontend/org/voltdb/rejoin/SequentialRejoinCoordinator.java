@@ -17,6 +17,7 @@
 
 package org.voltdb.rejoin;
 
+import java.io.File;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -27,6 +28,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.messaging.RejoinMessage;
 import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.utils.VoltFile;
 
 /**
  * Sequentially rejoins each site. This rejoin coordinator is accessed by sites
@@ -40,11 +42,23 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
     // contains all sites that haven't finished replaying transactions
     private final Queue<Long> m_rejoiningSites = new LinkedList<Long>();
 
-    public SequentialRejoinCoordinator(HostMessenger messenger, List<Long> sites) {
+    public SequentialRejoinCoordinator(HostMessenger messenger,
+                                       List<Long> sites,
+                                       String voltroot) {
         super(messenger);
         m_pendingSites = new LinkedList<Long>(sites);
         if (m_pendingSites.isEmpty()) {
             VoltDB.crashLocalVoltDB("No execution sites to rejoin", false, null);
+        }
+
+        // clear overflow dir in case there are files left from previous runs
+        try {
+            File overflowDir = new File(voltroot, "rejoin_overflow");
+            if (overflowDir.exists()) {
+                VoltFile.recursivelyDelete(overflowDir);
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Fail to clear rejoin overflow directory", false, e);
         }
     }
 

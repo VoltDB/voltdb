@@ -34,6 +34,11 @@ public interface RejoinSiteProcessor {
     public abstract Pair<List<byte[]>, Integer> initialize();
 
     /**
+     * Starts count down of waiting for the source to establish a connection.
+     */
+    public abstract void startCountDown();
+
+    /**
      * Whether or not all snapshot blocks are polled
      *
      * @return true if no more blocks to come, false otherwise
