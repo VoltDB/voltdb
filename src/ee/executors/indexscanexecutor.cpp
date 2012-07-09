@@ -233,6 +233,58 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     return true;
 }
 
+bool IndexScanExecutor::handleExceptionalSearchKeyValue(SQLException& e, const NValue& candidateValue, bool isPrefixKey,
+                                                        int& activeNumOfSearchKeys,
+                                                        IndexLookupType& localLookupType,
+                                                        SortDirectionType& localSortDirection)
+{
+    // This next bit of logic handles underflow and overflow while
+    // setting up the search keys.
+    // e.g. TINYINT > 200 or INT <= 6000000000
+
+    // rethrow if not an overflow - currently, it's expected to always be an overflow
+    if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+        throw e;
+    }
+
+    // if a EQ comparison is out of range, then return no tuples.
+    // all prefix component matches in the multi-component case are implicit EQ matches.
+    if ((localLookupType == INDEX_LOOKUP_TYPE_EQ) || isPrefixKey) {
+        return true;
+    }
+
+    // comparison is the only place where the executor might return matching tuples
+    // e.g. TINYINT < 1000 should return all values
+    if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+        if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
+            (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
+             // gt or gte when key overflows returns nothing
+            return true;
+        }
+        // VoltDB should only support LT or LTE with
+        // empty search keys for order-by without lookup
+        throw e;
+    }
+    if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+        if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
+            (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
+            // lt or lte when key underflows returns nothing
+            return true;
+        }
+        // don't allow GTE because it breaks null handling
+        localLookupType = INDEX_LOOKUP_TYPE_GT;
+    }
+
+    // if here, means all tuples with the previous searchkey
+    // columns need to be scanned. Note, if only one column,
+    // then all tuples will be scanned
+    activeNumOfSearchKeys--;
+    if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
+        localSortDirection = SORT_DIRECTION_TYPE_ASC;
+    }
+    return false;
+}
+
 bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
@@ -278,69 +330,22 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //
     m_searchKey.setAllNulls();
     VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
-    for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-        if (m_needsSubstituteSearchKey[ctr]) {
-            m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
-        }
-        NValue candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
-        try {
+    int ctr = 0;
+    NValue candidateValue;
+    try {
+        for (ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
+            if (m_needsSubstituteSearchKey[ctr]) {
+                m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
+            }
+            candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
             m_searchKey.setNValue(ctr, candidateValue);
         }
-        catch (SQLException e) {
-            // This next bit of logic handles underflow and overflow while
-            // setting up the search keys.
-            // e.g. TINYINT > 200 or INT <= 6000000000
-
-            // rethow if not an overflow - currently, it's expected to always be an overflow
-            if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
-                throw e;
-            }
-
-            // handle the case where this is a comparison, rather than equality match
-            // comparison is the only place where the executor might return matching tuples
-            // e.g. TINYINT < 1000 should return all values
-            if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                (ctr == (activeNumOfSearchKeys - 1))) {
-
-                if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
-                        (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
-
-                        // gt or gte when key overflows returns nothing
-                        return true;
-                    }
-                    else {
-                        // VoltDB should only support LT or LTE with
-                        // empty search keys for order-by without lookup
-                        throw e;
-                    }
-                }
-                if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
-                        (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                        // lt or lte when key underflows returns nothing
-                        return true;
-                    }
-                    else {
-                        // don't allow GTE because it breaks null handling
-                        localLookupType = INDEX_LOOKUP_TYPE_GT;
-                    }
-                }
-
-                // if here, means all tuples with the previous searchkey
-                // columns need to be scaned. Note, if only one column,
-                // then all tuples will be scanned
-                activeNumOfSearchKeys--;
-                if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
-                    localSortDirection = SORT_DIRECTION_TYPE_ASC;
-                }
-            }
-            // if a EQ comparison is out of range, then return no tuples
-            else {
-                return true;
-            }
-            break;
+    }
+    catch (SQLException e) {
+        bool isPrefix = ctr < (activeNumOfSearchKeys - 1);
+        if (handleExceptionalSearchKeyValue(e, candidateValue, isPrefix,
+                                            activeNumOfSearchKeys, localLookupType, localSortDirection)) {
+            return true;
         }
     }
     assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));

@@ -88,7 +88,7 @@ public:
 
     ~NestLoopIndexExecutor();
 
-protected:
+private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);

@@ -47,6 +47,7 @@
 #include <string>
 #include <stack>
 #include "nestloopindexexecutor.h"
+#include "indexscanexecutor.h"
 #include "common/debuglog.h"
 #include "common/tabletuple.h"
 #include "common/FatalException.hpp"
@@ -353,75 +354,23 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
         // against the inner table
         //
         index_values.setAllNulls();
-        for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
-            // in a normal index scan, params would be substituted here,
-            // but this scan fills in params outside the loop
-            NValue candidateValue = inline_node->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
-            try {
+        int ctr = 0;
+        NValue candidateValue;
+        try {
+            for (ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
+                // in a normal index scan, params would be substituted here,
+                // but this scan fills in params outside the loop
+                candidateValue = inline_node->getSearchKeyExpressions()[ctr]->eval(&outer_tuple, NULL);
                 index_values.setNValue(ctr, candidateValue);
             }
-            catch (SQLException e) {
-                // This next bit of logic handles underflow and overflow while
-                // setting up the search keys.
-                // e.g. TINYINT > 200 or INT <= 6000000000
-
-                // rethow if not an overflow - currently, it's expected to always be an overflow
-                if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
-                    throw e;
-                }
-
-                // handle the case where this is a comparison, rather than equality match
-                // comparison is the only place where the executor might return matching tuples
-                // e.g. TINYINT < 1000 should return all values
-                if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                    (ctr == (activeNumOfSearchKeys - 1))) {
-
-                    // sanity check that there is at least one EQ column
-                    // or else the join wouldn't work, right?
-                    assert(activeNumOfSearchKeys > 1);
-
-                    if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                        if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
-                            (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
-
-                            // gt or gte when key overflows breaks out
-                            // and only returns for left-outer
-                            keyException = true;
-                            break; // the outer while loop
-                        }
-                        else {
-                            // VoltDB should only support LT or LTE with
-                            // empty search keys for order-by without lookup
-                            throw e;
-                        }
-                    }
-                    if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                        if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
-                            (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                            // VoltDB should only support LT or LTE with
-                            // empty search keys for order-by without lookup
-                            throw e;
-                        }
-                        else {
-                            // don't allow GTE because it breaks null handling
-                            localLookupType = INDEX_LOOKUP_TYPE_GT;
-                        }
-                    }
-
-                    // if here, means all tuples with the previous searchkey
-                    // columns need to be scaned.
-                    activeNumOfSearchKeys--;
-                    if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
-                        localSortDirection = SORT_DIRECTION_TYPE_ASC;
-                    }
-                }
-                // if a EQ comparison is out of range, then the tuple from
-                // the outer loop returns no matches (except left-outer)
-                else {
-                    keyException = true;
-                }
-                break;
+        }
+        catch (SQLException e) {
+            bool isPrefix = ctr < (activeNumOfSearchKeys - 1);
+            if (IndexScanExecutor::handleExceptionalSearchKeyValue(e, candidateValue, isPrefix,
+                                                                   activeNumOfSearchKeys,
+                                                                   localLookupType,
+                                                                   localSortDirection)) {
+                keyException = true;
             }
         }
         VOLT_TRACE("Searching %s", index_values.debug("").c_str());

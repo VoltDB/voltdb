@@ -80,7 +80,12 @@ public:
     }
     ~IndexScanExecutor();
 
-protected:
+    static bool handleExceptionalSearchKeyValue(SQLException& e, const NValue& candidateValue,
+                                                bool isPrefixKey, int& activeNumOfSearchKeys,
+                                                IndexLookupType& localLookupType,
+                                                SortDirectionType& localSortDirection);
+
+private:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
