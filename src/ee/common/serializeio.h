@@ -49,6 +49,10 @@
 #include <limits>
 #include <vector>
 #include <string>
+#include <sstream>
+#include <fstream>
+#include <iomanip>
+#include <iostream>
 #include <exception>
 #include <arpa/inet.h>
 #include <cassert>
@@ -179,6 +183,9 @@ public:
     inline void readBytes(void* destination, size_t length) {
         ::memcpy(destination, getRawPointer(length), length);
     };
+
+    /** Write the buffer as hex bytes for debugging */
+    std::string fullBufferStringRep();
 
     /** Move the read position back by bytes. Warning: this method is
     currently unverified and could result in reading before the
