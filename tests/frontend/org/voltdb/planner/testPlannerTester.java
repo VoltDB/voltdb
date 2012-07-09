@@ -109,6 +109,30 @@ public class testPlannerTester extends TestCase {
 //	
 //        //assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("LIMIT") = 1 );
 //    }
+    public void testBatchCompile() {
+    	String ddl = "testplans-plannerTester-ddl.sql";
+    	String basename = "testplans-plannerTester-ddl";
+    	String stmtFile = "testplans-plannerTester-ddl.stmt";
+    	String savePath =  "/tmp/volttest/testplans-plannerTester-ddl.plan";
+    	try {
+			plannerTester.batchCompileSave(ddl, basename, stmtFile, savePath);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
+    
+    public void testCompile() {
+				try {
+					AbstractPlanNode apn = plannerTester.compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+				} catch (Exception e) {
+					// TODO Auto-generated catch block
+					e.printStackTrace();
+				}
+
+			
+    }
+    
     public void testWriteAndLoad() {
     	AbstractPlanNode pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
     	String path = "/home/zhengli/prettyJson.txt";
@@ -188,12 +212,22 @@ public class testPlannerTester extends TestCase {
     public void testDiffLeaves() {
     	AbstractPlanNode pn1 = null;
     	AbstractPlanNode pn2 = null;
-        pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+        pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
     	//pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-        pn2 = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
+        //pn2 = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
+        pn2 = compile("select * from l where b = ?;", 3, true);
         assertTrue(pn1 != null);
         assertTrue(pn2 != null);
         plannerTester.diffLeaves(pn1, pn2);
+    }
+    
+    public void testBatchDiffLeaves() {
+    	int size = 7;
+    	String pathBaseline = "/tmp/volttest/baseline1/testplans-plannerTester-ddl.plan";
+    	String pathNew = "/tmp/volttest/new1/testplans-plannerTester-ddl.plan";
+    	for( int i = 0; i < size; i++ ) {
+    		plannerTester.batchDiffLeaves(pathBaseline+i, pathNew+i, size);
+    	}
     }
 }
 

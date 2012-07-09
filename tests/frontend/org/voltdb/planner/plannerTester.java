@@ -2,6 +2,7 @@ package org.voltdb.planner;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
@@ -24,9 +25,11 @@ import org.voltdb.types.PlanNodeType;
 
 public class plannerTester {
 	private static PlannerTestAideDeCamp aide;
-	private static String m_ddl = "testplans-plannerTester-ddl.sql";
+	private static String m_ddlFile = "testplans-plannerTester-ddl.sql";
+	private static String m_stmtFile = "testplans-plannerTester-ddl.stmt";
+	private static ArrayList<String> m_stmts = new ArrayList<String>();
 
-    protected void setUpSchema( String ddl, String basename ) throws Exception {
+    public static void setUpSchema( String ddl, String basename ) throws Exception {
         aide = new PlannerTestAideDeCamp(TestIndexSelection.class.getResource(ddl),
         		basename);
 
@@ -36,6 +39,26 @@ public class plannerTester {
         for (Table t : tmap) {
             t.setIsreplicated(false);
         }
+    }
+    
+    public static void loadStmts ( String stmtFile ) throws IOException {
+    	m_stmts.clear();
+    	String line = null;
+    	BufferedReader reader = new BufferedReader( new FileReader( TestIndexSelection.class.getResource(stmtFile).getPath() ) );
+    	while( ( line = reader.readLine() ) != null ) {
+    		m_stmts.add( line );
+    	}
+    }
+    
+    //assumes single partition
+    public static void batchCompileSave( String ddl, String basename, String stmtFilePath, String savePath ) throws Exception {
+    	setUpSchema( ddl, basename );
+    	loadStmts( stmtFilePath );
+    	int size = m_stmts.size();
+    	for( int i = 0; i < size; i++ ) {
+    		AbstractPlanNode pn = compile( m_stmts.get(i), 0, true);
+    		writePlanToFile(pn, savePath+i );
+    	}
     }
 
     protected void tearDown() throws Exception {
@@ -91,6 +114,16 @@ public class plannerTester {
 		return pnt;
 	}
 	
+	//parameters : path to baseline and the new plans
+	public static void batchDiffLeaves( String pathBaseline, String pathNew, int size ) {
+		PlanNodeTree pnt1 = null;
+		PlanNodeTree pnt2 = null;
+		for( int i = 0; i < size; i++ ){
+			pnt1 = loadPlanFromFile( pathBaseline );
+			pnt2  = loadPlanFromFile( pathNew );
+			diffLeaves(pnt1.getRootPlanNode(), pnt2.getRootPlanNode());
+		}
+	}
 	
 	public static void diffLeaves( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ){
 		ArrayList<AbstractPlanNode> list1 = oldpn1.getLeafLists();
