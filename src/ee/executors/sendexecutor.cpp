@@ -118,7 +118,7 @@ TableTuple SendExecutor::p_next_pull()
     // 1. It's input table is a temp table
     // 2. Child supports pull mode (otherwise it will save it itself)
     bool needSave = (dynamic_cast<TempTable*>(getPlanNode()->getOutputTable()) != NULL)
-        && childExec->support_pull();
+        && childExec->support_pull() && childExec->parent_send_need_save_tuple_pull();
 
     TableTuple tuple;
     if (needSave) {

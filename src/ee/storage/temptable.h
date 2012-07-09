@@ -114,7 +114,7 @@ class TempTable : public Table {
     /**
      * Does a shallow copy that copies the pointer to uninlined columns.
      */
-    void insertTupleNonVirtual(TableTuple &source);
+    TableTuple insertTupleNonVirtual(TableTuple &source);
     void updateTupleNonVirtual(TableTuple &source, TableTuple &target);
 
     // ------------------------------------------------------------------
@@ -172,7 +172,7 @@ inline void TempTable::insertTupleNonVirtualWithDeepCopy(TableTuple &source, Poo
     m_tmpTarget1.setActiveTrue();
 }
 
-inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
+inline TableTuple TempTable::insertTupleNonVirtual(TableTuple &source) {
     //
     // First get the next free tuple
     // This will either give us one from the free slot list, or
@@ -191,6 +191,7 @@ inline void TempTable::insertTupleNonVirtual(TableTuple &source) {
     m_tmpTarget1.setActiveTrue();
     m_tmpTarget1.setPendingDeleteFalse();
     m_tmpTarget1.setPendingDeleteOnUndoReleaseFalse();
+    return m_tmpTarget1;
 }
 
 inline void TempTable::updateTupleNonVirtual(TableTuple &source, TableTuple &target) {

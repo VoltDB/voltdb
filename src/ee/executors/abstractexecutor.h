@@ -61,8 +61,20 @@ class TempTableLimits;
 class VoltDBEngine;
 
 namespace detail {
-struct AbstractExecutorState;
-} //namespace detail
+// must be in the header file to be visible from other executors
+struct AbstractExecutorState
+{
+    AbstractExecutorState(Table* table) :
+        m_iterator(table->makeIterator()),
+        m_nextTuple(table->schema()),
+        m_nullTuple(table->schema())
+    {}
+    boost::scoped_ptr<TableIterator> m_iterator;
+    TableTuple m_nextTuple;
+    TableTuple m_nullTuple;
+};
+
+} // namespace detail
 
 /**
  * AbstractExecutor provides the API for initializing and invoking executors.
@@ -101,6 +113,10 @@ class AbstractExecutor {
     // Clean up the output table of the executor tree as needed
     // Generic behavior wrapping the custom p_pre_execute_pull.
     void clearOutputTables();
+
+    //@TODO need something better than this.
+    // Only required by aggregate executor in case of INSERT
+    virtual bool parent_send_need_save_tuple_pull() const;
 
     /**
      * Returns true if the output table for the plannode must be cleaned up
@@ -311,6 +327,12 @@ inline void AbstractExecutor::clearOutputTables()
     depth_first_iterate_pull(fcleanup, false);
 }
 
+inline bool AbstractExecutor::parent_send_need_save_tuple_pull() const
+{
+    return true;
 }
+
+}
+
 
 #endif
