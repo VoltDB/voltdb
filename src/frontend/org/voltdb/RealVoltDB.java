@@ -425,7 +425,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         sites.add(siteMailbox.getHSId());
                     }
 
-                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, sites);
+                    m_rejoinCoordinator =
+                        new SequentialRejoinCoordinator(m_messenger, sites, m_catalogContext.cluster.getVoltroot());
                     m_messenger.registerMailbox(m_rejoinCoordinator);
                     m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
                                                        new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
@@ -1720,10 +1721,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
         }
-        consoleLog.info(
-                "Node data recovery completed after " + delta + " seconds with " + megabytes +
-                " megabytes transferred at a rate of " +
-                megabytesPerSecond + " megabytes/sec");
+
+        if (!m_config.m_newRejoin) {
+            consoleLog.info(
+                    "Node data recovery completed after " + delta + " seconds with " + megabytes +
+                    " megabytes transferred at a rate of " +
+                    megabytesPerSecond + " megabytes/sec");
+        }
+
         try {
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;

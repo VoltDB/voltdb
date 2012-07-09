@@ -49,6 +49,12 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
 
     private final long m_HSId;
 
+    /*
+     * Timeout if no connection in the specified amount of time. By default it's
+     * set to infinite. Once snapshot is successfully requested,
+     * startCountDown() will set it to 5 seconds.
+     */
+    private volatile long m_connectionTimeout = Long.MAX_VALUE;
     private ServerSocketChannel m_serverSocket = null;
     private SocketChannel m_sock = null;
     private final Semaphore m_initializationLock = new Semaphore(0);
@@ -145,7 +151,7 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
 
         try {
             final long startTime = System.currentTimeMillis();
-            while (System.currentTimeMillis() - startTime < 5000) {
+            while (System.currentTimeMillis() - startTime < m_connectionTimeout) {
                 try {
                     m_sock = m_serverSocket.accept();
                     if (m_sock != null) {
@@ -158,7 +164,7 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
                 Thread.yield();
             }
             if (m_sock == null) {
-                VoltDB.crashLocalVoltDB("Timed out waiting for connection from source partition",
+                VoltDB.crashLocalVoltDB("Timed out waiting for stream snapshot connection from source partition",
                         false, null);
             }
             m_sock.configureBlocking(true);
@@ -270,6 +276,11 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         outputBuffer.put(buf);
         outputBuffer.flip();
         return outputBuffer;
+    }
+
+    @Override
+    public void startCountDown() {
+        m_connectionTimeout = 5000; // 5 second timeout
     }
 
     @Override
