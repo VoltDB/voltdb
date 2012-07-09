@@ -109,7 +109,7 @@ public class testPlannerTester extends TestCase {
 //	
 //        //assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("LIMIT") = 1 );
 //    }
-    public void testBatchCompile() {
+    public void testBatchCompileSave() {
     	String ddl = "testplans-plannerTester-ddl.sql";
     	String basename = "testplans-plannerTester-ddl";
     	String stmtFile = "testplans-plannerTester-ddl.stmt";
@@ -129,85 +129,85 @@ public class testPlannerTester extends TestCase {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
-
-			
     }
     
     public void testWriteAndLoad() {
     	AbstractPlanNode pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+    	PlanNodeTree pnt1 = new PlanNodeTree( pn );
+    	System.out.println(pnt1.toJSONString());
     	String path = "/home/zhengli/prettyJson.txt";
     	plannerTester.writePlanToFile(pn, path);
     	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path);
     	System.out.println( pnt.toJSONString() );
     }
     
-    public void testLoadFromJSON() {
-    	AbstractPlanNode pn1 = null;
-        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-    	pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-        assertTrue(pn1 != null);
-        PlanNodeTree pnt = new PlanNodeTree( pn1 );
-       
-        JSONObject jobj;
-        String prettyJson = null;
-        
-        prettyJson = pnt.toJSONString();
-        System.out.println( prettyJson );
-        try {
-			jobj = new JSONObject( prettyJson );
-			
-			JSONArray values = jobj.getJSONArray("PLAN_NODES");
-			System.out.println( values.getJSONObject(0).toString() );
-			System.out.println( values.getJSONObject(0).getString("OUTPUT_SCHEMA") );
-			for( int i = 0; i < 6; i++ )
-				System.out.println( values.getJSONObject(i).getString("PLAN_NODE_TYPE") );
-			String str = values.getJSONObject(3).getString("CHILDREN_IDS");
-			System.out.println(str);
-			System.out.println( str.split(",")[1] );
-			System.out.println( values.getJSONObject(0).getJSONArray("CHILDREN_IDS").get(0));
-			//ArrayList<Integer> intlist =  
-			System.out.println( jobj.toString() );
-		} catch (JSONException e1) {
-			// TODO Auto-generated catch block
-			e1.printStackTrace();
-		}
-        //write plan to file
+//    public void testLoadFromJSON() {
+//    	AbstractPlanNode pn1 = null;
+//        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+//    	pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+//        assertTrue(pn1 != null);
+//        PlanNodeTree pnt = new PlanNodeTree( pn1 );
+//       
+//        JSONObject jobj;
+//        String prettyJson = null;
+//        
+//        prettyJson = pnt.toJSONString();
+//        System.out.println( prettyJson );
 //        try {
-//			BufferedWriter writer = new BufferedWriter( new FileWriter("/home/zhengli/prettyJson.txt") );
-//			writer.write( prettyJson );
-//			writer.flush();
-//			writer.close();
-//		} catch (IOException e) {
+//			jobj = new JSONObject( prettyJson );
+//			
+//			JSONArray values = jobj.getJSONArray("PLAN_NODES");
+//			System.out.println( values.getJSONObject(0).toString() );
+//			System.out.println( values.getJSONObject(0).getString("OUTPUT_SCHEMA") );
+//			for( int i = 0; i < 6; i++ )
+//				System.out.println( values.getJSONObject(i).getString("PLAN_NODE_TYPE") );
+//			String str = values.getJSONObject(3).getString("CHILDREN_IDS");
+//			System.out.println(str);
+//			System.out.println( str.split(",")[1] );
+//			System.out.println( values.getJSONObject(0).getJSONArray("CHILDREN_IDS").get(0));
+//			//ArrayList<Integer> intlist =  
+//			System.out.println( jobj.toString() );
+//		} catch (JSONException e1) {
+//			// TODO Auto-generated catch block
+//			e1.printStackTrace();
+//		}
+//        //write plan to file
+////        try {
+////			BufferedWriter writer = new BufferedWriter( new FileWriter("/home/zhengli/prettyJson.txt") );
+////			writer.write( prettyJson );
+////			writer.flush();
+////			writer.close();
+////		} catch (IOException e) {
+////			// TODO Auto-generated catch block
+////			e.printStackTrace();
+////		} 
+//        prettyJson = "";
+//        String line = null;
+//        //load plan from file
+//        try {
+//			BufferedReader reader = new BufferedReader( new FileReader( "/home/zhengli/prettyJson.txt" ));
+//				while( (line = reader.readLine() ) != null ){
+//					line = line.trim();
+//					prettyJson += line;
+//				}
+//			}
+//        catch (IOException e) {
+//    		// TODO Auto-generated catch block
+//    		e.printStackTrace();
+//    	}
+//		System.out.println( prettyJson );
+//		JSONObject jobj1;
+//		try {
+//			jobj1 = new JSONObject( prettyJson );
+//			JSONArray jarray = 	jobj1.getJSONArray("PLAN_NODES");
+//			PlanNodeTree pnt1 = new PlanNodeTree();
+//			pnt1.loadFromJSONArray(jarray);
+//			System.out.println( pnt1.toJSONString() );
+//		} catch (JSONException e) {
 //			// TODO Auto-generated catch block
 //			e.printStackTrace();
-//		} 
-        prettyJson = "";
-        String line = null;
-        //load plan from file
-        try {
-			BufferedReader reader = new BufferedReader( new FileReader( "/home/zhengli/prettyJson.txt" ));
-				while( (line = reader.readLine() ) != null ){
-					line = line.trim();
-					prettyJson += line;
-				}
-			}
-        catch (IOException e) {
-    		// TODO Auto-generated catch block
-    		e.printStackTrace();
-    	}
-		System.out.println( prettyJson );
-		JSONObject jobj1;
-		try {
-			jobj1 = new JSONObject( prettyJson );
-			JSONArray jarray = 	jobj1.getJSONArray("PLAN_NODES");
-			PlanNodeTree pnt1 = new PlanNodeTree();
-			pnt1.loadFromJSONArray(jarray);
-			System.out.println( pnt1.toJSONString() );
-		} catch (JSONException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-    }
+//		}
+//    }
     
     public void testDiffLeaves() {
     	AbstractPlanNode pn1 = null;
