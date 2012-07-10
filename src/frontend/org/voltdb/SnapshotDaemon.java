@@ -1088,12 +1088,14 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @param response
      * @return
      */
-    public Future<Void> processClientResponse(final ClientResponse response, final long handle) {
+    public Future<Void> processClientResponse(final Callable<ClientResponseImpl> response) {
         return m_es.submit(new Callable<Void>() {
             @Override
             public Void call() throws Exception {
                 try {
-                    m_procedureCallbacks.remove(handle).clientCallback(response);
+                    ClientResponseImpl resp = response.call();
+                    long handle = resp.getClientHandle();
+                    m_procedureCallbacks.remove(handle).clientCallback(resp);
                 } catch (Exception e) {
                     hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
                     throw e;

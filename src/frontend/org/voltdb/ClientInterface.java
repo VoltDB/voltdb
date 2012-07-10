@@ -1920,42 +1920,33 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         @Override
-        public void enqueue(org.voltcore.utils.DeferredSerialization ds)
+        public void enqueue(final org.voltcore.utils.DeferredSerialization ds)
         {
-            ClientResponseImpl resp = new ClientResponseImpl();
-            try
-            {
-                ByteBuffer b = ds.serialize()[0];
-                b.position(4);
-                resp.initFromBuffer(b);
-            }
-            catch (IOException ioe)
-            {
-                hostLog.error("Unable to deserialize ClientResponse from snapshot",
-                              ioe);
-                return;
-            }
-            m_snapshotDaemon.processClientResponse(resp,
-                                                   resp.getClientHandle());
+
+            m_snapshotDaemon.processClientResponse(new Callable<ClientResponseImpl>() {
+                @Override
+                public ClientResponseImpl call() throws Exception {
+                    ClientResponseImpl resp = new ClientResponseImpl();
+                    ByteBuffer b = ds.serialize()[0];
+                    b.position(4);
+                    resp.initFromBuffer(b);
+                    return resp;
+                }
+            });
         }
 
         @Override
-        public void enqueue(ByteBuffer b)
+        public void enqueue(final ByteBuffer b)
         {
-            ClientResponseImpl resp = new ClientResponseImpl();
-            b.position(4);
-            try
-            {
-                resp.initFromBuffer(b);
-            }
-            catch (IOException ioe)
-            {
-                hostLog.error("Unable to deserialize ClientResponse from snapshot",
-                              ioe);
-                return;
-            }
-            m_snapshotDaemon.processClientResponse(resp,
-                                                   resp.getClientHandle());
+            m_snapshotDaemon.processClientResponse(new Callable<ClientResponseImpl>() {
+                @Override
+                public ClientResponseImpl call() throws Exception {
+                    ClientResponseImpl resp = new ClientResponseImpl();
+                    b.position(4);
+                    resp.initFromBuffer(b);
+                    return resp;
+                }
+            });
         }
 
         @Override
