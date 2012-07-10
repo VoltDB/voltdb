@@ -934,7 +934,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     if (message instanceof InitiateResponseMessage) {
                         // forward response; copy is annoying. want slice of response.
                         InitiateResponseMessage response = (InitiateResponseMessage)message;
-                        Iv2Trace.logFinishTransaction(response);
+                        Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
                         ClientInterfaceHandleManager.Iv2InFlight clientData =
                             m_ciHandles.findHandle(response.getClientInterfaceHandle());
                         response.getClientResponseData().setClientHandle(clientData.m_clientHandle);

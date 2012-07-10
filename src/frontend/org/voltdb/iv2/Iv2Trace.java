@@ -58,11 +58,11 @@ public class Iv2Trace
         }
     }
 
-    public static void logFinishTransaction(InitiateResponseMessage msg)
+    public static void logFinishTransaction(InitiateResponseMessage msg, long localHSId)
     {
         if (iv2log.isTraceEnabled()) {
             String logmsg = new String("finishTxn %s ciHandle %s initHSId %s status %s");
-            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(msg.getInitiatorHSId()),
+            iv2log.trace(String.format(logmsg, CoreUtils.hsIdToString(localHSId),
                         ClientInterfaceHandleManager.handleToString(msg.getClientInterfaceHandle()),
                         CoreUtils.hsIdToString(msg.getCoordinatorHSId()),
                         respStatusToString(msg.getClientResponseData().getStatus())));
