@@ -105,14 +105,22 @@ public class AsyncCompilerAgent {
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
             final AsyncCompilerResult result = compileAdHocPlan(w);
-            // XXX: need client interface mailbox id.
-            m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+            if (w.completionHandler != null) {
+                w.completionHandler.onCompletion(result);
+            } else {
+                // XXX: need client interface mailbox id.
+                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+            }
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
             final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
-            // XXX: need client interface mailbox id.
-            m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+            if (w.completionHandler != null) {
+                w.completionHandler.onCompletion(result);
+            } else {
+                // XXX: need client interface mailbox id.
+                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+            }
         }
     }
 

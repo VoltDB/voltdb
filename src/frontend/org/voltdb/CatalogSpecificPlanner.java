@@ -49,7 +49,8 @@ public class CatalogSpecificPlanner {
         AdHocPlannerWork work =
             new AdHocPlannerWork(
                     -1, false, 0, 0, "", false, null, //none of the params on this line are used
-                    sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true, !multipart);
+                    sql, Arrays.asList(new String[] { sql }), multipart ? null : 0, m_catalogContext, true, !multipart,
+                    null);
         return m_agent.compileAdHocPlanFuture(work);
     }
 }
