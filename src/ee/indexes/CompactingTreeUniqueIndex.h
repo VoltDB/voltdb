@@ -246,7 +246,7 @@ public:
         m_keyIter = m_entries.lowerBound(m_tmp1);
         return m_entries.rankAsc(m_keyIter.key());
     }
-    int32_t getCounterBT(const TableTuple* searchKey) {
+    int32_t getCounterGT(const TableTuple* searchKey) {
         if (!hasRank) return -1;
         printf("<Tree Unique-map> get counter bigger than--- \n");
 

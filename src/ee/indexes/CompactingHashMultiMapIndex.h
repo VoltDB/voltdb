@@ -147,7 +147,7 @@ public:
     int32_t getCounterLET(const TableTuple* searchKey) {
         return -1;
     }
-    int32_t getCounterBT(const TableTuple* searchKey) {
+    int32_t getCounterGT(const TableTuple* searchKey) {
         return -1;
     }
 

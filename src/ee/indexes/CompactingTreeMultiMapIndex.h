@@ -228,7 +228,7 @@ public:
         m_seqIter = m_entries.lowerBound(m_tmp1);
         return m_entries.rankAsc(m_seqIter.key());
     }
-    int32_t getCounterBT(const TableTuple* searchKey) {
+    int32_t getCounterGT(const TableTuple* searchKey) {
         if (!hasRank) return -1;
         printf("<Tree Multimap> get counter bigger than--- \n");
 

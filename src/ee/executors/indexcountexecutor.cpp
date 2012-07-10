@@ -268,6 +268,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // POST EXPRESSION
     //
     AbstractExpression* post_expression = m_node->getPredicate();
+    assert(post_expression == NULL);
+    /*
     if (post_expression != NULL)
     {
         if (m_needsSubstitutePostExpression) {
@@ -275,21 +277,17 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
+    */
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
     // An index count has three parts:
     //  (1) Lookup tuples using the search key
-    //  (2) For each tuple that comes back, check whether the
-    //  end_expression is false.
-    //  If it is, then we stop scanning. Otherwise...
-    //  (3) Check whether the tuple satisfies the post expression.
-    //      If it does, then add it to the output table
     //
     // Use our search key to prime the index iterator
     // Now loop through each tuple given to us by the iterator
     //
-    int32_t rk = -1;
+    int32_t rkStart = 0, rkEnd = 0;
 
     if (activeNumOfSearchKeys > 0)
     {
@@ -301,9 +299,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
             // do something
+            rkStart = m_index->getCounterGT(&m_searchKey);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            rk = m_index->getCounterBT(&m_searchKey);
+            rkStart = m_index->getCounterGT(&m_searchKey);
+            if (m_index->exists(&m_searchKey))
+                rkStart++;
         }
         else {
             return false;
@@ -311,14 +312,15 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     }
 
     assert(m_index->is_countable_index_);
+    assert(post_expression == NULL);
     // seems to be like this semantics... still need to fix it
 
 
     printf("xin <IndexCount Executor> m_searchKey->: '%s'\n", m_searchKey.debug("T3").c_str());
-    printf("xin <IndexCount Executor> m_index->getRank: '%d'\n", rk);
+    printf("xin <IndexCount Executor> m_index->getRank: '%d'\n", rkStart);
 
     TableTuple& tmptup = m_outputTable->tempTuple();
-    tmptup.setNValue(0, ValueFactory::getBigIntValue(rk));
+    tmptup.setNValue(0, ValueFactory::getBigIntValue(rkStart));
     m_outputTable->insertTuple(tmptup);
 
     /*

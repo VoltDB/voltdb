@@ -312,7 +312,7 @@ public:
     /**
      * This function only supports countable tree index.
      */
-    virtual int32_t getCounterBT(const TableTuple *searchKey)
+    virtual int32_t getCounterGT(const TableTuple *searchKey)
     {
         throwFatalException("Invoked non-countable TableIndex virtual method getRankDes which has no implementation");
     }
