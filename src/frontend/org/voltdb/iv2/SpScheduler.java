@@ -67,12 +67,15 @@ public class SpScheduler extends Scheduler
     {
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
+        // Need a local copy that includes ourselves for the duplicate counter reconciliation
+        List<Long> liveHSIds = new ArrayList<Long>(m_replicaHSIds);
+        liveHSIds.add(m_mailbox.getHSId());
 
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
         List<Long> doneCounters = new LinkedList<Long>();
         for (DuplicateCounter counter : m_duplicateCounters.values()) {
-            int result = counter.updateReplicas(m_replicaHSIds);
+            int result = counter.updateReplicas(liveHSIds);
             if (result == DuplicateCounter.DONE) {
                 doneCounters.add(counter.getTxnId());
             }
