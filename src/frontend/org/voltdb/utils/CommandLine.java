@@ -23,6 +23,7 @@ import java.util.List;
 import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.START_ACTION;
 
 // VoltDB.Configuration represents all of the VoltDB command line parameters.
 // Extend that to include test-only parameters, the JVM parameters
@@ -56,8 +57,6 @@ public class CommandLine extends VoltDB.Configuration
         cl.m_externalInterface = m_externalInterface;
         cl.m_internalInterface = m_internalInterface;
         cl.m_drAgentPortStart = m_drAgentPortStart;
-        cl.m_rejoinToHostAndPort = m_rejoinToHostAndPort;
-        cl.m_liveRejoin = m_liveRejoin;
         cl.m_httpPort = m_httpPort;
         // final in baseclass: cl.m_isEnterprise = m_isEnterprise;
         cl.m_deadHostTimeoutMS = m_deadHostTimeoutMS;
@@ -69,7 +68,6 @@ public class CommandLine extends VoltDB.Configuration
         // final in baseclass: cl.m_commitLogDir = new File("/tmp");
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
-        cl.m_leaderPort = m_leaderPort;
         cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
 
@@ -113,14 +111,6 @@ public class CommandLine extends VoltDB.Configuration
     }
     public int port() {
         return m_port;
-    }
-
-    public int leaderPort() {
-        return m_leaderPort;
-    }
-
-    public void leaderPort(int leaderPort) {
-        m_leaderPort = leaderPort;
     }
 
     public int internalPort() {
@@ -188,13 +178,10 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
-    public CommandLine rejoinHostAndPort(String rejoinHostAndPort) {
-        this.m_rejoinToHostAndPort = rejoinHostAndPort;
-        return this;
-    }
-
-    public CommandLine isLiveRejoin(boolean isLiveRejoin) {
-        this.m_liveRejoin = isLiveRejoin;
+    public CommandLine leaderPort(int port)
+    {
+        String hostname = MiscUtils.getHostnameFromHostnameColonPort(m_leader);
+        m_leader = MiscUtils.getHostnameColonPortString(hostname, port);
         return this;
     }
 
@@ -439,26 +426,21 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("license"); cmdline.add(m_pathToLicense);
         }
 
+        if (m_startAction == START_ACTION.LIVE_REJOIN) {
+            // annoying, have to special case live rejoin
+            cmdline.add("live rejoin");
+        } else {
+            cmdline.add(m_startAction.toString().toLowerCase());
+        }
+
+        cmdline.add("host"); cmdline.add(m_leader);
         cmdline.add("catalog"); cmdline.add(jarFileName());
         cmdline.add("deployment"); cmdline.add(pathToDeployment());
 
-        // rejoin has no startAction or replication role
-        if (m_rejoinToHostAndPort == null || m_rejoinToHostAndPort.isEmpty()) {
-            if (m_startAction != null) {
-                cmdline.add(m_startAction.toString().toLowerCase());
-            }
-            cmdline.add("leader"); cmdline.add(m_leader);
-            cmdline.add("leaderport"); cmdline.add(Integer.toString(m_leaderPort));
-
+        // rejoin has no replication role
+        if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
             if (m_replicationRole == ReplicationRole.REPLICA) {
                 cmdline.add("replica");
-            }
-        }
-        else {
-            cmdline.add("rejoinhost"); cmdline.add(m_rejoinToHostAndPort);
-
-            if (m_liveRejoin) {
-                cmdline.add("live");
             }
         }
 

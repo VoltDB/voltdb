@@ -26,6 +26,8 @@ package org.voltdb;
 import java.io.File;
 import java.net.URL;
 
+import org.voltdb.utils.MiscUtils;
+
 /**
  * Wraps VoltDB in a Thread
  */
@@ -36,7 +38,9 @@ public class ServerThread extends Thread {
     public ServerThread(VoltDB.Configuration config) {
         m_config = config;
         m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = "";
+        if (m_config.m_leader == null) {
+            m_config.m_leader = "";
+        }
 
         if (!m_config.validate()) {
             m_config.usage();
@@ -92,11 +96,9 @@ public class ServerThread extends Thread {
         m_config.m_pathToDeployment = pathToDeployment;
         m_config.m_backend = target;
         m_config.m_pathToLicense = getTestLicensePath();
-        m_config.m_leader = "localhost";
+        m_config.m_leader = MiscUtils.getHostnameColonPortString("localhost", leaderPort);
         m_config.m_internalPort = internalPort;
-        m_config.m_leaderPort = leaderPort;
         m_config.m_zkInterface = "127.0.0.1:" + zkPort;
-        m_config.m_leader = "";
 
         if (!m_config.validate()) {
             m_config.usage();

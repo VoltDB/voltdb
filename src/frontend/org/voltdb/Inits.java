@@ -41,6 +41,7 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
+import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
@@ -112,7 +113,12 @@ public class Inits {
         m_config = rvdb.m_config;
         // determine if this is a rejoining node
         // (used for license check and later the actual rejoin)
-        m_isRejoin = m_config.m_rejoinToHostAndPort != null;
+        if (m_config.m_startAction == START_ACTION.REJOIN ||
+                m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
+            m_isRejoin = true;
+        } else {
+            m_isRejoin = false;
+        }
         m_threadCount = threadCount;
         m_deployment = rvdb.m_deployment;
 

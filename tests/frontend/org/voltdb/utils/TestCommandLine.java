@@ -26,6 +26,7 @@ package org.voltdb.utils;
 import static org.junit.Assert.*;
 
 import org.junit.Test;
+import org.voltdb.VoltDB.START_ACTION;
 
 public class TestCommandLine
 {
@@ -93,9 +94,22 @@ public class TestCommandLine
     public void testRejoin()
     {
         CommandLine cl = new CommandLine();
-        cl.startCommand("RECOVER");
-        cl.rejoinHostAndPort("127.0.0.1:6666");
-        assertTrue(cl.toString().contains("rejoinhost 127.0.0.1:6666"));
+        cl.startCommand("REJOIN");
+        cl.leader("127.0.0.1:6666");
+        System.err.println(cl.toString());
+        assertTrue(cl.toString().contains("rejoin host 127.0.0.1:6666"));
+        assertFalse(cl.toString().contains("start"));
+        assertFalse(cl.toString().contains("recover"));
+    }
+
+    @Test
+    public void testLiveRejoin()
+    {
+        CommandLine cl = new CommandLine();
+        cl.startCommand(START_ACTION.LIVE_REJOIN.name());
+        cl.leader("127.0.0.1:6666");
+        System.err.println(cl.toString());
+        assertTrue(cl.toString().contains("live rejoin host 127.0.0.1:6666"));
         assertFalse(cl.toString().contains("start"));
         assertFalse(cl.toString().contains("recover"));
     }

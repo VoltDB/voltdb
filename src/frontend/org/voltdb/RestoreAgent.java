@@ -624,7 +624,7 @@ SnapshotCompletionInterest {
          * If the user wants to create a new database, don't scan the
          * snapshots.
          */
-        if (m_action != START_ACTION.CREATE) {
+        if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
             snapshots = getSnapshots();
         }
 
@@ -724,7 +724,7 @@ SnapshotCompletionInterest {
          * Generate the replay plan here so that we don't have to wait until the
          * snapshot restore finishes.
          */
-        if (m_action != START_ACTION.CREATE) {
+        if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
             m_replayAgent.generateReplayPlan();
         }
 
