@@ -316,19 +316,23 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable[] results = null;
         try
         {
-            JSONObject jsObj = new JSONObject();
-            try {
-                jsObj.put("uripath", String.format("file://%s", dir));
-                jsObj.put("nonce", nonce);
-                jsObj.put("block", block);
-                if (csv) {
+            // For complete coverage test with JSON for CSV saves and legacy args otherwise.
+            if (csv) {
+                JSONObject jsObj = new JSONObject();
+                try {
+                    jsObj.put("uripath", String.format("file://%s", dir));
+                    jsObj.put("nonce", nonce);
+                    jsObj.put("block", block);
                     jsObj.put("format", "csv");
+                } catch (JSONException e) {
+                    fail("JSON exception" + e.getMessage());
                 }
-            } catch (JSONException e) {
-                fail("JSON exception" + e.getMessage());
+                results = client.callProcedure("@SnapshotSave", jsObj.toString()).getResults();
             }
-
-            results = client.callProcedure("@SnapshotSave", jsObj.toString()).getResults();
+            else {
+                results = client.callProcedure("@SnapshotSave", dir, nonce, (byte)(block ? 1 : 0))
+                                    .getResults();
+            }
         }
         catch (Exception ex)
         {
