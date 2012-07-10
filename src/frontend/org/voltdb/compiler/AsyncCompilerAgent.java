@@ -20,7 +20,6 @@ package org.voltdb.compiler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -156,7 +155,7 @@ public class AsyncCompilerAgent {
             try {
                 String sqlStatement = work.sqlStatements[0];
                 PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
-                                                            work.inferSinglePartition, work.allowParameterization);
+                                                          work.inferSinglePartition, work.allowParameterization);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 plannedStmtBatch.partitionParam = result.partitionParam;
@@ -164,6 +163,7 @@ public class AsyncCompilerAgent {
                                               result.onePlan,
                                               result.allPlan,
                                               result.replicatedDML,
+                                              result.nonDeterministic,
                                               result.params);
             }
             catch (Exception e) {
@@ -181,6 +181,7 @@ public class AsyncCompilerAgent {
                                                   result.onePlan,
                                                   result.allPlan,
                                                   result.replicatedDML,
+                                                  result.nonDeterministic,
                                                   result.params);
                 }
                 catch (Exception e) {
