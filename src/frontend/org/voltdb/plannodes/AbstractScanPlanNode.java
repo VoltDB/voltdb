@@ -310,8 +310,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     	super.loadFromJSONObject(jobj);
     	try {
 			this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+			//this.m_predicate.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name() ), null);
 		} catch (JSONException e) {
-			e.printStackTrace();
+			System.out.println(e.getMessage());
 		}
     }
 

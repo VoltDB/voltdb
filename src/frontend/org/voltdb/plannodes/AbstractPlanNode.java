@@ -40,6 +40,10 @@ import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.PlanNodeType;
 
+import com.sun.xml.internal.bind.v2.runtime.unmarshaller.XsiNilLoader.Array;
+
+import sun.tools.jar.resources.jar;
+
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
 
     /**
@@ -661,10 +665,36 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 			//todo : need to set up output_schema, inline_nodes and members in various plannodes
 			
 			m_outputSchema = new NodeSchema();
+			
+			//load inline nodes
+			JSONArray jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
+			if( jarray.length() != 0 ) {
+				PlanNodeTree pnt = new PlanNodeTree();
+				pnt.loadFromJSONArray(jarray);
+				loadInlineNodes(pnt);
+			}
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
+    }
+    
+    private void loadInlineNodes ( PlanNodeTree pnt ) {
+    	AbstractPlanNode pn = pnt.getRootPlanNode();
+    	HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        loadInlineNodes_recurse( pn, visited);
+    }
+    
+    public void loadInlineNodes_recurse( AbstractPlanNode pn, HashSet<AbstractPlanNode> visited) {
+    	if (visited.contains(this)) {
+            assert(false): "do not expect loops in plangraph.";
+            return;
+        }
+        visited.add(this);
+        m_inlineNodes.put( pn.getPlanNodeType(), pn);
+
+        for (AbstractPlanNode n : m_children)
+            n.loadInlineNodes_recurse( n, visited);
     }
 
     public String toExplainPlanString() {
