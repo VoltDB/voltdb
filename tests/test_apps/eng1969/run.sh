@@ -5,7 +5,7 @@ CLASSPATH="`ls -x ../../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../..
 VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"
 LICENSE="../../../voltdb/license.xml"
-LEADER="localhost"
+HOST="localhost"
 EXPORTDATA="exportdata"
 CLIENTLOG="clientlog"
 
@@ -42,7 +42,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader $LEADER
+        license $LICENSE host $HOST
 }
 
 # run the client that drives the example
