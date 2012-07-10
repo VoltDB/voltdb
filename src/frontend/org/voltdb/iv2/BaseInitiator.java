@@ -116,6 +116,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                     numberOfPartitions);
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
+            m_scheduler.setProcedureSet(procSet);
 
             m_scheduler.start();
             m_siteThread = new Thread(m_executionSite);
@@ -128,10 +129,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             // m_siteThread.start() in a Runnable which RealVoltDB can use for
             // configure/run sequencing in the future.
             joinElectoralCollege(kfactor);
-
-            // Leader elector chains are built, let scheduler do final
-            // initialization (the MPI needs to setup its MapCache)
-            m_scheduler.setProcedureSet(procSet);
         }
         catch (Exception e) {
            VoltDB.crashLocalVoltDB("Failed to configure initiator", true, e);
