@@ -18,6 +18,7 @@
 package org.voltdb.rejoin;
 
 import java.io.File;
+import java.util.ArrayList;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Queue;
@@ -99,7 +100,17 @@ public class SequentialRejoinCoordinator extends RejoinCoordinator {
             VoltDB.crashLocalVoltDB("Unknown site " + CoreUtils.hsIdToString(HSId) +
                                     " finished rejoin", false, null);
         }
-        rejoinLog.info("Finished rejoining site " + CoreUtils.hsIdToString(HSId));
+        String msg = "Finished rejoining site " + CoreUtils.hsIdToString(HSId);
+        ArrayList<Long> remainingSites = new ArrayList<Long>(m_pendingSites);
+        remainingSites.addAll(m_rejoiningSites);
+        if (!remainingSites.isEmpty()) {
+            msg += ". Remaining sites to rejoin: " +
+                    CoreUtils.hsIdCollectionToString(remainingSites);
+        }
+        else {
+            msg += ". All sites completed rejoin.";
+        }
+        rejoinLog.info(msg);
 
         if (m_rejoiningSites.isEmpty()) {
             // no more sites to rejoin, we're done
