@@ -132,7 +132,8 @@ public class testPlannerTester extends TestCase {
     }
     
     public void testWriteAndLoad() {
-    	AbstractPlanNode pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+    	//AbstractPlanNode pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+    	AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
     	PlanNodeTree pnt1 = new PlanNodeTree( pn );
     	System.out.println(pnt1.toJSONString());
     	String path = "/home/zhengli/prettyJson.txt";
@@ -212,10 +213,11 @@ public class testPlannerTester extends TestCase {
     public void testDiffLeaves() {
     	AbstractPlanNode pn1 = null;
     	AbstractPlanNode pn2 = null;
-        pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
-    	//pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
+        pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+        pn2 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
         //pn2 = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
-        pn2 = compile("select * from l where b = ?;", 3, true);
+        //pn2 = compile("select * from l where b = ?;", 3, true);
         assertTrue(pn1 != null);
         assertTrue(pn2 != null);
         plannerTester.diffLeaves(pn1, pn2);

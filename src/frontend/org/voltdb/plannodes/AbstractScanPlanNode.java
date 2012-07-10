@@ -305,6 +305,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.value(m_predicate);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
     }
+    
     @Override
     public void loadFromJSONObject( JSONObject jobj ) {
     	super.loadFromJSONObject(jobj);

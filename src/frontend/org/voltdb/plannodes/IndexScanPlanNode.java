@@ -21,7 +21,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.eclipse.jetty.util.ajax.JSON;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
@@ -364,7 +366,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         }
         stringer.endArray();
     }
-
+    
+    public void loadFromJSONObject( JSONObject jobj ) {
+    	super.loadFromJSONObject(jobj);
+    	try {
+			m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
+//			JSONObject obj = jobj.getJSONObject(Members.END_EXPRESSION.name());
+//			m_endExpression.fromJSONObject( obj, null);
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+    }
+    
     @Override
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
