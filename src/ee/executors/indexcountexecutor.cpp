@@ -28,6 +28,8 @@
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
 
+#include "plannodes/indexcountnode.h"
+
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
@@ -40,9 +42,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         TempTableLimits* limits)
 {
     //VOLT_TRACE("init IndexCount Executor");
-    VOLT_ERROR("init IndexCount Executor");
-    printf("init IndexCount Executor");
-    //LogManager::getThreadLogger(LOGGERID_SQL)->log(LOGLEVEL_ERROR, "init IndexCount Executor");
+    printf("init IndexCount Executor\n");
 
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
     assert(m_node);
@@ -51,7 +51,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // Create output table based on output schema from the plan
 
     // FIXME(xin): think about how to fix it
-    TupleSchema* schema = m_node->generateTupleSchema(true);
+    TupleSchema* schema = m_node->generateTupleSchema(false);
     int column_count = static_cast<int>(m_node->getOutputSchema().size());
     assert(column_count == 1);
 
@@ -60,11 +60,15 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     {
         column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
     }
+    printf("xin <IndexCount Executor> TupleSchema: '%s'\n", schema->debug().c_str());
+    //printf("xin <IndexCount Executor> column_names: '%s'\n", *(column_names[0]));
+
     // FIXME(xin):
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       m_node->getTargetTable()->name(),
                                                       schema,
-                                                      column_names));
+                                                      column_names,
+                                                      limits));
     delete[] column_names;
 
     //
@@ -84,6 +88,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     //                m_node->debug().c_str());
     //     return false;
     // }
+    printf("xin <IndexCount Executor> m_numOfSearchkeys: '%d'\n", m_numOfSearchkeys);
+
     for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
     {
         if (m_node->getSearchKeyExpressions()[ctr] == NULL)
@@ -108,6 +114,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     m_targetTable = static_cast<PersistentTable*>(m_node->getTargetTable());
     m_numOfColumns = static_cast<int>(m_outputTable->columnCount());
 
+    assert(m_numOfColumns == 1);
     //
     // Grab the Index from our inner table
     // We'll throw an error if the index is missing
@@ -116,7 +123,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // This index should have a true countable flag
     // FIXME(xin):
     assert(m_index->is_countable_index_);
-
+    printf("xin <IndexCount Executor> m_index: '%s'\n", m_node->debug().c_str());
 
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
@@ -132,6 +139,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
 
     m_tuple = TableTuple(m_targetTable->schema());
+    //printf("xin <IndexCount Executor> m_tuple: '%s'\n", m_tuple.debug("tablename").c_str());
 
     if (m_node->getEndExpression() != NULL)
     {
@@ -272,8 +280,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
-    int tuples_written = 0;
-    int tuples_skipped = 0;     // for offset
+    //int tuples_written = 0;
+    //int tuples_skipped = 0;     // for offset
 
     //
     // An index scan has three parts:
@@ -311,8 +319,10 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     assert(m_index->is_countable_index_);
     assert(m_index->getRank(&m_searchKey) != -1);
+    printf("<index count executor starts to do the work...>\n");
     // seems to be like this semantics... still need to fix it
-    m_outputTablem_outputTable->insertTupleNonVirtual(m_index->getRank(&m_searchKey));
+    // m_tuple.setNValue(0, ValueFactory::getBigIntValue(1));
+    // m_outputTable->insertTupleNonVirtual(m_index->getRank(&m_searchKey));
 
     /*
     //

@@ -21,7 +21,7 @@
 
 #include <stdexcept>
 #include <sstream>
-#include "indexscannode.h"
+#include "indexcountnode.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/types.h"
@@ -116,7 +116,7 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
 
 void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     AbstractScanPlanNode::loadFromJSONObject(obj);
-    printf("IndexCountPlanNode loadFromJsonObject runs...");
+    printf("IndexCountPlanNode loadFromJsonObject runs...\n");
     json_spirit::Value keyIterateValue = json_spirit::find_value( obj, "KEY_ITERATE");
     if (keyIterateValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,

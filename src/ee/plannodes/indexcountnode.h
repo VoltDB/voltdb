@@ -25,7 +25,7 @@
 #include <string>
 #include "abstractscannode.h"
 #include "json_spirit/json_spirit.h"
-
+#include "common/ValueFactory.hpp"
 namespace voltdb {
 
 class AbstractExpression;
@@ -36,13 +36,13 @@ class AbstractExpression;
 class IndexCountPlanNode : public AbstractScanPlanNode {
     public:
         IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            printf("IndexCountPlanNode runs...1");
+            printf("IndexCountPlanNode runs with catalog id...\n");
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
             this->end_expression = NULL;
         }
         IndexCountPlanNode() : AbstractScanPlanNode() {
-            printf("IndexCountPlanNode runs...");
+            printf("IndexCountPlanNode runs...\n");
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
             this->end_expression = NULL;
