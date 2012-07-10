@@ -278,11 +278,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
-    //int tuples_written = 0;
-    //int tuples_skipped = 0;     // for offset
-
-    //
-    // An index scan has three parts:
+    // An index count has three parts:
     //  (1) Lookup tuples using the search key
     //  (2) For each tuple that comes back, check whether the
     //  end_expression is false.
@@ -293,36 +289,36 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // Use our search key to prime the index iterator
     // Now loop through each tuple given to us by the iterator
     //
+    int32_t rk = -1;
+
     if (activeNumOfSearchKeys > 0)
     {
-        VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+        VOLT_ERROR("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                    localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
         if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            m_index->moveToKey(&m_searchKey);
+            // do something
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            m_index->moveToGreaterThanKey(&m_searchKey);
+            // do something
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            m_index->moveToKeyOrGreater(&m_searchKey);
+            rk = m_index->getCounterBT(&m_searchKey);
         }
         else {
             return false;
         }
     }
 
-    // Fixme(xin):
-    // I think I should answer COUNT(*) query just from here
-
     assert(m_index->is_countable_index_);
     // seems to be like this semantics... still need to fix it
-    int32_t rk = m_index->getRank(&m_searchKey);
+
+
     printf("xin <IndexCount Executor> m_searchKey->: '%s'\n", m_searchKey.debug("T3").c_str());
     printf("xin <IndexCount Executor> m_index->getRank: '%d'\n", rk);
 
     TableTuple& tmptup = m_outputTable->tempTuple();
-    tmptup.setNValue(0, ValueFactory::getBigIntValue(1));
+    tmptup.setNValue(0, ValueFactory::getBigIntValue(rk));
     m_outputTable->insertTuple(tmptup);
 
     /*

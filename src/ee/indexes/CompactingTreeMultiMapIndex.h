@@ -220,13 +220,21 @@ public:
         return moveToKey(m_keyIter.second.key());
     }
 
-    int32_t getRank(const TableTuple* searchKey) {
+    int32_t getCounterLET(const TableTuple* searchKey) {
         if (!hasRank) return -1;
-        printf("<Tree Multimap> getRank--- \n");
+        printf("<Tree Multimap> get counter less or equal than --- \n");
 
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
-        return m_entries.rankAsc(m_keyIter.key());
+        return m_entries.rankAsc(m_seqIter.key());
+    }
+    int32_t getCounterBT(const TableTuple* searchKey) {
+        if (!hasRank) return -1;
+        printf("<Tree Multimap> get counter bigger than--- \n");
+
+        m_tmp1.setFromKey(searchKey);
+        m_seqIter = m_entries.lowerBound(m_tmp1);
+        return m_entries.rankDes(m_seqIter.key());
     }
 
     size_t getSize() const { return m_entries.size(); }

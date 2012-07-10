@@ -301,11 +301,20 @@ public:
     }
 
     /**
-     *
+     * This function only supports countable tree index.
+     * For unique index, it will return the rank with the searchKey in ascending order including itself.
+     * For non-unique index,
      */
-    virtual int32_t getRank(const TableTuple *searchKey)
+    virtual int32_t getCounterLET(const TableTuple *searchKey)
     {
-        throwFatalException("Invoked TableIndex virtual method getRank which has no implementation");
+        throwFatalException("Invoked non-countable TableIndex virtual method getRankAsc which has no implementation");
+    }
+    /**
+     * This function only supports countable tree index.
+     */
+    virtual int32_t getCounterBT(const TableTuple *searchKey)
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method getRankDes which has no implementation");
     }
 
 

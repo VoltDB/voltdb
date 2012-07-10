@@ -148,8 +148,10 @@ public:
         return retval;
     }
 
-    int32_t getRank(const TableTuple* searchKey) {
-        // do not support it with hash index
+    int32_t getCounterLET(const TableTuple* searchKey) {
+        return -1;
+    }
+    int32_t getCounterBT(const TableTuple* searchKey) {
         return -1;
     }
 
