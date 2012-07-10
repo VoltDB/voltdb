@@ -144,6 +144,11 @@ public:
         return retval;
     }
 
+    int32_t getRank(const TableTuple* searchKey) {
+        // do not support it with hash index
+        return -1;
+    }
+
     size_t getSize() const { return m_entries.size(); }
 
     int64_t getMemoryEstimate() const

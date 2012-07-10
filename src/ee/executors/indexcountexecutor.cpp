@@ -321,10 +321,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     printf("xin <IndexCount Executor> m_searchKey->: '%s'\n", m_searchKey.debug("T3").c_str());
     printf("xin <IndexCount Executor> m_index->getRank: '%d'\n", rk);
 
-    char data[] = {'2'};
-    m_tuple = TableTuple(data,m_targetTable->schema());
-    //m_tuple.setNValue(0, ValueFactory::getBigIntValue(1));
-    m_outputTable->insertTupleNonVirtual(m_tuple);
+    TableTuple& tmptup = m_outputTable->tempTuple();
+    tmptup.setNValue(0, ValueFactory::getBigIntValue(1));
+    m_outputTable->insertTuple(tmptup);
 
     /*
     //

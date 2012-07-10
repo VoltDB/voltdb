@@ -238,9 +238,12 @@ public:
         return !m_match.isNullTuple();
     }
 
-    int32_t rank(const KeyType &key) const {
+    int32_t getRank(const TableTuple* searchKey) {
         if (!hasRank) return -1;
-        return m_entries.rankAsc(key);
+
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries.lowerBound(m_tmp1);
+        return m_entries.rankAsc(m_keyIter.key());
     }
 
     size_t getSize() const { return static_cast<size_t>(m_entries.size()); }

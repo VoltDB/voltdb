@@ -300,10 +300,12 @@ public:
     	return is_countable_index_;
     }
 
-    // FIXME(xin): still need to think about what parameter I should use
-    virtual int32_t getRank(const TableTuple *searchKey) const
+    /**
+     *
+     */
+    virtual int32_t getRank(const TableTuple *searchKey)
     {
-        return 1;
+        throwFatalException("Invoked TableIndex virtual method getRank which has no implementation");
     }
 
 

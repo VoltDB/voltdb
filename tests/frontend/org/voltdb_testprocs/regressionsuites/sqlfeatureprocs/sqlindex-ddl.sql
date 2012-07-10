@@ -3,4 +3,4 @@ CREATE TABLE T3 (
 	POINTS INTEGER NOT NULL,
 	PRIMARY KEY (ID)
 );
-create index idx_1_COUNTER on T3 (POINTS);
+create unique index idx_1_COUNTER on T3 (POINTS);

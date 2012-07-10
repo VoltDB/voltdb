@@ -220,6 +220,15 @@ public:
         return moveToKey(m_keyIter.second.key());
     }
 
+    int32_t getRank(const TableTuple* searchKey) {
+        if (!hasRank) return -1;
+        printf("<Tree Multimap> getRank--- \n");
+
+        m_tmp1.setFromKey(searchKey);
+        m_seqIter = m_entries.lowerBound(m_tmp1);
+        return m_entries.rankAsc(m_keyIter.key());
+    }
+
     size_t getSize() const { return m_entries.size(); }
 
     int64_t getMemoryEstimate() const
