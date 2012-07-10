@@ -199,9 +199,19 @@ function isUpdateResult(table)
 	return ((table.schema[0].name.length == 0 || table.schema[0].name == "modified_tuples") && table.data.length == 1 && table.schema.length == 1 && table.schema[0].type == 6);
 }
 
+function hex2bin(hex)
+{
+    var bytes = [], str;
+
+    for(var i=0; i< hex.length-1; i+=2)
+        bytes.push(parseInt(hex.substr(i, 2), 16));
+
+    return String.fromCharCode.apply(String, bytes);
+}
+
 function printGrid(target, id, table)
 {
-	var src = '<table id="resultset-' + id + '" class="sortable tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
+    var src = '<table id="resultset-' + id + '" class="sortable tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
     if (isUpdateResult(table))
 		src += '<th>modified_tuples</th>';
     else
@@ -213,8 +223,13 @@ function printGrid(target, id, table)
 	for(var j = 0; j < table.data.length; j++)
 	{
 		src += '<tr>';
-		for(var k = 0; k < table.data[j].length; k++)
-			src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + table.data[j][k] + '</td>';
+		for(var k = 0; k < table.data[j].length; k++) {
+                        if (table.schema[k].type == 25) {
+                            src += '<td align="right">' + hex2bin(table.data[j][k]) + '</td>';
+                        } else {
+                            src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + table.data[j][k] + '</td>';
+                        }
+                }
 		src += '</tr>';
 	}
 	src += '</tbody></table>';
