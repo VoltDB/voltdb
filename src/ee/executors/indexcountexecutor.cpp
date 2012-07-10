@@ -135,8 +135,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
                    m_targetTable->name().c_str(), m_node->debug().c_str());
         delete [] m_searchKeyBackingStore;
         return false;
-    }
     VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
+    }
 
     m_tuple = TableTuple(m_targetTable->schema());
     //printf("xin <IndexCount Executor> m_tuple: '%s'\n", m_tuple.debug("tablename").c_str());
@@ -174,8 +174,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
 
 bool IndexCountExecutor::p_execute(const NValueArray &params)
 {
-    printf("execute IndexCount Executor");
-
     assert(m_node);
     assert(m_node == dynamic_cast<IndexCountPlanNode*>(m_abstractNode));
     assert(m_outputTable);
@@ -318,11 +316,15 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // I think I should answer COUNT(*) query just from here
 
     assert(m_index->is_countable_index_);
-    assert(m_index->getRank(&m_searchKey) != -1);
-    printf("<index count executor starts to do the work...>\n");
     // seems to be like this semantics... still need to fix it
-    // m_tuple.setNValue(0, ValueFactory::getBigIntValue(1));
-    // m_outputTable->insertTupleNonVirtual(m_index->getRank(&m_searchKey));
+    int32_t rk = m_index->getRank(&m_searchKey);
+    printf("xin <IndexCount Executor> m_searchKey->: '%s'\n", m_searchKey.debug("T3").c_str());
+    printf("xin <IndexCount Executor> m_index->getRank: '%d'\n", rk);
+
+    char data[] = {'2'};
+    m_tuple = TableTuple(data,m_targetTable->schema());
+    //m_tuple.setNValue(0, ValueFactory::getBigIntValue(1));
+    m_outputTable->insertTupleNonVirtual(m_tuple);
 
     /*
     //
