@@ -263,6 +263,58 @@ public class TestVoltTable extends TestCase {
         }
     }
 
+    /*
+     * Use a heap buffer with an array offset to simulate a result set
+     * from the EE
+     */
+    public void testCompressionWithArrayOffset() throws Exception {
+        testResizedTable();
+        ByteBuffer buf = t.getBuffer();
+        byte bytes[] = new byte[buf.remaining() + 12];
+        byte subBytes[] = new byte[buf.remaining()];
+        buf.get(subBytes);
+        System.arraycopy(subBytes, 0, bytes, 12, subBytes.length);
+
+        buf = ByteBuffer.wrap(bytes);
+        buf.position(12);
+        buf = buf.slice();
+
+        VoltTable vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
+
+        FastSerializer fs = new FastSerializer();
+        fs.writeObject(t);
+
+        byte uncompressedBytes[] = fs.getBytes();
+
+
+        /*
+         * Test the sync method
+         */
+        byte decompressedBytes[] = CompressionService
+                .decompressBytes(vt.getCompressedBytes());
+        vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
+                ByteBuffer.wrap(decompressedBytes), true);
+        fs = new FastSerializer();
+        fs.writeObject(vt);
+        byte bytesForComparison[] = fs.getBytes();
+        assertTrue(java.util.Arrays.equals(bytesForComparison,
+                uncompressedBytes));
+
+        /*
+         * Now test async
+         */
+        vt = PrivateVoltTableFactory.createVoltTableFromBuffer(buf, true);
+        decompressedBytes = CompressionService
+                .decompressBytes(vt.getCompressedBytes());
+        vt = PrivateVoltTableFactory.createVoltTableFromBuffer(
+                ByteBuffer.wrap(decompressedBytes), true);
+        fs = new FastSerializer();
+        fs.writeObject(vt);
+        bytesForComparison = fs.getBytes();
+        assertTrue(java.util.Arrays.equals(bytesForComparison,
+                uncompressedBytes));
+    }
+
     public void testCompression() throws Exception {
         testResizedTable();
         byte compressedBytes[] = t.getCompressedBytes();

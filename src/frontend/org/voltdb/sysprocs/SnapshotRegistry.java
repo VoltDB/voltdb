@@ -21,6 +21,7 @@ import java.util.HashMap;
 import java.util.TreeSet;
 import java.util.Iterator;
 
+import org.voltdb.SnapshotFormat;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 /**
@@ -50,16 +51,17 @@ public class SnapshotRegistry {
         public final boolean result; //true success, false failure
 
         public final long bytesWritten;
-        public final boolean csv;
+        public final SnapshotFormat format;
 
         private final HashMap< String, Table> tables = new HashMap< String, Table>();
 
-        private Snapshot(long txnId, int hostId, String path, String nonce, boolean csv,
+        private Snapshot(long txnId, int hostId, String path, String nonce,
+                         SnapshotFormat format,
                          org.voltdb.catalog.Table tables[]) {
             this.txnId = txnId;
             this.path = path;
             this.nonce = nonce;
-            this.csv = csv;
+            this.format = format;
             timeFinished = 0;
             synchronized (this.tables) {
                 for (org.voltdb.catalog.Table table : tables) {
@@ -67,7 +69,7 @@ public class SnapshotRegistry {
                         SnapshotUtil.constructFilenameForTable(
                                 table,
                                 nonce,
-                                csv ? ".csv" : ".vpt",
+                                format,
                                 hostId);
                     this.tables.put(table.getTypeName(), new Table(table.getTypeName(), filename));
                 }
@@ -80,7 +82,7 @@ public class SnapshotRegistry {
             txnId = incomplete.txnId;
             path = incomplete.path;
             nonce = incomplete.nonce;
-            csv = incomplete.csv;
+            format = incomplete.format;
             this.timeFinished = timeFinished;
             synchronized (tables) {
                 tables.putAll(incomplete.tables);
@@ -153,9 +155,9 @@ public class SnapshotRegistry {
             int hostId,
             String path,
             String nonce,
-            boolean csv,
+            SnapshotFormat format,
             org.voltdb.catalog.Table tables[]) {
-        final Snapshot s = new Snapshot(txnId, hostId, path, nonce, csv, tables);
+        final Snapshot s = new Snapshot(txnId, hostId, path, nonce, format, tables);
 
         m_snapshots.add(s);
         if (m_snapshots.size() > m_maxStatusHistory) {

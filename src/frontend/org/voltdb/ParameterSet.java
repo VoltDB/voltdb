@@ -538,6 +538,11 @@ import org.voltdb.types.VoltDecimalHelper;
                             size += vt.getSerializedSize();
                         }
                         break;
+                    case VARBINARY:
+                        for (byte[] buf : (byte[][]) obj) {
+                            size += 4 + buf.length;
+                        }
+                        break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
                 }
@@ -688,6 +693,9 @@ import org.voltdb.types.VoltDecimalHelper;
                         break;
                     case VOLTTABLE:
                         FastSerializer.writeArray((VoltTable[]) obj, buf);
+                        break;
+                    case VARBINARY:
+                        FastSerializer.writeArray((byte[][]) obj, buf);
                         break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);

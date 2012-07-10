@@ -164,7 +164,13 @@ public abstract class SubPlanAssembler {
         HashMap<Column, ArrayList<AbstractExpression>> ltColumns = new HashMap<Column, ArrayList<AbstractExpression>>();
         for (AbstractExpression expr : exprs)
         {
-            Column col = getColumnForFilterExpression(table, expr);
+            Column col = null;
+            AbstractExpression indexable = getIndexableExpressionForFilter(table, expr);
+            if (indexable != null && indexable.getExpressionType() == ExpressionType.VALUE_TUPLE) {
+                TupleValueExpression tve = (TupleValueExpression)indexable;
+                col = getTableColumn(table, tve.getColumnName());
+            }
+            // Cop out for now on indexable complex expressions (that aren't just column references).
             if (col != null)
             {
                 if (expr.getExpressionType() == ExpressionType.COMPARE_EQUAL)
@@ -355,8 +361,7 @@ public abstract class SubPlanAssembler {
      * @param expr The comparison expression to search.
      * @return The column found or null if none found.
      */
-    protected Column
-    getColumnForFilterExpression(Table table, AbstractExpression expr)
+    protected AbstractExpression getIndexableExpressionForFilter(Table table, AbstractExpression expr)
     {
         if (expr == null)
             return null;
@@ -371,54 +376,59 @@ public abstract class SubPlanAssembler {
             return null;
         }
 
-        Column indexedColumn = getColumnForFilterExpressionRecursive(table, expr);
-        if (indexedColumn == null)
-            return indexedColumn;
+        AbstractExpression indexableExpr = null;
 
-        // EE index comparators do not support expressions on the key.
-        // The indexed column must not be part of a sub-expression.
-        boolean keyIsExpression = true;
+        boolean indexableOnLeft = isIndexableFilterOperand(table, expr.getLeft());
+        boolean indexableOnRight = isIndexableFilterOperand(table, expr.getRight());
 
-        // Also remember which side contains the key - need this later
-        boolean keyIsLeft = false;
-
-        // Already know that the column appears on at most one side of the
-        // expression. Can naively check both sides.
-        if (expr.getLeft().getExpressionType() == ExpressionType.VALUE_TUPLE) {
-            TupleValueExpression tve = (TupleValueExpression)(expr.getLeft());
-            if (getTableColumn(table, tve.getColumnName()) == indexedColumn) {
-                keyIsExpression = false;
-                keyIsLeft = true;
-            }
-        }
-        if (expr.getRight().getExpressionType() == ExpressionType.VALUE_TUPLE) {
-            TupleValueExpression tve = (TupleValueExpression)(expr.getRight());
-            if (getTableColumn(table, tve.getColumnName()) == indexedColumn) {
-                keyIsExpression = false;
-                keyIsLeft = false;
-            }
-        }
-
-        if (keyIsExpression)
+        // Left and right columns must not be from the same table,
+        // e.g. where t.a = t.b is not indexable with the current technology.
+        // It would require parallel iteration over two indexes,
+        // looking for matching keys AND matching payloads.
+        if (indexableOnLeft && indexableOnRight) {
             return null;
+        }
 
-        // EE index key comparator can not cast keys to the RHS type.
+        // EE index key comparator should not lose precision when casting keys to indexed type.
         // Do not choose an index that requires such a cast.
-        // Sadly, this restriction is not globally true but I don't
-        // think the planner can really predict the index type that
-        // the EE's index factory might construct.
-        VoltType keyType = keyIsLeft ? expr.getLeft().getValueType()
-                                     : expr.getRight().getValueType();
+        VoltType otherType = null;
+        if (indexableOnLeft) {
+            if (isOperandDependentOnTable(table, expr.getRight())) {
+                // Left and right operands must not be from the same table,
+                // e.g. where t.a = t.b is not indexable with the current technology.
+                return null;
+            }
+            indexableExpr = expr.getLeft();
+            otherType = expr.getRight().getValueType();
+        } else {
+            if (isOperandDependentOnTable(table, expr.getLeft())) {
+                // Left and right operands must not be from the same table,
+                // e.g. where t.a = t.b is not indexable with the current technology.
+                return null;
+            }
+            indexableExpr = expr.getRight();
+            otherType = expr.getLeft().getValueType();
+        }
 
-        VoltType exprType = keyIsLeft ? expr.getRight().getValueType()
-                                      : expr.getLeft().getValueType();
-
-        if (!VoltTypeUtil.isAllowableCastForKeyComparator(exprType, keyType))
+        VoltType keyType = indexableExpr.getValueType();
+        if (!VoltTypeUtil.isAllowableCastForKeyComparator(keyType, otherType))
         {
             return null;
         }
 
-        return indexedColumn;
+        return indexableExpr;
+    }
+
+    private boolean isOperandDependentOnTable(Table table, AbstractExpression expr) {
+        for (TupleValueExpression tve : ExpressionUtil.getTupleValueExpressions(expr)) {
+            //TODO: This clumsy testing of table names regardless of table aliases is
+            // EXACTLY why we can't have nice things like self-joins.
+            if (table.getTypeName().equals(tve.getTableName()))
+            {
+                return true;
+            }
+        }
+        return false;
     }
 
     /* Facilitate consistent expression column, table column comparisons. */
@@ -426,46 +436,20 @@ public abstract class SubPlanAssembler {
         return table.getColumns().getIgnoreCase(searchColumnName);
     }
 
-    protected Column
-    getColumnForFilterExpressionRecursive(Table table, AbstractExpression expr) {
-        // stopping steps:
-        //
-        if (expr == null)
-            return null;
-
+    private boolean isIndexableFilterOperand(Table table, AbstractExpression expr) {
+        assert(expr != null);
         if (expr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
             TupleValueExpression tve = (TupleValueExpression)expr;
+            //TODO: This clumsy testing of table names regardless of table aliases is
+            // EXACTLY why we can't have nice things like self-joins.
             if (table.getTypeName().equals(tve.getTableName()))
             {
-                return getTableColumn(table, tve.getColumnName());
+                return true;
             }
-            return null;
+            return false;
         }
-
-        // recursive step
-        //
-        Column leftCol = getColumnForFilterExpressionRecursive(table, expr.getLeft());
-        Column rightCol = getColumnForFilterExpressionRecursive(table, expr.getRight());
-
-        assert(leftCol == null ||
-               getTableColumn(table, leftCol.getTypeName()) != null);
-
-        assert(rightCol == null ||
-               getTableColumn(table, rightCol.getTypeName()) != null);
-
-        // Left and right columns must not be from the same table,
-        // e.g. where t.a = t.b is really a self join.
-        if (leftCol != null && rightCol != null) {
-            return null;
-        }
-
-        if (leftCol != null)
-            return leftCol;
-
-        if (rightCol != null)
-            return rightCol;
-
-        return null;
+        // In the future, general expressions of one or more of the table's columns will be indexable
+        return false;
     }
 
 

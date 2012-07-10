@@ -23,7 +23,6 @@
 
 package org.voltdb.planner;
 
-import java.io.PrintStream;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -227,15 +226,8 @@ public class PlannerTestAideDeCamp {
         // We then stick a serialized version of PlanNodeTree into a PlanFragment
         //
         try {
-            PrintStream plansJSONOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                    "statement-plans", name + "_json.txt");
-            plansJSONOut.print(json);
-            plansJSONOut.close();
-
-            PrintStream plansDOTOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                     "statement-plans", name + ".dot");
-            plansDOTOut.print(nodeLists.get(0).toDOTString("name"));
-            plansDOTOut.close();
+            BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json);
+            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"));
         } catch (Exception e) {
             e.printStackTrace();
         }
