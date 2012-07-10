@@ -225,7 +225,7 @@ function printGrid(target, id, table)
 		src += '<tr>';
 		for(var k = 0; k < table.data[j].length; k++) {
                         if (table.schema[k].type == 25) {
-                            src += '<td align="right">' + hex2bin(table.data[j][k]) + '</td>';
+                            src += '<td align="right"><pre>' + hex2bin(table.data[j][k]) + '</pre></td>';
                         } else {
                             src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + table.data[j][k] + '</td>';
                         }
