@@ -2001,7 +2001,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 VoltTable[] results = saveTables(client, TMPDIR, TESTNONCE, true, true);
                 assertEquals("Wrong host/site count from @SnapshotSave.",
                              host_count * site_count, results[0].getRowCount());
-            } finally {
+            }
+            finally {
                 client.close();
             }
 
@@ -2011,12 +2012,17 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             for (int iclient = 0; iclient < host_count; iclient++) {
                 client = ClientFactory.createClient();
                 client.createConnection(lc.getListenerAddresses().get(iclient));
-                SnapshotResult[] results =
-                        checkSnapshotStatus(client, null, TESTNONCE, null, "SUCCESS", null);
-                for (SnapshotResult result : results) {
-                    if (result.table.equals(replicatedTableName)) {
-                        nReplSaved++;
+                try {
+                    SnapshotResult[] results =
+                            checkSnapshotStatus(client, null, TESTNONCE, null, "SUCCESS", null);
+                    for (SnapshotResult result : results) {
+                        if (result.table.equals(replicatedTableName)) {
+                            nReplSaved++;
+                        }
                     }
+                }
+                finally {
+                    client.close();
                 }
             }
             assertEquals("Replicated table CSV is not saved on exactly one host.", 1, nReplSaved);
