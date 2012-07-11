@@ -93,6 +93,7 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         builder.setCompilerDebugPrintStream(capturing);
         builder.addLiteralSchema(simpleSchema);
         builder.addPartitionInfo("blah", "ival");
+        // Note: indexed_blah is left as a replicated table.
         builder.addStmtProcedure("Insert",
                 // Include lots of filthy whitespace to test output cleanup.
                 "insert                            into\t \tblah values\n\n(? \t ,\t\t\t?)                           ;", null);
