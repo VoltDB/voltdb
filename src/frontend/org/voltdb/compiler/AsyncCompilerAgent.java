@@ -108,6 +108,10 @@ public class AsyncCompilerAgent {
             if (w.completionHandler != null) {
                 w.completionHandler.onCompletion(result);
             } else {
+                /*
+                 * I believe this may be dead code? I don't know of anything receiving a response
+                 * via the mailbox system
+                 */
                 // XXX: need client interface mailbox id.
                 m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
             }
@@ -118,6 +122,10 @@ public class AsyncCompilerAgent {
             if (w.completionHandler != null) {
                 w.completionHandler.onCompletion(result);
             } else {
+                /*
+                 * I believe this may be dead code? I don't know of anything receiving a response
+                 * via the mailbox system
+                 */
                 // XXX: need client interface mailbox id.
                 m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
             }

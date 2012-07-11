@@ -148,6 +148,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
             new HashMap<String, List<InvocationAcceptancePolicy>>();
 
+    /*
+     * Allow the async compiler thread to immediately process completed planning tasks
+     * without waiting for the periodic work thread to poll the mailbox.
+     */
     private final  AsyncCompilerWorkCompletionHandler m_adhocCompletionHandler = new AsyncCompilerWorkCompletionHandler() {
         @Override
         public void onCompletion(AsyncCompilerResult result) {
@@ -1511,6 +1515,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
+    /*
+     * Invoked from the AsyncCompilerWorkCompletionHandler from the AsyncCompilerAgent thread.
+     * Has the effect of immediately handing the completed work to the network thread of the
+     * client instance that created the work and then dispatching it.
+     */
     public ListenableFutureTask<?> processFinishedCompilerWork(final AsyncCompilerResult result) {
         /*
          * Do the task in the network thread associated with the connection
