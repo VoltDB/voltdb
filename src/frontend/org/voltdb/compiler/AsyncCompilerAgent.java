@@ -92,8 +92,7 @@ public class AsyncCompilerAgent {
                     retval.hostname = work.hostname;
                     retval.adminConnection = work.adminConnection;
                     retval.clientData = work.clientData;
-                    // XXX: need client interface mailbox id.
-                    m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
+                    work.completionHandler.onCompletion(retval);
                 }
             }
         };
@@ -105,38 +104,20 @@ public class AsyncCompilerAgent {
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
             final AsyncCompilerResult result = compileAdHocPlan(w);
-            if (w.completionHandler != null) {
-                w.completionHandler.onCompletion(result);
-            } else {
-                /*
-                 * I believe this may be dead code? I don't know of anything receiving a response
-                 * via the mailbox system
-                 */
-                // XXX: need client interface mailbox id.
-                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
-            }
+            w.completionHandler.onCompletion(result);
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
             final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
-            if (w.completionHandler != null) {
-                w.completionHandler.onCompletion(result);
-            } else {
-                /*
-                 * I believe this may be dead code? I don't know of anything receiving a response
-                 * via the mailbox system
-                 */
-                // XXX: need client interface mailbox id.
-                m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
-            }
+            w.completionHandler.onCompletion(result);
         }
     }
 
-    public ListenableFuture<AdHocPlannedStmtBatch> compileAdHocPlanFuture(final AdHocPlannerWork apw) {
-        return m_es.submit(new Callable<AdHocPlannedStmtBatch>() {
+    public void compileAdHocPlanForProcedure(final AdHocPlannerWork apw) {
+        m_es.submit(new Runnable() {
             @Override
-            public AdHocPlannedStmtBatch call() throws Exception {
-                return compileAdHocPlan(apw);
+            public void run(){
+                apw.completionHandler.onCompletion(compileAdHocPlan(apw));
             }
         });
     }

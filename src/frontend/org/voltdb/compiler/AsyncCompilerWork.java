@@ -50,6 +50,9 @@ public class AsyncCompilerWork implements Serializable {
         this.adminConnection = adminConnection;
         this.clientData = clientData;
         this.completionHandler = completionHandler;
+        if (completionHandler == null) {
+            throw new IllegalArgumentException("Completion handler can't be null");
+        }
     }
 
     @Override
