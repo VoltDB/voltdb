@@ -301,7 +301,7 @@ public:
     }
 
     /**
-     * This function only supports countable tree index.
+     * This function only supports countable tree index. It returns the counter value less than or equal to the serarchKey.
      * For unique index, it will return the rank with the searchKey in ascending order including itself.
      * For non-unique index,
      */
@@ -310,7 +310,7 @@ public:
         throwFatalException("Invoked non-countable TableIndex virtual method getRankAsc which has no implementation");
     }
     /**
-     * This function only supports countable tree index.
+     * This function only supports countable tree index. It returns the counter value greater than the serarchKey.
      */
     virtual int32_t getCounterGT(const TableTuple *searchKey)
     {

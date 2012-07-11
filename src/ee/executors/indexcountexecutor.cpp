@@ -50,7 +50,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
 
     // Create output table based on output schema from the plan
 
-    // FIXME(xin): think about how to fix it
     TupleSchema* schema = m_node->generateTupleSchema(false);
     int column_count = static_cast<int>(m_node->getOutputSchema().size());
     assert(column_count == 1);
@@ -63,7 +62,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     printf("xin <IndexCount Executor> TupleSchema: '%s'\n", schema->debug().c_str());
     //printf("xin <IndexCount Executor> column_names: '%s'\n", *(column_names[0]));
 
-    // FIXME(xin):
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       m_node->getTargetTable()->name(),
                                                       schema,
@@ -121,7 +119,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     m_index = m_targetTable->index(m_node->getTargetIndexName());
     // This index should have a true countable flag
-    // FIXME(xin):
     assert(m_index->is_countable_index_);
     printf("xin <IndexCount Executor> m_index: '%s'\n", m_node->debug().c_str());
 
@@ -295,10 +292,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                    localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
         if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            // do something
+            // TODO(xin):
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            // do something
             rkStart = m_index->getCounterGT(&m_searchKey);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
@@ -313,14 +309,28 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     assert(m_index->is_countable_index_);
     assert(post_expression == NULL);
-    // seems to be like this semantics... still need to fix it
-
-
     printf("xin <IndexCount Executor> m_searchKey->: '%s'\n", m_searchKey.debug("T3").c_str());
-    printf("xin <IndexCount Executor> m_index->getRank: '%d'\n", rkStart);
+    printf("xin <IndexCount Executor> m_index->getRank {{Start}}: '%d'\n", rkStart);
+
+    if (end_expression != NULL)
+    {
+        ExpressionType localEndType = end_expression->getExpressionType();
+        printf("xin <IndexCount Executor> End expression {{end}}: '%s'\n", end_expression->debug().c_str()));
+        if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHAN) {
+
+        } else if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO) {
+
+            //rkEnd = m_index->getCounterLET();
+        } else if (localEndType == EXPRESSION_TYPE_COMPARE_EQUAL) {
+            // TODO(xin)
+
+        } else {
+            return false;
+        }
+    }
 
     TableTuple& tmptup = m_outputTable->tempTuple();
-    tmptup.setNValue(0, ValueFactory::getBigIntValue(rkStart));
+    tmptup.setNValue(0, ValueFactory::getBigIntValue(rkEnd - rkStart));
     m_outputTable->insertTuple(tmptup);
 
     /*
