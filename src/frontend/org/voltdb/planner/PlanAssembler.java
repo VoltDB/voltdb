@@ -529,7 +529,6 @@ public class PlanAssembler {
         }
         projectionNode.setOutputSchema(proj_schema);
 
-
         // add the projection inline (TODO: this will break if more than one
         // layer is below this)
         //
@@ -539,10 +538,14 @@ public class PlanAssembler {
         // The call here to generateOutputSchema() will recurse down to
         // the scan node and cause it to update appropriately.
         assert(subSelectRoot instanceof AbstractScanPlanNode);
-        subSelectRoot.addInlinePlanNode(projectionNode);
+        //subSelectRoot.addInlinePlanNode(projectionNode);
+        subSelectRoot.clearParents();
+        projectionNode.addAndLinkChild(subSelectRoot);
 
         // connect the nodes to build the graph
-        updateNode.addAndLinkChild(subSelectRoot);
+        //updateNode.addAndLinkChild(subSelectRoot);
+        updateNode.addAndLinkChild(projectionNode);
+
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
             updateNode.generateOutputSchema(m_catalogDb);
@@ -748,15 +751,17 @@ public class PlanAssembler {
         }
         projectionNode.setOutputSchema(proj_schema);
 
+        //@TODO pullexec prototype
         // if the projection can be done inline...
-        if (rootNode instanceof AbstractScanPlanNode) {
-            rootNode.addInlinePlanNode(projectionNode);
-            return rootNode;
-        } else {
+        //if (rootNode instanceof AbstractScanPlanNode) {
+        //if (rootNode instanceof IndexScanPlanNode) {
+        //    rootNode.addInlinePlanNode(projectionNode);
+        //    return rootNode;
+        //} else {
             projectionNode.addAndLinkChild(rootNode);
             projectionNode.generateOutputSchema(m_catalogDb);
             return projectionNode;
-        }
+        //}
     }
 
     /**

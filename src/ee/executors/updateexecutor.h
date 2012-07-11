@@ -46,6 +46,8 @@
 #ifndef HSTOREUPDATEEXECUTOR_H
 #define HSTOREUPDATEEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -53,6 +55,12 @@
 #include "execution/VoltDBEngine.h"
 
 namespace voltdb {
+
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct UpdateExecutorState;
+} //namespace detail
 
 class TableIndex;
 
@@ -63,20 +71,19 @@ class PersistentTable;
 class UpdateExecutor : public AbstractExecutor
 {
 public:
-    UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-    {
-        m_inputTargetMapSize = -1;
-        m_inputTable = NULL;
-        m_targetTable = NULL;
-        m_engine = engine;
-        m_partitionColumn = -1;
-    }
+    UpdateExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+
+    bool support_pull() const;
 
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+
+    TableTuple p_next_pull();
+    void p_pre_execute_pull(const NValueArray& params);
+    void p_post_execute_pull();
+    void p_insert_output_table_pull(TableTuple& tuple);
 
     UpdatePlanNode* m_node;
 
@@ -94,6 +101,9 @@ protected:
 
     /** reference to the engine/context to store the number of modified tuples */
     VoltDBEngine* m_engine;
+private:
+
+    boost::scoped_ptr<detail::UpdateExecutorState> m_state;
 };
 
 }

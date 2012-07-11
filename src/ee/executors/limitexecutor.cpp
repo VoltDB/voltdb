@@ -53,7 +53,37 @@
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
 
+namespace voltdb {
+namespace detail {
+
+    struct LimitExecutorState
+    {
+        LimitExecutorState(int limit, int offset, AbstractExecutor* childExec, Table* input_table) :
+            m_limit(limit),
+            m_offset(offset),
+            m_tupleCtr(0),
+            m_skipped(0),
+            m_inputTableSchema(input_table->schema()),
+            m_childExecutor(childExec)
+        {}
+
+        int m_limit;
+        int m_offset;
+        int m_tupleCtr;
+        bool m_skipped;
+        const TupleSchema* m_inputTableSchema;
+        AbstractExecutor* m_childExecutor;
+    };
+
+} // namespace detail
+} // namespace voltdb
+
 using namespace voltdb;
+
+LimitExecutor::LimitExecutor(VoltDBEngine* engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node), m_state()
+{}
+
 
 bool
 LimitExecutor::p_init(AbstractPlanNode* abstract_node,
@@ -86,7 +116,7 @@ LimitExecutor::p_init(AbstractPlanNode* abstract_node,
 bool
 LimitExecutor::p_execute(const NValueArray &params)
 {
-    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(m_abstractNode);
+    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(getPlanNode());
     assert(node);
     Table* output_table = node->getOutputTable();
     assert(output_table);
@@ -124,5 +154,46 @@ LimitExecutor::p_execute(const NValueArray &params)
         }
     }
 
+    return true;
+}
+
+
+TableTuple LimitExecutor::p_next_pull() {
+    // Skip first offset tuples
+    for (;m_state->m_skipped < m_state->m_offset; ++m_state->m_skipped) {
+        TableTuple tuple = m_state->m_childExecutor->next_pull();
+        if (tuple.isNullTuple()) {
+            return tuple;
+        }
+        ++m_state->m_skipped;
+    }
+
+    // Check if limit has run out
+    if (m_state->m_limit >= 0 && m_state->m_tupleCtr >= m_state->m_limit)
+        return TableTuple(m_state->m_inputTableSchema);
+
+    ++m_state->m_tupleCtr;
+    return m_state->m_childExecutor->next_pull();
+}
+
+void LimitExecutor::p_pre_execute_pull(const NValueArray &params) {
+    //
+    // Initialize itself
+    //
+    LimitPlanNode* node = dynamic_cast<LimitPlanNode*>(getPlanNode());
+    assert(node);
+    Table* input_table = node->getInputTables()[0];
+    assert(input_table);
+    int limit = 0;
+    int offset = 0;
+    node->getLimitAndOffsetByReference(params, limit, offset);
+    std::vector<AbstractPlanNode*>& children = node->getChildren();
+    assert(children.size() == 1);
+    AbstractExecutor* childExec = children[0]->getExecutor();
+    assert(childExec);
+    m_state.reset(new detail::LimitExecutorState(limit, offset, childExec, input_table));
+}
+
+bool LimitExecutor::support_pull() const {
     return true;
 }

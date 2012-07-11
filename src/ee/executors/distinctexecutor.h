@@ -46,6 +46,8 @@
 #ifndef HSTOREDISTINCTEXECUTOR_H
 #define HSTOREDISTINCTEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
@@ -56,15 +58,16 @@ namespace voltdb {
 class UndoLog;
 class ReadWriteSet;
 
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct DistinctExecutorState;
+} //namespace detail
+
 class DistinctExecutor : public AbstractExecutor
 {
 public:
-    DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-    {
-        this->distinct_column_type = VALUE_TYPE_INVALID;
-    }
-
+    DistinctExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
     ~DistinctExecutor();
 
 protected:
@@ -73,6 +76,19 @@ protected:
     bool p_execute(const NValueArray &params);
 
     ValueType distinct_column_type;
+
+//@TODO pullexec prototype
+public:
+    TableTuple p_next_pull();
+    bool support_pull() const;
+
+protected:
+
+    void p_pre_execute_pull(const NValueArray& params);
+
+private:
+
+    boost::scoped_ptr<detail::DistinctExecutorState> m_state;
 };
 
 }

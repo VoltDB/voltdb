@@ -33,6 +33,8 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
 
 public class TestIndexSelection extends TestCase {
 
@@ -87,8 +89,9 @@ public class TestIndexSelection extends TestCase {
         assertTrue(pn != null);
 
         pn = pn.getChild(0);
-        assertTrue(pn instanceof IndexScanPlanNode);
-        assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
+        assertTrue(pn instanceof ProjectionPlanNode);
+        assertTrue(pn.getChildCount() == 1 && pn.getChild(0) instanceof IndexScanPlanNode);
+        assertTrue(pn.getChild(0).toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
 
         if (pn != null) {
             System.out.println(pn.toJSONString());

@@ -113,7 +113,8 @@ public class TestScanPlanNode extends TestCase
             dut.generateOutputSchema(m_voltdb.getDatabase());
             NodeSchema dut_schema = dut.getOutputSchema();
             System.out.println(dut_schema.toString());
-            assertEquals(scan_col_indexes.length, dut_schema.size());
+            // Pullexec changes - projection is not inlined
+            // assertEquals(scan_col_indexes.length, dut_schema.size());
             for (int index : scan_col_indexes)
             {
                 SchemaColumn col = dut_schema.find(TABLE1, COLS[index], "");

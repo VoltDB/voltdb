@@ -63,7 +63,48 @@
 #include "storage/temptable.h"
 #include "storage/persistenttable.h"
 
+
+namespace voltdb {
+namespace detail {
+
+    struct IndexScanExecutorState
+    {
+        IndexScanExecutorState(const TupleSchema* schema, AbstractExpression* endExpression,
+            AbstractExpression* postExpression) :
+            m_targetTableSchema(schema),
+            m_endExpression(endExpression),
+            m_postExpression(postExpression),
+            m_firstTuple(NULL),
+            m_secondTuple(NULL),
+            m_done(false)
+        {}
+
+        const TupleSchema* m_targetTableSchema;
+        AbstractExpression* m_endExpression;
+        AbstractExpression* m_postExpression;
+        const TableTuple *m_firstTuple;
+        const TableTuple *m_secondTuple;
+        bool m_done;
+    };
+
+} // namespace detail
+} // namespace voltdb
+
 using namespace voltdb;
+
+IndexScanExecutor::IndexScanExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
+    : AbstractExecutor(engine, abstractNode), m_node(NULL), m_numOfColumns(0), m_numOfSearchkeys(0),
+    m_projectionNode(NULL), m_projectionAllTupleArray(NULL), m_projectionExpressions(NULL),
+    m_searchKey(), m_searchKeyBeforeSubstituteArray(NULL),
+    m_needsSubstituteProject(NULL), m_needsSubstituteSearchKey(NULL),
+    m_needsSubstitutePostExpression(false), m_needsSubstituteEndExpression(false),
+    m_lookupType(), m_sortDirection(), m_limitNode (NULL), m_limitSize(0), m_limitOffset(0),
+    m_outputTable(NULL), m_targetTable(NULL), m_index(NULL), m_dummy(), m_tuple(),
+    m_needsSubstituteSearchKeyPtr(), m_needsSubstituteProjectPtr(), m_projectionAllTupleArrayPtr(),
+    m_searchKeyBeforeSubstituteArrayPtr(), m_searchKeyBackingStore(NULL),
+    m_state()
+{}
+
 
 bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
                                TempTableLimits* limits)
@@ -288,7 +329,6 @@ bool IndexScanExecutor::handleExceptionalSearchKeyValue(SQLException& e, const N
 bool IndexScanExecutor::p_execute(const NValueArray &params)
 {
     assert(m_node);
-    assert(m_node == dynamic_cast<IndexScanPlanNode*>(m_abstractNode));
     assert(m_outputTable);
     assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
     assert(m_targetTable);
@@ -515,4 +555,202 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 IndexScanExecutor::~IndexScanExecutor() {
     delete [] m_searchKeyBackingStore;
     delete [] m_projectionExpressions;
+}
+
+//@TODO pullexec prototype
+bool IndexScanExecutor::support_pull() const {
+    return true;
+}
+
+TableTuple IndexScanExecutor::p_next_pull() {
+
+    if (m_state->m_done) {
+        return m_tuple;
+    }
+    while (true)
+    {
+        if (m_lookupType == INDEX_LOOKUP_TYPE_EQ) {
+            m_tuple = m_index->nextValueAtKey();
+        } else {
+            m_tuple = m_index->nextValue();
+        }
+
+        if (m_tuple.isNullTuple()) {
+            m_state->m_done = true;
+            return m_tuple;
+        }
+
+        VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
+        //
+        // First check whether the end_expression is now false
+        //
+        if (m_state->m_endExpression != NULL &&
+            m_state->m_endExpression->eval(m_state->m_firstTuple, m_state->m_secondTuple).isFalse())
+        {
+            VOLT_TRACE("End Expression evaluated to false, stopping scan");
+            m_tuple = TableTuple(m_state->m_targetTableSchema);
+            break;
+        }
+        //
+        // Then apply our post-predicate to do further filtering
+        //
+        if (m_state->m_postExpression != NULL &&
+            m_state->m_postExpression->eval(m_state->m_firstTuple, m_state->m_secondTuple).isFalse())
+        {
+            continue;
+        }
+        break;
+    }
+    return m_tuple;
+}
+
+
+void IndexScanExecutor::p_pre_execute_pull(const NValueArray &params)
+{
+    //
+    // Initialize itself
+    //
+    assert(m_node);
+    assert(m_node == dynamic_cast<IndexScanPlanNode*>(getPlanNode()));
+    assert(m_outputTable);
+    assert(m_outputTable == static_cast<TempTable*>(m_node->getOutputTable()));
+    assert(m_targetTable);
+    assert(m_targetTable == m_node->getTargetTable());
+    VOLT_DEBUG("IndexScan: %s.%s\n", m_targetTable->name().c_str(),
+               m_index->getName().c_str());
+
+    assert(m_searchKey.getSchema()->columnCount() > 0);
+    assert (m_index);
+    assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
+
+    set_expressions_pull(params);
+    set_search_key_pull(NULL);
+}
+
+void IndexScanExecutor::set_expressions_pull(const NValueArray &params)
+{
+    //
+    // SEARCH KEY
+    //
+    // assert (m_searchKey.getSchema()->columnCount() == m_numOfSearchkeys ||
+    //         m_lookupType == INDEX_LOOKUP_TYPE_GT);
+    m_searchKey.setAllNulls();
+    VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
+    for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
+        if (m_needsSubstituteSearchKey[ctr]) {
+            m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
+        }
+    }
+    VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
+
+    // Need to set it if this method is called from nestloop executor
+    m_tuple = TableTuple(m_targetTable->schema());
+    //
+    // END EXPRESSION
+    //
+    AbstractExpression* end_expression = m_node->getEndExpression();
+    if (end_expression != NULL)
+    {
+        if (m_needsSubstituteEndExpression) {
+            end_expression->substitute(params);
+        }
+        VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
+    }
+
+    //
+    // POST EXPRESSION
+    //
+    AbstractExpression* post_expression = m_node->getPredicate();
+    if (post_expression != NULL)
+    {
+        if (m_needsSubstitutePostExpression) {
+            post_expression->substitute(params);
+        }
+        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
+    }
+
+    for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++) {
+        if (m_needsSubstituteSearchKeyPtr[ctr]) {
+            m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
+        }
+    }
+    m_state.reset(new detail::IndexScanExecutorState(m_targetTable->schema(), end_expression, post_expression));
+}
+
+//@TODO
+void IndexScanExecutor::set_search_key_pull(const TableTuple* otherTuple)
+{
+    int activeNumOfSearchKeys = m_numOfSearchkeys;
+    IndexLookupType localLookupType = m_lookupType;
+    SortDirectionType localSortDirection = m_sortDirection;
+
+    m_state->m_done = false; // new "outer tuple" resets iteration
+    NValue candidateValue;
+    int ctr = 0;
+    try {
+        for (ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
+            candidateValue = m_searchKeyBeforeSubstituteArray[ctr]->eval(otherTuple, NULL);
+            m_searchKey.setNValue(ctr, candidateValue);
+        }
+    }
+    catch (SQLException e) {
+        bool isPrefix = ctr < (activeNumOfSearchKeys - 1);
+        if (handleExceptionalSearchKeyValue(e, candidateValue, isPrefix,
+                                            activeNumOfSearchKeys, localLookupType, localSortDirection)) {
+            m_state->m_done = true;
+            return;
+        }
+    }
+    if (otherTuple == NULL)
+    {
+        m_state->m_firstTuple = &m_tuple;
+    }
+    else
+    {
+        m_state->m_firstTuple = otherTuple;
+        m_state->m_secondTuple = &m_tuple;
+    }
+
+    //
+    // An index scan has three parts:
+    //  (1) Lookup tuples using the search key
+    //  (2) For each tuple that comes back, check whether the
+    //  end_expression is false.
+    //  If it is, then we stop scanning. Otherwise...
+    //  (3) Check whether the tuple satisfies the post expression.
+    //      If it does, then add it to the output table
+    //
+    // Use our search key to prime the index iterator
+    // Now loop through each tuple given to us by the iterator
+    //
+    if (activeNumOfSearchKeys > 0)
+    {
+        VOLT_TRACE("INDEX_LOOKUP_TYPE(%d) activeNumOfSearchKeys(%d) key:%s",
+                   localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+
+        if (localLookupType == INDEX_LOOKUP_TYPE_EQ)
+        {
+            m_index->moveToKey(&m_searchKey);
+        }
+        else if (localLookupType == INDEX_LOOKUP_TYPE_GT)
+        {
+            m_index->moveToGreaterThanKey(&m_searchKey);
+        }
+        else if (localLookupType == INDEX_LOOKUP_TYPE_GTE)
+        {
+            m_index->moveToKeyOrGreater(&m_searchKey);
+        }
+        else
+        {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "Invalid index lookup type");
+        }
+    }
+
+    else if (localSortDirection == SORT_DIRECTION_TYPE_INVALID) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "Invalid sort direction");
+    } else {
+        m_index->moveToEnd(localSortDirection == SORT_DIRECTION_TYPE_ASC);
+    }
 }

@@ -46,6 +46,8 @@
 #ifndef HSTOREDELETEEXECUTOR_H
 #define HSTOREDELETEEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
@@ -54,6 +56,12 @@
 #include "execution/VoltDBEngine.h"
 
 namespace voltdb {
+
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct DeleteExecutorState;
+} //namespace detail
 
 class TableIndex;
 
@@ -64,18 +72,19 @@ class PersistentTable;
 class DeleteExecutor : public AbstractExecutor
 {
 public:
-    DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
-        : AbstractExecutor(engine, abstract_node)
-    {
-        m_inputTable = NULL;
-        m_targetTable = NULL;
-        m_engine = engine;
-    }
+    DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+
+    bool support_pull() const;
 
 protected:
     bool p_init(AbstractPlanNode*,
                 TempTableLimits* limits);
     bool p_execute(const NValueArray &params);
+
+    TableTuple p_next_pull();
+    void p_pre_execute_pull(const NValueArray& params);
+    void p_post_execute_pull();
+    void p_insert_output_table_pull(TableTuple& tuple);
 
     DeletePlanNode* m_node;
 
@@ -90,6 +99,10 @@ protected:
     /** reference to the engine/context to store the number of
         modified tuples */
     VoltDBEngine* m_engine;
+
+private:
+
+    boost::scoped_ptr<detail::DeleteExecutorState> m_state;
 };
 
 }

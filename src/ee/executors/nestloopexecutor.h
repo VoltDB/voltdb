@@ -46,11 +46,19 @@
 #ifndef HSTORENESTLOOPEXECUTOR_H
 #define HSTORENESTLOOPEXECUTOR_H
 
+#include <boost/scoped_ptr.hpp>
+
 #include "common/common.h"
 #include "common/valuevector.h"
 #include "executors/abstractexecutor.h"
 
 namespace voltdb {
+
+// Aggregate Struct to keep Executor state in between iteration
+namespace detail
+{
+    struct NestLoopExecutorState;
+} //namespace detail
 
 class UndoLog;
 class ReadWriteSet;
@@ -60,11 +68,20 @@ class ReadWriteSet;
  */
 class NestLoopExecutor : public AbstractExecutor {
     public:
-        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node) : AbstractExecutor(engine, abstract_node) { }
+        NestLoopExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node);
+        bool support_pull() const;
+
     protected:
         bool p_init(AbstractPlanNode*,
                     TempTableLimits* limits);
         bool p_execute(const NValueArray &params);
+
+    private:
+        void reset_inner_state();
+        TableTuple p_next_pull();
+        void p_pre_execute_pull(const NValueArray& params);
+
+        boost::scoped_ptr<detail::NestLoopExecutorState> m_state;
 };
 
 }

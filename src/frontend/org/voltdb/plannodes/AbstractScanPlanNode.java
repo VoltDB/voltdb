@@ -222,8 +222,12 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
         else
         {
-            if (m_tableScanSchema.size() != 0)
-            {
+            //@TODO pullexec
+            //if (this instanceof SeqScanPlanNode) {
+            if (this instanceof AbstractScanPlanNode) {
+                // We will have projection node above the scan
+                m_outputSchema = m_tableSchema.clone();
+            } else if (m_tableScanSchema.size() != 0) {
                 // Order the scan columns according to the table schema
                 // before we stick them in the projection output
                 List<TupleValueExpression> scan_tves =

@@ -62,6 +62,38 @@
 using namespace std;
 using namespace voltdb;
 
+namespace voltdb {
+namespace detail {
+
+    struct DeleteExecutorState
+    {
+        DeleteExecutorState(AbstractExecutor* childExec, Table* outputTable) :
+            m_tuplesToDelete(),
+            m_childExecutor(childExec),
+            m_outputTable(outputTable),
+            m_outputTableName(outputTable->name()),
+            m_modifiedTuples(0),
+            m_done(false)
+        {}
+
+        std::vector<void*> m_tuplesToDelete;
+        AbstractExecutor* m_childExecutor;
+        Table* m_outputTable;
+        std::string m_outputTableName;
+        long m_modifiedTuples;
+        bool m_done;
+    };
+
+} // namespace detail
+} // namespace voltdb
+
+DeleteExecutor::DeleteExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+    : AbstractExecutor(engine, abstract_node),
+    m_node(NULL), m_truncate(), m_inputTable(NULL), m_targetTable(NULL),
+    m_inputTuple(), m_targetTuple(), m_engine(engine), m_state()
+{}
+
+
 bool DeleteExecutor::p_init(AbstractPlanNode *abstract_node,
                             TempTableLimits* limits)
 {
@@ -155,4 +187,96 @@ bool DeleteExecutor::p_execute(const NValueArray &params) {
     m_engine->m_tuplesModified += modified_tuples;
 
     return true;
+}
+
+bool DeleteExecutor::support_pull() const
+{
+    return true;
+}
+
+void DeleteExecutor::p_pre_execute_pull(const NValueArray &params)
+{
+    assert(m_targetTable);
+    std::vector<AbstractPlanNode*>& children = m_node->getChildren();
+    assert(children.size() == 1);
+    AbstractExecutor* childExec = children[0]->getExecutor();
+
+    Table* outputTable = m_node->getOutputTable();
+    assert(outputTable);
+
+    m_state.reset(new detail::DeleteExecutorState(childExec, outputTable));
+//{ printf("\nDEBUG: %s %ld\n", "PRE DELETE NO PROBLEM, REALLY", (long)m_targetTable->activeTupleCount()); }
+}
+
+TableTuple DeleteExecutor::p_next_pull()
+{
+    if (m_state->m_done) {
+        return TableTuple(m_node->getOutputTable()->schema());
+    }
+    else if (m_truncate) {
+        VOLT_TRACE("truncating table %s...", m_targetTable->name().c_str());
+        // count the truncated tuples as deleted
+        m_state->m_modifiedTuples = m_targetTable->activeTupleCount();
+        // actually delete all the tuples
+        m_targetTable->deleteAllTuples(true);
+    }
+    else
+    {
+        while (true)
+        {
+            TableTuple tuple = m_state->m_childExecutor->next_pull();
+            if (tuple.isNullTuple())
+            {
+                break;
+            }
+            // We can't delete the tuple while iterating the table because
+            // that would invalidate table iterator. Save the tuple address
+            // to be used after the iteration is complete
+            m_state->m_tuplesToDelete.push_back(tuple.address());
+        }
+        size_t tupleCount = m_state->m_tuplesToDelete.size();
+        m_state->m_modifiedTuples = tupleCount;
+        for (size_t i = 0; i < tupleCount; ++i) {
+            void* targetAddress = m_state->m_tuplesToDelete[i];
+            m_targetTuple.move(targetAddress);
+            // Delete from target table
+            if (!m_targetTable->deleteTuple(m_targetTuple, true)) {
+                char message[128];
+                snprintf(message, 128, "Failed to delete tuple from table '%s'",
+                         m_targetTable->name().c_str());
+                VOLT_ERROR("%s", message);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+            }
+//{ printf("\nDEBUG: %s\n", "DELETING NO PROBLEM, REALLY"); }
+        }
+    }
+//{ printf("\nDEBUG: %s %ld\n", "DELETED NO PROBLEM, REALLY", (long)m_targetTable->activeTupleCount()); }
+    m_state->m_done = true;
+    TableTuple countTuple = m_node->getOutputTable()->tempTuple();
+    countTuple.setNValue(0, ValueFactory::getBigIntValue(m_state->m_modifiedTuples));
+
+    return countTuple;
+}
+
+void DeleteExecutor::p_post_execute_pull()
+{
+    // add to the planfragments count of modified tuples
+    m_engine->m_tuplesModified += m_state->m_modifiedTuples;
+    VOLT_INFO("Finished deleting tuples");
+//{ printf("\nDEBUG: %s %ld\n", "DELETE DONE NO PROBLEM, REALLY", (long)m_targetTable->activeTupleCount()); }
+}
+
+void DeleteExecutor::p_insert_output_table_pull(TableTuple& tuple)
+{
+    // try to put the tuple into the output table
+    if (!m_state->m_outputTable->insertTuple(tuple))
+    {
+        char message[128];
+        snprintf(message, 128, "Failed to insert tuple count (%ld) into output table '%s'",
+                 static_cast<long int>(m_state->m_modifiedTuples),
+                 m_state->m_outputTableName.c_str());
+        VOLT_ERROR("%s", message);
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, message);
+    }
+//{ printf("\nDEBUG: %s\n", "DELETE DONE DONE NO PROBLEM, REALLY"); }
 }

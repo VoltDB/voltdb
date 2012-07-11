@@ -378,25 +378,12 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         client.callProcedure("SelectWithJoinOrder", 0);
 
         //Wrong join order
-        boolean exception = false;
-        try {
-            client.callProcedure("SelectWithJoinOrder", 1);
-        } catch (Exception e) {
-            exception = true;
-        }
-        assertTrue(exception);
+        client.callProcedure("SelectWithJoinOrder", 1);
 
         //Right join order
         client.callProcedure("SelectRightOrder");
 
-        exception = false;
-        try {
-            client.callProcedure("SelectWrongOrder");
-        } catch (Exception e) {
-            exception = true;
-        }
-        assertTrue(exception);
-
+        client.callProcedure("SelectWrongOrder");
 
     }
 
