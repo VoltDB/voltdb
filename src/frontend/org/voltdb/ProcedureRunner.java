@@ -1004,7 +1004,7 @@ public class ProcedureRunner {
        /*
         * Replicated custom fragment.
         */
-       void addCustomFragment(int index, String aggregatorFragment, ByteBuffer params) {
+       void addCustomFragment(int index, byte[] aggregatorFragment, ByteBuffer params) {
            assert(index >= 0);
            assert(index < m_batchSize);
            assert(aggregatorFragment != null);
@@ -1017,8 +1017,8 @@ public class ProcedureRunner {
         * Multi-partition/non-replicated custom fragment with collector and aggregator.
         */
        void addCustomFragmentPair(int index,
-                                  String collectorFragment,
-                                  String aggregatorFragment,
+                                  byte[] collectorFragment,
+                                  byte[] aggregatorFragment,
                                   ByteBuffer params) {
            assert(index >= 0);
            assert(index < m_batchSize);
@@ -1110,8 +1110,8 @@ public class ProcedureRunner {
                 */
                SQLStmtPlan plan = queuedSQL.stmt.getPlan();
                assert(plan != null);
-               String collectorFragment  = plan.getCollectorFragment();
-               String aggregatorFragment = plan.getAggregatorFragment();
+               byte[] collectorFragment  = plan.getCollectorFragment();
+               byte[] aggregatorFragment = plan.getAggregatorFragment();
                assert(aggregatorFragment != null);
 
                if (collectorFragment == null) {
@@ -1214,22 +1214,17 @@ public class ProcedureRunner {
                    for (int i = 0; i < batch.size(); i++) {
                        final QueuedSQL queuedSQL = batch.get(i);
                        final SQLStmt stmt = queuedSQL.stmt;
-                       final String aggregatorFragment = stmt.getPlan().getAggregatorFragment();
+                       final byte[] aggregatorFragment = stmt.getPlan().getAggregatorFragment();
                        assert(aggregatorFragment != null);
 
-                       try {
-                           m_site.loadPlanFragment(-1, aggregatorFragment);
-                           results[i] = m_site.executePlanFragments(
-                               1,
-                               new long[] { -1 },
-                               new long[] { AGG_DEPID },
-                               new ParameterSet[] {queuedSQL.params},
-                               m_txnState.txnId,
-                               m_catProc.getReadonly())[0];
-                       }
-                       finally {
-                           m_site.unloadPlanFragment(-1);
-                       }
+                       long fragId = m_site.loadPlanFragment(aggregatorFragment);
+                       results[i] = m_site.executePlanFragments(
+                           1,
+                           new long[] { fragId },
+                           new long[] { AGG_DEPID },
+                           new ParameterSet[] {queuedSQL.params},
+                           m_txnState.txnId,
+                           m_catProc.getReadonly())[0];
                    }
                    return results;
                }

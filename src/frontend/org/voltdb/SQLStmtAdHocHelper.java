@@ -36,8 +36,8 @@ public class SQLStmtAdHocHelper {
      * @return SQLStmt object with plan added
      */
     public static SQLStmt createWithPlan(String sqlText,
-                                         String aggregatorFragment,
-                                         String collectorFragment,
+                                         byte[] aggregatorFragment,
+                                         byte[] collectorFragment,
                                          boolean isReplicatedTableDML,
                                          List<ParameterInfo> params) {
         return SQLStmt.createWithPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML, params);

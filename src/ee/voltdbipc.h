@@ -111,8 +111,6 @@ private:
 
     void loadFragment(struct ipc_command *cmd);
 
-    void unloadFragment(struct ipc_command *cmd);
-
     void getStats(struct ipc_command *cmd);
 
     int8_t loadTable(struct ipc_command *cmd);

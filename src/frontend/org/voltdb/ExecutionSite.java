@@ -2362,15 +2362,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     @Override
-    public void loadPlanFragment(long planFragmentId, String plan) throws EEException
+    public long loadPlanFragment(byte[] plan)
     {
-        ee.loadPlanFragment(planFragmentId, plan);
-    }
-
-    @Override
-    public void unloadPlanFragment(long planFragmentId) throws EEException
-    {
-        ee.unloadPlanFragment(planFragmentId);
+        return ee.loadPlanFragment(plan);
     }
 
     @Override
@@ -2574,7 +2568,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 params = new ParameterSet();
             }
 
-            String fragmentPlan = ftask.getFragmentPlan(frag);
+            byte[] fragmentPlan = ftask.getFragmentPlan(frag);
             if (ftask.isSysProcTask()) {
                 return processSysprocFragmentTask(txnState, dependencies, fragmentId,
                                                   currentFragResponse, params);
@@ -2592,8 +2586,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 try {
                     // if custom fragment, load the plan
                     if (fragmentPlan != null) {
-                        fragmentId = -1;
-                        ee.loadPlanFragment(-1, fragmentPlan);
+                        fragmentId = ee.loadPlanFragment(fragmentPlan);
                     }
 
                     final VoltTable dependency = ee.executePlanFragments(
@@ -2615,11 +2608,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
                     currentFragResponse.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, e);
                     break;
-                }
-                finally {
-                    if (fragmentPlan != null) {
-                        ee.unloadPlanFragment(-1);
-                    }
                 }
             }
         }

@@ -23,8 +23,7 @@
 
 package org.voltdb_testprocs.regressionsuites;
 
-import java.nio.charset.Charset;
-
+import org.voltdb.VoltDB;
 import org.voltdb.VoltProcedure;
 import org.voltdb.utils.Encoder;
 
@@ -37,7 +36,7 @@ public class BufferArrayProc extends VoltProcedure {
 
     public long run(byte[][] data1, String[] data2, byte[][] data3) {
         for (byte[] b : data1) {
-            if (new String(b, Charset.defaultCharset()).equals("Hello") == false) {
+            if (new String(b, VoltDB.UTF8ENCODING).equals("Hello") == false) {
                 throw new VoltAbortException("bad match a");
             }
         }

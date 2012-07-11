@@ -78,15 +78,9 @@ typedef struct {
 
 typedef struct {
     struct ipc_command cmd;
-    int64_t fragmentId;
     int32_t planFragLength;
     char data[0];
 }__attribute__((packed)) loadfrag;
-
-typedef struct {
-    struct ipc_command cmd;
-    int64_t fragmentId;
-}__attribute__((packed)) unloadfrag;
 
 /*
  * Header for a load table request.
@@ -328,10 +322,6 @@ bool VoltDBIPC::execute(struct ipc_command *cmd) {
           loadFragment(cmd);
           result = kErrorCode_None;
           break;
-      case 27:
-          unloadFragment(cmd);
-          result = kErrorCode_None;
-          break;
       default:
         result = stub(cmd);
     }
@@ -571,10 +561,11 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
         // and reset to space for the results output
         m_engine->resetReusedResultOutputBuffer(1);//1 byte to add status code
         m_engine->setUndoToken(ntohll(queryCommand->undoToken));
+        Pool *pool = m_engine->getStringPool();
         for (int i = 0; i < numFrags; ++i) {
             int cnt = serialize_in.readShort();
             assert(cnt> -1);
-            Pool *pool = m_engine->getStringPool();
+
             deserializeParameterSetCommon(cnt, serialize_in, params, pool);
             m_engine->setUsedParamcnt(cnt);
             if (m_engine->executeQuery(ntohll(fragmentId[i]), 1, ntohll(inputDepId[i]),
@@ -584,9 +575,11 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
                                        i == numFrags - 1 ? true : false)) { //last
                 ++errors;
             }
-            pool->purge();
         }
-    } catch (FatalException e) {
+        pool->purge();
+        m_engine->resizePlanCache(); // shrink cache if need be
+    }
+    catch (FatalException e) {
         crashVoltDB(e);
     }
 
@@ -616,21 +609,24 @@ void VoltDBIPC::sendException(int8_t errorCode) {
     writeOrDie(m_fd, (unsigned char*)exceptionData, expectedSize);
 }
 
+/**
+ * Ensure a plan fragment is loaded.
+ * Return error code, fragmentid for plan, and cache stats
+ */
 void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
     int errors = 0;
 
     loadfrag *load = (loadfrag*)cmd;
 
-    int64_t planFragId = ntohll(load->fragmentId);
     int32_t planFragLength = ntohl(load->planFragLength);
 
-    // data as fast serialized string
-    // skip past the length prefix from fast serializer
-    string plan_str = string(load->data, planFragLength);
+    int64_t fragId;
+    bool wasHit;
+    int64_t cacheSize;
 
     try {
         // execute
-        if (m_engine->loadFragment(plan_str, planFragId)) {
+        if (m_engine->loadFragment(load->data, planFragLength, fragId, wasHit, cacheSize)) {
             ++errors;
         }
     } catch (FatalException e) {
@@ -641,31 +637,9 @@ void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
     const int8_t successResult = kErrorCode_Success;
     if (errors == 0) {
         writeOrDie(m_fd, (unsigned char*)&successResult, sizeof(int8_t));
-    } else {
-        sendException(kErrorCode_Error);
-    }
-}
-
-void VoltDBIPC::unloadFragment(struct ipc_command *cmd) {
-    int errors = 0;
-
-    unloadfrag *unload = (unloadfrag*)cmd;
-
-    int64_t planFragId = ntohll(unload->fragmentId);
-
-    try {
-        // execute
-        if (m_engine->unloadFragment(planFragId)) {
-            ++errors;
-        }
-    } catch (FatalException e) {
-        crashVoltDB(e);
-    }
-
-    // write the results array back across the wire
-    const int8_t successResult = kErrorCode_Success;
-    if (errors == 0) {
-        writeOrDie(m_fd, (unsigned char*)&successResult, sizeof(int8_t));
+        writeOrDie(m_fd, (unsigned char*)&fragId, sizeof(int64_t));
+        writeOrDie(m_fd, (unsigned char*)&wasHit, sizeof(int64_t));
+        writeOrDie(m_fd, (unsigned char*)&cacheSize, sizeof(int64_t));
     } else {
         sendException(kErrorCode_Error);
     }

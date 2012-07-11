@@ -65,6 +65,7 @@
 #include "common/SerializableEEException.h"
 #include "common/Topend.h"
 #include "common/DefaultTupleSerializer.h"
+#include "execution/FragmentManager.h"
 #include "logging/LogManager.h"
 #include "logging/LogProxy.h"
 #include "logging/StdoutLogProxy.h"
@@ -160,8 +161,11 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         int executeQuery(int64_t planfragmentId, int32_t outputDependencyId, int32_t inputDependencyId,
                          const NValueArray &params, int64_t txnId, int64_t lastCommittedTxnId, bool first, bool last);
 
-        int loadFragment(std::string fragmentString, int64_t planfragmentId);
-        int unloadFragment(int64_t planfragmentId);
+        // ensure a plan fragment is loaded, given a graph
+        // return the fragid and cache statistics
+        int loadFragment(const char *plan, int32_t length, int64_t &fragId, bool &wasHit, int64_t &cacheSize);
+        // purge cached plans over the specified cache size
+        void resizePlanCache();
 
         inline int getUsedParamcnt() const { return m_usedParamcnt;}
         inline void setUsedParamcnt(int usedParamcnt) { m_usedParamcnt = usedParamcnt;}
@@ -545,6 +549,9 @@ class __attribute__((visibility("default"))) VoltDBEngine {
         ExecutorContext *m_executorContext;
 
         DefaultTupleSerializer m_tupleSerializer;
+
+        FragmentManager m_fragmentManager;
+
     private:
         ThreadLocalPool m_tlPool;
 };

@@ -45,6 +45,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
+import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -88,7 +89,6 @@ import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
-import java.util.concurrent.locks.ReentrantLock;
 
 /**
  * Represents VoltDB's connection to client libraries outside the cluster.
@@ -1438,12 +1438,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // Set up the parameters.
         // Need separate lists due to limitations on the kind of objects that can be dispatched.
         // Convert to arrays, preferring primitive types.
-        List<String> aggregatorFragmentList = plannedStmtBatch.getAggregatorFragments();
-        String[] aggregatorFragments = aggregatorFragmentList.toArray(
-                new String[aggregatorFragmentList.size()]);
-        List<String> collectorFragmentList = plannedStmtBatch.getCollectorFragments();
-        String[] collectorFragments = collectorFragmentList.toArray(
-                new String[collectorFragmentList.size()]);
+        List<byte[]> aggregatorFragmentList = plannedStmtBatch.getAggregatorFragments();
+        byte[][] aggregatorFragments = aggregatorFragmentList.toArray(
+                new byte[aggregatorFragmentList.size()][]);
+        List<byte[]> collectorFragmentList = plannedStmtBatch.getCollectorFragments();
+        byte[][] collectorFragments = collectorFragmentList.toArray(
+                new byte[collectorFragmentList.size()][]);
         List<String> sqlStatementList = plannedStmtBatch.getSQLStatements();
         String[] sqlStatements = sqlStatementList.toArray(
                 new String[sqlStatementList.size()]);

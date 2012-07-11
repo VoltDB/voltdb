@@ -559,10 +559,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
     JNIEnv *env,
     jobject obj,
     jlong engine_ptr,
-    jlong fragment_id,
     jbyteArray plan) {
-
-    int retval = org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
 
     VOLT_DEBUG("nativeUnloadPlanFragment() start");
 
@@ -577,51 +574,41 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
     // convert java plan string to stdc++ string plan
     jbyte *str = env->GetByteArrayElements(plan, NULL);
     assert(str);
-    string cppplan( reinterpret_cast<char *>(str), env->GetArrayLength(plan));
+
+    // get the buffer to write results to
+    engine->resetReusedResultOutputBuffer();
+    ReferenceSerializeOutput* out = engine->getResultOutputSerializer();
+
+    // output from the engine's loadFragment method
+    int64_t fragId = 0;
+    bool wasHit = 0;
+    int64_t cacheSize = 0;
+
+    // load
+    int result = 0;
+    try {
+        result = engine->loadFragment(reinterpret_cast<char *>(str),
+                                      env->GetArrayLength(plan),
+                                      fragId, wasHit, cacheSize);
+    } catch (FatalException e) {
+        topend->crashVoltDB(e);
+    }
+    if (fragId == 0) {
+        result = 0;
+    }
+
+    // release plan memory
     env->ReleaseByteArrayElements(plan, str, JNI_ABORT);
 
-    // load
-    try {
-        retval = engine->loadFragment(cppplan, fragment_id);
-    } catch (FatalException e) {
-        topend->crashVoltDB(e);
-    }
+    // write results back to java
+    out->writeLong(fragId);
+    out->writeBool(wasHit);
+    out->writeLong(cacheSize);
 
-    return retval;
-}
-
-/*
- * Class:     org_voltdb_jni_ExecutionEngine
- * Method:    nativeUnloadPlanFragment
- * Signature: (JJ)I
- */
-SHAREDLIB_JNIEXPORT jint JNICALL
-Java_org_voltdb_jni_ExecutionEngine_nativeUnloadPlanFragment (
-    JNIEnv *env,
-    jobject obj,
-    jlong engine_ptr,
-    jlong fragment_id) {
-
-    int retval = org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
-
-    VOLT_DEBUG("nativeUnloadPlanFragment() start");
-
-    // setup
-    VoltDBEngine *engine = castToEngine(engine_ptr);
-    assert(engine);
-    Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
-
-    //JNIEnv pointer can change between calls, must be updated
-    updateJNILogProxy(engine);
-
-    // load
-    try {
-        retval = engine->unloadFragment(fragment_id);
-    } catch (FatalException e) {
-        topend->crashVoltDB(e);
-    }
-
-    return retval;
+    if (result == 1)
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;
+    else
+        return org_voltdb_jni_ExecutionEngine_ERRORCODE_SUCCESS;
 }
 
 /**
@@ -694,6 +681,7 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
         // cleanup
         stringPool->purge();
+        engine->resizePlanCache();
 
         if (failures > 0)
             return org_voltdb_jni_ExecutionEngine_ERRORCODE_ERROR;

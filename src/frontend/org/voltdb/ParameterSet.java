@@ -184,6 +184,9 @@ import org.voltdb.types.VoltDecimalHelper;
                     case VOLTTABLE:
                         out.writeArray((VoltTable[]) obj);
                         break;
+                    case VARBINARY:
+                        out.writeArray((byte[][]) obj);
+                        break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
                 }
@@ -540,7 +543,10 @@ import org.voltdb.types.VoltDecimalHelper;
                         break;
                     case VARBINARY:
                         for (byte[] buf : (byte[][]) obj) {
-                            size += 4 + buf.length;
+                            size += 4; // length prefix
+                            if (buf != null) {
+                                size += buf.length;
+                            }
                         }
                         break;
                     default:

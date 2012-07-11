@@ -115,8 +115,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         Hashinate(23),
         GetPoolAllocations(24),
         GetUSOs(25),
-        LoadFragment(26),
-        UnloadFragment(27);
+        LoadFragment(26);
         Commands(final int id) {
             m_id = id;
         }
@@ -174,22 +173,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_socket = null;
             }
         }
-
-//        /** blocking write of all m_data to outputstream */
-//        void write(final byte data[], final int amount) throws IOException {
-//            // write 4 byte length (which includes its own 4 bytes) in big-endian
-//            // order. this hurts .. but I'm not sure of a better way.
-//            final byte[] length = new byte[4];
-//            int amt = amount + 4;
-//            // System.out.println("Sending " + amt + " bytes");
-//            assert (amt >= 8);
-//            for (int i = 3; i >= 0; --i) {
-//                length[i] = (byte) (amt & 0xff);
-//                amt >>= 8;
-//            }
-//            m_socket.getOutputStream().write(length);
-//            m_socket.getOutputStream().write(data, 0, amount);
-//        }
 
         /** blocking write of all m_data to outputstream */
         void write() throws IOException {
@@ -435,6 +418,25 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 ds.readInt(); // ignore the dependency ID
                 tables[ii] = (VoltTable) ds.readObject(tables[ii], null);
             }
+        }
+
+        /**
+         * Read and deserialize a long from the wire.
+         */
+        public long readLong() throws IOException {
+            final ByteBuffer longBytes = ByteBuffer.allocate(8);
+
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (longBytes.hasRemaining()) {
+                int read = m_socketChannel.read(longBytes);
+                if (read == -1) {
+                    throw new EOFException();
+                }
+            }
+            longBytes.flip();
+
+            final long retval = longBytes.getLong();
+            return retval;
         }
 
         public void throwException(final int errorCode) throws IOException {
@@ -719,24 +721,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public void loadPlanFragment(long planFragmentId, String plan) throws EEException
+    public long loadPlanFragment(byte[] plan) throws EEException
     {
-        final FastSerializer fser = new FastSerializer();
-        try {
-            fser.writeString(plan);
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception);
-        }
-
         m_data.clear();
         m_data.putInt(Commands.LoadFragment.m_id);
-        m_data.putLong(planFragmentId);
-        //-4 because the data from fser contains a length prefix
-        ByteBuffer fragBuf = fser.getBuffer();
-        fragBuf.position(4);//skip string length prefix
-        //Put all lengths and counts in fixed size portion
-        m_data.putInt(fragBuf.remaining());
-        m_data.put(fragBuf);
+        m_data.putInt(plan.length);
+        m_data.put(plan);
 
         try {
             m_data.flip();
@@ -747,8 +737,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         int result = ExecutionEngine.ERRORCODE_ERROR;
+        long planFragId = 0;
+        boolean cacheHit = false;
+        long cacheSize = 0;
         try {
             result = m_connection.readStatusByte();
+            planFragId = m_connection.readLong();
+            cacheHit = m_connection.readLong() != 0;
+            cacheSize = m_connection.readLong();
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
@@ -756,33 +752,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
             throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
         }
-    }
-
-    @Override
-    public void unloadPlanFragment(long planFragmentId) throws EEException
-    {
-        m_data.clear();
-        m_data.putInt(Commands.UnloadFragment.m_id);
-        m_data.putLong(planFragmentId);
-
-        try {
-            m_data.flip();
-            m_connection.write();
-        } catch (final Exception e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        int result = ExecutionEngine.ERRORCODE_ERROR;
-        try {
-            result = m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-            throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
-        }
+        return planFragId;
     }
 
     @Override

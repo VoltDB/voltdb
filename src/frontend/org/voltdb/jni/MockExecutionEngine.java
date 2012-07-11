@@ -44,10 +44,9 @@ public class MockExecutionEngine extends ExecutionEngine {
     }
 
     @Override
-    public void loadPlanFragment(long planFragmentId, String plan) throws EEException {}
-
-    @Override
-    public void unloadPlanFragment(long planFragmentId) throws EEException {}
+    public long loadPlanFragment(byte[] plan) throws EEException {
+        return -1;
+    }
 
     @Override
     public VoltTable[] executePlanFragments(

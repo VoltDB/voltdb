@@ -328,9 +328,12 @@ public class FastSerializer implements DataOutput {
         }
         buf.putShort((short)values.length);
         for (int i = 0; i < values.length; ++i) {
-            if (values[i] == null)
-                throw new IOException("Array being fastserialized can't contain null values (position " + i + ")");
-            writeArray(values[i], buf);
+            if (values[i] == null) {
+                buf.putInt(-1); // null length prefix
+            }
+            else {
+                writeArray(values[i], buf);
+            }
         }
     }
 
@@ -356,15 +359,29 @@ public class FastSerializer implements DataOutput {
         buf.put(values);
     }
 
+    public void writeArray(byte[][] values) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        writeShort(values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                writeInt(-1);
+            }
+            else {
+                writeArray(values[i]);
+            }
+        }
+    }
+
     public void writeArray(byte[] values) throws IOException {
         if (values.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Array exceeds maximum length of "
                                   + VoltType.MAX_VALUE_LENGTH + " bytes");
         }
         writeInt(values.length);
-        for (int i = 0; i < values.length; ++i) {
-            writeByte(values[i]);
-        }
+        write(values);
     }
 
     public static void writeArray(short[] values, ByteBuffer buf) throws IOException {

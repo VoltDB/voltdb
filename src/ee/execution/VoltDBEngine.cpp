@@ -306,6 +306,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
 {
+    assert(planfragmentId != 0);
+
     Table *cleanUpTable = NULL;
     m_currentOutputDepId = outputDependencyId;
     m_currentInputDepId = inputDependencyId;
@@ -339,11 +341,10 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                              txnId,
                                              lastCommittedTxnId);
 
-   // count the number of plan fragments executed
+    // count the number of plan fragments executed
     ++m_pfCount;
 
     // execution lists for planfragments are cached by planfragment id
-    assert (planfragmentId >= -1);
     //printf("Looking to execute fragid %jd\n", (intmax_t)planfragmentId);
     map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(planfragmentId);
     assert (iter != m_executorMap.end());
@@ -426,48 +427,47 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
-int VoltDBEngine::loadFragment(std::string fragmentString, int64_t planfragmentId)
+int VoltDBEngine::loadFragment(const char *plan, int32_t length, int64_t &fragId, bool &wasHit, int64_t &cacheSize)
 {
-    int retval = ENGINE_ERRORCODE_ERROR;
+    fragId = 0;
 
-    try
-    {
-        if (initPlanFragment(planfragmentId, fragmentString))
+    wasHit = m_fragmentManager.upsert(plan, length, fragId);
+    cacheSize = m_fragmentManager.size();
+    if (!wasHit) {
+        try
         {
-            retval = ENGINE_ERRORCODE_SUCCESS;
+            std::string fragmentString(plan, length);
+            if (!initPlanFragment(fragId, fragmentString))
+            {
+                char message[128];
+                snprintf(message, 128, "Unable to load plan fragment for"
+                         " fragment id %jd.", (intmax_t)fragId);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              message);
+            }
         }
-        else
+        catch (SerializableEEException &e)
         {
-            char message[128];
-            snprintf(message, 128, "Unable to load plan fragment for"
-                    " fragment id %jd.", (intmax_t)planfragmentId);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+            VOLT_TRACE("loadFragment: failed to initialize plan fragment");
+            e.serialize(getExceptionOutputSerializer());
+            fragId = 0;
+            return 1;
         }
     }
-    catch (SerializableEEException &e)
-    {
-        VOLT_TRACE("loadFragment: failed to initialize plan fragment");
-        e.serialize(getExceptionOutputSerializer());
-        retval = ENGINE_ERRORCODE_ERROR;
-    }
 
-    return retval;
+    // nonzero on failure
+    return fragId == 0 ? 1 : 0;
 }
 
-int VoltDBEngine::unloadFragment(int64_t planfragmentId)
-{
-    int retval = ENGINE_ERRORCODE_ERROR;
-
-    std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
-    iter = m_executorMap.find(planfragmentId);
-    if (iter != m_executorMap.end()) {
-        // clean up stuff
-        m_executorMap.erase(planfragmentId);
-        retval = ENGINE_ERRORCODE_SUCCESS;
+void VoltDBEngine::resizePlanCache() {
+    while (int64_t purgeFragId = m_fragmentManager.purgeNext()) {
+        std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
+        iter = m_executorMap.find(purgeFragId);
+        if (iter != m_executorMap.end()) {
+            // clean up stuff
+            m_executorMap.erase(purgeFragId);
+        }
     }
-
-    return retval;
 }
 
 // -------------------------------------------------

@@ -72,8 +72,8 @@ public class SQLStmt {
      * @return SQLStmt object with plan added
      */
     static SQLStmt createWithPlan(String sqlText,
-                                  String aggregatorFragment,
-                                  String collectorFragment,
+                                  byte[] aggregatorFragment,
+                                  byte[] collectorFragment,
                                   boolean isReplicatedTableDML,
                                   List<ParameterInfo> params) {
         SQLStmt stmt = new SQLStmt(sqlText, null);

@@ -65,15 +65,10 @@ public interface SiteProcedureConnection {
     throws VoltAbortException;
 
     /**
-     * Load a JSON planfragment into a specific ID in the EE.
+     * Get the EE's plan fragment ID for a given JSON plan.
+     * May pull from cache or load on the spot.
      */
-    public void loadPlanFragment(long planFragmentId, String plan) throws EEException;
-
-    /**
-     * Unload a plan fragment with a specific ID from the EE. Dangerous.
-     * Might fail silently if ID isn't actually a loaded fragment.
-     */
-    public void unloadPlanFragment(long planFragmentId) throws EEException;
+    public long loadPlanFragment(byte[] plan) throws EEException;
 
     /**
      * Execute a set of plan fragments.

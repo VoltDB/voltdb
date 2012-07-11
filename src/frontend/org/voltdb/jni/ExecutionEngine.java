@@ -277,10 +277,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     abstract public void updateCatalog(final long txnId, final String diffCommands) throws EEException;
 
     /** Load a fragment, given a plan, into the EE with a specific fragment id */
-    abstract public void loadPlanFragment(long planFragmentId, String plan) throws EEException;
-
-    /** Unload a fragment with a specific id. Use carefully. Will mostly silently fail. */
-    abstract public void unloadPlanFragment(long planFragmentId) throws EEException;
+    abstract public long loadPlanFragment(byte[] plan) throws EEException;
 
     /** Run multiple plan fragments */
     abstract public VoltTable[] executePlanFragments(int numFragmentIds,
@@ -478,10 +475,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
             long txnId, long lastCommittedTxnId, long undoToken);
 
-    //Execution
-
-    protected native int nativeLoadPlanFragment(long pointer, long planFragmentId, byte plan[]);
-    protected native int nativeUnloadPlanFragment(long pointer, long planFragmentId);
+    protected native int nativeLoadPlanFragment(long pointer, byte[] plan);
 
     /**
      * Executes multiple plan fragments with the given parameter sets and gets the results.
