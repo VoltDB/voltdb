@@ -86,7 +86,8 @@ public abstract class AdHocBase extends VoltSystemProcedure {
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(sqlStatements[i],
                                                              aggregatorFragments[i],
                                                              collectorFragments[i],
-                                                             replicatedTableDMLFlags[i] == 1);
+                                                             replicatedTableDMLFlags[i] == 1,
+                                                             null);
             voltQueueSQL(stmt);
         }
 

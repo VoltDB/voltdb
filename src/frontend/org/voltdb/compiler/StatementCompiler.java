@@ -17,7 +17,6 @@
 
 package org.voltdb.compiler;
 
-import java.io.PrintStream;
 import java.util.Collections;
 
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -33,6 +32,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.planner.ParameterInfo;
 import org.voltdb.planner.PartitioningForStatement;
+import org.voltdb.planner.PlanningErrorException;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -69,26 +69,45 @@ public abstract class StatementCompiler {
         compiler.addInfo("Compiling Statement: " + stmt);
 
         // determine the type of the query
-        QueryType qtype;
+        QueryType qtype = QueryType.INVALID;
+        boolean statementRO = true;
         if (stmt.toLowerCase().startsWith("insert")) {
             qtype = QueryType.INSERT;
-            catalogStmt.setReadonly(false);
+            statementRO = false;
         }
         else if (stmt.toLowerCase().startsWith("update")) {
             qtype = QueryType.UPDATE;
-            catalogStmt.setReadonly(false);
+            statementRO = false;
         }
         else if (stmt.toLowerCase().startsWith("delete")) {
             qtype = QueryType.DELETE;
-            catalogStmt.setReadonly(false);
+            statementRO = false;
         }
         else if (stmt.toLowerCase().startsWith("select")) {
+            // This covers simple select statements as well as UNIONs and other set operations that are being used with default precedence
+            // as in "select ... from ... UNION select ... from ...;"
+            // Even if set operations are not currently supported, let them pass as "select" statements to let the parser sort them out.
             qtype = QueryType.SELECT;
-            catalogStmt.setReadonly(true);
         }
-        else {
-            throw compiler.new VoltCompilerException("Unparsable SQL statement: " + stmt);
+        else if (stmt.toLowerCase().startsWith("(")) {
+            // There does not seem to be a need to support parenthesized DML statements, so assume a read-only statement.
+            // If that assumption is wrong, then it has probably gotten to the point that we want to drop this up-front
+            // logic in favor of relying on the full parser/planner to determine the cataloged query type and read-only-ness.
+            // Parenthesized query statements are typically complex set operations (UNIONS, etc.)
+            // requiring parenthesis to explicitly determine precedence,
+            // but they MAY be as simple as a needlessly parenthesized single select statement:
+            // "( select * from table );" is valid SQL.
+            // So, assume QueryType.SELECT.
+            // If set operations require their own QueryType in the future, that's probably another case
+            // motivating diving right in to the full parser/planner without this pre-check.
+            // We don't want to be re-implementing the parser here -- this has already gone far enough.
+            qtype = QueryType.SELECT;
         }
+        // else:
+        // All the known statements are handled above, so default to cataloging an invalid read-only statement
+        // and leave it to the parser/planner to more intelligently reject the statement as unsupported.
+
+        catalogStmt.setReadonly(statementRO);
         catalogStmt.setQuerytype(qtype.getValue());
 
         // put the data in the catalog that we have
@@ -101,12 +120,15 @@ public abstract class StatementCompiler {
         PlanNodeList node_list = null;
         TrivialCostModel costModel = new TrivialCostModel();
         QueryPlanner planner = new QueryPlanner(
-                catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, true, false);
+                catalog.getClusters().get("cluster"), db, partitioning, hsql, estimates, false);
 
         CompiledPlan plan = null;
         try {
             plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
                     catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(), DEFAULT_MAX_JOIN_TABLES, null);
+        } catch (PlanningErrorException e) {
+            // These are normal expectable errors -- don't normally need a stack-trace.
+            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         } catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
@@ -162,14 +184,15 @@ public abstract class StatementCompiler {
         catalogStmt.setReplicatedtabledml(plan.replicatedTableDML);
         partitioning.setIsReplicatedTableDML(plan.replicatedTableDML);
 
-        // output the explained plan to disk for debugging
-        PrintStream plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                "statement-winner-plans", name + ".txt");
-        plansOut.println("SQL: " + plan.sql);
-        plansOut.println("COST: " + Double.toString(plan.cost));
-        plansOut.println("PLAN:\n");
-        plansOut.println(plan.explainedPlan);
-        plansOut.close();
+        // output the explained plan to disk (or caller) for debugging
+        StringBuilder planDescription = new StringBuilder(1000); // Initial capacity estimate.
+        planDescription.append("SQL: ").append(plan.sql);
+        planDescription.append("\nCOST: ").append(plan.cost);
+        planDescription.append("\nPLAN:\n");
+        planDescription.append(plan.explainedPlan);
+        String planString = planDescription.toString();
+        BuildDirectoryUtils.writeFile("statement-winner-plans", name + ".txt", planString);
+        compiler.captureDiagnosticContext(planString);
 
         // set the explain plan output into the catalog (in hex)
         catalogStmt.setExplainplan(Encoder.hexEncode(plan.explainedPlan));
@@ -190,6 +213,7 @@ public abstract class StatementCompiler {
             planFragment.setMultipartition(fragment.multiPartition);
 
             String json = node_list.toJSONString();
+            compiler.captureDiagnosticJsonFragment(json);
 
             // if we're generating more than just explain plans
             if (compilerDebug) {
@@ -203,17 +227,13 @@ public abstract class StatementCompiler {
                     throw compiler.new VoltCompilerException(e2.getMessage());
                 }
 
-                // output the plan to disk for debugging
-                plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                        "statement-winner-plan-fragments", name + "-" + String.valueOf(i) + ".txt");
-                plansOut.println(prettyJson);
-                plansOut.close();
+                // output the plan to disk as pretty json for debugging
+                BuildDirectoryUtils.writeFile("statement-winner-plan-fragments", name + "-" + String.valueOf(i) + ".txt",
+                                              prettyJson);
 
                 // output the plan to disk for debugging
-                plansOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                        "statement-winner-plan-fragments", name + String.valueOf(i) + ".dot");
-                plansOut.println(node_list.toDOTString(name + "-" + String.valueOf(i)));
-                plansOut.close();
+                BuildDirectoryUtils.writeFile("statement-winner-plan-fragments", name + String.valueOf(i) + ".dot",
+                                              node_list.toDOTString(name + "-" + String.valueOf(i)));
             }
 
             // Place serialized version of PlanNodeTree into a PlanFragment
@@ -230,6 +250,9 @@ public abstract class StatementCompiler {
             // increment the counter for fragment id
             i++;
         }
+        // Planner should have rejected with an exception any statement with an unrecognized type.
+        int validType = catalogStmt.getQuerytype();
+        assert(validType != QueryType.INVALID.getValue());
     }
 
     /**

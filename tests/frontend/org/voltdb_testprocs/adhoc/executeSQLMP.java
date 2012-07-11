@@ -1,5 +1,5 @@
 /* This file is part of VoltDB.
- * Copyright (C) 2008-2011 VoltDB Inc.
+ * Copyright (C) 2008-2012 VoltDB Inc.
  *
  * Permission is hereby granted, free of charge, to any person obtaining
  * a copy of this software and associated documentation files (the
@@ -20,41 +20,31 @@
  * ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
  * OTHER DEALINGS IN THE SOFTWARE.
  */
-package com.auctionexample;
 
+
+//
+// Accepts a vote, enforcing business logic: make sure the vote is for a valid
+// contestant and that the voter (phone number of the caller) is not above the
+// number of allowed votes.
+//
+
+package org.voltdb_testprocs.adhoc;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.types.TimestampType;
 
-/**
- *
- *
- */
-@ProcInfo(
-    partitionInfo = "ITEM.ITEMID: 1",
-    singlePartition = true
+@ProcInfo (
+    singlePartition = false
 )
-public class InsertIntoBid extends VoltProcedure {
-
-    public final SQLStmt insert = new SQLStmt("INSERT INTO BID VALUES (?, ?, ?, ?, ?);");
-    public final SQLStmt insertForExport = new SQLStmt("INSERT INTO BID_EXPORT VALUES (?, ?, ?, ?, ?);");
-
-    /**
-     *
-     * @param bidid
-     * @param itemid
-     * @param bidderid
-     * @param bidtime
-     * @param bidprice
-     * @return The number of rows affected.
-     * @throws VoltAbortException
-     */
-    public VoltTable[] run(int bidid, int itemid, int bidderid, TimestampType bidtime, double bidprice) throws VoltAbortException {
-        voltQueueSQL(insert, bidid, itemid, bidderid, bidtime, bidprice);
-        voltQueueSQL(insertForExport, bidid, itemid, bidderid, bidtime, bidprice);
-        return voltExecuteSQL();
+public class executeSQLMP extends VoltProcedure {
+    public static final SQLStmt testStmt = new SQLStmt("select * from PARTED1");
+    public VoltTable[] run(long partval, String sql) {
+        voltQueueSQLExperimental(sql);
+        voltQueueSQL(testStmt);
+        voltQueueSQLExperimental("select * from PARTED1 where partval = ?", partval);
+        voltQueueSQL(testStmt);
+        return voltExecuteSQL(true);
     }
 }

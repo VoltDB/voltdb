@@ -23,26 +23,31 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
-import java.util.Set;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.utils.CoreUtils;
+import org.voltdb.CatalogContext;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltcore.logging.VoltLogger;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskLogMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 
 public class MultiPartitionParticipantTxnState extends TransactionState {
+
+
 
     protected final ArrayDeque<WorkUnit> m_readyWorkUnits = new ArrayDeque<WorkUnit>();
     protected boolean m_isCoordinator;
@@ -55,10 +60,17 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     protected Map<Integer, List<VoltTable>> m_previousStackFrameDropDependencies = null;
     protected final StoredProcedureInvocation m_invocation; // for DR sending purposes
 
+    //protected ArrayList<FragmentTaskMessage> m_loggedFragmentTasks = null;
+    protected FragmentTaskLogMessage m_loggedFragments = null;
+
     private InitiateResponseMessage m_response;
     private HashSet<Long> m_outstandingAcks = null;
     private final java.util.concurrent.atomic.AtomicBoolean m_durabilityFlag;
     private final InitiateTaskMessage m_task;
+    private final CatalogContext m_context;
+
+    // ENG-3288 - Support mismatched results leniency for certain queries.
+    private boolean m_allowMismatchedResults = false;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -78,12 +90,40 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         m_hsId = site.getSiteId();
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
+        m_context = site.m_context;
+
         //Check to make sure we are the coordinator, it is possible to get an intiate task
         //where we aren't the coordinator because we are a replica of the coordinator.
-        if (notice instanceof InitiateTaskMessage)
-        {
+        if (notice instanceof InitiateTaskMessage) {
             // keep this around for DR purposes
             m_invocation = ((InitiateTaskMessage) notice).getStoredProcedureInvocation();
+
+            // Determine if mismatched results are okay.
+            if (m_invocation != null) {
+                String procName = m_invocation.getProcName();
+                if (procName.startsWith("@AdHoc")) {
+                    // For now the best we can do with ad hoc is to always allow mismatched results.
+                    // We don't know if it's non-deterministic or not. But the main use case for
+                    // being lenient is "SELECT * FROM TABLE LIMIT n", typically run as ad hoc.
+                    m_allowMismatchedResults = true;
+                } else {
+                    // Walk through the statements to see if any are non-deterministic.
+                    if (m_context != null && m_context.procedures != null) {
+                        Procedure proc = m_context.procedures.get(procName);
+                        if (proc != null) {
+                            CatalogMap<Statement> stmts = proc.getStatements();
+                            if (stmts != null) {
+                                for (Statement stmt : stmts) {
+                                    if (!stmt.getIscontentdeterministic() || !stmt.getIsorderdeterministic()) {
+                                        m_allowMismatchedResults = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             if (notice.getCoordinatorHSId() == m_hsId) {
                 m_isCoordinator = true;
@@ -96,12 +136,13 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 }
                 m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
                                                   null, m_hsId,
-                                                  null, false));
+                                                  null, false, m_allowMismatchedResults));
             } else {
                 m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
                 m_task = null;
             }
-        } else {
+        }
+        else {
             m_task = null;
             m_durabilityFlag = null;
             m_invocation = null;
@@ -167,17 +208,21 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return has_transactional_work;
     }
 
-    private boolean m_startedWhileRecovering;
-
     @Override
-    public boolean doWork(boolean recovering) {
+    public boolean doWork(boolean rejoining) {
+        if (rejoining && (m_rejoinState == RejoinState.NORMAL)) {
+            m_rejoinState = RejoinState.REJOINING;
+            if (!m_isReadOnly) {
+                m_loggedFragments = new FragmentTaskLogMessage(
+                        m_notice.getInitiatorHSId(), m_notice.getCoordinatorHSId(), m_notice.getTxnId());
+                assert(m_loggedFragments.getTxnId() == getNotice().getTxnId());
+            }
+        }
+
         if (!m_hasStartedWork) {
             m_site.beginNewTxn(this);
             m_hasStartedWork = true;
-            m_startedWhileRecovering = recovering;
         }
-
-        assert(m_startedWhileRecovering == recovering);
 
         if (m_done) {
             return true;
@@ -209,8 +254,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 initiateProcedure((InitiateTaskMessage) payload);
             }
             else if (payload instanceof FragmentTaskMessage) {
-                if (recovering && (wu.nonTransactional == false)) {
-                    processRecoveringFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
+                if ((m_rejoinState == RejoinState.REJOINING) && (wu.nonTransactional == false)) {
+                    processRejoiningFragmentWork((FragmentTaskMessage) payload, wu.getDependencies());
                 }
                 else {
                     // when recovering, still do non-transactional work
@@ -246,6 +291,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     void initiateProcedure(InitiateTaskMessage itask) {
         assert(m_isCoordinator);
+        // all MP txns are replayed as fragments
+        assert(m_rejoinState != RejoinState.REPLAYING);
 
         // Cache the response locally and create accounting
         // to track the outstanding acks.
@@ -324,19 +371,26 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
             // If we're not the coordinator, the transaction is read-only,
             // and this was the final task, then we can try to move on after
             // we've finished this work.
-            if (!isCoordinator() && isReadOnly() && ftask.isFinalTask())
-            {
+            if (!isCoordinator() && isReadOnly() && ftask.isFinalTask()) {
                 m_done = true;
             }
         }
     }
 
-    void processRecoveringFragmentWork(FragmentTaskMessage ftask, HashMap<Integer, List<VoltTable>> dependencies) {
+    private void processRejoiningFragmentWork(FragmentTaskMessage ftask, HashMap<Integer, List<VoltTable>> dependencies) {
         assert(ftask.getFragmentCount() > 0);
+        assert(m_rejoinState == RejoinState.REJOINING);
 
         FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_hsId);
         response.setRecovering(true);
         response.setStatus(FragmentResponseMessage.SUCCESS, null);
+
+        // log the work done for replay
+        if (!ftask.isReadOnly() && !ftask.isSysProcTask()) {
+            assert(m_notice.isReadOnly() == false);
+            assert(m_loggedFragments != null);
+            m_loggedFragments.appendFragmentTask(ftask);
+        }
 
         // add a dummy table for all of the expected dependency ids
         for (int i = 0; i < ftask.getFragmentCount(); i++) {
@@ -345,6 +399,13 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         }
 
         m_mbox.send(response.getDestinationSiteId(), response);
+
+        // If we're not the coordinator, the transaction is read-only,
+        // and this was the final task, then we can try to move on after
+        // we've finished this work.
+        if (!isCoordinator() && isReadOnly() && ftask.isFinalTask()) {
+            m_done = true;
+        }
     }
 
     @Override
@@ -353,7 +414,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         assert(dependencies.length > 0);
 
         WorkUnit w = new WorkUnit(m_site.getSiteTracker(), null, dependencies,
-                                  m_hsId, m_nonCoordinatingSites, true);
+                                  m_hsId, m_nonCoordinatingSites, true, m_allowMismatchedResults);
         if (isFinal)
             w.nonTransactional = true;
         for (int depId : dependencies) {
@@ -391,18 +452,12 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
     @Override
     public void createLocalFragmentWork(FragmentTaskMessage task, boolean nonTransactional) {
-        if (task.getFragmentCount() > 0) {
-            createLocalFragmentWorkDependencies(task, nonTransactional);
-        }
-    }
-
-    private void createLocalFragmentWorkDependencies(FragmentTaskMessage task, boolean nonTransactional)
-    {
         if (task.getFragmentCount() <= 0) return;
 
         WorkUnit w = new WorkUnit(m_site.getSiteTracker(), task,
                                   task.getAllUnorderedInputDepIds(),
-                                  m_hsId, m_nonCoordinatingSites, false);
+                                  m_hsId, m_nonCoordinatingSites, false,
+                                  m_allowMismatchedResults);
         w.nonTransactional = nonTransactional;
 
         for (int i = 0; i < task.getFragmentCount(); i++) {
@@ -671,4 +726,14 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         return m_invocation;
     }
 
+    @Override
+    public TransactionInfoBaseMessage getTransactionInfoBaseMessageForRejoinLog() {
+        assert(m_rejoinState == RejoinState.REJOINING);
+        assert(m_loggedFragments != null);
+        // skip txns that didn't do any work, or did sysproc work
+        if (m_loggedFragments.getFragmentTasks().size() == 0) {
+            return null;
+        }
+        return m_loggedFragments;
+    }
 }

@@ -68,6 +68,7 @@ import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
+import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocCompilerCache;
@@ -532,7 +533,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Don't use the auth system during recovery. Not safe to use
              * the node to initiate multi-partition txns during recovery
              */
-            if (!VoltDB.instance().recovering()) {
+            if (!VoltDB.instance().rejoining()) {
                 /*
                  * Authenticate the user.
                  */
@@ -802,7 +803,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final int numPartitions,
             final Object clientData,
             final int messageSize,
-            final long now)
+            final long now,
+            final boolean allowMismatchedResults)
     {
         return m_initiator.createTransaction(
                 connectionId,
@@ -816,7 +818,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 numPartitions,
                 clientData,
                 messageSize,
-                now);
+                now,
+                allowMismatchedResults);
     }
 
 
@@ -1036,8 +1039,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
-        List<AdHocPlannedStatement> statements = new ArrayList<AdHocPlannedStatement>();
-
         // try the cache
         // For now it's all or nothing on a batch of statements, i.e. all statements must match or
         // none.
@@ -1061,7 +1062,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             planBatch.addStatement(sqlStatement,
                                    plannedStatement.aggregatorFragment,
                                    plannedStatement.collectorFragment,
-                                   plannedStatement.isReplicatedTableDML);
+                                   plannedStatement.isReplicatedTableDML,
+                                   plannedStatement.isNonDeterministic,
+                                   null);
         }
         // All statements retrieved from cache?
         if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
@@ -1074,7 +1077,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     false, task.clientHandle, handler.connectionId(),
                     handler.m_hostname, handler.isAdmin(), ccxn,
-                    sql, sqlStatements, partitionParam));
+                    sql, sqlStatements, partitionParam, null, false, true));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1135,12 +1138,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         createTransaction(handler.connectionId(), handler.m_hostname,
                 handler.isAdmin(),
                 task,
-                false, // read only
-                true,  // single partition
-                false, // every site
+                false,      // read only
+                true,       // single partition
+                false,      // every site
                 involvedPartitions, involvedPartitions.length,
                 ccxn, buf.capacity(),
-                System.currentTimeMillis());
+                System.currentTimeMillis(),
+                false);     // allow mismatched results
         return null;
     }
 
@@ -1166,7 +1170,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sysProc.getEverysite(),
                     involvedPartitions, involvedPartitions.length,
                     ccxn, buf.capacity(),
-                    System.currentTimeMillis());
+                    System.currentTimeMillis(),
+                    false);
             return null;
         }
     }
@@ -1195,7 +1200,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                           sysProc.getEverysite(),
                           involvedPartitions, involvedPartitions.length,
                           ccxn, buf.capacity(),
-                          System.currentTimeMillis());
+                          System.currentTimeMillis(),
+                          false);
         return null;
     }
 
@@ -1316,7 +1322,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     sysProc.getEverysite(),
                     involvedPartitions, involvedPartitions.length,
                     ccxn, buf.capacity(),
-                    now);
+                    now,
+                    false);
 
         }
 
@@ -1354,6 +1361,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             new VoltTable[0], e.getMessage(), task.clientHandle);
                 }
             }
+            boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
             boolean success =
                 createTransaction(handler.connectionId(), handler.m_hostname,
                         handler.isAdmin(),
@@ -1363,7 +1371,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         catProc.getEverysite(),
                         involvedPartitions, involvedPartitions.length,
                         ccxn, buf.capacity(),
-                        now);
+                        now,
+                        allowMismatchedResults);
             if (!success) {
                 // HACK: this return is for the DR agent so that it
                 // will move along on duplicate replicated transactions
@@ -1376,6 +1385,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
         return null;
+    }
+
+    /**
+     * Determine if a procedure is non-deterministic by examining all its statements.
+     *
+     * @param proc  catalog procedure
+     * @return  true if it has any non-deterministic statements
+     */
+    static boolean isProcedureNonDeterministic(Procedure proc) {
+        boolean isNonDeterministic = false;
+        CatalogMap<Statement> stmts = proc.getStatements();
+        if (stmts != null) {
+            for (Statement stmt : stmts) {
+                if (!stmt.getIscontentdeterministic() || !stmt.getIsorderdeterministic()) {
+                    isNonDeterministic = true;
+                    break;
+                }
+            }
+        }
+        return isNonDeterministic;
     }
 
     void createAdHocTransaction(final AdHocPlannedStmtBatch plannedStmtBatch) {
@@ -1445,12 +1474,22 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }
 
+        // ENG-3288 - Non-deterministic read-only queries tolerate mismatched results.
+        boolean allowMismatchedResults = false;
+        if (plannedStmtBatch.isReadOnly()) {
+            for (AdHocPlannedStatement stmt : plannedStmtBatch.plannedStatements) {
+                if (stmt.isNonDeterministic) {
+                    allowMismatchedResults = true;
+                    break;
+                }
+            }
+        }
         // initiate the transaction
         createTransaction(plannedStmtBatch.connectionId, plannedStmtBatch.hostname,
-                plannedStmtBatch.adminConnection,
-                task, plannedStmtBatch.isReadOnly(), isSinglePartition, false, partitions,
-                partitions.length, plannedStmtBatch.clientData,
-                0, EstTime.currentTimeMillis());
+                plannedStmtBatch.adminConnection, task,
+                plannedStmtBatch.isReadOnly(), isSinglePartition, false,
+                partitions, partitions.length, plannedStmtBatch.clientData,
+                0, EstTime.currentTimeMillis(), allowMismatchedResults);
 
         // cache the plans, but don't hold onto the connection object
         plannedStmtBatch.clientData = null;
@@ -1491,7 +1530,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                      plannedStmtBatch.clientData,
                                                      plannedStmtBatch.sqlBatchText,
                                                      plannedStmtBatch.getSQLStatements(),
-                                                     plannedStmtBatch.partitionParam));
+                                                     plannedStmtBatch.partitionParam,
+                                                     null,
+                                                     false,
+                                                     true));
 
                         // XXX: Need to know the async mailbox id.
                         m_mailbox.send(Long.MIN_VALUE, work);
@@ -1534,7 +1576,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             changeResult.adminConnection,
                             task, false, true, true, m_allPartitions,
                             m_allPartitions.length, changeResult.clientData, 0,
-                            EstTime.currentTimeMillis());
+                            EstTime.currentTimeMillis(), false);
                 }
                 else {
                     throw new RuntimeException(
@@ -1701,12 +1743,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         });
         spi.clientHandle = clientData;
         // initiate the transaction
+        boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
         createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
                 m_allPartitions, m_allPartitions.length,
                 m_snapshotDaemonAdapter,
-                0, EstTime.currentTimeMillis());
+                0, EstTime.currentTimeMillis(),
+                allowMismatchedResults);
     }
 
     /**

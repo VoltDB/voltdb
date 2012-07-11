@@ -7,8 +7,7 @@
         <procedures>
             <procedure class='com.auctionexample.InsertIntoCategory' />
             <procedure class='com.auctionexample.InsertIntoUser' />
-            <procedure class='com.auctionexample.InsertIntoItem' />
-            <procedure class='com.auctionexample.InsertIntoBid' />
+            <procedure class='com.auctionexample.InsertIntoItemAndBid' />
             <procedure class='com.auctionexample.AuctionStatus' />
             <procedure class='com.auctionexample.BidOnAuction' />
             <procedure class='com.auctionexample.GetAuctionInfo' />

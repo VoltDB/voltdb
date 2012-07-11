@@ -101,7 +101,9 @@ typedef struct {
     int64_t undoToken;
     int32_t outputDepId;
     int32_t inputDepId;
-    int32_t length;
+    int32_t planFragLength;
+    int32_t parameterSetLength;
+    int16_t parameterCount;
     char data[0];
 }__attribute__((packed)) customplanfrag;
 
@@ -695,23 +697,41 @@ void VoltDBIPC::executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd) 
 
     // setup
     m_engine->resetReusedResultOutputBuffer();
-    m_engine->setUsedParamcnt(0);
     m_engine->setUndoToken(ntohll(plan->undoToken));
 
+    int32_t planFragLength = ntohl(plan->planFragLength);
+    int32_t parameterSetLength = ntohl(plan->parameterSetLength);
+    int16_t parameterCount = ntohs(plan->parameterCount);
+
     // data as fast serialized string
-    int32_t len = ntohl(plan->length);
-    string plan_str = string(plan->data, len);
+    // skip past the length prefix from fast serializer
+    string plan_str = string(plan->data, planFragLength);
+
+    // ...and fast serialized parameter sets last.
+    void* offset = plan->data + planFragLength;
+    ReferenceSerializeInput serialize_in(offset, parameterSetLength);
+
+    NValueArray &params = m_engine->getParameterContainer();
+
+    Pool *pool = m_engine->getStringPool();
+    deserializeParameterSetCommon( parameterCount, serialize_in, params, pool);
+    m_engine->setUsedParamcnt(parameterCount);
 
     // deps info
     int32_t outputDepId = ntohl(plan->outputDepId);
     int32_t inputDepId = ntohl(plan->inputDepId);
 
-    // execute
-    if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
-                                      ntohll(plan->txnId),
-                                      ntohll(plan->lastCommittedTxnId))) {
-        ++errors;
+    try {
+        // execute
+        if (m_engine->executePlanFragment(plan_str, outputDepId, inputDepId,
+                                          params, ntohll(plan->txnId),
+                                          ntohll(plan->lastCommittedTxnId))) {
+            ++errors;
+        }
+    } catch (FatalException e) {
+        crashVoltDB(e);
     }
+    pool->purge();
 
     // write the results array back across the wire
     const int8_t successResult = kErrorCode_Success;

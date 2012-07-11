@@ -30,6 +30,7 @@ import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 
 import junit.framework.TestCase;
@@ -1386,4 +1387,36 @@ public class TestVoltCompiler extends TestCase {
             final boolean success = compiler.compile(projectPath, testout_jar);
             assertTrue(success);
         }
+
+    public void test3324MPPlan() throws IOException {
+        final String simpleSchema =
+                "create table blah  (pkey integer not null, strval varchar(200), PRIMARY KEY(pkey));\n";
+        VoltProjectBuilder pb = new VoltProjectBuilder();
+        pb.enableDiagnostics();
+        pb.addLiteralSchema(simpleSchema);
+        pb.addPartitionInfo("blah", "pkey");
+        pb.addStmtProcedure("undeclaredspquery1", "select strval UNDECLARED1 from blah where pkey = ?");
+        pb.addStmtProcedure("undeclaredspquery2", "select strval UNDECLARED2 from blah where pkey = 12");
+        pb.addStmtProcedure("declaredspquery1", "select strval SODECLARED1 from blah where pkey = ?", "blah.pkey:0");
+        // Currently no way to do this?
+        // pb.addStmtProcedure("declaredspquery2", "select strval SODECLARED2 from blah where pkey = 12", "blah.pkey=12");
+        boolean success = pb.compile(Configuration.getPathToCatalogForTest("test3324.jar"));
+        assertTrue(success);
+        List<String> diagnostics = pb.harvestDiagnostics();
+        // Enable to test ENG-3324, still at large: assertEquals(2, countStringsMatching(diagnostics, ".*\"UNDECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
+        assertEquals(0, countStringsMatching(diagnostics, ".*\"SODECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
+        // System.out.println("test3324MPPlan");
+        // System.out.println(diagnostics);
+    }
+
+    private int countStringsMatching(List<String> diagnostics, String pattern) {
+        int count = 0;
+        for (String string : diagnostics) {
+            if (string.matches(pattern)) {
+                ++count;
+            }
+        }
+        return count;
+    }
+
 }

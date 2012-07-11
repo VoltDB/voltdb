@@ -24,12 +24,12 @@
 -- implicitly cast.  See Ticket 200
 
 --- test logic operators (AND) with comparison ops
-UPDATE _table SET @assign_col = @assign_type WHERE (_variable _cmp _variable) _logic (_variable _cmp @cmp_type)
+UPDATE _table SET @assign_col = @assign_type WHERE (_variable _cmp _variable) _logic (_variable[@col_type] _cmp @cmp_type)
 --- test arithmetic operators (+, -, *, /) with comparison ops
 -- Keep the value scaled down here to prevent internal precision issues when dividing by constants > 20?
-UPDATE _table SET @assign_col = @assign_type WHERE (_variable _math _value[int:0,10]) _cmp @cmp_type
+UPDATE _table SET @assign_col = @assign_type WHERE (_variable[@col_type] _math _value[int:0,10]) _cmp @cmp_type
 --- test comparison ops (<, <=, =, >=, >)
-UPDATE _table SET @assign_col = @assign_type WHERE _variable _cmp @cmp_type
+UPDATE _table SET @assign_col = @assign_type WHERE _variable[@col_type] _cmp @cmp_type
 -- test set expression
 --- test arithmetic (+, -, *, /) ops
 UPDATE _table SET @assign_col = @assign_col _math _value[int:0,3]

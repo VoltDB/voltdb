@@ -22,6 +22,8 @@
  */
 package com.auctionexample;
 
+import java.util.Random;
+
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
@@ -36,10 +38,12 @@ import org.voltdb.types.TimestampType;
     partitionInfo = "ITEM.ITEMID: 0",
     singlePartition = true
 )
-public class InsertIntoItem extends VoltProcedure {
+public class InsertIntoItemAndBid extends VoltProcedure {
 
     public final SQLStmt insert = new SQLStmt("INSERT INTO ITEM VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
     public final SQLStmt insertForExport = new SQLStmt("INSERT INTO ITEM_EXPORT VALUES (?, ?, ?, ?, ?, ?, ?, ?, ?);");
+    public final SQLStmt insert_Bid = new SQLStmt("INSERT INTO BID VALUES (?, ?, ?, ?, ?);");
+    public final SQLStmt insertForExport_Bid = new SQLStmt("INSERT INTO BID_EXPORT VALUES (?, ?, ?, ?, ?);");
 
     /**
      *
@@ -51,10 +55,20 @@ public class InsertIntoItem extends VoltProcedure {
      * @return The number of rows affected.
      * @throws VoltAbortException
      */
-    public VoltTable[] run(int itemId, String itemName, String itemDescription, long sellerId, long categoryId, long highBidId, double startPrice, TimestampType startTime,
-        TimestampType endTime) throws VoltAbortException {
-        voltQueueSQL(insert, itemId, itemName, itemDescription, sellerId, categoryId, highBidId, startPrice, startTime, endTime);
-        voltQueueSQL(insertForExport, itemId, itemName, itemDescription, sellerId, categoryId, highBidId, startPrice, startTime, endTime);
-        return voltExecuteSQL();
+    public VoltTable[] run(int itemId, String itemName, String itemDescription, long sellerId, long categoryId, double startPrice ) throws VoltAbortException {
+    	// figure out auction start and end times
+    	Random random = new Random();
+        final int oneMinuteOfMillis = 1000 * 1000 * 60;
+        TimestampType startTime = new TimestampType();
+        int duration = oneMinuteOfMillis + random.nextInt(oneMinuteOfMillis);
+        TimestampType endTime = new TimestampType(startTime.getTime() + duration);
+
+        voltQueueSQL(insert, itemId, itemName, itemDescription, sellerId, categoryId, itemId, startPrice, startTime, endTime);
+        voltQueueSQL(insertForExport, itemId, itemName, itemDescription, sellerId, categoryId, itemId, startPrice, startTime, endTime);
+        voltQueueSQL(insert_Bid, itemId, itemId, -1, 0L, startPrice);
+        voltQueueSQL(insertForExport_Bid, itemId, itemId, -1, 0L, startPrice);
+        VoltTable[]res = voltExecuteSQL();
+        assert(res == null);
+        return res;
     }
 }

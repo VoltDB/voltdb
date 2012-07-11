@@ -26,6 +26,8 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 
+import java.util.concurrent.atomic.AtomicReference;
+
 import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -60,7 +62,7 @@ public class TestTwoSitePlans extends TestCase {
     PlanFragment selectBottomFrag = null;
 
     @Override
-    public void setUp() throws IOException {
+    public void setUp() throws IOException, InterruptedException {
         VoltDB.instance().readBuildInfo("Test");
 
         // compile a catalog
@@ -94,12 +96,33 @@ public class TestTwoSitePlans extends TestCase {
         selectProc = procedures.get("MultiSiteSelect");
         assert(selectProc != null);
 
+        // Each EE needs its own thread for correct initialization.
+        final AtomicReference<ExecutionEngine> site1Reference = new AtomicReference<ExecutionEngine>();
+        Thread site1Thread = new Thread() {
+            @Override
+            public void run() {
+                site1Reference.set(new ExecutionEngineJNI(cluster.getRelativeIndex(), 1, 0, 0, "", 100, 2));
+            }
+        };
+        site1Thread.start();
+        site1Thread.join();
+
+        final AtomicReference<ExecutionEngine> site2Reference = new AtomicReference<ExecutionEngine>();
+        Thread site2Thread = new Thread() {
+            @Override
+            public void run() {
+                site2Reference.set(new ExecutionEngineJNI(cluster.getRelativeIndex(), 2, 1, 0, "", 100, 2));
+            }
+        };
+        site2Thread.start();
+        site2Thread.join();
+
         // create two EEs
         site1 = new ExecutionSite(0); // site 0
-        ee1 = new ExecutionEngineJNI(cluster.getRelativeIndex(), 1, 0, 0, "", 100, 2);
+        ee1 = site1Reference.get();
         ee1.loadCatalog( 0, catalog.serialize());
         site2 = new ExecutionSite(1); // site 1
-        ee2 = new ExecutionEngineJNI(cluster.getRelativeIndex(), 2, 1, 0, "", 100, 2);
+        ee2 = site2Reference.get();
         ee2.loadCatalog( 0, catalog.serialize());
 
         // cache some plan fragments

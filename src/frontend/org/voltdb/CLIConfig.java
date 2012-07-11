@@ -38,13 +38,24 @@ public abstract class CLIConfig {
     @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
     public @interface Option {
         String opt() default "";
+        String shortOpt() default "";
         boolean hasArg() default true;
+        boolean required() default false;
+        String desc() default "";
+    }
+
+    @Retention(RetentionPolicy.RUNTIME) // Make this annotation accessible at runtime via reflection.
+    @Target({ElementType.FIELD})       // This annotation can only be applied to class methods.
+    public @interface AdditionalArgs {
+        String opt() default "";
+        boolean hasArg() default false;
         boolean required() default false;
         String desc() default "";
     }
 
     // Apache Commons CLI API - requires JAR
     protected final Options options = new Options();
+    protected Options helpmsgs = new Options();
     protected String cmdName = "command";
 
     protected String configDump;
@@ -59,8 +70,7 @@ public abstract class CLIConfig {
     public void printUsage() {
         // automatically generate the help statement
         HelpFormatter formatter = new HelpFormatter();
-        formatter.setOptPrefix("--");
-        formatter.printHelp(cmdName, options, false);
+        formatter.printHelp(cmdName, helpmsgs, false);
     }
 
     private void assignValueToField(Field field, String value) throws Exception {
@@ -85,32 +95,49 @@ public abstract class CLIConfig {
             field.set(this, Float.parseFloat(value));
         else if ((cls == double.class) || (cls == Double.class))
             field.set(this, Double.parseDouble(value));
-        else if ((cls == char.class) || (cls == Character.class) || (cls == String.class))
-            field.set(this, value);
-        else
-            assert(false);
+        else if ((cls == String.class))
+                field.set(this, value);
+        else if (value.length() == 1 && ((cls == char.class) || (cls == Character.class)))
+                field.set(this, value.charAt(0));
+        else {
+                System.err.println("Parsing failed. Reason: can not assign " + value + " to "
+                                + cls.toString() + " class");
+                printUsage();
+            System.exit(-1);
+        }
+
     }
 
     public void parse(String cmdName, String[] args) {
         this.cmdName = cmdName;
 
         try {
-            options.addOption("help", false, "Print this message");
-
+            options.addOption("help","h", false, "Print this message");
             // add all of the declared options to the cli
             for (Field field : getClass().getDeclaredFields()) {
-                if (field.isAnnotationPresent(Option.class) == false) {
-                    continue;
+                if (field.isAnnotationPresent(Option.class)) {
+                        Option option = field.getAnnotation(Option.class);
+
+                    String opt = option.opt();
+                    if ((opt == null) || (opt.trim().length() == 0)) {
+                        opt = field.getName();
+                    }
+                    String shortopt = option.shortOpt();
+                    if ((shortopt == null) || (shortopt.trim().length() == 0)) {
+                        options.addOption(null, opt, option.hasArg(), option.desc());
+                        helpmsgs.addOption(null, opt, option.hasArg(), option.desc());
+                    } else {
+                        options.addOption(shortopt, opt, option.hasArg(), option.desc());
+                        helpmsgs.addOption(shortopt, opt, option.hasArg(), option.desc());
+                    }
+                } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
+                        AdditionalArgs params = field.getAnnotation(AdditionalArgs.class);
+                        String opt = params.opt();
+                        if ((opt == null) || (opt.trim().length() == 0)) {
+                        opt = field.getName();
+                    }
+                        options.addOption(opt, params.hasArg(), params.desc());
                 }
-
-                Option option = field.getAnnotation(Option.class);
-
-                String opt = option.opt();
-                if ((opt == null) || (opt.trim().length() == 0)) {
-                    opt = field.getName();
-                }
-
-                options.addOption(opt, option.hasArg(), option.desc());
             }
 
             CommandLineParser parser = new PosixParser();
@@ -120,47 +147,66 @@ public abstract class CLIConfig {
                 printUsage();
                 System.exit(0);
             }
-
+            String[] leftargs = cmd.getArgs();
+            int leftover = 0;
             // string key-value pairs
             Map<String, String> kvMap = new TreeMap<String, String>();
 
             for (Field field : getClass().getDeclaredFields()) {
-                if (field.isAnnotationPresent(Option.class) == false) {
-                    continue;
+                if (field.isAnnotationPresent(Option.class) ) {
+                         Option option = field.getAnnotation(Option.class);
+                     String opt = option.opt();
+                     if ((opt == null) || (opt.trim().length() == 0)) {
+                         opt = field.getName();
+                     }
+
+                     if (cmd.hasOption(opt)) {
+                         if (option.hasArg()) {
+                             assignValueToField(field, cmd.getOptionValue(opt));
+                         }
+                         else {
+                             if (field.getType().equals(boolean.class) || field.getType().equals(Boolean.class)) {
+                                field.setAccessible(true);
+                                try {
+                                     field.set(this, true);
+                                 } catch (Exception e) {
+                                     throw new IllegalArgumentException (e);
+                                 }
+                             }
+                             else {
+                                 printUsage();
+                             }
+                         }
+                     }
+                     else {
+                         if (option.required()) {
+                             printUsage();
+                         }
+                     }
+
+                     field.setAccessible(true);
+                     kvMap.put(opt, field.get(this).toString());
+                } else if (field.isAnnotationPresent(AdditionalArgs.class)) {
+                        // Deal with --table=BLHA, offer nice error message later
+                        leftover++;
                 }
-
-                Option option = field.getAnnotation(Option.class);
-
-                String opt = option.opt();
-                if ((opt == null) || (opt.length() == 0)) {
-                    opt = field.getName();
-                }
-
-                if (cmd.hasOption(opt)) {
-                    if (option.hasArg()) {
-                        assignValueToField(field, cmd.getOptionValue(opt));
-                    }
-                    else {
-                        if (field.getClass().equals(boolean.class) || field.getClass().equals(Boolean.class)) {
-                            try {
-                                field.set(this, true);
-                            } catch (Exception e) {
-                                e.printStackTrace();
-                            }
+            }
+            if (leftargs != null) {
+                if (leftargs.length <= leftover) {
+                        Field[] fields = getClass().getDeclaredFields();
+                    for (int i = 0,j=0; i<leftargs.length; i++) {
+                        for (;j < fields.length; j++) {
+                                if (fields[j].isAnnotationPresent(AdditionalArgs.class))
+                                        break;
                         }
-                        else {
-                            printUsage();
-                        }
+                        fields[j].setAccessible(true);
+                        fields[j].set(this, leftargs[i]);
                     }
-                }
-                else {
-                    if (option.required()) {
+                } else {
+                        System.err.println("Expected " + leftover + " args, but receive " + leftargs.length + " args");
                         printUsage();
-                    }
+                        System.exit(-1);
                 }
-
-                field.setAccessible(true);
-                kvMap.put(opt, field.get(this).toString());
             }
 
             // check that the values read are valid

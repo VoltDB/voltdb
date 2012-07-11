@@ -115,6 +115,8 @@ public class VoltCompiler {
 
     DatabaseEstimates m_estimates = new DatabaseEstimates();
 
+    private List<String> m_capturedDiagnosticDetail = null;
+
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     @SuppressWarnings("unused")
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
@@ -679,9 +681,36 @@ public class VoltCompiler {
             addClassToJar( classDependency, this );
         }
 
-        m_hsql.close();
     }
 
+
+    /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
+    public void enableDetailedCapture() {
+        m_capturedDiagnosticDetail = new ArrayList<String>();
+    }
+
+    /** Access recent plan output, for diagnostic purposes */
+    public List<String> harvestCapturedDetail() {
+        List<String> harvested = m_capturedDiagnosticDetail;
+        m_capturedDiagnosticDetail = null;
+        return harvested;
+    }
+
+    /** Capture plan context info -- statement, cost, high-level "explain". */
+    public void captureDiagnosticContext(String planDescription) {
+        if (m_capturedDiagnosticDetail == null) {
+            return;
+        }
+        m_capturedDiagnosticDetail.add(planDescription);
+    }
+
+    /** Capture plan content in terse json format. */
+    public void captureDiagnosticJsonFragment(String json) {
+        if (m_capturedDiagnosticDetail == null) {
+            return;
+        }
+        m_capturedDiagnosticDetail.add(json);
+    }
 
     /**
      * Create INSERT, UPDATE, DELETE and SELECT procedure descriptors for all partitioned,

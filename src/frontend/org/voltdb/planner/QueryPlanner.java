@@ -47,7 +47,6 @@ public class QueryPlanner {
     Cluster m_cluster;
     Database m_db;
     String m_recentErrorMsg;
-    boolean m_useGlobalIds;
     boolean m_quietPlanner;
     final boolean m_fullDebug;
 
@@ -62,7 +61,7 @@ public class QueryPlanner {
      */
     public QueryPlanner(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning,
                         HSQLInterface HSQL, DatabaseEstimates estimates,
-                        boolean useGlobalIds, boolean suppressDebugOutput) {
+                        boolean suppressDebugOutput) {
         assert(HSQL != null);
         assert(catalogCluster != null);
         assert(catalogDb != null);
@@ -72,7 +71,6 @@ public class QueryPlanner {
         m_db = catalogDb;
         m_cluster = catalogCluster;
         m_estimates = estimates;
-        m_useGlobalIds = useGlobalIds;
         m_quietPlanner = suppressDebugOutput;
         m_fullDebug = System.getProperties().contains("compilerdebug");
     }
@@ -105,8 +103,8 @@ public class QueryPlanner {
         // reset any error message
         m_recentErrorMsg = null;
 
-        // set the usage of global ids in the plan assembler
-        AbstractPlanNode.setUseGlobalIds(m_useGlobalIds);
+        // Reset plan node ids to start at 1 for this plan
+        AbstractPlanNode.resetPlanNodeIds();
 
         // use HSQLDB to get XML that describes the semantics of the statement
         // this is much easier to parse than SQL and is checked against the catalog
@@ -262,12 +260,9 @@ public class QueryPlanner {
      * @param filename
      */
     private void outputExplainedPlan(String stmtName, String procName, CompiledPlan plan, String filename) {
-        PrintStream candidatePlanOut =
-                BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                              filename + ".txt");
-
-        candidatePlanOut.println(plan.explainedPlan);
-        candidatePlanOut.close();
+        BuildDirectoryUtils.writeFile("statement-all-plans/" + procName + "_" + stmtName,
+                                      filename + ".txt",
+                                      plan.explainedPlan);
     }
 
     /**
@@ -277,10 +272,7 @@ public class QueryPlanner {
      */
     private void outputParsedStatement(String stmtName, String procName, AbstractParsedStmt parsedStmt) {
         // output a description of the parsed stmt
-        PrintStream parsedDebugOut =
-            BuildDirectoryUtils.getDebugOutputPrintStream("statement-parsed", procName + "_" + stmtName + ".txt");
-        parsedDebugOut.println(parsedStmt.toString());
-        parsedDebugOut.close();
+        BuildDirectoryUtils.writeFile("statement-parsed", procName + "_" + stmtName + ".txt", parsedStmt.toString());
     }
 
     /**
@@ -290,10 +282,7 @@ public class QueryPlanner {
      */
     private void outputCompiledStatement(String stmtName, String procName, VoltXMLElement xmlSQL) {
         // output the xml from hsql to disk for debugging
-        PrintStream xmlDebugOut =
-            BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-xml", procName + "_" + stmtName + ".xml");
-        xmlDebugOut.println(xmlSQL.toString());
-        xmlDebugOut.close();
+        BuildDirectoryUtils.writeFile("statement-hsql-xml", procName + "_" + stmtName + ".xml", xmlSQL.toString());
     }
 
     /**
@@ -338,18 +327,14 @@ public class QueryPlanner {
         json = "SQL: " + plan.sql + "\n" + json;
 
         // write json to disk
-        PrintStream candidatePlanOut =
-                BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                              filename + "-json.txt");
-        candidatePlanOut.println(json);
-        candidatePlanOut.close();
+        BuildDirectoryUtils.writeFile("statement-all-plans/" + procName + "_" + stmtName,
+                                      filename + "-json.txt",
+                                      json);
 
         // create a graph friendly version
-        candidatePlanOut =
-                BuildDirectoryUtils.getDebugOutputPrintStream("statement-all-plans/" + procName + "_" + stmtName,
-                                                              filename + ".dot");
-        candidatePlanOut.println(nodeList.toDOTString("name"));
-        candidatePlanOut.close();
+        BuildDirectoryUtils.writeFile("statement-all-plans/" + procName + "_" + stmtName,
+                                      filename + ".dot",
+                                      nodeList.toDOTString("name"));
     }
 
     /**
@@ -397,10 +382,7 @@ public class QueryPlanner {
 
         if (m_fullDebug) {
             // output the plan statistics to disk for debugging
-            PrintStream plansOut =
-                BuildDirectoryUtils.getDebugOutputPrintStream("statement-stats", procName + "_" + stmtName + ".txt");
-            plansOut.println(stats.toString());
-            plansOut.close();
+            BuildDirectoryUtils.writeFile("statement-stats", procName + "_" + stmtName + ".txt", stats.toString());
         }
     }
 

@@ -705,7 +705,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         localServer.waitForInitialization();
 
         Thread.sleep(1000);
-        while (VoltDB.instance().recovering()) {
+        while (VoltDB.instance().rejoining()) {
             Thread.sleep(100);
         }
 

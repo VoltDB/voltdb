@@ -27,8 +27,6 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
-import org.voltdb.VoltTable.ColumnInfo;
 
 @ProcInfo (
     partitionInfo = "transactions.pid:0",
@@ -37,14 +35,43 @@ import org.voltdb.VoltTable.ColumnInfo;
 public class doTxn extends VoltProcedure {
 
     public final SQLStmt getLastTxnId = new SQLStmt(
-            "SELECT txnid FROM transactions WHERE txnid < ? ORDER BY txnid DESC LIMIT 1;");
+            "SELECT txnid, rid FROM transactions ORDER BY txnid DESC LIMIT 1;");
+
+    public final SQLStmt getReplicated = new SQLStmt(
+            "SELECT * FROM replicated ORDER BY id LIMIT 10;");
 
     public final SQLStmt insertTxnid = new SQLStmt(
-            "INSERT INTO transactions VALUES (?, ?);");
+            "INSERT INTO transactions VALUES (?, ?, ?, ?);");
 
-    public VoltTable run(byte partition) {
-        voltQueueSQL(getLastTxnId, getTransactionId());
-        voltQueueSQL(insertTxnid, getTransactionId(), partition);
-        return voltExecuteSQL()[0];
+    public final SQLStmt deleteOldTxns = new SQLStmt(
+            "DELETE FROM transactions WHERE rid < ? AND rid >= 0;");
+
+    public VoltTable[] run(byte partition, long rid, long oldestRid, byte[] value) {
+        final long txnId = getTransactionId();
+        voltQueueSQL(getLastTxnId);
+        voltQueueSQL(getReplicated);
+        VoltTable[] results = voltExecuteSQL();
+
+        if (results[0].advanceRow()) {
+            long previousTxnId = results[0].getLong("txnid");
+            long previousRid = results[0].getLong("rid");
+            if (previousTxnId >= txnId || previousRid >= rid) {
+                throw new VoltAbortException("doTxn executed out of order");
+            }
+            results[0].resetRowPosition();
+        }
+        if (results[1].advanceRow()) {
+            long previousTxnId = results[1].getLong("id");
+            if (previousTxnId >= txnId) {
+                throw new VoltAbortException("doTxn and updateReplicated executed out of order");
+            }
+            results[1].resetRowPosition();
+        }
+
+        voltQueueSQL(insertTxnid, txnId, partition, rid, value);
+        voltQueueSQL(deleteOldTxns, oldestRid);
+        voltExecuteSQL(true);
+
+        return results;
     }
 }
