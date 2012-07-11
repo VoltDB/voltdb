@@ -257,10 +257,12 @@ public class VoltDB {
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
                 }
-                else if (arg.equals("host")) {
+                else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();
                 } else if (arg.startsWith("host")) {
                     m_leader = arg.substring("host ".length()).trim();
+                } else if (arg.startsWith("leader")) {
+                    m_leader = arg.substring("leader ".length()).trim();
                 }
                 // Deprecated, use the "rejoin" start action
                 else if (arg.equals("rejoinhost") || arg.startsWith("rejoinhost ")) {
@@ -420,11 +422,11 @@ public class VoltDB {
                 message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
                         + "       voltdb replica [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
-                        + "       voltdb [live] rejoin host <hostname>";
+                        + "       voltdb [live] rejoin host <hostname>\n";
             } else {
                 message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>\n"
                         + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
-                        + "       voltdb rejoin host <hostname>";
+                        + "       voltdb rejoin host <hostname>\n";
             }
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).
