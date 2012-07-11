@@ -9,7 +9,9 @@ import java.io.IOException;
 import java.net.URL;
 import java.util.ArrayList;
 import java.util.HashMap;
+import java.util.LinkedHashMap;
 import java.util.List;
+import java.util.Map;
 import java.util.Map.Entry;
 
 import org.eclipse.jetty.util.ajax.JSON;
@@ -123,6 +125,155 @@ public class plannerTester {
 			pnt2  = loadPlanFromFile( pathNew );
 			diffLeaves(pnt1.getRootPlanNode(), pnt2.getRootPlanNode());
 		}
+	}
+	
+	public static void diffInlineNodes( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ) {
+		ArrayList<AbstractPlanNode> list1 = oldpn1.getLists();
+		ArrayList<AbstractPlanNode> list2 = newpn2.getLists();
+		int size1 = list1.size();
+		int size2 = list2.size();
+		int max = Math.max(size1, size2);
+		int min = Math.min(size1, size2);
+		if( size1 != size2 ) {
+			System.out.println( "Different plan tree size, used to be: "+size1+", now is: "+size2 );
+			//only consider the case that sizes are different for now 
+			//diff inline nodes
+			
+//			for( int i = 0; i < min; i++ ) {
+//				AbstractPlanNode pn1 = list1.get(i);
+//				AbstractPlanNode pn2 = list2.get(i);
+//				PlanNodeType pnType1 = pn1.getPlanNodeType();
+//				PlanNodeType pnType2 = pn2.getPlanNodeType();
+				
+//				Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
+//				Map<PlanNodeType, AbstractPlanNode> inlineNodes2 = list2.get(i).getInlinePlanNodes();
+//				}
+		}
+		Map<Integer, AbstractPlanNode> projNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> projNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> limitNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> limitNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> orderByNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> orderByNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> projInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> projInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> limitInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> limitInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> orderByInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> orderByInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		for( int i = 0; i<size1; i++ ) {
+			AbstractPlanNode pn = list1.get(i);
+			int id = pn.getPlanNodeId();
+			int pnTypeValue = pn.getPlanNodeType().getValue();
+			if( pnTypeValue == PlanNodeType.PROJECTION.getValue() ){
+				projNodes1.put( id, pn );
+			}
+			else if( pnTypeValue == PlanNodeType.LIMIT.getValue() ) {
+				limitNodes1.put( id, pn );
+			}
+			else if( pnTypeValue == PlanNodeType.ORDERBY.getValue() ) {
+				orderByNodes1.put( id, pn );
+			}
+			//get the inlinenodes
+			if( pn.getInlinePlanNode(PlanNodeType.PROJECTION) != null ) {
+				projInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.PROJECTION ));
+			} 
+			if( pn.getInlinePlanNode(PlanNodeType.LIMIT) != null) {
+				limitInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.LIMIT));
+			}
+			if( pn.getInlinePlanNode(PlanNodeType.ORDERBY) != null) {
+				limitInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
+			}
+		}
+		for( int i = 0; i<size2; i++ ) {
+			AbstractPlanNode pn = list2.get(i);
+			int id = pn.getPlanNodeId();
+			int pnTypeValue = pn.getPlanNodeType().getValue();
+			if( pnTypeValue == PlanNodeType.PROJECTION.getValue() ){
+				projNodes2.put( id, pn );
+			}
+			else if( pnTypeValue == PlanNodeType.LIMIT.getValue() ) {
+				limitNodes2.put( id, pn );
+			}
+			else if( pnTypeValue == PlanNodeType.ORDERBY.getValue() ) {
+				orderByNodes2.put( id, pn );
+			}
+			
+			//get the inlinenodes
+			if( pn.getInlinePlanNode(PlanNodeType.PROJECTION) != null ) {
+				projInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.PROJECTION ));
+			} 
+			if( pn.getInlinePlanNode(PlanNodeType.LIMIT) != null) {
+				limitInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.LIMIT));
+			}
+			if( pn.getInlinePlanNode(PlanNodeType.ORDERBY) != null) {
+				limitInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
+			}
+		}
+		//do the diff
+		ArrayList<Integer> indexList = new ArrayList<Integer>();
+		for( int index: projInlineNodes1.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Inline Projection Node was at: "+indexList );
+		indexList.clear();
+		for( int index: projInlineNodes2.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Inline Projection Node now at: "+indexList );
+		indexList.clear();
+		for( int index: limitInlineNodes1.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Inline Limit Node was at: "+indexList );
+		indexList.clear();
+		for( int index: limitInlineNodes2.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Inline Limit Node now at: "+indexList );
+		indexList.clear();
+		for( int index: orderByInlineNodes1.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Inline Order By Node was at: "+indexList );
+		indexList.clear();
+		for( int index: orderByInlineNodes2.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Inline Order By Node now at: "+indexList );
+		indexList.clear();
+		
+		//non-inline proj limit order by nodes
+		for( int index: projNodes1.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Projection Node was at: "+indexList );
+		indexList.clear();
+		for( int index: projNodes2.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Projection Node now at: "+indexList );
+		indexList.clear();
+		for( int index: limitNodes1.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Limit Node was at: "+indexList );
+		indexList.clear();
+		for( int index: limitNodes2.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Limit Node now at: "+indexList );
+		indexList.clear();
+		for( int index: orderByNodes1.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Order By Node was at: "+indexList );
+		indexList.clear();
+		for( int index: orderByNodes2.keySet() ) {
+			indexList.add(index);
+		}
+		System.out.println( "Order By Node now at: "+indexList );
+		indexList.clear();
 	}
 	
 	public static void diffLeaves( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ){

@@ -209,6 +209,31 @@ public class testPlannerTester extends TestCase {
 //			e.printStackTrace();
 //		}
 //    }
+    public void testGetLists() {
+    	AbstractPlanNode pn1 = null;
+        pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+        
+        ArrayList<AbstractPlanNode> pnlist = pn1.getLists();
+        
+        System.out.println( pn1.toExplainPlanString() );
+        System.out.println( pnlist.size() );
+        for( int i = 0; i<pnlist.size(); i++ ){
+        	System.out.println( pnlist.get(i).toJSONString() );
+        }
+        assertTrue( pnlist.size() == 6 );
+    }
+    
+    public void testDiffInlineNodes() {
+    	AbstractPlanNode pn1 = null;
+    	AbstractPlanNode pn2 = null;
+        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
+        pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+        //pn2 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+        pn2 = compile("select * from l where b = ?;", 3, true);
+        assertTrue(pn1 != null);
+        assertTrue(pn2 != null);
+        plannerTester.diffInlineNodes(pn1, pn2);
+    }
     
     public void testDiffLeaves() {
     	AbstractPlanNode pn1 = null;
@@ -216,7 +241,6 @@ public class testPlannerTester extends TestCase {
         //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
         pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
         pn2 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-        //pn2 = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
         //pn2 = compile("select * from l where b = ?;", 3, true);
         assertTrue(pn1 != null);
         assertTrue(pn2 != null);

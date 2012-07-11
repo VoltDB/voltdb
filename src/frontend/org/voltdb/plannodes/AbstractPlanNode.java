@@ -511,6 +511,28 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // NOTE: ignores inline nodes.
     }
+    
+    public ArrayList<AbstractPlanNode> getLists () {
+    	HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        getLists_recurse( collected, visited);
+        return collected;
+    }
+    
+    public void getLists_recurse(ArrayList<AbstractPlanNode> collected,
+            HashSet<AbstractPlanNode> visited) {
+    	if (visited.contains(this)) {
+            assert(false): "do not expect loops in plangraph.";
+            return;
+        }
+        visited.add(this);
+        collected.add(this);
+
+        for (AbstractPlanNode n : m_children)
+            n.getLists_recurse(collected, visited);
+
+        // NOTE: ignores inline nodes.
+    }
 
     /**
      * @param type plan node type to search for
