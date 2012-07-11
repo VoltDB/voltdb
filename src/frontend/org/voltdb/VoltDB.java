@@ -57,7 +57,7 @@ public class VoltDB {
     public static final String ANON_STMT_NAME = "sql";
 
     public enum START_ACTION {
-        CREATE, RECOVER, START
+        CREATE, RECOVER, START, REJOIN, LIVE_REJOIN
     }
 
     public static Charset UTF8ENCODING = Charset.forName("UTF-8");
@@ -117,12 +117,6 @@ public class VoltDB {
         /** port number to use for DR channel (override in the deployment file) */
         public int m_drAgentPortStart = -1;
 
-        /** information used to rejoin this new node to a cluster */
-        public String m_rejoinToHostAndPort = null;
-
-        /** Use the new rejoin code */
-        public boolean m_newRejoin = false;
-
         /** HTTP port can't be set here, but eventually value will be reflected here */
         public int m_httpPort = Integer.MAX_VALUE;
 
@@ -165,11 +159,6 @@ public class VoltDB {
         /** true if we're running the rejoin tests. Not used in production. */
         public boolean m_isRejoinTest = false;
 
-        // note that this value can be set two ways, either by specifiying the
-        // leaderport explicitly, or by setting the internalport without specifying
-        // the leaderport.
-        public Integer m_leaderPort = DEFAULT_INTERNAL_PORT;
-
         /** Behavior-less arg used to differentiate command lines from "ps" */
         public String m_tag;
 
@@ -188,9 +177,6 @@ public class VoltDB {
 
         public Configuration(String args[]) {
             String arg;
-
-            // check if the leaderport is explicitly set
-            boolean containsLeaderPortConfig = false;
 
             // Arguments are accepted in any order.
             //
@@ -271,27 +257,17 @@ public class VoltDB {
                 else if (arg.startsWith("internalinterface ")) {
                     m_internalInterface = arg.substring("internalinterface ".length()).trim();
                 }
-                else if (arg.equals("leaderport")) {
-                    m_leaderPort = Integer.valueOf(args[++i]);
-                    containsLeaderPortConfig = true;
-                }
-                else if (arg.startsWith("leaderport ")) {
-                    m_leaderPort = Integer.parseInt(arg.substring("leaderport ".length()));
-                    containsLeaderPortConfig = true;
-                }
-                else if (arg.equals("leader")) {
+                else if (arg.equals("host") || arg.equals("leader")) {
                     m_leader = args[++i].trim();
+                } else if (arg.startsWith("host")) {
+                    m_leader = arg.substring("host ".length()).trim();
                 } else if (arg.startsWith("leader")) {
                     m_leader = arg.substring("leader ".length()).trim();
                 }
-                else if (arg.equals("rejoinhost")) {
-                    m_rejoinToHostAndPort = args[++i].trim();
-                }
-                else if (arg.startsWith("rejoinhost ")) {
-                    m_rejoinToHostAndPort = arg.substring("rejoinhost ".length()).trim();
-                }
-                else if (arg.equals("newrejoin")) {
-                    m_newRejoin = true;
+                // Deprecated, use the "rejoin" start action
+                else if (arg.equals("rejoinhost") || arg.startsWith("rejoinhost ")) {
+                    usage(System.out);
+                    System.exit(-1);
                 }
 
                 else if (arg.equals("create")) {
@@ -300,6 +276,12 @@ public class VoltDB {
                     m_startAction = START_ACTION.RECOVER;
                 } else if (arg.equals("start")) {
                     m_startAction = START_ACTION.START;
+                } else if (arg.equals("rejoin")) {
+                    m_startAction = START_ACTION.REJOIN;
+                } else if (arg.startsWith("live rejoin")) {
+                    m_startAction = START_ACTION.LIVE_REJOIN;
+                } else if (arg.equals("live") && args.length > i + 1 && args[++i].trim().equals("rejoin")) {
+                    m_startAction = START_ACTION.LIVE_REJOIN;
                 }
 
                 else if (arg.equals("replica")) {
@@ -347,11 +329,6 @@ public class VoltDB {
                     usage();
                     System.exit(-1);
                 }
-
-                // set the leaderport to the internalport if leaderport isn't set explicitly
-                if (!containsLeaderPortConfig) {
-                    m_leaderPort = m_internalPort;
-                }
             }
 
             // ENG-3035 Warn if 'recover' action has a catalog since we won't
@@ -361,9 +338,14 @@ public class VoltDB {
                 hostLog.warn("Catalog is ignored for 'recover' action.");
             }
 
-            // ENG-2815 If deployment is null (the user wants the default) and
-            // leader is null, supply the only valid leader value ("localhost").
-            if (m_leader == null && m_pathToDeployment == null) {
+            /*
+             * ENG-2815 If deployment is null (the user wants the default) and
+             * the start action is not rejoin and leader is null, supply the
+             * only valid leader value ("localhost").
+             */
+            if (m_leader == null && m_pathToDeployment == null &&
+                (m_startAction != START_ACTION.REJOIN &&
+                 m_startAction != START_ACTION.LIVE_REJOIN)) {
                 m_leader = "localhost";
             }
         }
@@ -377,16 +359,15 @@ public class VoltDB {
         public boolean validate() {
             boolean isValid = true;
 
-            if (m_startAction != START_ACTION.START &&
-                m_rejoinToHostAndPort != null &&
+            if (m_startAction == START_ACTION.CREATE &&
                 m_pathToCatalog == null) {
                 isValid = false;
                 hostLog.fatal("The catalog location is missing.");
             }
 
-            if (m_leader == null && m_rejoinToHostAndPort == null) {
+            if (m_leader == null) {
                 isValid = false;
-                hostLog.fatal("The leader hostname is missing.");
+                hostLog.fatal("The hostname is missing.");
             }
 
             if (m_backend.isIPC) {
@@ -398,7 +379,7 @@ public class VoltDB {
             }
 
             // require deployment file location
-            if (m_rejoinToHostAndPort == null) {
+            if (m_startAction != START_ACTION.REJOIN && m_startAction != START_ACTION.LIVE_REJOIN) {
                 // require deployment file location (null is allowed to receive default deployment)
                 if (m_pathToDeployment != null && m_pathToDeployment.isEmpty()) {
                     isValid = false;
@@ -414,10 +395,10 @@ public class VoltDB {
                     }
                 }
             } else {
-                if (!m_isEnterprise && m_newRejoin) {
+                if (!m_isEnterprise && m_startAction == START_ACTION.LIVE_REJOIN) {
                     // pauseless rejoin is only available in pro
                     isValid = false;
-                    hostLog.fatal("Pauseless rejoin is only available in the Enterprise Edition");
+                    hostLog.fatal("Live rejoin is only available in the Enterprise Edition");
                 }
             }
 
@@ -438,12 +419,14 @@ public class VoltDB {
             // GettingStarted.pdf).
             String message = "";
             if (org.voltdb.utils.MiscUtils.isPro()) {
-                message = "Usage: voltdb create [leader <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
-                        + "       voltdb recover [leader <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
-                        + "       voltdb replica [leader <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n";
+                message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
+                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>] license <license.xml>\n"
+                        + "       voltdb replica [host <hostname>] [deployment <deployment.xml>] license <license.xml> catalog <catalog.jar>\n"
+                        + "       voltdb [live] rejoin host <hostname>\n";
             } else {
-                message = "Usage: voltdb create [leader <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>\n"
-                        + "       voltdb recover [leader <hostname>] [deployment <deployment.xml>]\n";
+                message = "Usage: voltdb create [host <hostname>] [deployment <deployment.xml>] catalog <catalog.jar>\n"
+                        + "       voltdb recover [host <hostname>] [deployment <deployment.xml>]\n"
+                        + "       voltdb rejoin host <hostname>\n";
             }
             os.print(message);
             // Log it to log4j as well, which will capture the output to a file for (hopefully never) cases where VEM has issues (it generates command lines).

@@ -41,7 +41,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader localhost 
+        license $LICENSE host localhost
 }
 
 # run the client that drives the example
@@ -50,7 +50,7 @@ function client() {
     $CSVLOADER -f $DATAFILES/items.txt \
 			-p InsertIntoItemAndBid \
          		--user program \
-         		--password pass 
+         		--password pass
     $CSVLOADER -f $DATAFILES/categories.txt \
                         -p InsertIntoCategory \
                         --user program \
@@ -58,7 +58,7 @@ function client() {
     $CSVLOADER -f $DATAFILES/users.txt \
                         -p InsertIntoUser \
                         --user program \
-                        --password pass 
+                        --password pass
     srccompile
     java -classpath obj:$CLASSPATH com.auctionexample.Client
 }

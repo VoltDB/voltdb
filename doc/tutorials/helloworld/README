@@ -17,10 +17,10 @@ The commands to process these files (not using run.sh) are the following:
         (create database)
 
   $ java -Djava.library.path=../../../voltdb/ org.voltdb.VoltDB \
-         leader localhost \
+         host localhost \
          catalog helloworld.jar \
          deployment deployment.xml \
-         license ../../../voltdb/license.xml 
+         license ../../../voltdb/license.xml
 
         (in a separate window, set default to the helloworld sample directory
          then set the class path and run the client application)
