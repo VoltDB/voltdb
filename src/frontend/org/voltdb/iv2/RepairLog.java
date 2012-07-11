@@ -35,6 +35,11 @@ public class RepairLog
     // last seen truncation point.
     long m_truncationPoint;
 
+    // last seen spHandle
+    // Initialize to Long MAX_VALUE to prevent feeding a newly joined node
+    // transactions it should never have seen
+    long m_lastSpHandle = Long.MAX_VALUE;
+
     // is this a partition leader?
     boolean m_isLeader = false;
 
@@ -88,6 +93,7 @@ public class RepairLog
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
             truncate(m.getTruncationHandle());
+            m_lastSpHandle = m.getSpHandle();
             m_log.offer(new Item(m, m.getSpHandle()));
         }
     }
@@ -108,6 +114,12 @@ public class RepairLog
             }
             break;
         }
+    }
+
+    // return the last seen SP handle
+    public long getLastSpHandle()
+    {
+        return m_lastSpHandle;
     }
 
     // produce the contents of the repair log.

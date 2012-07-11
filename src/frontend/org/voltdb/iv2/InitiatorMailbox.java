@@ -249,7 +249,7 @@ public class InitiatorMailbox implements Mailbox
                         req.getRequestId(),
                         0, // sequence
                         0, // total expected
-                        Long.MIN_VALUE, // spHandle
+                        m_repairLog.getLastSpHandle(), // spHandle
                         null); // no payload. just an ack.
             send(message.m_sourceHSId, response);
         }
