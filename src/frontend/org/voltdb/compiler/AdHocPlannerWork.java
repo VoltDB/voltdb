@@ -35,10 +35,11 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection, Object clientData,
             String sqlBatchText, List<String> sqlStatements, Object partitionParam, CatalogContext context,
-            boolean allowParameterization, final boolean inferSinglePartition)
+            boolean allowParameterization, final boolean inferSinglePartition,
+            AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, shouldShutdown, clientHandle, connectionId, hostname,
-              adminConnection, clientData);
+              adminConnection, clientData, completionHandler);
         this.sqlBatchText = sqlBatchText;
         this.sqlStatements = sqlStatements.toArray(new String[sqlStatements.size()]);
         this.partitionParam = partitionParam;
