@@ -30,7 +30,9 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
+import java.util.Map;
 
 import junit.framework.TestCase;
 
@@ -43,6 +45,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.PlanNodeTree;
+import org.voltdb.types.PlanNodeType;
 public class testPlannerTester extends TestCase {
     private PlannerTestAideDeCamp aide;
 
@@ -132,14 +135,27 @@ public class testPlannerTester extends TestCase {
     }
     
     public void testWriteAndLoad() {
-    	//AbstractPlanNode pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-    	AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
+    	AbstractPlanNode pn = null;
+    	// pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+    	pn = compile("select * from l where b = ? limit ?;", 3, true);
+    	// pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
     	PlanNodeTree pnt1 = new PlanNodeTree( pn );
     	System.out.println(pnt1.toJSONString());
+    	System.out.println(pnt1.getRootPlanNode().toExplainPlanString() );
     	String path = "/home/zhengli/prettyJson.txt";
     	plannerTester.writePlanToFile(pn, path);
     	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path);
     	System.out.println( pnt.toJSONString() );
+    	System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
+    	ArrayList<AbstractPlanNode> list1 = pnt1.getRootPlanNode().getLists();
+    	ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getLists();
+    	assertTrue( list1.size() == list2.size() );
+    	for( int i = 0; i < list1.size(); i++ ) {
+    		Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
+    		Map<PlanNodeType, AbstractPlanNode> inlineNodes2 = list2.get(i).getInlinePlanNodes();
+    		if(  inlineNodes1 != null )
+    			assertTrue( inlineNodes1.size() == inlineNodes2.size() );
+    	}
     }
     
 //    public void testLoadFromJSON() {
@@ -229,9 +245,11 @@ public class testPlannerTester extends TestCase {
         //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
         pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
         //pn2 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-        pn2 = compile("select * from l where b = ?;", 3, true);
+        pn2 = compile("select * from l where b = ? limit ?;", 3, true);
         assertTrue(pn1 != null);
         assertTrue(pn2 != null);
+        System.out.println( pn1.toExplainPlanString() );
+        System.out.println( pn2.toExplainPlanString() );
         plannerTester.diffInlineNodes(pn1, pn2);
     }
     
@@ -247,13 +265,11 @@ public class testPlannerTester extends TestCase {
         plannerTester.diffLeaves(pn1, pn2);
     }
     
-    public void testBatchDiffLeaves() {
+    public void testBatchDiff() {
     	int size = 7;
     	String pathBaseline = "/tmp/volttest/baseline1/testplans-plannerTester-ddl.plan";
     	String pathNew = "/tmp/volttest/new1/testplans-plannerTester-ddl.plan";
-    	for( int i = 0; i < size; i++ ) {
-    		plannerTester.batchDiffLeaves(pathBaseline+i, pathNew+i, size);
-    	}
+    	plannerTester.batchDiff(pathBaseline, pathNew, size);
     }
 }
 

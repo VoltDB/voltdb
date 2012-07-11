@@ -113,6 +113,10 @@ public class PlanNodeTree implements JSONString {
         stringer.endArray();
     }
     
+    public List<AbstractPlanNode> getNodeList() {
+    	return m_planNodes;
+    }
+    
     public void loadFromJSONArray( JSONArray jArray ) {
     	int size = jArray.length();
     	

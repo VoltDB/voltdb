@@ -52,12 +52,13 @@ public class plannerTester {
     	}
     }
     
-    //assumes single partition
+   
     public static void batchCompileSave( String ddl, String basename, String stmtFilePath, String savePath ) throws Exception {
     	setUpSchema( ddl, basename );
     	loadStmts( stmtFilePath );
     	int size = m_stmts.size();
     	for( int i = 0; i < size; i++ ) {
+    		 //assumes single partition
     		AbstractPlanNode pn = compile( m_stmts.get(i), 0, true);
     		writePlanToFile(pn, savePath+i );
     	}
@@ -116,14 +117,19 @@ public class plannerTester {
 		return pnt;
 	}
 	
-	//parameters : path to baseline and the new plans
-	public static void batchDiffLeaves( String pathBaseline, String pathNew, int size ) {
+	//parameters : path to baseline and the new plans 
+	//size : number of total files in the baseline directory
+	public static void batchDiff( String pathBaseline, String pathNew, int size ) {
 		PlanNodeTree pnt1 = null;
 		PlanNodeTree pnt2 = null;
 		for( int i = 0; i < size; i++ ){
-			pnt1 = loadPlanFromFile( pathBaseline );
-			pnt2  = loadPlanFromFile( pathNew );
-			diffLeaves(pnt1.getRootPlanNode(), pnt2.getRootPlanNode());
+			System.out.println("Statement "+i+":");
+			pnt1 = loadPlanFromFile( pathBaseline+i );
+			pnt2  = loadPlanFromFile( pathNew+i );
+			AbstractPlanNode pn1 = pnt1.getRootPlanNode();
+			AbstractPlanNode pn2 = pnt2.getRootPlanNode();
+			diffLeaves( pn1, pn2 );
+			diffInlineNodes( pn1, pn2);
 		}
 	}
 	
@@ -132,22 +138,8 @@ public class plannerTester {
 		ArrayList<AbstractPlanNode> list2 = newpn2.getLists();
 		int size1 = list1.size();
 		int size2 = list2.size();
-		int max = Math.max(size1, size2);
-		int min = Math.min(size1, size2);
 		if( size1 != size2 ) {
 			System.out.println( "Different plan tree size, used to be: "+size1+", now is: "+size2 );
-			//only consider the case that sizes are different for now 
-			//diff inline nodes
-			
-//			for( int i = 0; i < min; i++ ) {
-//				AbstractPlanNode pn1 = list1.get(i);
-//				AbstractPlanNode pn2 = list2.get(i);
-//				PlanNodeType pnType1 = pn1.getPlanNodeType();
-//				PlanNodeType pnType2 = pn2.getPlanNodeType();
-				
-//				Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
-//				Map<PlanNodeType, AbstractPlanNode> inlineNodes2 = list2.get(i).getInlinePlanNodes();
-//				}
 		}
 		Map<Integer, AbstractPlanNode> projNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		Map<Integer, AbstractPlanNode> projNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
@@ -182,7 +174,7 @@ public class plannerTester {
 				limitInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.LIMIT));
 			}
 			if( pn.getInlinePlanNode(PlanNodeType.ORDERBY) != null) {
-				limitInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
+				orderByInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
 			}
 		}
 		for( int i = 0; i<size2; i++ ) {
@@ -207,7 +199,7 @@ public class plannerTester {
 				limitInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.LIMIT));
 			}
 			if( pn.getInlinePlanNode(PlanNodeType.ORDERBY) != null) {
-				limitInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
+				orderByInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
 			}
 		}
 		//do the diff
@@ -294,18 +286,18 @@ public class plannerTester {
 					String nodeType1 = j1.getString("PLAN_NODE_TYPE");
 					String nodeType2 = j2.getString("PLAN_NODE_TYPE");
 					if( !table1.equalsIgnoreCase(table2) )
-						System.out.println("Different table at "+i+" used to be: "+nodeType1+" at "+table1+", now is: "+nodeType2+" at "+table2);
+						System.out.println("Different table at leaf "+i+" used to be: "+nodeType1+" at "+table1+", now is: "+nodeType2+" at "+table2);
 					else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
-						System.out.println("Different scan at "+i+" used to be: "+nodeType1+" at "+table1+", now is: "+nodeType2+" at "+table2);
+						System.out.println("Different scan at leaf "+i+" used to be: "+nodeType1+" at "+table1+", now is: "+nodeType2+" at "+table2);
 					}
 					else if ( nodeType1.equalsIgnoreCase("INDEXSCAN") ) {
 						String index1 = j1.getString("TARGET_INDEX_NAME");
 						String index2 = j2.getString("TARGET_INDEX_NAME");
 						if( !index1.equalsIgnoreCase(index2) )
-							System.out.println("Different index at "+i+" used to be: "+index1+", now is: "+index2);
+							System.out.println("Different index at leaf "+i+" used to be: "+index1+", now is: "+index2);
 					}
 					else
-						System.out.println("Same at "+i);
+						System.out.println("Same at leaf "+i);
 				}
 				//lists size are different
 				if( size2 < max ) {
@@ -316,7 +308,7 @@ public class plannerTester {
 						String index = null;
 						if( nodeType.equalsIgnoreCase("INDEXSCAN") )
 						  index = j.getString("TARGET_INDEX_NAME");
-						System.out.println("Different at "+i+" used to be table: "+table+" type :"+nodeType+" " +
+						System.out.println("Different at leaf "+i+" used to be table: "+table+" type :"+nodeType+" " +
 								" index: "+index+" now is empty");
 		 			}
 				}
@@ -328,10 +320,10 @@ public class plannerTester {
 						String index = null;
 						if( nodeType.equalsIgnoreCase("INDEXSCAN") ) {
 						  index = j.getString("TARGET_INDEX_NAME");
-						  System.out.println("Different at "+i+" used to be empty, now is :"+nodeType+" " + " at "+table+" on index "+index);
+						  System.out.println("Different at leaf "+i+" used to be empty, now is :"+nodeType+" " + " at "+table+" on index "+index);
 						}
 						else
-							System.out.println("Different at "+i+" used to be empty, now is :"+nodeType+" at "+table);
+							System.out.println("Different at leaf "+i+" used to be empty, now is :"+nodeType+" at "+table);
 		 			}
 				}
 				}
@@ -341,10 +333,10 @@ public class plannerTester {
 				}
 		}
 		else {
-			System.out.println("same size!");
+			System.out.println("same leaf size");
 			try{
 				if( max == 1 ) {
-					System.out.println("single table query~");
+					System.out.println("single table query");
 					JSONObject j1 = new JSONObject( list1.get(0).toJSONString() );
 					JSONObject j2 = new JSONObject( list2.get(0).toJSONString() );
 					String table1 = j1.getString("TARGET_TABLE_NAME");
@@ -386,7 +378,7 @@ public class plannerTester {
 							System.out.println("Different index at "+i+" used to be: "+index1+", now is: "+index2);
 					}
 					else
-						System.out.println("Same at "+i);
+						System.out.println("Same at leaf"+i);
 				}
 			}
 			}

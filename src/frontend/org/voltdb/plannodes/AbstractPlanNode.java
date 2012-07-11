@@ -693,30 +693,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 			if( jarray.length() != 0 ) {
 				PlanNodeTree pnt = new PlanNodeTree();
 				pnt.loadFromJSONArray(jarray);
-				loadInlineNodes(pnt);
+				List<AbstractPlanNode> list = pnt.getNodeList();
+				for( AbstractPlanNode pn : list ) {
+					 m_inlineNodes.put( pn.getPlanNodeType(), pn);
+				}
 			}
 		} catch (JSONException e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
-    }
-    
-    private void loadInlineNodes ( PlanNodeTree pnt ) {
-    	AbstractPlanNode pn = pnt.getRootPlanNode();
-    	HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        loadInlineNodes_recurse( pn, visited);
-    }
-    
-    public void loadInlineNodes_recurse( AbstractPlanNode pn, HashSet<AbstractPlanNode> visited) {
-    	if (visited.contains(this)) {
-            assert(false): "do not expect loops in plangraph.";
-            return;
-        }
-        visited.add(this);
-        m_inlineNodes.put( pn.getPlanNodeType(), pn);
-
-        for (AbstractPlanNode n : m_children)
-            n.loadInlineNodes_recurse( n, visited);
     }
 
     public String toExplainPlanString() {

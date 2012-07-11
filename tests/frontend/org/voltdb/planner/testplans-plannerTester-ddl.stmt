@@ -1,7 +1,7 @@
-select * from t where a = ?;
-select * from t where a > ?;
-select * from t where a < ?;
-select * from t where a > ? and a < ?;
 select * from t where a = ? limit ?;
-select * from l, t where l.b=t.b;
-select * from t order by a;
+select * from t where a > ? limit ?;
+select * from t where a < ? limit ?;
+select * from t where a > ? and a < ? limit ?;
+select * from t where a = ? limit ?;
+select * from l, t where l.b=t.b limit ?;
+select * from t order by a limit ?;
