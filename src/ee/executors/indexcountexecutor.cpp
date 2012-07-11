@@ -41,8 +41,7 @@ using namespace voltdb;
 bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         TempTableLimits* limits)
 {
-    //VOLT_TRACE("init IndexCount Executor");
-    printf("init IndexCount Executor\n");
+    VOLT_ERROR("init IndexCount Executor");
 
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
     assert(m_node);
@@ -59,8 +58,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     {
         column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
     }
-    printf("xin <IndexCount Executor> TupleSchema: '%s'\n", schema->debug().c_str());
-    //printf("xin <IndexCount Executor> column_names: '%s'\n", *(column_names[0]));
+    VOLT_ERROR("<IndexCount Executor> TupleSchema: '%s'", schema->debug().c_str());
 
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       m_node->getTargetTable()->name(),
@@ -266,15 +264,15 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     //
     AbstractExpression* post_expression = m_node->getPredicate();
     assert(post_expression == NULL);
-    /*
+
     if (post_expression != NULL)
     {
         if (m_needsSubstitutePostExpression) {
             post_expression->substitute(params);
         }
-        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
+        VOLT_ERROR("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
-    */
+
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
 
@@ -295,10 +293,10 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             // TODO(xin):
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            rkStart = m_index->getCounterGT(&m_searchKey);
+            rkStart = m_index->getCounterToKeyOrGreater(&m_searchKey);
         }
         else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            rkStart = m_index->getCounterGT(&m_searchKey);
+            rkStart = m_index->getCounterToKeyOrGreater(&m_searchKey);
             if (m_index->exists(&m_searchKey))
                 rkStart++;
         }
@@ -309,13 +307,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     assert(m_index->is_countable_index_);
     assert(post_expression == NULL);
-    printf("xin <IndexCount Executor> m_searchKey->: '%s'\n", m_searchKey.debug("T3").c_str());
     printf("xin <IndexCount Executor> m_index->getRank {{Start}}: '%d'\n", rkStart);
 
     if (end_expression != NULL)
     {
         ExpressionType localEndType = end_expression->getExpressionType();
-        printf("xin <IndexCount Executor> End expression {{end}}: '%s'\n", end_expression->debug().c_str()));
+        printf("xin <IndexCount Executor> End expression {{end}}: '%s'\n", end_expression->debug().c_str());
         if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHAN) {
 
         } else if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO) {

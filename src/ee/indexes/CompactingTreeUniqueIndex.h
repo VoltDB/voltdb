@@ -238,21 +238,38 @@ public:
         return !m_match.isNullTuple();
     }
 
+    int32_t getCounterGET(const TableTuple* searchKey) {
+        if (!hasRank) return -1;
+        printf("<Tree Unique-map> get counter equal or greater than --- \n");
+
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries.lowerBound(m_tmp1);
+        int cmp = KeyComparator(m_keyIter.key(), m_tmp1);
+        if (cmp < 0) {
+            return m_entries.size() + 1;
+        } else {
+            return m_entries.rankAsc(m_keyIter.key());
+        }
+    }
     int32_t getCounterLET(const TableTuple* searchKey) {
         if (!hasRank) return -1;
-        printf("<Tree Unique-map> get counter less or equal than --- \n");
+        printf("<Tree Unique-map> get counter equal or less than--- \n");
 
         m_tmp1.setFromKey(searchKey);
         m_keyIter = m_entries.lowerBound(m_tmp1);
-        return m_entries.rankAsc(m_keyIter.key());
-    }
-    int32_t getCounterGT(const TableTuple* searchKey) {
-        if (!hasRank) return -1;
-        printf("<Tree Unique-map> get counter bigger than--- \n");
+        int cmp = KeyComparator(m_keyIter.key(), m_tmp1);
 
-        m_tmp1.setFromKey(searchKey);
-        m_keyIter = m_entries.lowerBound(m_tmp1);
-        return m_entries.rankDes(m_keyIter.key());
+        if (cmp > 0) {
+            KeyType tmpKey = m_keyIter.key();
+            m_keyIter.movePrev();
+            if (m_keyIter.isEnd()) {
+                return m_entries.rankAsc(tmpKey);
+            } else {
+                return m_entries.rankAsc(m_keyIter.key());
+            }
+        } else {
+            return m_entries.rankAsc(m_keyIter.key());
+        }
     }
 
     size_t getSize() const { return static_cast<size_t>(m_entries.size()); }

@@ -220,21 +220,41 @@ public:
         return moveToKey(m_keyIter.second.key());
     }
 
-    int32_t getCounterLET(const TableTuple* searchKey) {
+    int32_t getUpperCounterGET(const TableTuple* searchKey) {
         if (!hasRank) return -1;
-        printf("<Tree Multimap> get counter less or equal than --- \n");
+        printf("<Tree Multimap---getUpperCounterGET> \n");
 
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
-        return m_entries.rankAsc(m_seqIter.key());
+        int cmp = KeyComparator(m_seqIter.key(), m_tmp1);
+        if (cmp < 0) {
+            return m_entries.size() + 1;
+        } else {
+            return m_entries.rankAsc(m_seqIter.key());
+        }
     }
-    int32_t getCounterGT(const TableTuple* searchKey) {
+    int32_t getlowerCounterGET(const TableTuple* searchKey) {
         if (!hasRank) return -1;
-        printf("<Tree Multimap> get counter bigger than--- \n");
-
+        printf("<Tree Multimap---getlowerCounterGET> \n");
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
-        return m_entries.rankDes(m_seqIter.key());
+        int cmp = KeyComparator(m_seqIter.key(), m_tmp1);
+        if (cmp < 0) {
+            return m_entries.size() + 1;
+        } else {
+            return m_entries.rankAsc(m_seqIter.key());
+        }
+    }
+
+    int32_t getUpperCounterLET(const TableTuple* searchKey) {
+        if (!hasRank) return -1;
+        printf("<Tree Multimap---getUpperCounterLET> \n");
+        return 1;
+    }
+    int32_t getlowerCounterLET(const TableTuple* searchKey) {
+        if (!hasRank) return -1;
+        printf("<Tree Multimap---getlowerCounterLET> \n");
+        return 1;
     }
 
     size_t getSize() const { return m_entries.size(); }

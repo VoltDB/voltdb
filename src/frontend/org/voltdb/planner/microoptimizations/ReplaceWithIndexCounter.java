@@ -82,20 +82,34 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if (idx.getCountable() == false)
             return plan;
 
-        IndexCountPlanNode icpn = new IndexCountPlanNode((IndexScanPlanNode)child);
-        icpn.setOutputSchema(plan.getOutputSchema());
+        IndexCountPlanNode icpn = null;
+        if (isReplaceable(child)) {
+            icpn = new IndexCountPlanNode((IndexScanPlanNode)child);
+            icpn.setOutputSchema(plan.getOutputSchema());
 
-        // TODO: I am not sure if there is a null case or not
-        if (plan.getParent(0) != null) {
-            plan.addIntermediary(plan.getParent(0));
+            // TODO: I am not sure if there is a null case or not
+            if (plan.getParent(0) != null) {
+                plan.addIntermediary(plan.getParent(0));
+            }
+
+            // TODO: set schema using plan's schema
+            //plan.getOutputSchema()
+            plan.removeFromGraph();
+            child.removeFromGraph();
+
+            return icpn;
         }
+        return plan;
+    }
 
-        // TODO: set schema using plan's schema
-        //plan.getOutputSchema()
-        plan.removeFromGraph();
-        child.removeFromGraph();
 
-        return icpn;
+    // TODO(xin): add more checkings to replace only certain cases.
+    boolean isReplaceable(AbstractPlanNode child) {
+        if ((child instanceof IndexScanPlanNode) == false)
+            return false;
+
+
+        return true;
     }
 
 }

@@ -144,10 +144,10 @@ public:
         return retval;
     }
 
-    int32_t getCounterLET(const TableTuple* searchKey) {
+    int32_t getCounterToKeyOrGreater(const TableTuple* searchKey) {
         return -1;
     }
-    int32_t getCounterGT(const TableTuple* searchKey) {
+    int32_t getCounterToKeyOrSmaller(const TableTuple* searchKey) {
         return -1;
     }
 

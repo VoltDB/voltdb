@@ -7,7 +7,8 @@ create index idx_1_COUNTER on T1 (POINTS);
 
 CREATE TABLE T2 (
 	ID INTEGER NOT NULL,
+	NAME VARCHAR(10) NOT NULL,
 	POINTS INTEGER NOT NULL,
 	PRIMARY KEY (ID)
 );
-create index idx_1_TREE on T2 (POINTS);
+create index idx_2_COUNTER on T2 (NAME,POINTS);

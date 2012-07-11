@@ -92,6 +92,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         m_lookupType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
+        m_endExpression = isp.m_endExpression;
+        m_predicate = isp.m_predicate;
     }
 
     @Override

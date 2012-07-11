@@ -53,14 +53,14 @@ public class TestCountingIndexSuite extends RegressionSuite {
     public void testIndexCount() throws Exception {
         Client client = getClient();
 
-        client.callProcedure("T3.insert", 1, 1);
-        client.callProcedure("T3.insert", 2, 2);
-        client.callProcedure("T3.insert", 3, 3);
-        client.callProcedure("T3.insert", 4, 4);
-        client.callProcedure("T3.insert", 5, 5);
-        client.callProcedure("T3.insert", 6, 6);
+        client.callProcedure("T1.insert", 1, 1);
+        client.callProcedure("T1.insert", 2, 2);
+        client.callProcedure("T1.insert", 3, 3);
+        client.callProcedure("T1.insert", 4, 4);
+        client.callProcedure("T1.insert", 5, 5);
+        client.callProcedure("T1.insert", 6, 6);
 
-        VoltTable[] results = client.callProcedure("CountingIndexFeature", 4).getResults();
+        VoltTable[] results = client.callProcedure("CountingIndexFeature", 2, 4).getResults();
 
         assertEquals(1, results.length);
 
@@ -68,7 +68,7 @@ public class TestCountingIndexSuite extends RegressionSuite {
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
 
-        assertEquals(table.getLong(0), 2);
+        assertEquals(1, table.getLong(0));
         assertTrue(true);
     }
 
@@ -90,6 +90,9 @@ public class TestCountingIndexSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
         project.addProcedures(PROCEDURES);
+        project.addPartitionInfo("T1", "ID");
+        project.addPartitionInfo("T2", "ID");
+        project.addPartitionInfo("T3", "ID");
 
         boolean success;
 
