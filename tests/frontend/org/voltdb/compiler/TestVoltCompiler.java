@@ -139,8 +139,8 @@ public class TestVoltCompiler extends TestCase {
         fbs = checkPartitionParam("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );",
                                   "org.voltdb.compiler.procedures.PartitionParamBigint", "PKEY_BIGINT");
         expectedError =
-            "Mismatch between partition column and partition parameter for procedure " +
-            "org.voltdb.compiler.procedures.PartitionParamBigint\n" +
+            "Type mismatch between partition column and partition parameter for procedure " +
+            "org.voltdb.compiler.procedures.PartitionParamBigint may cause overflow or loss of precision.\n" +
             "Partition column is type VoltType.BIGINT and partition parameter is type VoltType.STRING";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
@@ -148,8 +148,8 @@ public class TestVoltCompiler extends TestCase {
                 "org.voltdb.compiler.procedures.PartitionParamInteger",
                 "PKEY_INTEGER");
         expectedError =
-                    "Mismatch between partition column and partition parameter for procedure " +
-                    "org.voltdb.compiler.procedures.PartitionParamInteger\n" +
+                    "Type mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamInteger may cause overflow or loss of precision.\n" +
                     "Partition column is type VoltType.INTEGER and partition parameter " +
                     "is type VoltType.BIGINT";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -158,8 +158,8 @@ public class TestVoltCompiler extends TestCase {
                 "org.voltdb.compiler.procedures.PartitionParamSmallint",
                 "PKEY_SMALLINT");
         expectedError =
-                    "Mismatch between partition column and partition parameter for procedure " +
-                    "org.voltdb.compiler.procedures.PartitionParamSmallint\n" +
+                    "Type mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamSmallint may cause overflow or loss of precision.\n" +
                     "Partition column is type VoltType.SMALLINT and partition parameter " +
                     "is type VoltType.BIGINT";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -168,8 +168,8 @@ public class TestVoltCompiler extends TestCase {
                 "org.voltdb.compiler.procedures.PartitionParamTinyint",
                 "PKEY_TINYINT");
         expectedError =
-                    "Mismatch between partition column and partition parameter for procedure " +
-                    "org.voltdb.compiler.procedures.PartitionParamTinyint\n" +
+                    "Type mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamTinyint may cause overflow or loss of precision.\n" +
                     "Partition column is type VoltType.TINYINT and partition parameter " +
                     "is type VoltType.SMALLINT";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -178,8 +178,8 @@ public class TestVoltCompiler extends TestCase {
                 "org.voltdb.compiler.procedures.PartitionParamString",
                 "PKEY_STRING");
         expectedError =
-                    "Mismatch between partition column and partition parameter for procedure " +
-                    "org.voltdb.compiler.procedures.PartitionParamString\n" +
+                    "Type mismatch between partition column and partition parameter for procedure " +
+                    "org.voltdb.compiler.procedures.PartitionParamString may cause overflow or loss of precision.\n" +
                     "Partition column is type VoltType.STRING and partition parameter " +
                     "is type VoltType.INTEGER";
         assertTrue(isFeedbackPresent(expectedError, fbs));
@@ -1403,7 +1403,11 @@ public class TestVoltCompiler extends TestCase {
         boolean success = pb.compile(Configuration.getPathToCatalogForTest("test3324.jar"));
         assertTrue(success);
         List<String> diagnostics = pb.harvestDiagnostics();
-        // Enable to test ENG-3324, still at large: assertEquals(2, countStringsMatching(diagnostics, ".*\"UNDECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
+        // This asserts that the undeclared SP plans don't mistakenly get SP treatment
+        // -- they must each include a RECEIVE plan node.
+        assertEquals(2, countStringsMatching(diagnostics, ".*\"UNDECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
+        // This asserts that the methods used to prevent undeclared SP plans from getting SP treatment
+        // don't over-reach to declared SP plans.
         assertEquals(0, countStringsMatching(diagnostics, ".*\"SODECLARED.\".*\"PLAN_NODE_TYPE\":\"RECEIVE\".*"));
         // System.out.println("test3324MPPlan");
         // System.out.println(diagnostics);

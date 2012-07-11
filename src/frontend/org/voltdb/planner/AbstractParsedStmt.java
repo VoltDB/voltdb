@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
@@ -82,6 +83,8 @@ public abstract class AbstractParsedStmt {
     public HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
 
     public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
+
+    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
     //User specified join order, null if none is specified
     public String joinOrder = null;
@@ -551,6 +554,8 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     tableFilterList.put(table, exprs);
                 }
+                expr.m_isJoiningClause = false;
+                addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
             else if (tableSet.size() == 2) {
@@ -566,6 +571,8 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     joinSelectionList.put(pair, exprs);
                 }
+                expr.m_isJoiningClause = true;
+                addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
             else if (tableSet.size() > 2) {
@@ -661,6 +668,54 @@ public abstract class AbstractParsedStmt {
         ParameterInfo param = paramsById.get(paramId);
         assert(param != null);
         return param.index;
+    }
+
+    private void addExprToEquivalenceSets(AbstractExpression expr) {
+        // Ignore expressions that are not of COMPARE_EQUAL type
+        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return;
+        }
+
+        AbstractExpression leftExpr = expr.getLeft();
+        AbstractExpression rightExpr = expr.getRight();
+        // Can't use an expression based on a column value that is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return;
+        }
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return;
+        }
+
+        // Any two asserted-equal expressions need to map to the same equivalence set,
+        // which must contain them and must be the only such set that contains them.
+        Set<AbstractExpression> eqSet1 = null;
+        if (valueEquivalence.containsKey(leftExpr)) {
+            eqSet1 = valueEquivalence.get(leftExpr);
+        }
+        if (valueEquivalence.containsKey(rightExpr)) {
+            Set<AbstractExpression> eqSet2 = valueEquivalence.get(rightExpr);
+            if (eqSet1 == null) {
+                // Add new leftExpr into existing rightExpr's eqSet.
+                valueEquivalence.put(leftExpr, eqSet2);
+                eqSet2.add(leftExpr);
+            } else {
+                // Merge eqSets, re-mapping all the rightExpr's equivalents into leftExpr's eqset.
+                for (AbstractExpression eqMember : eqSet2) {
+                    eqSet1.add(eqMember);
+                    valueEquivalence.put(eqMember, eqSet1);
+                }
+            }
+        } else {
+            if (eqSet1 == null) {
+                // Both leftExpr and rightExpr are new -- add leftExpr to the new eqSet first.
+                eqSet1 = new HashSet<AbstractExpression>();
+                valueEquivalence.put(leftExpr, eqSet1);
+                eqSet1.add(leftExpr);
+            }
+            // Add new rightExpr into leftExpr's eqSet.
+            valueEquivalence.put(rightExpr, eqSet1);
+            eqSet1.add(rightExpr);
+        }
     }
 
 }
