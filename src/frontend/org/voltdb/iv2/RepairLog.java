@@ -17,13 +17,14 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
 import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
-import java.util.Queue;
 
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 /**
@@ -32,8 +33,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
  */
 public class RepairLog
 {
-    // last seen truncation point.
-    long m_truncationPoint;
+    private static final boolean IS_SP = true;
+    private static final boolean IS_MP = false;
 
     // last seen spHandle
     // Initialize to Long MAX_VALUE to prevent feeding a newly joined node
@@ -48,9 +49,11 @@ public class RepairLog
     {
         final VoltMessage m_msg;
         final long m_handle;
+        final boolean m_type;
 
-        Item(VoltMessage msg, long handle)
+        Item(boolean type, VoltMessage msg, long handle)
         {
+            m_type = type;
             m_msg = msg;
             m_handle = handle;
         }
@@ -64,14 +67,24 @@ public class RepairLog
         {
             return m_msg;
         }
+
+        boolean isSP()
+        {
+            return m_type == IS_SP;
+        }
+
+        boolean isMP()
+        {
+            return m_type == IS_MP;
+        }
     }
 
     // log storage.
-    final Queue<Item> m_log;
+    final List<Item> m_log;
 
     RepairLog()
     {
-        m_log = new LinkedList<Item>();
+        m_log = new ArrayList<Item>();
     }
 
     // leaders log differently
@@ -82,7 +95,7 @@ public class RepairLog
         // This call to setLeaderState() to promote us to the leader shouldn't
         // happen until after log repair is complete.
         if (m_isLeader) {
-            truncate(Long.MAX_VALUE);
+            truncate(Long.MAX_VALUE, Long.MAX_VALUE);
         }
     }
 
@@ -90,29 +103,36 @@ public class RepairLog
     // the repairLog if the message includes a truncation hint.
     public void deliver(VoltMessage msg)
     {
+        if (msg instanceof FragmentTaskMessage) {
+            final FragmentTaskMessage m = (FragmentTaskMessage)msg;
+            truncate(m.getTruncationHandle(), Long.MIN_VALUE);
+            m_log.add(new Item(IS_MP, m, m.getTxnId()));
+        }
         if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
-            truncate(m.getTruncationHandle());
             m_lastSpHandle = m.getSpHandle();
-            m_log.offer(new Item(m, m.getSpHandle()));
+            truncate(Long.MIN_VALUE, m.getTruncationHandle());
+            m_log.add(new Item(IS_SP, m, m.getSpHandle()));
         }
     }
 
     // trim unnecessary log messages.
-    private void truncate(long spHandle)
+    private void truncate(long mpHandle, long spHandle)
     {
         // MIN signals no truncation work to do.
-        if (spHandle == Long.MIN_VALUE) {
+        if (spHandle == Long.MIN_VALUE && mpHandle == Long.MIN_VALUE) {
             return;
         }
 
-        m_truncationPoint = spHandle;
-        while (!m_log.isEmpty()) {
-            if (m_log.peek().m_handle <= m_truncationPoint) {
-                m_log.poll();
-                continue;
+        Iterator<RepairLog.Item> it = m_log.iterator();
+        while (it.hasNext()) {
+            RepairLog.Item item = it.next();
+            if (item.isSP() && item.m_handle <= spHandle) {
+                it.remove();
             }
-            break;
+            else if (item.isMP() && item.m_handle <= mpHandle) {
+                it.remove();
+            }
         }
     }
 

@@ -31,6 +31,7 @@ import static org.mockito.Mockito.*;
 
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import junit.framework.TestCase;
 import org.junit.Test;
@@ -50,6 +51,16 @@ public class TestRepairLog extends TestCase
         return truncInitMsg(Long.MIN_VALUE, 0);
     }
 
+    VoltMessage truncFragMsg(long truncPt, long mpTxnId)
+    {
+        FragmentTaskMessage msg = mock(FragmentTaskMessage.class);
+        when(msg.getTxnId()).thenReturn(mpTxnId);
+        when(msg.getTruncationHandle()).thenReturn(truncPt);
+        return msg;
+    }
+
+
+    // a message that should never be logged.
     private static class FooMessage extends VoltMessage
     {
         @Override
@@ -121,6 +132,31 @@ public class TestRepairLog extends TestCase
     }
 
     @Test
+    public void testOfferFragmentTaskMessage()
+    {
+        RepairLog rl = new RepairLog();
+
+        // trunc(trunc point, txnId).
+        VoltMessage m1 = truncFragMsg(0L, 1L);
+        rl.deliver(m1);
+        assertEquals(1, rl.contents().size());
+
+        VoltMessage m2 = truncFragMsg(0L, 2L);
+        rl.deliver(m2);
+        assertEquals(2, rl.contents().size());
+
+        // trim m1. add m3
+        VoltMessage m3 = truncFragMsg(1L, 3L);
+        rl.deliver(m3);
+        assertEquals(2, rl.contents().size());
+        assertEquals(m2, rl.contents().get(0).getMessage());
+        assertEquals(2L, rl.contents().get(0).getSpHandle());
+        assertEquals(m3, rl.contents().get(1).getMessage());
+        assertEquals(3L, rl.contents().get(1).getSpHandle());
+    }
+
+
+    @Test
     public void testTruncationAfterPromotion()
     {
         RepairLog rl = new RepairLog();
@@ -132,4 +168,5 @@ public class TestRepairLog extends TestCase
         rl.setLeaderState(true);
         assertEquals(0, rl.contents().size());
     }
+
 }

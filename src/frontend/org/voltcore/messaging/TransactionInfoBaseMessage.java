@@ -110,7 +110,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return false;
     }
 
-
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
