@@ -271,7 +271,7 @@ public class TestClientInterface {
      * initiates the txn.
      */
     @Test
-    public void testFinishedAdHocPlanning() {
+    public void testFinishedAdHocPlanning() throws Exception {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
                                            any(StoredProcedureInvocation.class),
                                            anyBoolean(), anyBoolean(), anyBoolean(),
@@ -282,8 +282,7 @@ public class TestClientInterface {
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, 0, "localhost", false, null);
         plannedStmtBatch.addStatement("select * from a", null, null, false, false, null);
-        m_mb.deliver(new LocalObjectMessage(plannedStmtBatch));
-        m_ci.checkForFinishedCompilerWork();
+        m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
         ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
@@ -353,8 +352,7 @@ public class TestClientInterface {
         catalogResult.deploymentCRC = 1234l;
         catalogResult.expectedCatalogVersion = 3;
         catalogResult.encodedDiffCommands = "diff";
-        m_mb.deliver(new LocalObjectMessage(catalogResult));
-        m_ci.checkForFinishedCompilerWork();
+        m_ci.processFinishedCompilerWork(catalogResult).run();
 
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
         ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =

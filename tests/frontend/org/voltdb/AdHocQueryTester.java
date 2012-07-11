@@ -38,7 +38,6 @@ public abstract class AdHocQueryTester extends TestCase {
 
     // TODO: make an enum
     protected final int NOT_VALIDATING_SP_RESULT = 0;
-    protected final int SHOULD_BE_VALIDATING_SP_RESULT = 0; // Should be but not, due to shortfalls in the planner.
     protected final int VALIDATING_SP_RESULT = 1;
     protected final int VALIDATING_TOTAL_SP_RESULT = 2;
 
@@ -132,18 +131,15 @@ public abstract class AdHocQueryTester extends TestCase {
         runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        // TODO: SHOULD BE supporting this as an SP query
-        // -- requires more detailed tracking of seemingly irrelevant filters on replicated columns in AccessPath.tagForMultiPartitionAccess.
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, SHOULD_BE_VALIDATING_SP_RESULT);
+
+        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and A.REPPEDVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
 
         runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        // TODO: SHOULD BE supporting this as an SP query
-        // -- requires more detailed tracking of seemingly irrelevant filters on replicated columns in AccessPath.tagForMultiPartitionAccess.
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0, 0, 1, SHOULD_BE_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = 0 and B.REPPEDVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
 
@@ -151,26 +147,20 @@ public abstract class AdHocQueryTester extends TestCase {
         runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and A.PARTVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and A.REPPEDVAL = B.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        // TODO: SHOULD BE supporting this as an SP query
-        // -- requires more detailed tracking of seemingly irrelevant filters on replicated columns in AccessPath.tagForMultiPartitionAccess.
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, SHOULD_BE_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and A.PARTVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = 0 and A.REPPEDVAL = B.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
 
         runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = 0 and B.PARTVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
-        // TODO: SHOULD BE supporting this as an SP query
-        // -- requires more detailed tracking of seemingly irrelevant filters on replicated columns in AccessPath.tagForMultiPartitionAccess.
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0, 0, 1, SHOULD_BE_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.PARTVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = 0 and B.REPPEDVAL = A.REPPEDVAL;", 0, 0, 1, VALIDATING_SP_RESULT);
 
         runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = B.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        // TODO: SHOULD BE supporting this as an SP query
-        // -- requires more detailed tracking of seemingly irrelevant filters on replicated columns in AccessPath.tagForMultiPartitionAccess.
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and A.REPPEDVAL = 0;", 0, 0, 1, SHOULD_BE_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and A.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = B.REPPEDVAL and A.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
 
@@ -178,17 +168,13 @@ public abstract class AdHocQueryTester extends TestCase {
         runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE A.PARTVAL = B.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE A.REPPEDVAL = B.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        // TODO: SHOULD BE supporting this as an SP query
-        // -- requires more detailed tracking of seemingly irrelevant filters on replicated columns in AccessPath.tagForMultiPartitionAccess.
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, SHOULD_BE_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE A.PARTVAL = B.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE A.REPPEDVAL = B.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
 
         runQueryTest("SELECT * FROM PARTED1 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = A.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        // TODO: SHOULD BE supporting this as an SP query
-        // -- requires more detailed tracking of seemingly irrelevant filters on replicated columns in AccessPath.tagForMultiPartitionAccess.
-        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and A.REPPEDVAL = 0;", 0, 0, 1, SHOULD_BE_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and A.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and A.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and A.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
 
@@ -196,9 +182,7 @@ public abstract class AdHocQueryTester extends TestCase {
         runQueryTest("SELECT * FROM PARTED3 A, PARTED2 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM PARTED2 A, PARTED3 B WHERE B.PARTVAL = A.PARTVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, PARTED2 B WHERE B.PARTVAL = A.REPPEDVAL and B.PARTVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
-        // TODO: SHOULD BE supporting this as an SP query
-        // -- requires more detailed tracking of seemingly irrelevant filters on replicated columns in AccessPath.tagForMultiPartitionAccess.
-        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and B.REPPEDVAL = 0;", 0, 0, 1, SHOULD_BE_VALIDATING_SP_RESULT);
+        runQueryTest("SELECT * FROM PARTED2 A, REPPED1 B WHERE B.REPPEDVAL = A.PARTVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
         runQueryTest("SELECT * FROM REPPED1 A, REPPED2 B WHERE B.REPPEDVAL = A.REPPEDVAL and B.REPPEDVAL = 0;", 0, 0, 1, VALIDATING_SP_RESULT);
 
 /* These queries are not yet supported SP because of B's varying partition key.

@@ -369,6 +369,11 @@ SnapshotCompletionInterest {
         public Future<?> unregister() {
             return null;
         }
+
+        @Override
+        public void queueTask(Runnable r) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     /**

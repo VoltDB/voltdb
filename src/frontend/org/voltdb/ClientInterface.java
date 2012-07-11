@@ -88,6 +88,7 @@ import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
@@ -100,6 +101,10 @@ import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 import org.voltdb.utils.MiscUtils;
+
+import com.google.common.util.concurrent.ListenableFutureTask;
+import com.google.common.util.concurrent.MoreExecutors;
+
 import java.util.concurrent.locks.ReentrantLock;
 
 /**
@@ -163,6 +168,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     private final Map<String, List<InvocationAcceptancePolicy>> m_policies =
             new HashMap<String, List<InvocationAcceptancePolicy>>();
+
+    /*
+     * Allow the async compiler thread to immediately process completed planning tasks
+     * without waiting for the periodic work thread to poll the mailbox.
+     */
+    private final  AsyncCompilerWorkCompletionHandler m_adhocCompletionHandler = new AsyncCompilerWorkCompletionHandler() {
+        @Override
+        public void onCompletion(AsyncCompilerResult result) {
+            processFinishedCompilerWork(result);
+        }
+    };
 
     // clock time of last call to the initiator's tick()
     static final int POKE_INTERVAL = 1000;
@@ -1162,7 +1178,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     m_siteId,
                     false, task.clientHandle, handler.connectionId(),
                     handler.m_hostname, handler.isAdmin(), ccxn,
-                    sql, sqlStatements, partitionParam, null, false, true));
+                    sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1192,7 +1208,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new CatalogChangeWork(
                     m_siteId,
                     task.clientHandle, handler.connectionId(), handler.m_hostname,
-                    handler.isAdmin(), ccxn, catalogBytes, deploymentString));
+                    handler.isAdmin(), ccxn, catalogBytes, deploymentString,
+                    m_adhocCompletionHandler));
 
         // XXX: need to know the async compiler mailbox id.
         m_mailbox.send(m_plannerSiteId, work);
@@ -1608,105 +1625,140 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     }
 
-    final void checkForFinishedCompilerWork() {
-        VoltMessage message;
-        while ((message = m_mailbox.recv()) != null) {
+    /*
+     * Invoked from the AsyncCompilerWorkCompletionHandler from the AsyncCompilerAgent thread.
+     * Has the effect of immediately handing the completed work to the network thread of the
+     * client instance that created the work and then dispatching it.
+     */
+    public ListenableFutureTask<?> processFinishedCompilerWork(final AsyncCompilerResult result) {
+        /*
+         * Do the task in the network thread associated with the connection
+         * so that access to the CIHM can be lock free for fast path work.
+         * Can't access the CIHM from this thread without adding locking.
+         */
+        final Connection c = (Connection)result.clientData;
+        final ListenableFutureTask<?> ft = ListenableFutureTask.create(new Runnable() {
+            @Override
+            public void run() {
+                if (result.errorMsg == null) {
+                    if (result instanceof AdHocPlannedStmtBatch) {
+                        final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
+                        if (plannedStmtBatch.catalogVersion != m_catalogContext.get().catalogVersion) {
 
-            if (!(message instanceof LocalObjectMessage)) {
-                continue;
-            }
+                            /* The adhoc planner learns of catalog updates after the EE and the
+                               rest of the system. If the adhoc sql was planned against an
+                               obsolete catalog, re-plan. */
+                            LocalObjectMessage work = new LocalObjectMessage(
+                                    new AdHocPlannerWork(m_siteId,
+                                                         false,
+                                                         plannedStmtBatch.clientHandle,
+                                                         plannedStmtBatch.connectionId,
+                                                         plannedStmtBatch.hostname,
+                                                         plannedStmtBatch.adminConnection,
+                                                         plannedStmtBatch.clientData,
+                                                         plannedStmtBatch.sqlBatchText,
+                                                         plannedStmtBatch.getSQLStatements(),
+                                                         plannedStmtBatch.partitionParam,
+                                                         null,
+                                                         false,
+                                                         true,
+                                                         m_adhocCompletionHandler));
 
-            final LocalObjectMessage lom = (LocalObjectMessage)message;
-            if (!(lom.payload instanceof AsyncCompilerResult)) {
-                continue;
-            }
+                            // XXX: Need to know the async mailbox id.
+                            m_mailbox.send(Long.MIN_VALUE, work);
+                        }
+                        else {
+                            createAdHocTransaction(plannedStmtBatch);
+                        }
+                    }
+                    else if (result instanceof CatalogChangeResult) {
+                        final CatalogChangeResult changeResult = (CatalogChangeResult) result;
+                        // create the execution site task
+                        StoredProcedureInvocation task = new StoredProcedureInvocation();
+                        task.procName = "@UpdateApplicationCatalog";
+                        task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
+                                       changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                                       changeResult.deploymentCRC);
+                        task.clientHandle = changeResult.clientHandle;
 
-            final AsyncCompilerResult result = (AsyncCompilerResult)lom.payload;
-            if (result.errorMsg == null) {
-                if (result instanceof AdHocPlannedStmtBatch) {
-                    final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                    if (plannedStmtBatch.catalogVersion != m_catalogContext.get().catalogVersion) {
+                        /*
+                         * Round trip the invocation to initialize it for command logging
+                         */
+                        FastSerializer fs = new FastSerializer();
+                        try {
+                            fs.writeObject(task);
+                            ByteBuffer source = fs.getBuffer();
+                            ByteBuffer copy = ByteBuffer.allocate(source.remaining());
+                            copy.put(source);
+                            copy.flip();
+                            FastDeserializer fds = new FastDeserializer(copy);
+                            task = new StoredProcedureInvocation();
+                            task.readExternal(fds);
+                        } catch (Exception e) {
+                            hostLog.fatal(e);
+                            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+                        }
 
-                        /* The adhoc planner learns of catalog updates after the EE and the
-                           rest of the system. If the adhoc sql was planned against an
-                           obsolete catalog, re-plan. */
-                        LocalObjectMessage work = new LocalObjectMessage(
-                                new AdHocPlannerWork(m_siteId,
-                                                     false,
-                                                     plannedStmtBatch.clientHandle,
-                                                     plannedStmtBatch.connectionId,
-                                                     plannedStmtBatch.hostname,
-                                                     plannedStmtBatch.adminConnection,
-                                                     plannedStmtBatch.clientData,
-                                                     plannedStmtBatch.sqlBatchText,
-                                                     plannedStmtBatch.getSQLStatements(),
-                                                     plannedStmtBatch.partitionParam,
-                                                     null,
-                                                     false,
-                                                     true));
-
-                        // XXX: Need to know the async mailbox id.
-                        m_mailbox.send(Long.MIN_VALUE, work);
+                        // initiate the transaction. These hard-coded values from catalog
+                        // procedure are horrible, horrible, horrible.
+                        createTransaction(changeResult.connectionId, changeResult.hostname,
+                                changeResult.adminConnection,
+                                task, false, true, true, m_allPartitions,
+                                m_allPartitions.length, changeResult.clientData, 0,
+                                EstTime.currentTimeMillis(), false);
                     }
                     else {
-                        createAdHocTransaction(plannedStmtBatch);
+                        throw new RuntimeException(
+                                "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
                     }
-                }
-                else if (result instanceof CatalogChangeResult) {
-                    final CatalogChangeResult changeResult = (CatalogChangeResult) result;
-                    // create the execution site task
-                    StoredProcedureInvocation task = new StoredProcedureInvocation();
-                    task.procName = "@UpdateApplicationCatalog";
-                    task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
-                                   changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                   changeResult.deploymentCRC);
-                    task.clientHandle = changeResult.clientHandle;
-
-                    /*
-                     * Round trip the invocation to initialize it for command logging
-                     */
-                    FastSerializer fs = new FastSerializer();
-                    try {
-                        fs.writeObject(task);
-                        ByteBuffer source = fs.getBuffer();
-                        ByteBuffer copy = ByteBuffer.allocate(source.remaining());
-                        copy.put(source);
-                        copy.flip();
-                        FastDeserializer fds = new FastDeserializer(copy);
-                        task = new StoredProcedureInvocation();
-                        task.readExternal(fds);
-                    } catch (Exception e) {
-                        hostLog.fatal(e);
-                        VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-                    }
-
-                    // initiate the transaction. These hard-coded values from catalog
-                    // procedure are horrible, horrible, horrible.
-                    createTransaction(changeResult.connectionId, changeResult.hostname,
-                            changeResult.adminConnection,
-                            task, false, true, true, m_allPartitions,
-                            m_allPartitions.length, changeResult.clientData, 0,
-                            EstTime.currentTimeMillis(), false);
                 }
                 else {
-                    throw new RuntimeException(
-                            "Should not be able to get here (ClientInterface.checkForFinishedCompilerWork())");
+                    ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(
+                                ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0], result.errorMsg,
+                                result.clientHandle);
+                    ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    errorResponse.flattenToBuffer(buf);
+                    buf.flip();
+                    c.writeStream().enqueue(buf);
                 }
             }
-            else {
-                ClientResponseImpl errorResponse =
-                    new ClientResponseImpl(
-                            ClientResponseImpl.UNEXPECTED_FAILURE,
-                            new VoltTable[0], result.errorMsg,
-                            result.clientHandle);
-                final Connection c = (Connection) result.clientData;
-                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
-                buf.putInt(buf.capacity() - 4);
-                errorResponse.flattenToBuffer(buf);
-                buf.flip();
-                c.writeStream().enqueue(buf);
-            }
+        }, null);
+        if (c != null) {
+            c.queueTask(ft);
         }
+
+        /*
+         * Add error handling in case of an unexpected exception
+         */
+        ft.addListener(new Runnable() {
+            @Override
+            public void run() {
+                try {
+                     ft.get();
+                } catch (Exception e) {
+                    StringWriter sw = new StringWriter();
+                    PrintWriter pw = new PrintWriter(sw);
+                    e.printStackTrace(pw);
+                    pw.flush();
+                    ClientResponseImpl errorResponse =
+                            new ClientResponseImpl(
+                                    ClientResponseImpl.UNEXPECTED_FAILURE,
+                                    new VoltTable[0], result.errorMsg,
+                                    result.clientHandle);
+                    ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                    buf.putInt(buf.capacity() - 4);
+                    errorResponse.flattenToBuffer(buf);
+                    buf.flip();
+                    c.writeStream().enqueue(buf);
+                }
+            }
+        }, MoreExecutors.sameThreadExecutor());
+
+        //Return the future task for test code
+        return ft;
     }
 
     /**
@@ -1741,9 +1793,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 mayActivateSnapshotDaemon();
             }
         }
-
-        // poll planner queue
-        checkForFinishedCompilerWork();
 
         return;
     }
@@ -1974,6 +2023,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             {
                 log.error("Something is using buffer chains with enqueue");
             }
+        }
+
+        @Override
+        public void queueTask(Runnable r) {
+            throw new UnsupportedOperationException();
         }
     }
 
