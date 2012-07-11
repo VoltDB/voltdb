@@ -185,11 +185,12 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now) {
+                                      long now,
+                                      boolean allowMismatchedResults) {
             createTransaction(connectionId, connectionHostname, adminConnection,
                               0, invocation, isReadOnly, isSinglePartition,
                               isEverySite, partitions, numPartitions,
-                              clientData, messageSize, now);
+                              clientData, messageSize, now, allowMismatchedResults);
             return true;
         }
 
@@ -206,7 +207,8 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       int numPartitions,
                                       Object clientData,
                                       int messageSize,
-                                      long now) {
+                                      long now,
+                                      boolean allowMismatchedResults) {
             String procName = invocation.procName;
             if (!procCounts.containsKey(procName)) {
                 m_unexpectedSPIs.add(procName);

@@ -214,7 +214,7 @@ public class TestClientInterface {
                                            any(StoredProcedureInvocation.class),
                                            anyBoolean(), anyBoolean(), anyBoolean(),
                                            any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong())).thenReturn(true);
+                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
 
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
@@ -226,8 +226,10 @@ public class TestClientInterface {
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
                                               invocationCaptor.capture(),
                                               boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(), partitionCaptor.capture(),
-                                              anyInt(), anyObject(), anyInt(), anyLong());
+                                              boolCaptor.capture(),
+                                              partitionCaptor.capture(),
+                                              anyInt(), anyObject(), anyInt(), anyLong(),
+                                              boolCaptor.capture());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertEquals(isAdmin, boolValues.get(0)); // is admin
         assertEquals(isReadonly, boolValues.get(1)); // readonly
@@ -274,12 +276,12 @@ public class TestClientInterface {
                                            any(StoredProcedureInvocation.class),
                                            anyBoolean(), anyBoolean(), anyBoolean(),
                                            any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong())).thenReturn(true);
+                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
 
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
                 "select * from a", null, 0, 0, 0, "localhost", false, null);
-        plannedStmtBatch.addStatement("select * from a", null, null, false, null);
+        plannedStmtBatch.addStatement("select * from a", null, null, false, false, null);
         m_mb.deliver(new LocalObjectMessage(plannedStmtBatch));
         m_ci.checkForFinishedCompilerWork();
 
@@ -289,8 +291,10 @@ public class TestClientInterface {
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
                                               invocationCaptor.capture(),
                                               boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(), any(int[].class),
-                                              anyInt(), anyObject(), anyInt(), anyLong());
+                                              boolCaptor.capture(),
+                                              any(int[].class), anyInt(),
+                                              anyObject(), anyInt(), anyLong(),
+                                              boolCaptor.capture());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
         assertTrue(boolValues.get(1));  // readonly
@@ -335,7 +339,7 @@ public class TestClientInterface {
                                            any(StoredProcedureInvocation.class),
                                            anyBoolean(), anyBoolean(), anyBoolean(),
                                            any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong())).thenReturn(true);
+                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
 
         CatalogChangeResult catalogResult = new CatalogChangeResult();
         catalogResult.clientData = null;
@@ -358,8 +362,10 @@ public class TestClientInterface {
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
                                               invocationCaptor.capture(),
                                               boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(), any(int[].class),
-                                              anyInt(), anyObject(), anyInt(), anyLong());
+                                              boolCaptor.capture(),
+                                              any(int[].class),
+                                              anyInt(), anyObject(), anyInt(), anyLong(),
+                                              boolCaptor.capture());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
         assertFalse(boolValues.get(1)); // readonly

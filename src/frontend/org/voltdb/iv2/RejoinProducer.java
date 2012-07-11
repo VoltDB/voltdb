@@ -174,7 +174,7 @@ public class RejoinProducer extends SiteTasker
 
         // request a blocking snapshot.
         SnapshotUtil.requestSnapshot(0l, "", nonce, true,
-                                     SnapshotFormat.STREAM, data, m_handler);
+                                     SnapshotFormat.STREAM, data, m_handler, true);
 
         // There are problems here, Chester. First, the site thread needs
         // to stay unblocked until the first data block is available. So,

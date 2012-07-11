@@ -162,16 +162,18 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      * @param aggregatorFragment    aggregator fragment
      * @param collectorFragment     collector fragment
      * @param isReplicatedTableDML  replicated table DML flag
+     * @param isNonDeterministic    non-deterministic SQL flag
      * @return                      statement object
      */
     public void addStatement(String sqlStatement, String aggregatorFragment,
                              String collectorFragment, boolean isReplicatedTableDML,
-                             List<ParameterInfo> params) {
+                             boolean isNonDeterministic, List<ParameterInfo> params) {
         AdHocPlannedStatement plannedStmt = new AdHocPlannedStatement(
                                                         sqlStatement,
                                                         aggregatorFragment,
                                                         collectorFragment,
                                                         isReplicatedTableDML,
+                                                        isNonDeterministic,
                                                         partitionParam,
                                                         catalogVersion);
         // The first non-select statement makes it not read-only.

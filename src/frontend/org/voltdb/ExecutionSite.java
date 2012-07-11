@@ -36,6 +36,7 @@ import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
@@ -504,16 +505,18 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
             final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
-            /*
-             * The logged txn count will be greater than the replayed txn count
-             * because some logged ones were before the stream snapshot
-             */
-            final long duration = (System.currentTimeMillis() - m_taskExeStartTime) / 1000;
-            final long throughput = duration == 0 ? m_executedTaskCount : m_executedTaskCount / duration;
-            m_recoveryLog.info("Logged " + m_loggedTaskCount + " tasks");
-            m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks in " +
-                    duration + " seconds at a rate of " +
-                    throughput + " tasks/second");
+            if (newRejoin) {
+                /*
+                 * The logged txn count will be greater than the replayed txn count
+                 * because some logged ones were before the stream snapshot
+                 */
+                final long duration = (System.currentTimeMillis() - m_taskExeStartTime) / 1000;
+                final long throughput = duration == 0 ? m_executedTaskCount : m_executedTaskCount / duration;
+                m_recoveryLog.info("Logged " + m_loggedTaskCount + " tasks");
+                m_recoveryLog.info("Executed " + m_executedTaskCount + " tasks in " +
+                        duration + " seconds at a rate of " +
+                        throughput + " tasks/second");
+            }
             m_recoveryProcessor = null;
             m_rejoinSnapshotProcessor = null;
             m_rejoinSnapshotTxnId = -1;
@@ -1034,6 +1037,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     } else {
                         //idle, do snapshot work
                         m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        // do some rejoin work
+                        doRejoinWork();
                     }
                 }
                 if (currentTxnState != null) {
@@ -1268,10 +1273,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         int partition = getCorrespondingPartitionId();
         long sourceSite = 0;
         List<Long> sourceSites = new ArrayList<Long>(m_tracker.getSitesForPartition(partition));
-        sourceSites.remove(getSiteId());
-        try {
-            sourceSite = sourceSites.get(0);
-        } catch (ArrayIndexOutOfBoundsException e) {
+        // Order the sites by host ID so that we won't get one that's still rejoining
+        TreeMap<Integer, Long> orderedSourceSites = new TreeMap<Integer, Long>();
+        for (long HSId : sourceSites) {
+            orderedSourceSites.put(CoreUtils.getHostIdFromHSId(HSId), HSId);
+        }
+        orderedSourceSites.remove(CoreUtils.getHostIdFromHSId(getSiteId()));
+        if (!orderedSourceSites.isEmpty()) {
+            sourceSite = orderedSourceSites.pollFirstEntry().getValue();
+        } else {
             VoltDB.crashLocalVoltDB("No source for partition " + partition,
                                     false, null);
         }
@@ -1316,6 +1326,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
                 VoltTable[] results = resp.getResults();
                 if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                    if (SnapshotUtil.isSnapshotQueued(results)) {
+                        m_recoveryLog.debug("Rejoin snapshot queued, waiting...");
+                        return;
+                    }
+
                     long txnId = -1;
                     String appStatus = resp.getAppStatusString();
                     if (appStatus == null) {
@@ -1332,6 +1347,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         return;
                     }
 
+                    m_recoveryLog.debug("Received rejoin snapshot txnId " + txnId);
+
                     // Send a message to self to avoid synchronization
                     RejoinMessage msg = new RejoinMessage(txnId);
                     m_mailbox.send(getSiteId(), msg);
@@ -1344,7 +1361,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         String nonce = "Rejoin_" + getSiteId() + "_" + System.currentTimeMillis();
         SnapshotUtil.requestSnapshot(0l, "", nonce, false,
-                                     SnapshotFormat.STREAM, data, handler);
+                                     SnapshotFormat.STREAM, data, handler, true);
 
         return null;
     }
@@ -1363,6 +1380,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (m_rejoinTaskLog != null) {
                 m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
             }
+            m_rejoinSnapshotProcessor.startCountDown();
             VoltDB.instance().getSnapshotCompletionMonitor()
                   .addInterest(m_snapshotCompletionHandler);
         } else {
@@ -1469,7 +1487,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         //hostLog.info("not logging transaction that didn't write");
                     }
                 } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Failed to log task message", true, e);
+                    VoltDB.crashLocalVoltDB("Failed to log task message", false, e);
                 }
             }
 

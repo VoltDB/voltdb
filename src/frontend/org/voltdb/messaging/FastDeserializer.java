@@ -268,14 +268,21 @@ public class FastDeserializer implements DataInput {
             throw new IOException("Array length is negative " + count);
         }
         if (type == byte.class) {
-            if (count > (1024 * 1024)) {
+            if (count > (VoltType.MAX_VALUE_LENGTH)) {
                 throw new IOException("Array length is greater then the max of 1 megabyte " + count);
             }
         }
         if (type == byte.class) {
             final byte[] retval = new byte[count];
+            readFully(retval);
+            return retval;
+        }
+        if (type == byte[].class) {
+            final byte[][] retval = new byte[count][];
             for (int i = 0; i < count; i++) {
-                retval[i] = readByte();
+                int size = readInt();
+                retval[i] = new byte[size];
+                readFully(retval[i]);
             }
             return retval;
         }

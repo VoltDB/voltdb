@@ -211,6 +211,9 @@ public class SnapshotSave extends VoltSystemProcedure
                                 + file_path + ", " + file_nonce);
 
                 if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
+                    HOST_LOG.debug("Snapshot in progress, " +
+                            SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() +
+                            " sites are still snapshotting");
                     result.addRow(
                                   context.getHostId(),
                                   hostname,
