@@ -104,7 +104,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
     final AgreementTxnIdSafetyState m_safetyState;
     private volatile boolean m_shouldContinue = true;
     private volatile boolean m_recovering = false;
-    private static final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
+    private static final VoltLogger m_recoveryLog = new VoltLogger("JOIN");
     private static final VoltLogger m_agreementLog = new VoltLogger("AGREEMENT");
     private long m_minTxnIdAfterRecovery = Long.MIN_VALUE;
     private final CountDownLatch m_shutdownComplete = new CountDownLatch(1);
