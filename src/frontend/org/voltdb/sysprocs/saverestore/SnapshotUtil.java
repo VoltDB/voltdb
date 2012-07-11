@@ -989,6 +989,11 @@ public class SnapshotUtil {
                 throw new UnsupportedOperationException();
             }
 
+            @Override
+            public void queueTask(Runnable r) {
+                throw new UnsupportedOperationException();
+            }
+
         };
 
         final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();

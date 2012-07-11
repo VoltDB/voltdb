@@ -95,32 +95,6 @@ public abstract class VoltTypeUtil {
         return (ret);
     }
 
-    /*
-     * Determine if a cast is allowable w/o loss of precision
-     * for index key comparison.
-     */
-    public static boolean isAllowableCastForKeyComparator(VoltType to, VoltType from) {
-        // self to self cast is obviously fine.
-        if (from == to)
-            return true;
-
-        if (from.isInteger()) {
-            if (to.isInteger()) {
-                // This allows integers getting smaller.
-                // The new EE handling for overflow/underflow rocks this case.
-                return true;
-            }
-            else if (to == VoltType.FLOAT) {
-                // Non-big integers make acceptable (exact) floats
-                if (from != VoltType.BIGINT) {
-                    return true;
-                }
-            }
-            // Not sure about integer-to-decimal: for now, just give up.
-        }
-        return false;
-    }
-
     public static VoltType determineImplicitCasting(VoltType left, VoltType right) {
         //
         // Make sure both are valid

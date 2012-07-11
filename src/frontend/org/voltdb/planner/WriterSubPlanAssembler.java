@@ -36,10 +36,10 @@ import org.voltdb.plannodes.AbstractPlanNode;
 public class WriterSubPlanAssembler extends SubPlanAssembler {
 
     /** The only table involved in this update or delete stmt */
-    Table m_targetTable;
+    final Table m_targetTable;
 
     /** The list of generated plans. This allows generation in batches.*/
-    ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<AbstractPlanNode>();
+    final ArrayDeque<AbstractPlanNode> m_plans = new ArrayDeque<AbstractPlanNode>();
 
     /** Only create access plans once - all are created in the first pass. */
     boolean m_generatedPlans = false;
@@ -68,11 +68,6 @@ public class WriterSubPlanAssembler extends SubPlanAssembler {
             m_generatedPlans = true;
             Table nextTables[] = new Table[0];
             ArrayList<AccessPath> paths = getRelevantAccessPathsForTable(m_targetTable, nextTables);
-            if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_partitioning.getCountOfPartitionedTables() > 0) {
-                m_partitioning.setEffectiveValue(null);
-                // Search the one partitioned table for a constant- or parameter-based equality filter that would justify SP processing.
-                AccessPath.tagForMultiPartitionAccess(new Table[] { m_targetTable }, new AccessPath[] { paths.get(0) }, m_partitioning);
-            }
             // for each access path
             for (AccessPath accessPath : paths) {
                 // get a plan

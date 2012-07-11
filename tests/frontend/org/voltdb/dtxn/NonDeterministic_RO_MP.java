@@ -21,29 +21,23 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.failureprocs;
+package org.voltdb.dtxn;
 
 import org.voltdb.ProcInfo;
 import org.voltdb.SQLStmt;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 @ProcInfo (
     singlePartition = false
 )
-public class ProcSPNoncandidate4 extends VoltProcedure {
+public class NonDeterministic_RO_MP extends VoltProcedure {
 
-    public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = ?");
-    // Additional query against partitioned table with parameterized where clause only on replicated table
-    // should discourage use of SP processing.
-    public static final SQLStmt spoiler =
-            new SQLStmt("select count(*) from blah, indexed_blah where blah.sval = indexed_blah.sval and indexed_blah.ival = ?");
+    public static final SQLStmt sql = new SQLStmt("select * from kv");
 
-    public long run(int i) {
-        voltQueueSQL(query, i);
-        voltQueueSQL(spoiler, i);
-        voltExecuteSQL();
-        // zero is a successful return
-        return 0;
+    public VoltTable run() {
+        voltQueueSQL(sql);
+        return voltExecuteSQL()[0];
     }
 
 }

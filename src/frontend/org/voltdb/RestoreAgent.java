@@ -369,6 +369,11 @@ SnapshotCompletionInterest {
         public Future<?> unregister() {
             return null;
         }
+
+        @Override
+        public void queueTask(Runnable r) {
+            throw new UnsupportedOperationException();
+        }
     }
 
     /**
@@ -1112,7 +1117,8 @@ SnapshotCompletionInterest {
                                           restoreProc.getEverysite(),
                                           m_allPartitions, m_allPartitions.length,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis());
+                                          EstTime.currentTimeMillis(),
+                                          false);
         } else {
             m_initiator.createTransaction(-1, "CommandLog", true,
                                           txnId, spi,
@@ -1121,7 +1127,8 @@ SnapshotCompletionInterest {
                                           restoreProc.getEverysite(),
                                           m_allPartitions, m_allPartitions.length,
                                           m_restoreAdapter, 0,
-                                          EstTime.currentTimeMillis());
+                                          EstTime.currentTimeMillis(),
+                                          false);
         }
     }
 

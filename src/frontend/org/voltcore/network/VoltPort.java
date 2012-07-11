@@ -434,4 +434,9 @@ public class VoltPort implements Connection
         return m_network.unregisterChannel(this);
     }
 
+    @Override
+    public void queueTask(Runnable r) {
+        m_network.queueTask(r);
+    }
+
 }

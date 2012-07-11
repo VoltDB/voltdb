@@ -17,6 +17,8 @@
 
 package org.voltdb.compiler;
 
+import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
+
 public class CatalogChangeWork extends AsyncCompilerWork {
     private static final long serialVersionUID = -5257248292283453286L;
 
@@ -26,10 +28,12 @@ public class CatalogChangeWork extends AsyncCompilerWork {
     public CatalogChangeWork(
             long replySiteId,
             long clientHandle, long connectionId, String hostname, boolean adminConnection,
-            Object clientData, byte[] catalogBytes, String deploymentString)
+            Object clientData, byte[] catalogBytes, String deploymentString,
+            AsyncCompilerWorkCompletionHandler completionHandler)
     {
         super(replySiteId, false, clientHandle, connectionId, hostname,
-              adminConnection, clientData);
+              adminConnection, clientData,
+              completionHandler);
         this.catalogBytes = catalogBytes.clone();
         this.deploymentString = deploymentString;
     }
