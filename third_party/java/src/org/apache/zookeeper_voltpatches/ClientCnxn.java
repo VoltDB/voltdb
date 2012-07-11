@@ -100,7 +100,7 @@ public class ClientCnxn {
             LOG.debug("zookeeper.disableAutoWatchReset is "
                     + disableAutoWatchReset);
         }
-        packetLen = Integer.getInteger("jute.maxbuffer", 4096 * 1024);
+        packetLen = Integer.getInteger("jute.maxbuffer", BinaryInputArchive.MAX_BUFFER_SIZE);
     }
 
     private final ArrayList<InetSocketAddress> serverAddrs = new ArrayList<InetSocketAddress>();

@@ -338,11 +338,13 @@ public class TestZK extends ZKTestBase {
         zk3.close();
     }
 
-//    @Test
-//    public void testMassiveNode() throws Exception {
-//        ZooKeeper zk = getClient(0);
-//        byte bytes[] = new byte[1048400];
-//        zk.create("/bar", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-//        zk.create("/foo", bytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-//    }
+    @Test
+    public void testMassiveNode() throws Exception {
+        ZooKeeper zk = getClient(0);
+//        byte bytes[] = new byte[50331648];
+        byte bytes[] = new byte[40000000];
+        zk.create("/bar", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        zk.create("/foo", bytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+        zk.getData("/foo", false, null);
+    }
 }

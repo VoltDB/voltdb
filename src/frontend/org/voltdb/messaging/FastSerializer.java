@@ -24,6 +24,7 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.voltcore.utils.DBBPool;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.VoltTable;
@@ -227,7 +228,7 @@ public class FastSerializer implements DataOutput {
      * wrapping the byte buffer.
      */
     public static void writeString(String string, ByteBuffer buffer) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
+        final int MAX_LENGTH = BinaryInputArchive.MAX_BUFFER_SIZE;
         final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
             buffer.putInt(NULL_STRING_INDICATOR);
@@ -259,7 +260,7 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeString(String string) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
+        final int MAX_LENGTH = BinaryInputArchive.MAX_BUFFER_SIZE;
         final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
             writeInt(NULL_STRING_INDICATOR);
@@ -622,7 +623,7 @@ public class FastSerializer implements DataOutput {
     }
 
     public static void writeString(byte[] m_procNameBytes, ByteBuffer buf) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
+        final int MAX_LENGTH = BinaryInputArchive.MAX_BUFFER_SIZE;
         final int NULL_STRING_INDICATOR = -1;
         if (m_procNameBytes == null) {
             buf.putInt(NULL_STRING_INDICATOR);

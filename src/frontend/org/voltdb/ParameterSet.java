@@ -56,7 +56,18 @@ import org.voltdb.types.VoltDecimalHelper;
     private final LinkedList<byte[][]> m_encodedStringArrays = new LinkedList<byte[][]>();
     private int m_serializedSize = -1; // memoized serialized size
 
+    private final boolean m_serializingToEE;
+
     public ParameterSet() {
+        m_serializingToEE = false;
+    }
+
+    private ParameterSet(boolean serializingToEE) {
+        m_serializingToEE = serializingToEE;
+    }
+
+    public static ParameterSet createParameterSetForEE() {
+        return new ParameterSet(true);
     }
 
     static Object limitType(Object o) {
@@ -88,6 +99,10 @@ import org.voltdb.types.VoltDecimalHelper;
         return m_serializedSize;
     }
 
+    /*
+     * Get a single indexed parameter. No size limits are enforced.
+     * Do not use for large strings or varbinary (> 1MB).
+     */
     static Object getParameterAtIndex(int partitionIndex, ByteBuffer unserializedParams) throws IOException {
         FastDeserializer in = new FastDeserializer(unserializedParams);
         int paramLen = in.readShort();
@@ -96,9 +111,9 @@ import org.voltdb.types.VoltDecimalHelper;
             throw new RuntimeException("Invalid partition parameter requested.");
         }
         for (int i = 0; i < partitionIndex; ++i) {
-            readOneParameter(in);
+            readOneParameter(in, false);
         }
-        Object retval = readOneParameter(in);
+        Object retval = readOneParameter(in, false);
         unserializedParams.rewind();
         return retval;
     }
@@ -109,7 +124,7 @@ import org.voltdb.types.VoltDecimalHelper;
         m_params = new Object[paramLen];
 
         for (int i = 0; i < paramLen; i++) {
-            m_params[i] = readOneParameter(in);
+            m_params[i] = readOneParameter(in, m_serializingToEE);
         }
     }
 
@@ -394,7 +409,8 @@ import org.voltdb.types.VoltDecimalHelper;
         return value;
     }
 
-    static private Object readOneParameter(FastDeserializer in) throws IOException {
+    static private Object readOneParameter(FastDeserializer in, boolean enforceSizeLimits)
+            throws IOException {
         byte nextTypeByte = in.readByte();
         if (nextTypeByte == ARRAY) {
             VoltType nextType = VoltType.get(in.readByte());
@@ -417,13 +433,17 @@ import org.voltdb.types.VoltDecimalHelper;
                 case FLOAT:
                     return in.readDouble();
                 case STRING:
-                    String string_val = in.readString();
+                    String string_val = (enforceSizeLimits
+                                            ? in.readString()
+                                            : in.readStringUnlimited());
                     if (string_val == null) {
                         return VoltType.NULL_STRING_OR_VARBINARY;
                     }
                     return string_val;
                 case VARBINARY:
-                    byte[] bin_val = in.readVarbinary();
+                    byte[] bin_val = (enforceSizeLimits
+                                            ? in.readVarbinary()
+                                            : in.readVarbinaryUnlimited());
                     if (bin_val == null) {
                         return VoltType.NULL_STRING_OR_VARBINARY;
                     }
