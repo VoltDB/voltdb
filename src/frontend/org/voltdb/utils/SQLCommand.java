@@ -65,6 +65,20 @@ public class SQLCommand
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
+    
+    // Test only
+    public static String parseSQLFile(String filepath) {
+    	return readScriptFile(filepath);
+    }
+    // Test only
+    public static void testExecuteQuery (String qry) {
+    	try {
+			executeQuery(qry);
+		} catch (Exception e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
     public static List<String> parseQuery(String query)
     {
         if (query == null)
@@ -1027,6 +1041,10 @@ public class SQLCommand
             }
             this_params.set(idx, param_type);
         }
+    }
+
+    static public void mockVoltDBForTest(Client testVoltDB) {
+        VoltDB = testVoltDB;
     }
 
     private static InputStream in = null;
