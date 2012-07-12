@@ -22,8 +22,10 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
@@ -40,6 +42,7 @@ public class RepairLog
     // Initialize to Long MAX_VALUE to prevent feeding a newly joined node
     // transactions it should never have seen
     long m_lastSpHandle = Long.MAX_VALUE;
+    long m_lastMpHandle = Long.MAX_VALUE;
 
     // is this a partition leader?
     boolean m_isLeader = false;
@@ -104,11 +107,21 @@ public class RepairLog
     public void deliver(VoltMessage msg)
     {
         if (msg instanceof FragmentTaskMessage) {
-            final FragmentTaskMessage m = (FragmentTaskMessage)msg;
+            final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
+            truncate(m.getTruncationHandle(), Long.MIN_VALUE);
+            // only log the first fragment of a procedure (and handle 1st case)
+            if (m.getTxnId() > m_lastMpHandle || m_lastMpHandle == Long.MAX_VALUE) {
+                m_log.add(new Item(IS_MP, m, m.getTxnId()));
+                m_lastMpHandle = m.getTxnId();
+            }
+        }
+        else if (msg instanceof CompleteTransactionMessage) {
+            final TransactionInfoBaseMessage m = (TransactionInfoBaseMessage)msg;
             truncate(m.getTruncationHandle(), Long.MIN_VALUE);
             m_log.add(new Item(IS_MP, m, m.getTxnId()));
+            m_lastMpHandle = m.getTxnId();
         }
-        if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
+        else if (!m_isLeader && msg instanceof Iv2InitiateTaskMessage) {
             final Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)msg;
             m_lastSpHandle = m.getSpHandle();
             truncate(Long.MIN_VALUE, m.getTruncationHandle());

@@ -31,6 +31,7 @@ import static org.mockito.Mockito.*;
 
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import junit.framework.TestCase;
@@ -59,6 +60,13 @@ public class TestRepairLog extends TestCase
         return msg;
     }
 
+    VoltMessage truncCompleteMsg(long truncPt, long mpTxnId)
+    {
+        CompleteTransactionMessage msg = mock(CompleteTransactionMessage.class);
+        when(msg.getTxnId()).thenReturn(mpTxnId);
+        when(msg.getTruncationHandle()).thenReturn(truncPt);
+        return msg;
+    }
 
     // a message that should never be logged.
     private static class FooMessage extends VoltMessage
@@ -145,8 +153,37 @@ public class TestRepairLog extends TestCase
         rl.deliver(m2);
         assertEquals(2, rl.contents().size());
 
+        // only the first message for a transaction is logged.
+        VoltMessage m2b = truncFragMsg(0L, 2L);
+        rl.deliver(m2b);
+        assertEquals(2, rl.contents().size());
+
         // trim m1. add m3
         VoltMessage m3 = truncFragMsg(1L, 3L);
+        rl.deliver(m3);
+        assertEquals(2, rl.contents().size());
+        assertEquals(m2, rl.contents().get(0).getMessage());
+        assertEquals(2L, rl.contents().get(0).getSpHandle());
+        assertEquals(m3, rl.contents().get(1).getMessage());
+        assertEquals(3L, rl.contents().get(1).getSpHandle());
+    }
+
+    @Test
+    public void testOfferCompleteMessage()
+    {
+        RepairLog rl = new RepairLog();
+
+        // trunc(trunc point, txnId).
+        VoltMessage m1 = truncCompleteMsg(0L, 1L);
+        rl.deliver(m1);
+        assertEquals(1, rl.contents().size());
+
+        VoltMessage m2 = truncCompleteMsg(0L, 2L);
+        rl.deliver(m2);
+        assertEquals(2, rl.contents().size());
+
+        // trim m1. add m3
+        VoltMessage m3 = truncCompleteMsg(1L, 3L);
         rl.deliver(m3);
         assertEquals(2, rl.contents().size());
         assertEquals(m2, rl.contents().get(0).getMessage());
