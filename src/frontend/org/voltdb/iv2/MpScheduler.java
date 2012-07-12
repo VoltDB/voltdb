@@ -163,7 +163,8 @@ public class MpScheduler extends Scheduler
                     message.isReadOnly(),
                     message.isSinglePartition(),
                     message.getStoredProcedureInvocation(),
-                    message.getClientInterfaceHandle());
+                    message.getClientInterfaceHandle(),
+                    message.getConnectionId());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
