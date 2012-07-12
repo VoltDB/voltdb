@@ -249,7 +249,7 @@ public enum VoltType {
      * of an object is array, except byte array. To fix ENG-933.
      */
 
-    public static boolean checkIfArrayType(Class<?> c)
+    public static boolean isUnsupportedArrayType(Class<?> c)
     {
       if (c.isArray())
       {
@@ -273,7 +273,7 @@ public enum VoltType {
      */
     public static VoltType typeFromClass(Class<?> cls) {
 
-        if (checkIfArrayType(cls))
+        if (isUnsupportedArrayType(cls))
         {
           throw new VoltTypeException("Arrays are not allowed as inputs to procedures, except byte arrays");
         }
