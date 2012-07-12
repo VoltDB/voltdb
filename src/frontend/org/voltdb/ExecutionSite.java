@@ -2230,7 +2230,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         }
         try {
             //Log it and acquire the completion permit from the semaphore
-            VoltDB.instance().getCommandLog().logFault(failedInitiators, faultedTxns).acquire();
+            Semaphore logFault = VoltDB.instance().getCommandLog().logFault(failedInitiators, faultedTxns);
+            if (logFault != null) {
+                logFault.acquire();
+            } else {
+                /*
+                 * If the log is not initialized yet, crash the node because it
+                 * will be missing fault information.
+                 */
+                VoltDB.crashLocalVoltDB("Node failure before log is initialized", false, null);
+            }
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while attempting to log a fault", true, e);
         }
