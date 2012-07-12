@@ -41,7 +41,7 @@ using namespace voltdb;
 bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         TempTableLimits* limits)
 {
-    VOLT_ERROR("init IndexCount Executor");
+    VOLT_DEBUG("init IndexCount Executor");
 
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
     assert(m_node);
@@ -58,7 +58,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     {
         column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
     }
-    VOLT_ERROR("<IndexCount Executor> TupleSchema: '%s'", schema->debug().c_str());
+    printf("<IndexCount Executor> TupleSchema: '%s'", schema->debug().c_str());
 
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       m_node->getTargetTable()->name(),
@@ -257,6 +257,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             end_expression->substitute(params);
         }
         VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
+        printf("End Expression:\n%s", end_expression->debug(true).c_str());
     }
 
     //
@@ -270,7 +271,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         if (m_needsSubstitutePostExpression) {
             post_expression->substitute(params);
         }
-        VOLT_ERROR("Post Expression:\n%s", post_expression->debug(true).c_str());
+        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
+        printf("Post Expression:\n%s", post_expression->debug(true).c_str());
     }
 
     assert (m_index);
@@ -286,8 +288,10 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     if (activeNumOfSearchKeys > 0)
     {
-        VOLT_ERROR("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+        VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                    localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+        printf("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
         if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
             // TODO(xin):

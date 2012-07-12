@@ -31,6 +31,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.types.ExpressionType;
 
 public class TestReplaceWithIndexCounter extends TestCase {
@@ -82,16 +83,30 @@ public class TestReplaceWithIndexCounter extends TestCase {
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
                         null);
     }
-
+    
     public void testCountStar2() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS < 6", 0, true);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
         checkIndexCounter(pn, false,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
                         null);
     }
 
     public void testCountStar3() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE POINTS > ? AND NAME ='XIN' ", 1, true);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS <= 6", 0, true);
+        checkIndexCounter(pn, false,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
+                        null);
+    }
+    
+    public void testCountStar4() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?", 2, true);
+        checkIndexCounter(pn, false,
+                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
+                        null);
+    }
+
+    public void testCountStar5() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE NAME ='XIN' AND POINTS > ? AND POINTS <= ?", 2, true);
         checkIndexCounter(pn, false,
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
                         null);
@@ -141,7 +156,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
 //            System.out.println("Parent " + i + " :" + p.getParent(i).toExplainPlanString());
 //        }
 
-        //assertTrue(p instanceof IndexCountPlanNode);
+        assertTrue(p instanceof IndexCountPlanNode);
 //        if (pushDownTypes != null) {
 //            for (ExpressionType type : pushDownTypes) {
 //                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
