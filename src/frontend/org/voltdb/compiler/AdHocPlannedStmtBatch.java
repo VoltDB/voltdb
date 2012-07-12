@@ -115,8 +115,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      *
      * @return list of SQL aggregator fragment strings
      */
-    public List<String> getAggregatorFragments() {
-        List<String> fragments = new ArrayList<String>(plannedStatements.size());
+    public List<byte[]> getAggregatorFragments() {
+        List<byte[]> fragments = new ArrayList<byte[]>(plannedStatements.size());
         for (AdHocPlannedStatement plannedStatement : plannedStatements) {
             fragments.add(plannedStatement.aggregatorFragment);
         }
@@ -128,8 +128,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      *
      * @return list of SQL collector fragment strings
      */
-    public List<String> getCollectorFragments() {
-        List<String> fragments = new ArrayList<String>(plannedStatements.size());
+    public List<byte[]> getCollectorFragments() {
+        List<byte[]> fragments = new ArrayList<byte[]>(plannedStatements.size());
         for (AdHocPlannedStatement plannedStatement : plannedStatements) {
             fragments.add(plannedStatement.collectorFragment);
         }
@@ -165,8 +165,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      * @param isNonDeterministic    non-deterministic SQL flag
      * @return                      statement object
      */
-    public void addStatement(String sqlStatement, String aggregatorFragment,
-                             String collectorFragment, boolean isReplicatedTableDML,
+    public void addStatement(String sqlStatement, byte[] aggregatorFragment,
+                             byte[] collectorFragment, boolean isReplicatedTableDML,
                              boolean isNonDeterministic, List<ParameterInfo> params) {
         AdHocPlannedStatement plannedStmt = new AdHocPlannedStatement(
                                                         sqlStatement,

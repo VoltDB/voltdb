@@ -20,8 +20,8 @@ package org.voltdb;
 public class SQLStmtPlan {
 
     private final String sqlText;
-    private final String aggregatorFragment;
-    private final String collectorFragment;
+    private final byte[] aggregatorFragment;
+    private final byte[] collectorFragment;
     private final boolean isReplicatedTableDML;
 
     /**
@@ -32,7 +32,7 @@ public class SQLStmtPlan {
      * @param collectorFragment     Compiled plan collector fragment
      * @param isReplicatedTableDML  True if replicated
      */
-    public SQLStmtPlan(String sqlText, String aggregatorFragment, String collectorFragment,
+    public SQLStmtPlan(String sqlText, byte[] aggregatorFragment, byte[] collectorFragment,
             boolean isReplicatedTableDML) {
         this.sqlText = sqlText;
         this.aggregatorFragment = aggregatorFragment;
@@ -52,7 +52,7 @@ public class SQLStmtPlan {
      * Get the plan aggregator fragment
      * @return  the plan aggregator fragment string
      */
-    public String getAggregatorFragment() {
+    public byte[] getAggregatorFragment() {
         return aggregatorFragment;
     }
 
@@ -60,7 +60,7 @@ public class SQLStmtPlan {
      * Get the plan collector fragment
      * @return  the plan collector fragment string
      */
-    public String getCollectorFragment() {
+    public byte[] getCollectorFragment() {
         return collectorFragment;
     }
 
