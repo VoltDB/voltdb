@@ -82,7 +82,7 @@ import com.google.common.collect.Sets;
  * a new PI and the consequent ZK observers for performing that
  * role.
  */
-public class Term
+public class SpTerm
 {
     VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
@@ -172,23 +172,23 @@ public class Term
         public void run(List<String> children)
         {
             // Need to handle startup separately from runtime updates.
-            if (Term.this.m_missingStartupSites.getCount() > 0) {
+            if (SpTerm.this.m_missingStartupSites.getCount() > 0) {
                 TreeSet<String> updatedReplicas = com.google.common.collect.Sets.newTreeSet(children);
                 // Cancel setup if a previously seen replica disappeared.
                 // I think voltcore might actually terminate before getting here...
-                Sets.SetView<String> removed = Sets.difference(Term.this.m_knownReplicas, updatedReplicas);
+                Sets.SetView<String> removed = Sets.difference(SpTerm.this.m_knownReplicas, updatedReplicas);
                 if (!removed.isEmpty()) {
                     tmLog.error(m_whoami
                             + "replica(s) failed during startup. Initialization can not complete."
                             + " Failed replicas: " + removed);
-                    Term.this.cancel();
+                    SpTerm.this.cancel();
                     return;
                 }
-                Sets.SetView<String> added = Sets.difference(updatedReplicas, Term.this.m_knownReplicas);
+                Sets.SetView<String> added = Sets.difference(updatedReplicas, SpTerm.this.m_knownReplicas);
                 int newReplicas = added.size();
                 m_knownReplicas.addAll(updatedReplicas);
                 for (int i=0; i < newReplicas; i++) {
-                    Term.this.m_missingStartupSites.countDown();
+                    SpTerm.this.m_missingStartupSites.countDown();
                 }
             }
             else {
@@ -220,7 +220,7 @@ public class Term
     /**
      * Setup a new Term but don't take any action to take responsibility.
      */
-    public Term(CountDownLatch missingStartupSites, ZooKeeper zk,
+    public SpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {

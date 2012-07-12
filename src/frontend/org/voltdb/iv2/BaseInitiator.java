@@ -54,7 +54,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     // Encapsulated objects
     protected final Scheduler m_scheduler;
     protected final InitiatorMailbox m_initiatorMailbox;
-    protected Term m_term = null;
+    protected SpTerm m_term = null;
     protected Site m_executionSite = null;
     protected LeaderElector m_leaderElector = null;
     protected Thread m_siteThread = null;
@@ -164,7 +164,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             Boolean success = false;
             while (!success) {
                 // term syslogs the start of leader promotion.
-                m_term = new Term(m_missingStartupSites, m_messenger.getZK(),
+                m_term = new SpTerm(m_missingStartupSites, m_messenger.getZK(),
                         m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                         m_zkMailboxNode, m_whoami);
                 m_initiatorMailbox.setTerm(m_term);
