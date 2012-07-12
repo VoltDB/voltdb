@@ -633,12 +633,17 @@ void VoltDBIPC::loadFragment(struct ipc_command *cmd) {
         crashVoltDB(e);
     }
 
+    // make network suitable
+    fragId = htonll(fragId);
+    int64_t wasHitLong = htonll((wasHit ? 1 : 0));
+    cacheSize = htonll(cacheSize);
+
     // write the results array back across the wire
     const int8_t successResult = kErrorCode_Success;
     if (errors == 0) {
         writeOrDie(m_fd, (unsigned char*)&successResult, sizeof(int8_t));
         writeOrDie(m_fd, (unsigned char*)&fragId, sizeof(int64_t));
-        writeOrDie(m_fd, (unsigned char*)&wasHit, sizeof(int64_t));
+        writeOrDie(m_fd, (unsigned char*)&wasHitLong, sizeof(int64_t));
         writeOrDie(m_fd, (unsigned char*)&cacheSize, sizeof(int64_t));
     } else {
         sendException(kErrorCode_Error);

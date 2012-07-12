@@ -221,6 +221,9 @@ VoltDBEngine::~VoltDBEngine() {
     // object multiple times.  Change at your own risk.
     // --izzy 8/19/2009
 
+    // clean up execution plans
+    m_executorMap.clear();
+
     // Get rid of any dummy undo quantum first so m_undoLog.clear()
     // doesn't wipe this out before we do it.
     if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
