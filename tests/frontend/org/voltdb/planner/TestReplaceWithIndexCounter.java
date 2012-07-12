@@ -83,7 +83,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
                         null);
     }
-    
+
     public void testCountStar2() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
         checkIndexCounter(pn, false,
@@ -97,7 +97,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
                         new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
                         null);
     }
-    
+
     public void testCountStar4() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?", 2, true);
         checkIndexCounter(pn, false,

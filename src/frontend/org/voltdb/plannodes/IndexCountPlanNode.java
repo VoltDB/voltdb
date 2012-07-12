@@ -83,11 +83,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         super();
 
         m_catalogIndex = isp.m_catalogIndex;
-        
+
         m_estimatedOutputTupleCount = 1;
         m_tableSchema = isp.m_tableSchema;
         m_tableScanSchema = isp.m_tableScanSchema.clone();
-        
+
         m_targetTableAlias = isp.m_targetTableAlias;
         m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
@@ -265,7 +265,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // set output schema according to aggregate plan node's output schema
         m_outputSchema = schema.clone();
     }
-    
+
     public void setParents(AbstractPlanNode parents) {
         // TODO(xin): set parents node
         //m_parents = parents.;

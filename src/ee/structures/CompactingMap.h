@@ -136,9 +136,10 @@ public:
     std::pair<iterator, iterator> equalRange(const Key &key);
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
-
+    // rankAsc is rankLower for multi-map
     int32_t rankAsc(const Key& key);
     int32_t rankDes(const Key& key);
+    int32_t rankUpper(const Key& key);
 
     /**
      * For debugging: verify the RB-tree constraints are met. SLOW.
@@ -732,6 +733,22 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankDes(const Key& key) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
+int32_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
+        if (!hasRank) return -1;
+        if (m_unique) return rankAsc(key);
+
+        iterator it;
+        it = upperBound(key);
+        NodeCount nc = 0;
+        it.movePrev();
+        while (key == it.key()) {
+            nc++;
+            it.movePrev();
+        }
+        return rankAsc(key) + nc;
+}
+
+template<typename Key, typename Data, typename Compare, bool hasRank>
 typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::lookupRank(int32_t ith) {
         if (!hasRank) return &NIL;
 
@@ -786,8 +803,19 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
                                 return false;
                         }
                 } else {
-                        rkasc = rankAsc(it.key());
-                        Key k = it.key();
+                        const Key k = it.key();
+                        rkasc = rankAsc(k);
+
+                        iterator up = upperBound(k);
+                        if (it.equals(up)) {
+                            // up is the upper bound of key
+                            NodeCount rkUpper = rankUpper(k);
+                            if (i != rkUpper) {
+                                printf("false: multi_rankUpper expected %d, but got %d\n", i, rkUpper);
+                                return false;
+                            }
+                        }
+
                         NodeCount nc = 0;
                         it.movePrev();
                         while (k == it.key()) {

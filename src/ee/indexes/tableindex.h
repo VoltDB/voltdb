@@ -297,7 +297,7 @@ public:
      */
     inline bool isCountableIndex() const
     {
-    	return is_countable_index_;
+        return is_countable_index_;
     }
 
     /**
@@ -307,14 +307,14 @@ public:
      */
     virtual int32_t getCounterToKeyOrGreater(const TableTuple *searchKey)
     {
-        throwFatalException("Invoked non-countable TableIndex virtual method getRankAsc which has no implementation");
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterToKeyOrGreater which has no implementation");
     }
     /**
      * This function only supports countable tree index. It returns the counter value greater than the serarchKey.
      */
     virtual int32_t getCounterToKeyOrSmaller(const TableTuple *searchKey)
     {
-        throwFatalException("Invoked non-countable TableIndex virtual method getRankDes which has no implementation");
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterToKeyOrSmaller which has no implementation");
     }
 
 

@@ -286,6 +286,10 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     //
     int32_t rkStart = 0, rkEnd = 0;
 
+    if (m_index->isUniqueIndex()) {
+
+    }
+
     if (activeNumOfSearchKeys > 0)
     {
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
