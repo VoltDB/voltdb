@@ -56,10 +56,26 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
     // API
     //
 
+    /**
+     * Callback is passed an immutable cache when a child (dis)appears/changes.
+     * Callback runs in the MapCache's ES (not the zk trigger thread).
+     */
+    public abstract static class Callback
+    {
+        abstract public void run(ImmutableMap<String, JSONObject> cache);
+    }
+
     /** Instantiate a MapCache of parent rootNode. The rootNode must exist. */
-    public MapCache(ZooKeeper zk, String rootNode) {
+    public MapCache(ZooKeeper zk, String rootNode)
+    {
+        this(zk, rootNode, null);
+    }
+
+    public MapCache(ZooKeeper zk, String rootNode, Callback cb)
+    {
         m_zk = zk;
         m_rootNode = rootNode;
+        m_cb = cb;
     }
 
     /** Initialize and start watching the cache. */
@@ -118,6 +134,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
 
     private final ZooKeeper m_zk;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+    private final Callback m_cb; // the callback when the cache changes
 
     // the children of this node are observed.
     private final String m_rootNode;
@@ -251,6 +268,9 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
         }
 
         m_publicCache.set(ImmutableMap.copyOf(cache));
+        if (m_cb != null) {
+            m_cb.run(m_publicCache.get());
+        }
     }
 
     /**
@@ -269,5 +289,8 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
             cacheCopy.remove(event.getPath());
         }
         m_publicCache.set(ImmutableMap.copyOf(cacheCopy));
+        if (m_cb != null) {
+            m_cb.run(m_publicCache.get());
+        }
     }
 }
