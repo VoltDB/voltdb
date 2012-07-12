@@ -17,6 +17,7 @@
 
 package org.voltcore.network;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 public interface Connection {
@@ -43,6 +44,8 @@ public interface Connection {
      */
     String getHostnameOrIP();
     long connectionId();
+
+    void queueTask(Runnable r);
 
     /**
      * Schedule the connection to be unregistered and closed

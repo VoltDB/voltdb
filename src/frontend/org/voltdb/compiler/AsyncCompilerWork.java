@@ -20,6 +20,10 @@ package org.voltdb.compiler;
 import java.io.Serializable;
 
 public class AsyncCompilerWork implements Serializable {
+
+    public interface AsyncCompilerWorkCompletionHandler {
+        public void onCompletion(AsyncCompilerResult result);
+    }
     private static final long serialVersionUID = 6588086204761949082L;
 
     final long replySiteId;
@@ -31,9 +35,12 @@ public class AsyncCompilerWork implements Serializable {
     final boolean adminConnection;
     final transient public Object clientData;
 
+    final AsyncCompilerWorkCompletionHandler completionHandler;
+
     public AsyncCompilerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection,
-            Object clientData)
+            Object clientData,
+            AsyncCompilerWorkCompletionHandler completionHandler)
     {
         this.replySiteId = replySiteId;
         this.shouldShutdown = shouldShutdown;
@@ -42,6 +49,10 @@ public class AsyncCompilerWork implements Serializable {
         this.hostname = hostname;
         this.adminConnection = adminConnection;
         this.clientData = clientData;
+        this.completionHandler = completionHandler;
+        if (completionHandler == null) {
+            throw new IllegalArgumentException("Completion handler can't be null");
+        }
     }
 
     @Override
