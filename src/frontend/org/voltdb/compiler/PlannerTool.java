@@ -22,6 +22,7 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
+import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
@@ -49,8 +50,8 @@ public class PlannerTool {
     public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
 
     public static class Result {
-        String onePlan = null;
-        String allPlan = null;
+        byte[] onePlan = null;
+        byte[] allPlan = null;
         boolean replicatedDML = false;
         boolean nonDeterministic = false;
         Object partitionParam;
@@ -60,8 +61,8 @@ public class PlannerTool {
         public String toString() {
             StringBuilder sb = new StringBuilder();
             sb.append("RESULT {\n");
-            sb.append("  ONE: ").append(onePlan == null ? "null" : onePlan).append("\n");
-            sb.append("  ALL: ").append(allPlan == null ? "null" : allPlan).append("\n");
+            sb.append("  ONE: ").append(onePlan == null ? "null" : new String(onePlan, VoltDB.UTF8ENCODING)).append("\n");
+            sb.append("  ALL: ").append(allPlan == null ? "null" : new String(allPlan, VoltDB.UTF8ENCODING)).append("\n");
             sb.append("  RTD: ").append(replicatedDML ? "true" : "false").append("\n");
             sb.append("  PARAM: ").append(partitionParam == null ? "null" : partitionParam.toString()).append("\n");
             sb.append("}");
@@ -165,8 +166,8 @@ public class PlannerTool {
         retval.params = plan.parameters;
         for (Fragment frag : plan.fragments) {
             PlanNodeList planList = new PlanNodeList(frag.planGraph);
-            String serializedPlan = planList.toJSONString();
-            String encodedPlan = serializedPlan; //Encoder.compressAndBase64Encode(serializedPlan);
+            byte[] serializedPlan = planList.toJSONString().getBytes(VoltDB.UTF8ENCODING);
+            byte[] encodedPlan = serializedPlan; //Encoder.compressAndBase64Encode(serializedPlan);
             if (frag.multiPartition) {
                 assert(retval.allPlan == null);
                 retval.allPlan = encodedPlan;

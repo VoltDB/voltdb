@@ -41,4 +41,16 @@ void FallbackSerializeOutput::expand(size_t minimum_desired) {
     ExecutorContext::getExecutorContext()->getTopend()->fallbackToEEAllocatedBuffer(fallbackBuffer_, maxAllocationSize);
 }
 
+std::string SerializeInput::fullBufferStringRep() {
+    std::stringstream message(std::stringstream::in
+                              | std::stringstream::out);
 
+    message << "length: " << end_ - current_ << " data: ";
+
+    for (const char* i = current_; i != end_; i++) {
+        const uint8_t value = static_cast<uint8_t>(*i);
+        message << std::setw( 2 ) << std::setfill( '0' ) << std::hex << std::uppercase << (int)value;
+        message << " ";
+    }
+    return message.str();
+}
