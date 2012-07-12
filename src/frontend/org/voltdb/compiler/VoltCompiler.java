@@ -637,6 +637,7 @@ public class VoltCompiler {
             final CatalogMap<MaterializedViewInfo> views = t.getViews();
             for (final MaterializedViewInfo mvi : views) {
                 mvi.getDest().setIsreplicated(false);
+                setGroupedTablePartitionColumn(mvi, c);
             }
         }
 
@@ -683,6 +684,30 @@ public class VoltCompiler {
 
     }
 
+    static private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn) {
+        // A view of a replicated table is replicated.
+        // A view of a partitioned table is partitioned -- regardless of whether it has a partition key
+        // -- it certainly isn't replicated!
+        // If the partitioning column is grouped, its counterpart is the partitioning column of the view table.
+        // Otherwise, the view table just doesn't have a partitioning column
+        // -- it is seemingly randomly distributed,
+        // and its grouped columns are only locally unique but not globally unique.
+        Table destTable = mvi.getDest();
+        // Get the grouped columns in "index" order.
+        // This order corresponds to the iteration order of the MaterializedViewInfo's getGroupbycols.
+        List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
+        String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
+        int index = 0;
+        for (ColumnRef cref : mvi.getGroupbycols()) {
+            Column srcCol = cref.getColumn();
+            if (srcCol.getName().equals(partitionColName)) {
+                Column destCol = destColumnArray.get(index);
+                destTable.setPartitioncolumn(destCol);
+                return;
+            }
+            ++index;
+        }
+    }
 
     /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
     public void enableDetailedCapture() {
