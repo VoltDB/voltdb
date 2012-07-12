@@ -28,6 +28,7 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 import java.util.concurrent.atomic.AtomicInteger;
 
+import org.apache.jute_voltpatches.BinaryInputArchive;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
@@ -551,7 +552,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
         params[0] = "NO_NULLS";
 
         // array to build the Big String.
-        final char blob[] = new char[VoltType.MAX_VALUE_LENGTH + 4];
+        final char blob[] = new char[BinaryInputArchive.MAX_BUFFER_SIZE + 4];
         for (int i = 0; i < blob.length; i++) {
             blob[i] = 'a';
         }
