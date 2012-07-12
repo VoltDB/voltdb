@@ -300,6 +300,8 @@ public:
         return is_countable_index_;
     }
 
+    virtual bool hasKey(const TableTuple *searchKey) = 0;
+
     /**
      * This function only supports countable tree index. It returns the counter value less than or equal to the serarchKey.
      * For unique index, it will return the rank with the searchKey in ascending order including itself.

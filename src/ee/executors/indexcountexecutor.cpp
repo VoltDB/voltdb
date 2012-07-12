@@ -257,14 +257,13 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             end_expression->substitute(params);
         }
         VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
-        printf("End Expression:\n%s", end_expression->debug(true).c_str());
+        printf("End Expression:\n%s\n", end_expression->debug(true).c_str());
     }
 
     //
     // POST EXPRESSION
     //
     AbstractExpression* post_expression = m_node->getPredicate();
-    assert(post_expression == NULL);
 
     if (post_expression != NULL)
     {
@@ -272,7 +271,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             post_expression->substitute(params);
         }
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
-        printf("Post Expression:\n%s", post_expression->debug(true).c_str());
+        printf("Post Expression:\n%s\n", post_expression->debug(true).c_str());
     }
 
     assert (m_index);
@@ -285,36 +284,36 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // Use our search key to prime the index iterator
     // Now loop through each tuple given to us by the iterator
     //
-    int32_t rkStart = 0, rkEnd = 0;
+    int32_t rkStart = 0, rkEnd = 0, rkRes = 0;
+
     TableTuple& tmptup = m_outputTable->tempTuple();
+    int leftIncluded = 0, rightIncluded = 0;
 
     if (m_index->isUniqueIndex()) {
-        if (activeNumOfSearchKeys > 0)
-            {
-                VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                           localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-                printf("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                        localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+        if (activeNumOfSearchKeys > 0) {
+            VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                    localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+            printf("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s\n",
+                    localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
-                if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-                    // TODO(xin):
-                }
-                else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-                    rkStart = m_index->getCounterGET(&m_searchKey, NULL);
-                }
-                else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-                    rkStart = m_index->getCounterGET(&m_searchKey, NULL);
-                    if (m_index->exists(&m_searchKey))
-                        rkStart++;
-                }
-                else {
-                    return false;
-                }
+            if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
+                // TODO(xin):
             }
+            else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+                rkStart = m_index->getCounterLET(&m_searchKey, NULL);
+            }
+            else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+                rkStart = m_index->getCounterLET(&m_searchKey, NULL);
+            }
+            else {
+                return false;
+            }
+        } else {
+            leftIncluded = 1;
+        }
         if (end_expression != NULL)
         {
             ExpressionType localEndType = end_expression->getExpressionType();
-            printf("xin <IndexCount Executor> End expression {{end}}: '%s'\n", end_expression->debug().c_str());
             if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHAN) {
 
             } else if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO) {
@@ -326,29 +325,31 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             } else {
                 return false;
             }
+        } else {
+            printf("WRONG, ERROR.....NOW...4\n");
+            rkEnd = m_index->getSize();
+            rightIncluded = 1;
+            printf("Count total: %d\n", rkEnd);
         }
 
-        tmptup.setNValue(0, ValueFactory::getBigIntValue(rkEnd - rkStart));
+//        if (m_index->hasKey(&m_searchKey)) {
+//                leftIncluded = 1;
+//                printf("left searchkey included\n");
+//        }
+
+        printf("ANSWER: %d - %d - 1 + %d + %d\n", rkEnd, rkStart, leftIncluded, rightIncluded);
+        rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
+
+        printf("xin <IndexCount Executor> ANSWER: '%d'\n", rkRes);
+
+        tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes));
         m_outputTable->insertTuple(tmptup);
 
     } else {
         // TODO(xin): add support for multi-map later
 
-
-        tmptup.setNValue(0, ValueFactory::getBigIntValue(rkEnd - rkStart));
-        m_outputTable->insertTuple(tmptup);
+        printf("WRONG, ERROR.......\n");
     }
-
-
-
-
-    assert(post_expression == NULL);
-    printf("xin <IndexCount Executor> m_index->getRank {{Start}}: '%d'\n", rkStart);
-
-
-
-
-
 
     /*
     //

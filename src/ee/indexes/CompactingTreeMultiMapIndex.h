@@ -220,6 +220,11 @@ public:
         return moveToKey(m_keyIter.second.key());
     }
 
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
+    }
+
     int32_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
         printf("<Tree Multimap---getUpperCounterGET> \n");

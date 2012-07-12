@@ -144,6 +144,10 @@ public:
         return retval;
     }
 
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
+    }
     int32_t getCounterGET(const TableTuple *searchKey, bool isUpper) {
         return -1;
     }

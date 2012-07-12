@@ -33,16 +33,17 @@ import org.voltdb.VoltTable;
     partitionInfo = "T1.ID: 0"
 )
 public class CountingIndexFeature extends VoltProcedure {
-
-    //public final SQLStmt countstar1 = new SQLStmt("SELECT COUNT(*) FROM T1 WHERE POINTS > ?");
-    public final SQLStmt countstar2 = new SQLStmt("SELECT COUNT(*) FROM T1 WHERE POINTS > ? AND POINTS < ?");
+    public final SQLStmt countstar0 = new SQLStmt("SELECT COUNT(*) FROM T1");
+    public final SQLStmt countstar1 = new SQLStmt("SELECT COUNT(*) FROM T1 WHERE POINTS > ?");
+    //public final SQLStmt countstar2 = new SQLStmt("SELECT COUNT(*) FROM T1 WHERE POINTS > ? AND POINTS < ?");
     //public final SQLStmt countstar3 = new SQLStmt("SELECT COUNT(*) FROM T2 WHERE POINTS > ? AND ID = 2");
     //public final SQLStmt countstar4 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE POINTS > ? AND POINTS < ?");
     //public final SQLStmt countstar5 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE POINTS > ? AND NAME = ?");
 
     public VoltTable[] run(int p1, int p2) {
-        //voltQueueSQL(countstar1, p1);
-        voltQueueSQL(countstar2, p1, p2);
+        voltQueueSQL(countstar0);
+        voltQueueSQL(countstar1, p1);
+        //voltQueueSQL(countstar2, p1, p2);
         return voltExecuteSQL();
     }
 

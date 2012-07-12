@@ -62,13 +62,18 @@ public class TestCountingIndexSuite extends RegressionSuite {
 
         VoltTable[] results = client.callProcedure("CountingIndexFeature", 2, 4).getResults();
 
-        assertEquals(1, results.length);
+        assertEquals(2, results.length);
 
         VoltTable table = results[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
+        assertEquals(6, table.getLong(0));
+        assertTrue(true);
 
-        assertEquals(1, table.getLong(0));
+        table = results[1];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(4, table.getLong(0));
         assertTrue(true);
     }
 

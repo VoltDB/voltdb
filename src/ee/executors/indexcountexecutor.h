@@ -62,6 +62,7 @@ protected:
 
     // Search key
     TableTuple m_searchKey;
+    TableTuple m_endKey;
     // search_key_beforesubstitute_array_ptr[]
     AbstractExpression** m_searchKeyBeforeSubstituteArray;
     bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]

@@ -43,7 +43,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         END_EXPRESSION,
         SEARCHKEY_EXPRESSIONS,
         KEY_ITERATE,
-        LOOKUP_TYPE;
+        LOOKUP_TYPE,
+        END_VALUE;
     }
 
     /**
@@ -69,7 +70,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected Boolean m_keyIterate = false;
 
     // The overall index lookup operation type
-    protected IndexLookupType m_lookupType = IndexLookupType.EQ;
+    protected IndexLookupType m_StartType = IndexLookupType.EQ;
+
+    // The overall index lookup operation type
+    protected IndexLookupType m_EndType = IndexLookupType.EQ;
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
@@ -92,7 +96,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
-        m_lookupType = isp.m_lookupType;
+        m_StartType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
         m_endExpression = isp.m_endExpression;
         m_predicate = isp.m_predicate;
@@ -176,7 +180,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
      * @return The type of this lookup.
      */
     public IndexLookupType getLookupType() {
-        return m_lookupType;
+        return m_StartType;
     }
 
     /**
@@ -184,7 +188,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
      * @param lookupType
      */
     public void setLookupType(IndexLookupType lookupType) {
-        m_lookupType = lookupType;
+        m_StartType = lookupType;
     }
 
     /**
@@ -308,7 +312,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
-        stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
+        stringer.key(Members.LOOKUP_TYPE.name()).value(m_StartType.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
         stringer.key(Members.END_EXPRESSION.name());
         stringer.value(m_endExpression);
@@ -329,7 +333,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         int keySize = m_searchkeyExpressions.size();
 
         String scanType = "tree-counter";
-        if (m_lookupType != IndexLookupType.EQ)
+        if (m_StartType != IndexLookupType.EQ)
             scanType = "tree-counter";
 
         String cover = "covering";
