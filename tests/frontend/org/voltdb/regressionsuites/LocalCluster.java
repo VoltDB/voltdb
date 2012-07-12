@@ -34,6 +34,7 @@ import org.voltdb.BackendTarget;
 import org.voltdb.ReplicationRole;
 import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
+import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CommandLine;
 import org.voltdb.utils.VoltFile;
@@ -627,17 +628,22 @@ public class LocalCluster implements VoltServerConfig {
         }
     }
 
+    public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost, boolean liveRejoin) {
+        return recoverOne(false, 0, hostId, portOffset, rejoinHost, liveRejoin);
+    }
+
     public boolean recoverOne(int hostId, Integer portOffset, String rejoinHost) {
-        return recoverOne(false, 0, hostId, portOffset, rejoinHost);
+        return recoverOne(false, 0, hostId, portOffset, rejoinHost, false);
     }
 
     private boolean recoverOne(boolean logtime, long startTime, int hostId) {
-        return recoverOne( logtime, startTime, hostId, null, "");
+        return recoverOne( logtime, startTime, hostId, null, "", false);
     }
 
     // Re-start a (dead) process. HostId is the enumberation of the host
     // in the cluster (0, 1, ... hostCount-1) -- not an hsid, for example.
-    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId, String rejoinHost) {
+    private boolean recoverOne(boolean logtime, long startTime, int hostId, Integer rejoinHostId,
+                               String rejoinHost, boolean liveRejoin) {
 
         // Lookup the client interface port of the rejoin host
         // I have no idea why this code ignores the user's input
@@ -670,12 +676,17 @@ public class LocalCluster implements VoltServerConfig {
         long start = 0;
         try {
             CommandLine rejoinCmdLn = m_cmdLines.get(hostId);
+            if (liveRejoin) {
+                rejoinCmdLn.startCommand(START_ACTION.LIVE_REJOIN.name());
+            } else {
+                rejoinCmdLn.startCommand(START_ACTION.REJOIN.name());
+            }
             // This shouldn't collide but apparently it sucks.
             // Bump it to avoid collisions on rejoin.
             if (m_debug) {
                 rejoinCmdLn.debugPort(portGenerator.next());
             }
-            rejoinCmdLn.rejoinHostAndPort(rejoinHost + ":" + String.valueOf(portNoToRejoin));
+            rejoinCmdLn.leader(rejoinHost + ":" + String.valueOf(portNoToRejoin));
 
             rejoinCmdLn.m_port = portGenerator.nextClient();
             rejoinCmdLn.m_adminPort = portGenerator.nextAdmin();
@@ -1050,7 +1061,7 @@ public class LocalCluster implements VoltServerConfig {
         cl.m_adminPort = config.m_adminPort;
         cl.m_zkInterface = config.m_zkInterface;
         cl.m_internalPort = config.m_internalPort;
-        cl.m_leaderPort = config.m_leaderPort;
+        cl.m_leader = config.m_leader;
     }
 
     protected boolean isMemcheckDefined() {
