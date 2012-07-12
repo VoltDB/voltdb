@@ -244,7 +244,7 @@ public:
 
         m_tmp1.setFromKey(searchKey);
         m_keyIter = m_entries.lowerBound(m_tmp1);
-        int cmp = KeyComparator(m_keyIter.key(), m_tmp1);
+        int cmp = m_eq(m_keyIter.key(), m_tmp1);
         if (cmp < 0) {
             return m_entries.size() + 1;
         } else {
@@ -257,7 +257,7 @@ public:
 
         m_tmp1.setFromKey(searchKey);
         m_keyIter = m_entries.lowerBound(m_tmp1);
-        int cmp = KeyComparator(m_keyIter.key(), m_tmp1);
+        int cmp = m_eq(m_keyIter.key(), m_tmp1);
 
         if (cmp > 0) {
             KeyType tmpKey = m_keyIter.key();

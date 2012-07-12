@@ -741,7 +741,7 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
         it = upperBound(key);
         NodeCount nc = 0;
         it.movePrev();
-        while (key == it.key()) {
+        while (m_comper(key, it.key()) == 0) {
             nc++;
             it.movePrev();
         }

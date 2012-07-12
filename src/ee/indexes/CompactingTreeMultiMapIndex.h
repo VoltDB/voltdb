@@ -226,7 +226,7 @@ public:
 
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
-        int cmp = KeyComparator(m_seqIter.key(), m_tmp1);
+        int cmp = m_eq(m_seqIter.key(), m_tmp1);
         if (cmp < 0) {
             return m_entries.size() + 1;
         }
@@ -238,10 +238,10 @@ public:
     }
     int32_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
-        printf("<Tree Multimap---getlowerCounterGET> \n");
+        printf("<Tree Multimap---getCounterLET> \n");
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
-        int cmp = KeyComparator(m_seqIter.key(), m_tmp1);
+        int cmp = m_eq(m_seqIter.key(), m_tmp1);
         if (cmp < 0) {
             return m_entries.size() + 1;
         }

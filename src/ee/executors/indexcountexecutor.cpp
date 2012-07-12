@@ -277,6 +277,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
+    assert(m_index->is_countable_index_);
 
     // An index count has three parts:
     //  (1) Lookup tuples using the search key
@@ -285,58 +286,69 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // Now loop through each tuple given to us by the iterator
     //
     int32_t rkStart = 0, rkEnd = 0;
+    TableTuple& tmptup = m_outputTable->tempTuple();
 
     if (m_index->isUniqueIndex()) {
+        if (activeNumOfSearchKeys > 0)
+            {
+                VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                           localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+                printf("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                        localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
+                if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
+                    // TODO(xin):
+                }
+                else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+                    rkStart = m_index->getCounterGET(&m_searchKey, NULL);
+                }
+                else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+                    rkStart = m_index->getCounterGET(&m_searchKey, NULL);
+                    if (m_index->exists(&m_searchKey))
+                        rkStart++;
+                }
+                else {
+                    return false;
+                }
+            }
+        if (end_expression != NULL)
+        {
+            ExpressionType localEndType = end_expression->getExpressionType();
+            printf("xin <IndexCount Executor> End expression {{end}}: '%s'\n", end_expression->debug().c_str());
+            if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHAN) {
+
+            } else if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO) {
+
+                //rkEnd = m_index->getCounterLET();
+            } else if (localEndType == EXPRESSION_TYPE_COMPARE_EQUAL) {
+                // TODO(xin)
+
+            } else {
+                return false;
+            }
+        }
+
+        tmptup.setNValue(0, ValueFactory::getBigIntValue(rkEnd - rkStart));
+        m_outputTable->insertTuple(tmptup);
+
+    } else {
+        // TODO(xin): add support for multi-map later
+
+
+        tmptup.setNValue(0, ValueFactory::getBigIntValue(rkEnd - rkStart));
+        m_outputTable->insertTuple(tmptup);
     }
 
-    if (activeNumOfSearchKeys > 0)
-    {
-        VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                   localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-        printf("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
-        if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            // TODO(xin):
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            rkStart = m_index->getCounterToKeyOrGreater(&m_searchKey);
-        }
-        else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            rkStart = m_index->getCounterToKeyOrGreater(&m_searchKey);
-            if (m_index->exists(&m_searchKey))
-                rkStart++;
-        }
-        else {
-            return false;
-        }
-    }
 
-    assert(m_index->is_countable_index_);
+
     assert(post_expression == NULL);
     printf("xin <IndexCount Executor> m_index->getRank {{Start}}: '%d'\n", rkStart);
 
-    if (end_expression != NULL)
-    {
-        ExpressionType localEndType = end_expression->getExpressionType();
-        printf("xin <IndexCount Executor> End expression {{end}}: '%s'\n", end_expression->debug().c_str());
-        if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHAN) {
 
-        } else if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO) {
 
-            //rkEnd = m_index->getCounterLET();
-        } else if (localEndType == EXPRESSION_TYPE_COMPARE_EQUAL) {
-            // TODO(xin)
 
-        } else {
-            return false;
-        }
-    }
 
-    TableTuple& tmptup = m_outputTable->tempTuple();
-    tmptup.setNValue(0, ValueFactory::getBigIntValue(rkEnd - rkStart));
-    m_outputTable->insertTuple(tmptup);
 
     /*
     //
