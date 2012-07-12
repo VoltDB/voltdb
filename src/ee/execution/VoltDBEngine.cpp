@@ -790,6 +790,7 @@ bool VoltDBEngine::rebuildTableCollections() {
  */
 bool VoltDBEngine::rebuildPlanFragmentCollections() {
     m_executorMap.clear();
+    m_fragmentManager.clear();
 
     // initialize all the planfragments.
     map<string, catalog::Procedure*>::const_iterator proc_iterator;

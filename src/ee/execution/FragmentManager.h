@@ -138,6 +138,10 @@ public:
         }
         return retval;
     }
+    
+    void clear() {
+        m_plans.clear();
+    }
 
     /** Number of objects cached */
     int64_t size() {
