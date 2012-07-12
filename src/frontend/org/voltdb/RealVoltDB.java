@@ -481,6 +481,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     m_messenger.registerMailbox(m_rejoinCoordinator);
                     m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
                                                        new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
+                } else if (isRejoin) {
+                    SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
                 }
 
                 // All mailboxes should be set up, publish it

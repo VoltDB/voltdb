@@ -170,7 +170,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 localServer = new ServerThread(config);
 
                 localServer.start();
-                localServer.waitForInitialization();
+                localServer.waitForRejoin();
 
                 Thread.sleep(2000);
 
