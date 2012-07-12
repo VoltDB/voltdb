@@ -197,14 +197,59 @@ public class PlanAssembler {
     void setupForNewPlans(AbstractParsedStmt parsedStmt)
     {
         int countOfPartitionedTables = 0;
+        Map<String, String> partitionColumnByTable = new HashMap<String, String>();
         // Do we have a need for a distributed scan at all?
+        // Iterate over the tables to collect partition columns.
         for (Table table : parsedStmt.tableList) {
+            Table viewTable = null;
+            // Get to the root table of views.
+            Table baseTable = table.getMaterializer();
+            while (baseTable != null) {
+                if (viewTable == null) {
+                    viewTable = table; // remember original (materialized view) table
+                }
+                table = baseTable;
+                baseTable = table.getMaterializer();
+            }
+
             if (table.getIsreplicated()) {
                 continue;
             }
             ++countOfPartitionedTables;
+            String colName = null;
+            Column partitionCol = table.getPartitioncolumn();
+            // "(partitionCol != null)" tests around an obscure edge case exercised far too regularly by lazy unit tests.
+            // The table is declared non-replicated yet specifies no partitioning column.
+            // One interpretation of this edge case is that the table has "randomly distributed data".
+            // "(viewTable == null)" account for the fact that there is no guarantee that a materialized view of a
+            // partitioned table projects the partitioning column as a grouping column (by the same name?).
+            // For now, we operate as if it does not group by the partitioning column, so that materialized views
+            // also present themselves as "randomly distributed data".
+            // In either case, the table is valid for use by MP queries only and can only be joined with replicated tables
+            // because it has no recognized partitioning join key.
+            if ((partitionCol != null) && (viewTable == null)) {
+                colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
+            }
+
+            if (viewTable != null) {
+                // refer back to the original materialized view table being scanned
+                table = viewTable;
+            }
+            //TODO: This map really wants to be indexed by table "alias" (the in-query table scan identifier)
+            // so self-joins can be supported without ambiguity.
+            String partitionedTable = table.getTypeName();
+            partitionColumnByTable.put(partitionedTable, colName);
         }
-        m_partitioning.setCountOfPartitionedTables(countOfPartitionedTables);
+        m_partitioning.setPartitionedTables(partitionColumnByTable, countOfPartitionedTables);
+        if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_partitioning.getCountOfPartitionedTables() > 0) {
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, parsedStmt.valueEquivalence);
+            int multiPartitionScanCount = m_partitioning.getCountOfIndependentlyPartitionedTables();
+            if (multiPartitionScanCount > 1) {
+                // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
+                String msg = "Join of multiple partitioned tables has insufficient join criteria.";
+                throw new PlanningErrorException(msg);
+            }
+        }
 
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {
@@ -325,10 +370,6 @@ public class PlanAssembler {
         fragment.planGraph.generateOutputSchema(m_catalogDb);
         retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
-    }
-
-    void resetPartitioningKey(Object best) {
-        m_partitioning.setEffectiveValue(best);
     }
 
     private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
@@ -634,7 +675,7 @@ public class PlanAssembler {
             if (column.equals(m_partitioning.getColumn())) {
                 String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
                 m_partitioning.addPartitioningExpression(fullColumnName, expr);
-                m_partitioning.setEffectiveValue(ConstantValueExpression.extractPartitioningValue(expr.getValueType(), expr));
+                m_partitioning.setInferredValue(ConstantValueExpression.extractPartitioningValue(expr.getValueType(), expr));
             }
 
             // add column to the materialize node.
@@ -649,7 +690,6 @@ public class PlanAssembler {
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
         insertNode.generateOutputSchema(m_catalogDb);
-        AbstractPlanNode rootNode = insertNode;
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
             return insertNode;
