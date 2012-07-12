@@ -110,6 +110,7 @@ public:
             // safety check
             assert(memcmp(p.first->core->plan, plan, length) == 0);
             m_plans.relocate(m_plans.begin(),p.first);
+            assert(fragId < 0);
             return true;
         }
         // if cache miss
@@ -119,6 +120,7 @@ public:
             // safety check
             assert(memcmp(key.core->plan, plan, length) == 0);
             fragId = key.fragmentId;
+            assert(fragId < 0);
             return false;
         }
     }

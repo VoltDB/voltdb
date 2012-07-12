@@ -223,6 +223,9 @@ public class ExecutionEngineJNI extends ExecutionEngine {
                 final long fragId = fds.readLong();
                 final boolean wasHit = fds.readBoolean();
                 final long cacheSize = fds.readLong();
+                if (fragId == 0) {
+                    throw new EEException(ERRORCODE_ERROR);
+                }
                 return fragId;
             } catch (final IOException ex) {
                 LOG.error("Failed to deserialze loadPlanFragment results" + ex);
@@ -250,7 +253,10 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long[] planFragmentIds,
             final long[] inputDepIds,
             final ParameterSet[] parameterSets,
-            final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException {
+            final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException
+    {
+        // plan frag zero is invalid
+        assert((planFragmentIds.length == 0) || (planFragmentIds[0] != 0));
 
         if (numFragmentIds == 0) return new VoltTable[0];
         final int batchSize = numFragmentIds;

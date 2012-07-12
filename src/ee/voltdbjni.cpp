@@ -585,7 +585,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
     int64_t cacheSize = 0;
 
     // load
-    int result = 0;
+    int result = 1;
     try {
         result = engine->loadFragment(reinterpret_cast<char *>(str),
                                       env->GetArrayLength(plan),
@@ -593,9 +593,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadPlanFragment (
     } catch (FatalException e) {
         topend->crashVoltDB(e);
     }
-    if (fragId == 0) {
-        result = 0;
-    }
+    assert((result == 1) || (fragId != 0));
 
     // release plan memory
     env->ReleaseByteArrayElements(plan, str, JNI_ABORT);
