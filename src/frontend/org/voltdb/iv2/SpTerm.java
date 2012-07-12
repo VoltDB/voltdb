@@ -50,7 +50,6 @@ import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltZK;
 
 import com.google.common.collect.Sets;
 
@@ -82,7 +81,7 @@ import com.google.common.collect.Sets;
  * a new PI and the consequent ZK observers for performing that
  * role.
  */
-public class SpTerm
+public class SpTerm implements Term
 {
     VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
@@ -420,6 +419,4 @@ public class SpTerm
             VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
         }
     }
-
-
 }
