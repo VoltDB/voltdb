@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.voltdb.catalog.Index;
+import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -77,13 +78,14 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         AbstractPlanNode child = plan.getChild(0);
         if ((child instanceof IndexScanPlanNode) == false)
             return plan;
+
         // check index type
         Index idx = ((IndexScanPlanNode)child).getCatalogIndex();
         if (idx.getCountable() == false)
             return plan;
 
         IndexCountPlanNode icpn = null;
-        if (isReplaceable(child)) {
+        if (isReplaceable((IndexScanPlanNode)child)) {
             icpn = new IndexCountPlanNode((IndexScanPlanNode)child);
             icpn.setOutputSchema(plan.getOutputSchema());
 
@@ -93,7 +95,6 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
             }
 
             // TODO: set schema using plan's schema
-            //plan.getOutputSchema()
             plan.removeFromGraph();
             child.removeFromGraph();
 
@@ -104,9 +105,15 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
 
 
     // TODO(xin): add more checkings to replace only certain cases.
-    boolean isReplaceable(AbstractPlanNode child) {
-        if ((child instanceof IndexScanPlanNode) == false)
-            return false;
+    boolean isReplaceable(IndexScanPlanNode child) {
+        AbstractExpression endExpr = child.getEndExpression();
+        AbstractExpression postExpr = child.getPredicate();
+        if (endExpr != null)
+            System.err.println("End Expression:\n" + endExpr);
+        if (postExpr != null)
+            System.err.println("Post Expression:\n" + postExpr);
+
+
 
 
         return true;

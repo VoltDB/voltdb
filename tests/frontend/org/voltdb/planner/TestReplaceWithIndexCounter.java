@@ -32,7 +32,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
-import org.voltdb.types.ExpressionType;
 
 public class TestReplaceWithIndexCounter extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -80,43 +79,37 @@ public class TestReplaceWithIndexCounter extends TestCase {
 
     public void testCountStar0() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, true);
-        checkIndexCounter(pn, true,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
-    }
-    public void testCountStar1() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3", 0, true);
-        checkIndexCounter(pn, false,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
+        checkIndexCounter(pn, true, false);
     }
     // SeqScan is not supported right now
-//    public void testCountStar2() {
-//        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
-//        checkIndexCounter(pn, false,
-//                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-//                        null);
-//    }
+    public void testCountStar1() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
+        checkIndexCounter(pn, false, false);
+    }
+
+    public void testCountStar2() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3", 0, true);
+        checkIndexCounter(pn, false, true);
+    }
 
     public void testCountStar3() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS <= 6", 0, true);
-        checkIndexCounter(pn, false,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
+        checkIndexCounter(pn, false, true);
     }
 
     public void testCountStar4() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?", 2, true);
-        checkIndexCounter(pn, false,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
+        checkIndexCounter(pn, false, true);
     }
 
     public void testCountStar5() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE NAME ='XIN' AND POINTS > ? AND POINTS <= ?", 2, true);
-        checkIndexCounter(pn, false,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ? AND POINTS <= ?", 2, true);
+        checkIndexCounter(pn, false, true);
+    }
+
+    public void testCountStar6() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS > ?", 2, true);
+        checkIndexCounter(pn, false, false);
     }
 
 //    public void testCountStarOnPartitionedTable() {
@@ -141,8 +134,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
      *            The expected aggregate types for the top aggregate node after
      *            pushing the original aggregate node down.
      */
-    private void checkIndexCounter(List<AbstractPlanNode> pn, boolean isMultiPart,
-                                 ExpressionType[] aggTypes, ExpressionType[] pushDownTypes) {
+    private void checkIndexCounter(List<AbstractPlanNode> pn, boolean isMultiPart, boolean isReplaceable) {
         assertTrue(pn.size() > 0);
 
         AbstractPlanNode p = pn.get(0).getChild(0);
@@ -162,8 +154,10 @@ public class TestReplaceWithIndexCounter extends TestCase {
 //            System.out.println("Child " + i + " :" + p.getChild(i).toExplainPlanString());
 //            System.out.println("Parent " + i + " :" + p.getParent(i).toExplainPlanString());
 //        }
-
-        assertTrue(p instanceof IndexCountPlanNode);
+        if (isReplaceable)
+            assertTrue(p instanceof IndexCountPlanNode);
+        else
+            assertTrue((p instanceof IndexCountPlanNode) == false);
 //        if (pushDownTypes != null) {
 //            for (ExpressionType type : pushDownTypes) {
 //                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
