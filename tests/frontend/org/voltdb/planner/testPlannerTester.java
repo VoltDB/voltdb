@@ -136,9 +136,10 @@ public class testPlannerTester extends TestCase {
     
     public void testWriteAndLoad() {
     	AbstractPlanNode pn = null;
-    	// pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-    	pn = compile("select * from l where b = ? limit ?;", 3, true);
-    	// pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
+    	//pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+    	//pn = compile("select * from l where b = ? limit ?;", 3, true);
+    	//pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
+    	pn = compile("select * from t order by a limit ?;",3, true);
     	PlanNodeTree pnt1 = new PlanNodeTree( pn );
     	System.out.println(pnt1.toJSONString());
     	System.out.println(pnt1.getRootPlanNode().toExplainPlanString() );
@@ -146,7 +147,7 @@ public class testPlannerTester extends TestCase {
     	plannerTester.writePlanToFile(pn, path);
     	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path);
     	System.out.println( pnt.toJSONString() );
-    	System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
+    	//System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
     	ArrayList<AbstractPlanNode> list1 = pnt1.getRootPlanNode().getLists();
     	ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getLists();
     	assertTrue( list1.size() == list2.size() );
@@ -253,16 +254,17 @@ public class testPlannerTester extends TestCase {
         plannerTester.diffInlineNodes(pn1, pn2);
     }
     
-    public void testDiffLeaves() {
+    public void testDiff() {
     	AbstractPlanNode pn1 = null;
     	AbstractPlanNode pn2 = null;
         //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
         pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-        pn2 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+        pn2 = compile("select * from l where b=? order by a;", 3, true);
         //pn2 = compile("select * from l where b = ?;", 3, true);
         assertTrue(pn1 != null);
         assertTrue(pn2 != null);
         plannerTester.diffLeaves(pn1, pn2);
+        plannerTester.diffInlineNodes(pn1, pn2);
     }
     
     public void testBatchDiff() {

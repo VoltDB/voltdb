@@ -30,6 +30,52 @@ public class plannerTester {
 	private static String m_ddlFile = "testplans-plannerTester-ddl.sql";
 	private static String m_stmtFile = "testplans-plannerTester-ddl.stmt";
 	private static ArrayList<String> m_stmts = new ArrayList<String>();
+	private static int m_treeSizeDiff;
+	private static boolean m_changedSQL;
+	
+	private static class Pair {
+	    private Object first; //first member of pair
+	    private Object second; //second member of pair
+
+	    public Pair(Object first, Object second) {
+	        this.first = first;
+	        this.second = second;
+	    }
+	    
+	    public void set( Object first, Object second ) {
+	    	this.first = first;
+	        this.second = second;
+	    }
+	    
+	    public Object getFirst( ) {
+	    	return first;
+	    }
+	    
+	    public Object getSecond( ) {
+	    	return second;
+	    }
+	    
+	    public void setFirst( Object first ) {
+	    	this.first = first;
+	    }
+	    
+	    public void setSecond( Object second ) {
+	    	this.second = second;
+	    }
+	    
+	    public String toString() {
+	    	if( first == null )
+	    		first = "[]";
+	    	if( second == null )
+	    		second = "[]";
+	    	return "("+first.toString()+","+second.toString()+")";
+	    }
+	    
+	    public boolean equals() {
+	    	return first.equals(second);
+	    }
+	}
+    //private Pair m_intPair = new Pair(0,0);
 
     public static void setUpSchema( String ddl, String basename ) throws Exception {
         aide = new PlannerTestAideDeCamp(TestIndexSelection.class.getResource(ddl),
@@ -134,12 +180,26 @@ public class plannerTester {
 	}
 	
 	public static void diffInlineNodes( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ) {
+		m_treeSizeDiff = 0;
 		ArrayList<AbstractPlanNode> list1 = oldpn1.getLists();
 		ArrayList<AbstractPlanNode> list2 = newpn2.getLists();
 		int size1 = list1.size();
 		int size2 = list2.size();
+		m_treeSizeDiff = size1 - size2;
+		Pair intPair = new Pair(0,0);
+		Pair stringPair = new Pair(null,null);
 		if( size1 != size2 ) {
-			System.out.println( "Different plan tree size, used to be: "+size1+", now is: "+size2 );
+			intPair.set(size1, size2);
+			System.out.println( "Plan tree size diff: " );
+			System.out.println( intPair.toString() );
+		}
+		if( !m_changedSQL ){
+			if( m_treeSizeDiff < 0 ){
+				System.out.println( "Old plan might be better" );
+			}
+			else if( m_treeSizeDiff > 0 ) {
+				System.out.println( "New plan might be better");
+			}
 		}
 		Map<Integer, AbstractPlanNode> projNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		Map<Integer, AbstractPlanNode> projNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
@@ -207,76 +267,111 @@ public class plannerTester {
 		for( int index: projInlineNodes1.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Inline Projection Node was at: "+indexList );
+		stringPair.setFirst(indexList.clone());
 		indexList.clear();
 		for( int index: projInlineNodes2.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Inline Projection Node now at: "+indexList );
+		stringPair.setSecond(indexList.clone());
+		if( !stringPair.equals() ){
+			System.out.println( "Inline Projection Nodes diff: ");
+			System.out.println( stringPair.toString() );
+		}
 		indexList.clear();
+		
 		for( int index: limitInlineNodes1.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Inline Limit Node was at: "+indexList );
+		stringPair.setFirst(indexList.clone());
 		indexList.clear();
 		for( int index: limitInlineNodes2.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Inline Limit Node now at: "+indexList );
+		stringPair.setSecond(indexList.clone());
+		if( !stringPair.equals() ) {
+			System.out.println( "Inline Limit Nodes diff: ");
+			System.out.println( stringPair.toString() );
+		}
 		indexList.clear();
+		
 		for( int index: orderByInlineNodes1.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Inline Order By Node was at: "+indexList );
+		stringPair.setFirst(indexList.clone());
 		indexList.clear();
 		for( int index: orderByInlineNodes2.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Inline Order By Node now at: "+indexList );
+		stringPair.setSecond(indexList.clone());
+		if( !stringPair.equals() ) {
+			System.out.println( "Inline Order By Node diff: " );
+			System.out.println( stringPair.toString() );
+		}
 		indexList.clear();
 		
 		//non-inline proj limit order by nodes
 		for( int index: projNodes1.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Projection Node was at: "+indexList );
+		stringPair.setFirst(indexList.clone());
 		indexList.clear();
 		for( int index: projNodes2.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Projection Node now at: "+indexList );
+		stringPair.setSecond(indexList.clone());
+		if( !stringPair.equals() ){
+			System.out.println( "Projection Node diff: " );
+			System.out.println( stringPair.toString() );
+		}
 		indexList.clear();
+		
 		for( int index: limitNodes1.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Limit Node was at: "+indexList );
+		stringPair.setFirst(indexList.clone());
 		indexList.clear();
 		for( int index: limitNodes2.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Limit Node now at: "+indexList );
+		stringPair.setSecond(indexList.clone());
+		if( !stringPair.equals() ){
+			System.out.println( "Limit Node diff: " );
+			System.out.println( stringPair.toString() );
+		}
 		indexList.clear();
+		
 		for( int index: orderByNodes1.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Order By Node was at: "+indexList );
+		stringPair.setFirst(indexList.clone());
 		indexList.clear();
 		for( int index: orderByNodes2.keySet() ) {
 			indexList.add(index);
 		}
-		System.out.println( "Order By Node now at: "+indexList );
+		stringPair.setSecond(indexList.clone());
+		if( !stringPair.equals() ){
+			System.out.println( "Order By Node diff:" );
+			System.out.println( stringPair.toString() );
+		}
 		indexList.clear();
 	}
 	
 	public static void diffLeaves( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ){
+		m_changedSQL = false;
 		ArrayList<AbstractPlanNode> list1 = oldpn1.getLeafLists();
 		ArrayList<AbstractPlanNode> list2 = newpn2.getLeafLists();
 		int size1 = list1.size();
 		int size2 = list2.size();
 		int max = Math.max(size1, size2);
 		int min = Math.min(size1, size2);
+		Pair intPair = new Pair(0,0);
+		Pair stringPair = new Pair("", "");
 		if( size1 != size2 ){
-			System.out.println( "Different size, used to be: "+size1+", now is: "+size2 );
+			intPair.set(size1, size2);
+			System.out.println( "Leaf size diff : " );
+			System.out.println( intPair );
+			System.out.println( "SQLSTMT might be changed" );
+			m_changedSQL = true;
 			try {
 				for( int i = 0; i < min; i++ ) {
 					JSONObject j1 = new JSONObject( list1.get(i).toJSONString() );
@@ -285,18 +380,26 @@ public class plannerTester {
 					String table2 = j2.getString("TARGET_TABLE_NAME");
 					String nodeType1 = j1.getString("PLAN_NODE_TYPE");
 					String nodeType2 = j2.getString("PLAN_NODE_TYPE");
-					if( !table1.equalsIgnoreCase(table2) )
-						System.out.println("Different table at leaf "+i+" used to be: "+nodeType1+" at "+table1+", now is: "+nodeType2+" at "+table2);
+					if( !table1.equalsIgnoreCase(table2) ) {
+						stringPair.set( nodeType1+" at "+table1, nodeType2+" at "+table2 );
+						System.out.println("Table diff at leaf "+i+":");
+						System.out.println( stringPair );
+					}
 					else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
-						System.out.println("Different scan at leaf "+i+" used to be: "+nodeType1+" at "+table1+", now is: "+nodeType2+" at "+table2);
+						stringPair.set(nodeType1+" at "+table1, nodeType2+" at "+table2);
+						System.out.println("Scan diff at leaf "+i+" :");
+						System.out.println( stringPair );
 					}
 					else if ( nodeType1.equalsIgnoreCase("INDEXSCAN") ) {
 						String index1 = j1.getString("TARGET_INDEX_NAME");
 						String index2 = j2.getString("TARGET_INDEX_NAME");
-						if( !index1.equalsIgnoreCase(index2) )
-							System.out.println("Different index at leaf "+i+" used to be: "+index1+", now is: "+index2);
+						stringPair.set( index1, index2);
+						if( !index1.equalsIgnoreCase(index2) ) {
+							System.out.println("Index diff at leaf "+i+" :");
+							System.out.println(stringPair);
+						}
 					}
-					else
+					else//either index scan using same index or seqscan on same table 
 						System.out.println("Same at leaf "+i);
 				}
 				//lists size are different
@@ -306,10 +409,20 @@ public class plannerTester {
 						String table = j.getString("TARGET_TABLE_NAME");
 						String nodeType = j.getString("PLAN_NODE_TYPE");
 						String index = null;
-						if( nodeType.equalsIgnoreCase("INDEXSCAN") )
+						if( nodeType.equalsIgnoreCase("INDEXSCAN") ) {
 						  index = j.getString("TARGET_INDEX_NAME");
-						System.out.println("Different at leaf "+i+" used to be table: "+table+" type :"+nodeType+" " +
-								" index: "+index+" now is empty");
+						}
+						if( index != null ) {
+							stringPair.set(nodeType+" on "+table+" using "+index, "Empty" );
+							System.out.println("Diff at leaf "+i+" :");
+							System.out.println(stringPair.toString());
+						}
+						else
+						{
+							stringPair.set(nodeType+" on "+table, "Empty" );
+							System.out.println("Diff at leaf "+i+": ");
+							System.out.println(stringPair.toString());
+						}
 		 			}
 				}
 				else if( size1 < max ) {
@@ -320,14 +433,22 @@ public class plannerTester {
 						String index = null;
 						if( nodeType.equalsIgnoreCase("INDEXSCAN") ) {
 						  index = j.getString("TARGET_INDEX_NAME");
-						  System.out.println("Different at leaf "+i+" used to be empty, now is :"+nodeType+" " + " at "+table+" on index "+index);
-						}
-						else
-							System.out.println("Different at leaf "+i+" used to be empty, now is :"+nodeType+" at "+table);
+						  if( index != null ) {
+								stringPair.set(nodeType+" on "+table+" using "+index, "Empty" );
+								System.out.println("Diff at leaf "+i+" :");
+								System.out.println(stringPair.toString());
+							}
+							else
+							{
+								stringPair.set(nodeType+" on "+table, "Empty" );
+								System.out.println("Diff at leaf "+i+": ");
+								System.out.println(stringPair.toString());
+							}
 		 			}
 				}
 				}
-				catch (JSONException e) {
+			}
+			catch (JSONException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
@@ -336,29 +457,37 @@ public class plannerTester {
 			System.out.println("same leaf size");
 			try{
 				if( max == 1 ) {
-					System.out.println("single table query");
+					System.out.println("Single table query");
 					JSONObject j1 = new JSONObject( list1.get(0).toJSONString() );
 					JSONObject j2 = new JSONObject( list2.get(0).toJSONString() );
 					String table1 = j1.getString("TARGET_TABLE_NAME");
 					String table2 = j2.getString("TARGET_TABLE_NAME");
 					String nodeType1 = j1.getString("PLAN_NODE_TYPE");
 					String nodeType2 = j2.getString("PLAN_NODE_TYPE");
-					if( !table1.equalsIgnoreCase(table2) )
-						System.out.println("Different table at "+0+" used to be: "+nodeType1+" at "+table1+", now is: "+nodeType2+" at "+table2);
+					if( !table1.equalsIgnoreCase(table2) ){
+						stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
+						System.out.println("Diff table at leaf"+0+" :");
+						System.out.println(stringPair);	
+					}
 					else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
-						System.out.println("Different scan at "+0+" used to be: "+nodeType1+", now is: "+nodeType2);
+						stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
+						System.out.println("Diff scan at leaf"+0+" :");
+						System.out.println(stringPair);
 					}
 					else if ( nodeType1.equalsIgnoreCase("INDEXSCAN") ) {
 						String index1 = j1.getString("TARGET_INDEX_NAME");
 						String index2 = j2.getString("TARGET_INDEX_NAME");
-						if( !index1.equalsIgnoreCase(index2) )
-							System.out.println("Different index at "+0+" used to be: "+index1+", now is: "+index2);
+						if( !index1.equalsIgnoreCase(index2) ){
+							stringPair.set(nodeType1+" on "+table1+" using "+index1, nodeType2+" on "+table2+" using "+index2 );
+							System.out.println("Diff index at leaf"+0+": ");
+							System.out.println(stringPair);
+						}
 					}
 					else
 						System.out.println("Same at "+0);
 				}
 				else {
-					System.out.println("Join Query:");
+					System.out.println("Join query");
 					for( int i = 0; i < max; i++ ) {
 						JSONObject j1 = new JSONObject( list1.get(i).toJSONString() );
 						JSONObject j2 = new JSONObject( list2.get(i).toJSONString() );
@@ -366,17 +495,25 @@ public class plannerTester {
 						String table2 = j2.getString("TARGET_TABLE_NAME");
 						String nodeType1 = j1.getString("PLAN_NODE_TYPE");
 						String nodeType2 = j2.getString("PLAN_NODE_TYPE");
-						if( !table1.equalsIgnoreCase(table2) )
-							System.out.println("Different table at "+i+" used to be: "+nodeType1+" at "+table1+", now is: "+nodeType2+" at "+table2);
+						if( !table1.equalsIgnoreCase(table2) ){
+							stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
+							System.out.println("Diff table at leaf"+i+" :");
+							System.out.println(stringPair);	
+						}
 						else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
-							System.out.println("Different scan at "+i+" used to be: "+nodeType1+", now is: "+nodeType2);
+							stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
+							System.out.println("Diff scan at leaf"+0+" :");
+							System.out.println(stringPair);	
 						}
 						else if ( nodeType1.equalsIgnoreCase("INDEXSCAN") ) {
 							String index1 = j1.getString("TARGET_INDEX_NAME");
 							String index2 = j2.getString("TARGET_INDEX_NAME");
-						if( !index1.equalsIgnoreCase(index2) )
-							System.out.println("Different index at "+i+" used to be: "+index1+", now is: "+index2);
-					}
+								if( !index1.equalsIgnoreCase(index2) ){
+									stringPair.set(nodeType1+" on "+table1+" using "+index1, nodeType2+" on "+table2+" using "+index2 );
+									System.out.println("Diff index at leaf"+0+": ");
+									System.out.println(stringPair);
+								}
+						}
 					else
 						System.out.println("Same at leaf"+i);
 				}
