@@ -84,7 +84,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
-        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, true, false, spi, 2101);
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, true, false, spi, 2101, 3101);
         itask.setSpHandle(31337);
         Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltMessage(itask);
 
@@ -98,6 +98,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getParameterCount(), itask2.getParameterCount());
         assertEquals(itask.getClientInterfaceHandle(), itask2.getClientInterfaceHandle());
         assertEquals(itask.getClientInterfaceHandle(), 2101);
+        assertEquals(itask.getConnectionId(), 3101);
         assertEquals(itask.getSpHandle(), itask2.getSpHandle());
         assertEquals(31337, itask.getSpHandle());
     }
@@ -144,8 +145,8 @@ public class TestVoltMessageSerialization extends TestCase {
     }
 
     public void testFragmentTaskWithTwoFrags() throws IOException {
-        Object[] params1 = {(Integer)10, (Double)10.1};
-        Object[] params2 = {(Integer)20, (Double)20.2};
+        Object[] params1 = {10, 10.1};
+        Object[] params2 = {20, 20.2};
 
         ParameterSet param_set1 = new ParameterSet();
         param_set1.setParameters(params1);
@@ -298,7 +299,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
-        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101);
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 100045, true, false, spi, 2101, 3101);
         itask.setSpHandle(31337);
 
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, itask);
@@ -318,6 +319,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getParameterCount(), itask2.getParameterCount());
         assertEquals(itask.getClientInterfaceHandle(), itask2.getClientInterfaceHandle());
         assertEquals(itask.getClientInterfaceHandle(), 2101);
+        assertEquals(itask.getConnectionId(), 3101);
         assertEquals(itask.getSpHandle(), itask2.getSpHandle());
         assertEquals(31337, itask.getSpHandle());
     }

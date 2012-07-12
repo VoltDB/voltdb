@@ -48,13 +48,13 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpScheduler extends Scheduler
 {
-    private Map<Long, TransactionState> m_outstandingTxns =
+    private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
-    private Map<Long, DuplicateCounter> m_duplicateCounters =
+    private final Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
 
     private final MapCache m_iv2Masters;
-    private AtomicLong m_txnId = new AtomicLong(1l << 40);
+    private final AtomicLong m_txnId = new AtomicLong(1l << 40);
     private final long m_buddyHSId;
 
     MpScheduler(long buddyHSId, SiteTaskerQueue taskQueue, MapCache iv2masters)
@@ -140,7 +140,8 @@ public class MpScheduler extends Scheduler
                     message.isReadOnly(),
                     true, // isSinglePartition
                     message.getStoredProcedureInvocation(),
-                    message.getClientInterfaceHandle());
+                    message.getClientInterfaceHandle(),
+                    message.getConnectionId());
             DuplicateCounter counter = new DuplicateCounter(
                     message.getInitiatorHSId(),
                     mpTxnId,
@@ -162,7 +163,8 @@ public class MpScheduler extends Scheduler
                     message.isReadOnly(),
                     message.isSinglePartition(),
                     message.getStoredProcedureInvocation(),
-                    message.getClientInterfaceHandle());
+                    message.getClientInterfaceHandle(),
+                    message.getConnectionId());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),

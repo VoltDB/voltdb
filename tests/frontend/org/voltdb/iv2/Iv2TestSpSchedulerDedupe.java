@@ -107,7 +107,8 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
                                        readOnly, // readonly
                                        singlePart, // single-part
                                        spi, // invocation
-                                       Long.MAX_VALUE); // client interface handle
+                                       Long.MAX_VALUE, // client interface handle
+                                       Long.MAX_VALUE); // client connection id
         return task;
     }
 

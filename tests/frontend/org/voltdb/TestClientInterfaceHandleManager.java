@@ -39,15 +39,15 @@ public class TestClientInterfaceHandleManager {
     public void testGetAndFind() throws Exception
     {
         Connection mockConnection = mock(Connection.class);
-        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager();
-        long handle = dut.getHandle(true, 7, 31337, mockConnection, false, 10, 10l);
+        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager( false, mockConnection);
+        long handle = dut.getHandle(true, 7, 31337, 10, 10l);
         assertEquals(7, ClientInterfaceHandleManager.getPartIdFromHandle(handle));
         assertEquals(0, ClientInterfaceHandleManager.getSeqNumFromHandle(handle));
         ClientInterfaceHandleManager.Iv2InFlight inflight = dut.findHandle(handle);
         assertEquals(handle, inflight.m_ciHandle);
         assertEquals(31337, inflight.m_clientHandle);
 
-        handle = dut.getHandle(false, 12, 31338, mockConnection, false, 10, 10l);
+        handle = dut.getHandle(false, 12, 31338, 10, 10l);
         assertEquals(ClientInterfaceHandleManager.MP_PART_ID,
                 ClientInterfaceHandleManager.getPartIdFromHandle(handle));
         assertEquals(0, ClientInterfaceHandleManager.getSeqNumFromHandle(handle));
@@ -60,10 +60,10 @@ public class TestClientInterfaceHandleManager {
     public void testGetAndRemove() throws Exception
     {
         Connection mockConnection = mock(Connection.class);
-        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager();
+        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager(false, mockConnection);
         List<Long> handles = new ArrayList<Long>();
         for (int i = 0; i < 10; i++) {
-            handles.add(dut.getHandle(true, 7, 31337 + i, mockConnection, false, 10, 10l));
+            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l));
         }
         System.out.println("Removing handle: " + handles.get(5));
         dut.removeHandle(handles.get(5));
@@ -84,10 +84,10 @@ public class TestClientInterfaceHandleManager {
     public void testGetSkipMissingHandles() throws Exception
     {
         Connection mockConnection = mock(Connection.class);
-        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager();
+        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager(false, mockConnection);
         List<Long> handles = new ArrayList<Long>();
         for (int i = 0; i < 10; i++) {
-            handles.add(dut.getHandle(true, 7, 31337 + i, mockConnection, false, 10, 10l));
+            handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l));
         }
         // pretend handles 0-4 were lost
         for (int i = 5; i < 10; i++) {
