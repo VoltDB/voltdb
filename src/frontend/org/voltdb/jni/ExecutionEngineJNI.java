@@ -49,7 +49,7 @@ import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** java.util.logging logger. */
-    private static final VoltLogger LOG = new VoltLogger(ExecutionEngine.class.getName());
+    private static final VoltLogger LOG = new VoltLogger("HOST");
 
     /** The HStoreEngine pointer. */
     private long pointer;
