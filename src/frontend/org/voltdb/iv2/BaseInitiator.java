@@ -70,6 +70,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         RejoinProducer rejoinProducer =
             new RejoinProducer(m_partitionId, scheduler.m_tasks);
         m_initiatorMailbox = new InitiatorMailbox(
+                m_partitionId,
                 m_scheduler,
                 m_messenger,
                 m_repairLog,
@@ -80,8 +81,12 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         rejoinProducer.setMailbox(m_initiatorMailbox);
         m_scheduler.setMailbox(m_initiatorMailbox);
 
-        m_whoami = whoamiPrefix +  " " + CoreUtils.hsIdToString(getInitiatorHSId())
-            + " for partition " + m_partitionId + " ";
+        String partitionString = " ";
+        if (m_partitionId != -1) {
+            partitionString = " for partition " + m_partitionId + " ";
+        }
+        m_whoami = whoamiPrefix +  " " +
+            CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
     }
 
     @Override
@@ -111,6 +116,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                     numberOfPartitions);
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
+            m_scheduler.setProcedureSet(procSet);
 
             m_scheduler.start();
             m_siteThread = new Thread(m_executionSite);
@@ -123,10 +129,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             // m_siteThread.start() in a Runnable which RealVoltDB can use for
             // configure/run sequencing in the future.
             joinElectoralCollege(kfactor);
-
-            // Leader elector chains are built, let scheduler do final
-            // initialization (the MPI needs to setup its MapCache)
-            m_scheduler.setProcedureSet(procSet);
         }
         catch (Exception e) {
            VoltDB.crashLocalVoltDB("Failed to configure initiator", true, e);
@@ -161,7 +163,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             long startTime = System.currentTimeMillis();
             Boolean success = false;
             while (!success) {
-                tmLog.info(m_whoami + "starting leader promotion");
+                // term syslogs the start of leader promotion.
                 m_term = new Term(m_missingStartupSites, m_messenger.getZK(),
                         m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                         m_zkMailboxNode, m_whoami);

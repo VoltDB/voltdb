@@ -33,6 +33,7 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
     public String aggregatorFragment;
     public String collectorFragment;
     public boolean isReplicatedTableDML;
+    public boolean isNonDeterministic;
     public Object partitionParam;
     public int catalogVersion;
     public List<ParameterInfo> params;
@@ -44,6 +45,7 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
      * @param aggregatorFragment        planned aggregator fragment
      * @param collectorFragment         planned collector fragment
      * @param isReplicatedTableDML      replication flag
+     * @param isNonDeterministic        non-deterministic SQL flag
      * @param partitionParam partition  parameter
      * @param catalogVersion            catalog version
      */
@@ -51,12 +53,14 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
                                  String aggregatorFragment,
                                  String collectorFragment,
                                  boolean isReplicatedTableDML,
+                                 boolean isNonDeterministic,
                                  Object partitionParam,
                                  int catalogVersion) {
         this.sql = sql;
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.isReplicatedTableDML = isReplicatedTableDML;
+        this.isNonDeterministic = isNonDeterministic;
         this.partitionParam = partitionParam;
         this.catalogVersion = catalogVersion;
     }

@@ -187,7 +187,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         {
             // FUTURE: should pass this status in at construction.
             long lowestSiteId = VoltDB.instance().getSiteTrackerForSnapshot().getLowestSiteForHost(getHostId());
-            System.out.println("\t\tLowest. Site: " + m_siteId + " lowest: " + lowestSiteId);
             return m_siteId == lowestSiteId;
         }
 
@@ -309,7 +308,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         ExecutionEngine eeTemp = null;
         try {
             if (m_backend == BackendTarget.NATIVE_EE_JNI) {
-                System.out.println("Creating JNI EE.");
                 eeTemp =
                     new ExecutionEngineJNI(
                         m_context.cluster.getRelativeIndex(),

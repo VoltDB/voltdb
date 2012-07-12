@@ -293,7 +293,9 @@ public class Term
     void prepareForStartup()
         throws InterruptedException
     {
-        tmLog.info(m_whoami + "starting with " + m_missingStartupSites.getCount() + " replicas.");
+        tmLog.info(m_whoami +
+                "starting leader promotion with " + m_knownReplicas.size() + " replicas. " +
+                "Waiting for " + m_missingStartupSites.getCount() + " more for configured k-safety.");
 
         // block here until the babysitter thread provides all replicas.
         // then initialize the mailbox's replica set and proceed as leader.

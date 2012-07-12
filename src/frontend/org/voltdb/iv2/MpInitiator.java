@@ -54,8 +54,17 @@ public class MpInitiator extends BaseInitiator
                           int numberOfPartitions,
                           boolean createForRejoin)
     {
-        // for now, lie - kfactor for MPI is always 0.
         super.configure(backend, serializedCatalog, catalogContext,
-                kfactor, csp, numberOfPartitions, createForRejoin);
+                kfactor, csp, numberOfPartitions,
+                createForRejoin && isRejoinable());
+    }
+
+    /**
+     * The MPInitiator does not have user data to rejoin.
+     */
+    @Override
+    public boolean isRejoinable()
+    {
+        return false;
     }
 }

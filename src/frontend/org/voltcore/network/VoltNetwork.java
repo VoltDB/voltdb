@@ -488,4 +488,9 @@ class VoltNetwork implements Runnable
     Long getThreadId() {
         return m_thread.getId();
     }
+
+    void queueTask(Runnable r) {
+        m_tasks.offer(r);
+        m_selector.wakeup();
+    }
 }

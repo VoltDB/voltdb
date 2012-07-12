@@ -126,12 +126,13 @@ public class MpScheduler extends Scheduler
         final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
 
         final List<Long> partitionInitiators = getHSIdsForPartitionInitiators();
-
+        final long mpTxnId = m_txnId.incrementAndGet();
+        // Don't have an SP HANDLE at the MPI, so fill in the unused value
+        Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
         // Handle every-site system procedures (at the MPI)
         if (runner.isEverySite()) {
             // Send an SP initiate task to all remote sites
             final Long localId = m_mailbox.getHSId();
-            final long mpTxnId = m_txnId.incrementAndGet();
             Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
                     localId, // make the MPI the initiator.
                     message.getCoordinatorHSId(),
@@ -152,11 +153,21 @@ public class MpScheduler extends Scheduler
             m_pendingTasks.offer(eptask);
             return;
         }
-
+        // Create a copy so we can overwrite the txnID so the InitiateResponse will be
+        // correctly tracked.
+        Iv2InitiateTaskMessage mp =
+            new Iv2InitiateTaskMessage(
+                    message.getInitiatorHSId(),
+                    message.getCoordinatorHSId(),
+                    mpTxnId,
+                    message.isReadOnly(),
+                    message.isSinglePartition(),
+                    message.getStoredProcedureInvocation(),
+                    message.getClientInterfaceHandle());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
-                    m_txnId.incrementAndGet(), m_pendingTasks, message, partitionInitiators,
+                    mpTxnId, m_pendingTasks, mp, partitionInitiators,
                     m_buddyHSId);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);

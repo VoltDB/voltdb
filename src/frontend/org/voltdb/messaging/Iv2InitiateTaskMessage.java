@@ -38,8 +38,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     // initiating a single-partition transaction.
     public static final long UNUSED_MP_TXNID = Long.MIN_VALUE;
 
-    // allow PI to signal RI repair log truncation with a new task.
-    private long m_truncationHandle;
     long m_clientInterfaceHandle;
     long m_connectionId;
     boolean m_isSinglePartition;
@@ -81,9 +79,10 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long connectionId)
     {
         super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
+        setTruncationHandle(truncationHandle);
+
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
-        m_truncationHandle = truncationHandle;
         m_clientInterfaceHandle = clientInterfaceHandle;
         m_connectionId = connectionId;
     }
@@ -95,7 +94,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         super(initiatorHSId, coordinatorHSId, rhs);
         m_isSinglePartition = rhs.m_isSinglePartition;
         m_invocation = rhs.m_invocation;
-        m_truncationHandle = rhs.m_truncationHandle;
         m_clientInterfaceHandle = rhs.m_clientInterfaceHandle;
         m_connectionId = rhs.m_connectionId;
     }
@@ -142,10 +140,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         return m_isDurable;
     }
 
-    public long getTruncationHandle() {
-        return m_truncationHandle;
-    }
-
     public AtomicBoolean getDurabilityFlagIfItExists() {
         return m_isDurable;
     }
@@ -158,7 +152,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     public int getSerializedSize()
     {
         int msgsize = super.getSerializedSize();
-        msgsize += 8; // m_truncationHandle
         msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_connectionId
         msgsize += 1; // is single partition flag
@@ -171,7 +164,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     {
         buf.put(VoltDbMessageFactory.IV2_INITIATE_TASK_ID);
         super.flattenToBuffer(buf);
-        buf.putLong(m_truncationHandle);
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
@@ -184,8 +176,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
         super.initFromBuffer(buf);
-
-        m_truncationHandle = buf.getLong();
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
@@ -204,7 +194,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(") FOR TXN ");
         sb.append(m_txnId).append("\n");
         sb.append(") TRUNC HANDLE ");
-        sb.append(m_truncationHandle).append("\n");
+        sb.append(getTruncationHandle()).append("\n");
         sb.append("SP HANDLE: ").append(m_spHandle).append("\n");
         sb.append("CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
         sb.append("\n");

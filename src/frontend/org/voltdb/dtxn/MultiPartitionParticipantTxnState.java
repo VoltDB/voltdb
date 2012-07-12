@@ -28,11 +28,15 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.CatalogContext;
 import org.voltdb.ExecutionSite;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Procedure;
+import org.voltdb.catalog.Statement;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -61,6 +65,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
     private HashSet<Long> m_outstandingAcks = null;
     private final java.util.concurrent.atomic.AtomicBoolean m_durabilityFlag;
     private final InitiateTaskMessage m_task;
+    private final CatalogContext m_context;
+
+    // ENG-3288 - Support mismatched results leniency for certain queries.
+    private boolean m_allowMismatchedResults = false;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -80,12 +88,40 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         m_hsId = site.getSiteId();
         m_nonCoordinatingSites = null;
         m_isCoordinator = false;
+        m_context = site.m_context;
 
         //Check to make sure we are the coordinator, it is possible to get an intiate task
         //where we aren't the coordinator because we are a replica of the coordinator.
         if (notice instanceof InitiateTaskMessage) {
             // keep this around for DR purposes
             m_invocation = ((InitiateTaskMessage) notice).getStoredProcedureInvocation();
+
+            // Determine if mismatched results are okay.
+            if (m_invocation != null) {
+                String procName = m_invocation.getProcName();
+                if (procName.startsWith("@AdHoc")) {
+                    // For now the best we can do with ad hoc is to always allow mismatched results.
+                    // We don't know if it's non-deterministic or not. But the main use case for
+                    // being lenient is "SELECT * FROM TABLE LIMIT n", typically run as ad hoc.
+                    m_allowMismatchedResults = true;
+                } else {
+                    // Walk through the statements to see if any are non-deterministic.
+                    if (m_context != null && m_context.procedures != null) {
+                        Procedure proc = m_context.procedures.get(procName);
+                        if (proc != null) {
+                            CatalogMap<Statement> stmts = proc.getStatements();
+                            if (stmts != null) {
+                                for (Statement stmt : stmts) {
+                                    if (!stmt.getIscontentdeterministic() || !stmt.getIsorderdeterministic()) {
+                                        m_allowMismatchedResults = true;
+                                        break;
+                                    }
+                                }
+                            }
+                        }
+                    }
+                }
+            }
 
             if (notice.getCoordinatorHSId() == m_hsId) {
                 m_isCoordinator = true;
@@ -98,7 +134,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 }
                 m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
                                                   null, m_hsId,
-                                                  null, false));
+                                                  null, false, m_allowMismatchedResults));
             } else {
                 m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
                 m_task = null;
@@ -376,7 +412,7 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         assert(dependencies.length > 0);
 
         WorkUnit w = new WorkUnit(m_site.getSiteTracker(), null, dependencies,
-                                  m_hsId, m_nonCoordinatingSites, true);
+                                  m_hsId, m_nonCoordinatingSites, true, m_allowMismatchedResults);
         if (isFinal)
             w.nonTransactional = true;
         for (int depId : dependencies) {
@@ -418,7 +454,8 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
 
         WorkUnit w = new WorkUnit(m_site.getSiteTracker(), task,
                                   task.getAllUnorderedInputDepIds(),
-                                  m_hsId, m_nonCoordinatingSites, false);
+                                  m_hsId, m_nonCoordinatingSites, false,
+                                  m_allowMismatchedResults);
         w.nonTransactional = nonTransactional;
 
         for (int i = 0; i < task.getFragmentCount(); i++) {

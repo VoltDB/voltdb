@@ -67,12 +67,15 @@ public class SpScheduler extends Scheduler
     {
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
+        // Need a local copy that includes ourselves for the duplicate counter reconciliation
+        List<Long> liveHSIds = new ArrayList<Long>(m_replicaHSIds);
+        liveHSIds.add(m_mailbox.getHSId());
 
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
         List<Long> doneCounters = new LinkedList<Long>();
         for (DuplicateCounter counter : m_duplicateCounters.values()) {
-            int result = counter.updateReplicas(m_replicaHSIds);
+            int result = counter.updateReplicas(liveHSIds);
             if (result == DuplicateCounter.DONE) {
                 doneCounters.add(counter.getTxnId());
             }
@@ -180,6 +183,7 @@ public class SpScheduler extends Scheduler
                 newSpHandle = msg.getSpHandle();
                 m_txnId.set(newSpHandle);
             }
+            Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, runner,
                         newSpHandle, m_pendingTasks, msg);
@@ -316,7 +320,7 @@ public class SpScheduler extends Scheduler
             newSpHandle = msg.getSpHandle();
             m_txnId.set(newSpHandle);
         }
-
+        Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, (inputDeps != null));
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have

@@ -21,29 +21,26 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.failureprocs;
+package org.voltdb.compiler;
 
-import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
-import org.voltdb.VoltProcedure;
 
-@ProcInfo (
-    singlePartition = false
-)
-public class ProcSPNoncandidate4 extends VoltProcedure {
+public class TestVoltCompilerErrorOnSetOps extends VoltCompilerErrorTest {
 
-    public static final SQLStmt query = new SQLStmt("select count(*) from blah where ival = ?");
-    // Additional query against partitioned table with parameterized where clause only on replicated table
-    // should discourage use of SP processing.
-    public static final SQLStmt spoiler =
-            new SQLStmt("select count(*) from blah, indexed_blah where blah.sval = indexed_blah.sval and indexed_blah.ival = ?");
-
-    public long run(int i) {
-        voltQueueSQL(query, i);
-        voltQueueSQL(spoiler, i);
-        voltExecuteSQL();
-        // zero is a successful return
-        return 0;
+    public void testNoErrorOnParens() throws Exception {
+        statementNonErrorTest("PARENS", "(select ival from blah);");
+    }
+    public void testErrorOnUnion() throws Exception {
+        statementErrorTest("UNION", "(select ival from blah) union (select ival from indexed_blah);");
+        statementErrorTest("UNION", "select ival from blah union select ival from indexed_blah;");
     }
 
+    public void testErrorOnIntersect() throws Exception {
+        statementErrorTest("INTERSECT", "(select ival from blah) intersect (select ival from indexed_blah);");
+        statementErrorTest("INTERSECT", "select ival from blah intersect select ival from indexed_blah;");
+    }
+
+    public void testErrorOnExcept() throws Exception {
+        statementErrorTest("EXCEPT", "(select ival from blah) except (select ival from indexed_blah);");
+        statementErrorTest("EXCEPT", "select ival from blah except select ival from indexed_blah;");
+    }
 }

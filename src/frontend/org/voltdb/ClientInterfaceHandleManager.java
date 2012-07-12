@@ -80,6 +80,11 @@ public class ClientInterfaceHandleManager
         return handle & SEQNUM_MAX;
     }
 
+    public static String handleToString(long handle)
+    {
+        return "(pid " + getPartIdFromHandle(handle) + " seq " + getSeqNumFromHandle(handle) + ")";
+    }
+
     static class Iv2InFlight
     {
         final long m_ciHandle;
