@@ -138,7 +138,7 @@ public:
         }
         return retval;
     }
-    
+
     void clear() {
         m_plans.clear();
     }
