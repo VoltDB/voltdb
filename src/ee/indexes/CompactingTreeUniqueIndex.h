@@ -238,7 +238,7 @@ public:
         return !m_match.isNullTuple();
     }
 
-    int32_t getCounterGET(const TableTuple* searchKey) {
+    int32_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
         printf("<Tree Unique-map> get counter equal or greater than --- \n");
 
@@ -251,7 +251,7 @@ public:
             return m_entries.rankAsc(m_keyIter.key());
         }
     }
-    int32_t getCounterLET(const TableTuple* searchKey) {
+    int32_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
         printf("<Tree Unique-map> get counter equal or less than--- \n");
 

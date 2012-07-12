@@ -136,7 +136,7 @@ public:
     std::pair<iterator, iterator> equalRange(const Key &key);
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
-    // rankAsc is rankLower for multi-map
+    // TODO(xin): later rename it to ranklower
     int32_t rankAsc(const Key& key);
     int32_t rankDes(const Key& key);
     int32_t rankUpper(const Key& key);

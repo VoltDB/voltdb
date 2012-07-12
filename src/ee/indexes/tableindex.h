@@ -305,16 +305,16 @@ public:
      * For unique index, it will return the rank with the searchKey in ascending order including itself.
      * For non-unique index,
      */
-    virtual int32_t getCounterToKeyOrGreater(const TableTuple *searchKey)
+    virtual int32_t getCounterGET(const TableTuple *searchKey, bool isUpper)
     {
-        throwFatalException("Invoked non-countable TableIndex virtual method getCounterToKeyOrGreater which has no implementation");
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
     }
     /**
      * This function only supports countable tree index. It returns the counter value greater than the serarchKey.
      */
-    virtual int32_t getCounterToKeyOrSmaller(const TableTuple *searchKey)
+    virtual int32_t getCounterLET(const TableTuple *searchKey, bool isUpper)
     {
-        throwFatalException("Invoked non-countable TableIndex virtual method getCounterToKeyOrSmaller which has no implementation");
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
     }
 
 
