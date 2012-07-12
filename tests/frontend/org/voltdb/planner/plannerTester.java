@@ -68,7 +68,7 @@ public class plannerTester {
 	    		first = "[]";
 	    	if( second == null )
 	    		second = "[]";
-	    	return "("+first.toString()+","+second.toString()+")";
+	    	return "("+first.toString()+" => "+second.toString()+")";
 	    }
 	    
 	    public boolean equals() {
@@ -213,6 +213,9 @@ public class plannerTester {
 		Map<Integer, AbstractPlanNode> limitInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		Map<Integer, AbstractPlanNode> orderByInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		Map<Integer, AbstractPlanNode> orderByInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> indexScanInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<Integer, AbstractPlanNode> indexScanInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+
 		for( int i = 0; i<size1; i++ ) {
 			AbstractPlanNode pn = list1.get(i);
 			int id = pn.getPlanNodeId();
@@ -235,6 +238,9 @@ public class plannerTester {
 			}
 			if( pn.getInlinePlanNode(PlanNodeType.ORDERBY) != null) {
 				orderByInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
+			}
+			if( pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null ){
+				indexScanInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) );
 			}
 		}
 		for( int i = 0; i<size2; i++ ) {
@@ -260,6 +266,9 @@ public class plannerTester {
 			}
 			if( pn.getInlinePlanNode(PlanNodeType.ORDERBY) != null) {
 				orderByInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
+			}
+			if( pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null ){
+				indexScanInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) );
 			}
 		}
 		//do the diff
@@ -305,6 +314,21 @@ public class plannerTester {
 		stringPair.setSecond(indexList.clone());
 		if( !stringPair.equals() ) {
 			System.out.println( "Inline Order By Node diff: " );
+			System.out.println( stringPair.toString() );
+		}
+		indexList.clear();
+		
+		for( int index: indexScanInlineNodes1.keySet() ) {
+			indexList.add(index);
+		}
+		stringPair.setFirst(indexList.clone());
+		indexList.clear();
+		for( int index: indexScanInlineNodes2.keySet() ) {
+			indexList.add(index);
+		}
+		stringPair.setSecond(indexList.clone());
+		if( !stringPair.equals() ) {
+			System.out.println( "Inline IndexScan Node diff: " );
 			System.out.println( stringPair.toString() );
 		}
 		indexList.clear();
@@ -366,11 +390,13 @@ public class plannerTester {
 		int min = Math.min(size1, size2);
 		Pair intPair = new Pair(0,0);
 		Pair stringPair = new Pair("", "");
+		Map<Integer, AbstractPlanNode> projNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		
 		if( size1 != size2 ){
 			intPair.set(size1, size2);
 			System.out.println( "Leaf size diff : " );
 			System.out.println( intPair );
-			System.out.println( "SQLSTMT might be changed" );
+			System.out.println( "SQL statement might be changed" );
 			m_changedSQL = true;
 			try {
 				for( int i = 0; i < min; i++ ) {
@@ -381,12 +407,12 @@ public class plannerTester {
 					String nodeType1 = j1.getString("PLAN_NODE_TYPE");
 					String nodeType2 = j2.getString("PLAN_NODE_TYPE");
 					if( !table1.equalsIgnoreCase(table2) ) {
-						stringPair.set( nodeType1+" at "+table1, nodeType2+" at "+table2 );
+						stringPair.set( nodeType1+" on "+table1, nodeType2+" on "+table2 );
 						System.out.println("Table diff at leaf "+i+":");
 						System.out.println( stringPair );
 					}
 					else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
-						stringPair.set(nodeType1+" at "+table1, nodeType2+" at "+table2);
+						stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2);
 						System.out.println("Scan diff at leaf "+i+" :");
 						System.out.println( stringPair );
 					}
@@ -451,13 +477,13 @@ public class plannerTester {
 			catch (JSONException e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
-				}
+			}
 		}
 		else {
 			System.out.println("same leaf size");
 			try{
 				if( max == 1 ) {
-					System.out.println("Single table query");
+					System.out.println("Single leaf plan");
 					JSONObject j1 = new JSONObject( list1.get(0).toJSONString() );
 					JSONObject j2 = new JSONObject( list2.get(0).toJSONString() );
 					String table1 = j1.getString("TARGET_TABLE_NAME");

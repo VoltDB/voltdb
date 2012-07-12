@@ -258,11 +258,13 @@ public class testPlannerTester extends TestCase {
     	AbstractPlanNode pn1 = null;
     	AbstractPlanNode pn2 = null;
         //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
-        pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-        pn2 = compile("select * from l where b=? order by a;", 3, true);
+        pn1 = compile("select * from l, t where t.a=l.b limit ?;", 3, true);
+        pn2 = compile("select * from l order by a;", 3, true);
         //pn2 = compile("select * from l where b = ?;", 3, true);
         assertTrue(pn1 != null);
         assertTrue(pn2 != null);
+        System.out.println(pn1.toExplainPlanString());
+        System.out.println(pn2.toExplainPlanString());
         plannerTester.diffLeaves(pn1, pn2);
         plannerTester.diffInlineNodes(pn1, pn2);
     }

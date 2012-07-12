@@ -503,6 +503,10 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             return;
         }
         visited.add(this);
+        if( this.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null )
+        	collected.add(this.getInlinePlanNode(PlanNodeType.INDEXSCAN));
+        if( this.getInlinePlanNode(PlanNodeType.SEQSCAN) != null )
+        	collected.add(this.getInlinePlanNode(PlanNodeType.SEQSCAN));
         if (getChildCount()==0 )
             collected.add(this);
 
