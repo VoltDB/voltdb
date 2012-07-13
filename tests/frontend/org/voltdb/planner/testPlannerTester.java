@@ -257,16 +257,27 @@ public class testPlannerTester extends TestCase {
     public void testDiff() {
     	AbstractPlanNode pn1 = null;
     	AbstractPlanNode pn2 = null;
-        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
-        pn1 = compile("select * from l, t where t.a=l.b order by b limit ?;", 3, true);
-        pn2 = compile("select * from l order by a;", 3, true);
-        //pn2 = compile("select * from l where b = ?;", 3, true);
+    	ArrayList<AbstractPlanNode> list1 = new ArrayList<AbstractPlanNode>();
+    	ArrayList<AbstractPlanNode> list2 = new ArrayList<AbstractPlanNode>();
+        pn1 = compile("select * from l order by b limit ?;", 3, true);
+        pn2 = compile("select * from l order by a limit ?;", 3, true);
         assertTrue(pn1 != null);
         assertTrue(pn2 != null);
-        System.out.println(pn1.toExplainPlanString());
-        System.out.println(pn2.toExplainPlanString());
-        plannerTester.diffLeaves(pn1, pn2);
-        plannerTester.diffInlineNodes(pn1, pn2);
+        list1.add(pn1);
+        list2.add(pn2);
+        pn1 = compile("select * from l, t where t.a=l.b order by b limit ?;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
+        
+        int size = list1.size();
+        for( int i = 0; i < size; i++ ) {
+        	System.out.println(i);
+        	System.out.println(pn1.toExplainPlanString());
+            System.out.println(pn2.toExplainPlanString());
+            plannerTester.diffLeaves(pn1, pn2);
+            plannerTester.diffInlineNodes(pn1, pn2);
+        }
     }
     
     public void testBatchDiff() {
