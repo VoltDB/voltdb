@@ -136,11 +136,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     m_tuple = TableTuple(m_targetTable->schema());
     //printf("xin <IndexCount Executor> m_tuple: '%s'\n", m_tuple.debug("tablename").c_str());
 
-    if (m_node->getEndExpression() != NULL)
-    {
-        m_needsSubstituteEndExpression =
-            m_node->getEndExpression()->hasParameter();
-    }
+
     if (m_node->getPredicate() != NULL)
     {
         m_needsSubstitutePostExpression =
@@ -250,7 +246,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     //
     // END EXPRESSION
     //
-    AbstractExpression* end_expression = m_node->getEndExpression();
+    AbstractExpression* end_expression = NULL;
     if (end_expression != NULL)
     {
         if (m_needsSubstituteEndExpression) {

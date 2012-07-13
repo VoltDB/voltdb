@@ -82,7 +82,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    protected Boolean m_replaceable = false;
+    protected Boolean m_endExprValid = false;
 
     public IndexCountPlanNode() {
         super();
@@ -107,6 +107,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         if (isp.getEndExpression() != null)
             this.setEndKeyExpression(isp.getEndExpression());
+        else
+            this.m_endExprValid = true;
     }
 
     @Override
@@ -272,7 +274,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     public boolean isReplaceable() {
-        return m_replaceable;
+        return m_endExprValid;
     }
 
     public void setEndKeyExpression(AbstractExpression endExpr) {
@@ -302,7 +304,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 m_LookupEndType = IndexLookupType.LTE;
             } else {
                 // something wrong, we can not handle other cases
-                m_replaceable = false;
+                m_endExprValid = false;
                 return;
             }
 
@@ -313,10 +315,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             }
         }
         if (ctOther != 1 || ctOther + ctEqual != cmpSize) {
-            m_replaceable = false;
+            m_endExprValid = false;
             return;
         }
-        m_replaceable = true;
+        m_endExprValid = true;
     }
 
     @Override
@@ -355,10 +357,17 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.LOOKUP_END_TYPE.name()).value(m_LookupEndType.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
 
-        stringer.key(Members.ENDKEY_EXPRESSION.name()).array();
-        for (AbstractExpression ae : m_endkeyExpressions) {
-            assert (ae instanceof JSONString);
-            stringer.value(ae);
+
+        stringer.key(Members.ENDKEY_EXPRESSION.name());
+        if (m_endkeyExpressions == null || m_endkeyExpressions.isEmpty()) {
+            stringer.value(null);
+        } else {
+            stringer.array();
+            for (AbstractExpression ae : m_endkeyExpressions) {
+                assert (ae instanceof JSONString);
+                stringer.value(ae);
+            }
+            stringer.endArray();
         }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
@@ -366,7 +375,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             assert (ae instanceof JSONString);
             stringer.value(ae);
         }
-
         stringer.endArray();
     }
 
