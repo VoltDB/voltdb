@@ -18,13 +18,13 @@
 package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
-import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -32,6 +32,7 @@ import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.types.ExpressionType;
+import org.voltdb.utils.CatalogUtil;
 
 public class ReplaceWithIndexCounter implements MicroOptimization {
 
@@ -110,36 +111,54 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
 
     // TODO(xin): add more checkings to replace only certain cases.
     boolean isReplaceable(IndexScanPlanNode child) {
-        
+
         AbstractExpression endExpr = child.getEndExpression();
-        AbstractExpression postExpr = child.getPredicate();
+        AbstractExpression predicateExpr = child.getPredicate();
         ArrayList<AbstractExpression> subEndExpr = null;
         if (endExpr != null) {
             System.err.println("End Expression:\n" + endExpr);
             subEndExpr = endExpr.findAllSubexpressionsOfClass(TupleValueExpression.class);
         }
-        
-        assert(postExpr != null);
-        System.err.println("Post Expression:\n" + postExpr);
-        ArrayList<AbstractExpression> subExpr = postExpr.findAllSubexpressionsOfClass(TupleValueExpression.class);;
+
+        assert(predicateExpr != null);
+        System.err.println("Post Expression:\n" + predicateExpr);
+        ArrayList<AbstractExpression> hasLeft = predicateExpr.findAllSubexpressionsOfClass(TupleValueExpression.class);
+
+        Set<String> columnsLeft = new HashSet<String>();
+        for (AbstractExpression ae: hasLeft) {
+            TupleValueExpression tve = (TupleValueExpression) ae;
+            columnsLeft.add(tve.getColumnName());
+            System.err.println("predicate columns:" + tve.getColumnName());
+        }
+
+        if (endExpr != null && subEndExpr != null) {
+            for (AbstractExpression ae: subEndExpr) {
+                TupleValueExpression tve = (TupleValueExpression) ae;
+                String columnName = tve.getColumnName();
+                if (columnsLeft.contains(columnName)) {
+                    columnsLeft.remove(columnName);
+                }
+            }
+        }
 
         Index idx = child.getCatalogIndex();
-        CatalogMap<ColumnRef> clms = idx.getColumns();
-        
-        
-        List<AbstractExpression> searchKeyExpre = child.getSearchKeyExpressions();
-        ArrayList<AbstractExpression> hasLeft = new ArrayList<AbstractExpression>(subExpr.size());
-        hasLeft.addAll(subExpr);
-        
-        for (AbstractExpression ae: subExpr) {
-            if (endExpr != null && subEndExpr != null && subEndExpr.contains(ae)) {
-                hasLeft.remove(ae);
+        List<ColumnRef> sortedColumns = CatalogUtil.getSortedCatalogItems(idx.getColumns(), "index");
+        int searchKeySize = child.getSearchKeyExpressions().size();
+
+        if (columnsLeft.size() > searchKeySize)
+            return false;
+
+        // assume it has searchKey
+        for (int i = 0; i < searchKeySize; i++) {
+            ColumnRef cr = sortedColumns.get(i);
+            String colName = cr.getColumn().getName();
+            if (columnsLeft.contains(colName)) {
+                columnsLeft.remove(colName);
+                System.err.println("SearchKey Column removed:" + colName);
             }
-            
-            
         }
-        
-        if (hasLeft.size() != 0)
+
+        if (columnsLeft.size() != 0)
             return false;
         return true;
     }

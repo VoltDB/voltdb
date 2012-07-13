@@ -108,7 +108,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar6() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS > ?", 2, true);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS > ?", 2, false);
         checkIndexCounter(pn, false, false);
     }
 
