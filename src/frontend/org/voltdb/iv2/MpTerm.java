@@ -19,15 +19,9 @@ package org.voltdb.iv2;
 
 import java.lang.InterruptedException;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -40,39 +34,10 @@ import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 
-import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
 
 import com.google.common.collect.Sets;
 
-// Some comments on threading and organization.
-//   start() returns a future. Block on this future to get the final answer.
-//
-//   deliver() runs in the initiator mailbox deliver() context and triggers
-//   all repair work.
-//
-//   replica change handler runs in the babysitter thread context.
-//   replica change handler invokes a method in init.mbox that also
-//   takes the init.mbox deliver lock
-//
-//   it is important that repair work happens with the deliver lock held
-//   and that updatereplicas also holds this lock -- replica failure during
-//   repair must happen unambigously before or after each local repair action.
-//
-//   A Term can be cancelled by initiator mailbox while the deliver lock is
-//   held. Repair work must check for cancellation before producing repair
-//   actions to the mailbox.
-//
-//   Note that a term can not prevent messages being delivered post cancellation.
-//   RepairLog requests therefore use a requestId to dis-ambiguate responses
-//   for cancelled requests that are filtering in late.
-
-
-/**
- * Term encapsulates the process/algorithm of becoming
- * a new PI and the consequent ZK observers for performing that
- * role.
- */
 public class MpTerm implements Term
 {
     VoltLogger tmLog = new VoltLogger("TM");
@@ -81,7 +46,6 @@ public class MpTerm implements Term
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
     private final long m_initiatorHSId;
-    private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
     private final CountDownLatch m_missingStartupSites;
     private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
@@ -89,66 +53,6 @@ public class MpTerm implements Term
 
     // Initialized in start() -- when the term begins.
     protected BabySitter m_babySitter;
-
-    long getRequestId()
-    {
-        return m_requestId;
-    }
-
-    // scoreboard for responding replica repair log responses (hsid -> response count)
-    static class ReplicaRepairStruct
-    {
-        int m_receivedResponses = 0;
-        int m_expectedResponses = -1; // (a log msg cares about this init. value)
-        long m_maxSpHandleSeen = Long.MIN_VALUE;
-
-        // update counters and return the number of outstanding messages.
-        int update(Iv2RepairLogResponseMessage response)
-        {
-            m_receivedResponses++;
-            m_expectedResponses = response.getOfTotal();
-            m_maxSpHandleSeen = Math.max(m_maxSpHandleSeen, response.getSpHandle());
-            return logsComplete();
-        }
-
-        // return 0 if all expected logs have been received.
-        int logsComplete()
-        {
-            // expected responses is really a count of remote
-            // messages. if there aren't any, the sequence will be
-            // 1 (the count of responses) while expected will be 0
-            // (the length of the remote log)
-            if (m_expectedResponses == 0) {
-               return 0;
-            }
-            return m_expectedResponses - m_receivedResponses;
-        }
-
-        // return true if this replica needs the message for spHandle.
-        boolean needs(long spHandle)
-        {
-            return m_maxSpHandleSeen < spHandle;
-        }
-    }
-
-    // replicas being processed and repaired.
-    Map<Long, ReplicaRepairStruct> m_replicaRepairStructs =
-        new HashMap<Long, ReplicaRepairStruct>();
-
-    // Determine equal repair responses by the SpHandle of the response.
-    Comparator<Iv2RepairLogResponseMessage> m_unionComparator =
-        new Comparator<Iv2RepairLogResponseMessage>()
-    {
-        @Override
-        public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
-        {
-            return (int)(o1.getSpHandle() - o2.getSpHandle());
-        }
-    };
-
-    // Union of repair responses.
-    TreeSet<Iv2RepairLogResponseMessage> m_repairLogUnion =
-        new TreeSet<Iv2RepairLogResponseMessage>(m_unionComparator);
 
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
@@ -174,7 +78,7 @@ public class MpTerm implements Term
                 Sets.SetView<String> added = Sets.difference(updatedReplicas, MpTerm.this.m_knownReplicas);
                 int newReplicas = added.size();
                 m_knownReplicas.addAll(updatedReplicas);
-                List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, updatedReplicas);
+                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(m_initiatorHSId, updatedReplicas);
                 m_mailbox.updateReplicas(replicas);
                 for (int i=0; i < newReplicas; i++) {
                     MpTerm.this.m_missingStartupSites.countDown();
@@ -182,7 +86,7 @@ public class MpTerm implements Term
             }
             else {
                 // remove the leader; convert to hsids; deal with the replica change.
-                List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, children);
+                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(m_initiatorHSId, children);
                 tmLog.info(m_whoami
                         + "replica change handler updating replica list to: "
                         + CoreUtils.hsIdCollectionToString(replicas));
@@ -190,21 +94,6 @@ public class MpTerm implements Term
             }
         }
     };
-
-    // conversion helper.
-    static List<Long> childrenToReplicaHSIds(long initiatorHSId, Collection<String> children)
-    {
-        List<Long> replicas = new ArrayList<Long>(children.size() - 1);
-        for (String child : children) {
-            long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
-            if (HSId != initiatorHSId)
-            {
-                replicas.add(HSId);
-            }
-        }
-        return replicas;
-    }
-
 
     /**
      * Setup a new Term but don't take any action to take responsibility.
@@ -229,17 +118,17 @@ public class MpTerm implements Term
     }
 
     /**
-     * Start a new Term. Returns a future that is done when the leadership has
-     * been fully assumed and all surviving replicas have been repaired.
-     *
-     * @param kfactorForStartup If running for startup and not for fault
-     * recovery, pass the kfactor required to proceed. For fault recovery,
-     * pass any negative value as kfactorForStartup.
+     * Start a new Term.  This starts watching followers via ZK.  Block on an
+     * appropriate repair algorithm to watch final promotion to leader.
      */
+    @Override
     public void start()
     {
         try {
-            makeBabySitter();
+            Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
+                    LeaderElector.electionDirForPartition(m_partitionId),
+                    m_replicasChangeHandler);
+            m_babySitter = pair.getFirst();
         }
         catch (ExecutionException ee) {
             VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);
@@ -248,16 +137,7 @@ public class MpTerm implements Term
         }
     }
 
-    // extract this out so it can be mocked for testcases.
-    // don't want to dep-inject - prefer Term encapsulates sitter.
-    protected void makeBabySitter() throws ExecutionException, InterruptedException
-    {
-        Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
-                LeaderElector.electionDirForPartition(m_partitionId),
-                m_replicasChangeHandler);
-        m_babySitter = pair.getFirst();
-    }
-
+    @Override
     public void shutdown()
     {
         if (m_babySitter != null) {
@@ -265,10 +145,11 @@ public class MpTerm implements Term
         }
     }
 
+    @Override
     public List<Long> getInterestingHSIds()
     {
         List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
+        List<Long> survivors =  BaseInitiator.childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
         survivors.add(m_initiatorHSId);
         return survivors;
     }

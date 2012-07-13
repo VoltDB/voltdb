@@ -17,8 +17,13 @@
 
 package org.voltdb.iv2;
 
+import java.util.ArrayList;
+import java.util.Collection;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+
+import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
@@ -60,6 +65,20 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     protected LeaderElector m_leaderElector = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
+
+    // conversion helper.
+    static List<Long> childrenToReplicaHSIds(long initiatorHSId, Collection<String> children)
+    {
+        List<Long> replicas = new ArrayList<Long>(children.size() - 1);
+        for (String child : children) {
+            long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
+            if (HSId != initiatorHSId)
+            {
+                replicas.add(HSId);
+            }
+        }
+        return replicas;
+    }
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix)
