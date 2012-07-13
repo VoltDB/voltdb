@@ -139,7 +139,7 @@ public class testPlannerTester extends TestCase {
     	//pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
     	//pn = compile("select * from l where b = ? limit ?;", 3, true);
     	//pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
-    	pn = compile("select * from t order by a limit ?;",3, true);
+    	pn = compile("select * from t where a = ? order by a limit ?;",3, true);
     	PlanNodeTree pnt1 = new PlanNodeTree( pn );
     	System.out.println(pnt1.toJSONString());
     	System.out.println(pnt1.getRootPlanNode().toExplainPlanString() );
@@ -269,14 +269,45 @@ public class testPlannerTester extends TestCase {
         pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
         list1.add(pn1);
         list2.add(pn2);
-        
+        pn1 = compile("select * from l, t where t.a=l.b order by b;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
+        pn1 = compile("select * from l, t where t.a=l.b limit ?;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
+        pn1 = compile("select * from l, t where t.a=l.b;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
+        pn1 = compile("select * from l order by a limit ?;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
+        pn1 = compile("select * from l limit ?;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
+        pn1 = compile("select * from l where a=? order by b limit ?;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
+        pn1 = compile("select * from l where a=? limit ?;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
+        pn1 = compile("select * from l where a=?;", 3, true);
+        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
         int size = list1.size();
         for( int i = 0; i < size; i++ ) {
         	System.out.println(i);
-        	System.out.println(pn1.toExplainPlanString());
-            System.out.println(pn2.toExplainPlanString());
-            plannerTester.diffLeaves(pn1, pn2);
-            plannerTester.diffInlineNodes(pn1, pn2);
+        	System.out.println(list1.get(i).toExplainPlanString());
+            System.out.println(list2.get(i).toExplainPlanString());
+            plannerTester.diffLeaves(list1.get(i), list2.get(i));
+            plannerTester.diffInlineNodes(list1.get(i), list2.get(i));
         }
     }
     

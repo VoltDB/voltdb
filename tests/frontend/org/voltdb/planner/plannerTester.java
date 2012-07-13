@@ -22,6 +22,8 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlanNodeType;
 
@@ -420,7 +422,6 @@ public class plannerTester {
 		int min = Math.min(size1, size2);
 		Pair intPair = new Pair(0,0);
 		Pair stringPair = new Pair("", "");
-		Map<Integer, AbstractPlanNode> projNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		
 		if( size1 != size2 ){
 			intPair.set(size1, size2);
@@ -432,10 +433,10 @@ public class plannerTester {
 				for( int i = 0; i < min; i++ ) {
 					JSONObject j1 = new JSONObject( list1.get(i).toJSONString() );
 					JSONObject j2 = new JSONObject( list2.get(i).toJSONString() );
-					String table1 = j1.getString("TARGET_TABLE_NAME");
-					String table2 = j2.getString("TARGET_TABLE_NAME");
-					String nodeType1 = j1.getString("PLAN_NODE_TYPE");
-					String nodeType2 = j2.getString("PLAN_NODE_TYPE");
+					String table1 = j1.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
+					String table2 = j2.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
+					String nodeType1 = j1.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
+					String nodeType2 = j2.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
 					if( !table1.equalsIgnoreCase(table2) ) {
 						stringPair.set( nodeType1+" on "+table1, nodeType2+" on "+table2 );
 						System.out.println("Table diff at leaf "+i+":");
@@ -446,9 +447,9 @@ public class plannerTester {
 						System.out.println("Scan diff at leaf "+i+" :");
 						System.out.println( stringPair );
 					}
-					else if ( nodeType1.equalsIgnoreCase("INDEXSCAN") ) {
-						String index1 = j1.getString("TARGET_INDEX_NAME");
-						String index2 = j2.getString("TARGET_INDEX_NAME");
+					else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
+						String index1 = j1.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
+						String index2 = j2.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
 						stringPair.set( index1, index2);
 						if( !index1.equalsIgnoreCase(index2) ) {
 							System.out.println("Index diff at leaf "+i+" :");
@@ -462,11 +463,11 @@ public class plannerTester {
 				if( size2 < max ) {
 					for( int i = min; i < max; i++ ) {
 						JSONObject j = new JSONObject( list1.get(i).toJSONString() );
-						String table = j.getString("TARGET_TABLE_NAME");
-						String nodeType = j.getString("PLAN_NODE_TYPE");
+						String table = j.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
+						String nodeType = j.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
 						String index = null;
-						if( nodeType.equalsIgnoreCase("INDEXSCAN") ) {
-						  index = j.getString("TARGET_INDEX_NAME");
+						if( nodeType.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
+						  index = j.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
 						}
 						if( index != null ) {
 							stringPair.set(nodeType+" on "+table+" using "+index, "Empty" );
@@ -484,23 +485,23 @@ public class plannerTester {
 				else if( size1 < max ) {
 					for( int i = min; i < max; i++ ) {
 						JSONObject j = new JSONObject( list2.get(i).toJSONString() );
-						String table = j.getString("TARGET_TABLE_NAME");
-						String nodeType = j.getString("PLAN_NODE_TYPE");
+						String table = j.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
+						String nodeType = j.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
 						String index = null;
-						if( nodeType.equalsIgnoreCase("INDEXSCAN") ) {
-						  index = j.getString("TARGET_INDEX_NAME");
-						  if( index != null ) {
-								stringPair.set(nodeType+" on "+table+" using "+index, "Empty" );
+						if( nodeType.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
+						  index = j.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
+						}
+						if( index != null ) {
+								stringPair.set("Empty", nodeType+" on "+table+" using "+index );
 								System.out.println("Diff at leaf "+i+" :");
 								System.out.println(stringPair.toString());
-							}
-							else
-							{
-								stringPair.set(nodeType+" on "+table, "Empty" );
+						}
+						else
+						{
+								stringPair.set("Empty", nodeType+" on "+table );
 								System.out.println("Diff at leaf "+i+": ");
 								System.out.println(stringPair.toString());
-							}
-		 			}
+						}
 				}
 				}
 			}
@@ -516,10 +517,10 @@ public class plannerTester {
 					System.out.println("Single leaf plan");
 					JSONObject j1 = new JSONObject( list1.get(0).toJSONString() );
 					JSONObject j2 = new JSONObject( list2.get(0).toJSONString() );
-					String table1 = j1.getString("TARGET_TABLE_NAME");
-					String table2 = j2.getString("TARGET_TABLE_NAME");
-					String nodeType1 = j1.getString("PLAN_NODE_TYPE");
-					String nodeType2 = j2.getString("PLAN_NODE_TYPE");
+					String table1 = j1.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
+					String table2 = j2.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
+					String nodeType1 = j1.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
+					String nodeType2 = j2.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
 					if( !table1.equalsIgnoreCase(table2) ){
 						stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
 						System.out.println("Diff table at leaf"+0+" :");
@@ -530,9 +531,9 @@ public class plannerTester {
 						System.out.println("Diff scan at leaf"+0+" :");
 						System.out.println(stringPair);
 					}
-					else if ( nodeType1.equalsIgnoreCase("INDEXSCAN") ) {
-						String index1 = j1.getString("TARGET_INDEX_NAME");
-						String index2 = j2.getString("TARGET_INDEX_NAME");
+					else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
+						String index1 = j1.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
+						String index2 = j2.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
 						if( !index1.equalsIgnoreCase(index2) ){
 							stringPair.set(nodeType1+" on "+table1+" using "+index1, nodeType2+" on "+table2+" using "+index2 );
 							System.out.println("Diff index at leaf"+0+": ");
@@ -547,10 +548,10 @@ public class plannerTester {
 					for( int i = 0; i < max; i++ ) {
 						JSONObject j1 = new JSONObject( list1.get(i).toJSONString() );
 						JSONObject j2 = new JSONObject( list2.get(i).toJSONString() );
-						String table1 = j1.getString("TARGET_TABLE_NAME");
-						String table2 = j2.getString("TARGET_TABLE_NAME");
-						String nodeType1 = j1.getString("PLAN_NODE_TYPE");
-						String nodeType2 = j2.getString("PLAN_NODE_TYPE");
+						String table1 = j1.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
+						String table2 = j2.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
+						String nodeType1 = j1.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
+						String nodeType2 = j2.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
 						if( !table1.equalsIgnoreCase(table2) ){
 							stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
 							System.out.println("Diff table at leaf"+i+" :");
@@ -561,9 +562,9 @@ public class plannerTester {
 							System.out.println("Diff scan at leaf"+0+" :");
 							System.out.println(stringPair);	
 						}
-						else if ( nodeType1.equalsIgnoreCase("INDEXSCAN") ) {
-							String index1 = j1.getString("TARGET_INDEX_NAME");
-							String index2 = j2.getString("TARGET_INDEX_NAME");
+						else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
+							String index1 = j1.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
+							String index2 = j2.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
 								if( !index1.equalsIgnoreCase(index2) ){
 									stringPair.set(nodeType1+" on "+table1+" using "+index1, nodeType2+" on "+table2+" using "+index2 );
 									System.out.println("Diff index at leaf"+0+": ");
