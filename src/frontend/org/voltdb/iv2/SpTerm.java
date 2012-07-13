@@ -176,6 +176,8 @@ public class SpTerm implements Term
                 Sets.SetView<String> added = Sets.difference(updatedReplicas, SpTerm.this.m_knownReplicas);
                 int newReplicas = added.size();
                 m_knownReplicas.addAll(updatedReplicas);
+                List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, updatedReplicas);
+                m_mailbox.updateReplicas(replicas);
                 for (int i=0; i < newReplicas; i++) {
                     SpTerm.this.m_missingStartupSites.countDown();
                 }
