@@ -17,6 +17,9 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.CountDownLatch;
+
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.messaging.HostMessenger;
 
@@ -66,5 +69,15 @@ public class MpInitiator extends BaseInitiator
     public boolean isRejoinable()
     {
         return false;
+    }
+
+    @Override
+    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
+            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            String zkMapCacheNode, String whoami)
+    {
+        return new MpTerm(missingStartupSites, zk,
+                partitionId, initiatorHSId, mailbox,
+                zkMapCacheNode, whoami);
     }
 }

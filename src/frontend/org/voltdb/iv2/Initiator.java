@@ -17,6 +17,10 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.CountDownLatch;
+
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -42,4 +46,9 @@ public interface Initiator
 
     /** This initiator participates in rejoin processing */
     public boolean isRejoinable();
+
+    /** Create a Term implementation appropriate for the subclass */
+    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
+            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            String zkMapCacheNode, String whoami);
 }

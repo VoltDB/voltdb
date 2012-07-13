@@ -17,9 +17,11 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.Future;
 import java.util.List;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.VoltMessage;
 
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
@@ -49,7 +51,7 @@ import org.voltcore.logging.VoltLogger;
  * a new PI and the consequent ZK observers for performing that
  * role.
  */
-public interface Term
+public interface RepairAlgo
 {
     VoltLogger tmLog = new VoltLogger("TM");
 
@@ -61,12 +63,12 @@ public interface Term
      * recovery, pass the kfactor required to proceed. For fault recovery,
      * pass any negative value as kfactorForStartup.
      */
-    public void start();
+    public Future<Boolean> start(List<Long> survivors);
+
+    public boolean cancel();
 
     public void shutdown();
 
-    /** Get the current set of HSIds which we're monitoring */
-    public List<Long> getInterestingHSIds();
-
-    public void setRepairAlgo(RepairAlgo algo);
+    /** Process a new repair log response */
+    public void deliver(VoltMessage message);
 }

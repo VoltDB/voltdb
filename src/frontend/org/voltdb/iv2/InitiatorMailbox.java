@@ -65,16 +65,22 @@ public class InitiatorMailbox implements Mailbox
     private final RejoinProducer m_rejoinProducer;
     private final MapCacheReader m_masterMapCache;
     private long m_hsId;
-    private SpTerm m_term;
+    private Term m_term;
+    private RepairAlgo m_algo;
 
     private Set<Long> m_replicas = null;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
 
-    synchronized public void setTerm(SpTerm term)
+    synchronized public void setTerm(Term term)
     {
         m_term = term;
+    }
+
+    synchronized public void setRepairAlgo(RepairAlgo algo)
+    {
+        m_algo = algo;
     }
 
     public InitiatorMailbox(int partitionId,
@@ -104,21 +110,14 @@ public class InitiatorMailbox implements Mailbox
         m_masterMapCache.shutdown();
     }
 
-    // Provide the starting replica configuration (for startup)
-    public synchronized void setReplicas(List<Long> replicas)
-    {
-        Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
-        m_msgHandler.updateReplicas(replicas);
-    }
-
     // Change the replica set configuration (during or after promotion)
     public synchronized void updateReplicas(List<Long> replicas)
     {
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
         // promotion, must cancel the term
-        if (m_replicas != null && m_term != null) {
-            m_term.cancel();
+        if (m_replicas != null && m_algo != null) {
+            m_algo.cancel();
         }
         m_replicas = new TreeSet<Long>();
         m_replicas.addAll(replicas);
@@ -163,7 +162,7 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         else if (message instanceof Iv2RepairLogResponseMessage) {
-            m_term.deliver(message);
+            m_algo.deliver(message);
             return;
         }
         else if (message instanceof RejoinMessage) {

@@ -22,26 +22,27 @@ import java.util.Collection;
 import java.util.Comparator;
 
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.TreeSet;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
-import org.voltcore.logging.VoltLogger;
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 
-import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
-import org.voltcore.zk.BabySitter;
-import org.voltcore.zk.BabySitter.Callback;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.VoltMessage;
+
 import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCacheWriter;
 
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
-
-import com.google.common.collect.Sets;
 
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
@@ -71,22 +72,18 @@ import com.google.common.collect.Sets;
  * a new PI and the consequent ZK observers for performing that
  * role.
  */
-public class SpTerm implements Term
+public class StartupAlgo implements RepairAlgo
 {
     VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
-    private final long m_initiatorHSId;
     private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
     private final CountDownLatch m_missingStartupSites;
     private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
-    private RepairAlgo m_algo = null;
-
-    // Initialized in start() -- when the term begins.
-    protected BabySitter m_babySitter;
+    private final String m_mapCacheNode;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -152,44 +149,6 @@ public class SpTerm implements Term
     TreeSet<Iv2RepairLogResponseMessage> m_repairLogUnion =
         new TreeSet<Iv2RepairLogResponseMessage>(m_unionComparator);
 
-    // runs on the babysitter thread when a replica changes.
-    // simply forward the notice to the initiator mailbox; it controls
-    // the Term processing.
-    Callback m_replicasChangeHandler = new Callback()
-    {
-        @Override
-        public void run(List<String> children)
-        {
-            // Need to handle startup separately from runtime updates.
-            if (SpTerm.this.m_missingStartupSites.getCount() > 0) {
-                TreeSet<String> updatedReplicas = com.google.common.collect.Sets.newTreeSet(children);
-                // Cancel setup if a previously seen replica disappeared.
-                // I think voltcore might actually terminate before getting here...
-                Sets.SetView<String> removed = Sets.difference(SpTerm.this.m_knownReplicas, updatedReplicas);
-                if (!removed.isEmpty()) {
-                    tmLog.error(m_whoami
-                            + "replica(s) failed during startup. Initialization can not complete."
-                            + " Failed replicas: " + removed);
-                    SpTerm.this.m_algo.cancel();
-                    return;
-                }
-                Sets.SetView<String> added = Sets.difference(updatedReplicas, SpTerm.this.m_knownReplicas);
-                int newReplicas = added.size();
-                m_knownReplicas.addAll(updatedReplicas);
-                for (int i=0; i < newReplicas; i++) {
-                    SpTerm.this.m_missingStartupSites.countDown();
-                }
-            }
-            else {
-                // remove the leader; convert to hsids; deal with the replica change.
-                List<Long> replicas = childrenToReplicaHSIds(m_initiatorHSId, children);
-                tmLog.info(m_whoami
-                        + "replica change handler updating replica list to: "
-                        + CoreUtils.hsIdCollectionToString(replicas));
-                m_mailbox.updateReplicas(replicas);
-            }
-        }
-    };
 
     // conversion helper.
     static List<Long> childrenToReplicaHSIds(long initiatorHSId, Collection<String> children)
@@ -209,13 +168,12 @@ public class SpTerm implements Term
     /**
      * Setup a new Term but don't take any action to take responsibility.
      */
-    public SpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
+    public StartupAlgo(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
         m_zk = zk;
         m_partitionId = partitionId;
-        m_initiatorHSId = initiatorHSId;
         m_mailbox = mailbox;
 
         if (missingStartupSites != null) {
@@ -226,6 +184,7 @@ public class SpTerm implements Term
         }
 
         m_whoami = whoami;
+        m_mapCacheNode = zkMapCacheNode;
     }
 
     /**
@@ -236,50 +195,64 @@ public class SpTerm implements Term
      * recovery, pass the kfactor required to proceed. For fault recovery,
      * pass any negative value as kfactorForStartup.
      */
-    public void start()
+    public Future<Boolean> start(List<Long> survivors)
     {
         try {
-            makeBabySitter();
+            prepareForStartup();
+        } catch (Exception e) {
+            tmLog.error(m_whoami + "failed leader promotion:", e);
+            m_promotionResult.setException(e);
+            m_promotionResult.done();
         }
-        catch (ExecutionException ee) {
-            VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, e);
-        }
-    }
-
-    // extract this out so it can be mocked for testcases.
-    // don't want to dep-inject - prefer Term encapsulates sitter.
-    protected void makeBabySitter() throws ExecutionException, InterruptedException
-    {
-        Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
-                LeaderElector.electionDirForPartition(m_partitionId),
-                m_replicasChangeHandler);
-        m_babySitter = pair.getFirst();
+        return m_promotionResult;
     }
 
     public boolean cancel()
     {
-        return m_promotionResult.cancel(false);
+        return false;
     }
 
     public void shutdown()
     {
-        if (m_babySitter != null) {
-            m_babySitter.shutdown();
+    }
+
+    /** Block until all replica's are present. */
+    void prepareForStartup()
+        throws InterruptedException
+    {
+        tmLog.info(m_whoami +
+                "starting leader promotion with " + m_knownReplicas.size() + " replicas. " +
+                "Waiting for " + m_missingStartupSites.getCount() + " more for configured k-safety.");
+
+        // block here until the babysitter thread provides all replicas.
+        // then initialize the mailbox's replica set and proceed as leader.
+        m_missingStartupSites.await();
+        declareReadyAsLeader();
+    }
+
+    /** Process a new repair log response */
+    public void deliver(VoltMessage message)
+    {
+        if (message instanceof Iv2RepairLogResponseMessage) {
+            throw new RuntimeException("Dude, shouldn't get these here.");
         }
     }
 
-    public List<Long> getInterestingHSIds()
+    // with leadership election complete, update the master list
+    // for non-initiator components that care.
+    void declareReadyAsLeader()
     {
-        List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
-        survivors.add(m_initiatorHSId);
-        return survivors;
-    }
-
-    public void setRepairAlgo(RepairAlgo algo)
-    {
-        m_algo = algo;
+        try {
+            MapCacheWriter iv2masters = new MapCache(m_zk, m_mapCacheNode);
+            iv2masters.put(Integer.toString(m_partitionId),
+                    new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
+            m_promotionResult.done();
+        } catch (KeeperException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
+        } catch (InterruptedException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
+        } catch (JSONException e) {
+            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
+        }
     }
 }

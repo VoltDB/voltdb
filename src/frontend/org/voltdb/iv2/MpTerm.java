@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.lang.InterruptedException;
+
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.Comparator;
@@ -71,7 +73,7 @@ import com.google.common.collect.Sets;
  * a new PI and the consequent ZK observers for performing that
  * role.
  */
-public class SpTerm implements Term
+public class MpTerm implements Term
 {
     VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
@@ -87,10 +89,6 @@ public class SpTerm implements Term
 
     // Initialized in start() -- when the term begins.
     protected BabySitter m_babySitter;
-
-    // Each Term can process at most one promotion; if promotion fails, make
-    // a new Term and try again (if that's your big plan...)
-    private final InaugurationFuture m_promotionResult = new InaugurationFuture();
 
     long getRequestId()
     {
@@ -161,23 +159,23 @@ public class SpTerm implements Term
         public void run(List<String> children)
         {
             // Need to handle startup separately from runtime updates.
-            if (SpTerm.this.m_missingStartupSites.getCount() > 0) {
+            if (MpTerm.this.m_missingStartupSites.getCount() > 0) {
                 TreeSet<String> updatedReplicas = com.google.common.collect.Sets.newTreeSet(children);
                 // Cancel setup if a previously seen replica disappeared.
                 // I think voltcore might actually terminate before getting here...
-                Sets.SetView<String> removed = Sets.difference(SpTerm.this.m_knownReplicas, updatedReplicas);
+                Sets.SetView<String> removed = Sets.difference(MpTerm.this.m_knownReplicas, updatedReplicas);
                 if (!removed.isEmpty()) {
                     tmLog.error(m_whoami
                             + "replica(s) failed during startup. Initialization can not complete."
                             + " Failed replicas: " + removed);
-                    SpTerm.this.m_algo.cancel();
+                    MpTerm.this.m_algo.cancel();
                     return;
                 }
-                Sets.SetView<String> added = Sets.difference(updatedReplicas, SpTerm.this.m_knownReplicas);
+                Sets.SetView<String> added = Sets.difference(updatedReplicas, MpTerm.this.m_knownReplicas);
                 int newReplicas = added.size();
                 m_knownReplicas.addAll(updatedReplicas);
                 for (int i=0; i < newReplicas; i++) {
-                    SpTerm.this.m_missingStartupSites.countDown();
+                    MpTerm.this.m_missingStartupSites.countDown();
                 }
             }
             else {
@@ -209,7 +207,7 @@ public class SpTerm implements Term
     /**
      * Setup a new Term but don't take any action to take responsibility.
      */
-    public SpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
+    public MpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
@@ -256,11 +254,6 @@ public class SpTerm implements Term
                 LeaderElector.electionDirForPartition(m_partitionId),
                 m_replicasChangeHandler);
         m_babySitter = pair.getFirst();
-    }
-
-    public boolean cancel()
-    {
-        return m_promotionResult.cancel(false);
     }
 
     public void shutdown()

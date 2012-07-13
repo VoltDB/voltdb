@@ -20,6 +20,7 @@ package org.voltdb.iv2;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -54,7 +55,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     // Encapsulated objects
     protected final Scheduler m_scheduler;
     protected final InitiatorMailbox m_initiatorMailbox;
-    protected SpTerm m_term = null;
+    protected Term m_term = null;
     protected Site m_executionSite = null;
     protected LeaderElector m_leaderElector = null;
     protected Thread m_siteThread = null;
@@ -155,6 +156,16 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         return isLeader;
     }
 
+    @Override
+    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
+            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            String zkMapCacheNode, String whoami)
+    {
+        return new SpTerm(missingStartupSites, zk,
+                partitionId, initiatorHSId, mailbox,
+                zkMapCacheNode, whoami);
+    }
+
     // runs on the leader elector callback thread.
     @Override
     public void becomeLeader()
@@ -162,13 +173,27 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         try {
             long startTime = System.currentTimeMillis();
             Boolean success = false;
+            m_term = createTerm(m_missingStartupSites, m_messenger.getZK(),
+                    m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                    m_zkMailboxNode, m_whoami);
+            m_initiatorMailbox.setTerm(m_term);
+            m_term.start();
             while (!success) {
+                RepairAlgo repair = null;
+                if (m_missingStartupSites != null) {
+                    repair = new StartupAlgo(m_missingStartupSites, m_messenger.getZK(),
+                            m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                            m_zkMailboxNode, m_whoami);
+                }
+                else {
+                    repair = new SpRepairAlgo(m_missingStartupSites, m_messenger.getZK(),
+                            m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                            m_zkMailboxNode, m_whoami);
+                }
+                m_term.setRepairAlgo(repair);
+                m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
-                m_term = new SpTerm(m_missingStartupSites, m_messenger.getZK(),
-                        m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
-                        m_zkMailboxNode, m_whoami);
-                m_initiatorMailbox.setTerm(m_term);
-                success = m_term.start().get();
+                success = repair.start(m_term.getInterestingHSIds()).get();
                 if (success) {
                     m_repairLog.setLeaderState(true);
                     m_scheduler.setLeaderState(true);
