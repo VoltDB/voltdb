@@ -97,7 +97,7 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
 
             icpn.setOutputSchema(plan.getOutputSchema());
 
-            // TODO: I am not sure if there is a null case or not
+            // TODO(xin): I am not sure if there is a null case or not
             if (plan.getParent(0) != null) {
                 plan.addIntermediary(plan.getParent(0));
             }

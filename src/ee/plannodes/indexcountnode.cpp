@@ -122,6 +122,15 @@ void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     }
     key_iterate = keyIterateValue.get_bool();
 
+    json_spirit::Value endTypeValue = json_spirit::find_value( obj, "END_TYPE");
+    if (endTypeValue == json_spirit::Value::null) {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                "IndexCountPlanNode::loadFromJSONObject:"
+                " Can't find END_TYPE");
+    }
+    std::string endTypeString = endTypeValue.get_str();
+    end_type = stringToIndexLookup(endTypeString);
+
     json_spirit::Value lookupTypeValue = json_spirit::find_value( obj, "LOOKUP_TYPE");
     if (lookupTypeValue == json_spirit::Value::null) {
         throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
@@ -140,18 +149,17 @@ void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     target_index_name = targetIndexNameValue.get_str();
 
     json_spirit::Value endKeyExpressionsValue = json_spirit::find_value( obj, "ENDKEY_EXPRESSIONS");
-        if (endKeyExpressionsValue == json_spirit::Value::null) {
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          "IndexCountPlanNode::loadFromJSONObject:"
-                                          " Can't find ENDKEY_EXPRESSIONS");
-        }
-    json_spirit::Array endKeyExpressionsArray = endKeyExpressionsValue.get_array();
-
-    for (int ii = 0; ii < endKeyExpressionsArray.size(); ii++) {
+    if (endKeyExpressionsValue == json_spirit::Value::null) {
+        endkey_expressions = NULL;
+    } else {
+        json_spirit::Array endKeyExpressionsArray = endKeyExpressionsValue.get_array();
+        for (int ii = 0; ii < endKeyExpressionsArray.size(); ii++) {
             json_spirit::Object endKeyExpressionObject = endKeyExpressionsArray[ii].get_obj();
             AbstractExpression *expr = AbstractExpression::buildExpressionTree(endKeyExpressionObject);
             endkey_expressions.push_back(expr);
+        }
     }
+
 
     json_spirit::Value searchKeyExpressionsValue = json_spirit::find_value( obj, "SEARCHKEY_EXPRESSIONS");
     if (searchKeyExpressionsValue == json_spirit::Value::null) {

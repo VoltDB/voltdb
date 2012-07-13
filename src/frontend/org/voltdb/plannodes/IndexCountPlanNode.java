@@ -47,7 +47,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         SEARCHKEY_EXPRESSIONS,
         ENDKEY_EXPRESSION,
         LOOKUP_TYPE,
-        LOOKUP_END_TYPE;
+        END_TYPE;
     }
 
     /**
@@ -76,7 +76,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected IndexLookupType m_LookupType = IndexLookupType.EQ;
 
     // The overall index lookup operation type
-    protected IndexLookupType m_LookupEndType = IndexLookupType.EQ;
+    protected IndexLookupType m_endType = IndexLookupType.EQ;
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
@@ -292,16 +292,16 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 ctEqual++;
             } else if (et == ExpressionType.COMPARE_GREATERTHAN) {
                 ctOther++;
-                m_LookupEndType = IndexLookupType.GT;
+                m_endType = IndexLookupType.GT;
             } else if (et == ExpressionType.COMPARE_GREATERTHANOREQUALTO) {
                 ctOther++;
-                m_LookupEndType = IndexLookupType.GTE;
+                m_endType = IndexLookupType.GTE;
             } else if (et == ExpressionType.COMPARE_LESSTHAN) {
                 ctOther++;
-                m_LookupEndType = IndexLookupType.LT;
+                m_endType = IndexLookupType.LT;
             } else if (et == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
                 ctOther++;
-                m_LookupEndType = IndexLookupType.LTE;
+                m_endType = IndexLookupType.LTE;
             } else {
                 // something wrong, we can not handle other cases
                 m_endExprValid = false;
@@ -354,7 +354,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
         stringer.key(Members.LOOKUP_TYPE.name()).value(m_LookupType.toString());
-        stringer.key(Members.LOOKUP_END_TYPE.name()).value(m_LookupEndType.toString());
+        stringer.key(Members.END_TYPE.name()).value(m_endType.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
 
 
