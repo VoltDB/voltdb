@@ -67,15 +67,12 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     protected final RepairLog m_repairLog = new RepairLog();
 
     // conversion helper.
-    static List<Long> childrenToReplicaHSIds(long initiatorHSId, Collection<String> children)
+    static List<Long> childrenToReplicaHSIds(Collection<String> children)
     {
-        List<Long> replicas = new ArrayList<Long>(children.size() - 1);
+        List<Long> replicas = new ArrayList<Long>(children.size());
         for (String child : children) {
             long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
-            if (HSId != initiatorHSId)
-            {
-                replicas.add(HSId);
-            }
+            replicas.add(HSId);
         }
         return replicas;
     }
@@ -209,7 +206,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                             m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                             m_zkMailboxNode, m_whoami);
                 }
-                m_term.setRepairAlgo(repair);
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
                 success = repair.start(m_term.getInterestingHSIds()).get();

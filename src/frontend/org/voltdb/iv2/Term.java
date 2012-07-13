@@ -43,6 +43,4 @@ public interface Term
 
     /** Get the current set of HSIds which we're monitoring */
     public List<Long> getInterestingHSIds();
-
-    public void setRepairAlgo(RepairAlgo algo);
 }

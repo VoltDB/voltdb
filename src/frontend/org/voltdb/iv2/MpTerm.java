@@ -45,11 +45,9 @@ public class MpTerm implements Term
 
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
-    private final long m_initiatorHSId;
     private final ZooKeeper m_zk;
     private final CountDownLatch m_missingStartupSites;
     private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
-    private RepairAlgo m_algo = null;
 
     // Initialized in start() -- when the term begins.
     protected BabySitter m_babySitter;
@@ -72,13 +70,13 @@ public class MpTerm implements Term
                     tmLog.error(m_whoami
                             + "replica(s) failed during startup. Initialization can not complete."
                             + " Failed replicas: " + removed);
-                    MpTerm.this.m_algo.cancel();
+                    VoltDB.crashLocalVoltDB("Replicas failed during startup.", true, null);
                     return;
                 }
                 Sets.SetView<String> added = Sets.difference(updatedReplicas, MpTerm.this.m_knownReplicas);
                 int newReplicas = added.size();
                 m_knownReplicas.addAll(updatedReplicas);
-                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(m_initiatorHSId, updatedReplicas);
+                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(updatedReplicas);
                 m_mailbox.updateReplicas(replicas);
                 for (int i=0; i < newReplicas; i++) {
                     MpTerm.this.m_missingStartupSites.countDown();
@@ -86,7 +84,7 @@ public class MpTerm implements Term
             }
             else {
                 // remove the leader; convert to hsids; deal with the replica change.
-                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(m_initiatorHSId, children);
+                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(children);
                 tmLog.info(m_whoami
                         + "replica change handler updating replica list to: "
                         + CoreUtils.hsIdCollectionToString(replicas));
@@ -104,7 +102,6 @@ public class MpTerm implements Term
     {
         m_zk = zk;
         m_partitionId = partitionId;
-        m_initiatorHSId = initiatorHSId;
         m_mailbox = mailbox;
 
         if (missingStartupSites != null) {
@@ -149,13 +146,7 @@ public class MpTerm implements Term
     public List<Long> getInterestingHSIds()
     {
         List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  BaseInitiator.childrenToReplicaHSIds(m_initiatorHSId, survivorsNames);
-        survivors.add(m_initiatorHSId);
+        List<Long> survivors =  BaseInitiator.childrenToReplicaHSIds(survivorsNames);
         return survivors;
-    }
-
-    public void setRepairAlgo(RepairAlgo algo)
-    {
-        m_algo = algo;
     }
 }
