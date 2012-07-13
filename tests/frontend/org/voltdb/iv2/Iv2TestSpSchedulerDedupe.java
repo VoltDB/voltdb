@@ -103,6 +103,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         Iv2InitiateTaskMessage task =
             new Iv2InitiateTaskMessage(destHSId, // don't care?
                                        Long.MIN_VALUE, // don't care
+                                       txnId - 1, // truncationHandle
                                        txnId,
                                        readOnly, // readonly
                                        singlePart, // single-part

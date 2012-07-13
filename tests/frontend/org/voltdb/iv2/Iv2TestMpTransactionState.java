@@ -197,7 +197,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, -1, txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, -1, (txnId-1), txnId, true, false, null, 0, 0);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -242,7 +242,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, -1, txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, -1, (txnId -1), txnId, true, false, null, 0, 0);
         int hsids = 6;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -284,7 +284,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(3, 4, txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(3, 4, (txnId - 1), txnId, true, false, null, 0, 0);
         int hsids = 6;
         buddyHSId = 3;
         long[] non_local = configureHSIds(hsids);
@@ -328,7 +328,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, 0, txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, 0, (txnId - 1), txnId, true, false, null, 0, 0);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -360,7 +360,7 @@ public class Iv2TestMpTransactionState extends TestCase
         // We're getting an error, so this should throw something
         boolean threw = false;
         try {
-            Map<Integer, List<VoltTable>> results = dut.recursableRun(siteConnection);
+            dut.recursableRun(siteConnection);
             fail();
         }
         catch (EEException eee) {
@@ -377,7 +377,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, 0, txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, 0, (txnId - 1), txnId, true, false, null, 0, 0);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -412,7 +412,7 @@ public class Iv2TestMpTransactionState extends TestCase
         // We're getting an error, so this should throw something
         boolean threw = false;
         try {
-            Map<Integer, List<VoltTable>> results = dut.recursableRun(siteConnection);
+            dut.recursableRun(siteConnection);
             fail();
         }
         catch (EEException eee) {

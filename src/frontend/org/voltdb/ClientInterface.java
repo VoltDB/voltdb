@@ -870,6 +870,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 Iv2InitiateTaskMessage workRequest =
                     new Iv2InitiateTaskMessage(m_siteId,
                             initiatorHSId,
+                            Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
                             Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
                             isReadOnly,
                             isSinglePartition,

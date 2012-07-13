@@ -138,6 +138,7 @@ public class MpTransactionState extends TransactionState
     public void createLocalFragmentWork(FragmentTaskMessage task, boolean nonTransactional)
     {
         m_localWork = task;
+        m_localWork.setTruncationHandle(m_task.getTruncationHandle());
     }
 
     @Override
@@ -148,6 +149,7 @@ public class MpTransactionState extends TransactionState
         // At some point maybe ProcedureRunner.slowPath() can get smarter
         if (task.getFragmentCount() > 0) {
             m_remoteWork = task;
+            m_remoteWork.setTruncationHandle(m_task.getTruncationHandle());
             // Distribute fragments to remote destinations.
             long[] non_local_hsids = new long[m_useHSIds.size()];
             for (int i = 0; i < m_useHSIds.size(); i++) {

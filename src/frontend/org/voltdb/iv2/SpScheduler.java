@@ -140,7 +140,8 @@ public class SpScheduler extends Scheduler
                 // the same initiate task message will overwrite each
                 // other's memory -- the message isn't copied on delivery
                 // to other local mailboxes.
-                msg = new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
+                msg = new Iv2InitiateTaskMessage(
+                        message.getInitiatorHSId(),
                         message.getCoordinatorHSId(),
                         m_repairLogTruncationHandle,
                         message.getTxnId(),

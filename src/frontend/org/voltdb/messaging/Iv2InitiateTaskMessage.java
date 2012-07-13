@@ -37,6 +37,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     // The default MP transaction id set by client interface when
     // initiating a single-partition transaction.
     public static final long UNUSED_MP_TXNID = Long.MIN_VALUE;
+    public static final long UNUSED_TRUNC_HANDLE = Long.MIN_VALUE;
 
     long m_clientInterfaceHandle;
     long m_connectionId;
@@ -49,22 +50,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     /** Empty constructor for de-serialization */
     Iv2InitiateTaskMessage() {
         super();
-    }
-
-    // MpScheduler creates msgs w/o truncation handles.
-    public Iv2InitiateTaskMessage(long initiatorHSId,
-                        long coordinatorHSId,
-                        long txnId,
-                        boolean isReadOnly,
-                        boolean isSinglePartition,
-                        StoredProcedureInvocation invocation,
-                        long clientInterfaceHandle,
-                        long connectionId)
-    {
-        this(initiatorHSId, coordinatorHSId, Long.MIN_VALUE,
-            txnId, isReadOnly, isSinglePartition, invocation,
-            clientInterfaceHandle,
-            connectionId);
     }
 
     // SpScheduler creates messages with truncation handles.
