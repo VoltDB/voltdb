@@ -54,84 +54,84 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         }
     }
 
-//    public void testOneShotRead() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        loadData(client);
-//
-//        // testcase: single-stmt read.
-//        ClientResponse resp = client.callProcedure("CountP1");
-//        assertTrue("Successful oneshot read.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Expect count=10", 10L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testOneShotWrite() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        loadData(client);
-//
-//        ClientResponse resp = client.callProcedure("UpdateP1");
-//        assertTrue("Successful oneshot write.", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Touched 10 rows", 10L, resp.getResults()[0].asScalarLong());
-//
-//        // verify the update results.
-//        resp = client.callProcedure("SumP1");
-//        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Updated sum=20", 20L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testOneShotConstraintViolationAllSites() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        loadData(client);
-//        boolean caught = false;
-//        try {
-//            client.callProcedure("ConstraintViolationUpdate");
-//            assertFalse("Failed to produce constraint violation", true);
-//        }
-//        catch (ProcCallException e) {
-//            assertEquals("Client response is rollback.",
-//                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-//            caught = true;
-//        }
-//        assertTrue("Expected exception.", caught);
-//
-//        // verify initial result is unchanged (transactions!)
-//        ClientResponse resp = client.callProcedure("SumB1");
-//        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
-//    }
-//
-//    public void testOneshotPartitionViolationAllSites() throws Exception
-//    {
-//        // Restrict to clustered tests (configured with > 1 partition)
-//        LocalCluster config = (LocalCluster)this.getServerConfig();
-//        int sites = config.m_siteCount;
-//        int nodes = config.m_hostCount;
-//        int k = config.m_kfactor;
-//        int parts = (nodes * sites) / (k + 1);
-//        if (parts == 1) {
-//            return;
-//        }
-//
-//        final Client client = this.getClient();
-//        loadData(client);
-//        try {
-//            client.callProcedure("PartitionViolationUpdate");
-//            assertFalse("Failed to produce violation", true);
-//        }
-//        catch (ProcCallException e) {
-//            assertEquals("Client response is error.",
-//                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
-//        }
-//        // verify initial result is unchanged (transactions!)
-//        ClientResponse resp = client.callProcedure("SumKey");
-//        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
-//        // see ENG-2941
-//        assertTrue(resp.getStatusString() == null);
-//    }
-//
+    public void testOneShotRead() throws Exception
+    {
+        final Client client = this.getClient();
+        loadData(client);
+
+        // testcase: single-stmt read.
+        ClientResponse resp = client.callProcedure("CountP1");
+        assertTrue("Successful oneshot read.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Expect count=10", 10L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testOneShotWrite() throws Exception
+    {
+        final Client client = this.getClient();
+        loadData(client);
+
+        ClientResponse resp = client.callProcedure("UpdateP1");
+        assertTrue("Successful oneshot write.", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Touched 10 rows", 10L, resp.getResults()[0].asScalarLong());
+
+        // verify the update results.
+        resp = client.callProcedure("SumP1");
+        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Updated sum=20", 20L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testOneShotConstraintViolationAllSites() throws Exception
+    {
+        final Client client = this.getClient();
+        loadData(client);
+        boolean caught = false;
+        try {
+            client.callProcedure("ConstraintViolationUpdate");
+            assertFalse("Failed to produce constraint violation", true);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is rollback.",
+                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            caught = true;
+        }
+        assertTrue("Expected exception.", caught);
+
+        // verify initial result is unchanged (transactions!)
+        ClientResponse resp = client.callProcedure("SumB1");
+        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
+    }
+
+    public void testOneshotPartitionViolationAllSites() throws Exception
+    {
+        // Restrict to clustered tests (configured with > 1 partition)
+        LocalCluster config = (LocalCluster)this.getServerConfig();
+        int sites = config.m_siteCount;
+        int nodes = config.m_hostCount;
+        int k = config.m_kfactor;
+        int parts = (nodes * sites) / (k + 1);
+        if (parts == 1) {
+            return;
+        }
+
+        final Client client = this.getClient();
+        loadData(client);
+        try {
+            client.callProcedure("PartitionViolationUpdate");
+            assertFalse("Failed to produce violation", true);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is error.",
+                    ClientResponse.UNEXPECTED_FAILURE, e.getClientResponse().getStatus());
+        }
+        // verify initial result is unchanged (transactions!)
+        ClientResponse resp = client.callProcedure("SumKey");
+        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
+        // see ENG-2941
+        assertTrue(resp.getStatusString() == null);
+    }
+
     public void testOneshotReplicatedWriteAndRead() throws Exception
     {
         final Client client = this.getClient();
@@ -142,27 +142,27 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         assertEquals("Expected sum=45", 45L, resp.getResults()[0].asScalarLong());
     }
 
-//    public void testOneshotReplicatedConstraintViolation() throws Exception
-//    {
-//        final Client client = this.getClient();
-//        boolean caught = false;
-//        loadData("R1.insert", client);
-//        try {
-//            client.callProcedure("ConstraintViolationUpdate_R");
-//            assertTrue("Failed to produce constraint violation", false);
-//        }
-//        catch (ProcCallException e) {
-//            assertEquals("Client response is rollback.",
-//                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
-//            caught = true;
-//        }
-//        assertTrue("Caught expected", caught);
-//
-//        // verify initial result is unchanged (transactions!)
-//        ClientResponse resp = client.callProcedure("SumB1_R");
-//        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
-//        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
-//    }
+    public void testOneshotReplicatedConstraintViolation() throws Exception
+    {
+        final Client client = this.getClient();
+        boolean caught = false;
+        loadData("R1.insert", client);
+        try {
+            client.callProcedure("ConstraintViolationUpdate_R");
+            assertTrue("Failed to produce constraint violation", false);
+        }
+        catch (ProcCallException e) {
+            assertEquals("Client response is rollback.",
+                    ClientResponse.GRACEFUL_FAILURE, e.getClientResponse().getStatus());
+            caught = true;
+        }
+        assertTrue("Caught expected", caught);
+
+        // verify initial result is unchanged (transactions!)
+        ClientResponse resp = client.callProcedure("SumB1_R");
+        assertTrue("Verified updates", resp.getStatus() == ClientResponse.SUCCESS);
+        assertEquals("Updated sum=45", 45L, resp.getResults()[0].asScalarLong());
+    }
 
 
     static public junit.framework.Test suite() {
@@ -211,12 +211,12 @@ public class TestMPBasecaseSuite extends RegressionSuite {
         config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
-//        builder.addServerConfig(config);
+        builder.addServerConfig(config);
 
         config = new LocalCluster("sqltypes-onesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t3 = config.compile(project);
         assertTrue(t3);
-//        builder.addServerConfig(config);
+        builder.addServerConfig(config);
 
         // CLUSTER
         config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
