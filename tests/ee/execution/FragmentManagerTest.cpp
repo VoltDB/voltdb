@@ -50,42 +50,42 @@ TEST_F(FragmentManagerTest, Basic) {
     int64_t fragId = 0;
     bool cacheHit = false;
 
-    cacheHit = fm.upsert(plan1, strlen(plan1), fragId);
+    cacheHit = fm.upsert(plan1, (int32_t)strlen(plan1), fragId);
     ASSERT_FALSE(cacheHit);
     ASSERT_TRUE(fragId == -1);
 
     fragId = fm.purgeNext();
     ASSERT_TRUE(fragId == 0);
 
-    cacheHit = fm.upsert(plan3, strlen(plan3), fragId);
+    cacheHit = fm.upsert(plan3, (int32_t)strlen(plan3), fragId);
     ASSERT_FALSE(cacheHit);
     ASSERT_TRUE(fragId == -2);
 
     fragId = fm.purgeNext();
     ASSERT_TRUE(fragId == 0);
 
-    cacheHit = fm.upsert(plan4, strlen(plan4), fragId);
+    cacheHit = fm.upsert(plan4, (int32_t)strlen(plan4), fragId);
     ASSERT_FALSE(cacheHit);
     ASSERT_TRUE(fragId == -3);
 
     fragId = fm.purgeNext();
     ASSERT_TRUE(fragId == 0);
 
-    cacheHit = fm.upsert(plan2, strlen(plan2), fragId);
+    cacheHit = fm.upsert(plan2, (int32_t)strlen(plan2), fragId);
     ASSERT_TRUE(cacheHit);
     ASSERT_TRUE(fragId == -1);
 
     fragId = fm.purgeNext();
     ASSERT_TRUE(fragId == 0);
 
-    cacheHit = fm.upsert(plan4, strlen(plan4), fragId);
+    cacheHit = fm.upsert(plan4, (int32_t)strlen(plan4), fragId);
     ASSERT_TRUE(cacheHit);
     ASSERT_TRUE(fragId == -3);
 
     fragId = fm.purgeNext();
     ASSERT_TRUE(fragId == 0);
 
-    cacheHit = fm.upsert(plan5, strlen(plan5), fragId);
+    cacheHit = fm.upsert(plan5, (int32_t)strlen(plan5), fragId);
     ASSERT_FALSE(cacheHit);
     ASSERT_TRUE(fragId == -6);
 
@@ -93,7 +93,7 @@ TEST_F(FragmentManagerTest, Basic) {
     ASSERT_TRUE(fragId == -2);
 
     plan1[0] = 'a';
-    cacheHit = fm.upsert(plan1, strlen(plan1), fragId);
+    cacheHit = fm.upsert(plan1, (int32_t)strlen(plan1), fragId);
     ASSERT_FALSE(cacheHit);
     ASSERT_TRUE(fragId == -7);
 }

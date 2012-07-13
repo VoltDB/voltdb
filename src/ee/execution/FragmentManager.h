@@ -18,8 +18,9 @@
 #ifndef FRAGMENTMANAGER_H_
 #define FRAGMENTMANAGER_H_
 
-#include <boost/shared_ptr.hpp>
+#include <cstring>
 #include <algorithm>
+#include <boost/shared_ptr.hpp>
 #include <boost/multi_index_container.hpp>
 #include <boost/multi_index/ordered_index.hpp>
 #include <boost/multi_index/identity.hpp>

@@ -663,13 +663,13 @@ SHAREDLIB_JNIEXPORT jint JNICALL Java_org_voltdb_jni_ExecutionEngine_nativeExecu
 
             engine->setUsedParamcnt(cnt);
 
-            long input_dep_id = -1;
+            int64_t input_dep_id = -1;
             if (input_dep_ids) {
                 env->GetLongArrayRegion(input_dep_ids, i, 1, (jlong*) &input_dep_id);
             }
 
             // success is 0 and error is 1.
-            if (engine->executeQuery(fragment_ids_buffer[i], 1, input_dep_id,
+            if (engine->executeQuery(fragment_ids_buffer[i], 1, static_cast<int32_t>(input_dep_id),
                                      params, txnId, lastCommittedTxnId, i == 0,
                                      i == (batch_size - 1)))
             {
