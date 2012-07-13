@@ -570,8 +570,7 @@ public class ProcedureRunner {
                  " can not be converted to NULL representation for arg " + ii + " for SQL stmt " + stmt.getText());
         }
 
-        // Create a ParameterSet that enforces size limits to protect the EE.
-        final ParameterSet params = ParameterSet.createParameterSetForEE();
+        final ParameterSet params = new ParameterSet();
         params.setParameters(args);
         return params;
     }

@@ -56,18 +56,7 @@ import org.voltdb.types.VoltDecimalHelper;
     private final LinkedList<byte[][]> m_encodedStringArrays = new LinkedList<byte[][]>();
     private int m_serializedSize = -1; // memoized serialized size
 
-    private final boolean m_serializingToEE;
-
     public ParameterSet() {
-        m_serializingToEE = false;
-    }
-
-    private ParameterSet(boolean serializingToEE) {
-        m_serializingToEE = serializingToEE;
-    }
-
-    public static ParameterSet createParameterSetForEE() {
-        return new ParameterSet(true);
     }
 
     static Object limitType(Object o) {
@@ -111,9 +100,9 @@ import org.voltdb.types.VoltDecimalHelper;
             throw new RuntimeException("Invalid partition parameter requested.");
         }
         for (int i = 0; i < partitionIndex; ++i) {
-            readOneParameter(in, false);
+            readOneParameter(in);
         }
-        Object retval = readOneParameter(in, false);
+        Object retval = readOneParameter(in);
         unserializedParams.rewind();
         return retval;
     }
@@ -124,7 +113,7 @@ import org.voltdb.types.VoltDecimalHelper;
         m_params = new Object[paramLen];
 
         for (int i = 0; i < paramLen; i++) {
-            m_params[i] = readOneParameter(in, m_serializingToEE);
+            m_params[i] = readOneParameter(in);
         }
     }
 
@@ -409,7 +398,7 @@ import org.voltdb.types.VoltDecimalHelper;
         return value;
     }
 
-    static private Object readOneParameter(FastDeserializer in, boolean enforceSizeLimits)
+    static private Object readOneParameter(FastDeserializer in)
             throws IOException {
         byte nextTypeByte = in.readByte();
         if (nextTypeByte == ARRAY) {
@@ -433,17 +422,13 @@ import org.voltdb.types.VoltDecimalHelper;
                 case FLOAT:
                     return in.readDouble();
                 case STRING:
-                    String string_val = (enforceSizeLimits
-                                            ? in.readString()
-                                            : in.readStringUnlimited());
+                    String string_val = in.readString();
                     if (string_val == null) {
                         return VoltType.NULL_STRING_OR_VARBINARY;
                     }
                     return string_val;
                 case VARBINARY:
-                    byte[] bin_val = (enforceSizeLimits
-                                            ? in.readVarbinary()
-                                            : in.readVarbinaryUnlimited());
+                    byte[] bin_val = in.readVarbinary();
                     if (bin_val == null) {
                         return VoltType.NULL_STRING_OR_VARBINARY;
                     }

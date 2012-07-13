@@ -174,9 +174,14 @@ public class FastDeserializer implements DataInput {
     }
 
     /**
-     * readString internal implementation that can optionally enforce the size limit.
+     * Read a string in the standard VoltDB way. That is, four
+     * bytes of length info followed by the bytes of characters
+     * encoded in UTF-8.
+     *
+     * @return The String value read from the stream.
+     * @throws IOException Rethrows any IOExceptions.
      */
-    private String readStringInternal(boolean enforceSizeLimit) throws IOException {
+    public String readString() throws IOException {
         final int NULL_STRING_INDICATOR = -1;
 
         final int len = readInt();
@@ -186,10 +191,6 @@ public class FastDeserializer implements DataInput {
             return null;
         assert len >= 0;
 
-        if (enforceSizeLimit && len > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Serializable strings cannot be longer then "
-                    + VoltType.MAX_VALUE_LENGTH + " bytes");
-        }
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("String length is negative " + len);
         }
@@ -208,35 +209,13 @@ public class FastDeserializer implements DataInput {
     }
 
     /**
-     * Read a string in the standard VoltDB way. That is, four
-     * bytes of length info followed by the bytes of characters
-     * encoded in UTF-8.
-     * Size limit is enforced. Protects the EE from overflow.
+     * Read a varbinary, serialized the same way VoltDB serializes
+     * strings, but returned as byte[].
      *
-     * @return The String value read from the stream.
+     * @return The byte[] value read from the stream.
      * @throws IOException Rethrows any IOExceptions.
      */
-    public String readString() throws IOException {
-        return readStringInternal(true);
-    }
-
-    /**
-     * Read a string in the standard VoltDB way. That is, four
-     * bytes of length info followed by the bytes of characters
-     * encoded in UTF-8.
-     * Size limit is NOT enforced (for non-EE use).
-     *
-     * @return The String value read from the stream.
-     * @throws IOException Rethrows any IOExceptions.
-     */
-    public String readStringUnlimited() throws IOException {
-        return readStringInternal(false);
-    }
-
-    /**
-     * readVarbinary internal implementation that can optionally enforce the size limit.
-     */
-    private byte[] readVarbinaryInternal(boolean enforceSizeLimit) throws IOException {
+    public byte[] readVarbinary() throws IOException {
         final int NULL_STRING_INDICATOR = -1;
 
         final int len = readInt();
@@ -246,10 +225,6 @@ public class FastDeserializer implements DataInput {
             return null;
         assert len >= 0;
 
-        if (enforceSizeLimit && len > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Serializable varbinary values cannot be longer then "
-                    + VoltType.MAX_VALUE_LENGTH + " bytes");
-        }
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("Varbinary length is negative " + len);
         }
@@ -258,30 +233,6 @@ public class FastDeserializer implements DataInput {
         final byte[] retval = new byte[len];
         readFully(retval);
         return retval;
-    }
-
-    /**
-     * Read a varbinary, serialized the same way VoltDB serializes
-     * strings, but returned as byte[].
-     * Size limit is enforced. Protects the EE from overflow.
-     *
-     * @return The byte[] value read from the stream.
-     * @throws IOException Rethrows any IOExceptions.
-     */
-    public byte[] readVarbinary() throws IOException {
-        return readVarbinaryInternal(true);
-    }
-
-    /**
-     * Read a varbinary, serialized the same way VoltDB serializes
-     * strings, but returned as byte[].
-     * Size limit is NOT enforced (for non-EE use).
-     *
-     * @return The byte[] value read from the stream.
-     * @throws IOException Rethrows any IOExceptions.
-     */
-    public byte[] readVarbinaryUnlimited() throws IOException {
-        return readVarbinaryInternal(false);
     }
 
     /**
