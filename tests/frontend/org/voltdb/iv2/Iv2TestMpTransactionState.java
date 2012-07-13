@@ -422,4 +422,34 @@ public class Iv2TestMpTransactionState extends TestCase
         }
         assertTrue(threw);
     }
+
+
+    @Test
+    public void testTruncationHandleForwarding() throws IOException
+    {
+        long truncPt = 100L;
+        Iv2InitiateTaskMessage taskmsg =
+            new Iv2InitiateTaskMessage(0, 0, truncPt, 101L, true, false, null, 0, 0);
+        assertEquals(truncPt, taskmsg.getTruncationHandle());
+
+        FragmentTaskMessage localFrag = mock(FragmentTaskMessage.class);
+        FragmentTaskMessage remoteFrag = mock(FragmentTaskMessage.class);
+        when(remoteFrag.getFragmentCount()).thenReturn(1);
+
+        buddyHSId = 0;
+        Mailbox mailbox = mock(Mailbox.class);
+
+        MpTransactionState dut =
+            new MpTransactionState(mailbox, 101L, taskmsg, allHsids, buddyHSId);
+
+        // create local work and verify the created localwork has the
+        // expected truncation point.
+        dut.createLocalFragmentWork(localFrag, false);
+        verify(dut.m_localWork).setTruncationHandle(truncPt);
+
+        // same with partcipating work.
+        dut.createAllParticipatingFragmentWork(remoteFrag);
+        verify(dut.m_remoteWork).setTruncationHandle(truncPt);
+    }
+
 }
