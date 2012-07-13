@@ -80,7 +80,7 @@ public class ParameterConverter {
             return sparam;
         }
 
-        // hack to make varbinary work with input as string
+        // hack to make varbinary work with input as hex string
         if ((paramType == byte[].class) && (pclass == String.class)) {
             return Encoder.hexDecode((String) param);
         }
@@ -92,6 +92,8 @@ public class ParameterConverter {
         if (isArray) {
             Class<?> pSubCls = pclass.getComponentType();
             Class<?> sSubCls = paramTypeComponentType;
+            int inputLength = Array.getLength(param);
+
             if (pSubCls == sSubCls) {
                 return param;
             }
@@ -99,8 +101,24 @@ public class ParameterConverter {
             // this is a bit ugly as it might hide passing
             //  arrays of the wrong type, but it "does the right thing"
             //  more often that not I guess...
-            else if (Array.getLength(param) == 0) {
+            else if (inputLength == 0) {
                 return Array.newInstance(sSubCls, 0);
+            }
+            // hack to make strings work with input as bytes
+            else if ((pSubCls == byte[].class) && (sSubCls == String.class)) {
+                String[] values = new String[inputLength];
+                for (int i = 0; i < inputLength; i++) {
+                    values[i] = new String((byte[]) Array.get(param, i), "UTF-8");
+                }
+                return values;
+            }
+            // hack to make varbinary work with input as hex string
+            else if ((pSubCls == String.class) && (sSubCls == byte[].class)) {
+                byte[][] values = new byte[inputLength][];
+                for (int i = 0; i < inputLength; i++) {
+                    values[i] = Encoder.hexDecode((String) Array.get(param, i));
+                }
+                return values;
             }
             else {
                 /*

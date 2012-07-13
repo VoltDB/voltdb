@@ -20,7 +20,6 @@ package org.voltdb.compiler;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.concurrent.Callable;
-import java.util.concurrent.ExecutorService;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -93,8 +92,7 @@ public class AsyncCompilerAgent {
                     retval.hostname = work.hostname;
                     retval.adminConnection = work.adminConnection;
                     retval.clientData = work.clientData;
-                    // XXX: need client interface mailbox id.
-                    m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
+                    work.completionHandler.onCompletion(retval);
                 }
             }
         };
@@ -106,22 +104,20 @@ public class AsyncCompilerAgent {
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
             final AsyncCompilerResult result = compileAdHocPlan(w);
-            // XXX: need client interface mailbox id.
-            m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+            w.completionHandler.onCompletion(result);
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
             final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
-            // XXX: need client interface mailbox id.
-            m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+            w.completionHandler.onCompletion(result);
         }
     }
 
-    public ListenableFuture<AdHocPlannedStmtBatch> compileAdHocPlanFuture(final AdHocPlannerWork apw) {
-        return m_es.submit(new Callable<AdHocPlannedStmtBatch>() {
+    public void compileAdHocPlanForProcedure(final AdHocPlannerWork apw) {
+        m_es.submit(new Runnable() {
             @Override
-            public AdHocPlannedStmtBatch call() throws Exception {
-                return compileAdHocPlan(apw);
+            public void run(){
+                apw.completionHandler.onCompletion(compileAdHocPlan(apw));
             }
         });
     }
@@ -156,7 +152,7 @@ public class AsyncCompilerAgent {
             try {
                 String sqlStatement = work.sqlStatements[0];
                 PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
-                                                            work.inferSinglePartition, work.allowParameterization);
+                                                          work.inferSinglePartition, work.allowParameterization);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 plannedStmtBatch.partitionParam = result.partitionParam;
@@ -164,6 +160,7 @@ public class AsyncCompilerAgent {
                                               result.onePlan,
                                               result.allPlan,
                                               result.replicatedDML,
+                                              result.nonDeterministic,
                                               result.params);
             }
             catch (Exception e) {
@@ -181,6 +178,7 @@ public class AsyncCompilerAgent {
                                                   result.onePlan,
                                                   result.allPlan,
                                                   result.replicatedDML,
+                                                  result.nonDeterministic,
                                                   result.params);
                 }
                 catch (Exception e) {

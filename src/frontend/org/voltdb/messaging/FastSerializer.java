@@ -283,7 +283,7 @@ public class FastSerializer implements DataOutput {
     }
 
     /**
-     * Write a varbinary in the standard VoltDB way. That is, two
+     * Write a varbinary in the standard VoltDB way. That is, four
      * bytes of length info followed by the bytes.
      *
      * @param bin The byte array value to be serialized.
@@ -321,6 +321,22 @@ public class FastSerializer implements DataOutput {
         }
     }
 
+    public static void writeArray(byte[][] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                buf.putInt(-1); // null length prefix
+            }
+            else {
+                writeArray(values[i], buf);
+            }
+        }
+    }
+
     public void writeArray(FastSerializable[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -334,15 +350,38 @@ public class FastSerializer implements DataOutput {
         }
     }
 
+    public static void writeArray(byte[] values, ByteBuffer buf) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        buf.putInt(values.length);
+        buf.put(values);
+    }
+
+    public void writeArray(byte[][] values) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        writeShort(values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                writeInt(-1);
+            }
+            else {
+                writeArray(values[i]);
+            }
+        }
+    }
+
     public void writeArray(byte[] values) throws IOException {
         if (values.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Array exceeds maximum length of "
                                   + VoltType.MAX_VALUE_LENGTH + " bytes");
         }
         writeInt(values.length);
-        for (int i = 0; i < values.length; ++i) {
-            writeByte(values[i]);
-        }
+        write(values);
     }
 
     public static void writeArray(short[] values, ByteBuffer buf) throws IOException {

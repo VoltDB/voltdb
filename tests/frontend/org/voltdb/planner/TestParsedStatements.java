@@ -23,7 +23,6 @@
 
 package org.voltdb.planner;
 
-import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
@@ -84,16 +83,12 @@ public class TestParsedStatements extends TestCase {
             assertTrue(false);
         }
         // output the xml from hsql to disk for debugging
-        PrintStream xmlDebugOut = BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-xml", stmtName + ".xml");
-        xmlDebugOut.println(xmlSQL);
-        xmlDebugOut.close();
+        BuildDirectoryUtils.writeFile("statement-hsql-xml", stmtName + ".xml", xmlSQL.toString());
 
         // get a parsed statement from the xml
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(stmtSQL, xmlSQL, m_db, null);
         // output a description of the parsed stmt
-        PrintStream parsedDebugOut = BuildDirectoryUtils.getDebugOutputPrintStream("statement-hsql-parsed", stmtName + ".txt");
-        parsedDebugOut.println(parsedStmt.toString());
-        parsedDebugOut.close();
+        BuildDirectoryUtils.writeFile("statement-hsql-parsed", stmtName + ".txt", parsedStmt.toString());
 
         int clausesFound = 0;
         clausesFound += parsedStmt.noTableSelectionList.size();

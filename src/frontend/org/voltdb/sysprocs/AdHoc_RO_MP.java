@@ -48,7 +48,7 @@ public class AdHoc_RO_MP extends AdHocBase {
      * @return  results as VoltTable array
      */
     public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String[] aggregatorFragments, String[] collectorFragments,
+            byte[][] aggregatorFragments, byte[][] collectorFragments,
             String[] sqlStatements, int[] replicatedTableDMLFlags) {
         return runAdHoc(ctx, aggregatorFragments, collectorFragments, sqlStatements, replicatedTableDMLFlags);
     }
