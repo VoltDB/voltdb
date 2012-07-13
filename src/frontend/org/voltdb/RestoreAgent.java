@@ -1113,7 +1113,7 @@ SnapshotCompletionInterest {
         });
 
         if (txnId == null) {
-            m_initiator.createTransaction(-1, "CommandLog", true, spi,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
@@ -1122,7 +1122,7 @@ SnapshotCompletionInterest {
                                           EstTime.currentTimeMillis(),
                                           false);
         } else {
-            m_initiator.createTransaction(-1, "CommandLog", true,
+            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
                                           txnId, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
