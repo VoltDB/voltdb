@@ -20,8 +20,12 @@ package org.voltdb.planner.microoptimizations;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
@@ -106,16 +110,37 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
 
     // TODO(xin): add more checkings to replace only certain cases.
     boolean isReplaceable(IndexScanPlanNode child) {
+        
         AbstractExpression endExpr = child.getEndExpression();
         AbstractExpression postExpr = child.getPredicate();
-        if (endExpr != null)
+        ArrayList<AbstractExpression> subEndExpr = null;
+        if (endExpr != null) {
             System.err.println("End Expression:\n" + endExpr);
-        if (postExpr != null)
-            System.err.println("Post Expression:\n" + postExpr);
+            subEndExpr = endExpr.findAllSubexpressionsOfClass(TupleValueExpression.class);
+        }
+        
+        assert(postExpr != null);
+        System.err.println("Post Expression:\n" + postExpr);
+        ArrayList<AbstractExpression> subExpr = postExpr.findAllSubexpressionsOfClass(TupleValueExpression.class);;
 
-
-
-
+        Index idx = child.getCatalogIndex();
+        CatalogMap<ColumnRef> clms = idx.getColumns();
+        
+        
+        List<AbstractExpression> searchKeyExpre = child.getSearchKeyExpressions();
+        ArrayList<AbstractExpression> hasLeft = new ArrayList<AbstractExpression>(subExpr.size());
+        hasLeft.addAll(subExpr);
+        
+        for (AbstractExpression ae: subExpr) {
+            if (endExpr != null && subEndExpr != null && subEndExpr.contains(ae)) {
+                hasLeft.remove(ae);
+            }
+            
+            
+        }
+        
+        if (hasLeft.size() != 0)
+            return false;
         return true;
     }
 
