@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-import java.util.Collection;
 import java.util.Comparator;
 
 import java.util.concurrent.CountDownLatch;
@@ -39,7 +38,6 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
 
@@ -47,34 +45,6 @@ import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
 
-// Some comments on threading and organization.
-//   start() returns a future. Block on this future to get the final answer.
-//
-//   deliver() runs in the initiator mailbox deliver() context and triggers
-//   all repair work.
-//
-//   replica change handler runs in the babysitter thread context.
-//   replica change handler invokes a method in init.mbox that also
-//   takes the init.mbox deliver lock
-//
-//   it is important that repair work happens with the deliver lock held
-//   and that updatereplicas also holds this lock -- replica failure during
-//   repair must happen unambigously before or after each local repair action.
-//
-//   A Term can be cancelled by initiator mailbox while the deliver lock is
-//   held. Repair work must check for cancellation before producing repair
-//   actions to the mailbox.
-//
-//   Note that a term can not prevent messages being delivered post cancellation.
-//   RepairLog requests therefore use a requestId to dis-ambiguate responses
-//   for cancelled requests that are filtering in late.
-
-
-/**
- * Term encapsulates the process/algorithm of becoming
- * a new PI and the consequent ZK observers for performing that
- * role.
- */
 public class SpRepairAlgo implements RepairAlgo
 {
     VoltLogger tmLog = new VoltLogger("TM");
@@ -82,11 +52,8 @@ public class SpRepairAlgo implements RepairAlgo
 
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
-    private final long m_initiatorHSId;
     private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
-    private final CountDownLatch m_missingStartupSites;
-    private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
     private final String m_mapCacheNode;
 
     // Each Term can process at most one promotion; if promotion fails, make
@@ -153,24 +120,8 @@ public class SpRepairAlgo implements RepairAlgo
     TreeSet<Iv2RepairLogResponseMessage> m_repairLogUnion =
         new TreeSet<Iv2RepairLogResponseMessage>(m_unionComparator);
 
-
-    // conversion helper.
-    static List<Long> childrenToReplicaHSIds(long initiatorHSId, Collection<String> children)
-    {
-        List<Long> replicas = new ArrayList<Long>(children.size() - 1);
-        for (String child : children) {
-            long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
-            if (HSId != initiatorHSId)
-            {
-                replicas.add(HSId);
-            }
-        }
-        return replicas;
-    }
-
-
     /**
-     * Setup a new Term but don't take any action to take responsibility.
+     * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
     public SpRepairAlgo(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
@@ -178,28 +129,13 @@ public class SpRepairAlgo implements RepairAlgo
     {
         m_zk = zk;
         m_partitionId = partitionId;
-        m_initiatorHSId = initiatorHSId;
         m_mailbox = mailbox;
-
-        if (missingStartupSites != null) {
-            m_missingStartupSites = missingStartupSites;
-        }
-        else {
-            m_missingStartupSites = new CountDownLatch(0);
-        }
 
         m_whoami = whoami;
         m_mapCacheNode = zkMapCacheNode;
     }
 
-    /**
-     * Start a new Term. Returns a future that is done when the leadership has
-     * been fully assumed and all surviving replicas have been repaired.
-     *
-     * @param kfactorForStartup If running for startup and not for fault
-     * recovery, pass the kfactor required to proceed. For fault recovery,
-     * pass any negative value as kfactorForStartup.
-     */
+    @Override
     public Future<Boolean> start(List<Long> survivors)
     {
         try {
@@ -212,13 +148,10 @@ public class SpRepairAlgo implements RepairAlgo
         return m_promotionResult;
     }
 
+    @Override
     public boolean cancel()
     {
         return m_promotionResult.cancel(false);
-    }
-
-    public void shutdown()
-    {
     }
 
     /** Start fixing survivors: setup scoreboard and request repair logs. */
@@ -236,6 +169,7 @@ public class SpRepairAlgo implements RepairAlgo
     }
 
     /** Process a new repair log response */
+    @Override
     public void deliver(VoltMessage message)
     {
         if (message instanceof Iv2RepairLogResponseMessage) {

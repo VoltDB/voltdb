@@ -17,15 +17,9 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayList;
-import java.util.Collection;
-import java.util.Comparator;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
-import java.util.HashMap;
 import java.util.List;
-import java.util.Map;
 import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -37,41 +31,11 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
-import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
 
-import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
 
-// Some comments on threading and organization.
-//   start() returns a future. Block on this future to get the final answer.
-//
-//   deliver() runs in the initiator mailbox deliver() context and triggers
-//   all repair work.
-//
-//   replica change handler runs in the babysitter thread context.
-//   replica change handler invokes a method in init.mbox that also
-//   takes the init.mbox deliver lock
-//
-//   it is important that repair work happens with the deliver lock held
-//   and that updatereplicas also holds this lock -- replica failure during
-//   repair must happen unambigously before or after each local repair action.
-//
-//   A Term can be cancelled by initiator mailbox while the deliver lock is
-//   held. Repair work must check for cancellation before producing repair
-//   actions to the mailbox.
-//
-//   Note that a term can not prevent messages being delivered post cancellation.
-//   RepairLog requests therefore use a requestId to dis-ambiguate responses
-//   for cancelled requests that are filtering in late.
-
-
-/**
- * Term encapsulates the process/algorithm of becoming
- * a new PI and the consequent ZK observers for performing that
- * role.
- */
 public class StartupAlgo implements RepairAlgo
 {
     VoltLogger tmLog = new VoltLogger("TM");
@@ -79,7 +43,6 @@ public class StartupAlgo implements RepairAlgo
 
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
-    private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
     private final CountDownLatch m_missingStartupSites;
     private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
@@ -89,84 +52,8 @@ public class StartupAlgo implements RepairAlgo
     // a new Term and try again (if that's your big plan...)
     private final InaugurationFuture m_promotionResult = new InaugurationFuture();
 
-    long getRequestId()
-    {
-        return m_requestId;
-    }
-
-    // scoreboard for responding replica repair log responses (hsid -> response count)
-    static class ReplicaRepairStruct
-    {
-        int m_receivedResponses = 0;
-        int m_expectedResponses = -1; // (a log msg cares about this init. value)
-        long m_maxSpHandleSeen = Long.MIN_VALUE;
-
-        // update counters and return the number of outstanding messages.
-        int update(Iv2RepairLogResponseMessage response)
-        {
-            m_receivedResponses++;
-            m_expectedResponses = response.getOfTotal();
-            m_maxSpHandleSeen = Math.max(m_maxSpHandleSeen, response.getSpHandle());
-            return logsComplete();
-        }
-
-        // return 0 if all expected logs have been received.
-        int logsComplete()
-        {
-            // expected responses is really a count of remote
-            // messages. if there aren't any, the sequence will be
-            // 1 (the count of responses) while expected will be 0
-            // (the length of the remote log)
-            if (m_expectedResponses == 0) {
-               return 0;
-            }
-            return m_expectedResponses - m_receivedResponses;
-        }
-
-        // return true if this replica needs the message for spHandle.
-        boolean needs(long spHandle)
-        {
-            return m_maxSpHandleSeen < spHandle;
-        }
-    }
-
-    // replicas being processed and repaired.
-    Map<Long, ReplicaRepairStruct> m_replicaRepairStructs =
-        new HashMap<Long, ReplicaRepairStruct>();
-
-    // Determine equal repair responses by the SpHandle of the response.
-    Comparator<Iv2RepairLogResponseMessage> m_unionComparator =
-        new Comparator<Iv2RepairLogResponseMessage>()
-    {
-        @Override
-        public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
-        {
-            return (int)(o1.getSpHandle() - o2.getSpHandle());
-        }
-    };
-
-    // Union of repair responses.
-    TreeSet<Iv2RepairLogResponseMessage> m_repairLogUnion =
-        new TreeSet<Iv2RepairLogResponseMessage>(m_unionComparator);
-
-
-    // conversion helper.
-    static List<Long> childrenToReplicaHSIds(long initiatorHSId, Collection<String> children)
-    {
-        List<Long> replicas = new ArrayList<Long>(children.size() - 1);
-        for (String child : children) {
-            long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
-            if (HSId != initiatorHSId)
-            {
-                replicas.add(HSId);
-            }
-        }
-        return replicas;
-    }
-
-
     /**
-     * Setup a new Term but don't take any action to take responsibility.
+     * Setup a new StartupAlgo but don't take any action to take responsibility.
      */
     public StartupAlgo(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
@@ -187,14 +74,7 @@ public class StartupAlgo implements RepairAlgo
         m_mapCacheNode = zkMapCacheNode;
     }
 
-    /**
-     * Start a new Term. Returns a future that is done when the leadership has
-     * been fully assumed and all surviving replicas have been repaired.
-     *
-     * @param kfactorForStartup If running for startup and not for fault
-     * recovery, pass the kfactor required to proceed. For fault recovery,
-     * pass any negative value as kfactorForStartup.
-     */
+    @Override
     public Future<Boolean> start(List<Long> survivors)
     {
         try {
@@ -207,16 +87,14 @@ public class StartupAlgo implements RepairAlgo
         return m_promotionResult;
     }
 
+    @Override
     public boolean cancel()
     {
+        // Can't cancel startup this way, Ned.
         return false;
     }
 
-    public void shutdown()
-    {
-    }
-
-    /** Block until all replica's are present. */
+    /** Block until all replicas are present. */
     void prepareForStartup()
         throws InterruptedException
     {
@@ -231,11 +109,10 @@ public class StartupAlgo implements RepairAlgo
     }
 
     /** Process a new repair log response */
+    @Override
     public void deliver(VoltMessage message)
     {
-        if (message instanceof Iv2RepairLogResponseMessage) {
-            throw new RuntimeException("Dude, shouldn't get these here.");
-        }
+        throw new RuntimeException("Dude, shouldn't get these here.");
     }
 
     // with leadership election complete, update the master list

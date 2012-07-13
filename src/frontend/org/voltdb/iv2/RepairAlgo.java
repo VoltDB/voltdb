@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.concurrent.Future;
 import java.util.List;
 
-import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
 // Some comments on threading and organization.
@@ -29,45 +28,33 @@ import org.voltcore.messaging.VoltMessage;
 //   deliver() runs in the initiator mailbox deliver() context and triggers
 //   all repair work.
 //
-//   replica change handler runs in the babysitter thread context.
-//   replica change handler invokes a method in init.mbox that also
-//   takes the init.mbox deliver lock
-//
 //   it is important that repair work happens with the deliver lock held
 //   and that updatereplicas also holds this lock -- replica failure during
 //   repair must happen unambigously before or after each local repair action.
 //
-//   A Term can be cancelled by initiator mailbox while the deliver lock is
-//   held. Repair work must check for cancellation before producing repair
-//   actions to the mailbox.
+//   A RepairAlgo can only be cancelled by initiator mailbox while the deliver
+//   lock is held. Repair work must check for cancellation before producing
+//   repair actions to the mailbox.
 //
-//   Note that a term can not prevent messages being delivered post cancellation.
-//   RepairLog requests therefore use a requestId to dis-ambiguate responses
-//   for cancelled requests that are filtering in late.
+//   Note that a RepairAlgo can not prevent messages being delivered post
+//   cancellation.  RepairLog requests therefore use a requestId to
+//   dis-ambiguate responses for cancelled requests that are filtering in late.
 
 
 /**
- * Term encapsulates the process/algorithm of becoming
- * a new PI and the consequent ZK observers for performing that
- * role.
+ * A RepairAlgo encapsulates the actions required to converge state across a
+ * leader and a set of followers (either SP replicas or MPI/SP leaders).
  */
 public interface RepairAlgo
 {
-    VoltLogger tmLog = new VoltLogger("TM");
-
     /**
-     * Start a new Term. Returns a future that is done when the leadership has
-     * been fully assumed and all surviving replicas have been repaired.
-     *
-     * @param kfactorForStartup If running for startup and not for fault
-     * recovery, pass the kfactor required to proceed. For fault recovery,
-     * pass any negative value as kfactorForStartup.
+     * Start a new RepairAlgo. Returns a future that is done when the
+     * leadership has been fully assumed and all surviving replicas have been
+     * repaired.
      */
     public Future<Boolean> start(List<Long> survivors);
 
     public boolean cancel();
-
-    public void shutdown();
 
     /** Process a new repair log response */
     public void deliver(VoltMessage message);
