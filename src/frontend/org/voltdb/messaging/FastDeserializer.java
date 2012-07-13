@@ -281,8 +281,13 @@ public class FastDeserializer implements DataInput {
             final byte[][] retval = new byte[count][];
             for (int i = 0; i < count; i++) {
                 int size = readInt();
-                retval[i] = new byte[size];
-                readFully(retval[i]);
+                if (size == -1) { // null length prefix
+                    retval[i] = null;
+                }
+                else {
+                    retval[i] = new byte[size];
+                    readFully(retval[i]);
+                }
             }
             return retval;
         }

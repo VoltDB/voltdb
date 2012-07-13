@@ -111,7 +111,7 @@ PRIMARY ENTRY POINTS
         <arg value="project.xml"/>                  <!-- project file -->
         <arg value="1"/>                            <!-- hosts -->
         <arg value="2"/>                            <!-- sites -->
-        <arg value="localhost"/>                    <!-- leader -->
+        <arg value="localhost"/>                    <!-- host -->
         <arg value="catalog.jar"/>                  <!-- output -->
         <classpath refid='project.classpath' />
         <assertions><disable /></assertions>

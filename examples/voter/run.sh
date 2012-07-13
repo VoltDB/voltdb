@@ -6,7 +6,7 @@ VOLTDB="../../bin/voltdb"
 VOLTCOMPILER="../../bin/voltcompiler"
 LOG4J="`pwd`/../../voltdb/log4j.xml"
 LICENSE="../../voltdb/license.xml"
-LEADER="localhost"
+HOST="localhost"
 
 # remove build artifacts
 function clean() {
@@ -37,7 +37,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader $LEADER enableiv2
+        license $LICENSE host $HOST enableiv2
 }
 
 # run the voltdb server locally
@@ -46,7 +46,7 @@ function rejoin() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB deployment deployment.xml \
-        license $LICENSE rejoinhost $LEADER enableiv2
+        license $LICENSE host $HOST enableiv2
 }
 
 function serverlegacy() {
@@ -54,7 +54,7 @@ function serverlegacy() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader $LEADER
+        license $LICENSE host $HOST
 }
 
 # run the client that drives the example

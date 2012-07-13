@@ -104,7 +104,7 @@ public class SysprocFragmentTask extends TransactionTask
                 // run the overloaded sysproc planfragment. pass an empty dependency
                 // set since remote (non-aggregator) fragments don't receive dependencies.
                 final DependencyPair dep
-                    = siteConnection.executePlanFragment(m_txn,
+                    = siteConnection.executeSysProcPlanFragment(m_txn,
                                                          m_inputDeps,
                                                          fragmentId,
                                                          params);

@@ -333,7 +333,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
-            boolean isRejoin = config.m_rejoinToHostAndPort != null;
+            boolean isRejoin = false;
+            if (config.m_startAction == START_ACTION.REJOIN ||
+                    config.m_startAction == START_ACTION.LIVE_REJOIN) {
+                isRejoin = true;
+            }
             m_rejoining = isRejoin;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
@@ -467,7 +471,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     m_messenger.registerMailbox(m_rejoinCoordinator);
                     hostLog.info("Using iv2 community rejoin");
                 }
-                else if (isRejoin && m_config.m_newRejoin) {
+                else if (isRejoin && m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
                     SnapshotSaveAPI.recoveringSiteCount.set(siteMailboxes.size());
                     hostLog.info("Set recovering site count to " + siteMailboxes.size());
                     // Construct and publish rejoin coordinator mailbox
@@ -1228,19 +1232,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      */
     void buildClusterMesh(boolean isRejoin) {
         final String leaderAddress = m_config.m_leader;
+        String hostname = MiscUtils.getHostnameFromHostnameColonPort(leaderAddress);
+        int port = MiscUtils.getPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
 
         org.voltcore.messaging.HostMessenger.Config hmconfig;
 
-        if (m_config.m_rejoinToHostAndPort != null) {
-            hmconfig = new org.voltcore.messaging.HostMessenger.Config(
-                    MiscUtils.getHostnameFromHostnameColonPort(m_config.m_rejoinToHostAndPort),
-                    MiscUtils.getPortFromHostnameColonPort(
-                            m_config.m_rejoinToHostAndPort, m_config.m_internalPort));
-        } else {
-            hmconfig = new org.voltcore.messaging.HostMessenger.Config(
-                    leaderAddress,
-                    m_config.m_leaderPort != null ? m_config.m_leaderPort : m_config.m_internalPort);
-        }
+        hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
         hmconfig.internalPort = m_config.m_internalPort;
         hmconfig.internalInterface = m_config.m_internalInterface;
         hmconfig.zkInterface = m_config.m_zkInterface;
@@ -1851,7 +1848,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
         }
 
-        if (!m_config.m_newRejoin) {
+        if (m_config.m_startAction == START_ACTION.REJOIN) {
             consoleLog.info(
                     "Node data recovery completed after " + delta + " seconds with " + megabytes +
                     " megabytes transferred at a rate of " +

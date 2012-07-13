@@ -495,35 +495,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
-            long[] planFragmentIds, int numFragmentIds,
-            ParameterSet[] parameterSets, int numParameterSets, long txnId,
-            boolean readOnly) throws EEException
-    {
-        return m_ee.executeQueryPlanFragmentsAndGetResults(
-            planFragmentIds,
-            numFragmentIds,
-            parameterSets,
-            numParameterSets,
-            txnId,
-            m_lastCommittedTxnId,
-            readOnly ? Long.MAX_VALUE : getNextUndoToken());
-    }
-
-    @Override
-    public VoltTable executePlanFragment(long planFragmentId, int inputDepId,
-                                         ParameterSet parameterSet, long txnId,
-                                         boolean readOnly) throws EEException
-    {
-        return m_ee.executePlanFragment(planFragmentId,
-                                        inputDepId,
-                                        parameterSet,
-                                        txnId,
-                                        m_lastCommittedTxnId,
-                                        readOnly ? Long.MAX_VALUE : getNextUndoToken());
-    }
-
-    @Override
     public long getReplicatedDMLDivisor()
     {
         return m_numberOfPartitions;
@@ -565,7 +536,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public DependencyPair executePlanFragment(
+    public DependencyPair executeSysProcPlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params)
@@ -584,16 +555,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public long[] getUSOForExportTable(String signature)
     {
         return m_ee.getUSOForExportTable(signature);
-    }
-
-    @Override
-    public VoltTable executeCustomPlanFragment(String plan, int inputDepId,
-                                               long txnId, ParameterSet params, boolean readOnly)
-    {
-        return m_ee.executeCustomPlanFragment(plan, inputDepId, txnId,
-                                              m_lastCommittedTxnId,
-                                              readOnly ? Long.MAX_VALUE : getNextUndoToken(),
-                                              params);
     }
 
     @Override
@@ -635,4 +596,25 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public void setRejoinComplete() {
         m_isRejoining = false;
     }
+
+    @Override
+    public long loadPlanFragment(byte[] plan) throws EEException {
+        return m_ee.loadPlanFragment(plan);
+    }
+
+    @Override
+    public VoltTable[] executePlanFragments(int numFragmentIds,
+            long[] planFragmentIds, long[] inputDepIds,
+            ParameterSet[] parameterSets, long txnId, boolean readOnly)
+            throws EEException {
+        return m_ee.executePlanFragments(
+                numFragmentIds,
+                planFragmentIds,
+                inputDepIds,
+                parameterSets,
+                txnId,
+                m_lastCommittedTxnId,
+                readOnly ? Long.MAX_VALUE : getNextUndoToken());
+    }
+
 }

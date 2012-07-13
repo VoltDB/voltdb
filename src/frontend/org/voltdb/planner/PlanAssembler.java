@@ -201,40 +201,22 @@ public class PlanAssembler {
         // Do we have a need for a distributed scan at all?
         // Iterate over the tables to collect partition columns.
         for (Table table : parsedStmt.tableList) {
-            Table viewTable = null;
-            // Get to the root table of views.
-            Table baseTable = table.getMaterializer();
-            while (baseTable != null) {
-                if (viewTable == null) {
-                    viewTable = table; // remember original (materialized view) table
-                }
-                table = baseTable;
-                baseTable = table.getMaterializer();
-            }
-
             if (table.getIsreplicated()) {
                 continue;
             }
             ++countOfPartitionedTables;
             String colName = null;
             Column partitionCol = table.getPartitioncolumn();
-            // "(partitionCol != null)" tests around an obscure edge case exercised far too regularly by lazy unit tests.
+            // "(partitionCol != null)" tests around an obscure edge case.
             // The table is declared non-replicated yet specifies no partitioning column.
-            // One interpretation of this edge case is that the table has "randomly distributed data".
-            // "(viewTable == null)" account for the fact that there is no guarantee that a materialized view of a
-            // partitioned table projects the partitioning column as a grouping column (by the same name?).
-            // For now, we operate as if it does not group by the partitioning column, so that materialized views
-            // also present themselves as "randomly distributed data".
-            // In either case, the table is valid for use by MP queries only and can only be joined with replicated tables
+            // This can occur legitimately when views based on partitioned tables neglect to group by the partition column.
+            // The interpretation of this edge case is that the table has "randomly distributed data".
+            // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
             // because it has no recognized partitioning join key.
-            if ((partitionCol != null) && (viewTable == null)) {
+            if (partitionCol != null) {
                 colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
             }
 
-            if (viewTable != null) {
-                // refer back to the original materialized view table being scanned
-                table = viewTable;
-            }
             //TODO: This map really wants to be indexed by table "alias" (the in-query table scan identifier)
             // so self-joins can be supported without ambiguity.
             String partitionedTable = table.getTypeName();

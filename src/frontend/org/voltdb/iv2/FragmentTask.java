@@ -99,7 +99,7 @@ public class FragmentTask extends TransactionTask
 
         for (int frag = 0; frag < m_task.getFragmentCount(); frag++)
         {
-            final long fragmentId = m_task.getFragmentId(frag);
+            long fragmentId = m_task.getFragmentId(frag);
             final int outputDepId = m_task.getOutputDepId(frag);
 
             ParameterSet params = m_task.getParameterSetForFragment(frag);
@@ -111,29 +111,27 @@ public class FragmentTask extends TransactionTask
              * abort type errors that should result in a roll back.
              * Assume that it is ninja: succeeds or doesn't return.
              * No roll back support.
+             *
+             * AW in 2012, the preceding comment might be wrong,
+             * I am pretty sure what we don't support is partial rollback.
+             * The entire procedure will roll back successfully on failure
              */
             try {
                 VoltTable dependency;
-                if (m_task.getFragmentPlan(frag) != null) {
-                    // make dependency ids available to the execution engine
-                    if ((m_inputDeps != null) && (m_inputDeps.size() > 0)) {
-                        siteConnection.stashWorkUnitDependencies(m_inputDeps);
-                    }
-                    dependency = siteConnection.executeCustomPlanFragment(
-                            m_task.getFragmentPlan(frag),
-                            inputDepId,
-                            m_txn.txnId,
-                            params,
-                            m_txn.isReadOnly());
+                byte[] fragmentPlan = m_task.getFragmentPlan(frag);
+
+                // if custom fragment, load the plan
+                if (fragmentPlan != null) {
+                    fragmentId = siteConnection.loadPlanFragment(fragmentPlan);
                 }
-                else {
-                    dependency =
-                        siteConnection.executePlanFragment(fragmentId,
-                                inputDepId,
-                                params,
-                                m_txn.txnId,
-                                m_txn.isReadOnly());
-                }
+
+                dependency = siteConnection.executePlanFragments(
+                        1,
+                        new long[] { fragmentId },
+                        new long [] { inputDepId },
+                        new ParameterSet[] { params },
+                        m_txn.txnId,
+                        m_txn.isReadOnly())[0];
 
                 if (hostLog.isTraceEnabled()) {
                     hostLog.l7dlog(Level.TRACE,

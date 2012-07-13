@@ -727,7 +727,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             public void send(long[] hsIds, VoltMessage message) {}
             @Override
             public void deliver(VoltMessage message) {
-                hostLog.warn("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
+                hostLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
             }
             @Override
             public void deliverFront(VoltMessage message) {}
