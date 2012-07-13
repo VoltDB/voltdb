@@ -207,14 +207,14 @@ public class plannerTester {
 		Map<Integer, AbstractPlanNode> limitNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		Map<Integer, AbstractPlanNode> orderByNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		Map<Integer, AbstractPlanNode> orderByNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
-		Map<Integer, AbstractPlanNode> projInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
-		Map<Integer, AbstractPlanNode> projInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
-		Map<Integer, AbstractPlanNode> limitInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
-		Map<Integer, AbstractPlanNode> limitInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
-		Map<Integer, AbstractPlanNode> orderByInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
-		Map<Integer, AbstractPlanNode> orderByInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
-		Map<Integer, AbstractPlanNode> indexScanInlineNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
-		Map<Integer, AbstractPlanNode> indexScanInlineNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
+		Map<AbstractPlanNode, AbstractPlanNode> projInlineNodes1 = new LinkedHashMap<AbstractPlanNode, AbstractPlanNode>();
+		Map<AbstractPlanNode, AbstractPlanNode> projInlineNodes2 = new LinkedHashMap<AbstractPlanNode, AbstractPlanNode>();
+		Map<AbstractPlanNode, AbstractPlanNode> limitInlineNodes1 = new LinkedHashMap<AbstractPlanNode, AbstractPlanNode>();
+		Map<AbstractPlanNode, AbstractPlanNode> limitInlineNodes2 = new LinkedHashMap<AbstractPlanNode, AbstractPlanNode>();
+		Map<AbstractPlanNode, AbstractPlanNode> orderByInlineNodes1 = new LinkedHashMap<AbstractPlanNode, AbstractPlanNode>();
+		Map<AbstractPlanNode, AbstractPlanNode> orderByInlineNodes2 = new LinkedHashMap<AbstractPlanNode, AbstractPlanNode>();
+		Map<AbstractPlanNode, AbstractPlanNode> indexScanInlineNodes1 = new LinkedHashMap<AbstractPlanNode, AbstractPlanNode>();
+		Map<AbstractPlanNode, AbstractPlanNode> indexScanInlineNodes2 = new LinkedHashMap<AbstractPlanNode, AbstractPlanNode>();
 
 		for( int i = 0; i<size1; i++ ) {
 			AbstractPlanNode pn = list1.get(i);
@@ -231,16 +231,16 @@ public class plannerTester {
 			}
 			//get the inlinenodes
 			if( pn.getInlinePlanNode(PlanNodeType.PROJECTION) != null ) {
-				projInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.PROJECTION ));
+				projInlineNodes1.put(pn, pn.getInlinePlanNode(PlanNodeType.PROJECTION ));
 			} 
 			if( pn.getInlinePlanNode(PlanNodeType.LIMIT) != null) {
-				limitInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.LIMIT));
+				limitInlineNodes1.put(pn, pn.getInlinePlanNode(PlanNodeType.LIMIT));
 			}
 			if( pn.getInlinePlanNode(PlanNodeType.ORDERBY) != null) {
-				orderByInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
+				orderByInlineNodes1.put(pn, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
 			}
 			if( pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null ){
-				indexScanInlineNodes1.put(id, pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) );
+				indexScanInlineNodes1.put(pn, pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) );
 			}
 		}
 		for( int i = 0; i<size2; i++ ) {
@@ -259,79 +259,88 @@ public class plannerTester {
 			
 			//get the inlinenodes
 			if( pn.getInlinePlanNode(PlanNodeType.PROJECTION) != null ) {
-				projInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.PROJECTION ));
+				projInlineNodes2.put(pn, pn.getInlinePlanNode(PlanNodeType.PROJECTION ));
 			} 
 			if( pn.getInlinePlanNode(PlanNodeType.LIMIT) != null) {
-				limitInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.LIMIT));
+				limitInlineNodes2.put(pn, pn.getInlinePlanNode(PlanNodeType.LIMIT));
 			}
 			if( pn.getInlinePlanNode(PlanNodeType.ORDERBY) != null) {
-				orderByInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
+				orderByInlineNodes2.put(pn, pn.getInlinePlanNode(PlanNodeType.ORDERBY));
 			}
 			if( pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null ){
-				indexScanInlineNodes2.put(id, pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) );
+				indexScanInlineNodes2.put(pn, pn.getInlinePlanNode(PlanNodeType.INDEXSCAN) );
 			}
 		}
 		//do the diff
 		ArrayList<Integer> indexList = new ArrayList<Integer>();
-		for( int index: projInlineNodes1.keySet() ) {
-			indexList.add(index);
+		ArrayList<AbstractPlanNode> parentNodeList = new ArrayList<AbstractPlanNode>();
+		for( AbstractPlanNode index: projInlineNodes1.keySet() ) {
+			parentNodeList.add(index);
 		}
-		stringPair.setFirst(indexList.clone());
-		indexList.clear();
-		for( int index: projInlineNodes2.keySet() ) {
-			indexList.add(index);
+		String info = getKeyInfo( parentNodeList );
+		stringPair.setFirst( info );
+		parentNodeList.clear();
+		for( AbstractPlanNode index: projInlineNodes2.keySet() ) {
+			parentNodeList.add(index);
 		}
-		stringPair.setSecond(indexList.clone());
+		info = getKeyInfo( parentNodeList );
+		stringPair.setSecond(info);
 		if( !stringPair.equals() ){
 			System.out.println( "Inline Projection Nodes diff: ");
 			System.out.println( stringPair.toString() );
 		}
-		indexList.clear();
+		parentNodeList.clear();
 		
-		for( int index: limitInlineNodes1.keySet() ) {
-			indexList.add(index);
+		for( AbstractPlanNode index: limitInlineNodes1.keySet() ) {
+			parentNodeList.add(index);
 		}
-		stringPair.setFirst(indexList.clone());
-		indexList.clear();
-		for( int index: limitInlineNodes2.keySet() ) {
-			indexList.add(index);
+		info = getKeyInfo( parentNodeList );
+		stringPair.setFirst(info);
+		parentNodeList.clear();
+		for( AbstractPlanNode index: limitInlineNodes2.keySet() ) {
+			parentNodeList.add(index);
 		}
-		stringPair.setSecond(indexList.clone());
+		info = getKeyInfo( parentNodeList );
+		stringPair.setSecond(info);
 		if( !stringPair.equals() ) {
 			System.out.println( "Inline Limit Nodes diff: ");
 			System.out.println( stringPair.toString() );
 		}
-		indexList.clear();
+		parentNodeList.clear();
 		
-		for( int index: orderByInlineNodes1.keySet() ) {
-			indexList.add(index);
+		for( AbstractPlanNode index: limitInlineNodes1.keySet() ) {
+			parentNodeList.add(index);
 		}
-		stringPair.setFirst(indexList.clone());
-		indexList.clear();
-		for( int index: orderByInlineNodes2.keySet() ) {
-			indexList.add(index);
+		info = getKeyInfo( parentNodeList );
+		stringPair.setFirst(info);
+		parentNodeList.clear();
+		for( AbstractPlanNode index: limitInlineNodes2.keySet() ) {
+			parentNodeList.add(index);
 		}
-		stringPair.setSecond(indexList.clone());
+		info = getKeyInfo( parentNodeList );
+		stringPair.setSecond(info);
 		if( !stringPair.equals() ) {
-			System.out.println( "Inline Order By Node diff: " );
+			System.out.println( "Inline OrderBy Nodes diff: ");
 			System.out.println( stringPair.toString() );
 		}
-		indexList.clear();
+		parentNodeList.clear();
 		
-		for( int index: indexScanInlineNodes1.keySet() ) {
-			indexList.add(index);
+		for( AbstractPlanNode index: limitInlineNodes1.keySet() ) {
+			parentNodeList.add(index);
 		}
-		stringPair.setFirst(indexList.clone());
-		indexList.clear();
-		for( int index: indexScanInlineNodes2.keySet() ) {
-			indexList.add(index);
+		info = getKeyInfo( parentNodeList );
+		stringPair.setFirst(info);
+		parentNodeList.clear();
+		for( AbstractPlanNode index: limitInlineNodes2.keySet() ) {
+			parentNodeList.add(index);
 		}
-		stringPair.setSecond(indexList.clone());
+		info = getKeyInfo( parentNodeList );
+		stringPair.setSecond(info);
 		if( !stringPair.equals() ) {
-			System.out.println( "Inline IndexScan Node diff: " );
+			System.out.println( "Inline IndexScan Nodes diff: ");
 			System.out.println( stringPair.toString() );
 		}
-		indexList.clear();
+		parentNodeList.clear();
 		
 		//non-inline proj limit order by nodes
 		for( int index: projNodes1.keySet() ) {
@@ -378,6 +387,27 @@ public class plannerTester {
 			System.out.println( stringPair.toString() );
 		}
 		indexList.clear();
+	}
+	
+	public static String getKeyInfo( ArrayList<AbstractPlanNode> pnList ) {
+		int size = pnList.size();
+		String str="";
+		for( AbstractPlanNode pn : pnList ) {
+			str += "[";
+			str += pn.getPlanNodeId();
+			str += "-";
+			str += pn.getPlanNodeType().toString();
+			str += ", ";
+		}
+		if(str.length()>1)
+		{
+			str = str.substring(0, str.length()-2 );
+			str += "]";
+		}
+		else{
+			str += "[]";
+		}
+		return str;
 	}
 	
 	public static void diffLeaves( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ){
