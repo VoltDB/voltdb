@@ -92,6 +92,9 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         IndexCountPlanNode icpn = null;
         if (isReplaceable((IndexScanPlanNode)child)) {
             icpn = new IndexCountPlanNode((IndexScanPlanNode)child);
+            if (icpn.isReplaceable() == false)
+                return plan;
+
             icpn.setOutputSchema(plan.getOutputSchema());
 
             // TODO: I am not sure if there is a null case or not
@@ -99,7 +102,6 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
                 plan.addIntermediary(plan.getParent(0));
             }
 
-            // TODO: set schema using plan's schema
             plan.removeFromGraph();
             child.removeFromGraph();
 
@@ -108,8 +110,6 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         return plan;
     }
 
-
-    // TODO(xin): add more checkings to replace only certain cases.
     boolean isReplaceable(IndexScanPlanNode child) {
 
         AbstractExpression endExpr = child.getEndExpression();

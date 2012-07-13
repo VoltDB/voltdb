@@ -31,8 +31,11 @@ import org.voltdb.catalog.Table;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
+import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
 
@@ -40,11 +43,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     public enum Members {
         TARGET_INDEX_NAME,
-        END_EXPRESSION,
-        SEARCHKEY_EXPRESSIONS,
         KEY_ITERATE,
+        SEARCHKEY_EXPRESSIONS,
+        ENDKEY_EXPRESSION,
         LOOKUP_TYPE,
-        END_VALUE;
+        LOOKUP_END_TYPE;
     }
 
     /**
@@ -59,25 +62,27 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // The index to use in the scan operation
     protected String m_targetIndexName;
 
-    // When this expression evaluates to true, we will stop scanning
-    protected AbstractExpression m_endExpression;
+    // ???
+    protected Boolean m_keyIterate = false;
+
+    //
+    protected List<AbstractExpression> m_endkeyExpressions = null;
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
     protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
-    // ???
-    protected Boolean m_keyIterate = false;
+    // The overall index lookup operation type
+    protected IndexLookupType m_LookupType = IndexLookupType.EQ;
 
     // The overall index lookup operation type
-    protected IndexLookupType m_StartType = IndexLookupType.EQ;
-
-    // The overall index lookup operation type
-    protected IndexLookupType m_EndType = IndexLookupType.EQ;
+    protected IndexLookupType m_LookupEndType = IndexLookupType.EQ;
 
     // A reference to the Catalog index object which defined the index which
     // this index scan is going to use
     protected Index m_catalogIndex = null;
+
+    protected Boolean m_replaceable = false;
 
     public IndexCountPlanNode() {
         super();
@@ -96,10 +101,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
-        m_StartType = isp.m_lookupType;
+        m_LookupType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
-        m_endExpression = isp.m_endExpression;
         m_predicate = isp.m_predicate;
+
+        if (isp.getEndExpression() != null)
+            this.setEndKeyExpression(isp.getEndExpression());
     }
 
     @Override
@@ -116,10 +123,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             throw new Exception("ERROR: There were no search key expressions defined for " + this);
         }
 
-        // Validate Expression Trees
-        if (m_endExpression != null) {
-            m_endExpression.validate();
-        }
         for (AbstractExpression exp : m_searchkeyExpressions) {
             exp.validate();
         }
@@ -180,7 +183,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
      * @return The type of this lookup.
      */
     public IndexLookupType getLookupType() {
-        return m_StartType;
+        return m_LookupType;
     }
 
     /**
@@ -188,7 +191,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
      * @param lookupType
      */
     public void setLookupType(IndexLookupType lookupType) {
-        m_StartType = lookupType;
+        m_LookupType = lookupType;
     }
 
     /**
@@ -203,36 +206,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
      */
     public void setTargetIndexName(String targetIndexName) {
         m_targetIndexName = targetIndexName;
-    }
-
-    /**
-     * @return the post_predicate
-     */
-    public AbstractExpression getEndExpression() {
-        return m_endExpression;
-    }
-
-    /**
-     * @param endExpression the end expression to set
-     */
-    public void setEndExpression(AbstractExpression endExpression)
-    {
-        if (endExpression != null)
-        {
-            // PlanNodes all need private deep copies of expressions
-            // so that the resolveColumnIndexes results
-            // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                m_endExpression = (AbstractExpression) endExpression.clone();
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
-            }
-        }
     }
 
     public void addSearchKeyExpression(AbstractExpression expr)
@@ -264,6 +237,30 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         return Collections.unmodifiableList(m_searchkeyExpressions);
     }
 
+    public void addEndKeyExpression(AbstractExpression expr)
+    {
+        if (expr != null)
+        {
+            // PlanNodes all need private deep copies of expressions
+            // so that the resolveColumnIndexes results
+            // don't get bashed by other nodes or subsequent planner runs
+            try
+            {
+                m_endkeyExpressions.add((AbstractExpression) expr.clone());
+            }
+            catch (CloneNotSupportedException e)
+            {
+                // This shouldn't ever happen
+                e.printStackTrace();
+                throw new RuntimeException(e.getMessage());
+            }
+        }
+    }
+
+    public List<AbstractExpression> getEndKeyExpressions() {
+        return Collections.unmodifiableList(m_endkeyExpressions);
+    }
+
     public void setOutputSchema(NodeSchema schema)
     {
         // set output schema according to aggregate plan node's output schema
@@ -272,18 +269,61 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     public void setParents(AbstractPlanNode parents) {
         // TODO(xin): set parents node
-        //m_parents = parents.;
+    }
+
+    public boolean isReplaceable() {
+        return m_replaceable;
+    }
+
+    public void setEndKeyExpression(AbstractExpression endExpr) {
+        // assume there is not post expression when I want to set endKey
+        assert(endExpr != null);
+        m_endkeyExpressions = new ArrayList<AbstractExpression>();
+
+        ArrayList <AbstractExpression> subEndExpr = endExpr.findAllSubexpressionsOfClass(ComparisonExpression.class);
+        int cmpSize = subEndExpr.size();
+        int ctEqual = 0, ctOther = 0;
+        for (AbstractExpression ae: subEndExpr) {
+            ExpressionType et = ae.getExpressionType();
+            // comparision type checking
+            if (et == ExpressionType.COMPARE_EQUAL) {
+                ctEqual++;
+            } else if (et == ExpressionType.COMPARE_GREATERTHAN) {
+                ctOther++;
+                m_LookupEndType = IndexLookupType.GT;
+            } else if (et == ExpressionType.COMPARE_GREATERTHANOREQUALTO) {
+                ctOther++;
+                m_LookupEndType = IndexLookupType.GTE;
+            } else if (et == ExpressionType.COMPARE_LESSTHAN) {
+                ctOther++;
+                m_LookupEndType = IndexLookupType.LT;
+            } else if (et == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                ctOther++;
+                m_LookupEndType = IndexLookupType.LTE;
+            } else {
+                // something wrong, we can not handle other cases
+                m_replaceable = false;
+                return;
+            }
+
+            if (ae.getLeft() instanceof TupleValueExpression) {
+                this.addEndKeyExpression(ae.getRight());
+            } else {
+                this.addEndKeyExpression(ae.getLeft());
+            }
+        }
+        if (ctOther != 1 || ctOther + ctEqual != cmpSize) {
+            m_replaceable = false;
+            return;
+        }
+        m_replaceable = true;
     }
 
     @Override
-    public void generateOutputSchema(Database db)
-    {
-    }
+    public void generateOutputSchema(Database db){}
 
     @Override
-    public void resolveColumnIndexes()
-    {
-    }
+    public void resolveColumnIndexes(){}
 
     @Override
     public boolean computeEstimatesRecursively(PlanStatistics stats, Cluster cluster, Database db, DatabaseEstimates estimates, ScalarValueHints[] paramHints) {
@@ -301,7 +341,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         DatabaseEstimates.TableEstimates tableEstimates = estimates.getEstimatesForTable(target.getTypeName());
         stats.incrementStatistic(0, StatsField.TREE_INDEX_LEVELS_TRAVERSED, (long)(Math.log(tableEstimates.maxTuples)));
 
-
         stats.incrementStatistic(0, StatsField.TUPLES_READ, 1);
         m_estimatedOutputTupleCount = 1;
 
@@ -312,16 +351,22 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
-        stringer.key(Members.LOOKUP_TYPE.name()).value(m_StartType.toString());
+        stringer.key(Members.LOOKUP_TYPE.name()).value(m_LookupType.toString());
+        stringer.key(Members.LOOKUP_END_TYPE.name()).value(m_LookupEndType.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
-        stringer.key(Members.END_EXPRESSION.name());
-        stringer.value(m_endExpression);
+
+        stringer.key(Members.ENDKEY_EXPRESSION.name()).array();
+        for (AbstractExpression ae : m_endkeyExpressions) {
+            assert (ae instanceof JSONString);
+            stringer.value(ae);
+        }
 
         stringer.key(Members.SEARCHKEY_EXPRESSIONS.name()).array();
         for (AbstractExpression ae : m_searchkeyExpressions) {
             assert (ae instanceof JSONString);
             stringer.value(ae);
         }
+
         stringer.endArray();
     }
 
@@ -333,7 +378,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         int keySize = m_searchkeyExpressions.size();
 
         String scanType = "tree-counter";
-        if (m_StartType != IndexLookupType.EQ)
+        if (m_LookupType != IndexLookupType.EQ)
             scanType = "tree-counter";
 
         String cover = "covering";

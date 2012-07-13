@@ -36,16 +36,14 @@ class AbstractExpression;
 class IndexCountPlanNode : public AbstractScanPlanNode {
     public:
         IndexCountPlanNode(CatalogId id) : AbstractScanPlanNode(id) {
-            printf("IndexCountPlanNode runs with catalog id...\n");
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->end_expression = NULL;
+            this->end_type = INDEX_LOOKUP_TYPE_EQ;
         }
         IndexCountPlanNode() : AbstractScanPlanNode() {
-            printf("IndexCountPlanNode runs...\n");
             this->key_iterate = false;
             this->lookup_type = INDEX_LOOKUP_TYPE_EQ;
-            this->end_expression = NULL;
+            this->end_type = INDEX_LOOKUP_TYPE_EQ;
         }
         ~IndexCountPlanNode();
         virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_INDEXCOUNT); }
@@ -59,12 +57,13 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         void setTargetIndexName(std::string name);
         std::string getTargetIndexName() const;
 
-        void setEndExpression(AbstractExpression* val);
-        AbstractExpression* getEndExpression() const;
-
         void setSearchKeyExpressions(std::vector<AbstractExpression*> &exps);
         std::vector<AbstractExpression*>& getSearchKeyExpressions();
         const std::vector<AbstractExpression*>& getSearchKeyExpressions() const;
+
+        void setEndKeyEndExpressions(std::vector<AbstractExpression*> &exps);
+        std::vector<AbstractExpression*>& getEndKeyExpressions();
+        const std::vector<AbstractExpression*>& getEndKeyExpressions() const;
 
         std::string debugInfo(const std::string &spacer) const;
 
@@ -77,11 +76,12 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
 
         //
         // TODO: Document
-        AbstractExpression* end_expression;
+        //
+        std::vector<AbstractExpression*> searchkey_expressions;
         //
         // TODO: Document
         //
-        std::vector<AbstractExpression*> searchkey_expressions;
+        std::vector<AbstractExpression*> endkey_expressions;
         //
         // Enable Index Key Iteration
         //
@@ -90,6 +90,10 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         // Index Lookup Type
         //
         IndexLookupType lookup_type;
+        //
+        // Index Lookup End Type
+        //
+        IndexLookupType end_type;
 };
 
 }

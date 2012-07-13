@@ -37,7 +37,9 @@ IndexCountPlanNode::~IndexCountPlanNode() {
     for (int ii = 0; ii < searchkey_expressions.size(); ii++) {
         delete searchkey_expressions[ii];
     }
-    delete end_expression;
+    for (int ii = 0; ii < endkey_expressions.size(); ii++) {
+        delete endkey_expressions[ii];
+    }
     delete getOutputTable();
     setOutputTable(NULL);
 }
@@ -63,17 +65,14 @@ std::string IndexCountPlanNode::getTargetIndexName() const {
     return this->target_index_name;
 }
 
-void IndexCountPlanNode::setEndExpression(AbstractExpression* val) {
-    // only expect this to be initialized once
-    if (end_expression && end_expression != val)
-    {
-        throwFatalException("end_expression initialized twice in IndexCountPlanNode?");
-        delete end_expression;
-    }
-    this->end_expression = val;
+void IndexCountPlanNode::setEndKeyEndExpressions(std::vector<AbstractExpression*> &exps) {
+    this->endkey_expressions = exps;
 }
-AbstractExpression* IndexCountPlanNode::getEndExpression() const {
-    return (this->end_expression);
+std::vector<AbstractExpression*>& IndexCountPlanNode::getEndKeyExpressions() {
+    return (this->endkey_expressions);
+}
+const std::vector<AbstractExpression*>& IndexCountPlanNode::getEndKeyExpressions() const {
+    return (this->endkey_expressions);
 }
 
 void IndexCountPlanNode::setSearchKeyExpressions(std::vector<AbstractExpression*> &exps) {
@@ -98,11 +97,9 @@ std::string IndexCountPlanNode::debugInfo(const std::string &spacer) const {
         buffer << this->searchkey_expressions[ctr]->debug(spacer);
     }
 
-    buffer << spacer << "End Expression: ";
-    if (this->end_expression != NULL) {
-        buffer << "\n" << this->end_expression->debug(spacer);
-    } else {
-        buffer << "<NULL>\n";
+    buffer << spacer << "EndKey Expressions:\n";
+    for (int ctr = 0, cnt = (int)this->endkey_expressions.size(); ctr < cnt; ctr++) {
+        buffer << this->endkey_expressions[ctr]->debug(spacer);
     }
 
     buffer << spacer << "Post-Scan Expression: ";
@@ -142,11 +139,18 @@ void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
     }
     target_index_name = targetIndexNameValue.get_str();
 
-    json_spirit::Value endExpressionValue = json_spirit::find_value( obj, "END_EXPRESSION");
-    if (endExpressionValue == json_spirit::Value::null) {
-        end_expression = NULL;
-    } else {
-        end_expression = AbstractExpression::buildExpressionTree(endExpressionValue.get_obj());
+    json_spirit::Value endKeyExpressionsValue = json_spirit::find_value( obj, "ENDKEY_EXPRESSIONS");
+        if (endKeyExpressionsValue == json_spirit::Value::null) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "IndexCountPlanNode::loadFromJSONObject:"
+                                          " Can't find ENDKEY_EXPRESSIONS");
+        }
+    json_spirit::Array endKeyExpressionsArray = endKeyExpressionsValue.get_array();
+
+    for (int ii = 0; ii < endKeyExpressionsArray.size(); ii++) {
+            json_spirit::Object endKeyExpressionObject = endKeyExpressionsArray[ii].get_obj();
+            AbstractExpression *expr = AbstractExpression::buildExpressionTree(endKeyExpressionObject);
+            endkey_expressions.push_back(expr);
     }
 
     json_spirit::Value searchKeyExpressionsValue = json_spirit::find_value( obj, "SEARCHKEY_EXPRESSIONS");
