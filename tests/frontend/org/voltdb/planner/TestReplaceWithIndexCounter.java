@@ -81,34 +81,54 @@ public class TestReplaceWithIndexCounter extends TestCase {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, true);
         checkIndexCounter(pn, true, false);
     }
-    // SeqScan is not supported right now
+    // TODO(xin):fix this ....
     public void testCountStar1() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS = ?", 0, true);
+        checkIndexCounter(pn, false, true);
+    }
+    // SeqScan is not supported right now
+    public void testCountStar3() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
         checkIndexCounter(pn, false, false);
     }
 
-    public void testCountStar2() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3", 0, true);
-        checkIndexCounter(pn, false, true);
-    }
-
-    public void testCountStar3() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS <= 6", 0, true);
-        checkIndexCounter(pn, false, true);
-    }
-
     public void testCountStar4() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?", 2, true);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS >= 3", 0, true);
         checkIndexCounter(pn, false, true);
     }
 
     public void testCountStar5() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ? AND POINTS <= ?", 2, true);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS <= 6", 0, true);
         checkIndexCounter(pn, false, true);
     }
 
-    public void testCountStar6() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS > ?", 2, false);
+    public void testCountStar7() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS >= 3 AND AGE = ?", 1, true);
+        checkIndexCounter(pn, false, false);
+    }
+
+    public void testCountStar8() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?", 2, true);
+        checkIndexCounter(pn, false, true);
+    }
+
+    public void testCountStar11() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?", 1, true);
+        checkIndexCounter(pn, false, false);
+    }
+
+    public void testCountStar12() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= ? AND POINTS <= ?", 2, true);
+        checkIndexCounter(pn, false, true);
+    }
+
+    public void testCountStar13() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?", 1, true);
+        checkIndexCounter(pn, false, true);
+    }
+
+    public void testCountStar15() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?", 2, false);
         checkIndexCounter(pn, false, false);
     }
 

@@ -290,13 +290,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             // comparision type checking
             if (et == ExpressionType.COMPARE_EQUAL) {
                 ctEqual++;
-            } else if (et == ExpressionType.COMPARE_GREATERTHAN) {
+            }
+            else if (et == ExpressionType.COMPARE_GREATERTHAN) {
                 ctOther++;
                 m_endType = IndexLookupType.GT;
             } else if (et == ExpressionType.COMPARE_GREATERTHANOREQUALTO) {
                 ctOther++;
                 m_endType = IndexLookupType.GTE;
-            } else if (et == ExpressionType.COMPARE_LESSTHAN) {
+            }
+            else if (et == ExpressionType.COMPARE_LESSTHAN) {
                 ctOther++;
                 m_endType = IndexLookupType.LT;
             } else if (et == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
@@ -314,10 +316,15 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 this.addEndKeyExpression(ae.getLeft());
             }
         }
-        if (ctOther != 1 || ctOther + ctEqual != cmpSize) {
+        if (ctOther > 1 || ctOther + ctEqual != cmpSize) {
             m_endExprValid = false;
             return;
         }
+        if (ctEqual != 0 && ctOther == 0) {
+            m_endExprValid = false;
+            return;
+        }
+
         m_endExprValid = true;
     }
 

@@ -59,6 +59,7 @@ protected:
     IndexCountPlanNode *m_node;
     int m_numOfColumns;
     int m_numOfSearchkeys;
+    int m_numOfEndkeys;
 
     // Search key
     TableTuple m_searchKey;
@@ -66,10 +67,14 @@ protected:
     // search_key_beforesubstitute_array_ptr[]
     AbstractExpression** m_searchKeyBeforeSubstituteArray;
     bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
+    AbstractExpression** m_endKeyBeforeSubstituteArray;
+    bool* m_needsSubstituteEndKey;
+
     bool m_needsSubstitutePostExpression;
     bool m_needsSubstituteEndExpression;
 
     IndexLookupType m_lookupType;
+    IndexLookupType m_endType;
 
     // IndexCount Information
     TempTable* m_outputTable;

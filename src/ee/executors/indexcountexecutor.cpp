@@ -78,12 +78,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     m_needsSubstituteSearchKeyPtr =
         boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
     m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
-    // if (m_numOfSearchkeys == 0)
-    // {
-    //     VOLT_ERROR("There are no search key expressions for PlanNode '%s'",
-    //                m_node->debug().c_str());
-    //     return false;
-    // }
+
     printf("xin <IndexCount Executor> m_numOfSearchkeys: '%d'\n", m_numOfSearchkeys);
 
     for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
@@ -98,6 +93,14 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
             m_node->getSearchKeyExpressions()[ctr]->hasParameter();
         m_searchKeyBeforeSubstituteArrayPtr[ctr] =
             m_node->getSearchKeyExpressions()[ctr];
+
+        if (m_node->getEndKeyExpressions() != NULL) {
+            if (m_node->getEndKeyExpressions()[ctr] == NULL) {
+                VOLT_ERROR("The end key expression at position '%d' is NULL for"
+                        " PlanNode '%s'", ctr, m_node->debug().c_str());
+                return false;
+            }
+        }
     }
 
     //
@@ -147,8 +150,10 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // Miscellanous Information
     //
     m_lookupType = m_node->getLookupType();
-
-    // FIXME(xin):
+    if (m_node->getEndKeyExpressions() != NULL) {
+        m_endType = m_node->end_type;
+        m_endKey = TableTuple(m_index->getKeySchema());
+    }
 
     // Need to move GTE to find (x,_) when doing a partial covering search.
     // the planner sometimes lies in this case: index_lookup_type_eq is incorrect.

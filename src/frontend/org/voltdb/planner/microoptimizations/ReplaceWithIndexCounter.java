@@ -89,6 +89,20 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if (idx.getCountable() == false)
             return plan;
 
+        // we are on the right track, but right now only deal with cases:
+        // (1) counter index on 1 column:
+        // Col >= ?, END EXPRE: null
+        // or Col == ?, END EXPRE: null
+        // or Col >= ? AND Col <= ?. END EXPRE: Col <= ?
+        // BUG: Col < ? will be treated as SEQSCAN, so do not deal with it right now.
+        // (2) counter index on 2 or more columns.
+        // Col_A = ? AND Col_B =? AND Col_C <= ? END EXPRE: Col <= ?
+        //
+
+        // The core idea is that counting index should know the start key and end key to
+        // jump to instead of doing index scan
+        // End expression should indicate the END key or the whole size of the index
+
         IndexCountPlanNode icpn = null;
         if (isReplaceable((IndexScanPlanNode)child)) {
             icpn = new IndexCountPlanNode((IndexScanPlanNode)child);
