@@ -248,8 +248,10 @@ public:
         printf("<Tree Unique-map> get counter equal or greater than --- \n");
 
         m_tmp1.setFromKey(searchKey);
-        if (hasKey(searchKey))
+        if (hasKey(searchKey)) {
+            printf("<Tree Unique-map>getCounterGET--- has searchKey !!!--- \n");
             return m_entries.rankAsc(m_tmp1);
+        }
 
         m_keyIter = m_entries.lowerBound(m_tmp1);
         return m_entries.rankAsc(m_keyIter.key());
