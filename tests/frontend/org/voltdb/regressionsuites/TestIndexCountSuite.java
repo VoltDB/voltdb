@@ -31,7 +31,7 @@ import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.CountingIndexFeature;
-public class TestCountingIndexSuite extends RegressionSuite {
+public class TestIndexCountSuite extends RegressionSuite {
 
     /*
      *  See also TestPlansGroupBySuite for tests of distinct, group by, basic aggregates
@@ -46,7 +46,7 @@ public class TestCountingIndexSuite extends RegressionSuite {
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
      */
-    public TestCountingIndexSuite(String name) {
+    public TestIndexCountSuite(String name) {
         super(name);
     }
 
@@ -89,7 +89,7 @@ public class TestCountingIndexSuite extends RegressionSuite {
         VoltServerConfig config = null;
 
         // the suite made here will all be using the tests from this class
-        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCountingIndexSuite.class);
+        MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestIndexCountSuite.class);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -137,6 +137,6 @@ public class TestCountingIndexSuite extends RegressionSuite {
     }
 
     public static void main(String args[]) {
-        org.junit.runner.JUnitCore.runClasses(TestCountingIndexSuite.class);
+        org.junit.runner.JUnitCore.runClasses(TestIndexCountSuite.class);
     }
 }
