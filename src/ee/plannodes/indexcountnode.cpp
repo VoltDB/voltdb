@@ -58,6 +58,13 @@ IndexLookupType IndexCountPlanNode::getLookupType() const {
     return lookup_type;
 }
 
+void IndexCountPlanNode::setEndType(IndexLookupType end_type) {
+    this->end_type = end_type;
+}
+IndexLookupType IndexCountPlanNode::getEndType() const {
+    return end_type;
+}
+
 void IndexCountPlanNode::setTargetIndexName(std::string name) {
     this->target_index_name = name;
 }
@@ -150,7 +157,7 @@ void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
 
     json_spirit::Value endKeyExpressionsValue = json_spirit::find_value( obj, "ENDKEY_EXPRESSIONS");
     if (endKeyExpressionsValue == json_spirit::Value::null) {
-        endkey_expressions = NULL;
+        endkey_expressions.empty();
     } else {
         json_spirit::Array endKeyExpressionsArray = endKeyExpressionsValue.get_array();
         for (int ii = 0; ii < endKeyExpressionsArray.size(); ii++) {

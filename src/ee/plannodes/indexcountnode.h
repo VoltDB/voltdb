@@ -54,6 +54,9 @@ class IndexCountPlanNode : public AbstractScanPlanNode {
         void setLookupType(IndexLookupType val);
         IndexLookupType getLookupType() const;
 
+        void setEndType(IndexLookupType val);
+        IndexLookupType getEndType() const;
+
         void setTargetIndexName(std::string name);
         std::string getTargetIndexName() const;
 

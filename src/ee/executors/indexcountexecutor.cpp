@@ -93,14 +93,33 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
             m_node->getSearchKeyExpressions()[ctr]->hasParameter();
         m_searchKeyBeforeSubstituteArrayPtr[ctr] =
             m_node->getSearchKeyExpressions()[ctr];
+    }
 
-        if (m_node->getEndKeyExpressions() != NULL) {
+
+    if (m_node->getEndKeyExpressions().size() == 0) {
+        m_hasEndKey = false;
+    } else {
+        m_hasEndKey = true;
+        m_numOfEndkeys = (int)m_node->getEndKeyExpressions().size();
+        m_endKeyBeforeSubstituteArrayPtr =
+                boost::shared_array<AbstractExpression*> (new AbstractExpression*[m_numOfEndkeys]);
+        m_endKeyBeforeSubstituteArray = m_endKeyBeforeSubstituteArrayPtr.get();
+        m_needsSubstituteEndKeyPtr =
+                boost::shared_array<bool>(new bool[m_numOfEndkeys]);
+        m_needsSubstituteEndKey = m_needsSubstituteEndKeyPtr.get();
+        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
+        {
             if (m_node->getEndKeyExpressions()[ctr] == NULL) {
                 VOLT_ERROR("The end key expression at position '%d' is NULL for"
                         " PlanNode '%s'", ctr, m_node->debug().c_str());
                 return false;
             }
+            m_needsSubstituteEndKeyPtr[ctr] =
+                    m_node->getEndKeyExpressions()[ctr]->hasParameter();
+            m_endKeyBeforeSubstituteArrayPtr[ctr] =
+                    m_node->getEndKeyExpressions()[ctr];
         }
+
     }
 
     //
@@ -126,12 +145,20 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
     m_searchKey.moveNoHeader(m_searchKeyBackingStore);
+    if (m_hasEndKey) {
+        m_endKey = TableTuple(m_index->getKeySchema());
+        m_endKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
+        m_endKey.moveNoHeader(m_endKeyBackingStore);
+    }
+
     if (m_index == NULL)
     {
         VOLT_ERROR("Failed to retreive index '%s' from table '%s' for PlanNode"
                    " '%s'", m_node->getTargetIndexName().c_str(),
                    m_targetTable->name().c_str(), m_node->debug().c_str());
         delete [] m_searchKeyBackingStore;
+        if (m_hasEndKey)
+            delete [] m_endKeyBackingStore;
         return false;
     VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
     }
@@ -150,9 +177,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // Miscellanous Information
     //
     m_lookupType = m_node->getLookupType();
-    if (m_node->getEndKeyExpressions() != NULL) {
-        m_endType = m_node->end_type;
-        m_endKey = TableTuple(m_index->getKeySchema());
+    if (m_hasEndKey) {
+        m_endType = m_node->getEndType();
     }
 
     // Need to move GTE to find (x,_) when doing a partial covering search.
@@ -248,24 +274,36 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
-    //
-    // END EXPRESSION
-    //
-    AbstractExpression* end_expression = NULL;
-    if (end_expression != NULL)
-    {
-        if (m_needsSubstituteEndExpression) {
-            end_expression->substitute(params);
+    int activeNumOfEndKeys = -1;
+    if (m_hasEndKey) {
+        activeNumOfEndKeys = m_numOfEndkeys;
+        //
+        // END KEY
+        //
+        m_endKey.setAllNulls();
+        VOLT_TRACE("Initial (all null) end key: '%s'", m_endKey.debugNoHeader().c_str());
+        for (int ctr = 0; ctr < activeNumOfEndKeys; ctr++) {
+            if (m_needsSubstituteEndKey[ctr]) {
+                m_endKeyBeforeSubstituteArray[ctr]->substitute(params);
+            }
+            NValue endKeyValue = m_endKeyBeforeSubstituteArray[ctr]->eval(&m_dummy, NULL);
+            try {
+                m_endKey.setNValue(ctr, endKeyValue);
+            }
+            catch (SQLException e) {
+                // TODO(xin): do checking exception later
+                //
+                throw e;
+            }
         }
-        VOLT_DEBUG("End Expression:\n%s", end_expression->debug(true).c_str());
-        printf("End Expression:\n%s\n", end_expression->debug(true).c_str());
+        assert((activeNumOfEndKeys == 0) || (m_endKey.getSchema()->columnCount() > 0));
+        VOLT_TRACE("End key after substitutions: '%s'", m_endKey.debugNoHeader().c_str());
     }
 
     //
     // POST EXPRESSION
     //
     AbstractExpression* post_expression = m_node->getPredicate();
-
     if (post_expression != NULL)
     {
         if (m_needsSubstitutePostExpression) {
@@ -297,37 +335,34 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             printf("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s\n",
                     localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
 
-            if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-                // TODO(xin):
-            }
-            else if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+            if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
                 rkStart = m_index->getCounterLET(&m_searchKey, NULL);
-            }
-            else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+            } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
                 rkStart = m_index->getCounterLET(&m_searchKey, NULL);
-            }
-            else {
+                leftIncluded = 1;
+            } else if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
+                // There is no equal case right now
+                return false;
+            } else {
                 return false;
             }
         } else {
             leftIncluded = 1;
         }
-        if (end_expression != NULL)
-        {
-            ExpressionType localEndType = end_expression->getExpressionType();
-            if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHAN) {
-
-            } else if (localEndType == EXPRESSION_TYPE_COMPARE_LESSTHANOREQUALTO) {
-
-                //rkEnd = m_index->getCounterLET();
-            } else if (localEndType == EXPRESSION_TYPE_COMPARE_EQUAL) {
-                // TODO(xin)
-
+        if (m_hasEndKey) {
+            IndexLookupType localEndType = m_endType;
+            if (localEndType == INDEX_LOOKUP_TYPE_GTE_LT) {
+                rkEnd = m_index->getCounterGET(&m_endKey, NULL);
+            } else if (localEndType == INDEX_LOOKUP_TYPE_GTE_LTE) {
+                rkEnd = m_index->getCounterGET(&m_endKey, NULL);
+                rightIncluded = 1;
+            } else if (localEndType == INDEX_LOOKUP_TYPE_EQ) {
+                // There is no equal case right now
+                return false;
             } else {
                 return false;
             }
         } else {
-            printf("WRONG, ERROR.....NOW...4\n");
             rkEnd = m_index->getSize();
             rightIncluded = 1;
             printf("Count total: %d\n", rkEnd);
@@ -349,7 +384,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     } else {
         // TODO(xin): add support for multi-map later
 
-        printf("WRONG, ERROR.......\n");
     }
 
     /*

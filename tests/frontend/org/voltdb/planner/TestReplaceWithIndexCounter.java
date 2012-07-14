@@ -76,19 +76,36 @@ public class TestReplaceWithIndexCounter extends TestCase {
         aide.tearDown();
     }
 
-
+    // DOES NOT support the cases down below right now 
     public void testCountStar0() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, true);
         checkIndexCounter(pn, true, false);
     }
-    // TODO(xin):fix this ....
+    // TODO(xin): Replace it with IndexCount node later
     public void testCountStar1() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS = ?", 0, true);
-        checkIndexCounter(pn, false, true);
+        checkIndexCounter(pn, false, false);
     }
     // SeqScan is not supported right now
     public void testCountStar3() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
+        checkIndexCounter(pn, false, false);
+    }
+    
+    public void testCountStar7() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS >= 3 AND AGE = ?", 1, true);
+        checkIndexCounter(pn, false, false);
+    }
+    
+    public void testCountStar15() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?", 2, false);
+        checkIndexCounter(pn, false, false);
+    }
+    
+    // Down below are cases that we can replace 
+    
+    public void testCountStar11() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?", 1, true);
         checkIndexCounter(pn, false, false);
     }
 
@@ -101,20 +118,10 @@ public class TestReplaceWithIndexCounter extends TestCase {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS <= 6", 0, true);
         checkIndexCounter(pn, false, true);
     }
-
-    public void testCountStar7() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS >= 3 AND AGE = ?", 1, true);
-        checkIndexCounter(pn, false, false);
-    }
-
+    
     public void testCountStar8() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?", 2, true);
         checkIndexCounter(pn, false, true);
-    }
-
-    public void testCountStar11() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?", 1, true);
-        checkIndexCounter(pn, false, false);
     }
 
     public void testCountStar12() {
@@ -125,11 +132,6 @@ public class TestReplaceWithIndexCounter extends TestCase {
     public void testCountStar13() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?", 1, true);
         checkIndexCounter(pn, false, true);
-    }
-
-    public void testCountStar15() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?", 2, false);
-        checkIndexCounter(pn, false, false);
     }
 
 //    public void testCountStarOnPartitionedTable() {
@@ -168,16 +170,11 @@ public class TestReplaceWithIndexCounter extends TestCase {
             System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
 
         }
-//        ArrayList<AbstractPlanNode> children = new ArrayList<AbstractPlanNode>();
-//        for (int i = 0; i < p.getChildCount(); i++) {
-//            children.add(p.getChild(i));
-//            System.out.println("Child " + i + " :" + p.getChild(i).toExplainPlanString());
-//            System.out.println("Parent " + i + " :" + p.getParent(i).toExplainPlanString());
-//        }
         if (isReplaceable)
             assertTrue(p instanceof IndexCountPlanNode);
         else
             assertTrue((p instanceof IndexCountPlanNode) == false);
+        
 //        if (pushDownTypes != null) {
 //            for (ExpressionType type : pushDownTypes) {
 //                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +

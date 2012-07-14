@@ -290,15 +290,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
             // comparision type checking
             if (et == ExpressionType.COMPARE_EQUAL) {
                 ctEqual++;
-            }
-            else if (et == ExpressionType.COMPARE_GREATERTHAN) {
-                ctOther++;
-                m_endType = IndexLookupType.GT;
-            } else if (et == ExpressionType.COMPARE_GREATERTHANOREQUALTO) {
-                ctOther++;
-                m_endType = IndexLookupType.GTE;
-            }
-            else if (et == ExpressionType.COMPARE_LESSTHAN) {
+            } else if (et == ExpressionType.COMPARE_LESSTHAN) {
                 ctOther++;
                 m_endType = IndexLookupType.LT;
             } else if (et == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
@@ -316,11 +308,16 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 this.addEndKeyExpression(ae.getLeft());
             }
         }
+        // Post expression cases are excluded
+        // Only one non-equal comparision allowed
         if (ctOther > 1 || ctOther + ctEqual != cmpSize) {
             m_endExprValid = false;
             return;
         }
-        if (ctEqual != 0 && ctOther == 0) {
+        // Two cases excluded: 
+        // (1) "SELECT count(*) from T1 WHERE POINTS = ?"
+        // (2) "SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?"
+        if (ctEqual == 1 && ctOther == 0) {
             m_endExprValid = false;
             return;
         }

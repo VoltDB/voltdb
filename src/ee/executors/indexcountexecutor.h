@@ -43,7 +43,7 @@ class IndexCountExecutor : public AbstractExecutor
 {
 public:
     IndexCountExecutor(VoltDBEngine* engine, AbstractPlanNode* abstractNode)
-        : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL)
+        : AbstractExecutor(engine, abstractNode), m_searchKeyBackingStore(NULL), m_endKeyBackingStore(NULL)
     {
     }
     ~IndexCountExecutor();
@@ -69,9 +69,9 @@ protected:
     bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
     AbstractExpression** m_endKeyBeforeSubstituteArray;
     bool* m_needsSubstituteEndKey;
+    bool m_hasEndKey;
 
     bool m_needsSubstitutePostExpression;
-    bool m_needsSubstituteEndExpression;
 
     IndexLookupType m_lookupType;
     IndexLookupType m_endType;
@@ -89,8 +89,13 @@ protected:
     boost::shared_array<bool> m_needsSubstituteSearchKeyPtr;
     boost::shared_array<AbstractExpression*>
         m_searchKeyBeforeSubstituteArrayPtr;
+    boost::shared_array<bool> m_needsSubstituteEndKeyPtr;
+    boost::shared_array<AbstractExpression*>
+            m_endKeyBeforeSubstituteArrayPtr;
+
     // So Valgrind doesn't complain:
     char* m_searchKeyBackingStore;
+    char* m_endKeyBackingStore;
 };
 
 }
