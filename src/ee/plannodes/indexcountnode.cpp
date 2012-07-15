@@ -157,8 +157,10 @@ void IndexCountPlanNode::loadFromJSONObject(json_spirit::Object &obj) {
 
     json_spirit::Value endKeyExpressionsValue = json_spirit::find_value( obj, "ENDKEY_EXPRESSIONS");
     if (endKeyExpressionsValue == json_spirit::Value::null) {
-        endkey_expressions.empty();
+        printf("ENDKEY EXPR*******NULL***********(EE)\n");
+        endkey_expressions.clear();
     } else {
+        printf("ENDKEY EXPR***NOT****NULL***********(EE)\n");
         json_spirit::Array endKeyExpressionsArray = endKeyExpressionsValue.get_array();
         for (int ii = 0; ii < endKeyExpressionsArray.size(); ii++) {
             json_spirit::Object endKeyExpressionObject = endKeyExpressionsArray[ii].get_obj();

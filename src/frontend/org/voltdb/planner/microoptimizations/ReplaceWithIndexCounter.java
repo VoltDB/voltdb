@@ -106,7 +106,7 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         IndexCountPlanNode icpn = null;
         if (isReplaceable((IndexScanPlanNode)child)) {
             icpn = new IndexCountPlanNode((IndexScanPlanNode)child);
-            if (icpn.isReplaceable() == false)
+            if (icpn.isEndExpreValid() == false)
                 return plan;
 
             icpn.setOutputSchema(plan.getOutputSchema());

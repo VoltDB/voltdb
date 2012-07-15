@@ -45,7 +45,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         TARGET_INDEX_NAME,
         KEY_ITERATE,
         SEARCHKEY_EXPRESSIONS,
-        ENDKEY_EXPRESSION,
+        ENDKEY_EXPRESSIONS,
         LOOKUP_TYPE,
         END_TYPE;
     }
@@ -273,7 +273,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         // TODO(xin): set parents node
     }
 
-    public boolean isReplaceable() {
+    public boolean isEndExpreValid() {
         return m_endExprValid;
     }
 
@@ -362,7 +362,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
 
 
-        stringer.key(Members.ENDKEY_EXPRESSION.name());
+        stringer.key(Members.ENDKEY_EXPRESSIONS.name());
         if (m_endkeyExpressions == null || m_endkeyExpressions.isEmpty()) {
             stringer.value(null);
         } else {

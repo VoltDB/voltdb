@@ -56,31 +56,31 @@ public class TestIndexCountSuite extends RegressionSuite {
         client.callProcedure("T1.insert", 1, 1);
         client.callProcedure("T1.insert", 2, 2);
         client.callProcedure("T1.insert", 3, 3);
-        client.callProcedure("T1.insert", 4, 4);
-        client.callProcedure("T1.insert", 5, 5);
+        
         client.callProcedure("T1.insert", 6, 6);
+        client.callProcedure("T1.insert", 8, 8);
 
-        VoltTable[] results = client.callProcedure("CountingIndexFeature", 2, 5).getResults();
+        VoltTable[] results = client.callProcedure("CountingIndexFeature", 4, 9).getResults();
 
-        assertEquals(1, results.length);
+        assertEquals(3, results.length);
 
         VoltTable table = results[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
-        assertEquals(3, table.getLong(0));
+        assertEquals(5, table.getLong(0));
         assertTrue(true);
 
-//        table = results[1];
-//        assertTrue(table.getRowCount() == 1);
-//        assertTrue(table.advanceRow());
-//        assertEquals(4, table.getLong(0));
-//        assertTrue(true);
-//        
-//        table = results[2];
-//        assertTrue(table.getRowCount() == 1);
-//        assertTrue(table.advanceRow());
-//        assertEquals(3, table.getLong(0));
-//        assertTrue(true);
+        table = results[1];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        assertTrue(true);
+        
+        table = results[2];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        assertTrue(true);
     }
 
     /**

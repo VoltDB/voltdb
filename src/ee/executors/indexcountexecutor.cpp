@@ -47,6 +47,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node);
     assert(m_node->getTargetTable());
 
+    printf("DEBUG for M_NODE: '%s'\n", m_node->debugInfo("<XIN>").c_str());
+
     // Create output table based on output schema from the plan
 
     TupleSchema* schema = m_node->generateTupleSchema(false);
@@ -97,8 +99,10 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
 
 
     if (m_node->getEndKeyExpressions().size() == 0) {
+        printf("<Index executor>: has NO index key\n");
         m_hasEndKey = false;
     } else {
+        printf("<Index executor>: has index key...........\n");
         m_hasEndKey = true;
         m_numOfEndkeys = (int)m_node->getEndKeyExpressions().size();
         m_endKeyBeforeSubstituteArrayPtr =
@@ -140,7 +144,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     m_index = m_targetTable->index(m_node->getTargetIndexName());
     // This index should have a true countable flag
     assert(m_index->is_countable_index_);
-    printf("xin <IndexCount Executor> m_index: '%s'\n", m_node->debug().c_str());
 
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
@@ -298,7 +301,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
         assert((activeNumOfEndKeys == 0) || (m_endKey.getSchema()->columnCount() > 0));
         VOLT_TRACE("End key after substitutions: '%s'", m_endKey.debugNoHeader().c_str());
-        printf("End key after substitutions: '%s'", m_endKey.debugNoHeader().c_str());
+        printf("End key after substitutions: '%s'\n", m_endKey.debugNoHeader().c_str());
     }
 
     //
@@ -340,13 +343,15 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 rkStart = m_index->getCounterLET(&m_searchKey, NULL);
             } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
                 rkStart = m_index->getCounterLET(&m_searchKey, NULL);
-                leftIncluded = 1;
+                if (m_index->hasKey(&m_searchKey))
+                    leftIncluded = 1;
             } else if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
                 // There is no equal case right now
                 return false;
             } else {
                 return false;
             }
+
         } else {
             assert(true);
             // never
@@ -355,12 +360,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             IndexLookupType localEndType = m_endType;
             printf("INDEX_END_TYPE(%d) m_numEndkeys(%d) key:%s\n",
                     localEndType, activeNumOfEndKeys, m_endKey.debugNoHeader().c_str());
-            if (localEndType == INDEX_LOOKUP_TYPE_GTE_LT) {
+            if (localEndType == INDEX_LOOKUP_TYPE_LT) {
                 rkEnd = m_index->getCounterGET(&m_endKey, NULL);
-            } else if (localEndType == INDEX_LOOKUP_TYPE_GTE_LTE) {
+            } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
                 rkEnd = m_index->getCounterGET(&m_endKey, NULL);
-                rightIncluded = 1;
-                printf("xin <IndexCount Executor> end <=: '%d'\n", rkEnd);
+                if (m_index->hasKey(&m_endKey))
+                    rightIncluded = 1;
             } else if (localEndType == INDEX_LOOKUP_TYPE_EQ) {
                 // There is no equal case right now
                 return false;
