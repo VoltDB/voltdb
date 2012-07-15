@@ -618,7 +618,8 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
                 }
                 if ( numChildren > expectedHosts) {
                     org.voltdb.VoltDB.crashLocalVoltDB("Expected to find " + expectedHosts +
-                            " hosts but found " + numChildren + " terminating this host", false, null);
+                            " hosts in cluster at startup but found " + numChildren +
+                            ".  Terminating this host.", false, null);
                 }
                 fw.get();
             }
