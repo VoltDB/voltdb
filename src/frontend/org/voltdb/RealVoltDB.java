@@ -34,6 +34,7 @@ import java.net.NetworkInterface;
 import java.net.SocketException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.Enumeration;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -46,6 +47,7 @@ import java.util.TreeSet;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.concurrent.Executors;
+import java.util.concurrent.Future;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ScheduledThreadPoolExecutor;
 import java.util.concurrent.Semaphore;
@@ -109,6 +111,7 @@ import org.voltdb.utils.VoltSampler;
 import com.google.common.collect.ImmutableList;
 import com.google.common.util.concurrent.ListeningExecutorService;
 import com.google.common.util.concurrent.MoreExecutors;
+import com.google.common.util.concurrent.SettableFuture;
 
 /**
  * RealVoltDB initializes global server components, like the messaging
@@ -343,6 +346,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ResponseSampler.initializeIfEnabled();
 
             buildClusterMesh(isRejoin);
+            final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
             m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes + "/" + m_messenger.getHostId());
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (!isRejoin) {
@@ -657,6 +661,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             if (m_commandLog != null && isRejoin) {
                 m_commandLog.initForRejoin(
                         m_catalogContext, Long.MIN_VALUE, true);
+            }
+
+            try {
+                buildStringValidation.get();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Failed to validate cluster build string", false, e);
             }
 
             if (!isRejoin) {
@@ -2003,5 +2013,52 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         bw.close();
 
         return deploymentXMLFile.getAbsolutePath();
+    }
+
+    private Future<?> validateBuildString(final String buildString, ZooKeeper zk) {
+        final SettableFuture<Object> retval = SettableFuture.create();
+        byte buildStringBytes[] = null;
+        try {
+            buildStringBytes = buildString.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new AssertionError(e);
+        }
+        final byte buildStringBytesFinal[] = buildStringBytes;
+
+        //Can use a void callback because ZK will execute them in order
+        zk.create(
+                VoltZK.buildstring,
+                buildStringBytes,
+                Ids.OPEN_ACL_UNSAFE,
+                CreateMode.PERSISTENT,
+                new ZKUtil.StringCallback(),
+                null);
+
+        zk.getData(VoltZK.buildstring, false, null, new org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback() {
+
+            @Override
+            public void processResult(int rc, String path, Object ctx,
+                    byte[] data, Stat stat) {
+                KeeperException.Code code = KeeperException.Code.get(rc);
+                if (code == KeeperException.Code.OK) {
+                    if (Arrays.equals(buildStringBytesFinal, data)) {
+                        retval.set(null);
+                    } else {
+                        try {
+                            VoltDB.crashGlobalVoltDB("Local build string \"" + buildString +
+                                    "\" does not match cluster build string \"" +
+                                    new String(data, "UTF-8")  + "\"", false, null);
+                        } catch (UnsupportedEncodingException e) {
+                            retval.setException(new AssertionError(e));
+                        }
+                    }
+                } else {
+                    retval.setException(KeeperException.create(code));
+                }
+            }
+
+        });
+
+        return retval;
     }
 }
