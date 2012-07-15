@@ -2034,7 +2034,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 new ZKUtil.StringCallback(),
                 null);
 
-        zk.getData(VoltZK.buildstring, false, null, new org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback() {
+        zk.getData(VoltZK.buildstring, false, new org.apache.zookeeper_voltpatches.AsyncCallback.DataCallback() {
 
             @Override
             public void processResult(int rc, String path, Object ctx,
@@ -2057,7 +2057,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 }
             }
 
-        });
+        }, null);
 
         return retval;
     }
