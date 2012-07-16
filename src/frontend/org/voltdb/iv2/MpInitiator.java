@@ -78,9 +78,7 @@ public class MpInitiator extends BaseInitiator
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
-        return new MpTerm(missingStartupSites, zk,
-                partitionId, initiatorHSId, mailbox,
-                zkMapCacheNode, whoami);
+        return new MpTerm(missingStartupSites, zk, initiatorHSId, mailbox, whoami);
     }
 
     @Override

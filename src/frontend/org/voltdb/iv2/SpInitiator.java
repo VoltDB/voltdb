@@ -70,9 +70,7 @@ public class SpInitiator extends BaseInitiator
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
-        return new SpTerm(missingStartupSites, zk,
-                partitionId, initiatorHSId, mailbox,
-                zkMapCacheNode, whoami);
+        return new SpTerm(missingStartupSites, zk, partitionId, initiatorHSId, mailbox, whoami);
     }
 
     @Override
