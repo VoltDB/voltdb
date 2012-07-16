@@ -287,7 +287,7 @@ public class MpPromoteAlgo implements RepairAlgo
     void addToRepairLog(Iv2RepairLogResponseMessage msg)
     {
         Iv2RepairLogResponseMessage prev = m_repairLogUnion.floor(msg);
-        if (prev.getHandle() != msg.getHandle()) {
+        if (prev != null && (prev.getHandle() != msg.getHandle())) {
             prev = null;
         }
 
