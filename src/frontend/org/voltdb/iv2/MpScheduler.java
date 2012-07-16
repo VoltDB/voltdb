@@ -57,6 +57,9 @@ public class MpScheduler extends Scheduler
     private final AtomicLong m_txnId = new AtomicLong(1l << 40);
     private final long m_buddyHSId;
 
+    // the current not-needed-any-more point of the repair log.
+    long m_repairLogTruncationHandle = Long.MIN_VALUE;
+
     MpScheduler(long buddyHSId, SiteTaskerQueue taskQueue, MapCache iv2masters)
     {
         super(taskQueue);
@@ -136,6 +139,7 @@ public class MpScheduler extends Scheduler
             Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(
                     localId, // make the MPI the initiator.
                     message.getCoordinatorHSId(),
+                    m_repairLogTruncationHandle,
                     mpTxnId,
                     message.isReadOnly(),
                     true, // isSinglePartition
@@ -159,6 +163,7 @@ public class MpScheduler extends Scheduler
             new Iv2InitiateTaskMessage(
                     message.getInitiatorHSId(),
                     message.getCoordinatorHSId(),
+                    m_repairLogTruncationHandle,
                     mpTxnId,
                     message.isReadOnly(),
                     message.isSinglePartition(),
@@ -191,6 +196,7 @@ public class MpScheduler extends Scheduler
             int result = counter.offer(message);
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
+                m_repairLogTruncationHandle = message.getTxnId();
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
@@ -201,6 +207,7 @@ public class MpScheduler extends Scheduler
         }
 
         // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
+        m_repairLogTruncationHandle = message.getTxnId();
         m_mailbox.send(message.getInitiatorHSId(), message);
     }
 
@@ -222,6 +229,7 @@ public class MpScheduler extends Scheduler
         // in flight from remote sites.  Drop those on the floor.
         // IZZY: After implementing BorrowTasks, I'm not sure that the above sequence
         // can actually happen any longer, but leaving this and logging it for now.
+        // RTB: Didn't we decide early rollback can do this legitimately.
         if (txn != null) {
             ((MpTransactionState)txn).offerReceivedFragmentResponse(message);
         }

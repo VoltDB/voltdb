@@ -96,17 +96,6 @@ abstract public class ProcedureTask extends TransactionTask
                 }
 
                 m_runner.setupTransaction(m_txn);
-                /*
-                   if (m_runner.isSystemProcedure()) {
-                       final Object[] combinedParams = new Object[callerParams.length + 1];
-                       combinedParams[0] = m_systemProcedureContext;
-                       for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                       cr = runner.call(txnId, combinedParams);
-                   }
-                   else {
-                        cr = runner.call(txnId, task.getParameters());
-                    }
-                */
                 cr = m_runner.call(txnId, task.getParameters());
 
                 response.setResults(cr);

@@ -94,7 +94,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return m_spHandle;
     }
 
-    protected void setTruncationHandle(long handle) {
+    public void setTruncationHandle(long handle) {
         m_truncationHandle = handle;
     }
 
@@ -109,7 +109,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     public boolean isSinglePartition() {
         return false;
     }
-
 
     @Override
     public int getSerializedSize() {

@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.lang.Long;
+
 import java.util.ArrayList;
 import java.util.Collections;
 
@@ -44,6 +46,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class SpScheduler extends Scheduler
 {
     List<Long> m_replicaHSIds = new ArrayList<Long>();
+    List<Long> m_sendToHSIds = new ArrayList<Long>();
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
@@ -67,15 +70,15 @@ public class SpScheduler extends Scheduler
     {
         // First - correct the official replica set.
         m_replicaHSIds = replicas;
-        // Need a local copy that includes ourselves for the duplicate counter reconciliation
-        List<Long> liveHSIds = new ArrayList<Long>(m_replicaHSIds);
-        liveHSIds.add(m_mailbox.getHSId());
+        // Update the list of remote replicas that we'll need to send to
+        m_sendToHSIds = new ArrayList<Long>(m_replicaHSIds);
+        m_sendToHSIds.remove(m_mailbox.getHSId());
 
         // Cleanup duplicate counters and collect DONE counters
         // in this list for further processing.
         List<Long> doneCounters = new LinkedList<Long>();
         for (DuplicateCounter counter : m_duplicateCounters.values()) {
-            int result = counter.updateReplicas(liveHSIds);
+            int result = counter.updateReplicas(m_replicaHSIds);
             if (result == DuplicateCounter.DONE) {
                 doneCounters.add(counter.getTxnId());
             }
@@ -140,7 +143,8 @@ public class SpScheduler extends Scheduler
                 // the same initiate task message will overwrite each
                 // other's memory -- the message isn't copied on delivery
                 // to other local mailboxes.
-                msg = new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
+                msg = new Iv2InitiateTaskMessage(
+                        message.getInitiatorHSId(),
                         message.getCoordinatorHSId(),
                         m_repairLogTruncationHandle,
                         message.getTxnId(),
@@ -156,7 +160,7 @@ public class SpScheduler extends Scheduler
                 if (!runner.isEverySite()) {
                     msg.setTxnId(newSpHandle);
                 }
-                if (m_replicaHSIds.size() > 0) {
+                if (m_sendToHSIds.size() > 0) {
                     Iv2InitiateTaskMessage replmsg =
                         new Iv2InitiateTaskMessage(m_mailbox.getHSId(),
                                 m_mailbox.getHSId(),
@@ -169,13 +173,11 @@ public class SpScheduler extends Scheduler
                                 msg.getConnectionId());
                     // Update the handle in the copy
                     replmsg.setSpHandle(newSpHandle);
-                    m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                    m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
                             replmsg);
-                    List<Long> expectedHSIds = new ArrayList<Long>(m_replicaHSIds);
-                    expectedHSIds.add(m_mailbox.getHSId());
                     DuplicateCounter counter = new DuplicateCounter(
                             msg.getInitiatorHSId(),
-                            msg.getTxnId(), expectedHSIds);
+                            msg.getTxnId(), m_replicaHSIds);
                     m_duplicateCounters.put(newSpHandle, counter);
                 }
             }
@@ -294,24 +296,22 @@ public class SpScheduler extends Scheduler
             msg.setSpHandle(newSpHandle);
             // If we have input dependencies, it's borrow work, there's no way we
             // can actually distribute it
-            if (m_replicaHSIds.size() > 0 && inputDeps == null) {
+            if (m_sendToHSIds.size() > 0 && inputDeps == null) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
-                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+                m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
                         replmsg);
-                List<Long> expectedHSIds = new ArrayList<Long>(m_replicaHSIds);
-                expectedHSIds.add(m_mailbox.getHSId());
                 DuplicateCounter counter;
                 if (message.getFragmentTaskType() != FragmentTaskMessage.SYS_PROC_PER_SITE) {
                     counter = new DuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), expectedHSIds);
+                            msg.getTxnId(), m_replicaHSIds);
                 }
                 else {
                     counter = new SysProcDuplicateCounter(
                             msg.getCoordinatorHSId(),
-                            msg.getTxnId(), expectedHSIds);
+                            msg.getTxnId(), m_replicaHSIds);
                 }
                 m_duplicateCounters.put(newSpHandle, counter);
             }
@@ -373,9 +373,9 @@ public class SpScheduler extends Scheduler
 
     public void handleCompleteTransactionMessage(CompleteTransactionMessage message)
     {
-        if (m_replicaHSIds.size() > 0) {
+        if (m_sendToHSIds.size() > 0) {
             CompleteTransactionMessage replmsg = message;
-            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_replicaHSIds),
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
                     replmsg);
         }
         TransactionState txn = m_outstandingTxns.remove(message.getTxnId());

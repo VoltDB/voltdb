@@ -944,6 +944,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 Iv2InitiateTaskMessage workRequest =
                     new Iv2InitiateTaskMessage(m_siteId,
                             initiatorHSId,
+                            Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
                             Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
                             isReadOnly,
                             isSinglePartition,
@@ -2026,7 +2027,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         spi.clientHandle = clientData;
         // initiate the transaction
         boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
-        createTransaction(-1, "SnapshotDaemon", true, // treat the snapshot daemon like it's on an admin port
+        createTransaction(m_snapshotDaemonAdapter.connectionId(),
+                "SnapshotDaemon",
+                true, // treat the snapshot daemon like it's on an admin port
                 spi, catProc.getReadonly(),
                 catProc.getSinglepartition(), catProc.getEverysite(),
                 m_allPartitions, m_allPartitions.length,
