@@ -50,21 +50,44 @@ public class TestIndexCountSuite extends RegressionSuite {
         super(name);
     }
 
-    public void testIndexCount() throws Exception {
+    public void testOneColumnIndex() throws Exception {
         Client client = getClient();
 
         client.callProcedure("T1.insert", 1, 1);
         client.callProcedure("T1.insert", 2, 2);
         client.callProcedure("T1.insert", 3, 3);
-        
+
         client.callProcedure("T1.insert", 6, 6);
         client.callProcedure("T1.insert", 8, 8);
 
-        VoltTable[] results = client.callProcedure("CountingIndexFeature", 4, 9).getResults();
+        VoltTable[] results;
+        VoltTable table;
 
+        // test with 2,6
+        results = client.callProcedure("CountingIndexFeature", 2, 6).getResults();
         assertEquals(3, results.length);
+        table = results[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
+        assertTrue(true);
 
-        VoltTable table = results[0];
+        table = results[1];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+        assertTrue(true);
+
+        table = results[2];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        assertTrue(true);
+
+        // test with 4,9
+        results = client.callProcedure("CountingIndexFeature", 4, 9).getResults();
+        assertEquals(3, results.length);
+        table = results[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
@@ -75,12 +98,24 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
         assertTrue(true);
-        
+
         table = results[2];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
         assertTrue(true);
+    }
+
+    public void testTwoOrMoreColumnIndexes() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("T2.insert", 1, 1);
+        client.callProcedure("T2.insert", 2, 2);
+        client.callProcedure("T2.insert", 3, 3);
+
+        client.callProcedure("T2.insert", 6, 6);
+        client.callProcedure("T2.insert", 8, 8);
+
     }
 
     /**

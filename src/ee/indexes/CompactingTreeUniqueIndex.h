@@ -247,6 +247,7 @@ public:
         if (!hasRank) return -1;
         printf("<Tree Unique-map> get counter equal or greater than --- \n");
 
+        printf ("Search KEY: '%s'", searchKey->debugNoHeader().c_str());
         m_tmp1.setFromKey(searchKey);
         if (hasKey(searchKey)) {
             printf("<Tree Unique-map>getCounterGET--- has searchKey !!!--- \n");
@@ -254,21 +255,37 @@ public:
         }
 
         m_keyIter = m_entries.lowerBound(m_tmp1);
-        return m_entries.rankAsc(m_keyIter.key());
+        //printf("<getCounterGET> Lowbound of the search key is %s", m_keyIter.key().debug(searchKey->getSchema()));
+        if (m_keyIter.isEnd()) {
+            printf("IS END... NO bigger key found...\n");
+            return m_entries.size() + 1;
+        } else {
+            TableTuple retval(m_tupleSchema);
+            retval.move(const_cast<void*>(m_keyIter.value()));
+            printf("<getCounterGET>*** Lowbound *** of the search key is %s \n", retval.debugNoHeader().c_str());
+            return m_entries.rankAsc(m_keyIter.key());
+        }
     }
     int32_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
         printf("<Tree Unique-map> get counter equal or less than--- \n");
 
         m_tmp1.setFromKey(searchKey);
-        if (hasKey(searchKey))
-            return m_entries.rankAsc(m_tmp1);
 
+        printf("<getCounterLET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
         m_keyIter = m_entries.lowerBound(m_tmp1);
+
+        TableTuple retval(m_tupleSchema);
+        retval.move(const_cast<void*>(m_keyIter.value()));
+        printf("<getCounterLET>*** Lowbound *** is %s \n", retval.debugNoHeader().c_str());
+        if (m_keyIter.isEnd()) {
+            return m_entries.size();
+        }
+
         int cmp = m_eq(m_tmp1, m_keyIter.key());
         printf("cmp value: %d\n", cmp);
 
-        if (cmp < 0) {
+        if (cmp == 0) {
             KeyType tmpKey = m_keyIter.key();
             m_keyIter.movePrev();
             if (m_keyIter.isEnd()) {
@@ -276,11 +293,8 @@ public:
             } else {
                 return m_entries.rankAsc(m_keyIter.key());
             }
-        } else if (cmp > 0) {
-            return m_entries.rankAsc(m_keyIter.key());
         } else {
-            assert(true);
-            return -1;
+            return m_entries.rankAsc(m_tmp1);
         }
     }
 
@@ -312,7 +326,8 @@ protected:
         TableIndex(scheme),
         m_entries(true, KeyComparator(m_keySchema)),
         m_begin(true),
-        m_eq(m_keySchema)
+        m_eq(m_keySchema),
+        m_cmp(m_keySchema)
     {
         m_match = TableTuple(m_tupleSchema);
     }
@@ -340,6 +355,7 @@ protected:
 
     // comparison stuff
     KeyEqualityChecker m_eq;
+    KeyComparator m_cmp;
 };
 
 }

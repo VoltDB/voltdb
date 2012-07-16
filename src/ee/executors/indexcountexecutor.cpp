@@ -47,7 +47,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node);
     assert(m_node->getTargetTable());
 
-    printf("DEBUG for M_NODE: '%s'\n", m_node->debugInfo("<XIN>").c_str());
+    //printf("DEBUG for M_NODE: '%s'\n", m_node->debugInfo("<XIN>").c_str());
 
     // Create output table based on output schema from the plan
 
@@ -99,10 +99,10 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
 
 
     if (m_node->getEndKeyExpressions().size() == 0) {
-        printf("<Index executor>: has NO index key\n");
+        printf("<Index executor>: has NO END KEY...........\n");
         m_hasEndKey = false;
     } else {
-        printf("<Index executor>: has index key...........\n");
+        printf("<Index executor>: has END KEY...........\n");
         m_hasEndKey = true;
         m_numOfEndkeys = (int)m_node->getEndKeyExpressions().size();
         m_endKeyBeforeSubstituteArrayPtr =
@@ -375,14 +375,11 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         } else {
             rkEnd = m_index->getSize();
             rightIncluded = 1;
-            printf("Count total: %d\n", rkEnd);
+            printf("Count total without END KEYs: %d\n", rkEnd);
         }
 
-        printf("ANSWER: %d - %d - 1 + %d + %d\n", rkEnd, rkStart, leftIncluded, rightIncluded);
         rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
-
-        printf("xin <IndexCount Executor> ANSWER: '%d'\n", rkRes);
-
+        printf("ANSWER %d = %d - %d - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
         tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes));
         m_outputTable->insertTuple(tmptup);
 
