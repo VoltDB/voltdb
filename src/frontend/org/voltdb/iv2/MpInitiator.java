@@ -59,8 +59,8 @@ public class MpInitiator extends BaseInitiator
                           int numberOfPartitions,
                           boolean createForRejoin)
     {
-        super.configure(backend, serializedCatalog, catalogContext,
-                kfactor, csp, numberOfPartitions,
+        super.configureCommon(backend, serializedCatalog, catalogContext,
+                numberOfPartitions, csp, numberOfPartitions,
                 createForRejoin && isRejoinable());
     }
 

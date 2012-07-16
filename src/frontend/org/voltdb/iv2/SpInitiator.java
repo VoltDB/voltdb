@@ -25,6 +25,9 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.messaging.HostMessenger;
 
+import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.VoltZK;
 
 /**
@@ -39,6 +42,18 @@ public class SpInitiator extends BaseInitiator
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(new SiteTaskerQueue()),
                 "SP");
+    }
+
+    @Override
+    public void configure(BackendTarget backend, String serializedCatalog,
+                          CatalogContext catalogContext,
+                          int kfactor, CatalogSpecificPlanner csp,
+                          int numberOfPartitions,
+                          boolean createForRejoin)
+    {
+        super.configureCommon(backend, serializedCatalog, catalogContext,
+                kfactor + 1, csp, numberOfPartitions,
+                createForRejoin && isRejoinable());
     }
 
     /**
