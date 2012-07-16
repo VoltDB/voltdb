@@ -77,7 +77,7 @@ public class SpPromoteAlgo implements RepairAlgo
         {
             m_receivedResponses++;
             m_expectedResponses = response.getOfTotal();
-            m_maxSpHandleSeen = Math.max(m_maxSpHandleSeen, response.getSpHandle());
+            m_maxSpHandleSeen = Math.max(m_maxSpHandleSeen, response.getHandle());
             return logsComplete();
         }
 
@@ -112,7 +112,7 @@ public class SpPromoteAlgo implements RepairAlgo
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
-            return (int)(o1.getSpHandle() - o2.getSpHandle());
+            return (int)(o1.getHandle() - o2.getHandle());
         }
     };
 
@@ -226,11 +226,11 @@ public class SpPromoteAlgo implements RepairAlgo
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
-                if  (entry.getValue().needs(li.getSpHandle())) {
+                if  (entry.getValue().needs(li.getHandle())) {
                     ++queued;
                     tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
                             entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
-                            li.getSpHandle());
+                            li.getHandle());
                     needsRepair.add(entry.getKey());
                 }
             }

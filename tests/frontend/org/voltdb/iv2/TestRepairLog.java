@@ -118,9 +118,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(2, rl.contents().size());
         assertEquals(m2, rl.contents().get(0).getMessage());
-        assertEquals(2L, rl.contents().get(0).getSpHandle());
+        assertEquals(2L, rl.contents().get(0).getHandle());
         assertEquals(m3, rl.contents().get(1).getMessage());
-        assertEquals(3L, rl.contents().get(1).getSpHandle());
+        assertEquals(3L, rl.contents().get(1).getHandle());
 
     }
 
@@ -163,9 +163,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(2, rl.contents().size());
         assertEquals(m2, rl.contents().get(0).getMessage());
-        assertEquals(2L, rl.contents().get(0).getSpHandle());
+        assertEquals(2L, rl.contents().get(0).getHandle());
         assertEquals(m3, rl.contents().get(1).getMessage());
-        assertEquals(3L, rl.contents().get(1).getSpHandle());
+        assertEquals(3L, rl.contents().get(1).getHandle());
     }
 
     @Test
@@ -187,9 +187,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(2, rl.contents().size());
         assertEquals(m2, rl.contents().get(0).getMessage());
-        assertEquals(2L, rl.contents().get(0).getSpHandle());
+        assertEquals(2L, rl.contents().get(0).getHandle());
         assertEquals(m3, rl.contents().get(1).getMessage());
-        assertEquals(3L, rl.contents().get(1).getSpHandle());
+        assertEquals(3L, rl.contents().get(1).getHandle());
     }
 
 

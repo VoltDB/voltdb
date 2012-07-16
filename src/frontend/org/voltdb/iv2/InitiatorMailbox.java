@@ -259,7 +259,7 @@ public class InitiatorMailbox implements Mailbox
                             req.getRequestId(),
                             seq,
                             ofTotal,
-                            log.getSpHandle(),
+                            log.getHandle(),
                             log.getMessage());
                 send(message.m_sourceHSId, response);
                 seq++;

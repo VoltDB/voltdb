@@ -44,7 +44,7 @@ public class TestSpRepairAlgo extends TestCase
     Iv2RepairLogResponseMessage makeResponse(long spHandle)
     {
         Iv2RepairLogResponseMessage m = mock(Iv2RepairLogResponseMessage.class);
-        when(m.getSpHandle()).thenReturn(spHandle);
+        when(m.getHandle()).thenReturn(spHandle);
         return m;
     }
 
@@ -73,7 +73,7 @@ public class TestSpRepairAlgo extends TestCase
 
         int i = 0;
         for (Iv2RepairLogResponseMessage li : term.m_repairLogUnion) {
-            assertEquals(li.getSpHandle(), expectedUnion[i++]);
+            assertEquals(li.getHandle(), expectedUnion[i++]);
         }
     }
 

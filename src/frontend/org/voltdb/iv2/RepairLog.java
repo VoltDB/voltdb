@@ -38,7 +38,6 @@ public class RepairLog
     private static final boolean IS_SP = true;
     private static final boolean IS_MP = false;
 
-    // last seen spHandle
     // Initialize to Long MAX_VALUE to prevent feeding a newly joined node
     // transactions it should never have seen
     long m_lastSpHandle = Long.MAX_VALUE;
@@ -61,7 +60,7 @@ public class RepairLog
             m_handle = handle;
         }
 
-        long getSpHandle()
+        long getHandle()
         {
             return m_handle;
         }
