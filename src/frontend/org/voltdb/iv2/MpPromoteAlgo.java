@@ -162,8 +162,8 @@ public class MpPromoteAlgo implements RepairAlgo
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
 
-        tmLog.info(m_whoami + "found (including self) " + m_survivors.size()
-                + " surviving replicas to repair. "
+        tmLog.info(m_whoami + "found " + m_survivors.size()
+                + " surviving leaders to repair. "
                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest = makeRepairLogRequestMessage(m_requestId);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
