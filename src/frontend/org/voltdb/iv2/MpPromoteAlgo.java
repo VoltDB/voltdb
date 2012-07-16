@@ -288,6 +288,10 @@ public class MpPromoteAlgo implements RepairAlgo
     // replace old messages with complete transaction messages.
     void addToRepairLog(Iv2RepairLogResponseMessage msg)
     {
+        // don't add the null payload from the first message ack to the repair log
+        if (msg.getPayload() == null) {
+            return;
+        }
         Iv2RepairLogResponseMessage prev = m_repairLogUnion.floor(msg);
         if (prev != null && (prev.getHandle() != msg.getHandle())) {
             prev = null;

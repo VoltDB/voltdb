@@ -61,6 +61,9 @@ public class MpTerm implements Term
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
     // the Term processing.
+    // NOTE: The contract with MapCache is that it always
+    // returns a full cache (one entry for every partition).  Returning a
+    // partially filled cache is NotSoGood(tm).
     Callback m_leadersChangeHandler = new Callback()
     {
         @Override
