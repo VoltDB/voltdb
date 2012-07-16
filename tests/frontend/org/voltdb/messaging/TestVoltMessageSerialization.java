@@ -325,4 +325,14 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(31337, itask.getSpHandle());
     }
 
+    public void testFirstIv2RepairLogResponseMessage() throws Exception
+    {
+        // simulate the first message in the sequence, sequence must be 0
+        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 0, 10, Long.MAX_VALUE, null);
+        Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
+        assertEquals(r1.getOfTotal(), r2.getOfTotal());
+        assertEquals(r1.getHandle(), r2.getHandle());
+        assertEquals(r1.getRequestId(), r2.getRequestId());
+        assertEquals(r1.getSequence(), r2.getSequence());
+    }
 }
