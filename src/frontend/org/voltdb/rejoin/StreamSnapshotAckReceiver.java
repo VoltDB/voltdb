@@ -25,7 +25,7 @@ import org.voltcore.logging.VoltLogger;
  * Reads acks from a rejoining partition
  */
 public class StreamSnapshotAckReceiver implements Runnable {
-    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
     private final SocketChannel m_sock;
     private final StreamSnapshotAckTracker m_ackTracker;
