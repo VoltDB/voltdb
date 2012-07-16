@@ -231,41 +231,47 @@ public class InitiatorMailbox implements Mailbox
     void handleLogRequest(VoltMessage message)
     {
         List<RepairLog.Item> logs = m_repairLog.contents();
-        int ofTotal = logs.size();
-        int seq = 1;
-
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
-        tmLog.info("SP " +  CoreUtils.hsIdToString(getHSId())
-                + " handling repair log request id " + req.getRequestId()
-                + " for " + CoreUtils.hsIdToString(message.m_sourceHSId)
-                + ". Responding with " + ofTotal + " repair log parts.");
 
-        if (logs.isEmpty()) {
-            // respond with an ack that the log is empty.
-            // maybe better if seq 0 is always the ack with null payload?
-            Iv2RepairLogResponseMessage response =
-                new Iv2RepairLogResponseMessage(
-                        req.getRequestId(),
-                        0, // sequence
-                        0, // total expected
-                        m_repairLog.getLastSpHandle(), // spHandle
-                        null); // no payload. just an ack.
-            send(message.m_sourceHSId, response);
+        String whoami =
+            "SP " +  CoreUtils.hsIdToString(getHSId())
+            + " handling repair log request id " + req.getRequestId()
+            + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ";
+
+        int seq = 0;
+        int ofTotal = 1;  // includes the ack.
+
+        // sp repair receives all logs. mp only receives mp logs.
+        for (RepairLog.Item log : logs) {
+            if (!req.isMPIRequest() || log.isMP()) {
+                ofTotal++;
+            }
         }
-        else {
-            for (RepairLog.Item log : logs) {
+
+        tmLog.info(whoami + "Responding with " + ofTotal + " repair log parts.");
+
+        // always send an initial ack.
+        Iv2RepairLogResponseMessage header =
+            new Iv2RepairLogResponseMessage(
+                    req.getRequestId(),
+                    seq++,
+                    ofTotal,
+                    m_repairLog.getLastSpHandle(),
+                    null); // no payload. just an ack.
+        send(message.m_sourceHSId, header);
+
+        for (RepairLog.Item log : logs) {
+            if (!req.isMPIRequest() || log.isMP()) {
                 Iv2RepairLogResponseMessage response =
                     new Iv2RepairLogResponseMessage(
                             req.getRequestId(),
-                            seq,
+                            seq++,
                             ofTotal,
                             log.getHandle(),
                             log.getMessage());
                 send(message.m_sourceHSId, response);
-                seq++;
             }
         }
-        return;
     }
 
     /**

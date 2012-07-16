@@ -289,6 +289,7 @@ public class TestVoltMessageSerialization extends TestCase {
         Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100, Iv2RepairLogRequestMessage.SPREQUEST);
         Iv2RepairLogRequestMessage rlm2 = (Iv2RepairLogRequestMessage) checkVoltMessage(rlm);
         assertEquals(rlm.getRequestId(), rlm2.getRequestId());
+        assertEquals(rlm.isMPIRequest(), rlm2.isMPIRequest());
     }
 
     public void testIv2RepairLogResponseMessage() throws Exception

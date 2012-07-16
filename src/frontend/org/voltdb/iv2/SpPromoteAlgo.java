@@ -73,7 +73,7 @@ public class SpPromoteAlgo implements RepairAlgo
         long m_maxSpHandleSeen = Long.MIN_VALUE;
 
         // update counters and return the number of outstanding messages.
-        int update(Iv2RepairLogResponseMessage response)
+        boolean update(Iv2RepairLogResponseMessage response)
         {
             m_receivedResponses++;
             m_expectedResponses = response.getOfTotal();
@@ -81,17 +81,9 @@ public class SpPromoteAlgo implements RepairAlgo
             return logsComplete();
         }
 
-        // return 0 if all expected logs have been received.
-        int logsComplete()
+        boolean logsComplete()
         {
-            // expected responses is really a count of remote
-            // messages. if there aren't any, the sequence will be
-            // 1 (the count of responses) while expected will be 0
-            // (the length of the remote log)
-            if (m_expectedResponses == 0) {
-               return 0;
-            }
-            return m_expectedResponses - m_receivedResponses;
+            return (m_expectedResponses - m_receivedResponses) == 0;
         }
 
         // return true if this replica needs the message for spHandle.
@@ -189,7 +181,7 @@ public class SpPromoteAlgo implements RepairAlgo
                         + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
             m_repairLogUnion.add(response);
-            if (rrs.update(response) == 0) {
+            if (rrs.update(response)) {
                 tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
                         + " responses for " + rrs.m_expectedResponses +
                         " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
@@ -204,7 +196,7 @@ public class SpPromoteAlgo implements RepairAlgo
     public boolean areRepairLogsComplete()
     {
         for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
-            if (entry.getValue().logsComplete() != 0) {
+            if (!entry.getValue().logsComplete()) {
                 return false;
             }
         }

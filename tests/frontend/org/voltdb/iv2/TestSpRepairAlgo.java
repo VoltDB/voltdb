@@ -96,7 +96,7 @@ public class TestSpRepairAlgo extends TestCase
         SpPromoteAlgo.ReplicaRepairStruct notDone1 = new SpPromoteAlgo.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
-        assertTrue(notDone1.logsComplete() != 0);
+        assertFalse(notDone1.logsComplete());
 
         SpPromoteAlgo.ReplicaRepairStruct notDone2 = new SpPromoteAlgo.ReplicaRepairStruct();
         notDone2.m_receivedResponses = 0;
@@ -105,7 +105,7 @@ public class TestSpRepairAlgo extends TestCase
         SpPromoteAlgo.ReplicaRepairStruct done1 = new SpPromoteAlgo.ReplicaRepairStruct();
         done1.m_receivedResponses = 5;
         done1.m_expectedResponses = 5;
-        assertTrue(done1.logsComplete() == 0);
+        assertTrue(done1.logsComplete());
 
         SpPromoteAlgo.ReplicaRepairStruct done2 = new SpPromoteAlgo.ReplicaRepairStruct();
         done2.m_receivedResponses = 10;
