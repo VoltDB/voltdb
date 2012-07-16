@@ -148,13 +148,6 @@ public:
         m_tmp1.setFromKey(searchKey);
         return (m_entries.find(m_tmp1).isEnd() == false);
     }
-    int32_t getCounterGET(const TableTuple *searchKey, bool isUpper) {
-        return -1;
-    }
-    int32_t getCounterLET(const TableTuple *searchKey, bool isUpper) {
-        return -1;
-    }
-
 
     size_t getSize() const { return m_entries.size(); }
 

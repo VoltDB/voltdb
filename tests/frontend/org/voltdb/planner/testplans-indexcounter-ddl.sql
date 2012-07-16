@@ -13,4 +13,4 @@ CREATE TABLE T2 (
 	AGE TINYINT NOT NULL,
 	PRIMARY KEY (ID)
 );
-create index idx_2_COUNTER on T2 (USERNAME,POINTS);
+create unique index idx_2_COUNTER on T2 (USERNAME,POINTS);

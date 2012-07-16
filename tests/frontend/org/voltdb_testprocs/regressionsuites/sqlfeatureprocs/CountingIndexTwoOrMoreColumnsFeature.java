@@ -30,20 +30,19 @@ import org.voltdb.VoltTable;
 
 @ProcInfo (
     singlePartition = true,
-    partitionInfo = "T1.ID: 0"
+    partitionInfo = "T2.UNAME: 2"
 )
-public class CountingIndexFeature extends VoltProcedure {
-    public final SQLStmt countstar0 = new SQLStmt("SELECT COUNT(*) FROM T1");
-    public final SQLStmt countstar1 = new SQLStmt("SELECT COUNT(*) FROM T1 WHERE POINTS > ?");
-    public final SQLStmt countstar2 = new SQLStmt("SELECT COUNT(*) FROM T1 WHERE POINTS > ? AND POINTS <= ?");
-    public final SQLStmt countstar3 = new SQLStmt("SELECT COUNT(*) FROM T2 WHERE POINTS > ? AND ID = 2");
-    public final SQLStmt countstar4 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE POINTS > ? AND POINTS < ?");
-    public final SQLStmt countstar5 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE POINTS > ? AND NAME = ?");
+public class CountingIndexTwoOrMoreColumnsFeature extends VoltProcedure {
 
-    public VoltTable[] run(int p1, int p2) {
-        voltQueueSQL(countstar0);
-        voltQueueSQL(countstar1, p1);
-        voltQueueSQL(countstar2, p1, p2);
+    public final SQLStmt countstar0 = new SQLStmt("SELECT COUNT(*) FROM T2 WHERE UNAME = ? AND POINTS < ?");
+    public final SQLStmt countstar1 = new SQLStmt("SELECT COUNT(*) FROM T2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?");
+
+    public VoltTable[] run(int p1, int p2, String p3) {
+
+        // multi column indexes
+        voltQueueSQL(countstar0, p3, p2);
+        voltQueueSQL(countstar1, p3, p1, p2);
+
         return voltExecuteSQL();
     }
 

@@ -130,19 +130,16 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         AbstractExpression predicateExpr = child.getPredicate();
         ArrayList<AbstractExpression> subEndExpr = null;
         if (endExpr != null) {
-            System.err.println("End Expression:\n" + endExpr);
             subEndExpr = endExpr.findAllSubexpressionsOfClass(TupleValueExpression.class);
         }
 
         assert(predicateExpr != null);
-        System.err.println("Post Expression:\n" + predicateExpr);
         ArrayList<AbstractExpression> hasLeft = predicateExpr.findAllSubexpressionsOfClass(TupleValueExpression.class);
 
         Set<String> columnsLeft = new HashSet<String>();
         for (AbstractExpression ae: hasLeft) {
             TupleValueExpression tve = (TupleValueExpression) ae;
             columnsLeft.add(tve.getColumnName());
-            System.err.println("predicate columns:" + tve.getColumnName());
         }
 
         if (endExpr != null && subEndExpr != null) {
@@ -168,7 +165,6 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
             String colName = cr.getColumn().getName();
             if (columnsLeft.contains(colName)) {
                 columnsLeft.remove(colName);
-                System.err.println("SearchKey Column removed:" + colName);
             }
         }
 

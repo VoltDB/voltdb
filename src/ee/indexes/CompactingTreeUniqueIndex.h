@@ -249,10 +249,10 @@ public:
 
         printf ("Search KEY: '%s'", searchKey->debugNoHeader().c_str());
         m_tmp1.setFromKey(searchKey);
-        if (hasKey(searchKey)) {
-            printf("<Tree Unique-map>getCounterGET--- has searchKey !!!--- \n");
-            return m_entries.rankAsc(m_tmp1);
-        }
+//        if (hasKey(searchKey)) {
+//            printf("<Tree Unique-map>getCounterGET--- has searchKey !!!--- \n");
+//            return m_entries.rankAsc(m_tmp1);
+//        }
 
         m_keyIter = m_entries.lowerBound(m_tmp1);
         //printf("<getCounterGET> Lowbound of the search key is %s", m_keyIter.key().debug(searchKey->getSchema()));
@@ -283,19 +283,16 @@ public:
         }
 
         int cmp = m_eq(m_tmp1, m_keyIter.key());
-        printf("cmp value: %d\n", cmp);
+        printf("<unique map>cmp value: %d\n", cmp);
 
+        KeyType tmpKey = m_keyIter.key();
         if (cmp == 0) {
-            KeyType tmpKey = m_keyIter.key();
             m_keyIter.movePrev();
-            if (m_keyIter.isEnd()) {
-                return m_entries.rankAsc(tmpKey);
-            } else {
+            if (m_keyIter.isEnd() == false)
                 return m_entries.rankAsc(m_keyIter.key());
-            }
-        } else {
-            return m_entries.rankAsc(m_tmp1);
         }
+        // return rank with the current key if equal or if we can not find a previous key
+        return m_entries.rankAsc(tmpKey);
     }
 
     size_t getSize() const { return static_cast<size_t>(m_entries.size()); }

@@ -227,34 +227,49 @@ public:
 
     int32_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
-        printf("<Tree Multimap---getUpperCounterGET> \n");
+        printf("<Tree Multimap---getCounterGET> \n");
 
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
-        int cmp = m_eq(m_seqIter.key(), m_tmp1);
-        if (cmp < 0) {
+
+        if (m_seqIter.isEnd()) {
             return m_entries.size() + 1;
-        }
-        if (isUpper) {
-            return m_entries.rankUpper(m_seqIter.key());
         } else {
-            return m_entries.rankAsc(m_seqIter.key());
+            if (isUpper) {
+                return m_entries.rankUpper(m_seqIter.key());
+            } else {
+                return m_entries.rankAsc(m_seqIter.key());
+            }
         }
     }
     int32_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
         printf("<Tree Multimap---getCounterLET> \n");
+
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
-        int cmp = m_eq(m_seqIter.key(), m_tmp1);
-        if (cmp < 0) {
-            return m_entries.size() + 1;
+
+        int cmp = m_eq(m_tmp1, m_seqIter.key());
+        printf("<multi map>cmp value: %d\n", cmp);
+        if (m_seqIter.isEnd()) {
+            return m_entries.size();
         }
-        if (isUpper) {
-            return m_entries.rankUpper(m_seqIter.key());
-        } else {
-            return m_entries.rankAsc(m_seqIter.key());
+        // TODO(xin): I need to fix this function
+       /*
+        KeyType tmpKey = m_seqIter.key();
+        if (cmp == 0) {
+            m_seqIter.movePre();
+            if (m_seqIter.isEnd() == false) {
+                if (isUpper) return m_entries.rankUpper(m_seqIter.key());
+                else return m_entries.rankAsc(m_seqIter.key());
+            }
         }
+        // return rank with the current key if equal or if we can not find a previous key
+        if (isUpper) return m_entries.rankUpper(tmpKey);
+        else return m_entries.rankAsc(tmpKey);
+        */
+        return -1;
+
     }
 
     size_t getSize() const { return m_entries.size(); }
