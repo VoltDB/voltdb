@@ -88,6 +88,7 @@ public class MpTerm implements Term
                 }
                 Sets.SetView<Long> added = Sets.difference(updatedLeaders, MpTerm.this.m_knownLeaders);
                 int newLeaders = added.size();
+                m_knownLeaders.clear();
                 m_knownLeaders.addAll(updatedLeaders);
                 m_mailbox.updateReplicas(leaders);
                 for (int i=0; i < newLeaders; i++) {
@@ -99,6 +100,8 @@ public class MpTerm implements Term
                 tmLog.info(m_whoami
                         + "MapCache change handler updating leader list to: "
                         + CoreUtils.hsIdCollectionToString(leaders));
+                m_knownLeaders.clear();
+                m_knownLeaders.addAll(updatedLeaders);
                 m_mailbox.updateReplicas(leaders);
             }
         }
