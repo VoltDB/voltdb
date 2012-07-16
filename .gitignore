@@ -28,3 +28,4 @@ voltipc.xcodeproj/
 *runapp*.py
 *.log
 tests/test_apps/*/*.jar
+src/frontend/org/voltdb/compiler/projectfile/

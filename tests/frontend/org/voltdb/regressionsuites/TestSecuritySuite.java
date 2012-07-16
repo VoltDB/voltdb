@@ -55,7 +55,7 @@ public class TestSecuritySuite extends RegressionSuite {
         super(name);
     }
 
-    public void testAuthentication() throws IOException {
+    public void xxxtestAuthentication() throws IOException {
         //Test failed auth
         this.m_username = "user1";
         this.m_password = "wrongpassword";
@@ -84,7 +84,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
     }
 
-    public void testSysprocAndAdhocPermissions() throws Exception {
+    public void xxxtestSysprocAndAdhocPermissions() throws Exception {
         Client client;
         boolean exceptionThrown;
         VoltTable modCount;
@@ -146,7 +146,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(results.length == 1);
     }
 
-    public void testProcedurePermissions() throws Exception {
+    public void xxxtestProcedurePermissions() throws Exception {
         Client client;
         boolean exceptionThrown;
 
@@ -224,7 +224,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
     }
 
-    public void testAllowedExportConnectorPermissions() throws ExportClientException {
+    public void xxxtestAllowedExportConnectorPermissions() throws ExportClientException {
         // user1 can connect (in groups list)
         ExportTestClient eclient = new ExportTestClient(1, port(0));
         eclient.addCredentials("user1", "password");
@@ -235,7 +235,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void testRejectedExportConnectorPermissions() {
+    public void xxxtestRejectedExportConnectorPermissions() {
         boolean caught = false;
         ExportTestClient eclient = new ExportTestClient(1, port(0));
         try {
@@ -249,6 +249,36 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(caught);
 
         eclient.disconnect();
+    }
+
+    // Tests permissions applied to auto-generated default CRUD procedures.
+    public void testDefaultProcPermissions() throws Exception {
+        Client client;
+        boolean exceptionThrown;
+
+        // userWithDefaultProcPerm is allowed to invoke default CRUD procs
+        m_username = "userWithDefaultProcPerm";
+        client = getClient();
+        exceptionThrown = false;
+        try {
+            client.callProcedure("NEW_ORDER.insert", 100, 100, 100);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertFalse(exceptionThrown);
+
+        // userWithoutDefaultProcPerm is not allowed to invoke default CRUD procs
+        m_username = "userWithoutDefaultProcPerm";
+        client = getClient();
+        exceptionThrown = false;
+        try {
+            client.callProcedure("NEW_ORDER.insert", 101, 101, 101);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
     }
 
     /**
@@ -279,15 +309,19 @@ public class TestSecuritySuite extends RegressionSuite {
                 new UserInfo("user1", "password", new String[] {"group1"}),
                 new UserInfo("user2", "password", new String[] {"group2"}),
                 new UserInfo("user3", "password", new String[] {"group3"}),
-                new UserInfo("user4", "password", new String[] {"group4"})
+                new UserInfo("user4", "password", new String[] {"group4"}),
+                new UserInfo("userWithDefaultProcPerm", "password", new String[] {"groupWithDefaultProcPerm"}),
+                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWithoutDefaultProcPerm"})
         };
         project.addUsers(users);
 
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("group1", false, false),
-                new GroupInfo("group2", false, true),
-                new GroupInfo("group3", true, false),
-                new GroupInfo("group4", true, true)
+                new GroupInfo("group1", false, false, false),
+                new GroupInfo("group2", false, true, true),
+                new GroupInfo("group3", true, false, false),
+                new GroupInfo("group4", true, true, true),
+                new GroupInfo("groupWithDefaultProcPerm", false, false, true),
+                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false)
         };
         project.addGroups(groups);
         project.setSecurityEnabled(true);

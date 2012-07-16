@@ -190,8 +190,8 @@ public class TestVoltDB extends TestCase {
 
         project.setSecurityEnabled(true);
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false),
-                new GroupInfo("blah", false, false)
+                new GroupInfo("foo", false, false, false),
+                new GroupInfo("blah", false, false, false)
         };
         project.addGroups(groups);
         UserInfo users[] = new UserInfo[] {
@@ -232,8 +232,8 @@ public class TestVoltDB extends TestCase {
 
         project.setSecurityEnabled(true);
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false),
-                new GroupInfo("blah", false, false)
+                new GroupInfo("foo", false, false, false),
+                new GroupInfo("blah", false, false, false)
         };
         project.addGroups(groups);
         UserInfo users[] = new UserInfo[] {};
