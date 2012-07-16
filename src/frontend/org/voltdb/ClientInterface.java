@@ -162,7 +162,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     /**
      * The CIHM is unique to the connection and the ACG is shared by all connections
-     * serviced by the associated network thread
+     * serviced by the associated network thread. They are paired so as to only do a single
+     * lookup.
+     *
+     * The ? extends ugliness is due to the SnapshotDaemon having an ACG that is a noop
      */
     private final COWMap<Long, Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup>>
             m_connectionSpecificStuff =
@@ -186,6 +189,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
     };
 
+    /*
+     * A thread local is a convenient way to keep the ACG out of volt core. The lookup is paired
+     * with the CIHM in m_connectionSpecificStuff in fast path code.
+     *
+     * With these initial values if you have 16 hardware threads you will end up with 4  ACGs
+     * and 32 megs/4k transactions and double that with 32 threads.
+     */
     private final ThreadLocal<AdmissionControlGroup> m_acg = new ThreadLocal<AdmissionControlGroup>() {
         @Override
         public AdmissionControlGroup initialValue() {
@@ -424,6 +434,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                                         if (handler instanceof ClientInputHandler) {
                                             final Connection c = m_network.registerChannel(socket, handler, 0);
+                                            /*
+                                             * If IV2 is enabled the logic initially enabling read is
+                                             * in the started method of the InputHandler
+                                             */
                                             if (!VoltDB.instance().isIV2Enabled()) {
                                                 m_backpressureLock.lock();
                                                 try {
@@ -751,17 +765,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void stopping(Connection c) {
             m_connections.remove(c);
-            System.out.println("Running stopping");
         }
 
         @Override
         public void stopped(Connection c) {
             m_numConnections.decrementAndGet();
             m_initiator.removeConnectionStats(connectionId());
+            /*
+             * It's necessary to free all the resources held by the IV2 ACG tracking.
+             * Outstanding requests may actually still be at large
+             */
             if (VoltDB.instance().isIV2Enabled()) {
                 Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup> p =
                         m_connectionSpecificStuff.remove(connectionId());
-                new Throwable("Running stopped").printStackTrace();
                 ClientInterfaceHandleManager cihm = p.getFirst();
                 AdmissionControlGroup acg = p.getSecond();
                 cihm.freeOutstandingTxns(acg);
@@ -769,6 +785,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
+        /*
+         * Runnables from returned by offBackPressure and onBackPressure are used
+         * by the network when a specific connection signals backpressure
+         * as opposed to the more global backpressure signaled by an ACG. The runnables
+         * are only intended to enable/disable backpressure for the specific connection
+         */
         @Override
         public Runnable offBackPressure() {
             if (VoltDB.instance().isIV2Enabled()) {
@@ -821,6 +843,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             };
         }
 
+        /*
+         * Return a monitor for the number of outstanding bytes pending write to this network
+         * connection
+         */
         @Override
         public QueueMonitor writestreamMonitor() {
             if (VoltDB.instance().isIV2Enabled()) {
@@ -837,7 +863,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         /*
-         * IV2 versions of backpressure management invoked by AdmissionControlGroup
+         * IV2 versions of backpressure management invoked by AdmissionControlGroup while
+         * globally enabling/disabling backpressure.
          */
         @Override
         public void onBackpressure() {
@@ -1019,6 +1046,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_initiator = initiator;
         m_cartographer = cartographer;
 
+        /*
+         * For the snapshot daemon create a noop ACG because it is privileged
+         */
         m_connectionSpecificStuff.put(
                 m_snapshotDaemonAdapter.connectionId(),
                 Pair.of(

@@ -230,6 +230,7 @@ public class ClientInterfaceHandleManager
      * does the mapping to the resources allocated to it.
      */
     void freeOutstandingTxns(AdmissionControlGroup acg) {
+        assert(m_expectedThreadId == Thread.currentThread().getId());
         for (Pair<HandleGenerator, Deque<Iv2InFlight>> p : m_partitionStuff.values()) {
             for (Iv2InFlight inflight : p.getSecond()) {
                 acg.reduceBackpressure(inflight.m_messageSize);
