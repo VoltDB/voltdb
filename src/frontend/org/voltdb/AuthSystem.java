@@ -393,29 +393,31 @@ public class AuthSystem {
         }
     }
 
+    private final AuthUser m_authDisabledUser = new AuthUser(null, null, null, false, false) {
+        @Override
+        public boolean hasPermission(Procedure proc) {
+            return true;
+        }
+
+        @Override
+        public boolean hasAdhocPermission() {
+            return true;
+        }
+
+        @Override
+        public boolean hasSystemProcPermission() {
+            return true;
+        }
+
+        @Override
+        public boolean authorizeConnector(String connectorName) {
+            return true;
+        }
+    };
+
     AuthUser getUser(String name) {
         if (!m_enabled) {
-            return new AuthUser(null, null, null, false, false) {
-                @Override
-                public boolean hasPermission(Procedure proc) {
-                    return true;
-                }
-
-                @Override
-                public boolean hasAdhocPermission() {
-                    return true;
-                }
-
-                @Override
-                public boolean hasSystemProcPermission() {
-                    return true;
-                }
-
-                @Override
-                public boolean authorizeConnector(String connectorName) {
-                    return true;
-                }
-            };
+            return m_authDisabledUser;
         }
         return m_users.get(name);
     }

@@ -37,7 +37,7 @@ import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
-import java.util.concurrent.LinkedBlockingDeque;
+import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.ThreadFactory;
 import java.util.concurrent.TimeUnit;
@@ -159,8 +159,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * IV2 stuff
      */
     private final MapCacheReader m_iv2Masters;
-    private final COWMap<Long, ClientInterfaceHandleManager> m_ciHandles =
-            new COWMap<Long, ClientInterfaceHandleManager>();
+
+    /**
+     * The CIHM is unique to the connection and the ACG is shared by all connections
+     * serviced by the associated network thread
+     */
+    private final COWMap<Long, Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup>>
+            m_connectionSpecificStuff =
+                new COWMap<Long, Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup>>();
     private final Cartographer m_cartographer;
 
     /**
@@ -177,6 +183,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void onCompletion(AsyncCompilerResult result) {
             processFinishedCompilerWork(result);
+        }
+    };
+
+    private final ThreadLocal<AdmissionControlGroup> m_acg = new ThreadLocal<AdmissionControlGroup>() {
+        @Override
+        public AdmissionControlGroup initialValue() {
+            return new AdmissionControlGroup( 1024 * 1024 * 8, 1000);
         }
     };
 
@@ -410,19 +423,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         socket.socket().setKeepAlive(true);
 
                                         if (handler instanceof ClientInputHandler) {
-                                            Connection c = m_network.registerChannel(socket, handler, 0);
-                                            m_backpressureLock.lock();
-                                            try {
-                                                if (!m_hasDTXNBackPressure) {
-                                                    if (VoltDB.instance().isIV2Enabled()) {
-                                                        m_ciHandles.put(c.connectionId(),
-                                                                new ClientInterfaceHandleManager( m_isAdmin, c));
+                                            final Connection c = m_network.registerChannel(socket, handler, 0);
+                                            if (!VoltDB.instance().isIV2Enabled()) {
+                                                m_backpressureLock.lock();
+                                                try {
+                                                    if (!m_hasDTXNBackPressure) {
+                                                        c.enableReadSelection();
                                                     }
-                                                    c.enableReadSelection();
+                                                    m_connections.add(c);
+                                                } finally {
+                                                    m_backpressureLock.unlock();
                                                 }
-                                                m_connections.add(c);
-                                            } finally {
-                                                m_backpressureLock.unlock();
                                             }
                                         } else {
                                             m_network.registerChannel(socket, handler, SelectionKey.OP_READ);
@@ -672,7 +683,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     /** A port that reads client procedure invocations and writes responses */
-    public class ClientInputHandler extends VoltProtocolHandler {
+    public class ClientInputHandler extends VoltProtocolHandler implements AdmissionControlGroup.ACGMember {
         public static final int MAX_READ = 8192 * 4;
 
         private Connection m_connection;
@@ -726,22 +737,50 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         @Override
         public void started(final Connection c) {
             m_connection = c;
+            if (VoltDB.instance().isIV2Enabled()) {
+                m_connectionSpecificStuff.put(c.connectionId(),
+                        Pair.of(new ClientInterfaceHandleManager( m_isAdmin, c),
+                                m_acg.get()));
+                m_acg.get().addMember(this);
+                if (!m_acg.get().hasBackPressure()) {
+                    c.enableReadSelection();
+                }
+            }
         }
 
         @Override
         public void stopping(Connection c) {
             m_connections.remove(c);
-            m_ciHandles.remove(c.connectionId());
+            System.out.println("Running stopping");
         }
 
         @Override
         public void stopped(Connection c) {
             m_numConnections.decrementAndGet();
             m_initiator.removeConnectionStats(connectionId());
+            if (VoltDB.instance().isIV2Enabled()) {
+                Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup> p =
+                        m_connectionSpecificStuff.remove(connectionId());
+                new Throwable("Running stopped").printStackTrace();
+                ClientInterfaceHandleManager cihm = p.getFirst();
+                AdmissionControlGroup acg = p.getSecond();
+                cihm.freeOutstandingTxns(acg);
+                acg.removeMember(this);
+            }
         }
 
         @Override
         public Runnable offBackPressure() {
+            if (VoltDB.instance().isIV2Enabled()) {
+                return new Runnable() {
+                    @Override
+                    public void run() {
+                        if (!m_acg.get().hasBackPressure()) {
+                            m_connection.enableReadSelection();
+                        }
+                    }
+                };
+            }
             return new Runnable() {
                 @Override
                 public void run() {
@@ -764,6 +803,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public Runnable onBackPressure() {
+            if (VoltDB.instance().isIV2Enabled()) {
+                new Runnable() {
+                    @Override
+                    public void run() {
+                        m_connection.disableReadSelection();
+                    }
+                };
+            }
             return new Runnable() {
                 @Override
                 public void run() {
@@ -776,7 +823,30 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public QueueMonitor writestreamMonitor() {
+            if (VoltDB.instance().isIV2Enabled()) {
+                return new QueueMonitor() {
+
+                    @Override
+                    public boolean queue(int bytes) {
+                        return m_acg.get().queue(bytes);
+                    }
+
+                };
+            }
             return m_clientQueueMonitor;
+        }
+
+        /*
+         * IV2 versions of backpressure management invoked by AdmissionControlGroup
+         */
+        @Override
+        public void onBackpressure() {
+            m_connection.disableReadSelection();
+        }
+
+        @Override
+        public void offBackpressure() {
+            m_connection.enableReadSelection();
         }
     }
 
@@ -848,7 +918,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean allowMismatchedResults)
     {
         if (VoltDB.instance().isIV2Enabled()) {
-            final ClientInterfaceHandleManager cihm = m_ciHandles.get(connectionId);
+            Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup> p =
+                    m_connectionSpecificStuff.get(connectionId);
+            final AdmissionControlGroup acg = p.getSecond();
+            final ClientInterfaceHandleManager cihm = p.getFirst();
+
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
                     messageSize, now);
             try {
@@ -866,7 +940,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else {
                     initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
                 }
-
+                acg.increaseBackpressure(messageSize);
                 Iv2InitiateTaskMessage workRequest =
                     new Iv2InitiateTaskMessage(m_siteId,
                             initiatorHSId,
@@ -944,9 +1018,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_initiator = initiator;
         m_cartographer = cartographer;
 
-        m_ciHandles.put(
+        m_connectionSpecificStuff.put(
                 m_snapshotDaemonAdapter.connectionId(),
-                new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter));
+                Pair.of(
+                        new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter),
+                        new AdmissionControlGroup(Integer.MAX_VALUE, Integer.MAX_VALUE) {
+                            @Override
+                            public void increaseBackpressure(int messageSize) {}
+                            @Override
+                            public void reduceBackpressure(int messageSize) {}
+                            @Override
+                            public boolean queue(int bytes) { return false; }
+                        }));
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
         m_acceptor = new ClientAcceptor(port, messenger.getNetwork(), false);
@@ -955,7 +1038,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         registerPolicies(replicationRole);
 
         m_mailbox = new LocalMailbox(VoltDB.instance().getHostMessenger()) {
-            LinkedBlockingDeque<VoltMessage> m_d = new LinkedBlockingDeque<VoltMessage>();
+            LinkedBlockingQueue<VoltMessage> m_d = new LinkedBlockingQueue<VoltMessage>();
             @Override
             public void deliver(final VoltMessage message) {
                 if (VoltDB.instance().isIV2Enabled()) {
@@ -963,9 +1046,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         // forward response; copy is annoying. want slice of response.
                         final InitiateResponseMessage response = (InitiateResponseMessage)message;
                         Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
-                        final ClientInterfaceHandleManager cihm = m_ciHandles.get(response.getClientConnectionId());
+                        Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup> p =
+                                m_connectionSpecificStuff.get(response.getClientConnectionId());
                         //Can be null on hangup
-                        if (cihm != null) {
+                        if (p != null) {
+                            final ClientInterfaceHandleManager cihm = p.getFirst();
+                            final AdmissionControlGroup acg = p.getSecond();
                             //Pass it to the network thread like a ninja
                             //Only the network can use the CIHM
                             cihm.connection.writeStream().enqueue(
@@ -976,6 +1062,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                 throws IOException {
                                             ClientInterfaceHandleManager.Iv2InFlight clientData =
                                                     cihm.findHandle(response.getClientInterfaceHandle());
+                                            acg.reduceBackpressure(clientData.m_messageSize);
                                             response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
                                             final long now = System.currentTimeMillis();
                                             final int delta = (int)(now - clientData.m_creationTime);
@@ -2071,10 +2158,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Map<Long, long[]> inflight_txn_stats;
         if (VoltDB.instance().isIV2Enabled()) {
             inflight_txn_stats = new HashMap<Long, long[]>();
-            for (Map.Entry<Long, ClientInterfaceHandleManager> e : m_ciHandles.entrySet()) {
+            for (Map.Entry<Long, Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup>> e :
+                    m_connectionSpecificStuff.entrySet()) {
                 long values[] = new long[2];
-                values[0] = e.getValue().isAdmin ? 1 : 0;
-                values[1] = e.getValue().getOutstandingTxns();
+                values[0] = e.getValue().getFirst().isAdmin ? 1 : 0;
+                values[1] = e.getValue().getFirst().getOutstandingTxns();
                 inflight_txn_stats.put(e.getKey(), values);
             }
         } else {

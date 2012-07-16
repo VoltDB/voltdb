@@ -164,6 +164,7 @@ public class AsyncBenchmark {
         this.config = config;
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
+        clientConfig.setMaxOutstandingTxns(Integer.MAX_VALUE);
         if (config.autotune) {
             clientConfig.enableAutoTune();
             clientConfig.setAutoTuneTargetInternalLatency(config.latencytarget);
