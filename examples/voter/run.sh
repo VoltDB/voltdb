@@ -79,8 +79,8 @@ function async-benchmark() {
         --servers=localhost:21212 \
         --contestants=6 \
         --maxvotes=2 \
-        --ratelimit=900000 \
-        --autotune=false \
+        --ratelimit=100000 \
+        --autotune=true \
         --latencytarget=6
 }
 
