@@ -256,7 +256,7 @@ public class ExecutionEngineJNI extends ExecutionEngine {
             final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException
     {
         // plan frag zero is invalid
-        assert((planFragmentIds.length == 0) || (planFragmentIds[0] != 0));
+        assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
 
         if (numFragmentIds == 0) return new VoltTable[0];
         final int batchSize = numFragmentIds;
