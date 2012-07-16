@@ -17,6 +17,12 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.CountDownLatch;
+
+import java.util.List;
+
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+
 import org.voltcore.messaging.HostMessenger;
 
 import org.voltdb.VoltZK;
@@ -43,4 +49,25 @@ public class SpInitiator extends BaseInitiator
     {
         return true;
     }
+
+    @Override
+    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
+            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            String zkMapCacheNode, String whoami)
+    {
+        return new SpTerm(missingStartupSites, zk,
+                partitionId, initiatorHSId, mailbox,
+                zkMapCacheNode, whoami);
+    }
+
+    @Override
+    public RepairAlgo createPromoteAlgo(List<Long> survivors, ZooKeeper zk,
+            int partitionId, InitiatorMailbox mailbox,
+            String zkMapCacheNode, String whoami)
+    {
+        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
+                m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
+    }
+
+
 }

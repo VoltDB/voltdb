@@ -25,7 +25,6 @@ import java.util.concurrent.ExecutionException;
 
 import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -54,7 +53,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     protected final HostMessenger m_messenger;
     protected final int m_partitionId;
     private CountDownLatch m_missingStartupSites;
-    private final String m_zkMailboxNode;
+    protected final String m_zkMailboxNode;
     protected final String m_whoami;
 
     // Encapsulated objects
@@ -172,16 +171,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         return isLeader;
     }
 
-    @Override
-    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
-    {
-        return new SpTerm(missingStartupSites, zk,
-                partitionId, initiatorHSId, mailbox,
-                zkMapCacheNode, whoami);
-    }
-
     // runs on the leader elector callback thread.
     @Override
     public void becomeLeader()
@@ -201,9 +190,10 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                             m_zkMailboxNode, m_whoami);
                 }
                 else {
-                    repair = new SpPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
+                    repair = createPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
                             m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
                 }
+
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
                 success = repair.start().get();
