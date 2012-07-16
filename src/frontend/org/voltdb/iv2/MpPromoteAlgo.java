@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 import java.util.Comparator;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.HashMap;
 import java.util.List;
@@ -122,9 +121,9 @@ public class MpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami, List<Long> survivors)
+    public MpPromoteAlgo(List<Long> survivors, ZooKeeper zk,
+            int partitionId, InitiatorMailbox mailbox,
+            String zkMapCacheNode, String whoami)
     {
         m_survivors = new ArrayList<Long>(survivors);
         m_zk = zk;
