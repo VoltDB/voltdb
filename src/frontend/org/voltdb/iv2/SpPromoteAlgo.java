@@ -44,7 +44,7 @@ import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
 
-public class SpRepairAlgo implements RepairAlgo
+public class SpPromoteAlgo implements RepairAlgo
 {
     VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
@@ -123,7 +123,7 @@ public class SpRepairAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public SpRepairAlgo(List<Long> survivors, ZooKeeper zk,
+    public SpPromoteAlgo(List<Long> survivors, ZooKeeper zk,
             int partitionId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {

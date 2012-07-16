@@ -202,7 +202,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                             m_zkMailboxNode, m_whoami);
                 }
                 else {
-                    repair = new SpRepairAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
+                    repair = new SpPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
                             m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
                 }
                 m_initiatorMailbox.setRepairAlgo(repair);

@@ -59,7 +59,7 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testUnion() throws Exception
     {
-        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -81,7 +81,7 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testStaleResponse() throws Exception
     {
-        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
         term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
         assertEquals(0L, term.m_repairLogUnion.size());
     }
@@ -92,22 +92,22 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testRepairLogsAreComplete()
     {
-        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
-        SpRepairAlgo.ReplicaRepairStruct notDone1 = new SpRepairAlgo.ReplicaRepairStruct();
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo.ReplicaRepairStruct notDone1 = new SpPromoteAlgo.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
         assertTrue(notDone1.logsComplete() != 0);
 
-        SpRepairAlgo.ReplicaRepairStruct notDone2 = new SpRepairAlgo.ReplicaRepairStruct();
+        SpPromoteAlgo.ReplicaRepairStruct notDone2 = new SpPromoteAlgo.ReplicaRepairStruct();
         notDone2.m_receivedResponses = 0;
         notDone2.m_expectedResponses = 10;
 
-        SpRepairAlgo.ReplicaRepairStruct done1 = new SpRepairAlgo.ReplicaRepairStruct();
+        SpPromoteAlgo.ReplicaRepairStruct done1 = new SpPromoteAlgo.ReplicaRepairStruct();
         done1.m_receivedResponses = 5;
         done1.m_expectedResponses = 5;
         assertTrue(done1.logsComplete() == 0);
 
-        SpRepairAlgo.ReplicaRepairStruct done2 = new SpRepairAlgo.ReplicaRepairStruct();
+        SpPromoteAlgo.ReplicaRepairStruct done2 = new SpPromoteAlgo.ReplicaRepairStruct();
         done2.m_receivedResponses = 10;
         done2.m_expectedResponses = 10;
 
@@ -137,18 +137,18 @@ public class TestSpRepairAlgo extends TestCase
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
 
         // missing 4, 5
-        SpRepairAlgo.ReplicaRepairStruct r1 = new SpRepairAlgo.ReplicaRepairStruct();
+        SpPromoteAlgo.ReplicaRepairStruct r1 = new SpPromoteAlgo.ReplicaRepairStruct();
         r1.m_maxSpHandleSeen = 3L;
 
         // complete
-        SpRepairAlgo.ReplicaRepairStruct r2 = new SpRepairAlgo.ReplicaRepairStruct();
+        SpPromoteAlgo.ReplicaRepairStruct r2 = new SpPromoteAlgo.ReplicaRepairStruct();
         r2.m_maxSpHandleSeen = 5L;
 
         // missing 3, 4, 5
-        SpRepairAlgo.ReplicaRepairStruct r3 = new SpRepairAlgo.ReplicaRepairStruct();
+        SpPromoteAlgo.ReplicaRepairStruct r3 = new SpPromoteAlgo.ReplicaRepairStruct();
         r3.m_maxSpHandleSeen = 2L;
 
         term.m_replicaRepairStructs.put(1L, r1);
@@ -190,10 +190,10 @@ public class TestSpRepairAlgo extends TestCase
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
 
         // missing 3, 4, 5
-        SpRepairAlgo.ReplicaRepairStruct r3 = new SpRepairAlgo.ReplicaRepairStruct();
+        SpPromoteAlgo.ReplicaRepairStruct r3 = new SpPromoteAlgo.ReplicaRepairStruct();
         r3.m_maxSpHandleSeen = 2L;
 
         term.m_replicaRepairStructs.put(3L, r3);
@@ -230,7 +230,7 @@ public class TestSpRepairAlgo extends TestCase
 
         // Stub some portions of a concrete Term instance - this is the
         // object being tested.
-        final SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test") {
+        final SpPromoteAlgo term = new SpPromoteAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test") {
             // there aren't replicas to ask for repair logs
             @Override
             void prepareForFaultRecovery() {
