@@ -35,6 +35,9 @@ import org.voltcore.logging.VoltLogger;
  */
 public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
 {
+    private static final VoltLogger networkLog = new VoltLogger("NETWORK");
+
+
     /*
      * Maximum values for each group are configured when the group is constructed
      */
@@ -46,6 +49,13 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     private int m_pendingTxnCount = 0;
     private long m_pendingTxnBytes = 0;
     private boolean m_hadBackPressure = false;
+
+    /*
+     * If for some reason ACG logs a negative transaction count or outstanding bytes,
+     * only do it once to avoid flooding. Not going to make it a fatal error, but
+     * don't want it to fail silently either.
+     */
+    private boolean m_haveLoggedACGNegativeFailure = false;
 
     /*
      * The ACG is accessed lock free from the network thread that owns the group.
@@ -93,8 +103,12 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     public void increaseBackpressure(int messageSize)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
+        if (messageSize < 1) {
+            throw new IllegalArgumentException("Message size must be > 0 but was " + messageSize);
+        }
         m_pendingTxnBytes += messageSize;
         m_pendingTxnCount++;
+        checkAndLogInvariants();
         if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
             if (!m_hadBackPressure) {
                 hostLog.debug("TXN back pressure began");
@@ -107,6 +121,41 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     }
 
     /*
+     * Check that various invariants are maintained. If they aren't log the error at most once,
+     * and take corrective action to maintain the invariants
+     */
+    private void checkAndLogInvariants() {
+        if (m_pendingTxnCount < 0 || m_pendingTxnBytes < 0) {
+            boolean badTxnCount = m_pendingTxnCount < 0 ? true : false;
+            boolean badPendingBytes = m_pendingTxnBytes < 0 ? true : false;
+            if (!m_haveLoggedACGNegativeFailure) {
+                m_haveLoggedACGNegativeFailure = true;
+                if (badTxnCount) {
+                    networkLog.error("Admission control error, negative outstanding transaction count. " +
+                            "This is error is not fatal, but it does indicate that admission control " +
+                            "is not correctly tracking transaction resource usage. This message will not repeat " +
+                            "the next time the condition occurs to avoid log spam");
+                }
+                if (badPendingBytes) {
+                    networkLog.error("Admission control error, negative outstanding transaction byte count (" +
+                            m_pendingTxnBytes + "). " +
+                            "This is error is not fatal, but it does indicate that admission control " +
+                            "is not correctly tracking transaction resource usage. This message will not repeat " +
+                            "the next time the condition occurs to avoid log spam");
+                }
+            }
+
+            /*
+             * Repair both. It's possible that repairing it will trigger a repair cascade
+             * effectively rendering the ACG always permissive, but it should right itself
+             * once all requests associated with the ACG have left the system and the correct values are indeed 0.
+             */
+            m_pendingTxnCount = 0;
+            m_pendingTxnBytes = 0;
+        }
+    }
+
+    /*
      * Invoked when receiving a response to a transaction. Decrements pending txn count in addition
      * to tracking the number of request bytes accepted. Can invoke offBackpressure
      * on all group members if there is a backpressure condition that has ended
@@ -114,8 +163,12 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     public void reduceBackpressure(int messageSize)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());
+        if (messageSize < 1) {
+            throw new IllegalArgumentException("Message size must be > 0 but was " + messageSize);
+        }
         m_pendingTxnBytes -= messageSize;
         m_pendingTxnCount--;
+        checkAndLogInvariants();
         if (m_pendingTxnBytes < (MAX_DESIRED_PENDING_BYTES * .8) &&
             m_pendingTxnCount < (MAX_DESIRED_PENDING_TXNS * .8))
         {
@@ -150,6 +203,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     public boolean queue(int bytes) {
         if (bytes > 0) {
             m_pendingTxnBytes += bytes;
+            checkAndLogInvariants();
             if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES) {
                 if (!m_hadBackPressure) {
                     hostLog.debug("TXN back pressure began");
@@ -161,6 +215,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
             }
         } else {
             m_pendingTxnBytes += bytes;
+            checkAndLogInvariants();
             if (m_pendingTxnBytes < (MAX_DESIRED_PENDING_BYTES * .8)) {
                 if (m_hadBackPressure) {
                     hostLog.debug("TXN backpressure ended");
