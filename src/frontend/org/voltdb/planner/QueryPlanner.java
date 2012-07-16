@@ -36,10 +36,10 @@ import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.utils.BuildDirectoryUtils;
 
 /**
- * The query planner accepts catalog data, SQL statements from the catalog, then
- * outputs the plan with the lowest cost according to the cost model.
- *
- */
+* The query planner accepts catalog data, SQL statements from the catalog, then
+* outputs the plan with the lowest cost according to the cost model.
+*
+*/
 public class QueryPlanner {
     PlanAssembler m_assembler;
     HSQLInterface m_HSQL;
@@ -51,14 +51,14 @@ public class QueryPlanner {
     final boolean m_fullDebug;
 
     /**
-     * Initialize planner with physical schema info and a reference to HSQLDB parser.
-     *
-     * @param catalogCluster Catalog info about the physical layout of the cluster.
-     * @param catalogDb Catalog info about schema, metadata and procedures.
-     * @param partitioning Describes the specified and inferred partition context.
-     * @param HSQL HSQLInterface pointer used for parsing SQL into XML.
-     * @param useGlobalIds
-     */
+* Initialize planner with physical schema info and a reference to HSQLDB parser.
+*
+* @param catalogCluster Catalog info about the physical layout of the cluster.
+* @param catalogDb Catalog info about schema, metadata and procedures.
+* @param partitioning Describes the specified and inferred partition context.
+* @param HSQL HSQLInterface pointer used for parsing SQL into XML.
+* @param useGlobalIds
+*/
     public QueryPlanner(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning,
                         HSQLInterface HSQL, DatabaseEstimates estimates,
                         boolean suppressDebugOutput) {
@@ -71,24 +71,24 @@ public class QueryPlanner {
         m_db = catalogDb;
         m_cluster = catalogCluster;
         m_estimates = estimates;
-       // m_quietPlanner = suppressDebugOutput;
-       // m_fullDebug = System.getProperties().contains("compilerdebug");
+//        m_quietPlanner = suppressDebugOutput;
+//        m_fullDebug = System.getProperties().contains("compilerdebug");
         m_quietPlanner = false;
         m_fullDebug = true;
     }
 
     /**
-     * Get the best plan for the SQL statement given, assuming the given costModel.
-     *
-     * @param costModel The current cost model to evaluate plans with.
-     * @param sql SQL stmt text to be planned.
-     * @param sql Suggested join order to be used for the query
-     * @param stmtName The name of the sql statement to be planned.
-     * @param procName The name of the procedure containing the sql statement to be planned.
-     * @param singlePartition Is the stmt single-partition?
-     * @param paramHints
-     * @return The best plan found for the SQL statement or null if none can be found.
-     */
+* Get the best plan for the SQL statement given, assuming the given costModel.
+*
+* @param costModel The current cost model to evaluate plans with.
+* @param sql SQL stmt text to be planned.
+* @param sql Suggested join order to be used for the query
+* @param stmtName The name of the sql statement to be planned.
+* @param procName The name of the procedure containing the sql statement to be planned.
+* @param singlePartition Is the stmt single-partition?
+* @param paramHints
+* @return The best plan found for the SQL statement or null if none can be found.
+*/
     public CompiledPlan compilePlan(
             AbstractCostModel costModel,
             String sql,
@@ -145,7 +145,6 @@ public class QueryPlanner {
         // get ready to find the plan with minimal cost
         CompiledPlan rawplan = null;
         CompiledPlan bestPlan = null;
-        Object bestPartitioningKey = null;
         String bestFilename = null;
         double minCost = Double.MAX_VALUE;
 
@@ -154,7 +153,7 @@ public class QueryPlanner {
 
         PlanStatistics stats = null;
 
-        {   // XXX: remove this brace and reformat the code when ready to open a whole new can of whitespace diffs.
+        { // XXX: remove this brace and reformat the code when ready to open a whole new can of whitespace diffs.
             // set up the plan assembler for this statement
             m_assembler.setupForNewPlans(parsedStmt);
 
@@ -206,7 +205,6 @@ public class QueryPlanner {
                         // free the PlanColumns held by the previous best plan
                         bestPlan = plan;
                         bestFilename = filename;
-                        bestPartitioningKey = plan.getPartitioningKey();
                     }
 
                     if (!m_quietPlanner) {
@@ -220,7 +218,7 @@ public class QueryPlanner {
                     }
                 }
             }
-        }   // XXX: remove this brace and reformat the code when ready to open a whole new can of whitespace diffs.
+        } // XXX: remove this brace and reformat the code when ready to open a whole new can of whitespace diffs.
 
         // make sure we got a winner
         if (bestPlan == null) {
@@ -249,18 +247,15 @@ public class QueryPlanner {
                 "This is statement not supported at this time.";
             return null;
         }
-        // Restore the result partitioning key to correspond to its setting for the best plan.
-        // This writable state is shared by m_assembler and the caller.
-        m_assembler.resetPartitioningKey(bestPartitioningKey);
         return bestPlan;
     }
 
     /**
-     * @param stmtName
-     * @param procName
-     * @param plan
-     * @param filename
-     */
+* @param stmtName
+* @param procName
+* @param plan
+* @param filename
+*/
     private void outputExplainedPlan(String stmtName, String procName, CompiledPlan plan, String filename) {
         BuildDirectoryUtils.writeFile("statement-all-plans/" + procName + "_" + stmtName,
                                       filename + ".txt",
@@ -268,32 +263,32 @@ public class QueryPlanner {
     }
 
     /**
-     * @param stmtName
-     * @param procName
-     * @param parsedStmt
-     */
+* @param stmtName
+* @param procName
+* @param parsedStmt
+*/
     private void outputParsedStatement(String stmtName, String procName, AbstractParsedStmt parsedStmt) {
         // output a description of the parsed stmt
         BuildDirectoryUtils.writeFile("statement-parsed", procName + "_" + stmtName + ".txt", parsedStmt.toString());
     }
 
     /**
-     * @param stmtName
-     * @param procName
-     * @param xmlSQL
-     */
+* @param stmtName
+* @param procName
+* @param xmlSQL
+*/
     private void outputCompiledStatement(String stmtName, String procName, VoltXMLElement xmlSQL) {
         // output the xml from hsql to disk for debugging
         BuildDirectoryUtils.writeFile("statement-hsql-xml", procName + "_" + stmtName + ".xml", xmlSQL.toString());
     }
 
     /**
-     * @param plan
-     * @param planGraph
-     * @param stmtName
-     * @param procName
-     * @param filename
-     */
+* @param plan
+* @param planGraph
+* @param stmtName
+* @param procName
+* @param filename
+*/
     private void outputPlanFullDebug(CompiledPlan plan, AbstractPlanNode planGraph, String stmtName, String procName, String filename) {
         // GENERATE JSON DEBUGGING OUTPUT BEFORE WE CLEAN UP THE
         // PlanColumns
@@ -340,9 +335,9 @@ public class QueryPlanner {
     }
 
     /**
-     * @param filename
-     * @param filenameRenamed
-     */
+* @param filename
+* @param filenameRenamed
+*/
     private void renameFile(String filename, String filenameRenamed) {
         File file;
         File fileRenamed;
@@ -352,11 +347,11 @@ public class QueryPlanner {
     }
 
     /**
-     * @param stmtName
-     * @param procName
-     * @param bestFilename
-     * @param stats
-     */
+* @param stmtName
+* @param procName
+* @param bestFilename
+* @param stats
+*/
     private void finalizeOutput(String stmtName, String procName, String bestFilename, PlanStatistics stats) {
         // find out where debugging is going
         String prefix = BuildDirectoryUtils.getBuildDirectoryPath() +
