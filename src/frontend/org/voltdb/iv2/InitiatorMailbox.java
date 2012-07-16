@@ -38,6 +38,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheReader;
 
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
@@ -266,15 +267,19 @@ public class InitiatorMailbox implements Mailbox
 
     /**
      * Create a real repair message from the msg repair log contents and
-     * instruct the message handler to execute a repair.
+     * instruct the message handler to execute a repair. Single partition
+     * work needs to do duplicate counting; MPI can simply broadcast the
+     * repair to the needs repair units -- where the SP will do the rest.
      */
-    void repairReplicasWith(List<Long> needsRepair, Iv2RepairLogResponseMessage msg)
+    void repairReplicasWith(List<Long> needsRepair, VoltMessage repairWork)
     {
-        VoltMessage repairWork = msg.getPayload();
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
             m_msgHandler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
+        }
+        else if (repairWork instanceof CompleteTransactionMessage) {
+            send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
         }
     }
 
