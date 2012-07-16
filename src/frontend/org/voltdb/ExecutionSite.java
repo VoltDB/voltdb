@@ -2659,7 +2659,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     // find the txn id visible to the proc
                     long txnId = txnState.txnId;
                     StoredProcedureInvocation invocation = txnState.getInvocation();
-                    if ((invocation != null) && (invocation.getType() == ProcedureInvocationType.REPLICATED)) {
+                    // this can't be null, initiate task must have an invocation
+                    if (invocation == null) {
+                        VoltDB.crashLocalVoltDB("Initiate task " + txnId + " missing invocation", false, null);
+                    }
+                    if ((invocation.getType() == ProcedureInvocationType.REPLICATED)) {
                         txnId = invocation.getOriginalTxnId();
                     }
 

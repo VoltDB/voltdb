@@ -568,8 +568,11 @@ void VoltDBIPC::executePlanFragments(struct ipc_command *cmd) {
 
             deserializeParameterSetCommon(cnt, serialize_in, params, pool);
             m_engine->setUsedParamcnt(cnt);
-            if (m_engine->executeQuery(ntohll(fragmentId[i]), 1, ntohll(inputDepId[i]),
-                                       params, ntohll(queryCommand->txnId),
+            if (m_engine->executeQuery(ntohll(fragmentId[i]),
+                                       1,
+                                       (int32_t)(ntohll(inputDepId[i])), // Java sends int64 but EE wants int32
+                                       params,
+                                       ntohll(queryCommand->txnId),
                                        ntohll(queryCommand->lastCommittedTxnId),
                                        i == 0 ? true : false, //first
                                        i == numFrags - 1 ? true : false)) { //last
