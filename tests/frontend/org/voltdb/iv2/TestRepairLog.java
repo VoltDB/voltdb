@@ -92,7 +92,7 @@ public class TestRepairLog extends TestCase
         rl.deliver(m1);
         rl.deliver(m2);
 
-        List<RepairLog.Item> contents = rl.contents();
+        List<RepairLog.Item> contents = rl.contents(false);
         assertEquals(2, contents.size());
         assertEquals(m1, contents.get(0).getMessage());
         assertEquals(m2, contents.get(1).getMessage());
@@ -106,21 +106,21 @@ public class TestRepairLog extends TestCase
         // add m1
         VoltMessage m1 = truncInitMsg(0L, 1L);
         rl.deliver(m1);
-        assertEquals(1, rl.contents().size());
+        assertEquals(1, rl.contents(false).size());
 
         // add m2
         VoltMessage m2 = truncInitMsg(0L, 2L);
         rl.deliver(m2);
-        assertEquals(2, rl.contents().size());
+        assertEquals(2, rl.contents(false).size());
 
         // trim m1. add m3
         VoltMessage m3 = truncInitMsg(1L, 3L);
         rl.deliver(m3);
-        assertEquals(2, rl.contents().size());
-        assertEquals(m2, rl.contents().get(0).getMessage());
-        assertEquals(2L, rl.contents().get(0).getHandle());
-        assertEquals(m3, rl.contents().get(1).getMessage());
-        assertEquals(3L, rl.contents().get(1).getHandle());
+        assertEquals(2, rl.contents(false).size());
+        assertEquals(m2, rl.contents(false).get(0).getMessage());
+        assertEquals(2L, rl.contents(false).get(0).getHandle());
+        assertEquals(m3, rl.contents(false).get(1).getMessage());
+        assertEquals(3L, rl.contents(false).get(1).getHandle());
 
     }
 
@@ -134,9 +134,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(new FooMessage());
         VoltMessage m2 = truncInitMsg(0L, 2L);
         rl.deliver(m2);
-        assertEquals(2, rl.contents().size());
-        assertEquals(m1, rl.contents().get(0).getMessage());
-        assertEquals(m2, rl.contents().get(1).getMessage());
+        assertEquals(2, rl.contents(false).size());
+        assertEquals(m1, rl.contents(false).get(0).getMessage());
+        assertEquals(m2, rl.contents(false).get(1).getMessage());
     }
 
     @Test
@@ -147,25 +147,25 @@ public class TestRepairLog extends TestCase
         // trunc(trunc point, txnId).
         VoltMessage m1 = truncFragMsg(0L, 1L);
         rl.deliver(m1);
-        assertEquals(1, rl.contents().size());
+        assertEquals(1, rl.contents(false).size());
 
         VoltMessage m2 = truncFragMsg(0L, 2L);
         rl.deliver(m2);
-        assertEquals(2, rl.contents().size());
+        assertEquals(2, rl.contents(false).size());
 
         // only the first message for a transaction is logged.
         VoltMessage m2b = truncFragMsg(0L, 2L);
         rl.deliver(m2b);
-        assertEquals(2, rl.contents().size());
+        assertEquals(2, rl.contents(false).size());
 
         // trim m1. add m3
         VoltMessage m3 = truncFragMsg(1L, 3L);
         rl.deliver(m3);
-        assertEquals(2, rl.contents().size());
-        assertEquals(m2, rl.contents().get(0).getMessage());
-        assertEquals(2L, rl.contents().get(0).getHandle());
-        assertEquals(m3, rl.contents().get(1).getMessage());
-        assertEquals(3L, rl.contents().get(1).getHandle());
+        assertEquals(2, rl.contents(false).size());
+        assertEquals(m2, rl.contents(false).get(0).getMessage());
+        assertEquals(2L, rl.contents(false).get(0).getHandle());
+        assertEquals(m3, rl.contents(false).get(1).getMessage());
+        assertEquals(3L, rl.contents(false).get(1).getHandle());
     }
 
     @Test
@@ -176,20 +176,20 @@ public class TestRepairLog extends TestCase
         // trunc(trunc point, txnId).
         VoltMessage m1 = truncCompleteMsg(0L, 1L);
         rl.deliver(m1);
-        assertEquals(1, rl.contents().size());
+        assertEquals(1, rl.contents(false).size());
 
         VoltMessage m2 = truncCompleteMsg(0L, 2L);
         rl.deliver(m2);
-        assertEquals(2, rl.contents().size());
+        assertEquals(2, rl.contents(false).size());
 
         // trim m1. add m3
         VoltMessage m3 = truncCompleteMsg(1L, 3L);
         rl.deliver(m3);
-        assertEquals(2, rl.contents().size());
-        assertEquals(m2, rl.contents().get(0).getMessage());
-        assertEquals(2L, rl.contents().get(0).getHandle());
-        assertEquals(m3, rl.contents().get(1).getMessage());
-        assertEquals(3L, rl.contents().get(1).getHandle());
+        assertEquals(2, rl.contents(false).size());
+        assertEquals(m2, rl.contents(false).get(0).getMessage());
+        assertEquals(2L, rl.contents(false).get(0).getHandle());
+        assertEquals(m3, rl.contents(false).get(1).getMessage());
+        assertEquals(3L, rl.contents(false).get(1).getHandle());
     }
 
 
@@ -201,9 +201,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m1);
         VoltMessage m2 = truncInitMsg(0L, 2L);
         rl.deliver(m2);
-        assertEquals(2, rl.contents().size());
+        assertEquals(2, rl.contents(false).size());
         rl.setLeaderState(true);
-        assertEquals(0, rl.contents().size());
+        assertEquals(0, rl.contents(false).size());
     }
 
 }

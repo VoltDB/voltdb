@@ -155,12 +155,15 @@ public class RepairLog
     }
 
     // produce the contents of the repair log.
-    public List<Item> contents()
+    public List<Item> contents(boolean forMPI)
     {
         List<Item> response = new LinkedList<Item>();
         Iterator<Item> it = m_log.iterator();
         while (it.hasNext()) {
-            response.add(it.next());
+            Item i = it.next();
+            if (!forMPI || i.isMP()) {
+                response.add(i);
+            }
         }
         return response;
     }

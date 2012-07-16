@@ -230,8 +230,8 @@ public class InitiatorMailbox implements Mailbox
     /** Produce the repair log. This is idempotent. */
     void handleLogRequest(VoltMessage message)
     {
-        List<RepairLog.Item> logs = m_repairLog.contents();
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
+        List<RepairLog.Item> logs = m_repairLog.contents(req.isMPIRequest());
 
         String whoami =
             "SP " +  CoreUtils.hsIdToString(getHSId())
@@ -239,15 +239,7 @@ public class InitiatorMailbox implements Mailbox
             + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ";
 
         int seq = 0;
-        int ofTotal = 1;  // includes the ack.
-
-        // sp repair receives all logs. mp only receives mp logs.
-        for (RepairLog.Item log : logs) {
-            if (!req.isMPIRequest() || log.isMP()) {
-                ofTotal++;
-            }
-        }
-
+        int ofTotal = logs.size() + 1;  // includes the ack.
         tmLog.info(whoami + "Responding with " + ofTotal + " repair log parts.");
 
         // always send an initial ack.
@@ -261,16 +253,14 @@ public class InitiatorMailbox implements Mailbox
         send(message.m_sourceHSId, header);
 
         for (RepairLog.Item log : logs) {
-            if (!req.isMPIRequest() || log.isMP()) {
-                Iv2RepairLogResponseMessage response =
-                    new Iv2RepairLogResponseMessage(
-                            req.getRequestId(),
-                            seq++,
-                            ofTotal,
-                            log.getHandle(),
-                            log.getMessage());
-                send(message.m_sourceHSId, response);
-            }
+            Iv2RepairLogResponseMessage response =
+                new Iv2RepairLogResponseMessage(
+                        req.getRequestId(),
+                        seq++,
+                        ofTotal,
+                        log.getHandle(),
+                        log.getMessage());
+            send(message.m_sourceHSId, response);
         }
     }
 
