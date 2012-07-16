@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 import java.util.Comparator;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.HashMap;
 import java.util.List;
@@ -55,6 +54,7 @@ public class SpRepairAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
     private final String m_mapCacheNode;
+    private final List<Long> m_survivors;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -123,23 +123,24 @@ public class SpRepairAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public SpRepairAlgo(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+    public SpRepairAlgo(List<Long> survivors, ZooKeeper zk,
+            int partitionId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
         m_zk = zk;
         m_partitionId = partitionId;
         m_mailbox = mailbox;
+        m_survivors = survivors;
 
         m_whoami = whoami;
         m_mapCacheNode = zkMapCacheNode;
     }
 
     @Override
-    public Future<Boolean> start(List<Long> survivors)
+    public Future<Boolean> start()
     {
         try {
-            prepareForFaultRecovery(survivors);
+            prepareForFaultRecovery();
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
@@ -155,17 +156,17 @@ public class SpRepairAlgo implements RepairAlgo
     }
 
     /** Start fixing survivors: setup scoreboard and request repair logs. */
-    void prepareForFaultRecovery(List<Long> survivors)
+    void prepareForFaultRecovery()
     {
-        for (Long hsid : survivors) {
+        for (Long hsid : m_survivors) {
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
 
-        tmLog.info(m_whoami + "found (including self) " + survivors.size()
+        tmLog.info(m_whoami + "found (including self) " + m_survivors.size()
                 + " surviving replicas to repair. "
-                + " Survivors: " + CoreUtils.hsIdCollectionToString(survivors));
+                + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
         VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
-        m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
+        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
 
     /** Process a new repair log response */

@@ -59,7 +59,7 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testUnion() throws Exception
     {
-        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, 0L, null, VoltZK.iv2masters, "Test");
+        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -81,7 +81,7 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testStaleResponse() throws Exception
     {
-        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, 0L, null, VoltZK.iv2masters, "Test");
+        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
         term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
         assertEquals(0L, term.m_repairLogUnion.size());
     }
@@ -92,7 +92,7 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testRepairLogsAreComplete()
     {
-        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, 0L, null, VoltZK.iv2masters, "Test");
+        SpRepairAlgo term = new SpRepairAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
         SpRepairAlgo.ReplicaRepairStruct notDone1 = new SpRepairAlgo.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
@@ -137,7 +137,7 @@ public class TestSpRepairAlgo extends TestCase
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters, "Test");
+        SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
 
         // missing 4, 5
         SpRepairAlgo.ReplicaRepairStruct r1 = new SpRepairAlgo.ReplicaRepairStruct();
@@ -190,7 +190,7 @@ public class TestSpRepairAlgo extends TestCase
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters, "Test");
+        SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
 
         // missing 3, 4, 5
         SpRepairAlgo.ReplicaRepairStruct r3 = new SpRepairAlgo.ReplicaRepairStruct();
@@ -230,10 +230,10 @@ public class TestSpRepairAlgo extends TestCase
 
         // Stub some portions of a concrete Term instance - this is the
         // object being tested.
-        final SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, 0L, mailbox, VoltZK.iv2masters, "Test") {
+        final SpRepairAlgo term = new SpRepairAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test") {
             // there aren't replicas to ask for repair logs
             @Override
-            void prepareForFaultRecovery(List<Long> survivors) {
+            void prepareForFaultRecovery() {
             }
 
         };
@@ -242,7 +242,7 @@ public class TestSpRepairAlgo extends TestCase
             @Override
             public void run() {
                 try {
-                    promotionResult.set(term.start(null).get());
+                    promotionResult.set(term.start().get());
                 } catch (Exception e) {
                     System.out.println("Promotion thread threw: " + e);
                     throw new RuntimeException(e);

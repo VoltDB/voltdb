@@ -198,17 +198,16 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                 RepairAlgo repair = null;
                 if (m_missingStartupSites != null) {
                     repair = new StartupAlgo(m_missingStartupSites, m_messenger.getZK(),
-                            m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                            m_partitionId, m_initiatorMailbox,
                             m_zkMailboxNode, m_whoami);
                 }
                 else {
-                    repair = new SpRepairAlgo(m_missingStartupSites, m_messenger.getZK(),
-                            m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
-                            m_zkMailboxNode, m_whoami);
+                    repair = new SpRepairAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
+                            m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
                 }
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
-                success = repair.start(m_term.getInterestingHSIds()).get();
+                success = repair.start().get();
                 if (success) {
                     m_repairLog.setLeaderState(true);
                     m_scheduler.setLeaderState(true);
