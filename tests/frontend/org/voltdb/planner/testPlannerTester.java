@@ -113,12 +113,9 @@ public class testPlannerTester extends TestCase {
 //        //assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("LIMIT") = 1 );
 //    }
     public void testBatchCompileSave() {
-    	String ddl = "testplans-plannerTester-ddl.sql";
-    	String basename = "testplans-plannerTester-ddl";
-    	String stmtFile = "testplans-plannerTester-ddl.stmt";
-    	String savePath =  "/tmp/volttest/testplans-plannerTester-ddl.plan";
     	try {
-			plannerTester.batchCompileSave(ddl, basename, stmtFile, savePath);
+    		plannerTester.setUp("/home/zhengli/test1");
+			plannerTester.batchCompileSave();
 		} catch (Exception e) {
 			// TODO Auto-generated catch block
 			e.printStackTrace();
@@ -316,6 +313,16 @@ public class testPlannerTester extends TestCase {
     	String pathBaseline = "/tmp/volttest/baseline1/testplans-plannerTester-ddl.plan";
     	String pathNew = "/tmp/volttest/new1/testplans-plannerTester-ddl.plan";
     	plannerTester.batchDiff(pathBaseline, pathNew, size);
+    }
+    
+    public void testWholeProcess() {
+    	try {
+			plannerTester.setUp("/home/zhengli/test1");
+			plannerTester.batchCompileSave();
+			plannerTester.batchDiff();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
     }
 }
 

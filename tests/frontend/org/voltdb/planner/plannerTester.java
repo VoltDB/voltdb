@@ -2,6 +2,7 @@ package org.voltdb.planner;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.FileWriter;
@@ -29,8 +30,13 @@ import org.voltdb.types.PlanNodeType;
 
 public class plannerTester {
 	private static PlannerTestAideDeCamp aide;
-	private static String m_ddlFile = "testplans-plannerTester-ddl.sql";
-	private static String m_stmtFile = "testplans-plannerTester-ddl.stmt";
+	private static String m_config;
+	private static String m_testName;
+	private static String m_pathRefPlan;
+	private static String m_baseName;
+	private static String m_pathDDL;
+	private static int m_numSQL;
+	private static String m_savePlanPath;
 	private static ArrayList<String> m_stmts = new ArrayList<String>();
 	private static int m_treeSizeDiff;
 	private static boolean m_changedSQL;
@@ -79,10 +85,51 @@ public class plannerTester {
 	}
     //private Pair m_intPair = new Pair(0,0);
 
-    public static void setUpSchema( String ddl, String basename ) throws Exception {
-        aide = new PlannerTestAideDeCamp(TestIndexSelection.class.getResource(ddl),
-        		basename);
-
+	public static void setUp( String pathConfigFile ) throws IOException {
+		BufferedReader reader = new BufferedReader( new FileReader( pathConfigFile ) );
+		String line = null;
+		while( ( line = reader.readLine() ) != null ) {
+			if( line.equalsIgnoreCase("Name:") ) {
+				line = reader.readLine();
+				m_testName = line; 
+			}
+			else if ( line.equalsIgnoreCase("Ref:") ) {
+				line = reader.readLine();
+				m_pathRefPlan = line;
+			}
+			else if( line.equalsIgnoreCase("DDL:")) {
+				line = reader.readLine();
+				m_pathDDL = line;
+			}
+			else if( line.equalsIgnoreCase("Base Name:") ) {
+				line = reader.readLine();
+				m_baseName = line;
+			}
+			else if( line.equalsIgnoreCase("SQL:")) {
+				line = reader.readLine();
+				m_numSQL = Integer.parseInt( line );
+				m_stmts.clear();
+				for( int i = 0; i < m_numSQL; i++ ) {
+					line = reader.readLine();
+					m_stmts.add(line);
+				}
+			}
+			else if( line.equalsIgnoreCase("Save Path:") ) {
+				line = reader.readLine();
+				m_savePlanPath = line;
+			}
+		}
+		try {
+			setUpSchema();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	}
+	
+    private static void setUpSchema() throws Exception {
+    	File ddlFile = new File(m_pathDDL);
+        aide = new PlannerTestAideDeCamp(ddlFile.toURI().toURL(),
+        		m_baseName);
         // Set all tables to non-replicated.
         Cluster cluster = aide.getCatalog().getClusters().get("cluster");
         CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
@@ -90,25 +137,15 @@ public class plannerTester {
             t.setIsreplicated(false);
         }
     }
-    
-    public static void loadStmts ( String stmtFile ) throws IOException {
-    	m_stmts.clear();
-    	String line = null;
-    	BufferedReader reader = new BufferedReader( new FileReader( TestIndexSelection.class.getResource(stmtFile).getPath() ) );
-    	while( ( line = reader.readLine() ) != null ) {
-    		m_stmts.add( line );
-    	}
-    }
-    
-   
-    public static void batchCompileSave( String ddl, String basename, String stmtFilePath, String savePath ) throws Exception {
-    	setUpSchema( ddl, basename );
-    	loadStmts( stmtFilePath );
+
+    public static void batchCompileSave( ) throws Exception {
+//    	setUpSchema( ddl, basename );
+//    	loadStmts( stmtFilePath );
     	int size = m_stmts.size();
     	for( int i = 0; i < size; i++ ) {
     		 //assumes single partition
     		AbstractPlanNode pn = compile( m_stmts.get(i), 0, true);
-    		writePlanToFile(pn, savePath+i );
+    		writePlanToFile(pn, m_savePlanPath+i );
     	}
     }
 
@@ -179,6 +216,10 @@ public class plannerTester {
 			diffLeaves( pn1, pn2 );
 			diffInlineNodes( pn1, pn2);
 		}
+	}
+	
+	public static void batchDiff( ) {
+		batchDiff( m_pathRefPlan, m_savePlanPath, m_numSQL );
 	}
 	
 	public static void diffInlineNodes( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ) {
