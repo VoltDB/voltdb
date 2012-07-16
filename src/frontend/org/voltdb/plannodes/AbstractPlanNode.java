@@ -40,10 +40,6 @@ import org.voltdb.planner.PlanStatistics;
 import org.voltdb.planner.StatsField;
 import org.voltdb.types.PlanNodeType;
 
-import com.sun.xml.internal.bind.v2.runtime.unmarshaller.XsiNilLoader.Array;
-
-import sun.tools.jar.resources.jar;
-
 public abstract class AbstractPlanNode implements JSONString, Comparable<AbstractPlanNode> {
 
     /**

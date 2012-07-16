@@ -21,6 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
@@ -37,6 +38,7 @@ public class plannerTester {
 	private static String m_pathDDL;
 	private static int m_numSQL;
 	private static String m_savePlanPath;
+	private static ArrayList<Pair> m_partitionColumns = new ArrayList<plannerTester.Pair>(); 
 	private static ArrayList<String> m_stmts = new ArrayList<String>();
 	private static int m_treeSizeDiff;
 	private static boolean m_changedSQL;
@@ -118,6 +120,12 @@ public class plannerTester {
 				line = reader.readLine();
 				m_savePlanPath = line;
 			}
+			else if( line.equalsIgnoreCase("Partition Columns:") ) {
+				line = reader.readLine();
+				int index = line.indexOf(".");
+				Pair p = new Pair( line.substring(0, index), line.substring(index+1) );
+				m_partitionColumns.add( p );
+			}
 		}
 		try {
 			setUpSchema();
@@ -134,7 +142,15 @@ public class plannerTester {
         Cluster cluster = aide.getCatalog().getClusters().get("cluster");
         CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
         for (Table t : tmap) {
-            t.setIsreplicated(false);
+        	String tableName = t.getTypeName();
+        	for( Pair p : m_partitionColumns ) {
+        		if( ((String)p.getFirst()).equalsIgnoreCase(tableName) ){
+        			t.setIsreplicated(false);
+        			Column column = t.getColumns().getIgnoreCase( (String)p.getSecond() );
+        			t.setPartitioncolumn(column);
+        			break;
+        		}
+        	}
         }
     }
 
@@ -144,7 +160,7 @@ public class plannerTester {
     	int size = m_stmts.size();
     	for( int i = 0; i < size; i++ ) {
     		 //assumes single partition
-    		AbstractPlanNode pn = compile( m_stmts.get(i), 0, true);
+    		AbstractPlanNode pn = compile( m_stmts.get(i), 0, false);
     		writePlanToFile(pn, m_savePlanPath+i );
     	}
     }
