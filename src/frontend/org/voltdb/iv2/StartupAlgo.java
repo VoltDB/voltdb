@@ -122,6 +122,7 @@ public class StartupAlgo implements RepairAlgo
             MapCacheWriter iv2masters = new MapCache(m_zk, m_mapCacheNode);
             iv2masters.put(Integer.toString(m_partitionId),
                     new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
+            // On startup, we want to start at TXN ID 0.  So, make it so.
             m_promotionResult.done(0);
         } catch (KeeperException e) {
             VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
