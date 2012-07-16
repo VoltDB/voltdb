@@ -136,7 +136,7 @@ public class MpTerm implements Term
     {
         try {
             m_mapCache = new MapCache(m_zk, VoltZK.iv2masters, m_leadersChangeHandler);
-            m_mapCache.start(false);
+            m_mapCache.start(true);
         }
         catch (ExecutionException ee) {
             VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);
