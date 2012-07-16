@@ -90,7 +90,6 @@ public class SQLStmt {
         }
 
         stmt.plan = new SQLStmtPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML);
-        stmt.fragGUIDs = new long[collectorFragment == null ? 1 : 2];
         return stmt;
     }
 
@@ -136,6 +135,7 @@ public class SQLStmt {
     int numStatementParamJavaTypes;
 
     long fragGUIDs[];
+    int numFragGUIDs;
 
     Statement catStmt = null;
 }
