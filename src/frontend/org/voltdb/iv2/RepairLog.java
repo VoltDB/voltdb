@@ -94,11 +94,11 @@ public class RepairLog
     void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
-        // If we're the leader, wipe out the old repair log.
-        // This call to setLeaderState() to promote us to the leader shouldn't
-        // happen until after log repair is complete.
+        // The leader doesn't truncate its own log; if promoted,
+        // wipe out the SP portion of the existing log. This promotion
+        // action always happens after repair is completed.
         if (m_isLeader) {
-            truncate(Long.MAX_VALUE, Long.MAX_VALUE);
+            truncate(Long.MIN_VALUE, Long.MAX_VALUE);
         }
     }
 
