@@ -242,7 +242,7 @@ public class TestSpRepairAlgo extends TestCase
             @Override
             public void run() {
                 try {
-                    promotionResult.set(term.start().get());
+                    promotionResult.set(term.start().get().getFirst());
                 } catch (Exception e) {
                     System.out.println("Promotion thread threw: " + e);
                     throw new RuntimeException(e);

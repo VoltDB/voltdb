@@ -37,6 +37,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
 
@@ -55,6 +56,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final ZooKeeper m_zk;
     private final String m_mapCacheNode;
     private final List<Long> m_survivors;
+    private long m_maxSeenTxnId = 0; // UPDATE ME TO REAL VALUE WHEN EXTRACTING BASE CLASS
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -129,14 +131,14 @@ public class SpPromoteAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Boolean> start()
+    public Future<Pair<Boolean, Long>> start()
     {
         try {
             prepareForFaultRecovery();
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.done();
+            m_promotionResult.done(Long.MIN_VALUE);
         }
         return m_promotionResult;
     }
@@ -252,7 +254,7 @@ public class SpPromoteAlgo implements RepairAlgo
             MapCacheWriter iv2masters = new MapCache(m_zk, m_mapCacheNode);
             iv2masters.put(Integer.toString(m_partitionId),
                     new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
-            m_promotionResult.done();
+            m_promotionResult.done(m_maxSeenTxnId);
         } catch (KeeperException e) {
             VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
         } catch (InterruptedException e) {

@@ -30,6 +30,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltdb.BackendTarget;
@@ -195,9 +196,11 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
 
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
-                success = repair.start().get();
+                Pair<Boolean, Long> result = repair.start().get();
+                success = result.getFirst();
                 if (success) {
                     m_repairLog.setLeaderState(true);
+                    m_scheduler.setMaxSeenTxnId(result.getSecond());
                     m_scheduler.setLeaderState(true);
                     tmLog.info(m_whoami
                             + "finished leader promotion. Took "

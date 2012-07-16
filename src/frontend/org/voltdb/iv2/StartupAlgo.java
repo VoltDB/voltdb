@@ -29,6 +29,8 @@ import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltcore.utils.Pair;
+
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
 
@@ -72,14 +74,14 @@ public class StartupAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Boolean> start()
+    public Future<Pair<Boolean, Long>> start()
     {
         try {
             prepareForStartup();
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.done();
+            m_promotionResult.done(Long.MIN_VALUE);
         }
         return m_promotionResult;
     }
@@ -120,7 +122,7 @@ public class StartupAlgo implements RepairAlgo
             MapCacheWriter iv2masters = new MapCache(m_zk, m_mapCacheNode);
             iv2masters.put(Integer.toString(m_partitionId),
                     new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
-            m_promotionResult.done();
+            m_promotionResult.done(0);
         } catch (KeeperException e) {
             VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
         } catch (InterruptedException e) {
