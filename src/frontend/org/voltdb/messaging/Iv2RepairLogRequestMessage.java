@@ -31,17 +31,26 @@ import org.voltcore.utils.CoreUtils;
  */
 public class Iv2RepairLogRequestMessage extends VoltMessage
 {
+    public final static int MPIREQUEST = 1;
+    public final static int SPREQUEST = 2;
     private long m_requestId = 0;
+    private int m_requestType = SPREQUEST;
 
     /** Empty constructor for de-serialization */
     Iv2RepairLogRequestMessage() {
         super();
     }
 
-    public Iv2RepairLogRequestMessage(long requestId)
+    public Iv2RepairLogRequestMessage(long requestId, int requestType)
     {
         super();
         m_requestId = requestId;
+        m_requestType = requestType;
+    }
+
+    public boolean isMPIRequest()
+    {
+        return m_requestType == MPIREQUEST;
     }
 
     public long getRequestId()
@@ -54,6 +63,7 @@ public class Iv2RepairLogRequestMessage extends VoltMessage
     {
         int msgsize = super.getSerializedSize();
         msgsize += 8; // requestId
+        msgsize += 4; // requestType
         return msgsize;
     }
 
@@ -62,6 +72,7 @@ public class Iv2RepairLogRequestMessage extends VoltMessage
     {
         buf.put(VoltDbMessageFactory.IV2_REPAIR_LOG_REQUEST);
         buf.putLong(m_requestId);
+        buf.putInt(m_requestType);
 
         assert(buf.capacity() == buf.position());
         buf.limit(buf.position());
@@ -70,6 +81,7 @@ public class Iv2RepairLogRequestMessage extends VoltMessage
     @Override
     public void initFromBuffer(ByteBuffer buf) throws IOException {
         m_requestId = buf.getLong();
+        m_requestType = buf.getInt();
     }
 
     @Override
@@ -80,6 +92,8 @@ public class Iv2RepairLogRequestMessage extends VoltMessage
         sb.append(CoreUtils.hsIdToString(m_sourceHSId));
         sb.append(" REQID: ");
         sb.append(m_requestId);
+        sb.append(" REQTYPE: ");
+        sb.append(m_requestType);
         return sb.toString();
     }
 }

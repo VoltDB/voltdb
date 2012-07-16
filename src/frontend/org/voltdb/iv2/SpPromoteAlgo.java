@@ -165,7 +165,8 @@ public class SpPromoteAlgo implements RepairAlgo
         tmLog.info(m_whoami + "found (including self) " + m_survivors.size()
                 + " surviving replicas to repair. "
                 + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
-        VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
+        VoltMessage logRequest =
+            new Iv2RepairLogRequestMessage(m_requestId, Iv2RepairLogRequestMessage.SPREQUEST);
         m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
 

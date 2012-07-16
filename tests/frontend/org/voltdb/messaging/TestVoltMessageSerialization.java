@@ -286,7 +286,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testIv2RepairLogRequestMessage() throws IOException
     {
-        Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100);
+        Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100, Iv2RepairLogRequestMessage.SPREQUEST);
         Iv2RepairLogRequestMessage rlm2 = (Iv2RepairLogRequestMessage) checkVoltMessage(rlm);
         assertEquals(rlm.getRequestId(), rlm2.getRequestId());
     }
