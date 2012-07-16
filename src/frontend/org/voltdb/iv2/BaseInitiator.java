@@ -192,7 +192,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             m_term = createTerm(m_missingStartupSites, m_messenger.getZK(),
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_zkMailboxNode, m_whoami);
-            m_initiatorMailbox.setTerm(m_term);
             m_term.start();
             while (!success) {
                 RepairAlgo repair = null;

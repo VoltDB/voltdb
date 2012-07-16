@@ -66,18 +66,12 @@ public class InitiatorMailbox implements Mailbox
     private final RejoinProducer m_rejoinProducer;
     private final MapCacheReader m_masterMapCache;
     private long m_hsId;
-    private Term m_term;
     private RepairAlgo m_algo;
 
     private Set<Long> m_replicas = null;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
-
-    synchronized public void setTerm(Term term)
-    {
-        m_term = term;
-    }
 
     synchronized public void setRepairAlgo(RepairAlgo algo)
     {
