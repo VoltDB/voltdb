@@ -173,7 +173,7 @@ public class AuthSystem {
                 return false;
             }
             if (proc.getDefaultproc()) {
-                return hasGroupWithDefaultProcPermission();
+                return hasDefaultProcPermission();
             }
             return m_authorizedProcedures.contains(proc);
         }

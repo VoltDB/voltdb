@@ -55,7 +55,7 @@ public class TestSecuritySuite extends RegressionSuite {
         super(name);
     }
 
-    public void xxxtestAuthentication() throws IOException {
+    public void testAuthentication() throws IOException {
         //Test failed auth
         this.m_username = "user1";
         this.m_password = "wrongpassword";
@@ -84,7 +84,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
     }
 
-    public void xxxtestSysprocAndAdhocPermissions() throws Exception {
+    public void testSysprocAndAdhocPermissions() throws Exception {
         Client client;
         boolean exceptionThrown;
         VoltTable modCount;
@@ -146,7 +146,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(results.length == 1);
     }
 
-    public void xxxtestProcedurePermissions() throws Exception {
+    public void testProcedurePermissions() throws Exception {
         Client client;
         boolean exceptionThrown;
 
@@ -224,7 +224,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(exceptionThrown);
     }
 
-    public void xxxtestAllowedExportConnectorPermissions() throws ExportClientException {
+    public void testAllowedExportConnectorPermissions() throws ExportClientException {
         // user1 can connect (in groups list)
         ExportTestClient eclient = new ExportTestClient(1, port(0));
         eclient.addCredentials("user1", "password");
@@ -235,7 +235,7 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void xxxtestRejectedExportConnectorPermissions() {
+    public void testRejectedExportConnectorPermissions() {
         boolean caught = false;
         ExportTestClient eclient = new ExportTestClient(1, port(0));
         try {
