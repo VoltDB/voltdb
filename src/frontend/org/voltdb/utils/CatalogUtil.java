@@ -28,6 +28,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -86,6 +87,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
+
+import org.mindrot.BCrypt;
 
 /**
  *
@@ -1175,10 +1178,14 @@ public abstract class CatalogUtil {
         // always be named "database", so I've temporarily hardcoded it here until a more robust solution is available.
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
+        SecureRandom sr = new SecureRandom();
         for (UsersType.User user : users.getUser()) {
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
-            byte passwordHash[] = extractPassword(user.getPassword());
-            catUser.setShadowpassword(Encoder.hexEncode(passwordHash));
+            String hashedPW =
+                    BCrypt.hashpw(
+                            extractPassword(user.getPassword()),
+                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+            catUser.setShadowpassword(hashedPW);
 
             // process the @groups comma separated list
             if (user.getGroups() != null) {
@@ -1214,8 +1221,11 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(jsonEnabled);
     }
 
-    /** Read a hashed password from password. */
-    private static byte[] extractPassword(String password) {
+    /** Read a hashed password from password.
+     *  SHA-1 hash it once to match what we will get from the wire protocol
+     *  and then hex encode it
+     * */
+    private static String extractPassword(String password) {
         MessageDigest md = null;
         try {
             md = MessageDigest.getInstance("SHA-1");
@@ -1223,8 +1233,8 @@ public abstract class CatalogUtil {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);
         }
-        final byte passwordHash[] = md.digest(md.digest(password.getBytes()));
-        return passwordHash;
+        final byte passwordHash[] = md.digest(password.getBytes());
+        return Encoder.hexEncode(passwordHash);
     }
 
 }

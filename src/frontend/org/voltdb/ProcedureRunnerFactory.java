@@ -32,8 +32,9 @@ public class ProcedureRunnerFactory {
 
     public ProcedureRunner create(
             VoltProcedure procedure,
-            Procedure catProc) {
-        return new ProcedureRunner(procedure, m_site, m_context, catProc);
+            Procedure catProc,
+            CatalogSpecificPlanner csp) {
+        return new ProcedureRunner(procedure, m_site, m_context, catProc, csp);
     }
 
 }

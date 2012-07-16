@@ -114,14 +114,14 @@ public class TestSimpleWorkUnit extends TestCase
     public void testNoDependenciesNoReplicas() {
         setUpSites(1, 2, 1);
         WorkUnit w = new WorkUnit(m_voltdb.getSiteTracker(),
-                                  work, new int[]{}, 0, null, false);
+                                  work, new int[]{}, 0, null, false, false);
         assertTrue(w.allDependenciesSatisfied());
         assertEquals(work, w.getPayload());
         assertNull(w.getDependencies());
         assertNull(w.getDependency(0));
 
         w = new WorkUnit(m_voltdb.getSiteTracker(), work, null,
-                         0, null, false);
+                         0, null, false, false);
         assertTrue(w.allDependenciesSatisfied());
     }
 
@@ -131,7 +131,7 @@ public class TestSimpleWorkUnit extends TestCase
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         WorkUnit w = new WorkUnit(m_voltdb.getSiteTracker(),
                                   work, new int[]{ 4, multi_dep }, 0L,
-                                  new long[]{CoreUtils.getHSIdFromHostAndSite(0, 1)}, false);
+                                  new long[]{CoreUtils.getHSIdFromHostAndSite(0, 1)}, false, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(multi_dep).size(), 0);
@@ -149,7 +149,7 @@ public class TestSimpleWorkUnit extends TestCase
         setUpSites(1, 2, 1);
         WorkUnit w = new WorkUnit(m_voltdb.getSiteTracker(),
                                   work, new int[]{ 4, 5 }, 0L,
-                                  new long[]{1}, false);
+                                  new long[]{1}, false, false);
 
         // Put a dependency that does not exist
         try {
@@ -181,7 +181,8 @@ public class TestSimpleWorkUnit extends TestCase
                                   new long[]{
                                         CoreUtils.getHSIdFromHostAndSite( 0, 1),
                                         CoreUtils.getHSIdFromHostAndSite( 1, 2),
-                                        CoreUtils.getHSIdFromHostAndSite( 1, 3)}, false);
+                                        CoreUtils.getHSIdFromHostAndSite( 1, 3)},
+                                  false, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -213,7 +214,7 @@ public class TestSimpleWorkUnit extends TestCase
         int multi_dep = 5 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
         WorkUnit w = new WorkUnit(m_voltdb.getSiteTracker(),
                                   work, new int[]{ 4, multi_dep }, 0L,
-                                  new long[] { 1, 2, 3}, false);
+                                  new long[] { 1, 2, 3}, false, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);
@@ -244,7 +245,7 @@ public class TestSimpleWorkUnit extends TestCase
                                       CoreUtils.getHSIdFromHostAndSite( 0, 1),
                                       CoreUtils.getHSIdFromHostAndSite( 1, 2),
                                       CoreUtils.getHSIdFromHostAndSite( 1, 3)},
-                                      false);
+                                  false, false);
         assertFalse(w.allDependenciesSatisfied());
         assertEquals(w.getDependency(4).size(), 0);
         assertEquals(w.getDependency(5).size(), 0);

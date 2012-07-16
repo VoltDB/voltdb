@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -203,20 +205,41 @@ public class TestFunctionsSuite extends RegressionSuite {
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
-        // These two cases are apparently not close enough to trigger ENG-3191, but they're worth trying?
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) > (ABS(NUM) + 4)");
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID = -2 - NUM");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // These cases were originally failed attempts to trigger ENG-3191, but they still seem worth trying.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) = 2 + NUM");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(NUM) < (ABS(ID) - 4)");
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(NUM) = (2 - ID)");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID < 0");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
 
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) = (0 - ID)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        // Here's the ENG-3191 case, all better now.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID = (0 - ABS(ID))");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
 
         boolean caught = false;
 
@@ -423,7 +446,18 @@ public class TestFunctionsSuite extends RegressionSuite {
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
+        final String literalSchema =
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); ";
+        try {
+            project.addLiteralSchema(literalSchema);
+        } catch (IOException e) {
+            assertFalse(true);
+        }
         project.addPartitionInfo("P1", "ID");
 
         project.addStmtProcedure("WHERE_ABS", "select count(*) from P1 where ABS(ID) > 9");

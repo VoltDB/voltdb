@@ -21,6 +21,7 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
+import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -191,7 +192,7 @@ public abstract class ProcedureCompiler {
         // track if there are any writer statements and/or sequential scans and/or an overlooked common partitioning parameter
         boolean procHasWriteStmts = false;
         boolean procHasSeqScans = false;
-        boolean procHasCommonPartitioning = true; // true but procPartitionExpression == null means a correctly MP proc
+        boolean procWantsCommonPartitioning = true; // true but procPartitionExpression == null means a correctly MP proc
         AbstractExpression commonPartitionExpression = null;
         String exampleSPstatement = null;
         Object exampleSPvalue = null;
@@ -224,31 +225,23 @@ public abstract class ProcedureCompiler {
                     estimates, catalogStmt, stmt.getText(), stmt.getJoinOrder(), partitioning);
 
             if (partitioning.wasSpecifiedAsSingle()) {
-                procHasCommonPartitioning = false; // Don't try to infer what's already been asserted.
+                procWantsCommonPartitioning = false; // Don't try to infer what's already been asserted.
                 // The planner does not currently attempt to second-guess a plan declared as single-partition, maybe some day.
                 // In theory, the PartitioningForStatement would confirm the use of (only) a parameter as a partition key --
                 // or if the partition key was determined to be some other constant (expression?) it might display an informational
                 // message that the passed parameter is assumed to be equal to the hard-coded partition key constant (expression).
 
                 // Validate any inferred statement partitioning given the statement's possible usage, until a contradiction is found.
-            } else if (procHasCommonPartitioning) {
+            } else if (procWantsCommonPartitioning) {
                 // Only consider statements that are capable of running SP with a partitioning parameter that does not seem to
                 // conflict with the partitioning of prior statements.
-
-                // Usually, replicated-only statements in a mix with others have no effect on the MP/SP decision
-                if (partitioning.getCountOfPartitionedTables() == 0) {
-                    // but SP is strictly forbidden in this case, for consistency of the replicated data.
-                    if (partitioning.getIsReplicatedTableDML()) {
-                        procHasCommonPartitioning = false;
-                    }
-
-                } else if (partitioning.getCountOfIndependentlyPartitionedTables() == 0) {
+                if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
                     AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
                     if (statementPartitionExpression != null) {
                         if (commonPartitionExpression == null) {
                             commonPartitionExpression = statementPartitionExpression;
                             exampleSPstatement = stmt.getText();
-                            exampleSPvalue = partitioning.effectivePartitioningValue();
+                            exampleSPvalue = partitioning.inferredPartitioningValue();
                         } else if (commonPartitionExpression.equals(statementPartitionExpression) ||
                                    (statementPartitionExpression instanceof ParameterValueExpression &&
                                     commonPartitionExpression instanceof ParameterValueExpression)) {
@@ -256,13 +249,25 @@ public abstract class ProcedureCompiler {
                             // any statement parameter used for partitioning MIGHT come from the same proc parameter as
                             // any other statement's parameter used for partitioning.
                         } else {
-                            procHasCommonPartitioning = false; // appears to be different partitioning for different statements
+                            procWantsCommonPartitioning = false; // appears to be different partitioning for different statements
                         }
+                    } else {
+                        // There is a statement with a partitioned table whose partitioning column is
+                        // not equality filtered with a constant or param. Abandon all hope.
+                        procWantsCommonPartitioning = false;
                     }
+
+                // Usually, replicated-only statements in a mix with others have no effect on the MP/SP decision
+                } else if (partitioning.getCountOfPartitionedTables() == 0) {
+                    // but SP is strictly forbidden for DML, to maintain the consistency of the replicated data.
+                    if (partitioning.getIsReplicatedTableDML()) {
+                        procWantsCommonPartitioning = false;
+                    }
+
                 } else {
                     // There is a statement with a partitioned table whose partitioning column is
                     // not equality filtered with a constant or param. Abandon all hope.
-                    procHasCommonPartitioning = false;
+                    procWantsCommonPartitioning = false;
                 }
             }
 
@@ -276,7 +281,7 @@ public abstract class ProcedureCompiler {
         }
 
         // MIGHT the planner have uncovered an overlooked opportunity to run all statements SP?
-        if (procHasCommonPartitioning && (commonPartitionExpression != null)) {
+        if (procWantsCommonPartitioning && (commonPartitionExpression != null)) {
             String msg = null;
             if (commonPartitionExpression instanceof ParameterValueExpression) {
                 msg = "This procedure might benefit from an @ProcInfo annotation designating parameter " +
@@ -440,20 +445,23 @@ public abstract class ProcedureCompiler {
                 if (partitionType == candidate)
                     found = true;
             }
-
-            VoltType columnType = VoltType.get((byte)procedure.getPartitioncolumn().getType());
-            VoltType paramType = VoltType.typeFromClass(partitionType);
-            if (columnType != paramType) {
-                String msg = "Mismatch between partition column and partition parameter for procedure " +
-                    procedure.getClassname() + "\nPartition column is type " + columnType +
-                    " and partition parameter is type " + paramType;
-                throw compiler.new VoltCompilerException(msg);
-            }
-
-            // assume on of the two tests above passes and one fails
             if (!found) {
                 String msg = "PartitionInfo parameter must be a String or Number for procedure: " + procedure.getClassname();
                 throw compiler.new VoltCompilerException(msg);
+            }
+
+            VoltType columnType = VoltType.get((byte)procedure.getPartitioncolumn().getType());
+            VoltType paramType = VoltType.typeFromClass(partitionType);
+            if ( ! columnType.canExactlyRepresentAnyValueOf(paramType)) {
+                String msg = "Type mismatch between partition column and partition parameter for procedure " +
+                    procedure.getClassname() + " may cause overflow or loss of precision.\nPartition column is type " + columnType +
+                    " and partition parameter is type " + paramType;
+                throw compiler.new VoltCompilerException(msg);
+            } else if ( ! paramType.canExactlyRepresentAnyValueOf(columnType)) {
+                String msg = "Type mismatch between partition column and partition parameter for procedure " +
+                        procedure.getClassname() + " does not allow the full range of partition key values.\nPartition column is type " + columnType +
+                        " and partition parameter is type " + paramType;
+                compiler.addWarn(msg);
             }
         }
 
@@ -564,8 +572,7 @@ public abstract class ProcedureCompiler {
             // or if the partition key was determined to be some other hard-coded constant (expression?) it might display a warning
             // message that the passed parameter is assumed to be equal to that constant (expression).
         } else {
-            if (partitioning.getCountOfPartitionedTables() > 0 &&
-                    partitioning.getCountOfIndependentlyPartitionedTables() == 0) {
+            if (partitioning.getCountOfIndependentlyPartitionedTables() == 1) {
                 AbstractExpression statementPartitionExpression = partitioning.singlePartitioningExpression();
                 if (statementPartitionExpression != null) {
                     // The planner has uncovered an overlooked opportunity to run the statement SP.
@@ -575,7 +582,7 @@ public abstract class ProcedureCompiler {
                                 ":" + ((ParameterValueExpression) statementPartitionExpression).getParameterIndex() + "'";
                     } else {
                         String valueDescription = null;
-                        Object partitionValue = partitioning.effectivePartitioningValue();
+                        Object partitionValue = partitioning.inferredPartitioningValue();
                         if (partitionValue == null) {
                             // Statement partitioned on a runtime constant. This is likely to be cryptic, but hopefully gets the idea across.
                             valueDescription = "of " + statementPartitionExpression.toString();

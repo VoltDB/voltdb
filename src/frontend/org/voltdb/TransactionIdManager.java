@@ -86,15 +86,37 @@ public class TransactionIdManager {
     // gets set to inf if using a single node
     long BACKWARD_TIME_FORGIVENESS_WINDOW_MS = VoltDB.BACKWARD_TIME_FORGIVENESS_WINDOW_MS;
 
+    public interface Clock {
+        long get();
+        void sleep(long millis) throws InterruptedException;
+    }
+
+    private final Clock m_clock;
+
+    public TransactionIdManager(long initiatorId, long timestampTestingSalt) {
+        this(initiatorId, timestampTestingSalt, new Clock() {
+            @Override
+            public long get() {
+                return System.currentTimeMillis();
+            }
+
+            @Override
+            public void sleep(long millis) throws InterruptedException {
+                Thread.sleep(millis);
+            }
+        });
+    }
+
     /**
      * Initialize the TransactionIdManager for this site
      * @param initiatorId The siteId of the current site.
      * @param timestampTestingSalt Value of the salt used to skew a clock in testing.
      */
-    public TransactionIdManager(long initiatorId, long timestampTestingSalt) {
+    public TransactionIdManager(long initiatorId, long timestampTestingSalt, Clock clock) {
         this.initiatorId = initiatorId;
 
         m_timestampTestingSalt = timestampTestingSalt;
+        m_clock = clock;
 
         // warn if running with a simulated clock skew
         // this should only be used for testing
@@ -125,7 +147,7 @@ public class TransactionIdManager {
     public long getNextUniqueTransactionId() {
         // get the current time, usually the salt value is zero
         // in testing it is used to simulate clock skew
-        long currentTime = System.currentTimeMillis() + m_timestampTestingSalt;
+        long currentTime = m_clock.get() + m_timestampTestingSalt;
         if (currentTime == lastUsedTime) {
             // increment the counter for this millisecond
             counterValue++;
@@ -135,7 +157,7 @@ public class TransactionIdManager {
             if (counterValue > COUNTER_MAX_VALUE) {
                 // spin until the next millisecond
                 while (currentTime == lastUsedTime)
-                    currentTime = System.currentTimeMillis();
+                    currentTime = m_clock.get();
                 // reset the counter and lastUsedTime for the new millisecond
                 lastUsedTime = currentTime;
                 counterValue = 0;
@@ -159,9 +181,9 @@ public class TransactionIdManager {
                     // note, the loop should stop once lastUsedTime is PASSED, not current
                     while ((currentTime <= lastUsedTime) && (count-- > 0)) {
                         try {
-                            Thread.sleep(lastUsedTime - currentTime + 1);
+                            m_clock.sleep(lastUsedTime - currentTime + 1);
                         } catch (InterruptedException e) {}
-                        currentTime = System.currentTimeMillis();
+                        currentTime = m_clock.get();
                     }
                     // if the loop above ended because it ran too much
                     if (count < 0) {

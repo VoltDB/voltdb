@@ -42,7 +42,7 @@ public class RejoinTestBase extends TestCase {
 
     static final Class<?>[] PROCEDURES = { NonOrgVoltDBProc.class };
 
-    VoltProjectBuilder getBuilderForTest() throws UnsupportedEncodingException {
+    public VoltProjectBuilder getBuilderForTest() throws UnsupportedEncodingException {
         String simpleSchema =
             "create table blah (" +
             "ival bigint default 0 not null, " +
@@ -105,7 +105,7 @@ public class RejoinTestBase extends TestCase {
             new ProcedureInfo(new String[] { "foo" }, "SelectBlahReplicated", "select * from blah_replicated where ival = ?;", null),
             new ProcedureInfo(new String[] { "foo" }, "InsertPartitioned", "insert into PARTITIONED values (?, ?);", "PARTITIONED.pkey:0"),
             new ProcedureInfo(new String[] { "foo" }, "UpdatePartitioned", "update PARTITIONED set value = ? where pkey = ?;", "PARTITIONED.pkey:1"),
-            new ProcedureInfo(new String[] { "foo" }, "SelectPartitioned", "select * from PARTITIONED;", null),
+            new ProcedureInfo(new String[] { "foo" }, "SelectPartitioned", "select * from PARTITIONED order by pkey;", null),
             new ProcedureInfo(new String[] { "foo" }, "InsertPartitionedLarge", "insert into PARTITIONED_LARGE values (?, ?, ?);", "PARTITIONED_LARGE.pkey:0")
         };
 

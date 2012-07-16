@@ -69,7 +69,7 @@ public class TestDeterminism extends TestCase {
     {
         CompiledPlan cp = null;
         try {
-            cp = aide.compilePlan(sql, 0, false, null);
+            cp = aide.compileAdHocPlan(sql);
         }
         catch (NullPointerException ex) {
             // aide may throw NPE if no plangraph was created

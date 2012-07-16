@@ -24,7 +24,9 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
+import org.voltdb.ClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentTaskMessage;
@@ -43,6 +45,8 @@ import org.voltdb.messaging.FragmentTaskMessage;
  */
 class WorkUnit
 {
+private static final VoltLogger log = new VoltLogger(WorkUnit.class.getName());
+
     class DependencyTracker
     {
         // needs to be a TreeMap so iterator has deterministic order
@@ -60,7 +64,7 @@ class WorkUnit
             m_expectedSites = expectedSites;
         }
 
-        boolean addResult(long HSId, long mapId, VoltTable result)
+        boolean addResult(long HSId, long mapId, VoltTable result, boolean allowMismatchedResults)
         {
             boolean retval = true;
             if (!(m_results.containsKey(mapId)))
@@ -69,7 +73,8 @@ class WorkUnit
             }
             else
             {
-                if (!m_results.get(mapId).hasSameContents(result))
+                // Look for a mismatch unless we're being lenient.
+                if (!allowMismatchedResults && !m_results.get(mapId).hasSameContents(result))
                 {
                     retval = false;
                 }
@@ -168,6 +173,9 @@ class WorkUnit
     int m_stackCount = 0;
     boolean commitEvenIfDirty = false;
     boolean nonTransactional = false;
+    // ENG-3288 - Be lenient about mis-matched results for read-only queries that are
+    // flagged as non-deterministic.
+    final boolean m_allowMismatchedResults;
 
     /**
      * Get the "payload" for this <code>WorkUnit</code>. The payload is
@@ -242,10 +250,12 @@ class WorkUnit
     WorkUnit(SiteTracker siteTracker, VoltMessage payload,
              int[] dependencyIds, long HSId,
              long[] nonCoordinatingHSIds,
-             boolean shouldResumeProcedure)
+             boolean shouldResumeProcedure,
+             boolean allowMismatchedResults)
     {
         this.m_payload = payload;
         m_shouldResumeProcedure = shouldResumeProcedure;
+        m_allowMismatchedResults = allowMismatchedResults;
         if (payload != null && payload instanceof FragmentTaskMessage)
         {
             m_taskType = ((FragmentTaskMessage) payload).getFragmentTaskType();
@@ -296,10 +306,11 @@ class WorkUnit
         // If not same, kill entire cluster and hide the bodies.
         // In all seriousness, we have no valid way to recover from a non-deterministic event
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
-        boolean duplicate_okay =
-            m_dependencies.get(dependencyId).addResult(HSId, map_id, payload);
-        if (!duplicate_okay)
-        {
+        // ENG-3288 - Allow non-deterministic read-only transactions to have mismatched results
+        // so that LIMIT queries without ORDER BY clauses work.
+        boolean addOkay =
+            m_dependencies.get(dependencyId).addResult(HSId, map_id, payload, m_allowMismatchedResults);
+        if (!addOkay) {
             String msg = "Mismatched results received for partition: " + partition;
             msg += "\n  from execution site: " + HSId;
             msg += "\n  Original results: " + m_dependencies.get(dependencyId).getResult(map_id).toString();

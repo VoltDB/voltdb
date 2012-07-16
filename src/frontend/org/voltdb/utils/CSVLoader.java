@@ -71,7 +71,7 @@ public class CSVLoader {
 
     private static CSVReader csvReader;
     private static Client csvClient;
-    protected static final VoltLogger m_log = new VoltLogger("CSVLoader");
+    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;

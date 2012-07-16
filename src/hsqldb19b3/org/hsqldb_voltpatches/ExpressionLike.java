@@ -31,7 +31,6 @@
 
 package org.hsqldb_voltpatches;
 
-import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.lib.HsqlList;
 import org.hsqldb_voltpatches.lib.Set;
 import org.hsqldb_voltpatches.types.BinaryData;
@@ -103,14 +102,14 @@ public final class ExpressionLike extends ExpressionLogical {
 
         Object leftValue   = nodes[LEFT].getValue(session);
         Object rightValue  = nodes[RIGHT].getValue(session);
-        Object escapeValue = nodes[ESCAPE] == null ? null
+        Object escapeValue = (nodes.length < TERNARY || nodes[ESCAPE] == null) ? null
                                                    : nodes[ESCAPE].getValue(
                                                        session);
 
         if (likeObject.isVariable) {
             synchronized (likeObject) {
                 likeObject.setPattern(session, rightValue, escapeValue,
-                                      nodes[ESCAPE] != null);
+                        (nodes.length == TERNARY) && (nodes[ESCAPE] != null));
 
                 return likeObject.compare(session, leftValue);
             }

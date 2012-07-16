@@ -19,7 +19,7 @@ package org.voltdb.compiler;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -38,6 +38,9 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
+import com.google.common.util.concurrent.ListenableFuture;
+import com.google.common.util.concurrent.ListeningExecutorService;
+
 public class AsyncCompilerAgent {
 
     static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
@@ -49,11 +52,8 @@ public class AsyncCompilerAgent {
     Mailbox m_mailbox;
 
     // do work in this executor service
-    final ExecutorService m_es =
+    final ListeningExecutorService m_es =
         CoreUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
-
-    // wraps the VoltPlanner and does the actual query planning
-    private PlannerTool m_ptool = null;
 
     // intended for integration test use. finish planning what's in
     // the queue and terminate the TPE.
@@ -92,8 +92,7 @@ public class AsyncCompilerAgent {
                     retval.hostname = work.hostname;
                     retval.adminConnection = work.adminConnection;
                     retval.clientData = work.clientData;
-                    // XXX: need client interface mailbox id.
-                    m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(retval));
+                    work.completionHandler.onCompletion(retval);
                 }
             }
         };
@@ -105,29 +104,34 @@ public class AsyncCompilerAgent {
         if (wrapper.payload instanceof AdHocPlannerWork) {
             final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
             final AsyncCompilerResult result = compileAdHocPlan(w);
-            // XXX: need client interface mailbox id.
-            m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+            w.completionHandler.onCompletion(result);
         }
         else if (wrapper.payload instanceof CatalogChangeWork) {
             final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
             final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
-            // XXX: need client interface mailbox id.
-            m_mailbox.send(message.m_sourceHSId, new LocalObjectMessage(result));
+            w.completionHandler.onCompletion(result);
         }
     }
 
-    AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
+    public void compileAdHocPlanForProcedure(final AdHocPlannerWork apw) {
+        m_es.submit(new Runnable() {
+            @Override
+            public void run(){
+                apw.completionHandler.onCompletion(compileAdHocPlan(apw));
+            }
+        });
+    }
+
+    AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
-        CatalogContext context = VoltDB.instance().getCatalogContext();
-        if (m_ptool == null || m_ptool.m_context.catalogVersion != context.catalogVersion) {
-            if (m_ptool != null) {
-                // cleanly shutdown hsql
-                m_ptool.shutdown();
-            }
-            m_ptool = new PlannerTool(context);
+        CatalogContext context = work.catalogContext;
+        if (context == null) {
+            context = VoltDB.instance().getCatalogContext();
         }
+
+        final PlannerTool ptool = context.m_ptool;
 
         AdHocPlannedStmtBatch plannedStmtBatch =
                 new AdHocPlannedStmtBatch(work.sqlBatchText,
@@ -147,15 +151,17 @@ public class AsyncCompilerAgent {
             // Single statement batch.
             try {
                 String sqlStatement = work.sqlStatements[0];
-                PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam,
-                                                            true);
+                PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
+                                                          work.inferSinglePartition, work.allowParameterization);
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 plannedStmtBatch.partitionParam = result.partitionParam;
                 plannedStmtBatch.addStatement(sqlStatement,
                                               result.onePlan,
                                               result.allPlan,
-                                              result.replicatedDML);
+                                              result.replicatedDML,
+                                              result.nonDeterministic,
+                                              result.params);
             }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
@@ -165,13 +171,15 @@ public class AsyncCompilerAgent {
             // Multi-statement batch.
             for (final String sqlStatement : work.sqlStatements) {
                 try {
-                    PlannerTool.Result result = m_ptool.planSql(sqlStatement, work.partitionParam,
-                                                                false);
+                    PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
+                                                                false, work.allowParameterization);
 
                     plannedStmtBatch.addStatement(sqlStatement,
                                                   result.onePlan,
                                                   result.allPlan,
-                                                  result.replicatedDML);
+                                                  result.replicatedDML,
+                                                  result.nonDeterministic,
+                                                  result.params);
                 }
                 catch (Exception e) {
                     errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());

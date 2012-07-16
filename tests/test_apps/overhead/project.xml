@@ -1,0 +1,17 @@
+<?xml version="1.0"?>
+<project>
+    <database>
+        <schemas>
+            <schema path='ddl.sql' />
+        </schemas>
+        <procedures>
+            <procedure class='overhead.procedures.NoArgs' />
+            <procedure class='overhead.procedures.BinaryPayload' />
+            <procedure class='overhead.procedures.NoArgsRW' />
+            <procedure class='overhead.procedures.BinaryPayloadRW' />
+        </procedures>
+        <partitions>
+            <partition table='store' column='key' />
+        </partitions>
+    </database>
+</project>

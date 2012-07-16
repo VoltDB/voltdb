@@ -27,7 +27,7 @@ public class AdHocCompilerCache {
 
     static final int MAX_ENTRIES = 100;
 
-    Map<String, AdHocPlannedStatement> m_cache = new LinkedHashMap<String, AdHocPlannedStatement>() {
+    Map<String, AdHocPlannedStatement> m_cache = new LinkedHashMap<String, AdHocPlannedStatement>(MAX_ENTRIES * 2, .75f, true) {
         private static final long serialVersionUID = 1L;
 
         // This method is called just after a new entry has been added
@@ -37,14 +37,14 @@ public class AdHocCompilerCache {
         }
     };
 
-    public AdHocPlannedStatement get(String sql, boolean singlePartition) {
+    public synchronized AdHocPlannedStatement get(String sql, boolean singlePartition) {
         AdHocPlannedStatement candidate = m_cache.get(sql);
         if (candidate == null) return null;
         if ((candidate.partitionParam != null) == singlePartition) return candidate;
         return null;
     }
 
-    public void put (AdHocPlannedStatement result) {
+    public synchronized void put (AdHocPlannedStatement result) {
         m_cache.put(result.sql, result);
     }
 }

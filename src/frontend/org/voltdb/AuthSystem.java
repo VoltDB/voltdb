@@ -31,6 +31,8 @@ import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
+import org.mindrot.BCrypt;
+
 
 /**
  * The AuthSystem parses authentication and permission information from the catalog and uses it to generate a representation
@@ -88,7 +90,12 @@ public class AuthSystem {
         /**
          * SHA-1 double hashed copy of the users clear text password
          */
-        private final byte[] m_shadowPassword;
+        private final byte[] m_sha1ShadowPassword;
+
+        /**
+         * SHA-1 hashed and then bcrypted copy of the users clear text password
+         */
+        private final String m_bcryptShadowPassword;
 
         /**
          * Name of the user
@@ -123,14 +130,18 @@ public class AuthSystem {
         private final HashSet<Connector> m_authorizedConnectors = new HashSet<Connector>();
 
         /**
-         *
+         * The constructor accepts the password as either sha1 or bcrypt. In practice
+         * there will be only one passed in depending on the format of the password in the catalog.
+         * The other will be null and that is used to determine how to hash the supplied password
+         * for auth
          * @param shadowPassword SHA-1 double hashed copy of the users clear text password
          * @param name Name of the user
          * @param sysproc Whether this user is granted permission to invoke system procedures (can also be granted by group membership)
          * @param adhoc Whether this user is granted permission to invoke adhoc queries (can also be granted by group membership)
          */
-        private AuthUser(byte[] shadowPassword, String name, boolean sysproc, boolean adhoc) {
-            m_shadowPassword = shadowPassword;
+        private AuthUser(byte[] sha1ShadowPassword, String bcryptShadowPassword, String name, boolean sysproc, boolean adhoc) {
+            m_sha1ShadowPassword = sha1ShadowPassword;
+            m_bcryptShadowPassword = bcryptShadowPassword;
             m_name = name;
             m_sysproc = sysproc;
             m_adhoc = adhoc;
@@ -231,7 +242,23 @@ public class AuthSystem {
          * First associate all users with groups and vice versa
          */
         for (org.voltdb.catalog.User catalogUser : db.getUsers()) {
-            final AuthUser user = new AuthUser( Encoder.hexDecode(catalogUser.getShadowpassword()),
+            String shadowPassword = catalogUser.getShadowpassword();
+            byte sha1ShadowPassword[] = null;
+            if (shadowPassword.length() == 40) {
+                /*
+                 * This is an old catalog with a SHA-1 password
+                 * Need to hex decode it
+                 */
+                sha1ShadowPassword = Encoder.hexDecode(shadowPassword);
+            } else if (shadowPassword.length() != 60) {
+                /*
+                 * If not 40 should be 60 since it is bcrypt
+                 */
+                VoltDB.crashGlobalVoltDB(
+                        "Found a shadowPassword in the catalog that was in an unrecogized format", true, null);
+            }
+
+            final AuthUser user = new AuthUser( sha1ShadowPassword, shadowPassword,
                     catalogUser.getTypeName(), catalogUser.getSysproc(), catalogUser.getAdhoc());
             m_users.put(user.m_name.intern(), user);
             for (org.voltdb.catalog.GroupRef catalogGroupRef : catalogUser.getGroups()) {
@@ -335,14 +362,29 @@ public class AuthSystem {
             return false;
         }
 
-        MessageDigest md = null;
-        try {
-            md = MessageDigest.getInstance("SHA-1");
-        } catch (NoSuchAlgorithmException e) {
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        boolean matched = true;
+        if (user.m_sha1ShadowPassword != null) {
+            MessageDigest md = null;
+            try {
+                md = MessageDigest.getInstance("SHA-1");
+            } catch (NoSuchAlgorithmException e) {
+                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+            }
+            byte passwordHash[] = md.digest(password);
+
+            /*
+             * A n00bs attempt at constant time comparison
+             */
+            for (int ii = 0; ii < passwordHash.length; ii++) {
+                if (passwordHash[ii] != user.m_sha1ShadowPassword[ii]){
+                    matched = false;
+                }
+            }
+        } else {
+            matched = BCrypt.checkpw(Encoder.hexEncode(password), user.m_bcryptShadowPassword);
         }
-        byte passwordHash[] = md.digest(password);
-        if (java.util.Arrays.equals(passwordHash, user.m_shadowPassword)) {
+
+        if (matched) {
             authLogger.l7dlog(Level.INFO, LogKeys.auth_AuthSystem_AuthenticatedUser.name(), new Object[] {username}, null);
             return true;
         } else {
@@ -353,7 +395,7 @@ public class AuthSystem {
 
     AuthUser getUser(String name) {
         if (!m_enabled) {
-            return new AuthUser(null, null, false, false) {
+            return new AuthUser(null, null, null, false, false) {
                 @Override
                 public boolean hasPermission(Procedure proc) {
                     return true;
