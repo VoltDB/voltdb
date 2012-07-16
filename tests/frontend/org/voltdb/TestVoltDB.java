@@ -173,6 +173,11 @@ public class TestVoltDB extends TestCase {
         String[] args250 = {"rejoin"};
         config = new VoltDB.Configuration(args250);
         assertFalse(config.validate());
+
+        // rejoinhost should still work
+        String[] args201 = {"rejoinhost", "localhost"};
+        config = new VoltDB.Configuration(args201);
+        assertTrue(config.validate());
     }
 
     /**
