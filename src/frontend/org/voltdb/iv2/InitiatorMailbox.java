@@ -226,36 +226,16 @@ public class InitiatorMailbox implements Mailbox
     void handleLogRequest(VoltMessage message)
     {
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
-        List<RepairLog.Item> logs = m_repairLog.contents(req.isMPIRequest());
+        List<Iv2RepairLogResponseMessage> logs = m_repairLog.contents(req.getRequestId(),
+                req.isMPIRequest());
 
-        String whoami =
-            "SP " +  CoreUtils.hsIdToString(getHSId())
+        tmLog.info(""
+            + CoreUtils.hsIdToString(getHSId())
             + " handling repair log request id " + req.getRequestId()
-            + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ";
+            + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ");
 
-        int seq = 0;
-        int ofTotal = logs.size() + 1;  // includes the ack.
-        tmLog.info(whoami + "Responding with " + ofTotal + " repair log parts.");
-
-        // always send an initial ack.
-        Iv2RepairLogResponseMessage header =
-            new Iv2RepairLogResponseMessage(
-                    req.getRequestId(),
-                    seq++,
-                    ofTotal,
-                    m_repairLog.getLastSpHandle(),
-                    null); // no payload. just an ack.
-        send(message.m_sourceHSId, header);
-
-        for (RepairLog.Item log : logs) {
-            Iv2RepairLogResponseMessage response =
-                new Iv2RepairLogResponseMessage(
-                        req.getRequestId(),
-                        seq++,
-                        ofTotal,
-                        log.getHandle(),
-                        log.getMessage());
-            send(message.m_sourceHSId, response);
+        for (Iv2RepairLogResponseMessage log : logs) {
+            send(message.m_sourceHSId, log);
         }
     }
 
