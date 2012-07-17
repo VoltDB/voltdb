@@ -286,9 +286,10 @@ public class TestVoltMessageSerialization extends TestCase {
 
     public void testIv2RepairLogRequestMessage() throws IOException
     {
-        Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100);
+        Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100, Iv2RepairLogRequestMessage.SPREQUEST);
         Iv2RepairLogRequestMessage rlm2 = (Iv2RepairLogRequestMessage) checkVoltMessage(rlm);
         assertEquals(rlm.getRequestId(), rlm2.getRequestId());
+        assertEquals(rlm.isMPIRequest(), rlm2.isMPIRequest());
     }
 
     public void testIv2RepairLogResponseMessage() throws Exception
@@ -305,7 +306,7 @@ public class TestVoltMessageSerialization extends TestCase {
         Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, itask);
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
-        assertEquals(r1.getSpHandle(), r2.getSpHandle());
+        assertEquals(r1.getHandle(), r2.getHandle());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
 

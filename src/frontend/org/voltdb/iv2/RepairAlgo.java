@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.concurrent.Future;
-import java.util.List;
 
 import org.voltcore.messaging.VoltMessage;
 
@@ -52,7 +51,7 @@ public interface RepairAlgo
      * leadership has been fully assumed and all surviving replicas have been
      * repaired.
      */
-    public Future<Boolean> start(List<Long> survivors);
+    public Future<Boolean> start();
 
     public boolean cancel();
 

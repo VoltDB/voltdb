@@ -38,6 +38,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheReader;
 
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
@@ -65,18 +66,12 @@ public class InitiatorMailbox implements Mailbox
     private final RejoinProducer m_rejoinProducer;
     private final MapCacheReader m_masterMapCache;
     private long m_hsId;
-    private Term m_term;
     private RepairAlgo m_algo;
 
     private Set<Long> m_replicas = null;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
-
-    synchronized public void setTerm(Term term)
-    {
-        m_term = term;
-    }
 
     synchronized public void setRepairAlgo(RepairAlgo algo)
     {
@@ -230,55 +225,55 @@ public class InitiatorMailbox implements Mailbox
     /** Produce the repair log. This is idempotent. */
     void handleLogRequest(VoltMessage message)
     {
-        List<RepairLog.Item> logs = m_repairLog.contents();
-        int ofTotal = logs.size();
-        int seq = 1;
-
         Iv2RepairLogRequestMessage req = (Iv2RepairLogRequestMessage)message;
-        tmLog.info("SP " +  CoreUtils.hsIdToString(getHSId())
-                + " handling repair log request id " + req.getRequestId()
-                + " for " + CoreUtils.hsIdToString(message.m_sourceHSId)
-                + ". Responding with " + ofTotal + " repair log parts.");
+        List<RepairLog.Item> logs = m_repairLog.contents(req.isMPIRequest());
 
-        if (logs.isEmpty()) {
-            // respond with an ack that the log is empty.
-            // maybe better if seq 0 is always the ack with null payload?
+        String whoami =
+            "SP " +  CoreUtils.hsIdToString(getHSId())
+            + " handling repair log request id " + req.getRequestId()
+            + " for " + CoreUtils.hsIdToString(message.m_sourceHSId) + ". ";
+
+        int seq = 0;
+        int ofTotal = logs.size() + 1;  // includes the ack.
+        tmLog.info(whoami + "Responding with " + ofTotal + " repair log parts.");
+
+        // always send an initial ack.
+        Iv2RepairLogResponseMessage header =
+            new Iv2RepairLogResponseMessage(
+                    req.getRequestId(),
+                    seq++,
+                    ofTotal,
+                    m_repairLog.getLastSpHandle(),
+                    null); // no payload. just an ack.
+        send(message.m_sourceHSId, header);
+
+        for (RepairLog.Item log : logs) {
             Iv2RepairLogResponseMessage response =
                 new Iv2RepairLogResponseMessage(
                         req.getRequestId(),
-                        0, // sequence
-                        0, // total expected
-                        m_repairLog.getLastSpHandle(), // spHandle
-                        null); // no payload. just an ack.
+                        seq++,
+                        ofTotal,
+                        log.getHandle(),
+                        log.getMessage());
             send(message.m_sourceHSId, response);
         }
-        else {
-            for (RepairLog.Item log : logs) {
-                Iv2RepairLogResponseMessage response =
-                    new Iv2RepairLogResponseMessage(
-                            req.getRequestId(),
-                            seq,
-                            ofTotal,
-                            log.getSpHandle(),
-                            log.getMessage());
-                send(message.m_sourceHSId, response);
-                seq++;
-            }
-        }
-        return;
     }
 
     /**
      * Create a real repair message from the msg repair log contents and
-     * instruct the message handler to execute a repair.
+     * instruct the message handler to execute a repair. Single partition
+     * work needs to do duplicate counting; MPI can simply broadcast the
+     * repair to the needs repair units -- where the SP will do the rest.
      */
-    void repairReplicasWith(List<Long> needsRepair, Iv2RepairLogResponseMessage msg)
+    void repairReplicasWith(List<Long> needsRepair, VoltMessage repairWork)
     {
-        VoltMessage repairWork = msg.getPayload();
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
             m_msgHandler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
+        }
+        else if (repairWork instanceof CompleteTransactionMessage) {
+            send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
         }
     }
 

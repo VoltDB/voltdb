@@ -20,7 +20,6 @@ package org.voltdb.iv2;
 import java.util.ArrayList;
 import java.util.Comparator;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 import java.util.HashMap;
 import java.util.List;
@@ -45,7 +44,7 @@ import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 import org.voltdb.VoltDB;
 
-public class SpRepairAlgo implements RepairAlgo
+public class SpPromoteAlgo implements RepairAlgo
 {
     VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
@@ -55,6 +54,7 @@ public class SpRepairAlgo implements RepairAlgo
     private final long m_requestId = System.nanoTime();
     private final ZooKeeper m_zk;
     private final String m_mapCacheNode;
+    private final List<Long> m_survivors;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -73,25 +73,17 @@ public class SpRepairAlgo implements RepairAlgo
         long m_maxSpHandleSeen = Long.MIN_VALUE;
 
         // update counters and return the number of outstanding messages.
-        int update(Iv2RepairLogResponseMessage response)
+        boolean update(Iv2RepairLogResponseMessage response)
         {
             m_receivedResponses++;
             m_expectedResponses = response.getOfTotal();
-            m_maxSpHandleSeen = Math.max(m_maxSpHandleSeen, response.getSpHandle());
+            m_maxSpHandleSeen = Math.max(m_maxSpHandleSeen, response.getHandle());
             return logsComplete();
         }
 
-        // return 0 if all expected logs have been received.
-        int logsComplete()
+        boolean logsComplete()
         {
-            // expected responses is really a count of remote
-            // messages. if there aren't any, the sequence will be
-            // 1 (the count of responses) while expected will be 0
-            // (the length of the remote log)
-            if (m_expectedResponses == 0) {
-               return 0;
-            }
-            return m_expectedResponses - m_receivedResponses;
+            return (m_expectedResponses - m_receivedResponses) == 0;
         }
 
         // return true if this replica needs the message for spHandle.
@@ -112,7 +104,7 @@ public class SpRepairAlgo implements RepairAlgo
         @Override
         public int compare(Iv2RepairLogResponseMessage o1, Iv2RepairLogResponseMessage o2)
         {
-            return (int)(o1.getSpHandle() - o2.getSpHandle());
+            return (int)(o1.getHandle() - o2.getHandle());
         }
     };
 
@@ -123,23 +115,24 @@ public class SpRepairAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public SpRepairAlgo(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+    public SpPromoteAlgo(List<Long> survivors, ZooKeeper zk,
+            int partitionId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
         m_zk = zk;
         m_partitionId = partitionId;
         m_mailbox = mailbox;
+        m_survivors = survivors;
 
         m_whoami = whoami;
         m_mapCacheNode = zkMapCacheNode;
     }
 
     @Override
-    public Future<Boolean> start(List<Long> survivors)
+    public Future<Boolean> start()
     {
         try {
-            prepareForFaultRecovery(survivors);
+            prepareForFaultRecovery();
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
@@ -155,17 +148,18 @@ public class SpRepairAlgo implements RepairAlgo
     }
 
     /** Start fixing survivors: setup scoreboard and request repair logs. */
-    void prepareForFaultRecovery(List<Long> survivors)
+    void prepareForFaultRecovery()
     {
-        for (Long hsid : survivors) {
+        for (Long hsid : m_survivors) {
             m_replicaRepairStructs.put(hsid, new ReplicaRepairStruct());
         }
 
-        tmLog.info(m_whoami + "found (including self) " + survivors.size()
+        tmLog.info(m_whoami + "found (including self) " + m_survivors.size()
                 + " surviving replicas to repair. "
-                + " Survivors: " + CoreUtils.hsIdCollectionToString(survivors));
-        VoltMessage logRequest = new Iv2RepairLogRequestMessage(m_requestId);
-        m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), logRequest);
+                + " Survivors: " + CoreUtils.hsIdCollectionToString(m_survivors));
+        VoltMessage logRequest =
+            new Iv2RepairLogRequestMessage(m_requestId, Iv2RepairLogRequestMessage.SPREQUEST);
+        m_mailbox.send(com.google.common.primitives.Longs.toArray(m_survivors), logRequest);
     }
 
     /** Process a new repair log response */
@@ -187,7 +181,7 @@ public class SpRepairAlgo implements RepairAlgo
                         + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
             m_repairLogUnion.add(response);
-            if (rrs.update(response) == 0) {
+            if (rrs.update(response)) {
                 tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
                         + " responses for " + rrs.m_expectedResponses +
                         " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
@@ -202,7 +196,7 @@ public class SpRepairAlgo implements RepairAlgo
     public boolean areRepairLogsComplete()
     {
         for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
-            if (entry.getValue().logsComplete() != 0) {
+            if (!entry.getValue().logsComplete()) {
                 return false;
             }
         }
@@ -225,11 +219,11 @@ public class SpRepairAlgo implements RepairAlgo
         for (Iv2RepairLogResponseMessage li : m_repairLogUnion) {
             List<Long> needsRepair = new ArrayList<Long>(5);
             for (Entry<Long, ReplicaRepairStruct> entry : m_replicaRepairStructs.entrySet()) {
-                if  (entry.getValue().needs(li.getSpHandle())) {
+                if  (entry.getValue().needs(li.getHandle())) {
                     ++queued;
                     tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
                             entry.getValue().m_maxSpHandleSeen + ". Repairing with " +
-                            li.getSpHandle());
+                            li.getHandle());
                     needsRepair.add(entry.getKey());
                 }
             }

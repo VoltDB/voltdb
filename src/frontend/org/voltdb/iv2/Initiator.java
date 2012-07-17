@@ -19,6 +19,8 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.CountDownLatch;
 
+import java.util.List;
+
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltdb.BackendTarget;
@@ -50,5 +52,10 @@ public interface Initiator
     /** Create a Term implementation appropriate for the subclass */
     public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            String zkMapCacheNode, String whoami);
+
+    /** Create a Promotion implementation appropriate for the subclass */
+    public RepairAlgo createPromoteAlgo(List<Long> survivors, ZooKeeper zk,
+            int partitionId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami);
 }

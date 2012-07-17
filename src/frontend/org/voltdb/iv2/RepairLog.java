@@ -38,7 +38,6 @@ public class RepairLog
     private static final boolean IS_SP = true;
     private static final boolean IS_MP = false;
 
-    // last seen spHandle
     // Initialize to Long MAX_VALUE to prevent feeding a newly joined node
     // transactions it should never have seen
     long m_lastSpHandle = Long.MAX_VALUE;
@@ -61,7 +60,7 @@ public class RepairLog
             m_handle = handle;
         }
 
-        long getSpHandle()
+        long getHandle()
         {
             return m_handle;
         }
@@ -94,11 +93,11 @@ public class RepairLog
     void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
-        // If we're the leader, wipe out the old repair log.
-        // This call to setLeaderState() to promote us to the leader shouldn't
-        // happen until after log repair is complete.
+        // The leader doesn't truncate its own log; if promoted,
+        // wipe out the SP portion of the existing log. This promotion
+        // action always happens after repair is completed.
         if (m_isLeader) {
-            truncate(Long.MAX_VALUE, Long.MAX_VALUE);
+            truncate(Long.MIN_VALUE, Long.MAX_VALUE);
         }
     }
 
@@ -156,12 +155,15 @@ public class RepairLog
     }
 
     // produce the contents of the repair log.
-    public List<Item> contents()
+    public List<Item> contents(boolean forMPI)
     {
         List<Item> response = new LinkedList<Item>();
         Iterator<Item> it = m_log.iterator();
         while (it.hasNext()) {
-            response.add(it.next());
+            Item i = it.next();
+            if (!forMPI || i.isMP()) {
+                response.add(i);
+            }
         }
         return response;
     }

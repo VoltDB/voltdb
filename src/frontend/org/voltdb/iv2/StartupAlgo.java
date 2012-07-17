@@ -19,8 +19,6 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
-import java.util.List;
-import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
@@ -45,7 +43,6 @@ public class StartupAlgo implements RepairAlgo
     private final int m_partitionId;
     private final ZooKeeper m_zk;
     private final CountDownLatch m_missingStartupSites;
-    private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
     private final String m_mapCacheNode;
 
     // Each Term can process at most one promotion; if promotion fails, make
@@ -56,7 +53,7 @@ public class StartupAlgo implements RepairAlgo
      * Setup a new StartupAlgo but don't take any action to take responsibility.
      */
     public StartupAlgo(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            int partitionId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
         m_zk = zk;
@@ -75,7 +72,7 @@ public class StartupAlgo implements RepairAlgo
     }
 
     @Override
-    public Future<Boolean> start(List<Long> survivors)
+    public Future<Boolean> start()
     {
         try {
             prepareForStartup();
@@ -99,8 +96,8 @@ public class StartupAlgo implements RepairAlgo
         throws InterruptedException
     {
         tmLog.info(m_whoami +
-                "starting leader promotion with " + m_knownReplicas.size() + " replicas. " +
-                "Waiting for " + m_missingStartupSites.getCount() + " more for configured k-safety.");
+                "starting leader promotion.  Waiting for " +
+                m_missingStartupSites.getCount() + " more for configured k-safety.");
 
         // block here until the babysitter thread provides all replicas.
         // then initialize the mailbox's replica set and proceed as leader.

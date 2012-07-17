@@ -34,7 +34,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
     private long m_requestId = 0;
     private int m_sequence = 0;
     private int m_ofTotal = 0;
-    private long m_spHandle = Long.MIN_VALUE;
+    private long m_handle = Long.MIN_VALUE;
 
     // The original task that is must be replicated for
     // repair. Note: if the destination repair log is
@@ -56,7 +56,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_requestId = requestId;
         m_sequence = sequence;
         m_ofTotal = ofTotal;
-        m_spHandle = spHandle;
+        m_handle = spHandle;
         m_payload = payload;
     }
 
@@ -75,9 +75,9 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         return m_ofTotal;
     }
 
-    public long getSpHandle()
+    public long getHandle()
     {
-        return m_spHandle;
+        return m_handle;
     }
 
     public VoltMessage getPayload()
@@ -106,7 +106,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         buf.putLong(m_requestId);
         buf.putInt(m_sequence);
         buf.putInt(m_ofTotal);
-        buf.putLong(m_spHandle);
+        buf.putLong(m_handle);
 
         if (m_payload != null) {
             ByteBuffer paybuf = ByteBuffer.allocate(m_payload.getSerializedSize());
@@ -126,7 +126,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_requestId = buf.getLong();
         m_sequence = buf.getInt();
         m_ofTotal = buf.getInt();
-        m_spHandle = buf.getLong();
+        m_handle = buf.getLong();
 
         // going inception.
         if (m_ofTotal != 0) {
@@ -150,7 +150,7 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         sb.append(" OF TOTAL: ");
         sb.append(m_ofTotal);
         sb.append(" SP HANDLE: ");
-        sb.append(m_spHandle);
+        sb.append(m_handle);
         sb.append(" PAYLOAD: ");
         if (m_payload == null) {
             sb.append("null");
