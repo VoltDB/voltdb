@@ -53,7 +53,7 @@ public class TestIndexCountSuite extends RegressionSuite {
     public TestIndexCountSuite(String name) {
         super(name);
     }
-    /*
+
     public void testOneColumnIndex() throws Exception {
         Client client = getClient();
 
@@ -135,7 +135,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
         assertTrue(true);
-    }*/
+    }
 
     public void test() throws Exception {
         Client client = getClient();
@@ -170,11 +170,10 @@ public class TestIndexCountSuite extends RegressionSuite {
         table = results[1];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
-        assertEquals(1, table.getLong(0));
+        assertEquals(2, table.getLong(0));
         assertTrue(true);
 
     }
-
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.

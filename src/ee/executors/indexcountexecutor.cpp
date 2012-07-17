@@ -60,7 +60,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     {
         column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
     }
-    printf("<IndexCount Executor> TupleSchema: '%s'", schema->debug().c_str());
+    //printf("<IndexCount Executor> TupleSchema: '%s'", schema->debug().c_str());
 
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       m_node->getTargetTable()->name(),
@@ -81,8 +81,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
     m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
 
-    printf("xin <IndexCount Executor> m_numOfSearchkeys: '%d'\n", m_numOfSearchkeys);
-
     for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
     {
         if (m_node->getSearchKeyExpressions()[ctr] == NULL)
@@ -97,7 +95,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
             m_node->getSearchKeyExpressions()[ctr];
     }
 
-
     if (m_node->getEndKeyExpressions().size() == 0) {
         printf("<Index executor>: has NO END KEY...........\n");
         m_hasEndKey = false;
@@ -111,7 +108,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_needsSubstituteEndKeyPtr =
                 boost::shared_array<bool>(new bool[m_numOfEndkeys]);
         m_needsSubstituteEndKey = m_needsSubstituteEndKeyPtr.get();
-        for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
+        for (int ctr = 0; ctr < m_numOfEndkeys; ctr++)
         {
             if (m_node->getEndKeyExpressions()[ctr] == NULL) {
                 VOLT_ERROR("The end key expression at position '%d' is NULL for"
@@ -167,8 +164,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     m_tuple = TableTuple(m_targetTable->schema());
-    //printf("xin <IndexCount Executor> m_tuple: '%s'\n", m_tuple.debug("tablename").c_str());
-
 
     if (m_node->getPredicate() != NULL)
     {
@@ -314,7 +309,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             post_expression->substitute(params);
         }
         VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
-        printf("Post Expression:\n%s\n", post_expression->debug(true).c_str());
     }
 
     assert (m_index);
@@ -334,33 +328,35 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     int leftIncluded = 0, rightIncluded = 0;
 
     if (m_index->isUniqueIndex()) {
-        if (activeNumOfSearchKeys > 0) {
-            VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                    localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-            printf("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s\n",
-                    localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-
-            if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+        assert (activeNumOfSearchKeys > 0);
+        VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+        if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+            rkStart = m_index->getCounterLET(&m_searchKey, NULL);
+        } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+            rkStart = m_index->getCounterLET(&m_searchKey, NULL);
+            if (m_index->hasKey(&m_searchKey))
+                leftIncluded = 1;
+            if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
+                // two columns index, no value for the second column
+                // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
+                // this may be changed if we can handle one column index case
+                // like: SELECT count(*) from T2 WHERE POINTS < ?
+                printf("SEARCH KEY Not complete*******\n");
                 rkStart = m_index->getCounterLET(&m_searchKey, NULL);
-            } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-                rkStart = m_index->getCounterLET(&m_searchKey, NULL);
-                if (m_index->hasKey(&m_searchKey))
-                    leftIncluded = 1;
-            } else if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-                // There is no equal case right now
-                return false;
-            } else {
-                return false;
+                // because the searchKey is not complete, we should find it,
+                // but it actually finds the previous rank. Add 1 back.
+                rkStart++;
+                leftIncluded = 1;
             }
-
+        } else if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
+            return false;
         } else {
-            assert(true);
-            // never
+            return false;
         }
+
         if (m_hasEndKey) {
             IndexLookupType localEndType = m_endType;
-            printf("INDEX_END_TYPE(%d) m_numEndkeys(%d) key:%s\n",
-                    localEndType, activeNumOfEndKeys, m_endKey.debugNoHeader().c_str());
             if (localEndType == INDEX_LOOKUP_TYPE_LT) {
                 rkEnd = m_index->getCounterGET(&m_endKey, NULL);
             } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {

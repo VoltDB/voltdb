@@ -35,7 +35,7 @@ import org.voltdb.VoltTable;
 public class CountingIndexTest extends VoltProcedure {
 
     public final SQLStmt countstar0 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE TEL = ? AND POINTS < ?");
-    public final SQLStmt countstar1 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE TEL = ? AND POINTS > ? AND POINTS < ?");
+    public final SQLStmt countstar1 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?");
 
     public VoltTable[] run(int p1, int p2, int p3) {
 

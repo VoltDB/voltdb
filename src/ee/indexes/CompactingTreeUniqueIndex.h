@@ -247,15 +247,10 @@ public:
         if (!hasRank) return -1;
         printf("<Tree Unique-map> get counter equal or greater than --- \n");
 
-        printf ("Search KEY: '%s'", searchKey->debugNoHeader().c_str());
+        printf("<getCounterGET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
         m_tmp1.setFromKey(searchKey);
-//        if (hasKey(searchKey)) {
-//            printf("<Tree Unique-map>getCounterGET--- has searchKey !!!--- \n");
-//            return m_entries.rankAsc(m_tmp1);
-//        }
 
         m_keyIter = m_entries.lowerBound(m_tmp1);
-        //printf("<getCounterGET> Lowbound of the search key is %s", m_keyIter.key().debug(searchKey->getSchema()));
         if (m_keyIter.isEnd()) {
             printf("IS END... NO bigger key found...\n");
             return m_entries.size() + 1;
@@ -269,18 +264,17 @@ public:
     int32_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
         printf("<Tree Unique-map> get counter equal or less than--- \n");
-
         m_tmp1.setFromKey(searchKey);
 
         printf("<getCounterLET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
         m_keyIter = m_entries.lowerBound(m_tmp1);
 
-        TableTuple retval(m_tupleSchema);
-        retval.move(const_cast<void*>(m_keyIter.value()));
-        printf("<getCounterLET>*** Lowbound *** is %s \n", retval.debugNoHeader().c_str());
         if (m_keyIter.isEnd()) {
             return m_entries.size();
         }
+        TableTuple retval(m_tupleSchema);
+        retval.move(const_cast<void*>(m_keyIter.value()));
+        printf("<getCounterLET>*** Lowbound *** is %s \n", retval.debugNoHeader().c_str());
 
         int cmp = m_eq(m_tmp1, m_keyIter.key());
         printf("<unique map>cmp value: %d\n", cmp);
@@ -290,6 +284,8 @@ public:
             m_keyIter.movePrev();
             if (m_keyIter.isEnd() == false)
                 return m_entries.rankAsc(m_keyIter.key());
+            else
+                return 0;
         }
         // return rank with the current key if equal or if we can not find a previous key
         return m_entries.rankAsc(tmpKey);
