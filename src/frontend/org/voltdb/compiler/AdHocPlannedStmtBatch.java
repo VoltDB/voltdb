@@ -196,7 +196,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      */
     public boolean isSinglePartitionCompatible() {
         for (AdHocPlannedStatement plannedStmt : plannedStatements) {
-            if (plannedStmt.isReplicatedTableDML || plannedStmt.collectorFragment != null) {
+            if (plannedStmt.collectorFragment != null) {
                 return false;
             }
         }

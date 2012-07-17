@@ -1428,7 +1428,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         StoredProcedureInvocation task = new StoredProcedureInvocation();
         // pick the sysproc based on the presence of partition info
         // HSQL does not specifically implement AdHoc SP -- instead, use its always-SP implementation of AdHoc
-        boolean isSinglePartition = (plannedStmtBatch.partitionParam != null) && ! m_isConfiguredForHSQL;
+        boolean isSinglePartition = plannedStmtBatch.isSinglePartitionCompatible() || m_isConfiguredForHSQL;
         int partitions[] = null;
 
         if (isSinglePartition) {
@@ -1438,7 +1438,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             else {
                 task.procName = "@AdHoc_RW_SP";
             }
-            assert(plannedStmtBatch.isSinglePartitionCompatible());
             partitions = new int[] { TheHashinator.hashToPartition(plannedStmtBatch.partitionParam) };
         }
         else {
