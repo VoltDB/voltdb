@@ -30,10 +30,6 @@ import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.CountingIndexOneColumnFeature;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.CountingIndexThreeColumnsTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.CountingIndexTwoColumnsIntegerTest;
-import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.CountingIndexTwoOrMoreColumnsFeature;
 public class TestIndexCountSuite extends RegressionSuite {
 
     /*
@@ -42,10 +38,6 @@ public class TestIndexCountSuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
-        CountingIndexOneColumnFeature.class,
-        CountingIndexTwoOrMoreColumnsFeature.class,
-        CountingIndexTwoColumnsIntegerTest.class,
-        CountingIndexThreeColumnsTest.class
     };
 
     /**
@@ -59,42 +51,35 @@ public class TestIndexCountSuite extends RegressionSuite {
     public void testOneColumnIndex() throws Exception {
         Client client = getClient();
 
-        client.callProcedure("T1.insert", 1, 1);
-        client.callProcedure("T1.insert", 2, 2);
-        client.callProcedure("T1.insert", 3, 3);
-        client.callProcedure("T1.insert", 6, 6);
-        client.callProcedure("T1.insert", 8, 8);
+        client.callProcedure("TU1.insert", 1, 1);
+        client.callProcedure("TU1.insert", 2, 2);
+        client.callProcedure("TU1.insert", 3, 3);
+        client.callProcedure("TU1.insert", 6, 6);
+        client.callProcedure("TU1.insert", 8, 8);
 
-        VoltTable[] results;
         VoltTable table;
 
         // test with 2,6
-        results = client.callProcedure("CountingIndexOneColumnFeature", 2, 6).getResults();
-        assertEquals(2, results.length);
-
-        table = results[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 2").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
         assertTrue(true);
 
-        table = results[1];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 2 AND POINTS <= 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
         assertTrue(true);
 
         // test with 4,9
-        results = client.callProcedure("CountingIndexOneColumnFeature", 4, 9).getResults();
-        assertEquals(2, results.length);
-
-        table = results[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 4").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
         assertTrue(true);
 
-        table = results[1];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 4 AND POINTS <= 9").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
@@ -104,31 +89,26 @@ public class TestIndexCountSuite extends RegressionSuite {
     public void testTwoOrMoreColumnsIndexes() throws Exception {
         Client client = getClient();
 
-        client.callProcedure("T2.insert", 1, 1, "xin");
-        client.callProcedure("T2.insert", 2, 2, "xin");
-        client.callProcedure("T2.insert", 3, 3, "xin");
-        client.callProcedure("T2.insert", 4, 6, "xin");
-        client.callProcedure("T2.insert", 5, 8, "xin");
-        client.callProcedure("T2.insert", 6, 1, "jia");
-        client.callProcedure("T2.insert", 7, 2, "jia");
-        client.callProcedure("T2.insert", 8, 3, "jia");
-        client.callProcedure("T2.insert", 9, 6, "jia");
-        client.callProcedure("T2.insert", 10, 8, "jia");
+        client.callProcedure("TU2.insert", 1, 1, "xin");
+        client.callProcedure("TU2.insert", 2, 2, "xin");
+        client.callProcedure("TU2.insert", 3, 3, "xin");
+        client.callProcedure("TU2.insert", 4, 6, "xin");
+        client.callProcedure("TU2.insert", 5, 8, "xin");
+        client.callProcedure("TU2.insert", 6, 1, "jia");
+        client.callProcedure("TU2.insert", 7, 2, "jia");
+        client.callProcedure("TU2.insert", 8, 3, "jia");
+        client.callProcedure("TU2.insert", 9, 6, "jia");
+        client.callProcedure("TU2.insert", 10, 8, "jia");
 
-        VoltTable[] results;
         VoltTable table;
-
         // test with 2,6
-        results = client.callProcedure("CountingIndexTwoOrMoreColumnsFeature", 2, 6, "jia").getResults();
-        assertEquals(2, results.length);
-
-        table = results[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
         assertTrue(true);
 
-        table = results[1];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU2 WHERE UNAME = 'jia' AND POINTS > 2 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
@@ -138,31 +118,26 @@ public class TestIndexCountSuite extends RegressionSuite {
     public void testTwoColumnsIntegerIndex() throws Exception {
         Client client = getClient();
 
-        client.callProcedure("T3.insert", 1, 1, 123);
-        client.callProcedure("T3.insert", 2, 2, 123);
-        client.callProcedure("T3.insert", 3, 3, 123);
-        client.callProcedure("T3.insert", 4, 6, 123);
-        client.callProcedure("T3.insert", 5, 8, 123);
-        client.callProcedure("T3.insert", 6, 1, 456);
-        client.callProcedure("T3.insert", 7, 2, 456);
-        client.callProcedure("T3.insert", 8, 3, 456);
-        client.callProcedure("T3.insert", 9, 6, 456);
-        client.callProcedure("T3.insert", 10, 8, 456);
+        client.callProcedure("TU3.insert", 1, 1, 123);
+        client.callProcedure("TU3.insert", 2, 2, 123);
+        client.callProcedure("TU3.insert", 3, 3, 123);
+        client.callProcedure("TU3.insert", 4, 6, 123);
+        client.callProcedure("TU3.insert", 5, 8, 123);
+        client.callProcedure("TU3.insert", 6, 1, 456);
+        client.callProcedure("TU3.insert", 7, 2, 456);
+        client.callProcedure("TU3.insert", 8, 3, 456);
+        client.callProcedure("TU3.insert", 9, 6, 456);
+        client.callProcedure("TU3.insert", 10, 8, 456);
 
-        VoltTable[] results;
         VoltTable table;
-
         // test with 2,6
-        results = client.callProcedure("CountingIndexTwoColumnsIntegerTest", 2, 6, 456).getResults();
-        assertEquals(2, results.length);
-
-        table = results[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU3 WHERE TEL = 456 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
         assertTrue(true);
 
-        table = results[1];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU3 WHERE TEL = 456 AND POINTS >= 2 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
@@ -171,31 +146,26 @@ public class TestIndexCountSuite extends RegressionSuite {
 
     public void testThreeColumnsIndex() throws Exception {
         Client client = getClient();
-        client.callProcedure("T4.insert", 1, 1, "xin", 0);
-        client.callProcedure("T4.insert", 2, 2, "xin", 1);
-        client.callProcedure("T4.insert", 3, 3, "xin", 0);
-        client.callProcedure("T4.insert", 4, 6, "xin", 1);
-        client.callProcedure("T4.insert", 5, 8, "xin", 0);
-        client.callProcedure("T4.insert", 6, 1, "jia", 0);
-        client.callProcedure("T4.insert", 7, 2, "jia", 1);
-        client.callProcedure("T4.insert", 8, 3, "jia", 0);
-        client.callProcedure("T4.insert", 9, 6, "jia", 1);
-        client.callProcedure("T4.insert", 10, 8, "jia", 0);
+        client.callProcedure("TU4.insert", 1, 1, "xin", 0);
+        client.callProcedure("TU4.insert", 2, 2, "xin", 1);
+        client.callProcedure("TU4.insert", 3, 3, "xin", 0);
+        client.callProcedure("TU4.insert", 4, 6, "xin", 1);
+        client.callProcedure("TU4.insert", 5, 8, "xin", 0);
+        client.callProcedure("TU4.insert", 6, 1, "jia", 0);
+        client.callProcedure("TU4.insert", 7, 2, "jia", 1);
+        client.callProcedure("TU4.insert", 8, 3, "jia", 0);
+        client.callProcedure("TU4.insert", 9, 6, "jia", 1);
+        client.callProcedure("TU4.insert", 10, 8, "jia", 0);
 
-        VoltTable[] results;
         VoltTable table;
-
         // test with 2,6
-        results = client.callProcedure("CountingIndexThreeColumnsTest", "xin", 0, 2, 6).getResults();
-        assertEquals(2, results.length);
-
-        table = results[0];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU4 WHERE UNAME = 'xin' AND SEX = 0 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
         assertTrue(true);
 
-        table = results[1];
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU4 WHERE UNAME = 'xin' AND SEX = 0 AND POINTS >= 2 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
@@ -220,10 +190,10 @@ public class TestIndexCountSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
         project.addProcedures(PROCEDURES);
-        project.addPartitionInfo("T1", "ID");
-        project.addPartitionInfo("T2", "UNAME");
-        project.addPartitionInfo("T3", "TEL");
-        project.addPartitionInfo("T4", "UNAME");
+        project.addPartitionInfo("TU1", "ID");
+        project.addPartitionInfo("TU2", "UNAME");
+        project.addPartitionInfo("TU3", "TEL");
+        project.addPartitionInfo("TU4", "UNAME");
 
         boolean success;
 
