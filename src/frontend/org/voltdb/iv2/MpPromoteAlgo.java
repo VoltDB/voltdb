@@ -19,40 +19,32 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 import java.util.Comparator;
-
-import java.util.concurrent.Future;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 import java.util.TreeSet;
+import java.util.concurrent.Future;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
-
-import org.voltdb.iv2.MpPromoteAlgo;
-import org.voltdb.iv2.MpPromoteAlgo;
-
+import org.voltdb.VoltDB;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
-import org.voltdb.VoltDB;
 
 public class MpPromoteAlgo implements RepairAlgo
 {
-    VoltLogger tmLog = new VoltLogger("TM");
+    static final VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
@@ -77,14 +69,28 @@ public class MpPromoteAlgo implements RepairAlgo
     {
         int m_receivedResponses = 0;
         int m_expectedResponses = -1; // (a log msg cares about this init. value)
-        long m_maxHandleSeen = Long.MIN_VALUE;
+        long m_maxHandleCompleted = Long.MAX_VALUE;
+        long m_minHandleSeen = Long.MAX_VALUE;
 
         // update counters and return the number of outstanding messages.
-        boolean update(int expectedResponses, long currHandle)
+        boolean update(Iv2RepairLogResponseMessage response)
         {
             m_receivedResponses++;
-            m_expectedResponses = expectedResponses;
-            m_maxHandleSeen = Math.max(m_maxHandleSeen, currHandle);
+            m_expectedResponses = response.getOfTotal();
+            // track the oldest MP not truncated from the log.
+            m_minHandleSeen = Math.min(m_minHandleSeen, response.getHandle());
+            // track the newest MP that was completed.
+            if (response.getPayload() != null &&
+                response.getPayload() instanceof CompleteTransactionMessage) {
+                // this is overly defensive: the replies should always arrive
+                // in increasing handle order.
+                if (m_maxHandleCompleted == Long.MAX_VALUE) {
+                    m_maxHandleCompleted = response.getHandle();
+                }
+                else {
+                    m_maxHandleCompleted = Math.max(m_maxHandleCompleted, response.getHandle());
+                }
+            }
             return logsComplete();
         }
 
@@ -94,10 +100,24 @@ public class MpPromoteAlgo implements RepairAlgo
             return (m_expectedResponses - m_receivedResponses) == 0;
         }
 
-        // return true if this replica needs the message for spHandle.
-        boolean needs(long spHandle)
+        // If the replica saw at least one MP transaction, it requires repair
+        // for all transactions GT the known max completed handle.
+        boolean needs(long handle)
         {
-            return m_maxHandleSeen < spHandle;
+            if (m_minHandleSeen != Long.MAX_VALUE) {
+                // must repair if no transactions were completed.
+                if (m_maxHandleCompleted == Long.MAX_VALUE) {
+                    return true;
+                }
+                else if (handle > m_maxHandleCompleted) {
+                    return true;
+                }
+            }
+
+            tmLog.debug("Rejecting repair for " + handle + " minHandleSeen: " + m_minHandleSeen +
+              " maxHandleCompleted: " + m_maxHandleCompleted);
+
+            return false;
         }
     }
 
@@ -181,6 +201,16 @@ public class MpPromoteAlgo implements RepairAlgo
                         + " Received response for request id: " + response.getRequestId());
                 return;
             }
+
+            // Step 1: if the msg has a known (not MAX VALUE) handle, update m_maxSeen.
+            if (response.getHandle() != Long.MAX_VALUE) {
+                m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
+            }
+
+            // Step 2: offer to the union
+            addToRepairLog(response);
+
+            // Step 3: update the corresponding replica repair struct.
             ReplicaRepairStruct rrs = m_replicaRepairStructs.get(response.m_sourceHSId);
             if (rrs.m_expectedResponses < 0) {
                 tmLog.info(m_whoami + "collecting " + response.getOfTotal()
@@ -188,8 +218,7 @@ public class MpPromoteAlgo implements RepairAlgo
                         + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
 
-            addToRepairLog(response);
-            if (rrs.update(response.getOfTotal(), computeSafePoint(response))) {
+            if (rrs.update(response)) {
                 tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
                         + " responses for " + rrs.m_expectedResponses +
                         " repair log entries from " + CoreUtils.hsIdToString(response.m_sourceHSId));
@@ -231,7 +260,7 @@ public class MpPromoteAlgo implements RepairAlgo
                 if  (entry.getValue().needs(li.getHandle())) {
                     ++queued;
                     tmLog.debug(m_whoami + "repairing " + entry.getKey() + ". Max seen " +
-                            entry.getValue().m_maxHandleSeen + ". Repairing with " +
+                            entry.getValue().m_maxHandleCompleted + ". Repairing with " +
                             li.getHandle());
                     needsRepair.add(entry.getKey());
                 }
@@ -304,17 +333,6 @@ public class MpPromoteAlgo implements RepairAlgo
             // prefer complete messages to fragment tasks.
             m_repairLogUnion.remove(prev);
             m_repairLogUnion.add(msg);
-        }
-    }
-
-    long computeSafePoint(Iv2RepairLogResponseMessage msg) {
-        long oldSafePoint = m_maxSeenTxnId;
-        m_maxSeenTxnId = Math.max(m_maxSeenTxnId, msg.getHandle());
-        if (msg.getPayload() instanceof CompleteTransactionMessage) {
-            return msg.getHandle();
-        }
-        else {
-            return oldSafePoint;
         }
     }
 

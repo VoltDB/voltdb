@@ -205,6 +205,10 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                     tmLog.info(m_whoami
                             + "finished leader promotion. Took "
                             + (System.currentTimeMillis() - startTime) + " ms.");
+
+                    // TODO:
+                    // THIS IS where map cache should be updated, not
+                    // in the promotion algorithm.
                 }
                 else {
                     // The only known reason to fail is a failed replica during
