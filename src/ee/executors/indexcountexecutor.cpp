@@ -1,10 +1,6 @@
 /* This file is part of VoltDB.
  * Copyright (C) 2008-2012 VoltDB Inc.
  *
- * This file contains original code and/or modifications of original code.
- * Any modifications made by VoltDB Inc. are licensed under the following
- * terms and conditions:
- *
  * VoltDB is free software: you can redistribute it and/or modify
  * it under the terms of the GNU General Public License as published by
  * the Free Software Foundation, either version 3 of the License, or
@@ -410,12 +406,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         if (post_expression == NULL ||
             post_expression->eval(&m_tuple, NULL).isTrue())
         {
-        	// Straight Insert
-        	//
-        	// Try to put the tuple into our output table
-        	//
-        	m_outputTable->insertTupleNonVirtual(m_tuple);
-        	tuples_written++;
+            // Straight Insert
+            //
+            // Try to put the tuple into our output table
+            //
+            m_outputTable->insertTupleNonVirtual(m_tuple);
+            tuples_written++;
         }
     }*/
 

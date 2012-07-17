@@ -76,7 +76,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
         aide.tearDown();
     }
 
-    // DOES NOT support the cases down below right now 
+    // DOES NOT support the cases down below right now
     public void testCountStar0() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, true);
         checkIndexCounter(pn, true, false);
@@ -91,19 +91,19 @@ public class TestReplaceWithIndexCounter extends TestCase {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
         checkIndexCounter(pn, false, false);
     }
-    
+
     public void testCountStar7() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS >= 3 AND AGE = ?", 1, true);
         checkIndexCounter(pn, false, false);
     }
-    
+
     public void testCountStar15() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?", 2, false);
         checkIndexCounter(pn, false, false);
     }
-    
-    // Down below are cases that we can replace 
-    
+
+    // Down below are cases that we can replace
+
     public void testCountStar11() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?", 1, true);
         checkIndexCounter(pn, false, false);
@@ -118,7 +118,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS <= 6", 0, true);
         checkIndexCounter(pn, false, true);
     }
-    
+
     public void testCountStar8() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?", 2, true);
         checkIndexCounter(pn, false, true);
@@ -174,7 +174,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
             assertTrue(p instanceof IndexCountPlanNode);
         else
             assertTrue((p instanceof IndexCountPlanNode) == false);
-        
+
 //        if (pushDownTypes != null) {
 //            for (ExpressionType type : pushDownTypes) {
 //                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
