@@ -36,14 +36,14 @@ public class plannerTester {
 	private static String m_pathRefPlan;
 	private static String m_baseName;
 	private static String m_pathDDL;
-	private static int m_numSQL;
+	private static int m_numSQL = 0;
 	private static String m_savePlanPath;
 	private static ArrayList<Pair> m_partitionColumns = new ArrayList<plannerTester.Pair>(); 
 	private static ArrayList<String> m_stmts = new ArrayList<String>();
 	private static int m_treeSizeDiff;
 	private static boolean m_changedSQL;
 	
-	private static class Pair {
+	public static class Pair {
 	    private Object first; //first member of pair
 	    private Object second; //second member of pair
 
@@ -108,13 +108,12 @@ public class plannerTester {
 				m_baseName = line;
 			}
 			else if( line.equalsIgnoreCase("SQL:")) {
-				line = reader.readLine();
-				m_numSQL = Integer.parseInt( line );
 				m_stmts.clear();
-				for( int i = 0; i < m_numSQL; i++ ) {
-					line = reader.readLine();
-					m_stmts.add(line);
+				m_numSQL = 0;
+				while( (line = reader.readLine()).length() > 6 ) {
+					m_stmts.add( line );
 				}
+				m_numSQL = m_stmts.size();
 			}
 			else if( line.equalsIgnoreCase("Save Path:") ) {
 				line = reader.readLine();
@@ -133,6 +132,18 @@ public class plannerTester {
 			e.printStackTrace();
 		}
 	}
+	
+	public static void setUp( String pathDDL, String baseName, String table, String column ) {
+		Pair p = new Pair( table, column ); 
+		m_partitionColumns.add(p);
+		m_pathDDL = pathDDL;
+		m_baseName = baseName;
+		try {
+			setUpSchema();
+		} catch (Exception e) {
+			e.printStackTrace();
+		}
+	} 
 	
     private static void setUpSchema() throws Exception {
     	File ddlFile = new File(m_pathDDL);
@@ -153,38 +164,43 @@ public class plannerTester {
         	}
         }
     }
-
-    public static void batchCompileSave( ) throws Exception {
-//    	setUpSchema( ddl, basename );
-//    	loadStmts( stmtFilePath );
-    	int size = m_stmts.size();
-    	for( int i = 0; i < size; i++ ) {
-    		 //assumes single partition
-    		AbstractPlanNode pn = compile( m_stmts.get(i), 0, false);
-    		writePlanToFile(pn, m_savePlanPath+i );
-    	}
-    }
-
+    
     protected void tearDown() throws Exception {
         aide.tearDown();
     }
     
-	public static AbstractPlanNode compile( String sql, int paramCount,
+	public static List<AbstractPlanNode> compile( String sql, int paramCount,
             boolean singlePartition ) throws Exception {
-		List<AbstractPlanNode> pn = null;
-        pn =  aide.compile(sql, paramCount, singlePartition);
-        return pn.get(0);
+		List<AbstractPlanNode> pnList = null;
+        pnList =  aide.compile(sql, paramCount, singlePartition);
+        return pnList;
 	}
 	
-	public static void writePlanToFile( AbstractPlanNode pn, String path ) {
+	public static AbstractPlanNode combinePlanNodes( List<AbstractPlanNode> pnList ) {
+		int size = pnList.size();
+		AbstractPlanNode pn = pnList.get(0);
+		if( size == 1 )
+			return pn;
+		else {
+			PlanNodeTree pnt = new PlanNodeTree( pn );
+			for( int i = 1; i < size; i++ ) {
+				pnt.concatenate( pnList.get(i) );
+			}
+			return pnt.getRootPlanNode();
+		}
+	}
+	
+	public static void writePlanToFile( AbstractPlanNode pn, String pathToDir, String fileName) {
 		if( pn == null ) {
 			System.err.println("the plan node is null, nothing to write");
 			System.exit(-1);
 		}
 		PlanNodeTree pnt = new PlanNodeTree( pn );
 		String prettyJson = pnt.toJSONString();
+		if( !new File(pathToDir).exists() )
+			new File(pathToDir).mkdir();
         try {
-		    	BufferedWriter writer = new BufferedWriter( new FileWriter( path ) );
+		    	BufferedWriter writer = new BufferedWriter( new FileWriter( pathToDir+fileName ) );
 		    	writer.write( prettyJson );
 		    	writer.flush();
 		    	writer.close();
@@ -193,20 +209,19 @@ public class plannerTester {
 		}
 	}
 	
-	public static PlanNodeTree loadPlanFromFile( String path ) {
+	public static PlanNodeTree loadPlanFromFile( String path ) throws FileNotFoundException {
 		PlanNodeTree pnt = new PlanNodeTree();
 		String prettyJson = "";
 		String line = null;
-		 try {
 				BufferedReader reader = new BufferedReader( new FileReader( path ));
-				while( (line = reader.readLine() ) != null ){
-					line = line.trim();
-					prettyJson += line;
+				try {
+					while( (line = reader.readLine() ) != null ){
+						line = line.trim();
+						prettyJson += line;
+					}
+				} catch (IOException e1) {
+					e1.printStackTrace();
 				}
-			}
-	        catch (IOException e) {
-	    		e.printStackTrace();
-	    	}
 			JSONObject jobj;
 			try {
 				jobj = new JSONObject( prettyJson );
@@ -218,24 +233,42 @@ public class plannerTester {
 		return pnt;
 	}
 	
+    public static void batchCompileSave( ) throws Exception {
+    	int size = m_stmts.size();
+    	for( int i = 0; i < size; i++ ) {
+    		//assume multi partition
+    		List<AbstractPlanNode> pnList = compile( m_stmts.get(i), 0, false);
+    		AbstractPlanNode pn = combinePlanNodes(pnList);
+    		writePlanToFile(pn, m_savePlanPath, m_testName+i+".plan"+i );
+    	}
+    }
+	
 	//parameters : path to baseline and the new plans 
 	//size : number of total files in the baseline directory
 	public static void batchDiff( String pathBaseline, String pathNew, int size ) {
 		PlanNodeTree pnt1 = null;
 		PlanNodeTree pnt2 = null;
 		for( int i = 0; i < size; i++ ){
-			System.out.println("Statement "+i+":");
-			pnt1 = loadPlanFromFile( pathBaseline+i );
-			pnt2  = loadPlanFromFile( pathNew+i );
+			System.out.println("Statement "+i+" of "+m_testName+": ");
+			try {
+				pnt1 = loadPlanFromFile( pathBaseline+m_testName+".plan"+i );
+				pnt2  = loadPlanFromFile( pathNew+m_testName+".plan"+i );
+			} catch (FileNotFoundException e) {
+				System.err.println("Plan files don't exist.Use batchCompileSave() to generate plans");
+			}
 			AbstractPlanNode pn1 = pnt1.getRootPlanNode();
 			AbstractPlanNode pn2 = pnt2.getRootPlanNode();
-			diffLeaves( pn1, pn2 );
+			diffScans( pn1, pn2 );
 			diffInlineNodes( pn1, pn2);
+			System.out.println("");
 		}
 	}
 	
 	public static void batchDiff( ) {
+		System.out.println( "Begin Diff for "+m_testName );
 		batchDiff( m_pathRefPlan, m_savePlanPath, m_numSQL );
+		System.out.println("==================================================================="+
+				"End of "+m_testName);
 	}
 	
 	public static void diffInlineNodes( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ) {
@@ -469,10 +502,10 @@ public class plannerTester {
 		return str;
 	}
 	
-	public static void diffLeaves( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ){
+	public static void diffScans( AbstractPlanNode oldpn, AbstractPlanNode newpn ){
 		m_changedSQL = false;
-		ArrayList<AbstractPlanNode> list1 = oldpn1.getLeafLists();
-		ArrayList<AbstractPlanNode> list2 = newpn2.getLeafLists();
+		ArrayList<AbstractPlanNode> list1 = oldpn.getScanNodeList();
+		ArrayList<AbstractPlanNode> list2 = newpn.getScanNodeList();
 		int size1 = list1.size();
 		int size2 = list2.size();
 		int max = Math.max(size1, size2);
@@ -512,6 +545,8 @@ public class plannerTester {
 							System.out.println("Index diff at leaf "+i+" :");
 							System.out.println(stringPair);
 						}
+						else
+							System.out.println("Same at leaf "+i);
 					}
 					else//either index scan using same index or seqscan on same table 
 						System.out.println("Same at leaf "+i);
@@ -585,7 +620,7 @@ public class plannerTester {
 					}
 					else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
 						stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
-						System.out.println("Diff scan at leaf"+0+" :");
+						System.out.println("Diff scan at leaf "+0+" :");
 						System.out.println(stringPair);
 					}
 					else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
@@ -596,12 +631,15 @@ public class plannerTester {
 							System.out.println("Diff index at leaf"+0+": ");
 							System.out.println(stringPair);
 						}
+						else
+							System.out.println("Same at "+0);
 					}
 					else
 						System.out.println("Same at "+0);
 				}
 				else {
 					System.out.println("Join query");
+					//System.out.println( newpn.toExplainPlanString() );
 					for( int i = 0; i < max; i++ ) {
 						JSONObject j1 = new JSONObject( list1.get(i).toJSONString() );
 						JSONObject j2 = new JSONObject( list2.get(i).toJSONString() );
@@ -611,12 +649,12 @@ public class plannerTester {
 						String nodeType2 = j2.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
 						if( !table1.equalsIgnoreCase(table2) ){
 							stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
-							System.out.println("Diff table at leaf"+i+" :");
+							System.out.println("Diff table at leaf "+i+" :");
 							System.out.println(stringPair);	
 						}
 						else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
 							stringPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
-							System.out.println("Diff scan at leaf"+0+" :");
+							System.out.println("Diff scan at leaf "+i+" :");
 							System.out.println(stringPair);	
 						}
 						else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
@@ -624,12 +662,15 @@ public class plannerTester {
 							String index2 = j2.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
 								if( !index1.equalsIgnoreCase(index2) ){
 									stringPair.set(nodeType1+" on "+table1+" using "+index1, nodeType2+" on "+table2+" using "+index2 );
-									System.out.println("Diff index at leaf"+0+": ");
+									System.out.println("Diff index at leaf "+i+": ");
 									System.out.println(stringPair);
+								}
+								else {
+									System.out.println("Same at leaf "+i);
 								}
 						}
 					else
-						System.out.println("Same at leaf"+i);
+						System.out.println("Same at leaf "+i);
 				}
 			}
 			}

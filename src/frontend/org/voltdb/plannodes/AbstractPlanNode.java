@@ -485,29 +485,30 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         // NOTE: ignores inline nodes.
     }
     
-    public ArrayList<AbstractPlanNode> getLeafLists () {
+    public ArrayList<AbstractPlanNode> getScanNodeList () {
     	HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
         ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
-        getLeafLists_recurse( collected, visited);
+        getScanNodeList_recurse( collected, visited);
         return collected;
     }
     
-    public void getLeafLists_recurse(ArrayList<AbstractPlanNode> collected,
+    public void getScanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
     	if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";
             return;
         }
         visited.add(this);
+        for (AbstractPlanNode n : m_children)
+            n.getScanNodeList_recurse(collected, visited);
+        
         if( this.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null )
         	collected.add(this.getInlinePlanNode(PlanNodeType.INDEXSCAN));
         if( this.getInlinePlanNode(PlanNodeType.SEQSCAN) != null )
         	collected.add(this.getInlinePlanNode(PlanNodeType.SEQSCAN));
-        if (getChildCount()==0 )
+        if ( getChildCount()==0 && 
+        		( getPlanNodeType().equals(PlanNodeType.SEQSCAN) || getPlanNodeType().equals(PlanNodeType.INDEXSCAN ) ) )
             collected.add(this);
-
-        for (AbstractPlanNode n : m_children)
-            n.getLeafLists_recurse(collected, visited);
 
         // NOTE: ignores inline nodes.
     }

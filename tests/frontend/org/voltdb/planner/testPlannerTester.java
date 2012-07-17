@@ -36,6 +36,7 @@ import java.util.Map;
 
 import junit.framework.TestCase;
 
+import org.apache.commons.lang3.tuple.Pair;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -124,28 +125,44 @@ public class testPlannerTester extends TestCase {
     
     public void testCompile() {
 				try {
-					AbstractPlanNode apn = plannerTester.compile("select * from l, t where t.b=l.b limit ?;", 3, true);
+					plannerTester.setUp("/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+							"testplans-plannerTester-ddl", "L", "a");
+					//List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
+					List<AbstractPlanNode> pnList = plannerTester.compile("insert into l VALUES(?,?,?,?);", 4, false);
+					assertTrue( pnList.size() == 2 );
+					System.out.println( pnList.size() );
+					System.out.println( pnList.get(0).toExplainPlanString() );
+					System.out.println( pnList.get(1).toExplainPlanString() );
+					
+					AbstractPlanNode pn = plannerTester.combinePlanNodes( pnList );
+					System.out.println( pn.toExplainPlanString() );
 				} catch (Exception e) {
 					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
     }
     
-    public void testWriteAndLoad() {
+    public void testWriteAndLoad() throws Exception {
     	AbstractPlanNode pn = null;
     	//pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
     	//pn = compile("select * from l where b = ? limit ?;", 3, true);
     	//pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
-    	pn = compile("select * from t where a = ? order by a limit ?;",3, true);
-    	PlanNodeTree pnt1 = new PlanNodeTree( pn );
-    	System.out.println(pnt1.toJSONString());
-    	System.out.println(pnt1.getRootPlanNode().toExplainPlanString() );
-    	String path = "/home/zhengli/prettyJson.txt";
-    	plannerTester.writePlanToFile(pn, path);
+    	//pn = compile("select * from t where a = ? order by a limit ?;",3, true);
+    	plannerTester.setUp("/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+				"testplans-plannerTester-ddl", "L", "a");
+		List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
+
+    	String path = "/home/zhengli/";
+    	System.out.println( pnList.size() );
+    	
+    	pn = plannerTester.combinePlanNodes(pnList);
+    	System.out.println( pn.toExplainPlanString() );
+    	plannerTester.writePlanToFile( pn, path, "prettyJson.txt");
+    	
     	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path);
     	System.out.println( pnt.toJSONString() );
     	//System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
-    	ArrayList<AbstractPlanNode> list1 = pnt1.getRootPlanNode().getLists();
+    	ArrayList<AbstractPlanNode> list1 = pn.getLists();
     	ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getLists();
     	assertTrue( list1.size() == list2.size() );
     	for( int i = 0; i < list1.size(); i++ ) {
@@ -303,7 +320,7 @@ public class testPlannerTester extends TestCase {
         	System.out.println(i);
         	System.out.println(list1.get(i).toExplainPlanString());
             System.out.println(list2.get(i).toExplainPlanString());
-            plannerTester.diffLeaves(list1.get(i), list2.get(i));
+            plannerTester.diffScans(list1.get(i), list2.get(i));
             plannerTester.diffInlineNodes(list1.get(i), list2.get(i));
         }
     }
@@ -317,7 +334,7 @@ public class testPlannerTester extends TestCase {
     
     public void testWholeProcess() {
     	try {
-			plannerTester.setUp("/home/zhengli/test1");
+			plannerTester.setUp("/home/zhengli/Voter");
 			plannerTester.batchCompileSave();
 			plannerTester.batchDiff();
 		} catch (Exception e) {
