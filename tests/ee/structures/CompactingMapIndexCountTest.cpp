@@ -240,6 +240,31 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
     ASSERT_TRUE(volt.verifyRank());
 }
 
+TEST_F(CompactingMapTest, SimpleMultiRank) {
+    // Start the counting index feature
+    voltdb::CompactingMap<int, int, IntComparator, true> volt(true, IntComparator());
+    ASSERT_TRUE(volt.verify());
+    voltdb::CompactingMap<int, int, IntComparator, true>::iterator volti;
+    bool sucess;
+    int rankasc, rankdec, rankupper;
+
+    sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(2, 2)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(5, 5)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(6, 6)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(6, 6)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(8, 8)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(8, 8)); ASSERT_TRUE(sucess);
+
+    rankasc = volt.rankAsc(3); ASSERT_TRUE(rankasc == 3);
+    rankdec = volt.rankDes(3); ASSERT_TRUE(rankdec == volt.size() - rankasc);
+    rankupper = volt.rankUpper(3); ASSERT_TRUE(rankupper == 5);
+
+}
+
 TEST_F(CompactingMapTest, RandomMultiRank) {
     const int ITERATIONS  = 1001;
     const int BIGGEST_VAL = 100;
