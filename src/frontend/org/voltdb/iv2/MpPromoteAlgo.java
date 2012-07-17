@@ -61,7 +61,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final ZooKeeper m_zk;
     private final String m_mapCacheNode;
     private final List<Long> m_survivors;
-    private long m_maxSeenTxnId;
+    private long m_maxSeenTxnId = 0;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -308,12 +308,13 @@ public class MpPromoteAlgo implements RepairAlgo
     }
 
     long computeSafePoint(Iv2RepairLogResponseMessage msg) {
+        long oldSafePoint = m_maxSeenTxnId;
         m_maxSeenTxnId = Math.max(m_maxSeenTxnId, msg.getHandle());
         if (msg.getPayload() instanceof CompleteTransactionMessage) {
             return msg.getHandle();
         }
         else {
-            return Long.MIN_VALUE;
+            return oldSafePoint;
         }
     }
 
