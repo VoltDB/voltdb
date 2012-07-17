@@ -339,7 +339,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 // this may be changed if we can handle one column index case
                 // like: SELECT count(*) from T2 WHERE POINTS < ?
                 printf("SEARCH KEY Not complete*******\n");
-                rkStart = m_index->getCounterLET(&m_searchKey, NULL);
                 // because the searchKey is not complete, we should find it,
                 // but it actually finds the previous rank. Add 1 back.
                 rkStart++;
@@ -377,43 +376,52 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         m_outputTable->insertTuple(tmptup);
 
     } else {
-        // TODO(xin): add support for multi-map later
+        assert (activeNumOfSearchKeys > 0);
+        VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+                localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+        if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+            rkStart = m_index->getCounterLET(&m_searchKey, false);
+        } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+            rkStart = m_index->getCounterLET(&m_searchKey, true);
+            if (m_index->hasKey(&m_searchKey))
+                leftIncluded = 1;
+            if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
+                // two columns index, no value for the second column
+                // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
+                // this may be changed if we can handle one column index case
+                // like: SELECT count(*) from T2 WHERE POINTS < ?
+                printf("SEARCH KEY Not complete*******\n");
+                // because the searchKey is not complete, we should find it,
+                // but it actually finds the previous rank. Add 1 back.
+                rkStart++;
+                leftIncluded = 1;
+            }
+        } else {
+            return false;
+        }
 
+        if (m_hasEndKey) {
+            IndexLookupType localEndType = m_endType;
+            if (localEndType == INDEX_LOOKUP_TYPE_LT) {
+                rkEnd = m_index->getCounterGET(&m_endKey, false);
+            } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
+                rkEnd = m_index->getCounterGET(&m_endKey, true);
+                if (m_index->hasKey(&m_endKey))
+                    rightIncluded = 1;
+            } else {
+                return false;
+            }
+        } else {
+            rkEnd = m_index->getSize();
+            rightIncluded = 1;
+            printf("Count total without END KEYs: %d\n", rkEnd);
+        }
+
+        rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
+        printf("ANSWER %d = %d - %d - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
+        tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes ));
+        m_outputTable->insertTuple(tmptup);
     }
-
-    /*
-    //
-    // We have to different nextValue() methods for different lookup types
-    //
-    while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
-            !(m_tuple = m_index->nextValueAtKey()).isNullTuple()) ||
-           ((localLookupType != INDEX_LOOKUP_TYPE_EQ || activeNumOfSearchKeys == 0) &&
-            !(m_tuple = m_index->nextValue()).isNullTuple()))
-    {
-        VOLT_TRACE("LOOPING in indexcount: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
-        //
-        // First check whether the end_expression is now false
-        //
-        if (end_expression != NULL &&
-            end_expression->eval(&m_tuple, NULL).isFalse())
-        {
-            VOLT_TRACE("End Expression evaluated to false, stopping scan");
-            break;
-        }
-        //
-        // Then apply our post-predicate to do further filtering
-        //
-        if (post_expression == NULL ||
-            post_expression->eval(&m_tuple, NULL).isTrue())
-        {
-            // Straight Insert
-            //
-            // Try to put the tuple into our output table
-            //
-            m_outputTable->insertTupleNonVirtual(m_tuple);
-            tuples_written++;
-        }
-    }*/
 
     VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug().c_str());
     return true;
@@ -421,4 +429,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
 IndexCountExecutor::~IndexCountExecutor() {
     delete [] m_searchKeyBackingStore;
+    if (m_hasEndKey)
+        delete [] m_endKeyBackingStore;
 }

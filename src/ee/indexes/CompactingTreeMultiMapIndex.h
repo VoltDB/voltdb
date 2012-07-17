@@ -254,20 +254,21 @@ public:
         if (m_seqIter.isEnd()) {
             return m_entries.size();
         }
-        // TODO(xin): I need to fix this function
-       /*
+
         KeyType tmpKey = m_seqIter.key();
         if (cmp == 0) {
-            m_seqIter.movePre();
+            //FIXME(xin):no movePre() method ???
+            //m_seqIter.movePre();
             if (m_seqIter.isEnd() == false) {
                 if (isUpper) return m_entries.rankUpper(m_seqIter.key());
                 else return m_entries.rankAsc(m_seqIter.key());
-            }
+            } else
+                return 0;
         }
         // return rank with the current key if equal or if we can not find a previous key
         if (isUpper) return m_entries.rankUpper(tmpKey);
         else return m_entries.rankAsc(tmpKey);
-        */
+
         return -1;
 
     }
