@@ -242,7 +242,7 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
 
 TEST_F(CompactingMapTest, SimpleMultiRank) {
     // Start the counting index feature
-    voltdb::CompactingMap<int, int, IntComparator, true> volt(true, IntComparator());
+    voltdb::CompactingMap<int, int, IntComparator, true> volt(false, IntComparator());
     ASSERT_TRUE(volt.verify());
     voltdb::CompactingMap<int, int, IntComparator, true>::iterator volti;
     bool sucess;
