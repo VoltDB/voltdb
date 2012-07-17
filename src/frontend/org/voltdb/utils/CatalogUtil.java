@@ -97,12 +97,27 @@ public abstract class CatalogUtil {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    public static final String CATALOG_FILENAME = "catalog.txt";
+    // The minimum version of catalog that's compatible with this version of Volt
+    public static final int[] minCompatibleVersion = {2, 0};
 
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) {
+    public static final String CATALOG_FILENAME = "catalog.txt";
+    public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
+
+    /**
+     * Load a catalog from the jar bytes.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return The serialized string of the catalog content.
+     * @throws Exception
+     *             If the catalog cannot be loaded because it's incompatible, or
+     *             if there is no version information in the catalog.
+     */
+    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws Exception {
         assert(catalogBytes != null);
 
         String serializedCatalog = null;
+        String voltVersionString = null;
         try {
             InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
             byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
@@ -110,6 +125,24 @@ public abstract class CatalogUtil {
             if (null == serializedCatalogBytes) throw new VoltTypeException("Database catalog not found - please build your application using the current verison of VoltDB.");
 
             serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
+
+            // Get Volt version string
+            byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
+            if (buildInfoBytes == null) {
+                throw new Exception("Catalog build information not found - please build your application using the current verison of VoltDB.");
+            }
+            String buildInfo = new String(buildInfoBytes, "UTF-8");
+            String[] buildInfoLines = buildInfo.split("\n");
+            if (buildInfoLines.length != 5) {
+                throw new Exception("Catalog built with an old version of VoltDB - please build your application using the current verison of VoltDB.");
+            }
+            voltVersionString = buildInfoLines[0].trim();
+
+            // Check if it's compatible
+            if (!isCatalogCompatible(voltVersionString)) {
+                throw new Exception("Catalog compiled with " + voltVersionString + " is not compatible with the current version of VoltDB (" +
+                        VoltDB.instance().getVersionString() + ")- " + " please build your application using the current verison of VoltDB.");
+            }
         } catch (IOException e) {
             if (log != null)
                 log.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CatalogReadFailure.name(), e);
@@ -449,6 +482,41 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+
+    /**
+     * Check if a catalog compiled with the given version of VoltDB is
+     * compatible with the current version of VoltDB.
+     *
+     * The rule is that the catalog must be compiled with a version of VoltDB
+     * that's within the range [minCompatibleVersion, currentVersion],
+     * inclusive.
+     *
+     * @param catalogVersionStr
+     *            The version string of the VoltDB that compiled the catalog.
+     * @return true if it's compatible, false otherwise.
+     */
+    public static boolean isCatalogCompatible(String catalogVersionStr)
+    {
+        if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
+            return false;
+        }
+
+        int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        int[] currentVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
+
+        if (catalogVersion == null) {
+            throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
+        }
+
+        int maxCmpResult = MiscUtils.compareVersions(catalogVersion, currentVersion);
+        int minCmpResult = MiscUtils.compareVersions(catalogVersion, minCompatibleVersion);
+
+        if (minCmpResult == -1 || maxCmpResult == 1) {
+            return false;
+        }
+
+        return true;
     }
 
     public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL, boolean crashOnFailedValidation) {

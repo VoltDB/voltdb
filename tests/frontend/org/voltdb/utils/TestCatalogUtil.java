@@ -24,6 +24,8 @@
 package org.voltdb.utils;
 
 import java.io.File;
+import java.util.ArrayList;
+import java.util.Arrays;
 import java.util.List;
 
 import junit.framework.TestCase;
@@ -41,6 +43,8 @@ import org.voltdb.catalog.Systemsettings;
 import org.voltdb.catalog.Table;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.types.ConstraintType;
+
+import com.google.common.base.Joiner;
 
 public class TestCatalogUtil extends TestCase {
 
@@ -380,5 +384,61 @@ public class TestCatalogUtil extends TestCase {
         String commands = catalog.serialize();
         System.out.println(commands);
 
+    }
+
+    public void testCatalogVersionCheck() {
+        // really old version shouldn't work
+        assertFalse(CatalogUtil.isCatalogCompatible("0.3"));
+
+        // one minor version older than the min supported
+        int[] minCompatibleVersion = Arrays.copyOf(CatalogUtil.minCompatibleVersion,
+                                                   CatalogUtil.minCompatibleVersion.length);
+        for (int i = minCompatibleVersion.length - 1; i >= 0; i--) {
+            if (minCompatibleVersion[i] != 0) {
+                minCompatibleVersion[i]--;
+                break;
+            }
+        }
+        ArrayList<Integer> arrayList = new ArrayList<Integer>();
+        for (int part : minCompatibleVersion) {
+            arrayList.add(part);
+        }
+        String version = Joiner.on('.').join(arrayList);
+        assertNotNull(version);
+        assertFalse(CatalogUtil.isCatalogCompatible(version));
+
+        // one minor version newer than the current version
+        final String currentVersion = VoltDB.instance().getVersionString();
+        int[] parseCurrentVersion = MiscUtils.parseVersionString(currentVersion);
+        parseCurrentVersion[parseCurrentVersion.length - 1]++;
+        arrayList = new ArrayList<Integer>();
+        for (int part : parseCurrentVersion) {
+            arrayList.add(part);
+        }
+        String futureVersion = Joiner.on('.').join(arrayList);
+        assertFalse(CatalogUtil.isCatalogCompatible(futureVersion));
+
+        // longer version string
+        String longerVersion = currentVersion + ".2";
+        assertFalse(CatalogUtil.isCatalogCompatible(longerVersion));
+
+        /*
+         * only test shorter version string if the min compatible version does
+         * not equal to the current version
+         */
+        int[] currentVersionInts = MiscUtils.parseVersionString(currentVersion);
+        if (MiscUtils.compareVersions(CatalogUtil.minCompatibleVersion, currentVersionInts) == -1) {
+            // shorter version string
+            String[] split = currentVersion.split("\\.");
+            String[] shorter = new String[split.length - 1];
+            for (int i = 0; i < shorter.length; i++) {
+                shorter[i] = split[i];
+            }
+            String shortVersion = Joiner.on('.').join(shorter);
+            assertTrue(CatalogUtil.isCatalogCompatible(shortVersion));
+        }
+
+        // current version should work
+        assertTrue(CatalogUtil.isCatalogCompatible(VoltDB.instance().getVersionString()));
     }
 }

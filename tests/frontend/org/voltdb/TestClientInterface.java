@@ -56,7 +56,6 @@ import org.junit.Test;
 import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.LocalObjectMessage;
-import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.ClientInterface.ClientInputHandler;
@@ -88,8 +87,6 @@ public class TestClientInterface {
 
     // real CI, but spied on using mockito
     private static ClientInterface m_ci = null;
-    // the mailbox in CI
-    private static Mailbox m_mb = null;
 
     private static int[] m_allPartitions = new int[] {0, 1, 2};
 
@@ -123,11 +120,9 @@ public class TestClientInterface {
         doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
                                        m_context, m_messenger, ReplicationRole.NONE, m_initiator, m_allPartitions));
-
-        m_mb = m_ci.m_mailbox;
     }
 
-    private static void buildCatalog() throws IOException {
+    private static void buildCatalog() throws Exception {
         // build a real catalog
         File cat = File.createTempFile("temp-log-reinitiator", "catalog");
         cat.deleteOnExit();

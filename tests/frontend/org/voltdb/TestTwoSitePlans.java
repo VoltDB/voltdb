@@ -24,7 +24,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.IOException;
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -61,7 +60,7 @@ public class TestTwoSitePlans extends TestCase {
     PlanFragment selectBottomFrag = null;
 
     @Override
-    public void setUp() throws IOException, InterruptedException {
+    public void setUp() throws Exception {
         VoltDB.instance().readBuildInfo("Test");
 
         // compile a catalog

@@ -24,8 +24,6 @@
 package org.voltdb;
 
 import java.io.File;
-import java.io.IOException;
-
 import junit.framework.TestCase;
 
 import org.voltdb.VoltDB.START_ACTION;
@@ -180,9 +178,9 @@ public class TestVoltDB extends TestCase {
      *
      * This test tries to assign a user in the deployment file to a group that does not exist and asserts that
      * deployment file compilation fails.
-     * @throws IOException
+     * @throws Exception
      */
-    public void testCompileDeploymentAddUserToNonExistentGroup() throws IOException {
+    public void testCompileDeploymentAddUserToNonExistentGroup() throws Exception {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();
@@ -222,9 +220,9 @@ public class TestVoltDB extends TestCase {
      * ENG-720: NullPointerException when trying to start server with no users
      *
      * This test makes sure deployment validation passes when there are no users.
-     * @throws IOException
+     * @throws Exception
      */
-    public void testCompileDeploymentNoUsers() throws IOException {
+    public void testCompileDeploymentNoUsers() throws Exception {
         TPCCProjectBuilder project = new TPCCProjectBuilder();
         project.addDefaultSchema();
         project.addDefaultPartitioning();

@@ -24,8 +24,6 @@
 package org.voltdb.planner;
 
 import java.io.File;
-import java.io.IOException;
-
 import junit.framework.TestCase;
 
 import org.voltdb.CatalogContext;
@@ -39,7 +37,7 @@ public class TestPlannerTool extends TestCase {
 
     PlannerTool m_pt = null;
 
-    public void testSimple() throws IOException {
+    public void testSimple() throws Exception {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addAllDefaults();
         final File jar = new File("tpcc-oop.jar");
@@ -128,7 +126,7 @@ public class TestPlannerTool extends TestCase {
         System.out.println(result);
     }
 
-    public void testBadDDL() throws IOException
+    public void testBadDDL() throws Exception
     {
         // semicolons in in-lined comments are bad
         VoltProjectBuilder builder = new VoltProjectBuilder();

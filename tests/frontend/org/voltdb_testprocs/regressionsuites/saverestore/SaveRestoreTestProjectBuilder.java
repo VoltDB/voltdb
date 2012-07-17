@@ -24,7 +24,6 @@
 package org.voltdb_testprocs.regressionsuites.saverestore;
 
 import java.io.File;
-import java.io.IOException;
 import java.net.URL;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -88,7 +87,7 @@ public class SaveRestoreTestProjectBuilder extends VoltProjectBuilder
         return jarFilename;
     }
 
-    public Catalog createSaveRestoreSchemaCatalog() throws IOException
+    public Catalog createSaveRestoreSchemaCatalog() throws Exception
     {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "saverestore-jni.jar";
