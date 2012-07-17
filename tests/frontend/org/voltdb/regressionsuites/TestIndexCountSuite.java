@@ -44,7 +44,6 @@ public class TestIndexCountSuite extends RegressionSuite {
         super(name);
     }
 
-    /*
     public void testOneColumnUniqueIndex() throws Exception {
         Client client = getClient();
 
@@ -168,7 +167,6 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertEquals(1, table.getLong(0));
         assertTrue(true);
     }
-    */
 
     public void testOneColumnMultiIndex() throws Exception {
         Client client = getClient();

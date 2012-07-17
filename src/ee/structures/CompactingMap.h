@@ -690,39 +690,77 @@ bool CompactingMap<Key, Data, Compare, hasRank>::isReachableNode(const TreeNode*
 template<typename Key, typename Data, typename Compare, bool hasRank>
 int32_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
         if (!hasRank) return -1;
-
         TreeNode *n = lookup(key);
+        // must pass a key that already in map
         if (n == &NIL) return -1;
         TreeNode *x = m_root, *p = n;
         NodeCount ct = 0,ctr = 0, ctl = 0;
         int m = m_comper(key, x->key);
-        if (m == 0) {
+        if (m_unique) {
+            if (m == 0) {
                 if (x->right != &NIL)
-                        ctr = x->right->subct;
-                ct = n->subct - ctr;
-        } else if (m > 0) {
+                    ctr = x->right->subct;
+                ct = n->subct - ctr; // can be changed to: ct = x->subct - ctr;
+            } else if (m > 0) {
                 if (p->right != &NIL)
-                        ctr = p->right->subct;
+                    ctr = p->right->subct;
                 ct += p->subct - ctr;
                 while (p->parent != &NIL) {
-                        if (p->parent->right == p) {
-                                ct += p->parent->subct - p->subct;;
-                        }
-                        p = p->parent;
+                    if (p->parent->right == p) {
+                        ct += p->parent->subct - p->subct;
+                    }
+                    p = p->parent;
                 }
-        } else {
+            } else {
                 if (p->left != &NIL)
-                        ctl = p->left->subct;
+                    ctl = p->left->subct;
                 ct += p->subct - ctl - 1;
                 while (p->parent != &NIL) {
-                        if (p->parent->left == p) {
-                                ct += p->parent->subct - p->subct;
-                        }
-                        p = p->parent;
+                    if (p->parent->left == p) {
+                        ct += p->parent->subct - p->subct;
+                    }
+                    p = p->parent;
                 }
                 ct = x->subct - ct;
+            }
+        } else {
+            if (m == 0) {
+                if (x->right != &NIL)
+                    ctr = x->right->subct;
+                ct += x->subct - ctr;
+                while(p->parent != &NIL) {
+                    if (m_comper(key, p->key) == 0) {
+                        if (p->right != &NIL && m_comper(key, p->right->key) == 0)
+                            ct-= p->right->subct;
+                        ct--;
+                    }
+                    p = p->parent;
+                }
+            } else if (m > 0) {
+                if (p->right != &NIL)
+                    ctr = p->right->subct;
+                ct += p->subct - ctr;
+                while (p->parent != &NIL) {
+                    if (p->parent->right == p) {
+                        ct += p->parent->subct - p->subct;
+                    }
+                    p = p->parent;
+                }
+
+            } else {
+                if (p->left != &NIL)
+                    ctl = p->left->subct;
+                ct += p->subct - ctl - 1;
+                while (p->parent != &NIL) {
+                    if (p->parent->left == p) {
+                        ct += p->parent->subct - p->subct;
+                    }
+                    p = p->parent;
+                }
+                ct = x->subct - ct;
+            }
+
         }
-        assert(ct >= 1);
         return ct;
 }
 
@@ -739,6 +777,8 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
 
         iterator it;
         it = upperBound(key);
+        it.movePrev();
+
         NodeCount nc = 0;
         it.movePrev();
         while (m_comper(key, it.key()) == 0) {

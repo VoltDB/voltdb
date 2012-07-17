@@ -246,7 +246,7 @@ TEST_F(CompactingMapTest, SimpleMultiRank) {
     ASSERT_TRUE(volt.verify());
     voltdb::CompactingMap<int, int, IntComparator, true>::iterator volti;
     bool sucess;
-    int rankasc, rankdec, rankupper;
+    int rankasc, rankupper;
 
     sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(sucess);
     sucess = volt.insert(std::pair<int,int>(2, 2)); ASSERT_TRUE(sucess);
@@ -259,9 +259,18 @@ TEST_F(CompactingMapTest, SimpleMultiRank) {
     sucess = volt.insert(std::pair<int,int>(8, 8)); ASSERT_TRUE(sucess);
     sucess = volt.insert(std::pair<int,int>(8, 8)); ASSERT_TRUE(sucess);
 
+    rankasc = volt.rankAsc(1); ASSERT_TRUE(rankasc == 1);
+    rankasc = volt.rankAsc(2); ASSERT_TRUE(rankasc == 2);
     rankasc = volt.rankAsc(3); ASSERT_TRUE(rankasc == 3);
-    rankdec = volt.rankDes(3); ASSERT_TRUE(rankdec == volt.size() - rankasc);
-    rankupper = volt.rankUpper(3); ASSERT_TRUE(rankupper == 5);
+    rankasc = volt.rankAsc(5); ASSERT_TRUE(rankasc == 6);
+    rankasc = volt.rankAsc(6); ASSERT_TRUE(rankasc == 7);
+    rankasc = volt.rankAsc(8); ASSERT_TRUE(rankasc == 9);
+    rankasc = volt.rankAsc(8); ASSERT_TRUE(rankasc == 9);
+    rankasc = volt.rankAsc(7); ASSERT_TRUE(rankasc == -1);
+
+    rankupper = volt.rankUpper(3);
+    printf("Upper: %d\n", rankupper);
+    ASSERT_TRUE(rankupper == 5);
 
 }
 
