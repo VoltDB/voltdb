@@ -108,7 +108,7 @@ public class TestMpPromoteAlgo extends TestCase
     @Test
     public void testUnion() throws Exception
     {
-        MpPromoteAlgo algo = new MpPromoteAlgo(new ArrayList<Long>(), null, 0, null, VoltZK.iv2masters, "Test");
+        MpPromoteAlgo algo = new MpPromoteAlgo(new ArrayList<Long>(), null, "Test");
 
         // returned handles in a non-trivial order, with duplicates.
         // txns 1-5 are complete. 6 is not complete.
@@ -150,13 +150,12 @@ public class TestMpPromoteAlgo extends TestCase
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        ZooKeeper zk = mock(ZooKeeper.class);
         ArrayList<Long> masters = new ArrayList<Long>();
         masters.add(1L);
         masters.add(2L);
         masters.add(3L);
 
-        MpPromoteAlgo algo = new MpPromoteAlgo(masters, zk, -1, mailbox, VoltZK.iv2masters, "Test");
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
         algo.prepareForFaultRecovery();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));

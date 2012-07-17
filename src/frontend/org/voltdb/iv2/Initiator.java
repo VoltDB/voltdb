@@ -55,7 +55,6 @@ public interface Initiator
             String zkMapCacheNode, String whoami);
 
     /** Create a Promotion implementation appropriate for the subclass */
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, ZooKeeper zk,
-            int partitionId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami);
+    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+            String whoami);
 }

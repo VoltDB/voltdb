@@ -26,17 +26,10 @@ import java.util.Map.Entry;
 import java.util.TreeSet;
 import java.util.concurrent.Future;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheWriter;
-import org.voltdb.VoltDB;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -48,10 +41,7 @@ public class MpPromoteAlgo implements RepairAlgo
     private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
-    private final int m_partitionId;
     private final long m_requestId = System.nanoTime();
-    private final ZooKeeper m_zk;
-    private final String m_mapCacheNode;
     private final List<Long> m_survivors;
     private long m_maxSeenTxnId = 0;
 
@@ -143,17 +133,13 @@ public class MpPromoteAlgo implements RepairAlgo
     /**
      * Setup a new RepairAlgo but don't take any action to take responsibility.
      */
-    public MpPromoteAlgo(List<Long> survivors, ZooKeeper zk,
-            int partitionId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+    public MpPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+            String whoami)
     {
         m_survivors = new ArrayList<Long>(survivors);
-        m_zk = zk;
-        m_partitionId = partitionId;
         m_mailbox = mailbox;
 
         m_whoami = whoami;
-        m_mapCacheNode = zkMapCacheNode;
     }
 
     @Override
@@ -271,35 +257,8 @@ public class MpPromoteAlgo implements RepairAlgo
         }
         tmLog.info(m_whoami + "finished queuing " + queued + " replica repair messages.");
 
-        // Can't run ZK work on a Network thread. Hack up a new context here.
-        // See ENG-3176
-        Thread declareLeaderThread = new Thread() {
-            @Override
-            public void run() {
-                declareReadyAsLeader();
-            }
-        };
-        declareLeaderThread.start();
+        m_promotionResult.done(m_maxSeenTxnId);
     }
-
-    // with leadership election complete, update the master list
-    // for non-initiator components that care.
-    void declareReadyAsLeader()
-    {
-        try {
-            MapCacheWriter iv2masters = new MapCache(m_zk, m_mapCacheNode);
-            iv2masters.put(Integer.toString(m_partitionId),
-                    new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
-            m_promotionResult.done(m_maxSeenTxnId);
-        } catch (KeeperException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        } catch (JSONException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        }
-    }
-
 
     //
     //

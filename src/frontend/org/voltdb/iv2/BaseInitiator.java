@@ -26,6 +26,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
 
+import org.json_voltpatches.JSONObject;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 
@@ -33,6 +35,8 @@ import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
+import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -185,13 +189,11 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             while (!success) {
                 RepairAlgo repair = null;
                 if (m_missingStartupSites != null) {
-                    repair = new StartupAlgo(m_missingStartupSites, m_messenger.getZK(),
-                            m_partitionId, m_initiatorMailbox,
-                            m_zkMailboxNode, m_whoami);
+                    repair = new StartupAlgo(m_missingStartupSites, m_whoami);
                 }
                 else {
-                    repair = createPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
-                            m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
+                    repair = createPromoteAlgo(m_term.getInterestingHSIds(),
+                            m_initiatorMailbox, m_whoami);
                 }
 
                 m_initiatorMailbox.setRepairAlgo(repair);
@@ -206,9 +208,12 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                             + "finished leader promotion. Took "
                             + (System.currentTimeMillis() - startTime) + " ms.");
 
-                    // TODO:
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
+                    MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(),
+                            m_zkMailboxNode);
+                    iv2masters.put(Integer.toString(m_partitionId),
+                            new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
                 }
                 else {
                     // The only known reason to fail is a failed replica during

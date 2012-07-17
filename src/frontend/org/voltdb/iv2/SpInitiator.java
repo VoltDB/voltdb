@@ -74,13 +74,9 @@ public class SpInitiator extends BaseInitiator
     }
 
     @Override
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, ZooKeeper zk,
-            int partitionId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+            String whoami)
     {
-        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
-                m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
+        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
     }
-
-
 }
