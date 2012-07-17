@@ -23,6 +23,7 @@
 
 package org.voltdb.utils;
 
+import java.io.IOException;
 import java.util.Random;
 
 import junit.framework.TestCase;
@@ -68,7 +69,7 @@ public class TestEncoder extends TestCase {
         assertEquals(someText, result);
     }
 
-    public void testB64WithBigness() throws Exception {
+    public void testB64WithBigness() throws IOException {
         String someText = TPCCProjectBuilder.getTPCCSchemaCatalog().serialize();
 
         String b64Text = Encoder.compressAndBase64Encode(someText);

@@ -24,6 +24,7 @@
 package org.voltdb.benchmark.tpcc;
 
 import java.io.File;
+import java.io.IOException;
 import java.net.URL;
 
 import org.voltdb.benchmark.tpcc.procedures.LoadWarehouse;
@@ -162,9 +163,8 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
 
     /**
      * Get a pointer to a compiled catalog for TPCC with all the procedures.
-     * @throws Exception
      */
-    public Catalog createTPCCSchemaCatalog() throws Exception {
+    public Catalog createTPCCSchemaCatalog() throws IOException {
         // compile a catalog
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
         String catalogJar = testDir + File.separator + "tpcc-jni.jar";
@@ -192,9 +192,8 @@ public class TPCCProjectBuilder extends VoltProjectBuilder {
     /**
      * Get a pointer to a compiled catalog for TPCC with all the procedures.
      * This can be run without worrying about setting up anything else in this class.
-     * @throws Exception
      */
-    static public Catalog getTPCCSchemaCatalog() throws Exception {
+    static public Catalog getTPCCSchemaCatalog() throws IOException {
         return (new TPCCProjectBuilder().createTPCCSchemaCatalog());
     }
 }

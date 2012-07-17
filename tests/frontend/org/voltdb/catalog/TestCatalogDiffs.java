@@ -24,6 +24,8 @@
 package org.voltdb.catalog;
 
 import java.io.File;
+import java.io.IOException;
+
 import junit.framework.TestCase;
 
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
@@ -69,7 +71,7 @@ public class TestCatalogDiffs extends TestCase {
         return retval;
     }
 
-    protected Catalog catalogForJar(String pathToJar) throws Exception {
+    protected Catalog catalogForJar(String pathToJar) throws IOException {
         byte[] bytes = CatalogUtil.toBytes(new File(pathToJar));
         String serializedCatalog = CatalogUtil.loadCatalogFromJar(bytes, null);
         assertNotNull(serializedCatalog);
@@ -101,7 +103,7 @@ public class TestCatalogDiffs extends TestCase {
     }
 
 
-    public void testAddProcedure() throws Exception {
+    public void testAddProcedure() throws IOException {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("expanded", EXPANDEDPROCS);
@@ -110,7 +112,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testModifyProcedureCode() throws Exception {
+    public void testModifyProcedureCode() throws IOException {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("conflict", CONFLICTPROCS);
@@ -119,7 +121,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testDeleteProcedure() throws Exception {
+    public void testDeleteProcedure() throws IOException {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
         String updated = compile("fewer", FEWERPROCS);
@@ -128,7 +130,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testAddGroup() throws Exception {
+    public void testAddGroup() throws IOException {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
@@ -140,7 +142,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testAddGroupAndUser() throws Exception {
+    public void testAddGroupAndUser() throws IOException {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
@@ -156,7 +158,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testModifyUser() throws Exception {
+    public void testModifyUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
         gi[0] = new GroupInfo("group1", true, true);
 
@@ -174,7 +176,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testDeleteUser() throws Exception {
+    public void testDeleteUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
         gi[0] = new GroupInfo("group1", true, true);
 
@@ -191,7 +193,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testDeleteGroupAndUser() throws Exception {
+    public void testDeleteGroupAndUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
         gi[0] = new GroupInfo("group1", true, true);
 
@@ -208,7 +210,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testChangeUsersAssignedGroups() throws Exception {
+    public void testChangeUsersAssignedGroups() throws IOException {
         GroupInfo gi[] = new GroupInfo[2];
         gi[0] = new GroupInfo("group1", true, true);
         gi[1] = new GroupInfo("group2", true, true);
@@ -229,7 +231,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testChangeSecurityEnabled() throws Exception {
+    public void testChangeSecurityEnabled() throws IOException {
         GroupInfo gi[] = new GroupInfo[2];
         gi[0] = new GroupInfo("group1", true, true);
         gi[1] = new GroupInfo("group2", true, true);
@@ -248,7 +250,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff (catOriginal, catUpdated);
     }
 
-    public void testUnallowedChange() throws Exception {
+    public void testUnallowedChange() throws IOException {
         String original = compile("base", BASEPROCS);
         Catalog catOriginal = catalogForJar(original);
 
@@ -268,7 +270,7 @@ public class TestCatalogDiffs extends TestCase {
         assertFalse(diff.supported());
     }
 
-    public void testDiffOfIdenticalCatalogs() throws Exception {
+    public void testDiffOfIdenticalCatalogs() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -297,7 +299,7 @@ public class TestCatalogDiffs extends TestCase {
 
     // N.B. Some of the testcases assume this exact table structure... if you change it,
     // check the callers.
-    Catalog getCatalogForTable(String tableName, String catname) throws Exception {
+    Catalog getCatalogForTable(String tableName, String catname) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo(tableName, "C1");
@@ -316,7 +318,7 @@ public class TestCatalogDiffs extends TestCase {
 
     // N.B. Some of the testcases assume this exact table structure .. if you change it,
     // check the callers...
-    Catalog get2ColumnCatalogForTable(String tableName, String catname) throws Exception {
+    Catalog get2ColumnCatalogForTable(String tableName, String catname) throws IOException {
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE " + tableName + " (C1 BIGINT NOT NULL, C2 BIGINT NOT NULL, PRIMARY KEY(C1));");
         builder.addPartitionInfo(tableName, "C1");
@@ -331,7 +333,7 @@ public class TestCatalogDiffs extends TestCase {
     }
 
 
-    public void testAddTable() throws Exception {
+    public void testAddTable() throws IOException {
         // Start with table A.
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("CREATE TABLE A (C1 BIGINT NOT NULL, PRIMARY KEY(C1));");
@@ -351,7 +353,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testDropTable() throws Exception {
+    public void testDropTable() throws IOException {
         // Start with table A and B.
         VoltProjectBuilder builder = new VoltProjectBuilder();
         builder.addLiteralSchema("\nCREATE TABLE A (C1 BIGINT NOT NULL, PRIMARY KEY(C1));" +
@@ -371,19 +373,19 @@ public class TestCatalogDiffs extends TestCase {
     }
 
 
-    public void testAddTableColumnRejected() throws Exception {
+    public void testAddTableColumnRejected() throws IOException {
         Catalog catOriginal = getCatalogForTable("A", "addtablecolumnrejected1");
         Catalog catUpdated = get2ColumnCatalogForTable("A", "addtablecolumnrejected2");
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testRemoveTableColumnRejected() throws Exception {
+    public void testRemoveTableColumnRejected() throws IOException {
         Catalog catOriginal = get2ColumnCatalogForTable("A", "removetablecolumnrejected2");
         Catalog catUpdated = getCatalogForTable("A", "removetablecolumnrejected1");
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testAddTableIndexRejected() throws Exception {
+    public void testAddTableIndexRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // start with a table
@@ -402,7 +404,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testRemoveTableIndexRejected() throws Exception {
+    public void testRemoveTableIndexRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // start with a table with an index
@@ -419,7 +421,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testAddTableConstraintRejected() throws Exception {
+    public void testAddTableConstraintRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // start with a table without a PKEY
@@ -435,7 +437,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testRemoveTableConstraintRejected() throws Exception {
+    public void testRemoveTableConstraintRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with the primary key
@@ -452,7 +454,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testAddMaterializedViewRejected() throws Exception {
+    public void testAddMaterializedViewRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
@@ -469,7 +471,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testRemoveMaterializedViewRejected() throws Exception {
+    public void testRemoveMaterializedViewRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with a view
@@ -492,7 +494,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiffRejected(catOriginal, catUpdated);
     }
 
-    public void testRemoveTableAndMaterializedViewAccepted() throws Exception {
+    public void testRemoveTableAndMaterializedViewAccepted() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         // with a view
@@ -515,7 +517,7 @@ public class TestCatalogDiffs extends TestCase {
         verifyDiff(catOriginal, catUpdated);
     }
 
-    public void testChangeTableReplicationSettingRejected() throws Exception {
+    public void testChangeTableReplicationSettingRejected() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
         VoltProjectBuilder builder = new VoltProjectBuilder();
