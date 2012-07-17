@@ -141,7 +141,7 @@ public abstract class CatalogUtil {
             // Check if it's compatible
             if (!isCatalogCompatible(voltVersionString)) {
                 throw new Exception("Catalog compiled with " + voltVersionString + " is not compatible with the current version of VoltDB (" +
-                        VoltDB.instance().getVersionString() + ")- " + " please build your application using the current verison of VoltDB.");
+                        VoltDB.instance().getVersionString() + ") - " + " please build your application using the current verison of VoltDB.");
             }
         } catch (IOException e) {
             if (log != null)
