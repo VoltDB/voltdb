@@ -64,6 +64,11 @@ public class AuthSystem {
         private final boolean m_sysproc;
 
         /**
+         * Whether membership in this group grants permission to invoke default procedures
+         */
+        private final boolean m_defaultproc;
+
+        /**
          * Whether membership in this group grants permission to invoke adhoc queries
          */
         private final boolean m_adhoc;
@@ -72,11 +77,13 @@ public class AuthSystem {
          *
          * @param name Name of the group
          * @param sysproc Whether membership in this group grants permission to invoke system procedures
+         * @param defaultproc Whether membership in this group grants permission to invoke default procedures
          * @param adhoc Whether membership in this group grants permission to invoke adhoc queries
          */
-        private AuthGroup(String name, boolean sysproc, boolean adhoc) {
+        private AuthGroup(String name, boolean sysproc, boolean defaultproc, boolean adhoc) {
             m_name = name;
             m_sysproc = sysproc;
+            m_defaultproc = defaultproc;
             m_adhoc = adhoc;
         }
     }
@@ -108,6 +115,11 @@ public class AuthSystem {
         private final boolean m_sysproc;
 
         /**
+         * Whether this user is granted permission to invoke default procedures (can also be granted by group membership)
+         */
+        private final boolean m_defaultproc;
+
+        /**
          * Whether this user is granted permission to invoke adhoc queries (can also be granted by group membership)
          */
         private final boolean m_adhoc;
@@ -137,24 +149,31 @@ public class AuthSystem {
          * @param shadowPassword SHA-1 double hashed copy of the users clear text password
          * @param name Name of the user
          * @param sysproc Whether this user is granted permission to invoke system procedures (can also be granted by group membership)
+         * @param defaultproc Whether this user is granted permission to invoke default procedures (can also be granted by group membership)
          * @param adhoc Whether this user is granted permission to invoke adhoc queries (can also be granted by group membership)
          */
-        private AuthUser(byte[] sha1ShadowPassword, String bcryptShadowPassword, String name, boolean sysproc, boolean adhoc) {
+        private AuthUser(byte[] sha1ShadowPassword, String bcryptShadowPassword, String name,
+                         boolean sysproc, boolean defaultproc, boolean adhoc) {
             m_sha1ShadowPassword = sha1ShadowPassword;
             m_bcryptShadowPassword = bcryptShadowPassword;
             m_name = name;
             m_sysproc = sysproc;
+            m_defaultproc = defaultproc;
             m_adhoc = adhoc;
         }
 
         /**
          * Check if a user has permission to invoke the specified stored procedure
+         * Handle both user-written procedures and default auto-generated ones.
          * @param proc Catalog entry for the stored procedure to check
          * @return true if the user has permission and false otherwise
          */
         public boolean hasPermission(Procedure proc) {
             if (proc == null) {
                 return false;
+            }
+            if (proc.getDefaultproc()) {
+                return hasDefaultProcPermission();
             }
             return m_authorizedProcedures.contains(proc);
         }
@@ -183,11 +202,19 @@ public class AuthSystem {
         }
 
         /**
-         * Check if a user has permission to invoke adhoc queries by virtue of a direct grant, or group membership,
+         * Check if a user has permission to invoke system procedures by virtue of a direct grant, or group membership,
          * @return true if the user has permission and false otherwise
          */
         public boolean hasSystemProcPermission() {
             return m_sysproc || hasGroupWithSysProcPermission();
+        }
+
+        /**
+         * Check if a user has permission to invoke default procedures by virtue of a direct grant, or group membership,
+         * @return true if the user has permission and false otherwise
+         */
+        public boolean hasDefaultProcPermission() {
+            return m_defaultproc || hasGroupWithDefaultProcPermission();
         }
 
         /**
@@ -198,6 +225,20 @@ public class AuthSystem {
         private boolean hasGroupWithSysProcPermission() {
             for (AuthGroup group : m_groups) {
                 if (group.m_sysproc) {
+                    return true;
+                }
+            }
+            return false;
+        }
+
+        /**
+         * Utility function to iterate through groups and check if any group the user is a member of
+         * grants defaultproc permission
+         * @return true if the user has permission and false otherwise
+         */
+        private boolean hasGroupWithDefaultProcPermission() {
+            for (AuthGroup group : m_groups) {
+                if (group.m_defaultproc) {
                     return true;
                 }
             }
@@ -259,13 +300,15 @@ public class AuthSystem {
             }
 
             final AuthUser user = new AuthUser( sha1ShadowPassword, shadowPassword,
-                    catalogUser.getTypeName(), catalogUser.getSysproc(), catalogUser.getAdhoc());
+                    catalogUser.getTypeName(), catalogUser.getSysproc(),
+                    catalogUser.getDefaultproc(), catalogUser.getAdhoc());
             m_users.put(user.m_name.intern(), user);
             for (org.voltdb.catalog.GroupRef catalogGroupRef : catalogUser.getGroups()) {
                 final org.voltdb.catalog.Group  catalogGroup = catalogGroupRef.getGroup();
                 AuthGroup group = null;
                 if (!m_groups.containsKey(catalogGroup.getTypeName())) {
-                    group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(), catalogGroup.getAdhoc());
+                    group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(),
+                                          catalogGroup.getDefaultproc(), catalogGroup.getAdhoc());
                     m_groups.put(group.m_name, group);
                 } else {
                     group = m_groups.get(catalogGroup.getTypeName());
@@ -278,7 +321,8 @@ public class AuthSystem {
         for (org.voltdb.catalog.Group catalogGroup : db.getGroups()) {
             AuthGroup group = null;
             if (!m_groups.containsKey(catalogGroup.getTypeName())) {
-                group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(), catalogGroup.getAdhoc());
+                group = new AuthGroup(catalogGroup.getTypeName(), catalogGroup.getSysproc(),
+                                      catalogGroup. getDefaultproc(), catalogGroup.getAdhoc());
                 m_groups.put(group.m_name, group);
                 //A group not associated with any users? Weird stuff.
             } else {
@@ -395,7 +439,7 @@ public class AuthSystem {
 
     AuthUser getUser(String name) {
         if (!m_enabled) {
-            return new AuthUser(null, null, null, false, false) {
+            return new AuthUser(null, null, null, false, false, false) {
                 @Override
                 public boolean hasPermission(Procedure proc) {
                     return true;
@@ -408,6 +452,11 @@ public class AuthSystem {
 
                 @Override
                 public boolean hasSystemProcPermission() {
+                    return true;
+                }
+
+                @Override
+                public boolean hasDefaultProcPermission() {
                     return true;
                 }
 

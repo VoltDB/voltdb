@@ -687,7 +687,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // As catalogupdate-cluster-base but with security enabled. This requires users and groups..
-        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, false)};
+        GroupInfo groups[] = new GroupInfo[] {new GroupInfo("group1", false, false, false)};
         UserInfo users[] = new UserInfo[] {new UserInfo("user1", "userpass1", new String[] {"group1"})};
         ProcedureInfo procInfo = new ProcedureInfo(new String[] {"group1"}, InsertNewOrder.class);
 

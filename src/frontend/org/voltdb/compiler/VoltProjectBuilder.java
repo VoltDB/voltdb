@@ -173,11 +173,13 @@ public class VoltProjectBuilder {
         private final String name;
         private final boolean adhoc;
         private final boolean sysproc;
+        private final boolean defaultproc;
 
-        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc){
+        public GroupInfo(final String name, final boolean adhoc, final boolean sysproc, final boolean defaultproc){
             this.name = name;
             this.adhoc = adhoc;
             this.sysproc = sysproc;
+            this.defaultproc = defaultproc;
         }
 
         @Override
@@ -717,6 +719,7 @@ public class VoltProjectBuilder {
             final Element group = doc.createElement("group");
             group.setAttribute("name", "default");
             group.setAttribute("sysproc", "true");
+            group.setAttribute("defaultproc", "true");
             group.setAttribute("adhoc", "true");
             groups.appendChild(group);
         }
@@ -725,6 +728,7 @@ public class VoltProjectBuilder {
                 final Element group = doc.createElement("group");
                 group.setAttribute("name", info.name);
                 group.setAttribute("sysproc", info.sysproc ? "true" : "false");
+                group.setAttribute("defaultproc", info.defaultproc ? "true" : "false");
                 group.setAttribute("adhoc", info.adhoc ? "true" : "false");
                 groups.appendChild(group);
             }
