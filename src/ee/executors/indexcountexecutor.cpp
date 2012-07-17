@@ -320,7 +320,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     int32_t rkStart = 0, rkEnd = 0, rkRes = 0;
 
     TableTuple& tmptup = m_outputTable->tempTuple();
-    printf("<index executor> SCHEMA: %s", tmptup.debug("T2").c_str());
     int leftIncluded = 0, rightIncluded = 0;
 
     if (m_index->isUniqueIndex()) {
@@ -380,9 +379,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                 localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
         if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            rkStart = m_index->getCounterLET(&m_searchKey, false);
-        } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
             rkStart = m_index->getCounterLET(&m_searchKey, true);
+        } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+            rkStart = m_index->getCounterLET(&m_searchKey, false);
             if (m_index->hasKey(&m_searchKey))
                 leftIncluded = 1;
             if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {

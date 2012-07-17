@@ -722,7 +722,7 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
                 }
                 ct = x->subct - ct;
         }
-
+        assert(ct >= 1);
         return ct;
 }
 

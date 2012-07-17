@@ -245,11 +245,9 @@ public:
 
     int32_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
-        printf("<Tree Unique-map> get counter equal or greater than --- \n");
+        printf("<Tree Unique-map *** getCounterGET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
 
-        printf("<getCounterGET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
         m_tmp1.setFromKey(searchKey);
-
         m_keyIter = m_entries.lowerBound(m_tmp1);
         if (m_keyIter.isEnd()) {
             printf("IS END... NO bigger key found...\n");
@@ -263,10 +261,9 @@ public:
     }
     int32_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
-        printf("<Tree Unique-map> get counter equal or less than--- \n");
-        m_tmp1.setFromKey(searchKey);
+        printf("<Tree Unique-map *** getCounterLET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
 
-        printf("<getCounterLET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
+        m_tmp1.setFromKey(searchKey);
         m_keyIter = m_entries.lowerBound(m_tmp1);
 
         if (m_keyIter.isEnd()) {
@@ -285,9 +282,10 @@ public:
             if (m_keyIter.isEnd() == false)
                 return m_entries.rankAsc(m_keyIter.key());
             else
+                //we can not find a previous key
                 return 0;
         }
-        // return rank with the current key if equal or if we can not find a previous key
+        // return rank with the current key if equal
         return m_entries.rankAsc(tmpKey);
     }
 

@@ -309,7 +309,7 @@ TEST_F(CompactingMapTest, RandomMultiRank) {
                 stli = stl.insert(std::pair<std::string, std::string>(val, val_value));
                 ASSERT_TRUE(stli != stl.end());
                 bool success = volt.insert(std::pair<std::string, std::string>(val, val_value));
-                assert(success);
+                ASSERT_TRUE(success);
             }
         }
         //

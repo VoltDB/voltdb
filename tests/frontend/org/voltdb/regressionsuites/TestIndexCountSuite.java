@@ -32,10 +32,6 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 public class TestIndexCountSuite extends RegressionSuite {
 
-    /*
-     *  See also TestPlansGroupBySuite for tests of distinct, group by, basic aggregates
-     */
-
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
     };
@@ -48,7 +44,8 @@ public class TestIndexCountSuite extends RegressionSuite {
         super(name);
     }
 
-    public void testOneColumnIndex() throws Exception {
+    /*
+    public void testOneColumnUniqueIndex() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TU1.insert", 1, 1);
@@ -86,7 +83,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void testTwoOrMoreColumnsIndexes() throws Exception {
+    public void testTwoOrMoreColumnsUniqueIndex() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TU2.insert", 1, 1, "xin");
@@ -115,7 +112,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void testTwoColumnsIntegerIndex() throws Exception {
+    public void testTwoColumnsUniqueIntegerIndex() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TU3.insert", 1, 1, 123);
@@ -144,7 +141,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(true);
     }
 
-    public void testThreeColumnsIndex() throws Exception {
+    public void testThreeColumnsUniqueIndex() throws Exception {
         Client client = getClient();
         client.callProcedure("TU4.insert", 1, 1, "xin", 0);
         client.callProcedure("TU4.insert", 2, 2, "xin", 1);
@@ -170,6 +167,54 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
         assertTrue(true);
+    }
+    */
+
+    public void testOneColumnMultiIndex() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("TM1.insert", 1, 1);
+        client.callProcedure("TM1.insert", 2, 2);
+
+        client.callProcedure("TM1.insert", 3, 3);
+        client.callProcedure("TM1.insert", 4, 3);
+        client.callProcedure("TM1.insert", 5, 3);
+
+        client.callProcedure("TM1.insert", 6, 5);
+
+        client.callProcedure("TM1.insert", 7, 6);
+        client.callProcedure("TM1.insert", 8, 6);
+
+        client.callProcedure("TM1.insert", 9, 8);
+        client.callProcedure("TM1.insert", 10, 8);
+
+        VoltTable table;
+
+        // test with 2,6
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM1 WHERE POINTS > 3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
+        assertTrue(true);
+
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM1 WHERE POINTS > 2 AND POINTS <= 6").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(6, table.getLong(0));
+        assertTrue(true);
+
+        // test with 4,9
+//        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM1 WHERE POINTS > 4").getResults()[0];
+//        assertTrue(table.getRowCount() == 1);
+//        assertTrue(table.advanceRow());
+//        assertEquals(2, table.getLong(0));
+//        assertTrue(true);
+//
+//        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM1 WHERE POINTS > 4 AND POINTS <= 9").getResults()[0];
+//        assertTrue(table.getRowCount() == 1);
+//        assertTrue(table.advanceRow());
+//        assertEquals(2, table.getLong(0));
+//        assertTrue(true);
     }
 
     /**
@@ -228,7 +273,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
-*/
+        */
         return builder;
     }
 
