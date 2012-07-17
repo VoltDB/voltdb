@@ -32,7 +32,7 @@ import org.voltdb.VoltTable;
     singlePartition = true,
     partitionInfo = "T3.TEL: 2"
 )
-public class CountingIndexTest extends VoltProcedure {
+public class CountingIndexTwoColumnsIntegerTest extends VoltProcedure {
 
     public final SQLStmt countstar0 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE TEL = ? AND POINTS < ?");
     public final SQLStmt countstar1 = new SQLStmt("SELECT COUNT(*) FROM T3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?");
