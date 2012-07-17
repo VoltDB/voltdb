@@ -234,9 +234,9 @@ public class TestExportSuiteTestExportAndDroppedTableThenShutdown extends Regres
 
 
     static final GroupInfo GROUPS[] = new GroupInfo[] {
-        new GroupInfo("export", false, false),
-        new GroupInfo("proc", true, true),
-        new GroupInfo("admin", true, true)
+        new GroupInfo("export", false, false, false),
+        new GroupInfo("proc", true, true, true),
+        new GroupInfo("admin", true, true, true)
     };
 
     static final UserInfo[] USERS = new UserInfo[] {

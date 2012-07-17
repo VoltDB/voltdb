@@ -282,10 +282,14 @@ public class VoltDB {
                 } else if (arg.startsWith("leader")) {
                     m_leader = arg.substring("leader ".length()).trim();
                 }
-                // Deprecated, use the "rejoin" start action
-                else if (arg.equals("rejoinhost") || arg.startsWith("rejoinhost ")) {
-                    usage(System.out);
-                    System.exit(-1);
+                // synonym for "rejoin host" for backward compatibility
+                else if (arg.equals("rejoinhost")) {
+                    m_startAction = START_ACTION.REJOIN;
+                    m_leader = args[++i].trim();
+                }
+                else if (arg.startsWith("rejoinhost ")) {
+                    m_startAction = START_ACTION.REJOIN;
+                    m_leader = arg.substring("rejoinhost ".length()).trim();
                 }
 
                 else if (arg.equals("create")) {

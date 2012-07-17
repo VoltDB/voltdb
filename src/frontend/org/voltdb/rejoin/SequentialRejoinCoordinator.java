@@ -36,7 +36,7 @@ import org.voltdb.utils.VoltFile;
  * sequentially, so no need to synchronize.
  */
 public class SequentialRejoinCoordinator extends RejoinCoordinator {
-    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
     // contains all sites that haven't started streaming snapshot
     private final Queue<Long> m_pendingSites;
