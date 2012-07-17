@@ -23,6 +23,9 @@
 
 package org.voltdb.types;
 
+import java.security.MessageDigest;
+import java.util.Arrays;
+
 import junit.framework.TestCase;
 
 import org.voltdb.BackendTarget;
@@ -272,5 +275,60 @@ public class TestBlobType extends TestCase {
 
         // stop execution
         VoltDB.instance().shutdown(localServer);
+    }
+
+    public void testBigFatBlobs() throws Exception {
+        String simpleSchema =
+            "create table blah (" +
+            "ival bigint default 0 not null, " +
+            "b varbinary(256) default null, " +
+            "s varchar(256) default null, " +
+            "PRIMARY KEY(ival));";
+
+        VoltProjectBuilder builder = new VoltProjectBuilder();
+        builder.addLiteralSchema(simpleSchema);
+        builder.addProcedures(BigFatBlobAndStringMD5.class);
+        boolean success = builder.compile(Configuration.getPathToCatalogForTest("bigfatblobs.jar"), 1, 1, 0);
+        assertTrue("Failed to compile catalog", success);
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("bigfatblobs.xml"));
+
+        VoltDB.Configuration config = new VoltDB.Configuration();
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("bigfatblobs.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("bigfatblobs.xml");
+        config.m_backend = BackendTarget.NATIVE_EE_JNI;
+        ServerThread localServer = new ServerThread(config);
+        localServer.start();
+        localServer.waitForInitialization();
+
+        try {
+            Client client = ClientFactory.createClient();
+            client.createConnection("localhost");
+            try {
+                byte[] b = new byte[5000000];
+                char[] c = new char[5000000];
+                for (int i = 0; i < b.length; i++) {
+                    b[i] = (byte) (i % 256);
+                    c[i] = (char) (i % 128);
+                }
+                String s = new String(c);
+                ClientResponse cr = client.callProcedure("BigFatBlobAndStringMD5", b, s);
+                assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+                VoltTable t = cr.getResults()[0];
+                assertEquals(1, t.getRowCount());
+                assertTrue(t.advanceRow());
+                // Validate MD5 sums instead of the actual data. The returned VoltTable
+                // can't hold it anyway due to a 1 MB limit.
+                MessageDigest md5 = MessageDigest.getInstance("MD5");
+                assertTrue(Arrays.equals(md5.digest(b), t.getVarbinary("b_md5")));
+                assertTrue(Arrays.equals(md5.digest(s.getBytes()), t.getVarbinary("s_md5")));
+            }
+            finally {
+                client.close();
+            }
+        }
+        finally {
+            // stop execution
+            VoltDB.instance().shutdown(localServer);
+        }
     }
 }

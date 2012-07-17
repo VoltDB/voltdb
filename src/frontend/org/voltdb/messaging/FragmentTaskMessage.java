@@ -45,7 +45,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         Integer m_outputDepId = null;
         ArrayList<Integer> m_inputDepIds = null;
         // For unplanned item
-        String m_fragmentPlan = null;
+        byte[] m_fragmentPlan = null;
 
         public FragmentData() {
         }
@@ -77,7 +77,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                     sb.append(id).append(", ");
                 sb.setLength(sb.lastIndexOf(", "));
             }
-            if (m_fragmentPlan != null && !m_fragmentPlan.isEmpty()) {
+            if ((m_fragmentPlan != null) && (m_fragmentPlan.length != 0)) {
                 sb.append("\n");
                 sb.append("  FRAGMENT_PLAN ");
                 sb.append(m_fragmentPlan);
@@ -142,7 +142,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
      * @param parameterSet
      * @param fragmentPlan
      */
-    public void addCustomFragment(int outputDepId, ByteBuffer parameterSet, String fragmentPlan) {
+    public void addCustomFragment(int outputDepId, ByteBuffer parameterSet, byte[] fragmentPlan) {
         FragmentData item = new FragmentData();
         item.m_outputDepId = outputDepId;
         item.m_parameterSet = parameterSet;
@@ -273,7 +273,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return item.m_parameterSet.asReadOnlyBuffer();
     }
 
-    public String getFragmentPlan(int index) {
+    public byte[] getFragmentPlan(int index) {
         assert(index >= 0 && index < m_items.size());
         FragmentData item = m_items.get(index);
         assert(item != null);
@@ -356,7 +356,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             // Each unplanned item gets an index (2) and a size (4) and buffer for
             // the fragment plan string.
             if (item.m_fragmentPlan != null) {
-                msgsize += 2 + 4 + item.m_fragmentPlan.length();
+                msgsize += 2 + 4 + item.m_fragmentPlan.length;
             }
         }
 
@@ -449,9 +449,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             FragmentData item = m_items.get(index);
             if (item.m_fragmentPlan != null) {
                 buf.putShort(index);
-                byte[] bytes = item.m_fragmentPlan.getBytes();
-                buf.putInt(bytes.length);
-                buf.put(bytes);
+                buf.putInt(item.m_fragmentPlan.length);
+                buf.put(item.m_fragmentPlan);
             }
         }
     }
@@ -531,9 +530,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             FragmentData item = m_items.get(index);
             int fragmentPlanLength = buf.getInt();
             if (fragmentPlanLength > 0) {
-                byte[] bytes = new byte[fragmentPlanLength];
-                buf.get(bytes);
-                item.m_fragmentPlan = new String(bytes);
+                item.m_fragmentPlan = new byte[fragmentPlanLength];
+                buf.get(item.m_fragmentPlan);
             }
         }
     }
