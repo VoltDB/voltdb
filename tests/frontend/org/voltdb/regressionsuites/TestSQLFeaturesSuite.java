@@ -378,12 +378,25 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         client.callProcedure("SelectWithJoinOrder", 0);
 
         //Wrong join order
-        client.callProcedure("SelectWithJoinOrder", 1);
+        boolean exception = false;
+        try {
+            client.callProcedure("SelectWithJoinOrder", 1);
+        } catch (Exception e) {
+            exception = true;
+        }
+        assertTrue(exception);
 
         //Right join order
         client.callProcedure("SelectRightOrder");
 
-        client.callProcedure("SelectWrongOrder");
+        exception = false;
+        try {
+            client.callProcedure("SelectWrongOrder");
+        } catch (Exception e) {
+            exception = true;
+        }
+        assertTrue(exception);
+
 
     }
 
@@ -463,9 +476,33 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
+        // CONFIG #2: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
 
+        // get a server config for the native backend with two sites/partitions
+        config = new LocalSingleProcessServer("sqlfeatures-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
+
+        // build the jarfile (note the reuse of the TPCC project)
+        success = config.compile(project);
+        assert(success);
+
+        // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #3: 1 Local Site/Partition running on HSQL backend
+        /////////////////////////////////////////////////////////////
+
+        config = new LocalSingleProcessServer("sqlfeatures-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #4: Local Cluster (of processes)
+        /////////////////////////////////////////////////////////////
+
+        // HSQL for Local Cluster config? This does not seem right.
         config = new LocalCluster("sqlfeatures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assert(success);
