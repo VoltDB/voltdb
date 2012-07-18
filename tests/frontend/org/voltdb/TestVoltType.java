@@ -247,4 +247,14 @@ public class TestVoltType extends TestCase {
         fail();
     }
 
+    public void testIsUnsupportedArrayType()
+    {
+      String[] s = {"Hello", "World"};
+      assertTrue(VoltType.isUnsupportedArrayType(s.getClass()));
+      byte[] b = {127, -128, 0};
+      assertFalse(VoltType.isUnsupportedArrayType(b.getClass()));
+      int i = 30;
+      assertFalse(VoltType.isUnsupportedArrayType(b.getClass()));
+    }
+
 }

@@ -49,6 +49,7 @@ import org.voltdb_testprocs.regressionsuites.sqltypesprocs.ParamSetArrays;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Select;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.Update;
 import org.voltdb_testprocs.regressionsuites.sqltypesprocs.UpdateDecimal;
+import org.voltdb_testprocs.regressionsuites.sqltypesprocs.InsertForUnsupportedArray;
 
 public class TestSQLTypesSuite extends RegressionSuite {
 
@@ -64,7 +65,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Delete.class, Insert.class,
             InsertBase.class, InsertMulti.class, Select.class, Update.class,
-            UpdateDecimal.class, ParamSetArrays.class };
+            UpdateDecimal.class, ParamSetArrays.class, InsertForUnsupportedArray.class};
 
     /** Utility to create an array of bytes with value "b" of length "length" */
     public static byte[] byteArray(final int length, final byte b) {
@@ -1234,6 +1235,25 @@ public class TestSQLTypesSuite extends RegressionSuite {
         helper_testInvalidParameterSerializations(client, params);
     }
 
+    public void testIsUnsupportedArrayType()
+        throws IOException, ProcCallException
+        //throws Exception
+        {
+        final Client client = this.getClient();
+        String[] languages = {"Bengali", "English"};
+        boolean caught;
+        try {
+            caught = false;
+            client.callProcedure("InsertForUnsupportedArray", "Hello", "World", languages);
+        } catch (Exception e) {
+            System.out.println("Hi Bibudh");
+            caught = true;
+        }
+        assertTrue(caught);
+        //assert(caught);
+    }
+
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -1252,6 +1272,10 @@ public class TestSQLTypesSuite extends RegressionSuite {
                 .getResource("sqltypessuite-ddl.sql"));
         project.addSchema(TestSQLTypesSuite.class
                 .getResource("sqltypessuite-nonulls-ddl.sql"));
+        //For ENG-933
+        project.addSchema(TestSQLTypesSuite.class
+                .getResource("sqltypesuite-unsupportedarray.sql"));
+
         project.addPartitionInfo("NO_NULLS", "PKEY");
         project.addPartitionInfo("ALLOW_NULLS", "PKEY");
         project.addPartitionInfo("WITH_DEFAULTS", "PKEY");
@@ -1259,11 +1283,18 @@ public class TestSQLTypesSuite extends RegressionSuite {
         project.addPartitionInfo("EXPRESSIONS_WITH_NULLS", "PKEY");
         project.addPartitionInfo("EXPRESSIONS_NO_NULLS", "PKEY");
         project.addPartitionInfo("JUMBO_ROW", "PKEY");
+        //For ENG-933
+        project.addPartitionInfo("HELLOWORLD", "DIALECT");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure(
                 "PassObjectNull",
                 "insert into ALLOW_NULLS values ( ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?, ?);",
                 "NO_NULLS.PKEY: 0");
+
+        /*project.addStmtProcedure(
+                "PassObjectNull",
+                "insert into HELLOWORLD values ( ?, ?, ?);",
+                "HELLOWORLD.DIALECT: 2");*/
 
         boolean success;
 
