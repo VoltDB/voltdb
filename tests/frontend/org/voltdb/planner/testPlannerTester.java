@@ -74,8 +74,8 @@ public class testPlannerTester extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"),
-                                         "testindexselectionplans");
+        aide = new PlannerTestAideDeCamp(testPlannerTester.class.getResource("testplans-plannerTester-ddl.sql"),
+                                         "testplans-plannerTester-ddl");
 
         // Set all tables to non-replicated.
         Cluster cluster = aide.getCatalog().getClusters().get("cluster");
@@ -125,14 +125,13 @@ public class testPlannerTester extends TestCase {
     
     public void testCompile() {
 				try {
-					plannerTester.setUp("/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
-							"testplans-plannerTester-ddl", "L", "a");
+					plannerTester.setUp("/home/zhengli/workspace/voltdb/examples/voter/ddl.sql",
+							"ddl", "votes", "phone_number");
 					//List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
-					List<AbstractPlanNode> pnList = plannerTester.compile("insert into l VALUES(?,?,?,?);", 4, false);
-					assertTrue( pnList.size() == 2 );
+					List<AbstractPlanNode> pnList = plannerTester.compile("INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);", 4, false);
+					//assertTrue( pnList.size() == 2 );
 					System.out.println( pnList.size() );
 					System.out.println( pnList.get(0).toExplainPlanString() );
-					System.out.println( pnList.get(1).toExplainPlanString() );
 					
 					AbstractPlanNode pn = plannerTester.combinePlanNodes( pnList );
 					System.out.println( pn.toExplainPlanString() );
@@ -334,12 +333,37 @@ public class testPlannerTester extends TestCase {
     
     public void testWholeProcess() {
     	try {
-			plannerTester.setUp("/home/zhengli/Voter");
+			plannerTester.setUp("/home/zhengli/test1");
 			plannerTester.batchCompileSave();
 			plannerTester.batchDiff();
 		} catch (Exception e) {
 			e.printStackTrace();
 		}
+    }
+    
+    //make sure plan files are already in baseline directories 
+    public void testDiffVoltExamples() {
+    	try {
+    		plannerTester.setUp("/home/zhengli/test1");
+    		plannerTester.batchDiff();
+    	
+    		plannerTester.setUp("/home/zhengli/Voter");
+    		plannerTester.batchDiff();
+    	
+    		plannerTester.setUp("/home/zhengli/voltcache");
+    		plannerTester.batchDiff();
+    	
+    		plannerTester.setUp("/home/zhengli/voltkv");
+    		plannerTester.batchDiff();
+    	}
+    	catch ( Exception e ) {
+    		e.printStackTrace();
+    	}
+    }
+    
+    public void testMain() {
+    	String[] args = {"-d","-C=/home/zhengli/test1", "-C=/home/zhengli/Voter","-C=/home/zhengli/voltcache","-C=/home/zhengli/voltkv"};
+    	plannerTester.main(args);
     }
 }
 
