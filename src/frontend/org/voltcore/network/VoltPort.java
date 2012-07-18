@@ -368,19 +368,27 @@ public class VoltPort implements Connection
         m_handler.stopping(this);
     }
 
+    private boolean m_alreadyStopped = false;
+
     /**
      * Called when unregistration is complete and the Connection can no
      * longer be interacted with.
+     *
+     * Various error paths fall back to unregistering so it can happen multiple times and is really
+     * annoying. Suppress it here with a flag
      */
     void unregistered() {
         try {
-            try {
-                m_handler.stopped(this);
-            } finally {
+            if (!m_alreadyStopped) {
+                m_alreadyStopped = true;
                 try {
-                    m_writeStream.shutdown();
+                    m_handler.stopped(this);
                 } finally {
-                    m_readStream.shutdown();
+                    try {
+                        m_writeStream.shutdown();
+                    } finally {
+                        m_readStream.shutdown();
+                    }
                 }
             }
         } finally {
