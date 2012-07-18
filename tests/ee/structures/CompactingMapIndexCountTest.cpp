@@ -265,13 +265,14 @@ TEST_F(CompactingMapTest, SimpleMultiRank) {
     rankasc = volt.rankAsc(5); ASSERT_TRUE(rankasc == 6);
     rankasc = volt.rankAsc(6); ASSERT_TRUE(rankasc == 7);
     rankasc = volt.rankAsc(8); ASSERT_TRUE(rankasc == 9);
-    rankasc = volt.rankAsc(8); ASSERT_TRUE(rankasc == 9);
     rankasc = volt.rankAsc(7); ASSERT_TRUE(rankasc == -1);
 
-    rankupper = volt.rankUpper(3);
-    printf("Upper: %d\n", rankupper);
-    ASSERT_TRUE(rankupper == 5);
-
+    rankupper = volt.rankUpper(1); ASSERT_TRUE(rankupper == 1);
+    rankupper = volt.rankUpper(2); ASSERT_TRUE(rankupper == 2);
+    rankupper = volt.rankUpper(3); ASSERT_TRUE(rankupper == 5);
+    rankupper = volt.rankUpper(5); ASSERT_TRUE(rankupper == 6);
+    rankupper = volt.rankUpper(6); ASSERT_TRUE(rankupper == 8);
+    rankupper = volt.rankUpper(8); ASSERT_TRUE(rankupper == 10);
 }
 
 TEST_F(CompactingMapTest, RandomMultiRank) {
