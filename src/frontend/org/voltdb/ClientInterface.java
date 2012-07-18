@@ -49,7 +49,6 @@ import java.util.concurrent.locks.ReentrantLock;
 
 import org.apache.commons.lang3.ArrayUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.Level;
@@ -72,11 +71,8 @@ import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheReader;
-
-import org.voltdb.iv2.Cartographer;
-import org.voltdb.iv2.Iv2Trace;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Procedure;
@@ -89,12 +85,14 @@ import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
+import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.Cartographer;
+import org.voltdb.iv2.Iv2Trace;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -1732,10 +1730,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Round trip the invocation to initialize it for command logging
          */
         FastSerializer fs = new FastSerializer();
+        int serializedSize = 0;
         try {
             fs.writeObject(task);
             ByteBuffer source = fs.getBuffer();
             ByteBuffer copy = ByteBuffer.allocate(source.remaining());
+            serializedSize = copy.capacity();
             copy.put(source);
             copy.flip();
             FastDeserializer fds = new FastDeserializer(copy);
@@ -1760,7 +1760,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 plannedStmtBatch.adminConnection, task,
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
                 partitions, partitions.length, plannedStmtBatch.clientData,
-                0, EstTime.currentTimeMillis(), allowMismatchedResults);
+                serializedSize, EstTime.currentTimeMillis(), allowMismatchedResults);
 
         // cache the plans, but don't hold onto the connection object
         plannedStmtBatch.clientData = null;
