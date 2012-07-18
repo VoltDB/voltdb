@@ -72,6 +72,10 @@
         <level value="TRACE"/>
     </logger -->
 
+    <!-- logger name="IV2QUEUETRACE">
+        <level value="TRACE"/>
+    </logger -->
+
     <!-- Always let dragent to write to the console. -->
     <logger name="DRAGENT">
         <level value="INFO"/>

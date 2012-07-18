@@ -37,6 +37,7 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class Iv2Trace
 {
     private static VoltLogger iv2log = new VoltLogger("IV2TRACE");
+    private static VoltLogger iv2queuelog = new VoltLogger("IV2QUEUETRACE");
 
     public static void logTopology(long leaderHSId, List<Long> replicas, int partitionId)
     {
@@ -179,6 +180,24 @@ public class Iv2Trace
                         CoreUtils.hsIdToString(ftask.m_sourceHSId),
                         txnIdToString(ftask.getTxnId()),
                         txnIdToString(spHandle)));
+        }
+    }
+
+    public static void logTransactionTaskQueueOffer(TransactionTask task)
+    {
+        if (iv2queuelog.isTraceEnabled()) {
+            String logmsg = new String ("txnQOffer txnId %s spHandle %s type %s");
+            iv2queuelog.trace(String.format(logmsg, task.getMpTxnId(), task.getLocalTxnId(),
+                    task.m_txn.isSinglePartition() ? "SP" : "MP"));
+        }
+    }
+
+    public static void logSiteTaskerQueueOffer(TransactionTask task)
+    {
+        if (iv2queuelog.isTraceEnabled()) {
+            String logmsg = new String ("tskQOffer txnId %s spHandle %s type %s");
+            iv2queuelog.trace(String.format(logmsg, task.getMpTxnId(), task.getLocalTxnId(),
+                    task.m_txn.isSinglePartition() ? "SP" : "MP"));
         }
     }
 }

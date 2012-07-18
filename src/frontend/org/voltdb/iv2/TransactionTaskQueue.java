@@ -45,6 +45,7 @@ public class TransactionTaskQueue
      */
     synchronized boolean offer(TransactionTask task)
     {
+        Iv2Trace.logTransactionTaskQueueOffer(task);
         boolean retval = false;
         // Single partitions never queue if empty
         // Multipartitions always queue
@@ -59,7 +60,7 @@ public class TransactionTaskQueue
                 retval = true;
             }
             else {
-                m_taskQueue.offer(task);
+                taskQueueOffer(task);
             }
         }
         else {
@@ -67,9 +68,17 @@ public class TransactionTaskQueue
                 m_backlog.addLast(task);
                 retval = true;
             }
-            m_taskQueue.offer(task);
+            taskQueueOffer(task);
         }
         return retval;
+    }
+
+    // Add a local method to offer to the SiteTaskerQueue so we have
+    // a single point we can log through.
+    private void taskQueueOffer(TransactionTask task)
+    {
+        Iv2Trace.logSiteTaskerQueueOffer(task);
+        m_taskQueue.offer(task);
     }
 
     /**
@@ -88,7 +97,7 @@ public class TransactionTaskQueue
                 m_backlog.removeFirst();
                 while (!m_backlog.isEmpty()) {
                     TransactionTask next = m_backlog.getFirst();
-                    m_taskQueue.offer(next);
+                    taskQueueOffer(next);
                     ++offered;
                     if (next.getTransactionState().isSinglePartition()) {
                         m_backlog.removeFirst();
@@ -106,7 +115,7 @@ public class TransactionTaskQueue
                             if (task.getMpTxnId() == next.getMpTxnId())
                             {
                                 iter.remove();
-                                m_taskQueue.offer(task);
+                                taskQueueOffer(task);
                                 ++offered;
                             }
                         }
