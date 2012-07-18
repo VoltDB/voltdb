@@ -242,4 +242,10 @@ public class MpScheduler extends Scheduler
     {
         throw new RuntimeException("MpScheduler should never see a CompleteTransactionMessage");
     }
+
+    @Override
+    public void setMaxSeenTxnId(long maxSeenTxnId) {
+        assert(maxSeenTxnId >= (1l << 40));
+        m_txnId.set(maxSeenTxnId);
+    }
 }

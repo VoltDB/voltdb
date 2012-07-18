@@ -19,23 +19,30 @@ package org.voltdb.iv2;
 
 import java.lang.InterruptedException;
 
+import java.util.ArrayList;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+
 import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.Pair;
-import org.voltcore.zk.BabySitter;
-import org.voltcore.zk.BabySitter.Callback;
-import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCache.Callback;
 
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
+import com.google.common.collect.ImmutableMap;
 import com.google.common.collect.Sets;
 
 public class MpTerm implements Term
@@ -44,51 +51,61 @@ public class MpTerm implements Term
     private final String m_whoami;
 
     private final InitiatorMailbox m_mailbox;
-    private final int m_partitionId;
     private final ZooKeeper m_zk;
     private final CountDownLatch m_missingStartupSites;
-    private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
+    private final TreeSet<Long> m_knownLeaders = new TreeSet<Long>();
 
     // Initialized in start() -- when the term begins.
-    protected BabySitter m_babySitter;
+    protected MapCache m_mapCache;
 
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
     // the Term processing.
-    Callback m_replicasChangeHandler = new Callback()
+    // NOTE: The contract with MapCache is that it always
+    // returns a full cache (one entry for every partition).  Returning a
+    // partially filled cache is NotSoGood(tm).
+    Callback m_leadersChangeHandler = new Callback()
     {
         @Override
-        public void run(List<String> children)
+        public void run(ImmutableMap<String, JSONObject> cache)
         {
+            Set<Long> updatedLeaders = new HashSet<Long>();
+            for (JSONObject thing : cache.values()) {
+                try {
+                    updatedLeaders.add(Long.valueOf(thing.getLong("hsid")));
+                } catch (JSONException e) {
+                    VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
+                }
+            }
+            List<Long> leaders = new ArrayList<Long>(updatedLeaders);
             // Need to handle startup separately from runtime updates.
             if (MpTerm.this.m_missingStartupSites.getCount() > 0) {
-                TreeSet<String> updatedReplicas = com.google.common.collect.Sets.newTreeSet(children);
-                // Cancel setup if a previously seen replica disappeared.
-                // I think voltcore might actually terminate before getting here...
-                Sets.SetView<String> removed = Sets.difference(MpTerm.this.m_knownReplicas, updatedReplicas);
+
+                Sets.SetView<Long> removed = Sets.difference(MpTerm.this.m_knownLeaders, updatedLeaders);
                 if (!removed.isEmpty()) {
                     tmLog.error(m_whoami
-                            + "replica(s) failed during startup. Initialization can not complete."
-                            + " Failed replicas: " + removed);
-                    VoltDB.crashLocalVoltDB("Replicas failed during startup.", true, null);
+                            + "leader(s) failed during startup. Initialization can not complete."
+                            + " Failed leaders: " + removed);
+                    VoltDB.crashLocalVoltDB("Leaders failed during startup.", true, null);
                     return;
                 }
-                Sets.SetView<String> added = Sets.difference(updatedReplicas, MpTerm.this.m_knownReplicas);
-                int newReplicas = added.size();
-                m_knownReplicas.addAll(updatedReplicas);
-                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(updatedReplicas);
-                m_mailbox.updateReplicas(replicas);
-                for (int i=0; i < newReplicas; i++) {
+                Sets.SetView<Long> added = Sets.difference(updatedLeaders, MpTerm.this.m_knownLeaders);
+                int newLeaders = added.size();
+                m_knownLeaders.clear();
+                m_knownLeaders.addAll(updatedLeaders);
+                m_mailbox.updateReplicas(leaders);
+                for (int i=0; i < newLeaders; i++) {
                     MpTerm.this.m_missingStartupSites.countDown();
                 }
             }
             else {
                 // remove the leader; convert to hsids; deal with the replica change.
-                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(children);
                 tmLog.info(m_whoami
-                        + "replica change handler updating replica list to: "
-                        + CoreUtils.hsIdCollectionToString(replicas));
-                m_mailbox.updateReplicas(replicas);
+                        + "MapCache change handler updating leader list to: "
+                        + CoreUtils.hsIdCollectionToString(leaders));
+                m_knownLeaders.clear();
+                m_knownLeaders.addAll(updatedLeaders);
+                m_mailbox.updateReplicas(leaders);
             }
         }
     };
@@ -97,11 +114,10 @@ public class MpTerm implements Term
      * Setup a new Term but don't take any action to take responsibility.
      */
     public MpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+            long initiatorHSId, InitiatorMailbox mailbox,
+            String whoami)
     {
         m_zk = zk;
-        m_partitionId = partitionId;
         m_mailbox = mailbox;
 
         if (missingStartupSites != null) {
@@ -122,10 +138,8 @@ public class MpTerm implements Term
     public void start()
     {
         try {
-            Pair<BabySitter, List<String>> pair = BabySitter.blockingFactory(m_zk,
-                    LeaderElector.electionDirForPartition(m_partitionId),
-                    m_replicasChangeHandler);
-            m_babySitter = pair.getFirst();
+            m_mapCache = new MapCache(m_zk, VoltZK.iv2masters, m_leadersChangeHandler);
+            m_mapCache.start(true);
         }
         catch (ExecutionException ee) {
             VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);
@@ -137,16 +151,18 @@ public class MpTerm implements Term
     @Override
     public void shutdown()
     {
-        if (m_babySitter != null) {
-            m_babySitter.shutdown();
+        if (m_mapCache != null) {
+            try {
+                m_mapCache.shutdown();
+            } catch (InterruptedException e) {
+                // We're shutting down...this may jsut be faster.
+            }
         }
     }
 
     @Override
     public List<Long> getInterestingHSIds()
     {
-        List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  BaseInitiator.childrenToReplicaHSIds(survivorsNames);
-        return survivors;
+        return new ArrayList<Long>(m_knownLeaders);
     }
 }

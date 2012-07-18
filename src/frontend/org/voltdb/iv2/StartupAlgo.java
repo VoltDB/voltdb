@@ -20,30 +20,17 @@ package org.voltdb.iv2;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.Future;
 
-import org.apache.zookeeper_voltpatches.KeeperException;
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
 
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheWriter;
-
-import org.voltdb.VoltDB;
+import org.voltcore.utils.Pair;
 
 public class StartupAlgo implements RepairAlgo
 {
     VoltLogger tmLog = new VoltLogger("TM");
     private final String m_whoami;
 
-    private final InitiatorMailbox m_mailbox;
-    private final int m_partitionId;
-    private final ZooKeeper m_zk;
     private final CountDownLatch m_missingStartupSites;
-    private final String m_mapCacheNode;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -52,14 +39,8 @@ public class StartupAlgo implements RepairAlgo
     /**
      * Setup a new StartupAlgo but don't take any action to take responsibility.
      */
-    public StartupAlgo(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+    public StartupAlgo(CountDownLatch missingStartupSites, String whoami)
     {
-        m_zk = zk;
-        m_partitionId = partitionId;
-        m_mailbox = mailbox;
-
         if (missingStartupSites != null) {
             m_missingStartupSites = missingStartupSites;
         }
@@ -68,18 +49,17 @@ public class StartupAlgo implements RepairAlgo
         }
 
         m_whoami = whoami;
-        m_mapCacheNode = zkMapCacheNode;
     }
 
     @Override
-    public Future<Boolean> start()
+    public Future<Pair<Boolean, Long>> start()
     {
         try {
             prepareForStartup();
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.done();
+            m_promotionResult.done(Long.MIN_VALUE);
         }
         return m_promotionResult;
     }
@@ -102,7 +82,7 @@ public class StartupAlgo implements RepairAlgo
         // block here until the babysitter thread provides all replicas.
         // then initialize the mailbox's replica set and proceed as leader.
         m_missingStartupSites.await();
-        declareReadyAsLeader();
+        m_promotionResult.done(0);
     }
 
     /** Process a new repair log response */
@@ -110,23 +90,5 @@ public class StartupAlgo implements RepairAlgo
     public void deliver(VoltMessage message)
     {
         throw new RuntimeException("Dude, shouldn't get these here.");
-    }
-
-    // with leadership election complete, update the master list
-    // for non-initiator components that care.
-    void declareReadyAsLeader()
-    {
-        try {
-            MapCacheWriter iv2masters = new MapCache(m_zk, m_mapCacheNode);
-            iv2masters.put(Integer.toString(m_partitionId),
-                    new JSONObject("{hsid:" + m_mailbox.getHSId() + "}"));
-            m_promotionResult.done();
-        } catch (KeeperException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        } catch (InterruptedException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        } catch (JSONException e) {
-            VoltDB.crashLocalVoltDB("Bad news: failed to declare leader.", true, e);
-        }
     }
 }

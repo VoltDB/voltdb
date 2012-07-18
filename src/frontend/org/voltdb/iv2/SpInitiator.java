@@ -25,6 +25,9 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.messaging.HostMessenger;
 
+import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.VoltZK;
 
 /**
@@ -41,6 +44,18 @@ public class SpInitiator extends BaseInitiator
                 "SP");
     }
 
+    @Override
+    public void configure(BackendTarget backend, String serializedCatalog,
+                          CatalogContext catalogContext,
+                          int kfactor, CatalogSpecificPlanner csp,
+                          int numberOfPartitions,
+                          boolean createForRejoin)
+    {
+        super.configureCommon(backend, serializedCatalog, catalogContext,
+                kfactor + 1, csp, numberOfPartitions,
+                createForRejoin && isRejoinable());
+    }
+
     /**
      * SpInitiator has userdata that must be rejoined.
      */
@@ -55,19 +70,13 @@ public class SpInitiator extends BaseInitiator
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
-        return new SpTerm(missingStartupSites, zk,
-                partitionId, initiatorHSId, mailbox,
-                zkMapCacheNode, whoami);
+        return new SpTerm(missingStartupSites, zk, partitionId, initiatorHSId, mailbox, whoami);
     }
 
     @Override
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, ZooKeeper zk,
-            int partitionId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+            String whoami)
     {
-        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
-                m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
+        return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
     }
-
-
 }

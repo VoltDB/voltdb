@@ -96,7 +96,7 @@ public class SpTerm implements Term
      */
     public SpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+            String whoami)
     {
         m_zk = zk;
         m_partitionId = partitionId;

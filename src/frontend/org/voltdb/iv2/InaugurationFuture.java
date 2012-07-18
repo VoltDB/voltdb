@@ -25,32 +25,36 @@ import java.util.concurrent.Future;
 import java.util.concurrent.TimeoutException;
 import java.util.concurrent.TimeUnit;
 
+import org.voltcore.utils.Pair;
+
 // future that represents completion of transition to leader.
-class InaugurationFuture implements Future<Boolean>
+class InaugurationFuture implements Future<Pair<Boolean, Long>>
 {
     private CountDownLatch m_doneLatch = new CountDownLatch(1);
     private AtomicBoolean m_cancelled = new AtomicBoolean(false);
     private ExecutionException m_exception = null;
+    private Long m_maxTxnId = Long.MIN_VALUE;
 
     void setException(Exception e)
     {
         m_exception = new ExecutionException(e);
     }
 
-    private Boolean result() throws ExecutionException
+    private Pair<Boolean, Long> result() throws ExecutionException
     {
         if (m_exception != null) {
             throw m_exception;
         }
         else if (isCancelled()) {
-            return false;
+            return new Pair<Boolean, Long>(false, Long.MIN_VALUE);
         }
-        return true;
+        return new Pair<Boolean, Long>(true, m_maxTxnId);
 
     }
 
-    public void done()
+    public void done(long maxTxnId)
     {
+        m_maxTxnId = maxTxnId;
         m_doneLatch.countDown();
     }
 
@@ -80,19 +84,17 @@ class InaugurationFuture implements Future<Boolean>
     }
 
     @Override
-    public Boolean get() throws InterruptedException, ExecutionException
+    public Pair<Boolean, Long> get() throws InterruptedException, ExecutionException
     {
         m_doneLatch.await();
         return result();
     }
 
     @Override
-    public Boolean get(long timeout, TimeUnit unit)
+    public Pair<Boolean, Long> get(long timeout, TimeUnit unit)
         throws InterruptedException, ExecutionException, TimeoutException
     {
         m_doneLatch.await(timeout, unit);
         return result();
     }
 }
-
-

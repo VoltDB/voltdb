@@ -129,7 +129,9 @@ public class Iv2RepairLogResponseMessage extends VoltMessage
         m_handle = buf.getLong();
 
         // going inception.
-        if (m_ofTotal != 0) {
+        // The first message in the repair log response stream is always a null
+        // ack, so don't try to deserialize a message that won't exist.
+        if (m_sequence != 0) {
             VoltDbMessageFactory messageFactory = new VoltDbMessageFactory();
             m_payload = messageFactory.createMessageFromBuffer(buf, m_sourceHSId);
         }

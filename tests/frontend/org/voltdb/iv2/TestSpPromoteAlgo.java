@@ -28,18 +28,15 @@ import java.util.ArrayList;
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.List;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.mockito.InOrder;
 import static org.mockito.Mockito.*;
 
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
-import org.voltdb.VoltZK;
 import junit.framework.TestCase;
 import org.junit.Test;
 
-public class TestSpRepairAlgo extends TestCase
+public class TestSpPromoteAlgo extends TestCase
 {
     Iv2RepairLogResponseMessage makeResponse(long spHandle)
     {
@@ -59,7 +56,7 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testUnion() throws Exception
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test");
 
         // returned sphandles in a non-trivial order, with duplicates.
         long returnedSpHandles[] = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
@@ -81,7 +78,7 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testStaleResponse() throws Exception
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test");
         term.deliver(makeStaleResponse(1L, term.getRequestId() + 1));
         assertEquals(0L, term.m_repairLogUnion.size());
     }
@@ -92,7 +89,7 @@ public class TestSpRepairAlgo extends TestCase
     @Test
     public void testRepairLogsAreComplete()
     {
-        SpPromoteAlgo term = new SpPromoteAlgo(null, null, 0, null, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, null, "Test");
         SpPromoteAlgo.ReplicaRepairStruct notDone1 = new SpPromoteAlgo.ReplicaRepairStruct();
         notDone1.m_receivedResponses = 1;
         notDone1.m_expectedResponses = 2;
@@ -137,7 +134,7 @@ public class TestSpRepairAlgo extends TestCase
     public void testRepairSurvivors()
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
-        SpPromoteAlgo term = new SpPromoteAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test");
 
         // missing 4, 5
         SpPromoteAlgo.ReplicaRepairStruct r1 = new SpPromoteAlgo.ReplicaRepairStruct();
@@ -190,7 +187,7 @@ public class TestSpRepairAlgo extends TestCase
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         InOrder inOrder = inOrder(mailbox);
 
-        SpPromoteAlgo term = new SpPromoteAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test");
+        SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test");
 
         // missing 3, 4, 5
         SpPromoteAlgo.ReplicaRepairStruct r3 = new SpPromoteAlgo.ReplicaRepairStruct();
@@ -230,7 +227,7 @@ public class TestSpRepairAlgo extends TestCase
 
         // Stub some portions of a concrete Term instance - this is the
         // object being tested.
-        final SpPromoteAlgo term = new SpPromoteAlgo(null, mock(ZooKeeper.class), 0, mailbox, VoltZK.iv2masters, "Test") {
+        final SpPromoteAlgo term = new SpPromoteAlgo(null, mailbox, "Test") {
             // there aren't replicas to ask for repair logs
             @Override
             void prepareForFaultRecovery() {
@@ -242,7 +239,7 @@ public class TestSpRepairAlgo extends TestCase
             @Override
             public void run() {
                 try {
-                    promotionResult.set(term.start().get());
+                    promotionResult.set(term.start().get().getFirst());
                 } catch (Exception e) {
                     System.out.println("Promotion thread threw: " + e);
                     throw new RuntimeException(e);

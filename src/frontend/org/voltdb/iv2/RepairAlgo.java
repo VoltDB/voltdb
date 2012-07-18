@@ -21,6 +21,8 @@ import java.util.concurrent.Future;
 
 import org.voltcore.messaging.VoltMessage;
 
+import org.voltcore.utils.Pair;
+
 // Some comments on threading and organization.
 //   start() returns a future. Block on this future to get the final answer.
 //
@@ -51,7 +53,7 @@ public interface RepairAlgo
      * leadership has been fully assumed and all surviving replicas have been
      * repaired.
      */
-    public Future<Boolean> start();
+    public Future<Pair<Boolean, Long>> start();
 
     public boolean cancel();
 

@@ -59,8 +59,8 @@ public class MpInitiator extends BaseInitiator
                           int numberOfPartitions,
                           boolean createForRejoin)
     {
-        super.configure(backend, serializedCatalog, catalogContext,
-                kfactor, csp, numberOfPartitions,
+        super.configureCommon(backend, serializedCatalog, catalogContext,
+                numberOfPartitions, csp, numberOfPartitions,
                 createForRejoin && isRejoinable());
     }
 
@@ -78,17 +78,13 @@ public class MpInitiator extends BaseInitiator
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String zkMapCacheNode, String whoami)
     {
-        return new MpTerm(missingStartupSites, zk,
-                partitionId, initiatorHSId, mailbox,
-                zkMapCacheNode, whoami);
+        return new MpTerm(missingStartupSites, zk, initiatorHSId, mailbox, whoami);
     }
 
     @Override
-    public RepairAlgo createPromoteAlgo(List<Long> survivors, ZooKeeper zk,
-            int partitionId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+    public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
+            String whoami)
     {
-        return new MpPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
-                m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
+        return new MpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
     }
 }

@@ -26,12 +26,17 @@ import java.util.concurrent.ExecutionException;
 import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
 
+import org.json_voltpatches.JSONObject;
+
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
+import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -105,10 +110,9 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
     }
 
-    @Override
-    public void configure(BackendTarget backend, String serializedCatalog,
+    protected void configureCommon(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          int kfactor, CatalogSpecificPlanner csp,
+                          int startupCount, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin)
     {
@@ -144,7 +148,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             // FUTURE: Consider possibly returning this and the
             // m_siteThread.start() in a Runnable which RealVoltDB can use for
             // configure/run sequencing in the future.
-            joinElectoralCollege(kfactor);
+            joinElectoralCollege(startupCount);
         }
         catch (Exception e) {
            VoltDB.crashLocalVoltDB("Failed to configure initiator", true, e);
@@ -153,9 +157,9 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
 
     // Register with m_partition's leader elector node
     // On the leader, becomeLeader() will run before joinElectoralCollage returns.
-    boolean joinElectoralCollege(int kfactor) throws InterruptedException, ExecutionException, KeeperException
+    boolean joinElectoralCollege(int startupCount) throws InterruptedException, ExecutionException, KeeperException
     {
-        m_missingStartupSites = new CountDownLatch(kfactor + 1);
+        m_missingStartupSites = new CountDownLatch(startupCount);
         m_leaderElector = new LeaderElector(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null, this);
@@ -185,24 +189,29 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             while (!success) {
                 RepairAlgo repair = null;
                 if (m_missingStartupSites != null) {
-                    repair = new StartupAlgo(m_missingStartupSites, m_messenger.getZK(),
-                            m_partitionId, m_initiatorMailbox,
-                            m_zkMailboxNode, m_whoami);
+                    repair = new StartupAlgo(m_missingStartupSites, m_whoami);
                 }
                 else {
-                    repair = createPromoteAlgo(m_term.getInterestingHSIds(), m_messenger.getZK(),
-                            m_partitionId, m_initiatorMailbox, m_zkMailboxNode, m_whoami);
+                    repair = createPromoteAlgo(m_term.getInterestingHSIds(),
+                            m_initiatorMailbox, m_whoami);
                 }
 
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.
-                success = repair.start().get();
+                Pair<Boolean, Long> result = repair.start().get();
+                success = result.getFirst();
                 if (success) {
-                    m_repairLog.setLeaderState(true);
-                    m_scheduler.setLeaderState(true);
+                    m_initiatorMailbox.setLeaderState(result.getSecond());
                     tmLog.info(m_whoami
                             + "finished leader promotion. Took "
                             + (System.currentTimeMillis() - startTime) + " ms.");
+
+                    // THIS IS where map cache should be updated, not
+                    // in the promotion algorithm.
+                    MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(),
+                            m_zkMailboxNode);
+                    iv2masters.put(Integer.toString(m_partitionId),
+                            new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
                 }
                 else {
                     // The only known reason to fail is a failed replica during

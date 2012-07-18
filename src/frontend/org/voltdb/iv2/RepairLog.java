@@ -22,12 +22,15 @@ import java.util.Iterator;
 import java.util.LinkedList;
 import java.util.List;
 
+import org.voltcore.logging.VoltLogger;
+
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
 /**
  * The repair log stores messages received from a PI in case they need to be
@@ -37,6 +40,8 @@ public class RepairLog
 {
     private static final boolean IS_SP = true;
     private static final boolean IS_MP = false;
+
+    VoltLogger tmLog = new VoltLogger("TM");
 
     // Initialize to Long MAX_VALUE to prevent feeding a newly joined node
     // transactions it should never have seen
@@ -155,17 +160,44 @@ public class RepairLog
     }
 
     // produce the contents of the repair log.
-    public List<Item> contents(boolean forMPI)
+    public List<Iv2RepairLogResponseMessage> contents(long requestId, boolean forMPI)
     {
-        List<Item> response = new LinkedList<Item>();
+        List<Item> items = new LinkedList<Item>();
         Iterator<Item> it = m_log.iterator();
         while (it.hasNext()) {
             Item i = it.next();
             if (!forMPI || i.isMP()) {
-                response.add(i);
+                items.add(i);
             }
         }
-        return response;
+
+        int ofTotal = items.size() + 1;
+        tmLog.info("Responding with " + ofTotal + " repair log parts.");
+        List<Iv2RepairLogResponseMessage> responses =
+            new LinkedList<Iv2RepairLogResponseMessage>();
+
+        int seq = 0;
+        Iv2RepairLogResponseMessage header =
+            new Iv2RepairLogResponseMessage(
+                    requestId,
+                    seq++,
+                    ofTotal,
+                    forMPI ? m_lastMpHandle : m_lastSpHandle,
+                    null); // no payload. just an ack.
+        responses.add(header);
+
+        Iterator<Item> itemator = items.iterator();
+        while (itemator.hasNext()) {
+            Item item = itemator.next();
+            Iv2RepairLogResponseMessage response =
+                new Iv2RepairLogResponseMessage(
+                        requestId,
+                        seq++,
+                        ofTotal,
+                        item.getHandle(),
+                        item.getMessage());
+            responses.add(response);
+        }
+        return responses;
     }
 }
-
