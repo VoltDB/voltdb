@@ -31,7 +31,7 @@ import org.voltdb.utils.CompressionService;
  * A thread that sends snapshot data across the wire.
  */
 public class StreamSnapshotSender implements Runnable {
-    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
     private final SocketChannel m_sock;
     private final LinkedBlockingQueue<BBContainer> m_queue =

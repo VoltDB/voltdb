@@ -30,9 +30,10 @@ import org.voltdb.planner.ParameterInfo;
 public class AdHocPlannedStatement extends AsyncCompilerResult implements Cloneable {
     private static final long serialVersionUID = 1144100816601598092L;
     public String sql;
-    public String aggregatorFragment;
-    public String collectorFragment;
+    public byte[] aggregatorFragment;
+    public byte[] collectorFragment;
     public boolean isReplicatedTableDML;
+    public boolean isNonDeterministic;
     public Object partitionParam;
     public int catalogVersion;
     public List<ParameterInfo> params;
@@ -44,19 +45,22 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
      * @param aggregatorFragment        planned aggregator fragment
      * @param collectorFragment         planned collector fragment
      * @param isReplicatedTableDML      replication flag
+     * @param isNonDeterministic        non-deterministic SQL flag
      * @param partitionParam partition  parameter
      * @param catalogVersion            catalog version
      */
     public AdHocPlannedStatement(String sql,
-                                 String aggregatorFragment,
-                                 String collectorFragment,
+                                 byte[] aggregatorFragment,
+                                 byte[] collectorFragment,
                                  boolean isReplicatedTableDML,
+                                 boolean isNonDeterministic,
                                  Object partitionParam,
                                  int catalogVersion) {
         this.sql = sql;
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.isReplicatedTableDML = isReplicatedTableDML;
+        this.isNonDeterministic = isNonDeterministic;
         this.partitionParam = partitionParam;
         this.catalogVersion = catalogVersion;
     }

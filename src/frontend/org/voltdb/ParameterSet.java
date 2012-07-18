@@ -88,6 +88,10 @@ import org.voltdb.types.VoltDecimalHelper;
         return m_serializedSize;
     }
 
+    /*
+     * Get a single indexed parameter. No size limits are enforced.
+     * Do not use for large strings or varbinary (> 1MB).
+     */
     static Object getParameterAtIndex(int partitionIndex, ByteBuffer unserializedParams) throws IOException {
         FastDeserializer in = new FastDeserializer(unserializedParams);
         int paramLen = in.readShort();
@@ -183,6 +187,9 @@ import org.voltdb.types.VoltDecimalHelper;
                         break;
                     case VOLTTABLE:
                         out.writeArray((VoltTable[]) obj);
+                        break;
+                    case VARBINARY:
+                        out.writeArray((byte[][]) obj);
                         break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);
@@ -394,7 +401,8 @@ import org.voltdb.types.VoltDecimalHelper;
         return value;
     }
 
-    static private Object readOneParameter(FastDeserializer in) throws IOException {
+    static private Object readOneParameter(FastDeserializer in)
+            throws IOException {
         byte nextTypeByte = in.readByte();
         if (nextTypeByte == ARRAY) {
             VoltType nextType = VoltType.get(in.readByte());
@@ -536,6 +544,14 @@ import org.voltdb.types.VoltDecimalHelper;
                     case VOLTTABLE:
                         for (VoltTable vt : (VoltTable[]) obj) {
                             size += vt.getSerializedSize();
+                        }
+                        break;
+                    case VARBINARY:
+                        for (byte[] buf : (byte[][]) obj) {
+                            size += 4; // length prefix
+                            if (buf != null) {
+                                size += buf.length;
+                            }
                         }
                         break;
                     default:
@@ -688,6 +704,9 @@ import org.voltdb.types.VoltDecimalHelper;
                         break;
                     case VOLTTABLE:
                         FastSerializer.writeArray((VoltTable[]) obj, buf);
+                        break;
+                    case VARBINARY:
+                        FastSerializer.writeArray((byte[][]) obj, buf);
                         break;
                     default:
                         throw new RuntimeException("FIXME: Unsupported type " + type);

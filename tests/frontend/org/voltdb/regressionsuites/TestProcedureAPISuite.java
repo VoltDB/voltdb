@@ -31,10 +31,12 @@ import java.util.Random;
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltDB;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb_testprocs.regressionsuites.BufferArrayProc;
 import org.voltdb_testprocs.regressionsuites.LastBatchLie;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeMP;
 import org.voltdb_testprocs.regressionsuites.VariableBatchSizeSP;
@@ -43,7 +45,7 @@ public class TestProcedureAPISuite extends RegressionSuite {
 
     // procedures used by these tests
     static final Class<?>[] PROCEDURES = {
-        VariableBatchSizeMP.class, VariableBatchSizeSP.class, LastBatchLie.class
+        VariableBatchSizeMP.class, VariableBatchSizeSP.class, LastBatchLie.class, BufferArrayProc.class
     };
 
     /**
@@ -134,6 +136,20 @@ public class TestProcedureAPISuite extends RegressionSuite {
             }
         }
         assertTrue(threw);
+    }
+
+    public void testCallArrayOfArrays() throws IOException, ProcCallException {
+        Client client = getClient();
+        byte[][] data = new byte[10][];
+        for (int i = 0; i < data.length; i++) {
+            data[i] = "Hello".getBytes(VoltDB.UTF8ENCODING);
+        }
+        String[] data3 = new String[3];
+        data3[0] = "AAbbff00";
+        data3[1] = "AAbbff0011";
+        data3[2] = "1234567890abcdef";
+
+        client.callProcedure(BufferArrayProc.class.getSimpleName(), data, data, data3);
     }
 
     /**

@@ -38,6 +38,7 @@ import org.voltdb.utils.CatalogUtil;
 public class TestAdHocPlans extends AdHocQueryTester {
 
     private PlannerTool m_pt;
+    private boolean m_debugging_set_this_to_retry_failures = false;
 
     @Override
     protected void setUp() throws Exception {
@@ -71,6 +72,12 @@ public class TestAdHocPlans extends AdHocQueryTester {
         if ((validatingSPresult == VALIDATING_SP_RESULT) != spPlan) {
             System.out.println("Missed: "+ query);
             System.out.println(result);
+            // This is a good place for a breakpoint,
+            // to set this debugging flag and step into the planner,
+            // for a do-over after getting an unexpected result.
+            if (m_debugging_set_this_to_retry_failures) {
+                result = m_pt.planSql(query, null, true, false);
+            }
         }
         assertEquals((validatingSPresult == VALIDATING_SP_RESULT), spPlan);
         return 0;
