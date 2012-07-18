@@ -215,88 +215,39 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         assert(joinOrder != null);
         assert(m_plans.size() == 0);
 
+        // In a multi-fragment plan that contains a join,
+        // is it better to send partitioned tuples and join them on the coordinator
+        // or is it better to join them before sending?
+        // On the assumption that joined rows are wider (taking more bandwidth per row),
+        // we would want to send and then join if joined rows were one-to-one, but if
+        // There is a special case -- a join of more than one partitioned table on their partition keys,
+        // when that join must happen first -- the send/receive protocol only allows sending a single
+        // intermediate result table per statement.
+        // In a join of multiple partitioned tables and one or more replicated tables, it is theoretically
+        // possible to do the partitioned table join, and then the send/receive, and then the replicated
+        // table join.
+        // Deciding whether to defer the send/receive to after a join in other cases requires a complex
+        // trade-off involving the following considerations:
+        //  - Deferring send/recieve typically involves transmitting wider rows (more bandwidth per row).
+        //  - Deferring send/recieve may either increase or decrease bandwidth requirements depending on whether
+        //    the join has a net filtering effect on rows (in a one-to-"averages-fewer-than-one" relationship)
+        //    or a net multiplication effect (in a one-to-many relationship).
+        //  - Deferring send/recieve increases shared processing across nodes
+        //    -- less single-threaded post-processing on the single aggregator.
+        // For now, for simplicity, we only defer the send/receive when required, but when required, we
+        // go all the way and defer to after even the replicated joins.
+
+        boolean deferSendReceivePair = m_partitioning.getCountOfPartitionedTables() > 1;
+
         // compute the reasonable access paths for all tables
         //HashMap<Table, ArrayList<Index[]>> accessPathOptions = generateAccessPathsForEachTable(joinOrder);
         // compute all combinations of access paths for this particular join order
         ArrayList<AccessPath[]> listOfAccessPathCombos = generateAllAccessPathCombinationsForJoinOrder(joinOrder);
 
-        // Identify whether all the partitioned tables in the join are filtered/joined on a common partition key
-        // Currently, if a partition key was provided to the planner,
-        // a single-partition scan is required and all partitioned tables accessed are
-        // assumed to follow this partition-key-equality pattern -- the query will only operate on the rows within a single partition,
-        // so caveat emptor if the query designating a single-partition does not fit the pattern.
-        // If no partition key was provided to the planner, multi-partition execution is initially assumed.
-        // That leaves several interesting cases.
-        // 1) In the best case, analysis of the plan can detect the partition-key-equality-join pattern and also detect a
-        // constant equality filter on any of the equivalent keys. In this case, the constant can be field-promoted
-        // to a partitioning value and the statement run single-partition on whichever partition the value hashes to.
-        // 2) In the next best case, a partition-key-equality pattern is detected but a constant equality filter does
-        // not exist or can not be resolved to a (hashable) constant value. The result is a two-fragment query where
-        // the top fragment coordinates the results of the distributed partition-based scan/joins in the bottom fragment.
-        // 3) In the worst case, there is no partition-key-equality -- or an incomplete one that does not cover all partitioned tables.
-        // Such a query would require a 3-fragment plan, with a top fragment joining the results of scans received from two lower fragments
-        // -- 3-fragment plans are not supported, so such plans can be rejected at this stage with no loss of functionality.
-        // 4) There is an additional edge case that would theoretically not have to exceed the 2-fragment limit.
-        // This would involve an arbitrary join with two partitioned tables (and, as implied in the above cases,
-        // any number of replicated tables) with no constraints on the join criteria BUT a requirement that the last
-        // partitioned table to be scanned (the first as listed in the reversed "joinOrder/accessPath" vector) have a
-        // constant equality filter as in case 1 that can be used as a partition key. In that case, the partition designated
-        // by that key could be selected as the coordinator to execute a top fragment join of the results of the bottom
-        // fragment's multi-partition scan.  The problem with this case is that (AFAIK --paul) there is no way to
-        // separately indicate to the initiator that a plan (fragment) must be run on a particular partition (like an SP query)
-        // but that the query has also has a distributed lower fragment (like an MP query).
-        // Supporting cases 1 and 2 but rejecting cases 3 and 4 simplifies the required analysis and supports
-        // inferred SP ad hocs based on a constant equality filter and a partition-key-equality pattern (case 1)
-        // in the context of and without regressing the fix for ENG-496 (case 2) which was the original motivation for
-        // AccessPath.isPartitionKeyEquality.
-
-        boolean suppressSendReceivePair = true;
-        int partitionedTableCount = m_partitioning.getCountOfPartitionedTables();
-        if ((m_partitioning.wasSpecifiedAsSingle() == false) &&  partitionedTableCount > 0) {
-            // It's possible that a leftover inferred value from the previous join order may not hold for the current one?
-            m_partitioning.setEffectiveValue(null);
-            // It's usually better to send and receive pre-join tuples than post-join tuples.
-            suppressSendReceivePair = false; // tentative/default value.
-            // This analysis operates independently of indexes, so only needs to operate on the naive (first) accessPath.
-            AccessPath.tagForMultiPartitionAccess(joinOrder, listOfAccessPathCombos.get(0), m_partitioning);
-            int multiPartitionScanCount = m_partitioning.getCountOfIndependentlyPartitionedTables();
-            if (multiPartitionScanCount > 1) {
-                // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
-                return;
-            }
-            if (m_partitioning.inferredPartitioningValue() == null) {
-                // For (multiPartitionScanCount == 1), "case 2" where the last-listed (first-scanned) partitioned table
-                // has no constant filter, it accounts for the 1 independent partitioned scan.
-                // In this case, whether to suppress the usual Receive/Send nodes below the joins depends on whether
-                // there are other partitioned tables being scanned but not counted because of partition key equality.
-                // If not, (for joins solely against replicated tables) it's probably better to try to inject the Receive/Send nodes
-                // below the join.
-                // If so, the Receive/Send nodes must be suppressed until after the join.
-
-                // For (multiPartitionScanCount == 0), the failure to produce a partitionKey
-                // when that would involve expression evaluation has forced a degenerate case
-                // that case can be handled the same way.
-                if (partitionedTableCount > 1) {
-                    suppressSendReceivePair = true;
-                }
-            } else {
-                if (multiPartitionScanCount == 1) {
-                    // "case 4" IF the last-listed (first-scanned) partitioned table has a constant filter,
-                    // then some other independent partitioned scan is getting counted as the 1.
-                    // We WISH we could support this case, but we don't.
-                    // When we do, we'll have to figure out how to deal with the possible existence of both
-                    // localized and non-localized joins.
-                    return;
-                } else {
-                    suppressSendReceivePair = m_partitioning.isInferringSP(); // No Send/Receive needed in a single-partition statement.
-                }
-            }
-            // Anything else can be handled in one or two plan fragments, injecting Receive/Send nodes below any joins.
-        }
         // for each access path
         for (AccessPath[] accessPath : listOfAccessPathCombos) {
             // get a plan
-            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinOrder, accessPath, suppressSendReceivePair);
+            AbstractPlanNode scanPlan = getSelectSubPlanForAccessPath(joinOrder, accessPath, deferSendReceivePair);
             m_plans.add(scanPlan);
         }
     }
@@ -312,13 +263,14 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath, boolean suppressSendReceivePair) {
+    private AbstractPlanNode getSelectSubPlanForAccessPath(Table[] joinOrder, AccessPath[] accessPath, boolean deferSendReceivePair) {
 
         // do the actual work
-        AbstractPlanNode retv = getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath, suppressSendReceivePair);
-        // If there is a multi-partition statement on one or more partitioned Tables and the Send/Receive nodes were suppressed,
+        AbstractPlanNode retv = getSelectSubPlanForAccessPathsIterative(joinOrder, accessPath, deferSendReceivePair);
+        // If there is a multi-partition statement on one or more partitioned Tables
+        // and the pre-join Send/Receive nodes were suppressed,
         // they need to come into play "post-join".
-        if (suppressSendReceivePair &&
+        if (deferSendReceivePair &&
                 (m_partitioning.getCountOfPartitionedTables() > 0) &&
                 m_partitioning.effectivePartitioningValue() == null) {
             retv = addSendReceivePair(retv);
@@ -340,8 +292,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
      * @return A completed plan-sub-graph that should match the correct tuples from the
      * correct tables.
      */
-    protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath,
-            boolean suppressSendReceivePair) {
+    protected AbstractPlanNode getSelectSubPlanForAccessPathsIterative(Table[] joinOrder, AccessPath[] accessPath, boolean deferSendReceivePair) {
         AbstractPlanNode resultPlan = null;
         for (int at = joinOrder.length-1; at >= 0; --at) {
             AbstractPlanNode scanPlan = getAccessPlanForTable(joinOrder[at], accessPath[at]);
@@ -359,7 +310,7 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
              * If the access plan for the table in the join order was for a
              * distributed table scan there will be a send/receive pair at the top.
              */
-            if (suppressSendReceivePair || joinOrder[at].getIsreplicated()) {
+            if (deferSendReceivePair || (m_partitioning.effectivePartitioningValue() != null) || joinOrder[at].getIsreplicated()) {
                 continue;
             }
             resultPlan = addSendReceivePair(resultPlan);
@@ -407,13 +358,6 @@ public class SelectSubPlanAssembler extends SubPlanAssembler {
         }
 
         return retval;
-    }
-
-    private AbstractPlanNode getAccessPlanForTable(Table table, AccessPath accessPath, boolean suppressSendReceivePair) {
-        AbstractPlanNode result = getAccessPlanForTable(table, accessPath);
-        if (suppressSendReceivePair || table.getIsreplicated())
-            return result;
-        return addSendReceivePair(result);
     }
 
     /**

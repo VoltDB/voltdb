@@ -400,6 +400,36 @@ public class TestSQLFeaturesSuite extends RegressionSuite {
 
     }
 
+    public void testSetOpsThatFail() throws Exception {
+        Client client = getClient();
+
+        boolean caught;
+
+        caught = false;
+        try {
+            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) UNION (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
+        } catch (ProcCallException e) {
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) INTERSECT (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
+        } catch (ProcCallException e) {
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            client.callProcedure("@AdHoc", "(SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100) EXCEPT (SELECT NO_O_ID FROM NEW_ORDER WHERE NO_O_ID < 100);");
+        } catch (ProcCallException e) {
+            caught = true;
+        }
+        assertTrue(caught);
+}
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.

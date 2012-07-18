@@ -145,7 +145,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.7.2";
+    private static final String m_defaultVersionString = "2.8";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -312,7 +312,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             // determine if this is a rejoining node
             // (used for license check and later the actual rejoin)
-            boolean isRejoin = config.m_rejoinToHostAndPort != null;
+            boolean isRejoin = false;
+            if (config.m_startAction == START_ACTION.REJOIN ||
+                    config.m_startAction == START_ACTION.LIVE_REJOIN) {
+                isRejoin = true;
+            }
             m_rejoining = isRejoin;
 
             // Set std-out/err to use the UTF-8 encoding and fail if UTF-8 isn't supported
@@ -419,13 +423,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_mailboxPublisher.registerMailbox(MailboxType.StatsAgent, new MailboxNodeContent(statsHSId, null));
 
                 // Construct and publish rejoin coordinator mailbox
-                if (isRejoin && m_config.m_newRejoin) {
+                if (isRejoin && m_config.m_startAction == START_ACTION.LIVE_REJOIN) {
                     ArrayList<Long> sites = new ArrayList<Long>();
                     for (Mailbox siteMailbox : siteMailboxes) {
                         sites.add(siteMailbox.getHSId());
                     }
 
-                    m_rejoinCoordinator = new SequentialRejoinCoordinator(m_messenger, sites);
+                    m_rejoinCoordinator =
+                        new SequentialRejoinCoordinator(m_messenger, sites, m_catalogContext.cluster.getVoltroot());
                     m_messenger.registerMailbox(m_rejoinCoordinator);
                     m_mailboxPublisher.registerMailbox(MailboxType.OTHER,
                                                        new MailboxNodeContent(m_rejoinCoordinator.getHSId(), null));
@@ -1121,19 +1126,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
      */
     void buildClusterMesh(boolean isRejoin) {
         final String leaderAddress = m_config.m_leader;
+        String hostname = MiscUtils.getHostnameFromHostnameColonPort(leaderAddress);
+        int port = MiscUtils.getPortFromHostnameColonPort(leaderAddress, m_config.m_internalPort);
 
         org.voltcore.messaging.HostMessenger.Config hmconfig;
 
-        if (m_config.m_rejoinToHostAndPort != null) {
-            hmconfig = new org.voltcore.messaging.HostMessenger.Config(
-                    MiscUtils.getHostnameFromHostnameColonPort(m_config.m_rejoinToHostAndPort),
-                    MiscUtils.getPortFromHostnameColonPort(
-                            m_config.m_rejoinToHostAndPort, m_config.m_internalPort));
-        } else {
-            hmconfig = new org.voltcore.messaging.HostMessenger.Config(
-                    leaderAddress,
-                    m_config.m_leaderPort != null ? m_config.m_leaderPort : m_config.m_internalPort);
-        }
+        hmconfig = new org.voltcore.messaging.HostMessenger.Config(hostname, port);
         hmconfig.internalPort = m_config.m_internalPort;
         hmconfig.internalInterface = m_config.m_internalInterface;
         hmconfig.zkInterface = m_config.m_zkInterface;
@@ -1720,10 +1718,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 VoltDB.crashLocalVoltDB("Error starting client interface.", true, e);
             }
         }
-        consoleLog.info(
-                "Node data recovery completed after " + delta + " seconds with " + megabytes +
-                " megabytes transferred at a rate of " +
-                megabytesPerSecond + " megabytes/sec");
+
+        if (m_config.m_startAction == START_ACTION.REJOIN) {
+            consoleLog.info(
+                    "Node data recovery completed after " + delta + " seconds with " + megabytes +
+                    " megabytes transferred at a rate of " +
+                    megabytesPerSecond + " megabytes/sec");
+        }
+
         try {
             final ZooKeeper zk = m_messenger.getZK();
             boolean logRecoveryCompleted = false;
@@ -1736,12 +1738,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             if (logRecoveryCompleted) {
                 m_rejoining = false;
-                consoleLog.info("Node recovery completed");
+                consoleLog.info("Node rejoin completed");
             }
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to log host recovery completion to ZK", true, e);
+            VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
-        hostLog.info("Logging host recovery completion to ZK");
+        hostLog.info("Logging host rejoin completion to ZK");
     }
 
     @Override
@@ -1861,7 +1863,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public synchronized void recoveryComplete() {
         m_rejoining = false;
-        consoleLog.info("Node recovery completed");
+        consoleLog.info("Node rejoin completed");
     }
 
     @Override

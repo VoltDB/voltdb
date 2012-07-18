@@ -211,6 +211,9 @@ public class SnapshotSave extends VoltSystemProcedure
                                 + file_path + ", " + file_nonce);
 
                 if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
+                    HOST_LOG.debug("Snapshot in progress, " +
+                            SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() +
+                            " sites are still snapshotting");
                     result.addRow(
                                   context.getHostId(),
                                   hostname,
@@ -311,7 +314,11 @@ public class SnapshotSave extends VoltSystemProcedure
         final SnapshotFormat format = SnapshotFormat.getEnumIgnoreCase(formatStr);
         final String data = jsObj.optString("data");
 
-        HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
+        if (format == SnapshotFormat.STREAM) {
+            HOST_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
+        } else {
+            HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
+        }
 
         ColumnInfo[] error_result_columns = new ColumnInfo[2];
         int ii = 0;
