@@ -167,7 +167,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertEquals(1, table.getLong(0));
         assertTrue(true);
     }
-*/
+
     public void testOneColumnMultiIndex() throws Exception {
         Client client = getClient();
 
@@ -272,6 +272,59 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertEquals(1, table.getLong(0));
         assertTrue(true);
     }
+   */ 
+    public void testTwoColumnsMultiIndex() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("TM2.insert", 1, 1, "xin");
+        client.callProcedure("TM2.insert", 2, 2, "xin");
+        client.callProcedure("TM2.insert", 3, 3, "xin");
+        client.callProcedure("TM2.insert", 4, 3, "xin");
+        client.callProcedure("TM2.insert", 5, 3, "xin");
+        client.callProcedure("TM2.insert", 6, 5, "xin");
+        client.callProcedure("TM2.insert", 7, 6, "xin");
+        client.callProcedure("TM2.insert", 8, 6, "xin");
+        client.callProcedure("TM2.insert", 9, 8, "xin");
+        client.callProcedure("TM2.insert", 10, 8, "xin");
+        
+        client.callProcedure("TM2.insert", 11, 1, "jia");
+        client.callProcedure("TM2.insert", 12, 2, "jia");
+        client.callProcedure("TM2.insert", 13, 3, "jia");
+        client.callProcedure("TM2.insert", 14, 3, "jia");
+        client.callProcedure("TM2.insert", 15, 3, "jia");
+        client.callProcedure("TM2.insert", 16, 5, "jia");
+        client.callProcedure("TM2.insert", 17, 6, "jia");
+        client.callProcedure("TM2.insert", 18, 6, "jia");
+        client.callProcedure("TM2.insert", 19, 8, "jia");
+        client.callProcedure("TM2.insert", 20, 8, "jia");
+        
+        VoltTable table;
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM2 WHERE UNAME = 'xin' AND POINTS > 1000").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(0, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM2 WHERE UNAME = 'xin' AND POINTS > -1").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(10, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM2 WHERE UNAME = 'xin' AND POINTS > 3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM2 WHERE UNAME = 'xin' AND POINTS >= 3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(8, table.getLong(0));
+        assertTrue(true);
+        
+    }
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
@@ -295,6 +348,8 @@ public class TestIndexCountSuite extends RegressionSuite {
         project.addPartitionInfo("TU2", "UNAME");
         project.addPartitionInfo("TU3", "TEL");
         project.addPartitionInfo("TU4", "UNAME");
+        project.addPartitionInfo("TM1", "ID");
+        project.addPartitionInfo("TM2", "UNAME");
 
         boolean success;
 
