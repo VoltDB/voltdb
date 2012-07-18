@@ -18,6 +18,7 @@ package org.voltdb;
 
 
 import java.util.HashSet;
+
 import org.voltcore.logging.VoltLogger;
 
 /**
@@ -42,7 +43,9 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
      * Maximum values for each group are configured when the group is constructed
      */
     final private int MAX_DESIRED_PENDING_BYTES;
+    final private int LESS_THAN_MAX_DESIRED_PENDING_BYTES;
     final private int MAX_DESIRED_PENDING_TXNS;
+    final private int LESS_THAN_MAX_DESIRED_PENDING_TXNS;
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
@@ -80,7 +83,9 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
     public AdmissionControlGroup(int maxBytes, int maxRequests)
     {
         MAX_DESIRED_PENDING_BYTES = maxBytes;
+        LESS_THAN_MAX_DESIRED_PENDING_BYTES = (int)(MAX_DESIRED_PENDING_BYTES * .8);
         MAX_DESIRED_PENDING_TXNS = maxRequests;
+        LESS_THAN_MAX_DESIRED_PENDING_TXNS = (int)(MAX_DESIRED_PENDING_BYTES * .8);
     }
 
     public void addMember(ACGMember member)
@@ -169,8 +174,8 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         m_pendingTxnBytes -= messageSize;
         m_pendingTxnCount--;
         checkAndLogInvariants();
-        if (m_pendingTxnBytes < (MAX_DESIRED_PENDING_BYTES * .8) &&
-            m_pendingTxnCount < (MAX_DESIRED_PENDING_TXNS * .8))
+        if (m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES &&
+            m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS)
         {
             if (m_hadBackPressure) {
                 hostLog.debug("TXN backpressure ended");
@@ -216,7 +221,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         } else {
             m_pendingTxnBytes += bytes;
             checkAndLogInvariants();
-            if (m_pendingTxnBytes < (MAX_DESIRED_PENDING_BYTES * .8)) {
+            if (m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES) {
                 if (m_hadBackPressure) {
                     hostLog.debug("TXN backpressure ended");
                     m_hadBackPressure = false;
