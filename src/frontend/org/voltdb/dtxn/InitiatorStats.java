@@ -143,7 +143,7 @@ public class InitiatorStats extends SiteStatsSource {
         LinkedList<String> keysToRemove = new LinkedList<String>();
         for (String key : keySet) {
             // note: use lastIndexOf below to support inner classes as procedures
-            int cId = Integer.parseInt(key.substring(key.lastIndexOf('$') + 1));
+            long cId = Long.parseLong(key.substring(key.lastIndexOf('$') + 1));
             if (cId == connectionId) {
                 keysToRemove.add(key);
             }
