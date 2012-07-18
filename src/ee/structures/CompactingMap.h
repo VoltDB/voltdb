@@ -138,7 +138,6 @@ public:
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
     // TODO(xin): later rename it to ranklower
     int32_t rankAsc(const Key& key);
-    int32_t rankDes(const Key& key);
     int32_t rankUpper(const Key& key);
 
     /**
@@ -696,38 +695,11 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
         TreeNode *x = m_root, *p = n;
         NodeCount ct = 0,ctr = 0, ctl = 0;
         int m = m_comper(key, x->key);
-        if (m_unique) {
-            if (m == 0) {
-                if (x->right != &NIL)
-                    ctr = x->right->subct;
-                ct = n->subct - ctr; // can be changed to: ct = x->subct - ctr;
-            } else if (m > 0) {
-                if (p->right != &NIL)
-                    ctr = p->right->subct;
-                ct += p->subct - ctr;
-                while (p->parent != &NIL) {
-                    if (p->parent->right == p) {
-                        ct += p->parent->subct - p->subct;
-                    }
-                    p = p->parent;
-                }
-            } else {
-                if (p->left != &NIL)
-                    ctl = p->left->subct;
-                ct += p->subct - ctl - 1;
-                while (p->parent != &NIL) {
-                    if (p->parent->left == p) {
-                        ct += p->parent->subct - p->subct;
-                    }
-                    p = p->parent;
-                }
-                ct = x->subct - ct;
-            }
-        } else {
-            if (m == 0) {
-                if (x->right != &NIL)
-                    ctr = x->right->subct;
-                ct += x->subct - ctr;
+        if (m == 0) {
+            if (x->right != &NIL)
+                ctr = x->right->subct;
+            ct += x->subct - ctr;
+            if (!m_unique) {
                 while(p->parent != &NIL) {
                     if (m_comper(key, p->key) == 0) {
                         if (p->right != &NIL && m_comper(key, p->right->key) == 0)
@@ -736,38 +708,30 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
                     }
                     p = p->parent;
                 }
-            } else if (m > 0) {
-                if (p->right != &NIL)
-                    ctr = p->right->subct;
-                ct += p->subct - ctr;
-                while (p->parent != &NIL) {
-                    if (p->parent->right == p) {
-                        ct += p->parent->subct - p->subct;
-                    }
-                    p = p->parent;
-                }
-
-            } else {
-                if (p->left != &NIL)
-                    ctl = p->left->subct;
-                ct += p->subct - ctl - 1;
-                while (p->parent != &NIL) {
-                    if (p->parent->left == p) {
-                        ct += p->parent->subct - p->subct;
-                    }
-                    p = p->parent;
-                }
-                ct = x->subct - ct;
             }
-
+        } else if (m > 0) {
+            if (p->right != &NIL)
+                ctr = p->right->subct;
+            ct += p->subct - ctr;
+            while (p->parent != &NIL) {
+                if (p->parent->right == p) {
+                    ct += p->parent->subct - p->subct;
+                }
+                p = p->parent;
+            }
+        } else {
+            if (p->left != &NIL)
+                ctl = p->left->subct;
+            ct += p->subct - ctl - 1;
+            while (p->parent != &NIL) {
+                if (p->parent->left == p) {
+                    ct += p->parent->subct - p->subct;
+                }
+                p = p->parent;
+            }
+            ct = x->subct - ct;
         }
         return ct;
-}
-
-template<typename Key, typename Data, typename Compare, bool hasRank>
-int32_t CompactingMap<Key, Data, Compare, hasRank>::rankDes(const Key& key) {
-        if (!hasRank) return -1;
-        return m_count - rankAsc(key);
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
@@ -816,10 +780,10 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
                 return true;
 
         iterator it;
-        NodeCount rkasc, rkdes;
+        int32_t rkasc;
         TreeNode * n = &NIL;
         // iterate rank start from 1 to m_count
-        for (NodeCount i = 1; i <= m_count; i++) {
+        for (int32_t i = 1; i <= m_count; i++) {
                 it = findRank(i);
                 if ((n = lookup(it.key())) == &NIL) {
                         printf("Can not find rank %d node with key\n", i);
@@ -831,25 +795,31 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
                                 printf("false: unique_rankAsc expected %d, but got %d\n", i, rkasc);
                                 return false;
                         }
-                        rkdes = rankDes(it.key());
-                        if (rkdes != m_count - rkasc) {
-                                printf("false: unique_rankDes %d node with key\n", i);
-                                return false;
-                        }
                 } else {
                         const Key k = it.key();
-                        rkasc = rankAsc(k);
-
+                        // test rankUpper
                         iterator up = upperBound(k);
-                        if (it.equals(up)) {
-                            // up is the upper bound of key
-                            NodeCount rkUpper = rankUpper(k);
-                            if (i != rkUpper) {
-                                printf("false: multi_rankUpper expected %d, but got %d\n", i, rkUpper);
-                                return false;
+                        int32_t rkUpper;
+                        if (up.isEnd() == false) {
+                            up.movePrev();
+                            if (it.equals(up)) {
+                                rkUpper = rankUpper(k);
+                                if (rkUpper != i) {
+                                    printf("false: multi_rankUpper expected %d, but got %d\n", i, rkUpper);
+                                    return false;
+                                }
+                            }
+                        } else {
+                            if (m_count == i) {
+                                rkUpper = rankUpper(k);
+                                if (rkUpper != m_count) {
+                                    printf("false: multi_rankUpper expected %d, but got %d\n", i, rkUpper);
+                                    return false;
+                                }
                             }
                         }
-
+                        // test rankAsc
+                        rkasc = rankAsc(k);
                         NodeCount nc = 0;
                         it.movePrev();
                         while (k == it.key()) {

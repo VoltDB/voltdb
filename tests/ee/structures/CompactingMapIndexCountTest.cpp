@@ -189,8 +189,6 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 }
                 int rankasc= volt.rankAsc(val);
                 ASSERT_TRUE(rankasc == ct);
-                int rankdec = volt.rankDes(val);
-                ASSERT_TRUE(rankdec == stl.size() - rankasc);
                 volti = volt.findRank(rankasc);
                 ASSERT_TRUE(volti.key() == val);
 
@@ -210,8 +208,6 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 }
                 int rankasc= volt.rankAsc(val);
                 ASSERT_TRUE(rankasc == ct);
-                int rankdec = volt.rankDes(val);
-                ASSERT_TRUE(rankdec == stl.size() - rankasc);
                 volti = volt.findRank(rankasc);
                 ASSERT_TRUE(volti.key() == val);
 
