@@ -73,6 +73,7 @@
         <xsd:complexType>
           <xsd:attribute name="name" type="xsd:string" use="required"/>
           <xsd:attribute name="sysproc" type="xsd:boolean" default="false"/>
+          <xsd:attribute name="defaultproc" type="xsd:boolean" default="false"/>
           <xsd:attribute name="adhoc" type="xsd:boolean" default="false"/>
         </xsd:complexType>
       </xsd:element>

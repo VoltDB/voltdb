@@ -152,7 +152,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.7.2";
+    private static final String m_defaultVersionString = "2.8";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -1867,12 +1867,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
             if (logRecoveryCompleted) {
                 m_rejoining = false;
-                consoleLog.info("Node recovery completed");
+                consoleLog.info("Node rejoin completed");
             }
         } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Unable to log host recovery completion to ZK", true, e);
+            VoltDB.crashLocalVoltDB("Unable to log host rejoin completion to ZK", true, e);
         }
-        hostLog.info("Logging host recovery completion to ZK");
+        hostLog.info("Logging host rejoin completion to ZK");
     }
 
     @Override
@@ -1992,7 +1992,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     @Override
     public synchronized void recoveryComplete() {
         m_rejoining = false;
-        consoleLog.info("Node recovery completed");
+        consoleLog.info("Node rejoin completed");
     }
 
     @Override

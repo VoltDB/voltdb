@@ -16,15 +16,14 @@
  */
 package org.voltcore.zk;
 
-import java.util.concurrent.atomic.AtomicBoolean;
-
-import java.util.concurrent.ExecutionException;
 import java.util.List;
 import java.util.ListIterator;
+import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
 import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -32,6 +31,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.VoltZK;
 
@@ -153,6 +153,9 @@ public class LeaderElector {
         es.awaitTermination(356, TimeUnit.DAYS);
     }
 
+    private final static VoltLogger LOG = new VoltLogger("HOST");
+
+
     /**
      * Set a watch on the node that comes before the specified node in the
      * directory.
@@ -191,7 +194,7 @@ public class LeaderElector {
                         break;
                     } else {
                         // reverse the direction of iteration
-                        previous = iter.previous();
+                        previous = ZKUtil.joinZKPath(dir, iter.previous());
                     }
                 }
                 break;

@@ -90,7 +90,7 @@ public class RejoinTestBase extends TestCase {
         builder.addPartitionInfo("TEST_INLINED_STRING", "pkey");
         builder.addPartitionInfo("ENG798", "C1");
 
-        GroupInfo gi = new GroupInfo("foo", true, true);
+        GroupInfo gi = new GroupInfo("foo", true, true, true);
         builder.addGroups(new GroupInfo[] { gi } );
         UserInfo ui = new UserInfo( "ry@nlikesthe", "y@nkees", new String[] { "foo" } );
         builder.addUsers(new UserInfo[] { ui } );
