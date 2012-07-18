@@ -21,35 +21,31 @@
  * OTHER DEALINGS IN THE SOFTWARE.
  */
 
-package org.voltdb_testprocs.regressionsuites.fixedsql;
+package org.voltdb.types;
 
-import org.voltdb.ProcInfo;
-import org.voltdb.SQLStmt;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
+
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltTable.ColumnInfo;
+import org.voltdb.VoltType;
 
-@ProcInfo
-(
-    singlePartition = true,
-    partitionInfo = "ASSET.OBJECT_DETAIL_ID: 1"
-)
-public class InsertBatch extends VoltProcedure {
-
-    public final SQLStmt insert = new SQLStmt
-      ("INSERT INTO ASSET VALUES (?, ?);");
-
-    public VoltTable[] run(int batchSize, int odi, int offset)
-    {
-        for (int j = 0; j < batchSize / 1000; j++)
-        {
-            for (int i = 0; i < 1000; i++)
-            {
-                int id = (j * 1000) + i;
-                voltQueueSQL(insert, id + offset, odi);
-            }
-            voltExecuteSQL();
+/**
+ * Accepts varbinary and string blobs and returns an MD5 digest for each so that the
+ * caller can compare against its own MD5 calculations. Can't return the data directly
+ * due to VoltTable size limitations (1 MB).
+ */
+public class BigFatBlobAndStringMD5 extends VoltProcedure {
+    public VoltTable run(byte[] b, String s) {
+        VoltTable t = new VoltTable(new ColumnInfo("b_md5", VoltType.VARBINARY),
+                                    new ColumnInfo("s_md5", VoltType.VARBINARY));
+        try {
+            MessageDigest md5 = MessageDigest.getInstance("MD5");
+            t.addRow(md5.digest(b), md5.digest(s.getBytes()));
+        } catch (NoSuchAlgorithmException e) {
+            // If the row wasn't added the test caller will consider it a failure.
         }
-        VoltTable[] results = null;
-        return results;
+        return t;
     }
 }

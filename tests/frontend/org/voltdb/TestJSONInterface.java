@@ -637,7 +637,7 @@ public class TestJSONInterface extends TestCase {
         builder.addSchema(schemaPath);
         builder.addPartitionInfo("HELLOWORLD", "DIALECT");
 
-        GroupInfo gi = new GroupInfo("foo", true, true);
+        GroupInfo gi = new GroupInfo("foo", true, true, true);
         builder.addGroups(new GroupInfo[] { gi } );
 
         // create 20 users, only the first one has an interesting user/pass

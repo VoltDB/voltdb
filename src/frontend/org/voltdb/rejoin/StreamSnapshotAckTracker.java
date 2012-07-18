@@ -25,7 +25,7 @@ import org.voltcore.logging.VoltLogger;
  * expected
  */
 public class StreamSnapshotAckTracker {
-    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
     private final HashMap<Integer, Integer> m_acks = new HashMap<Integer, Integer>();
     private final int m_bufferQuota;

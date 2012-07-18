@@ -48,6 +48,7 @@ public class ClientInterfaceHandleManager
     private long m_outstandingTxns;
     public final boolean isAdmin;
     public final Connection connection;
+    private final long m_expectedThreadId = Thread.currentThread().getId();
 
     private static class HandleGenerator
     {
@@ -121,6 +122,7 @@ public class ClientInterfaceHandleManager
             long clientHandle,
             int messageSize, long creationTime)
     {
+        assert(m_expectedThreadId == Thread.currentThread().getId());
         if (!isSinglePartition) {
             partitionId = MP_PART_ID;
         }
@@ -152,6 +154,7 @@ public class ClientInterfaceHandleManager
      */
     boolean removeHandle(long ciHandle)
     {
+        assert(m_expectedThreadId == Thread.currentThread().getId());
         int partitionId = getPartIdFromHandle(ciHandle);
         Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
@@ -178,6 +181,7 @@ public class ClientInterfaceHandleManager
      */
     Iv2InFlight findHandle(long ciHandle)
     {
+        assert(m_expectedThreadId == Thread.currentThread().getId());
         int partitionId = getPartIdFromHandle(ciHandle);
         Pair<HandleGenerator, Deque<Iv2InFlight>> partitionStuff = m_partitionStuff.get(partitionId);
         if (partitionStuff == null) {
@@ -217,5 +221,20 @@ public class ClientInterfaceHandleManager
     long getOutstandingTxns()
     {
         return m_outstandingTxns;
+    }
+
+    /**
+     * When a connection goes away, free all resources held by that connection
+     * This opens a small window of opportunity for mischief in that work may
+     * still be outstanding in the cluster, but once the client goes away so does
+     * does the mapping to the resources allocated to it.
+     */
+    void freeOutstandingTxns(AdmissionControlGroup acg) {
+        assert(m_expectedThreadId == Thread.currentThread().getId());
+        for (Pair<HandleGenerator, Deque<Iv2InFlight>> p : m_partitionStuff.values()) {
+            for (Iv2InFlight inflight : p.getSecond()) {
+                acg.reduceBackpressure(inflight.m_messageSize);
+            }
+        }
     }
 }
