@@ -23,21 +23,22 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
+
+import org.mockito.InOrder;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.mock;
-import static org.mockito.Mockito.times;
-import static org.mockito.Mockito.verify;
-import static org.mockito.Mockito.when;
+import static org.mockito.Mockito.*;
 
 import java.util.ArrayList;
 import java.util.List;
 
-import junit.framework.TestCase;
+import org.voltcore.utils.Pair;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
+import junit.framework.*;
+
 import org.junit.Test;
-import org.voltdb.VoltZK;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -147,7 +148,7 @@ public class TestMpPromoteAlgo extends TestCase
 
     // verify that algo asks initMailbox to send the expected repair messages.
     @Test
-    public void testRepairSurvivors()
+    public void testRepairSurvivors() throws InterruptedException, ExecutionException
     {
         InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
         ArrayList<Long> masters = new ArrayList<Long>();
@@ -157,7 +158,7 @@ public class TestMpPromoteAlgo extends TestCase
 
         MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
         long requestId = algo.getRequestId();
-        algo.prepareForFaultRecovery();
+        Future<Pair<Boolean, Long>> result = algo.start();
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has a frag for txn 1000. MP handle is 1000L
@@ -176,7 +177,106 @@ public class TestMpPromoteAlgo extends TestCase
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        Pair<Boolean, Long> real_result = result.get();
+        assertEquals(1000L, (long)real_result.getSecond());
     }
+
+    @Test
+    public void testSlowDieOff() throws InterruptedException, ExecutionException
+    {
+        InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
+        InOrder inOrder = inOrder(mailbox);
+        ArrayList<Long> masters = new ArrayList<Long>();
+        masters.add(1L);
+        masters.add(2L);
+        masters.add(3L);
+
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
+        long requestId = algo.getRequestId();
+        Future<Pair<Boolean, Long>> result = algo.start();
+
+        // Master 1
+        // First, everyone completed
+        // has a frag for txn 1000. MP handle is 1000L
+        algo.deliver(makeRealAckResponse(requestId,      1L, 0, 8, 1000L));
+        algo.deliver(makeRealFragResponse(requestId,     1L, 1, 8, 1000L));
+        algo.deliver(makeRealCompleteResponse(requestId, 1L, 2, 8, 1000L));
+        // Second, 3 will lose complete
+        algo.deliver(makeRealFragResponse(requestId,     1L, 3, 8, 1001L));
+        algo.deliver(makeRealCompleteResponse(requestId, 1L, 4, 8, 1001L));
+        // Third, 2 will lose complete and 3 has nothing
+        algo.deliver(makeRealFragResponse(requestId,     1L, 5, 8, 1002L));
+        algo.deliver(makeRealCompleteResponse(requestId, 1L, 6, 8, 1002L));
+        // Fourth, 1 just has a fragment, the other two are gone.
+        algo.deliver(makeRealFragResponse(requestId,     1L, 7, 8, 1003L));
+
+        // Master 2
+        // has only the normal ack. Never saw an MP transaction.
+        algo.deliver(makeRealAckResponse(requestId,      2L, 0, 6, 1000L));
+        algo.deliver(makeRealFragResponse(requestId,     2L, 1, 6, 1000L));
+        algo.deliver(makeRealCompleteResponse(requestId, 2L, 2, 6, 1000L));
+        // second, 3 loses complete
+        algo.deliver(makeRealFragResponse(requestId,     2L, 3, 6, 1001L));
+        algo.deliver(makeRealCompleteResponse(requestId, 2L, 4, 6, 1001L));
+        // third, 2 (us) loses complete
+        algo.deliver(makeRealFragResponse(requestId,     2L, 5, 6, 1002L));
+
+        // Master 3
+        // also has a complete. MP handle is 1000L
+        algo.deliver(makeRealAckResponse(requestId,      3L, 0, 4, 1000L));
+        algo.deliver(makeRealFragResponse(requestId,     3L, 1, 4, 1000L));
+        algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 4, 1000L));
+        // 3 loses complete
+        algo.deliver(makeRealFragResponse(requestId,     3L, 3, 4, 1001L));
+
+        // First, repair 3
+        List<Long> needsRepair = new ArrayList<Long>();
+        needsRepair.add(3L);
+        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        needsRepair.clear();
+        needsRepair.add(2L);
+        needsRepair.add(3L);
+        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+        needsRepair.clear();
+        needsRepair.add(1L);
+        needsRepair.add(2L);
+        needsRepair.add(3L);
+        inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
+
+        Pair<Boolean, Long> real_result = result.get();
+        assertEquals(1003L, (long)real_result.getSecond());
+    }
+
+    // verify correct txnID when no MP has ever been done
+    @Test
+    public void testSaneWithNoMP() throws InterruptedException, ExecutionException
+    {
+        InitiatorMailbox mailbox = mock(InitiatorMailbox.class);
+        ArrayList<Long> masters = new ArrayList<Long>();
+        masters.add(1L);
+        masters.add(2L);
+        masters.add(3L);
+
+        MpPromoteAlgo algo = new MpPromoteAlgo(masters, mailbox, "Test");
+        long requestId = algo.getRequestId();
+        Future<Pair<Boolean, Long>> result = algo.start();
+        verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
+
+        // has only the normal ack. Never saw an MP transaction.
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 1, Long.MAX_VALUE));
+
+        // has only the normal ack. Never saw an MP transaction.
+        algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE));
+
+        // has only the normal ack. Never saw an MP transaction.
+        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 1, Long.MAX_VALUE));
+
+        // verify that the discovered txn id is 0 (the correct starting txnid).
+        Pair<Boolean, Long> real_result = result.get();
+        assertEquals(0L, (long)real_result.getSecond());
+    }
+
+
 
 
 
