@@ -43,10 +43,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(m_node);
     assert(m_node->getTargetTable());
 
-    //printf("DEBUG for M_NODE: '%s'\n", m_node->debugInfo("<XIN>").c_str());
-
     // Create output table based on output schema from the plan
-
     TupleSchema* schema = m_node->generateTupleSchema(false);
     int column_count = static_cast<int>(m_node->getOutputSchema().size());
     assert(column_count == 1);
@@ -56,7 +53,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     {
         column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
     }
-    //printf("<IndexCount Executor> TupleSchema: '%s'", schema->debug().c_str());
 
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       m_node->getTargetTable()->name(),
@@ -381,9 +377,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
             rkStart = m_index->getCounterLET(&m_searchKey, true);
         } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            rkStart = m_index->getCounterLET(&m_searchKey, false);
-            if (m_index->hasKey(&m_searchKey))
+            if (m_index->hasKey(&m_searchKey)) {
                 leftIncluded = 1;
+                rkStart = m_index->getCounterLET(&m_searchKey, false);
+            } else {
+                rkStart = m_index->getCounterLET(&m_searchKey, true);
+            }
             if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
                 // two columns index, no value for the second column
                 // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?

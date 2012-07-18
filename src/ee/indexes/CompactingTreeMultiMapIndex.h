@@ -253,6 +253,10 @@ public:
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
 
+        if (m_seqIter.isEnd()) {
+            return m_entries.size();
+        }
+
         TableTuple retval(m_tupleSchema);
         retval.move(const_cast<void*>(m_seqIter.value()));
         printf("<getCounterLET>*** Lowbound *** is %s \n", retval.debugNoHeader().c_str());
@@ -267,6 +271,8 @@ public:
         if (cmp == 0) {
             m_seqIter.movePrev();
             if (m_seqIter.isEnd() == false) {
+                retval.move(const_cast<void*>(m_seqIter.value()));
+                printf("<getCounterLET>*** PREVIOUS key *** is %s \n", retval.debugNoHeader().c_str());
                 if (isUpper) return m_entries.rankUpper(m_seqIter.key());
                 else return m_entries.rankAsc(m_seqIter.key());
             } else
