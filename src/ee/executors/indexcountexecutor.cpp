@@ -282,7 +282,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             }
             catch (SQLException e) {
                 // TODO(xin): do checking exception later
-                //
                 throw e;
             }
         }
