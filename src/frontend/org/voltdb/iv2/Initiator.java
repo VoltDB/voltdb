@@ -18,9 +18,11 @@
 package org.voltdb.iv2;
 
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.ExecutionException;
 
 import java.util.List;
 
+import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltdb.BackendTarget;
@@ -38,7 +40,8 @@ public interface Initiator
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin);
+                          boolean createForRejoin)
+        throws KeeperException, InterruptedException, ExecutionException;
 
     /** Shutdown an Initiator and its sub-components. */
     public void shutdown();

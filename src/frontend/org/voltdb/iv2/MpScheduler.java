@@ -245,6 +245,9 @@ public class MpScheduler extends Scheduler
 
     @Override
     public void setMaxSeenTxnId(long maxSeenTxnId) {
+        if (maxSeenTxnId == 0) {
+            maxSeenTxnId = (1l << 40);
+        }
         assert(maxSeenTxnId >= (1l << 40));
         m_txnId.set(maxSeenTxnId);
     }

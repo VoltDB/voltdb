@@ -559,15 +559,23 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              * Configure and start all the IV2 sites
              */
             if (isIV2Enabled()) {
-                for (Initiator iv2init : m_iv2Initiators) {
-                    iv2init.configure(
-                            getBackendTargetType(),
-                            m_serializedCatalog,
-                            m_catalogContext,
-                            m_deployment.getCluster().getKfactor(),
-                            csp,
-                            clusterConfig.getPartitionCount(),
-                            m_rejoining);
+                try {
+                    for (Initiator iv2init : m_iv2Initiators) {
+                        iv2init.configure(
+                                getBackendTargetType(),
+                                m_serializedCatalog,
+                                m_catalogContext,
+                                m_deployment.getCluster().getKfactor(),
+                                csp,
+                                clusterConfig.getPartitionCount(),
+                                m_rejoining);
+                    }
+                } catch (Exception e) {
+                    Throwable toLog = e;
+                    if (e instanceof ExecutionException) {
+                        toLog = ((ExecutionException)e).getCause();
+                    }
+                    VoltDB.crashLocalVoltDB("Error configuring IV2 initiator.", true, toLog);
                 }
             }
             else {

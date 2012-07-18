@@ -40,9 +40,12 @@ import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+
+import org.voltdb.iv2.StartupAlgo;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
+
 import org.voltdb.VoltDB;
 
 /**
@@ -115,8 +118,8 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                           int startupCount, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin)
+        throws KeeperException, ExecutionException, InterruptedException
     {
-        try {
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -149,10 +152,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             // m_siteThread.start() in a Runnable which RealVoltDB can use for
             // configure/run sequencing in the future.
             joinElectoralCollege(startupCount);
-        }
-        catch (Exception e) {
-           VoltDB.crashLocalVoltDB("Failed to configure initiator", true, e);
-        }
     }
 
     // Register with m_partition's leader elector node
