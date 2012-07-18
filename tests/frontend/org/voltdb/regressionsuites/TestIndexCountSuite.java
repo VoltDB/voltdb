@@ -43,7 +43,7 @@ public class TestIndexCountSuite extends RegressionSuite {
     public TestIndexCountSuite(String name) {
         super(name);
     }
-/*
+
     public void testOneColumnUniqueIndex() throws Exception {
         Client client = getClient();
 
@@ -54,12 +54,41 @@ public class TestIndexCountSuite extends RegressionSuite {
         client.callProcedure("TU1.insert", 8, 8);
 
         VoltTable table;
-
-        // test with 2,6
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > -1000").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(5, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 1000").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(0, table.getLong(0));
+        assertTrue(true);
+        
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 2").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(3, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS >= 2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(4, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 4").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS >= 4").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
         assertTrue(true);
 
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 2 AND POINTS <= 6").getResults()[0];
@@ -67,12 +96,35 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
         assertTrue(true);
-
-        // test with 4,9
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 4").getResults()[0];
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS >= 2 AND POINTS <= 6").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(3, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 2 AND POINTS < 6").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(1, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS >= 2 AND POINTS < 6").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 5 AND POINTS <= 8").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 5 AND POINTS < 8").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(1, table.getLong(0));
         assertTrue(true);
 
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 4 AND POINTS <= 9").getResults()[0];
@@ -80,8 +132,26 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
         assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS >= 4 AND POINTS <= 9").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > 4 AND POINTS < 9").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS >= 4 AND POINTS < 9").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(2, table.getLong(0));
+        assertTrue(true);
     }
-
+    
     public void testTwoOrMoreColumnsUniqueIndex() throws Exception {
         Client client = getClient();
 
@@ -272,7 +342,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertEquals(1, table.getLong(0));
         assertTrue(true);
     }
-   */ 
+    
     public void testTwoColumnsMultiIndex() throws Exception {
         Client client = getClient();
 
