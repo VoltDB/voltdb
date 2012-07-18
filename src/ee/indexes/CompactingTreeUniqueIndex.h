@@ -245,37 +245,25 @@ public:
 
     int32_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
-        printf("<Tree Unique-map *** getCounterGET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
 
         m_tmp1.setFromKey(searchKey);
         m_keyIter = m_entries.lowerBound(m_tmp1);
         if (m_keyIter.isEnd()) {
-            printf("IS END... NO bigger key found...\n");
             return m_entries.size() + 1;
         } else {
-            TableTuple retval(m_tupleSchema);
-            retval.move(const_cast<void*>(m_keyIter.value()));
-            printf("<getCounterGET>*** Lowbound *** of the search key is %s \n", retval.debugNoHeader().c_str());
             return m_entries.rankAsc(m_keyIter.key());
         }
     }
     int32_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
-        printf("<Tree Unique-map *** getCounterLET>*** SearchKey *** %s \n", searchKey->debugNoHeader().c_str());
 
         m_tmp1.setFromKey(searchKey);
         m_keyIter = m_entries.lowerBound(m_tmp1);
 
-        if (m_keyIter.isEnd()) {
+        if (m_keyIter.isEnd())
             return m_entries.size();
-        }
-        TableTuple retval(m_tupleSchema);
-        retval.move(const_cast<void*>(m_keyIter.value()));
-        printf("<getCounterLET>*** Lowbound *** is %s \n", retval.debugNoHeader().c_str());
 
         int cmp = m_eq(m_tmp1, m_keyIter.key());
-        printf("<unique map>cmp value: %d\n", cmp);
-
         KeyType tmpKey = m_keyIter.key();
         if (cmp == 0) {
             m_keyIter.movePrev();

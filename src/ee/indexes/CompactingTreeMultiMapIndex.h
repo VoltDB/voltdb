@@ -228,17 +228,12 @@ public:
     int32_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
-        printf("<Tree Multi-map *** getCounterGET, isUpper: %d>*** SearchKey *** %s \n", (isUpper?1:0), searchKey->debugNoHeader().c_str());
-
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
 
         if (m_seqIter.isEnd()) {
             return m_entries.size() + 1;
         } else {
-            TableTuple retval(m_tupleSchema);
-            retval.move(const_cast<void*>(m_seqIter.value()));
-            printf("<getCounterGET>*** Lowbound *** is %s \n", retval.debugNoHeader().c_str());
             if (isUpper) {
                 return m_entries.rankUpper(m_seqIter.key());
             } else {
@@ -248,7 +243,6 @@ public:
     }
     int32_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
-        printf("<Tree Multi-map *** getCounterLET, isUpper: %d>*** SearchKey *** %s \n", (isUpper?1:0), searchKey->debugNoHeader().c_str());
 
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
@@ -257,12 +251,7 @@ public:
             return m_entries.size();
         }
 
-        TableTuple retval(m_tupleSchema);
-        retval.move(const_cast<void*>(m_seqIter.value()));
-        printf("<getCounterLET>*** Lowbound *** is %s \n", retval.debugNoHeader().c_str());
-
         int cmp = m_eq(m_tmp1, m_seqIter.key());
-        printf("<multi map>cmp value: %d\n", cmp);
         if (m_seqIter.isEnd()) {
             return m_entries.size();
         }
@@ -271,8 +260,6 @@ public:
         if (cmp == 0) {
             m_seqIter.movePrev();
             if (m_seqIter.isEnd() == false) {
-                retval.move(const_cast<void*>(m_seqIter.value()));
-                printf("<getCounterLET>*** PREVIOUS key *** is %s \n", retval.debugNoHeader().c_str());
                 if (isUpper) return m_entries.rankUpper(m_seqIter.key());
                 else return m_entries.rankAsc(m_seqIter.key());
             } else
@@ -280,7 +267,6 @@ public:
                 return 0;
         }
         // return rank with the current key if equal
-        printf("return rank with the current key if equal\n");
         if (isUpper) return m_entries.rankUpper(tmpKey);
         else return m_entries.rankAsc(tmpKey);
     }

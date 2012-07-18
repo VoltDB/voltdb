@@ -88,10 +88,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     if (m_node->getEndKeyExpressions().size() == 0) {
-        printf("<Index executor>: has NO END KEY...........\n");
         m_hasEndKey = false;
     } else {
-        printf("<Index executor>: has END KEY...........\n");
         m_hasEndKey = true;
         m_numOfEndkeys = (int)m_node->getEndKeyExpressions().size();
         m_endKeyBeforeSubstituteArrayPtr =
@@ -287,7 +285,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
         assert((activeNumOfEndKeys == 0) || (m_endKey.getSchema()->columnCount() > 0));
         VOLT_TRACE("End key after substitutions: '%s'", m_endKey.debugNoHeader().c_str());
-        printf("End key after substitutions: '%s'\n", m_endKey.debugNoHeader().c_str());
     }
 
     //
@@ -306,12 +303,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
     assert(m_index->is_countable_index_);
 
-    // An index count has three parts:
-    //  (1) Lookup tuples using the search key
+    // An index count has two parts: unique and multi
     //
-    // Use our search key to prime the index iterator
-    // Now loop through each tuple given to us by the iterator
-    //
+
     int32_t rkStart = 0, rkEnd = 0, rkRes = 0;
 
     TableTuple& tmptup = m_outputTable->tempTuple();
@@ -332,14 +326,11 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
                 // this may be changed if we can handle one column index case
                 // like: SELECT count(*) from T2 WHERE POINTS < ?
-                printf("SEARCH KEY Not complete*******\n");
                 // because the searchKey is not complete, we should find it,
                 // but it actually finds the previous rank. Add 1 back.
                 rkStart++;
                 leftIncluded = 1;
             }
-        } else if (localLookupType == INDEX_LOOKUP_TYPE_EQ) {
-            return false;
         } else {
             return false;
         }
@@ -352,23 +343,13 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 rkEnd = m_index->getCounterGET(&m_endKey, NULL);
                 if (m_index->hasKey(&m_endKey))
                     rightIncluded = 1;
-            } else if (localEndType == INDEX_LOOKUP_TYPE_EQ) {
-                // There is no equal case right now
-                return false;
             } else {
                 return false;
             }
         } else {
             rkEnd = m_index->getSize();
             rightIncluded = 1;
-            printf("Count total without END KEYs: %d\n", rkEnd);
         }
-
-        rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
-        printf("ANSWER %d = %d - %d - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
-        tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes));
-        m_outputTable->insertTuple(tmptup);
-
     } else {
         assert (activeNumOfSearchKeys > 0);
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
@@ -387,7 +368,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
                 // this may be changed if we can handle one column index case
                 // like: SELECT count(*) from T2 WHERE POINTS < ?
-                printf("SEARCH KEY Not complete*******\n");
                 // because the searchKey is not complete, we should find it,
                 // but it actually finds the previous rank. Add 1 back.
                 rkStart++;
@@ -411,14 +391,12 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         } else {
             rkEnd = m_index->getSize();
             rightIncluded = 1;
-            printf("Count total without END KEYs: %d\n", rkEnd);
         }
-
-        rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
-        printf("ANSWER %d = %d - %d - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
-        tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes ));
-        m_outputTable->insertTuple(tmptup);
     }
+    rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
+    printf("ANSWER %d = %d - %d - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
+    tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes ));
+    m_outputTable->insertTuple(tmptup);
 
     VOLT_DEBUG ("Index Count :\n %s", m_outputTable->debug().c_str());
     return true;
