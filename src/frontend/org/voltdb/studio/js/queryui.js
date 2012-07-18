@@ -151,8 +151,8 @@ this.execute = function()
 		else
 		{
                     var canRun = true;
-                    if (!/count\(.*\)/.test(statements[i].toLowerCase()) && statements[i].toLowerCase().indexOf('order by') == -1)
-                        canRun = confirm('Running a non-deterministic query can be dangerious, consider adding an order by clause. Are you sure you want to proceed?');
+                    if (/^select /i.test(statements[i]) && !/count\(.*\)/i.test(statements[i]) && statements[i].toLowerCase().indexOf('order by') == -1)
+                        canRun = confirm('Running a non-deterministic query can be dangerous, consider adding an order by clause. Are you sure you want to proceed?');
 
                     if (canRun)
                         connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
