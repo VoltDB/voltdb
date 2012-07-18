@@ -60,7 +60,7 @@ public class InitiatorMailbox implements Mailbox
     VoltLogger tmLog = new VoltLogger("TM");
 
     private final int m_partitionId;
-    private final InitiatorMessageHandler m_msgHandler;
+    private final Scheduler m_scheduler;
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
     private final RejoinProducer m_rejoinProducer;
@@ -78,13 +78,20 @@ public class InitiatorMailbox implements Mailbox
         m_algo = algo;
     }
 
+    synchronized public void setLeaderState(long maxSeenTxnId)
+    {
+        m_repairLog.setLeaderState(true);
+        m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
+        m_scheduler.setLeaderState(true);
+    }
+
     public InitiatorMailbox(int partitionId,
-            InitiatorMessageHandler msgHandler,
+            Scheduler scheduler,
             HostMessenger messenger, RepairLog repairLog,
             RejoinProducer rejoinProducer)
     {
         m_partitionId = partitionId;
-        m_msgHandler = msgHandler;
+        m_scheduler = scheduler;
         m_messenger = messenger;
         m_repairLog = repairLog;
         m_rejoinProducer = rejoinProducer;
@@ -116,7 +123,7 @@ public class InitiatorMailbox implements Mailbox
         }
         m_replicas = new TreeSet<Long>();
         m_replicas.addAll(replicas);
-        m_msgHandler.updateReplicas(replicas);
+        m_scheduler.updateReplicas(replicas);
     }
 
     public long getMasterHsId(int partitionId)
@@ -165,7 +172,7 @@ public class InitiatorMailbox implements Mailbox
             return;
         }
         m_repairLog.deliver(message);
-        m_msgHandler.deliver(message);
+        m_scheduler.deliver(message);
     }
 
     @Override
@@ -250,7 +257,7 @@ public class InitiatorMailbox implements Mailbox
         if (repairWork instanceof Iv2InitiateTaskMessage) {
             Iv2InitiateTaskMessage m = (Iv2InitiateTaskMessage)repairWork;
             Iv2InitiateTaskMessage work = new Iv2InitiateTaskMessage(getHSId(), getHSId(), m);
-            m_msgHandler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
+            m_scheduler.handleIv2InitiateTaskMessageRepair(needsRepair, work);
         }
         else if (repairWork instanceof CompleteTransactionMessage) {
             send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);

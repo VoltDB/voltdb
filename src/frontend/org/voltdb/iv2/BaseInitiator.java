@@ -201,9 +201,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                 Pair<Boolean, Long> result = repair.start().get();
                 success = result.getFirst();
                 if (success) {
-                    m_repairLog.setLeaderState(true);
-                    m_scheduler.setMaxSeenTxnId(result.getSecond());
-                    m_scheduler.setLeaderState(true);
+                    m_initiatorMailbox.setLeaderState(result.getSecond());
                     tmLog.info(m_whoami
                             + "finished leader promotion. Took "
                             + (System.currentTimeMillis() - startTime) + " ms.");
