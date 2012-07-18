@@ -150,7 +150,12 @@ this.execute = function()
 		}
 		else
 		{
-			connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
+                    var canRun = true;
+                    if (/^select /i.test(statements[i]) && !/count\(.*\)/i.test(statements[i]) && statements[i].toLowerCase().indexOf('order by') == -1)
+                        canRun = confirm('Running a non-deterministic query can be dangerous, consider adding an order by clause. Are you sure you want to proceed?');
+
+                    if (canRun)
+                        connectionQueue.BeginExecute('@AdHoc', statements[i].replace(/[\r\n]+/g, " ").replace(/'/g,"''"), callback.Callback);
 		}
 	}
 	connectionQueue.End(function(state,success) {
