@@ -394,7 +394,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
     }
     rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
-    printf("ANSWER %d = %d - %d - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
+    //printf("ANSWER %d = %d - %d - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
     tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes ));
     m_outputTable->insertTuple(tmptup);
 

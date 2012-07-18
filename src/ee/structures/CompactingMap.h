@@ -780,15 +780,6 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
         if (it.isEnd())
             return m_count;
         return rankAsc(it.key()) - 1;
-//        it.movePrev();
-//
-//        NodeCount nc = 0;
-//        it.movePrev();
-//        while (m_comper(key, it.key()) == 0) {
-//            nc++;
-//            it.movePrev();
-//        }
-//        return rankAsc(key) + nc;
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
