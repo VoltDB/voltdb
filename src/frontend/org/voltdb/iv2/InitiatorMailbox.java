@@ -22,8 +22,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.ExecutionException;
 
 import java.util.List;
-import java.util.Set;
-import java.util.TreeSet;
 
 import org.json_voltpatches.JSONObject;
 
@@ -67,8 +65,6 @@ public class InitiatorMailbox implements Mailbox
     private final MapCacheReader m_masterMapCache;
     private long m_hsId;
     private RepairAlgo m_algo;
-
-    private Set<Long> m_replicas = null;
 
     // hacky temp txnid
     AtomicLong m_txnId = new AtomicLong(0);
@@ -118,11 +114,9 @@ public class InitiatorMailbox implements Mailbox
         Iv2Trace.logTopology(getHSId(), replicas, m_partitionId);
         // If a replica set has been configured and it changed during
         // promotion, must cancel the term
-        if (m_replicas != null && m_algo != null) {
+        if (m_algo != null) {
             m_algo.cancel();
         }
-        m_replicas = new TreeSet<Long>();
-        m_replicas.addAll(replicas);
         m_scheduler.updateReplicas(replicas);
     }
 
