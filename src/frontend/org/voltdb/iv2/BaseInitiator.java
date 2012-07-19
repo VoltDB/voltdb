@@ -141,7 +141,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setProcedureSet(procSet);
 
-            m_scheduler.start();
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
 
@@ -233,9 +232,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     {
         // rtb: better to schedule a shutdown SiteTasker?
         // than to play java interrupt() games?
-        if (m_scheduler != null) {
-            m_scheduler.shutdown();
-        }
         if (m_executionSite != null) {
             m_executionSite.startShutdown();
         }

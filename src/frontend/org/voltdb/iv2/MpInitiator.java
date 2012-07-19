@@ -27,7 +27,6 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.messaging.HostMessenger;
 
-import org.voltcore.zk.MapCache;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -49,8 +48,7 @@ public class MpInitiator extends BaseInitiator
                 MP_INIT_PID,
                 new MpScheduler(
                     buddyHSId,
-                    new SiteTaskerQueue(),
-                    new MapCache(messenger.getZK(), VoltZK.iv2masters)),
+                    new SiteTaskerQueue()),
                 "MP");
     }
 

@@ -21,19 +21,11 @@ import java.util.ArrayList;
 
 import java.util.concurrent.atomic.AtomicLong;
 
-import java.util.concurrent.ExecutionException;
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
-
-import org.apache.zookeeper_voltpatches.KeeperException;
-
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 
 import org.voltcore.messaging.VoltMessage;
-import org.voltcore.zk.MapCache;
 
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
@@ -53,53 +45,25 @@ public class MpScheduler extends Scheduler
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
 
-    private final MapCache m_iv2Masters;
+    private final List<Long> m_iv2Masters;
     private final AtomicLong m_txnId = new AtomicLong(1l << 40);
     private final long m_buddyHSId;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    MpScheduler(long buddyHSId, SiteTaskerQueue taskQueue, MapCache iv2masters)
+    MpScheduler(long buddyHSId, SiteTaskerQueue taskQueue)
     {
         super(taskQueue);
-        m_iv2Masters = iv2masters;
         m_buddyHSId = buddyHSId;
-    }
-
-    List<Long> getHSIdsForPartitionInitiators()
-    {
-        Map<String, JSONObject> cache = m_iv2Masters.pointInTimeCache();
-        List<Long> results = new ArrayList<Long>(cache.size());
-        for (Entry<String, JSONObject> entry : cache.entrySet()) {
-            try {
-                results.add(entry.getValue().getLong("hsid"));
-            } catch (JSONException e) {
-                VoltDB.crashLocalVoltDB("Invalid JSON in iv2masters MapCache.", false, e);
-            }
-        }
-        return results;
-    }
-
-    @Override
-    public void start() throws KeeperException, InterruptedException, ExecutionException
-    {
-        m_iv2Masters.start(true);
-    }
-
-    @Override
-    public void shutdown()
-    {
-        try {
-            m_iv2Masters.shutdown();
-        } catch (Exception ignored) {
-        }
+        m_iv2Masters = new ArrayList<Long>();
     }
 
     @Override
     public void updateReplicas(List<Long> replicas)
     {
-        // nothing to do for multi-part here yet.
+        m_iv2Masters.clear();
+        m_iv2Masters.addAll(replicas);
     }
 
     @Override
@@ -128,7 +92,6 @@ public class MpScheduler extends Scheduler
         final String procedureName = message.getStoredProcedureName();
         final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
 
-        final List<Long> partitionInitiators = getHSIdsForPartitionInitiators();
         final long mpTxnId = m_txnId.incrementAndGet();
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
@@ -149,11 +112,11 @@ public class MpScheduler extends Scheduler
             DuplicateCounter counter = new DuplicateCounter(
                     message.getInitiatorHSId(),
                     mpTxnId,
-                    partitionInitiators);
+                    m_iv2Masters);
             m_duplicateCounters.put(mpTxnId, counter);
             EveryPartitionTask eptask =
                 new EveryPartitionTask(m_mailbox, mpTxnId, m_pendingTasks, sp,
-                        partitionInitiators);
+                        m_iv2Masters);
             m_pendingTasks.offer(eptask);
             return;
         }
@@ -173,8 +136,7 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
-                    mpTxnId, m_pendingTasks, mp, partitionInitiators,
-                    m_buddyHSId);
+                    mpTxnId, m_pendingTasks, mp, m_iv2Masters, m_buddyHSId);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);
     }
