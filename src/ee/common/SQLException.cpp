@@ -30,6 +30,7 @@ const char* SQLException::data_exception_most_specific_type_mismatch = "2200G";
 const char* SQLException::data_exception_numeric_value_out_of_range = "22003";
 const char* SQLException::data_exception_string_data_length_mismatch = "22026";
 const char* SQLException::integrity_constraint_violation = "23000";
+const char* SQLException::dynamic_sql_error = "07000";
 
 // These are ordered by error code. Names and codes are volt
 // specific - must find merge conflicts on duplicate codes.

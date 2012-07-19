@@ -197,14 +197,41 @@ public class PlanAssembler {
     void setupForNewPlans(AbstractParsedStmt parsedStmt)
     {
         int countOfPartitionedTables = 0;
+        Map<String, String> partitionColumnByTable = new HashMap<String, String>();
         // Do we have a need for a distributed scan at all?
+        // Iterate over the tables to collect partition columns.
         for (Table table : parsedStmt.tableList) {
             if (table.getIsreplicated()) {
                 continue;
             }
             ++countOfPartitionedTables;
+            String colName = null;
+            Column partitionCol = table.getPartitioncolumn();
+            // "(partitionCol != null)" tests around an obscure edge case.
+            // The table is declared non-replicated yet specifies no partitioning column.
+            // This can occur legitimately when views based on partitioned tables neglect to group by the partition column.
+            // The interpretation of this edge case is that the table has "randomly distributed data".
+            // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
+            // because it has no recognized partitioning join key.
+            if (partitionCol != null) {
+                colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
+            }
+
+            //TODO: This map really wants to be indexed by table "alias" (the in-query table scan identifier)
+            // so self-joins can be supported without ambiguity.
+            String partitionedTable = table.getTypeName();
+            partitionColumnByTable.put(partitionedTable, colName);
         }
-        m_partitioning.setCountOfPartitionedTables(countOfPartitionedTables);
+        m_partitioning.setPartitionedTables(partitionColumnByTable, countOfPartitionedTables);
+        if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_partitioning.getCountOfPartitionedTables() > 0) {
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, parsedStmt.valueEquivalence);
+            int multiPartitionScanCount = m_partitioning.getCountOfIndependentlyPartitionedTables();
+            if (multiPartitionScanCount > 1) {
+                // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
+                String msg = "Join of multiple partitioned tables has insufficient join criteria.";
+                throw new PlanningErrorException(msg);
+            }
+        }
 
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {
@@ -325,10 +352,6 @@ public class PlanAssembler {
         fragment.planGraph.generateOutputSchema(m_catalogDb);
         retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
-    }
-
-    void resetPartitioningKey(Object best) {
-        m_partitioning.setEffectiveValue(best);
     }
 
     private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
@@ -634,7 +657,7 @@ public class PlanAssembler {
             if (column.equals(m_partitioning.getColumn())) {
                 String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
                 m_partitioning.addPartitioningExpression(fullColumnName, expr);
-                m_partitioning.setEffectiveValue(ConstantValueExpression.extractPartitioningValue(expr.getValueType(), expr));
+                m_partitioning.setInferredValue(ConstantValueExpression.extractPartitioningValue(expr.getValueType(), expr));
             }
 
             // add column to the materialize node.
@@ -649,7 +672,6 @@ public class PlanAssembler {
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
         insertNode.generateOutputSchema(m_catalogDb);
-        AbstractPlanNode rootNode = insertNode;
 
         if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
             return insertNode;

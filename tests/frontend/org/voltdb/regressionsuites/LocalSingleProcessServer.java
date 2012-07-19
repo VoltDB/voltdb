@@ -38,8 +38,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
  * Implementation of a VoltServerConfig for the simplest case:
  * the single-process VoltServer that's so easy to use.
  *
+ * Edit: Please don't use this.
+ * Use ServerThread or single-node, in-process LocalCluster.
+ *
  */
-public class LocalSingleProcessServer implements VoltServerConfig {
+@Deprecated
+public abstract class LocalSingleProcessServer implements VoltServerConfig {
 
     public final String m_jarFileName;
     public int m_siteCount;

@@ -79,9 +79,11 @@ public class HSQLInterface {
         this.sessionProxy = sessionProxy;
     }
 
-    public void close() {
+    @Override
+    public void finalize() {
+        final Database db = sessionProxy.getDatabase();
         sessionProxy.close();
-        DatabaseManager.closeDatabases(Database.CLOSEMODE_IMMEDIATELY);
+        db.close(Database.CLOSEMODE_IMMEDIATELY);
         sessionProxy = null;
     }
 

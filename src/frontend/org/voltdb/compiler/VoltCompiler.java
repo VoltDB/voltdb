@@ -115,6 +115,8 @@ public class VoltCompiler {
 
     DatabaseEstimates m_estimates = new DatabaseEstimates();
 
+    private List<String> m_capturedDiagnosticDetail = null;
+
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     @SuppressWarnings("unused")
     private static final VoltLogger Log = new VoltLogger("org.voltdb.compiler.VoltCompiler");
@@ -523,6 +525,7 @@ public class VoltCompiler {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
                 catGroup.setAdhoc(group.isAdhoc());
                 catGroup.setSysproc(group.isSysproc());
+                catGroup.setDefaultproc(group.isDefaultproc());
             }
         }
 
@@ -635,6 +638,7 @@ public class VoltCompiler {
             final CatalogMap<MaterializedViewInfo> views = t.getViews();
             for (final MaterializedViewInfo mvi : views) {
                 mvi.getDest().setIsreplicated(false);
+                setGroupedTablePartitionColumn(mvi, c);
             }
         }
 
@@ -679,9 +683,60 @@ public class VoltCompiler {
             addClassToJar( classDependency, this );
         }
 
-        m_hsql.close();
     }
 
+    static private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn) {
+        // A view of a replicated table is replicated.
+        // A view of a partitioned table is partitioned -- regardless of whether it has a partition key
+        // -- it certainly isn't replicated!
+        // If the partitioning column is grouped, its counterpart is the partitioning column of the view table.
+        // Otherwise, the view table just doesn't have a partitioning column
+        // -- it is seemingly randomly distributed,
+        // and its grouped columns are only locally unique but not globally unique.
+        Table destTable = mvi.getDest();
+        // Get the grouped columns in "index" order.
+        // This order corresponds to the iteration order of the MaterializedViewInfo's getGroupbycols.
+        List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
+        String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
+        int index = 0;
+        for (ColumnRef cref : mvi.getGroupbycols()) {
+            Column srcCol = cref.getColumn();
+            if (srcCol.getName().equals(partitionColName)) {
+                Column destCol = destColumnArray.get(index);
+                destTable.setPartitioncolumn(destCol);
+                return;
+            }
+            ++index;
+        }
+    }
+
+    /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
+    public void enableDetailedCapture() {
+        m_capturedDiagnosticDetail = new ArrayList<String>();
+    }
+
+    /** Access recent plan output, for diagnostic purposes */
+    public List<String> harvestCapturedDetail() {
+        List<String> harvested = m_capturedDiagnosticDetail;
+        m_capturedDiagnosticDetail = null;
+        return harvested;
+    }
+
+    /** Capture plan context info -- statement, cost, high-level "explain". */
+    public void captureDiagnosticContext(String planDescription) {
+        if (m_capturedDiagnosticDetail == null) {
+            return;
+        }
+        m_capturedDiagnosticDetail.add(planDescription);
+    }
+
+    /** Capture plan content in terse json format. */
+    public void captureDiagnosticJsonFragment(String json) {
+        if (m_capturedDiagnosticDetail == null) {
+            return;
+        }
+        m_capturedDiagnosticDetail.add(json);
+    }
 
     /**
      * Create INSERT, UPDATE, DELETE and SELECT procedure descriptors for all partitioned,

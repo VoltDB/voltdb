@@ -312,6 +312,19 @@ public class TestAdminMode extends RegressionSuite
 //        }
 //    }
 
+    /**
+     * LocalSingleProcessServer is verboten, but it needs to be used here because
+     * LocalCluster doesn't yet do the right admin mode thing yet.
+     */
+    @SuppressWarnings("deprecation")
+    static class ForcedLocalSingleProcessServer extends LocalSingleProcessServer {
+        public ForcedLocalSingleProcessServer(String jarFileName,
+                int siteCount, BackendTarget target) {
+            super(jarFileName, siteCount, target);
+        }
+    }
+
+    @SuppressWarnings("deprecation")
     static public Test suite() throws IOException {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAdminMode.class);
@@ -319,8 +332,8 @@ public class TestAdminMode extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalSingleProcessServer config =
-                new LocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        ForcedLocalSingleProcessServer config =
+                new ForcedLocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
 
         // Start in admin mode
         success = config.compileWithAdminMode(project, 32323, true);

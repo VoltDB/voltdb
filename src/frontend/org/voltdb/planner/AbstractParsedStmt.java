@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
@@ -82,6 +83,8 @@ public abstract class AbstractParsedStmt {
     public HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
 
     public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
+
+    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
     //User specified join order, null if none is specified
     public String joinOrder = null;
@@ -369,18 +372,31 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseFunctionExpression(VoltXMLElement exprNode, Database db) {
         String name = exprNode.attributes.get("name").toLowerCase();
-        // parameterized? (expected?) argument type of function?
-        //TODO: (Figure out whether/how it's OK to only get one type parameter? Is that all SQL needs?)
+        // Parameterized argument type of function. One parameter type is apparently all that SQL ever needs.
         String value_type_name = exprNode.attributes.get("type");
         VoltType value_type = VoltType.typeFromString(value_type_name);
         AbstractExpression expr = null;
 
-        SQLFunction[] overloads = SQLFunction.functionsByName(name);
-        if (overloads == null) {
-            throw new PlanningErrorException("Function '" + name + "' is not supported");
+        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        // This needs to be conditional on an expected/allowed number/type of arguments.
+        for (VoltXMLElement argNode : exprNode.children) {
+            assert(argNode != null);
+            // recursively parse each argument subtree (could be any kind of expression).
+            AbstractExpression argExpr = parseExpressionTree(argNode, db);
+            assert(argExpr != null);
+            args.add(argExpr);
         }
 
-        // Validate/select specific named function overload against supported argument type(s?)
+        List<SQLFunction> overloads = SQLFunction.functionsByNameAndArgumentCount(name, args.size());
+        if (overloads == null) {
+            throw new PlanningErrorException("Function '" + name + "' with " + args.size() + " arguments is not supported");
+        }
+
+        // Validate/select specific named function overload against supported argument type(s?).
+        // This amounts to a not-yet-implemented performance feature that allows the planner to direct the
+        // executor to argument-type-specific functions instead of relying on its current tendency to
+        // type-check every row/value at runtime.
+        // Until that day, overloads can be a singleton list.
         SQLFunction resolved = null;
         for (SQLFunction supportedFunction : overloads) {
             resolved = supportedFunction;
@@ -419,15 +435,6 @@ public abstract class AbstractParsedStmt {
             expr.setValueSize(vt.getMaxLengthInBytes());
         }
 
-        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
-        // This needs to be conditional on an expected/allowed number/type of arguments.
-        for (VoltXMLElement argNode : exprNode.children) {
-            assert(argNode != null);
-            // recursively parse each argument subtree (could be any kind of expression).
-            AbstractExpression argExpr = parseExpressionTree(argNode, db);
-            assert(argExpr != null);
-            args.add(argExpr);
-        }
         expr.setArgs(args);
         return expr;
     }
@@ -547,6 +554,8 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     tableFilterList.put(table, exprs);
                 }
+                expr.m_isJoiningClause = false;
+                addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
             else if (tableSet.size() == 2) {
@@ -562,6 +571,8 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     joinSelectionList.put(pair, exprs);
                 }
+                expr.m_isJoiningClause = true;
+                addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
             else if (tableSet.size() > 2) {
@@ -657,6 +668,54 @@ public abstract class AbstractParsedStmt {
         ParameterInfo param = paramsById.get(paramId);
         assert(param != null);
         return param.index;
+    }
+
+    private void addExprToEquivalenceSets(AbstractExpression expr) {
+        // Ignore expressions that are not of COMPARE_EQUAL type
+        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return;
+        }
+
+        AbstractExpression leftExpr = expr.getLeft();
+        AbstractExpression rightExpr = expr.getRight();
+        // Can't use an expression based on a column value that is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return;
+        }
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return;
+        }
+
+        // Any two asserted-equal expressions need to map to the same equivalence set,
+        // which must contain them and must be the only such set that contains them.
+        Set<AbstractExpression> eqSet1 = null;
+        if (valueEquivalence.containsKey(leftExpr)) {
+            eqSet1 = valueEquivalence.get(leftExpr);
+        }
+        if (valueEquivalence.containsKey(rightExpr)) {
+            Set<AbstractExpression> eqSet2 = valueEquivalence.get(rightExpr);
+            if (eqSet1 == null) {
+                // Add new leftExpr into existing rightExpr's eqSet.
+                valueEquivalence.put(leftExpr, eqSet2);
+                eqSet2.add(leftExpr);
+            } else {
+                // Merge eqSets, re-mapping all the rightExpr's equivalents into leftExpr's eqset.
+                for (AbstractExpression eqMember : eqSet2) {
+                    eqSet1.add(eqMember);
+                    valueEquivalence.put(eqMember, eqSet1);
+                }
+            }
+        } else {
+            if (eqSet1 == null) {
+                // Both leftExpr and rightExpr are new -- add leftExpr to the new eqSet first.
+                eqSet1 = new HashSet<AbstractExpression>();
+                valueEquivalence.put(leftExpr, eqSet1);
+                eqSet1.add(leftExpr);
+            }
+            // Add new rightExpr into leftExpr's eqSet.
+            valueEquivalence.put(rightExpr, eqSet1);
+            eqSet1.add(rightExpr);
+        }
     }
 
 }

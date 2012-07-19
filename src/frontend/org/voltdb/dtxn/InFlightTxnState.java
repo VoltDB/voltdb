@@ -47,7 +47,8 @@ public class InFlightTxnState implements Serializable {
             long initiateTime,
             long connectionId,
             String connectionHostname,
-            boolean isAdmin)
+            boolean isAdmin,
+            boolean allowMismatchedResults)
     {
         this.txnId = txnId;
         this.firstCoordinatorId = firstCoordinatorId;
@@ -62,6 +63,7 @@ public class InFlightTxnState implements Serializable {
         this.connectionId = connectionId;
         this.connectionHostname = connectionHostname;
         this.isAdmin = isAdmin;
+        this.allowMismatchedResults = allowMismatchedResults;
 
         outstandingResponses = 1;
 
@@ -98,31 +100,37 @@ public class InFlightTxnState implements Serializable {
         // If not same, kill entire cluster and hide the bodies.
         // In all seriousness, we have no valid way to recover from a non-deterministic event
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
+        // ENG-3288 - Allow non-deterministic read-only transactions to have mismatched results
+        // so that LIMIT queries without ORDER BY clauses work.
         if (resultsForComparison != null) {
-            VoltTable[] curr_results = r.getResults();
-            if (resultsForComparison.length != curr_results.length)
-            {
-                String msg = "Mismatched result count received for transaction ID: " + txnId;
-                msg += "\n  while executing stored procedure: " + invocation.getProcName();
-                msg += "\n  from execution site: " + coordinatorHSId;
-                msg += "\n  Expected number of results: " + resultsForComparison.length;
-                msg += "\n  Mismatched number of results: " + curr_results.length;
-                // die die die
-                VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
-                throw new RuntimeException(msg); // gets called only by test code
-            }
-            for (int i = 0; i < resultsForComparison.length; ++i)
-            {
-                if (!curr_results[i].hasSameContents(resultsForComparison[i]))
+            if (!allowMismatchedResults) {
+                VoltTable[] curr_results = r.getResults();
+                if (resultsForComparison.length != curr_results.length)
                 {
-                    String msg = "Mismatched results received for transaction ID: " + txnId;
+                    String msg = "Mismatched result count received for transaction ID: " + txnId;
                     msg += "\n  while executing stored procedure: " + invocation.getProcName();
                     msg += "\n  from execution site: " + coordinatorHSId;
-                    msg += "\n  Expected results: " + resultsForComparison[i].toString();
-                    msg += "\n  Mismatched results: " + curr_results[i].toString();
+                    msg += "\n  Expected number of results: " + resultsForComparison.length;
+                    msg += "\n  Mismatched number of results: " + curr_results.length;
+                    msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
                     // die die die
                     VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
                     throw new RuntimeException(msg); // gets called only by test code
+                }
+                for (int i = 0; i < resultsForComparison.length; ++i)
+                {
+                    if (!curr_results[i].hasSameContents(resultsForComparison[i]))
+                    {
+                        String msg = "Mismatched results received for transaction ID: " + txnId;
+                        msg += "\n  while executing stored procedure: " + invocation.getProcName();
+                        msg += "\n  from execution site: " + coordinatorHSId;
+                        msg += "\n  Expected results: " + resultsForComparison[i].toString();
+                        msg += "\n  Mismatched results: " + curr_results[i].toString();
+                        msg += "\n  Read-only: " + new Boolean(isReadOnly).toString();
+                        // die die die
+                        VoltDB.crashGlobalVoltDB(msg, false, null); // kills process
+                        throw new RuntimeException(msg); // gets called only by test code
+                    }
                 }
             }
         }
@@ -238,6 +246,7 @@ public class InFlightTxnState implements Serializable {
     public final long connectionId;
     public final String connectionHostname;
     public final boolean isAdmin;
+    public final boolean allowMismatchedResults;
 
     // in multipartition txns, the coord id goes here
     // in single partition txns:

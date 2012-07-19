@@ -80,16 +80,15 @@ public:
  */
 template <ExpressionType E>
 class GeneralFunctionExpression : public AbstractExpression {
-    const std::vector<AbstractExpression *>& m_args;
 public:
     GeneralFunctionExpression(const std::vector<AbstractExpression *>& args)
-        : AbstractExpression(E) {
-        for (int i = 0; i < m_args.size(); ++i) {
-            delete m_args[i];
-        }
-    };
+        : AbstractExpression(E), m_args(args) {}
 
     virtual ~GeneralFunctionExpression() {
+        size_t i = m_args.size();
+        while (i--) {
+            delete m_args[i];
+        }
         delete &m_args;
     }
 
@@ -104,6 +103,9 @@ public:
     std::string debugInfo(const std::string &spacer) const {
         return (spacer + "GeneralFunctionExpression " + expressionToString(getExpressionType()));
     }
+
+private:
+    const std::vector<AbstractExpression *>& m_args;
 };
 
 }
@@ -118,16 +120,25 @@ AbstractExpression*
 ExpressionUtil::functionFactory(ExpressionType et, const std::vector<AbstractExpression*>* arguments) {
     assert(arguments);
     AbstractExpression* ret = 0;
-    if (arguments->size() == 0) {
+    size_t nArgs = arguments->size();
+    switch(nArgs) {
+    case 0:
         // ret = new ConstantFunctionExpression<???>();
         delete arguments;
-    } else if(arguments->size() == 1) {
+        break;
+    case 1:
         if (et == EXPRESSION_TYPE_FUNCTION_ABS) {
             ret = new UnaryFunctionExpression<EXPRESSION_TYPE_FUNCTION_ABS>((*arguments)[0]);
+            delete arguments;
         }
-        delete arguments;
-    } else {
-        //ret = new GeneralFunctionExpression<???>(*arguments);
+        break;
+    default:
+        // GeneralFunctions delete the arguments container when through with it.
+        if (et == EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM) {
+            ret = new GeneralFunctionExpression<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(*arguments);
+        } else if (et == EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR) {
+            ret = new GeneralFunctionExpression<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(*arguments);
+        }
     }
     assert(ret);
     return ret;

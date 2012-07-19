@@ -95,35 +95,6 @@ public abstract class VoltTypeUtil {
         return (ret);
     }
 
-    /*
-     * Determine if a cast is allowable w/o loss of precision
-     * for index key comparison.
-     */
-    public static boolean isAllowableCastForKeyComparator(VoltType from, VoltType to) {
-        // self to self cast is obviously fine.
-        if (from == to)
-            return true;
-
-        // allow only float to float
-        // allow only decimal to decimal
-        // allow only string to string
-        if (to == VoltType.STRING    ||
-            from == VoltType.STRING  ||
-            to == VoltType.DECIMAL   ||
-            from == VoltType.DECIMAL ||
-            to == VoltType.FLOAT     ||
-            from == VoltType.FLOAT)
-        {
-            return from == to;
-        }
-
-        // disallow integers getting smaller
-        if (to.isInteger())
-            return from.isInteger();
-
-        return true;
-    }
-
     public static VoltType determineImplicitCasting(VoltType left, VoltType right) {
         //
         // Make sure both are valid

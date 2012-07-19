@@ -36,7 +36,7 @@ public abstract class BuildDirectoryUtils {
     static String m_debugRoot = null;
     static Set<String> m_seenPaths = new TreeSet<String>();
 
-    public static PrintStream getDebugOutputPrintStream(final String dir, final String filename) {
+    public static void writeFile(final String dir, final String filename, String content) {
         // cache the root of the folder
         if (m_debugRoot == null) {
             if (System.getenv("TEST_DIR") != null) {
@@ -56,12 +56,15 @@ public abstract class BuildDirectoryUtils {
 
         String filepath = subFolderPath + File.separator + filename;
         File f = new File(filepath);
+        PrintStream streamOut = null;
         try {
-            return new PrintStream(f);
+            streamOut = new PrintStream(f);
         } catch (FileNotFoundException e) {
             e.printStackTrace();
-            return null;
+            return;
         }
+        streamOut.println(content);
+        streamOut.close();
     }
 
     public static String getBuildDirectoryPath() {
@@ -72,4 +75,5 @@ public abstract class BuildDirectoryUtils {
             return ".";
         }
     }
+
 }

@@ -23,6 +23,8 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
@@ -203,20 +205,41 @@ public class TestFunctionsSuite extends RegressionSuite {
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
-        // These two cases are apparently not close enough to trigger ENG-3191, but they're worth trying?
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) > (ABS(NUM) + 4)");
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID = -2 - NUM");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // These cases were originally failed attempts to trigger ENG-3191, but they still seem worth trying.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) = 2 + NUM");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
-        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(NUM) < (ABS(ID) - 4)");
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(NUM) = (2 - ID)");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         resultB = r.asScalarLong();
         assertEquals(resultA, resultB);
 
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID < 0");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
 
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) = (0 - ID)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        // Here's the ENG-3191 case, all better now.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID = (0 - ABS(ID))");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
 
         boolean caught = false;
 
@@ -244,6 +267,170 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
+    public void testSubstring() throws Exception
+    {
+        System.out.println("STARTING testSubstring");
+        Client client = getClient();
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PRIMARY KEY (ID)
+                );
+        */
+        for(int id=7; id < 15; id++) {
+            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1);
+            client.drain();
+        }
+        ClientResponse cr = null;
+        VoltTable r = null;
+
+        // test where support
+        cr = client.callProcedure("WHERE_SUBSTRING2");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+
+        cr = client.callProcedure("WHERE_SUBSTRING3");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+
+        // Test select support
+        cr = client.callProcedure("DISPLAY_SUBSTRING");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals("12", r.getString(0));
+
+        // Test ORDER BY by support
+        cr = client.callProcedure("ORDER_SUBSTRING");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        long value = r.getLong(0);
+        assertEquals(5, value);
+
+        // Test GROUP BY by support
+        cr = client.callProcedure("AGG_OF_SUBSTRING");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        assertEquals("10", r.getString(0));
+
+        // Test null propagation
+        cr = client.callProcedure("INSERT_NULL", 99);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INSERT_NULL", 98);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INSERT_NULL", 97);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INSERT_NULL", 96);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INSERT_NULL", 95);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        long resultA;
+        long resultB;
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where DESC >= 'X11'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING (DESC FROM 2) >= '11'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not DESC >= 'X12'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( DESC FROM 2) >= '12'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where DESC >= 'X2'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where SUBSTRING(DESC FROM 2 FOR 1) >= '2'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( SUBSTRING (DESC FROM 2) FROM 1 FOR 1) < '2'");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        boolean caught = false;
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING( DESC FROM 2) > 9");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("incompatible data type") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (1 FROM 2) > 9");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("incompatible data type") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (1 FROM DESC) > '9'");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("incompatible data type") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not SUBSTRING (DESC FROM DESC) > 'ABC'");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("incompatible data type") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -259,7 +446,18 @@ public class TestFunctionsSuite extends RegressionSuite {
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();
-        project.addSchema(Insert.class.getResource("fixed-sql-ddl.sql"));
+        final String literalSchema =
+                "CREATE TABLE P1 ( " +
+                "ID INTEGER DEFAULT '0' NOT NULL, " +
+                "DESC VARCHAR(300), " +
+                "NUM INTEGER, " +
+                "RATIO FLOAT, " +
+                "PRIMARY KEY (ID) ); ";
+        try {
+            project.addLiteralSchema(literalSchema);
+        } catch (IOException e) {
+            assertFalse(true);
+        }
         project.addPartitionInfo("P1", "ID");
 
         project.addStmtProcedure("WHERE_ABS", "select count(*) from P1 where ABS(ID) > 9");
@@ -275,6 +473,20 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("AGG_OF_ABS", "select MIN(ABS(ID)-2) from P1");
         // RuntimeException seems to stem from parser failure similar to ENG-2901
         // project.addStmtProcedure("ABS_OF_AGG", "select ABS(MIN(ID+9)) from P1");
+
+        project.addStmtProcedure("WHERE_SUBSTRING2", "select count(*) from P1 where SUBSTRING (DESC FROM 2) > '12'");
+        project.addStmtProcedure("WHERE_SUBSTRING3", "select count(*) from P1 where not SUBSTRING (DESC FROM 2 FOR 1) > '13'");
+
+        // Test select support
+        project.addStmtProcedure("DISPLAY_SUBSTRING", "select SUBSTRING (DESC FROM 2) from P1 where ID = -12");
+
+        // Test ORDER BY by support
+        project.addStmtProcedure("ORDER_SUBSTRING", "select ID+15 from P1 order by SUBSTRING (DESC FROM 2)");
+
+        // Test GROUP BY by support
+        project.addStmtProcedure("AGG_OF_SUBSTRING", "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
+
+
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 

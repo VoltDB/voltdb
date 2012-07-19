@@ -74,10 +74,7 @@ class TheHashinator {
                              partitionCount);
         }
         default:
-            // XXX-IZZY MAYBE THIS SHOULD BE NON-FATAL?
-            // XXX-HUGG This is fatal because if you get here, there's a bug in
-            //  VoltDB.
-            throwFatalException("Attempted to hashinate an unsupported type: %s",
+            throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
                                 getTypeName(val_type).c_str());
         }
     }
@@ -110,7 +107,7 @@ class TheHashinator {
         int32_t hashCode = 0;
         int32_t offset = 0;
         if (length < 0) {
-            throwFatalException("Attempted to hashinate a 0 length or less string %d", length);
+            throwDynamicSQLException("Attempted to hashinate a string with length(%d) < 0", length);
         }
         for (int32_t ii = 0; ii < length; ii++) {
            hashCode = 31 * hashCode + string[offset++];

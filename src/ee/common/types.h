@@ -62,7 +62,7 @@ class NValue;
 enum ValueType {
     VALUE_TYPE_INVALID      = 0,    // a column should never be this type!
     VALUE_TYPE_NULL         = 1,    // and they should never be this either!
-    // VALUE_TYPE_HSQL_NUMERIC = 2, // Java planner only. Not used in EE.
+    VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC = 2, // Java planner only. Not used in EE.
 
     //
     // Column Types
@@ -278,6 +278,8 @@ enum ExpressionType {
     // Functions
     // -----------------------------
     EXPRESSION_TYPE_FUNCTION_ABS                    = 100,
+    EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM         = 110,
+    EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR     = 111,
 
 };
 

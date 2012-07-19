@@ -56,7 +56,7 @@ class TableAndIndexTest : public Test {
     public:
         TableAndIndexTest() {
             dummyUndo = new DummyUndoQuantum();
-            engine = new ExecutorContext(0, 0, dummyUndo, NULL, false, 0, "", 0);
+            engine = new ExecutorContext(0, 0, dummyUndo, NULL, NULL, false, "", 0);
             mem = 0;
 
             vector<voltdb::ValueType> districtColumnTypes;

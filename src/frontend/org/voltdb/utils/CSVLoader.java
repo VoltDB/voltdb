@@ -55,7 +55,8 @@ public class CSVLoader {
     private static final int waitSeconds = 10;
 
     private static CSVConfig config = null;
-    private static long latency = -1;
+    private static long latency = 0;
+    private static long start = 0;
     private static boolean standin = false;
 
     public static String pathInvalidrowfile = "";
@@ -71,7 +72,7 @@ public class CSVLoader {
 
     private static CSVReader csvReader;
     private static Client csvClient;
-    protected static final VoltLogger m_log = new VoltLogger("CSVLoader");
+    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
     private static final class MyCallback implements ProcedureCallback {
         private final long m_lineNum;
@@ -95,6 +96,7 @@ public class CSVLoader {
                     }
                     if (errorInfo.size() >= m_config.maxerrors) {
                         m_log.error("The number of Failure row data exceeds " + m_config.maxerrors);
+                        produceFiles();
                         close_cleanup();
                         System.exit(-1);
                     }
@@ -111,52 +113,52 @@ public class CSVLoader {
     }
 
     private static class CSVConfig extends CLIConfig {
-        @Option(shortOpt = "f", desc = "directory path to produce report files.")
+        @Option(shortOpt = "f", desc = "location of CSV input file")
         String file = "";
 
-        @Option(shortOpt = "p", desc = "procedure name to insert the data into the database.")
+        @Option(shortOpt = "p", desc = "procedure name to insert the data into the database")
         String procedure = "";
 
-        @Option(desc = "maximum rows to be read of the csv file.")
+        @Option(desc = "maximum rows to be read from the CSV file")
         int limitrows = Integer.MAX_VALUE;
 
-        @Option(shortOpt = "r", desc = "directory path to produce report files.")
+        @Option(shortOpt = "r", desc = "directory path for report files")
         String reportdir = System.getProperty("user.dir");
 
-        @Option(shortOpt = "m", desc = "stop the process after NUMBER confirmed failures. The actual number of failures may be much higher.")
+        @Option(shortOpt = "m", desc = "maximum errors allowed")
         int maxerrors = 100;
 
-        @Option(desc = "the delimiter to use for separating entries.")
+        @Option(desc = "delimiter to use for separating entries")
         char separator = CSVParser.DEFAULT_SEPARATOR;
 
-        @Option(desc = "the character to use for quoted elements.")
+        @Option(desc = "character to use for quoted elements (default: \")")
         char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;
 
-        @Option(desc = "the character to use for escaping a separator or quote.")
+        @Option(desc = "character to use for escaping a separator or quote (default: \\)")
         char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
 
-        @Option(desc = "sets if characters outside the quotes are ignored.", hasArg = false)
+        @Option(desc = "require all input values to be enclosed in quotation marks", hasArg = false)
         boolean strictquotes = CSVParser.DEFAULT_STRICT_QUOTES;
 
-        @Option(desc = "the line number to skip for start reading.")
+        @Option(desc = "number of lines to skip before inserting rows into the database")
         int skip = CSVReader.DEFAULT_SKIP_LINES;
 
-        @Option(desc = "the default leading whitespace behavior to use if none is supplied.", hasArg = false)
+        @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
         boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
 
-        @Option(shortOpt = "s", desc = "the servers to be connected")
+        @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
         String servers = "localhost";
 
-        @Option(shortOpt = "u", desc = "user name that is used to connect to the servers,by defalut null")
+        @Option(desc = "username when connecting to the servers")
         String user = "";
 
-        @Option(shortOpt = "P", desc = "password for this user to use to connect the servers,by defalut null")
+        @Option(desc = "password to use when connecting to servers")
         String password = "";
 
-        @Option(desc = "port to be used for the servers right now")
+        @Option(desc = "port to use when connecting to database (default: 21212)")
         int port = Client.VOLTDB_SERVER_PORT;
 
-        @AdditionalArgs(desc = "insert the data into database by TABLENAME.INSERT procedure by default.")
+        @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
         String table = "";
 
         @Override
@@ -179,14 +181,16 @@ public class CSVLoader {
         @Override
         public void printUsage() {
             System.out
-                    .println("Semantics: csvloader [args] tablename or csvloader [args] -p procedurename");
+                .println("Usage: csvloader [args] tablename");
+            System.out
+                .println("       csvloader [args] -p procedurename");
             super.printUsage();
         }
     }
 
     public static void main(String[] args) throws IOException,
             InterruptedException {
-        long start = System.currentTimeMillis();
+        start = System.currentTimeMillis();
         int waits = 0;
         int shortWaits = 0;
 
@@ -222,6 +226,7 @@ public class CSVLoader {
         } catch (Exception e) {
             m_log.error("Error to connect to the servers:"
                     + config.servers);
+            close_cleanup();
             System.exit(-1);
         }
 
@@ -233,16 +238,26 @@ public class CSVLoader {
 
             int columnCnt = 0;
             VoltTable procInfo = null;
+            boolean isProcExist = false;
             try {
                 procInfo = csvClient.callProcedure("@SystemCatalog",
                         "PROCEDURECOLUMNS").getResults()[0];
                 while (procInfo.advanceRow()) {
                     if (insertProcedure.matches((String) procInfo.get(
-                            "PROCEDURE_NAME", VoltType.STRING)))
+                            "PROCEDURE_NAME", VoltType.STRING))) {
                         columnCnt++;
+                        isProcExist = true;
+                    }
                 }
             } catch (Exception e) {
-                e.printStackTrace();
+                m_log.error(e.getMessage(), e);
+                close_cleanup();
+                System.exit(-1);
+            }
+            if (isProcExist == false) {
+                m_log.error("No matching insert procedure available");
+                close_cleanup();
+                System.exit(-1);
             }
 
             while ((config.limitrows-- > 0)
@@ -272,6 +287,7 @@ public class CSVLoader {
                             if (errorInfo.size() >= config.maxerrors) {
                                 m_log.error("The number of Failure row data exceeds "
                                         + config.maxerrors);
+                                produceFiles();
                                 close_cleanup();
                                 System.exit(-1);
                             }
@@ -308,11 +324,9 @@ public class CSVLoader {
             }
         }
 
-        latency = System.currentTimeMillis() - start;
-        m_log.info("CSVLoader elaspsed: " + latency / 1000F
-                + " seconds");
         produceFiles();
         close_cleanup();
+        csvClient.close();
     }
 
     private static String checkparams_trimspace(String[] slot,
@@ -340,7 +354,7 @@ public class CSVLoader {
         if (config.file.equals(""))
             standin = true;
         if (!config.table.equals("")) {
-            insertProcedure = config.table + ".insert";
+            insertProcedure = config.table.toUpperCase() + ".insert";
         } else {
             insertProcedure = config.procedure;
         }
@@ -352,8 +366,7 @@ public class CSVLoader {
                 dir.mkdirs();
             }
         } catch (Exception x) {
-            m_log.error(x.getMessage());
-            x.printStackTrace();
+            m_log.error(x.getMessage(), x);
             System.exit(-1);
         }
 
@@ -387,6 +400,9 @@ public class CSVLoader {
     }
 
     private static void produceFiles() {
+        latency = System.currentTimeMillis() - start;
+        m_log.info("CSVLoader elaspsed: " + latency / 1000F
+                + " seconds");
 
         int bulkflush = 300; // by default right now
         try {
@@ -443,8 +459,6 @@ public class CSVLoader {
         errorInfo.clear();
 
         csvReader.close();
-        csvClient.close();
-
         out_invaliderowfile.close();
         out_logfile.close();
         out_reportfile.close();

@@ -20,6 +20,8 @@ package org.voltdb.compiler;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.voltdb.planner.ParameterInfo;
+
 /**
  * Holds a batch of planned SQL statements.
  *
@@ -35,8 +37,9 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     public final int catalogVersion;
 
     // The planned statements.
-    // Keep private so that isReadOnly can be maintained by methods of this class.
-    private final List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
+    // Do not add statements directly. Use addStatement so that the readOnly flag
+    // is updated
+    public final List<AdHocPlannedStatement> plannedStatements = new ArrayList<AdHocPlannedStatement>();
 
     // Assume the batch is read-only until we see the first non-select statement.
     private boolean readOnly = true;
@@ -112,8 +115,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      *
      * @return list of SQL aggregator fragment strings
      */
-    public List<String> getAggregatorFragments() {
-        List<String> fragments = new ArrayList<String>(plannedStatements.size());
+    public List<byte[]> getAggregatorFragments() {
+        List<byte[]> fragments = new ArrayList<byte[]>(plannedStatements.size());
         for (AdHocPlannedStatement plannedStatement : plannedStatements) {
             fragments.add(plannedStatement.aggregatorFragment);
         }
@@ -125,8 +128,8 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      *
      * @return list of SQL collector fragment strings
      */
-    public List<String> getCollectorFragments() {
-        List<String> fragments = new ArrayList<String>(plannedStatements.size());
+    public List<byte[]> getCollectorFragments() {
+        List<byte[]> fragments = new ArrayList<byte[]>(plannedStatements.size());
         for (AdHocPlannedStatement plannedStatement : plannedStatements) {
             fragments.add(plannedStatement.collectorFragment);
         }
@@ -159,15 +162,18 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      * @param aggregatorFragment    aggregator fragment
      * @param collectorFragment     collector fragment
      * @param isReplicatedTableDML  replicated table DML flag
+     * @param isNonDeterministic    non-deterministic SQL flag
      * @return                      statement object
      */
-    public void addStatement(String sqlStatement, String aggregatorFragment,
-                             String collectorFragment, boolean isReplicatedTableDML) {
+    public void addStatement(String sqlStatement, byte[] aggregatorFragment,
+                             byte[] collectorFragment, boolean isReplicatedTableDML,
+                             boolean isNonDeterministic, List<ParameterInfo> params) {
         AdHocPlannedStatement plannedStmt = new AdHocPlannedStatement(
                                                         sqlStatement,
                                                         aggregatorFragment,
                                                         collectorFragment,
                                                         isReplicatedTableDML,
+                                                        isNonDeterministic,
                                                         partitionParam,
                                                         catalogVersion);
         // The first non-select statement makes it not read-only.
@@ -180,6 +186,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         plannedStmt.hostname = hostname;
         plannedStmt.adminConnection = adminConnection;
         plannedStmt.clientData = clientData;
+        plannedStmt.params = params;
         plannedStatements.add(plannedStmt);
     }
 
@@ -189,7 +196,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      */
     public boolean isSinglePartitionCompatible() {
         for (AdHocPlannedStatement plannedStmt : plannedStatements) {
-            if (plannedStmt.isReplicatedTableDML || plannedStmt.collectorFragment != null) {
+            if (plannedStmt.collectorFragment != null) {
                 return false;
             }
         }

@@ -49,7 +49,7 @@ public:
     }
 
     static inline NValue getStringValue(const char *value) {
-        return NValue::getStringValue(std::string(value));
+        return NValue::getStringValue(value, value ? strlen(value) : 0);
     }
 
     static inline NValue getStringValue(std::string value) {

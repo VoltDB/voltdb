@@ -66,7 +66,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
      * @return
      */
     public VoltTable[] runAdHoc(SystemProcedureExecutionContext ctx,
-            String[] aggregatorFragments, String[] collectorFragments,
+            byte[][] aggregatorFragments, byte[][] collectorFragments,
             String[] sqlStatements, int[] replicatedTableDMLFlags) {
 
         // Collections must be the same size since they all contain slices of the same data.
@@ -86,7 +86,8 @@ public abstract class AdHocBase extends VoltSystemProcedure {
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(sqlStatements[i],
                                                              aggregatorFragments[i],
                                                              collectorFragments[i],
-                                                             replicatedTableDMLFlags[i] == 1);
+                                                             replicatedTableDMLFlags[i] == 1,
+                                                             null);
             voltQueueSQL(stmt);
         }
 

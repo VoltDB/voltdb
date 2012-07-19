@@ -16,8 +16,9 @@
  */
 package org.voltdb;
 
-import java.util.LinkedList;
+import java.util.Iterator;
 import java.util.TreeSet;
+import java.util.concurrent.CopyOnWriteArrayList;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.ThreadFactory;
@@ -30,13 +31,15 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
 
 public class SnapshotCompletionMonitor {
     @SuppressWarnings("unused")
     private static final VoltLogger LOG = new VoltLogger("LOGGING");
-    final LinkedList<SnapshotCompletionInterest> m_interests = new LinkedList<SnapshotCompletionInterest>();
+    final CopyOnWriteArrayList<SnapshotCompletionInterest> m_interests =
+            new CopyOnWriteArrayList<SnapshotCompletionInterest>();
     private ZooKeeper m_zk;
     private final ExecutorService m_es = new ThreadPoolExecutor(1, 1,
             0L, TimeUnit.MILLISECONDS,
@@ -138,34 +141,26 @@ public class SnapshotCompletionMonitor {
         }
         JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
         long txnId = jsonObj.getLong("txnId");
-        int totalNodes = jsonObj.getInt("hosts");
+        JSONArray hosts = jsonObj.getJSONArray("hosts");
         int totalNodesFinished = jsonObj.getInt("finishedHosts");
         String nonce = jsonObj.getString("nonce");
         boolean truncation = jsonObj.getBoolean("isTruncation");
 
-        if (totalNodes == totalNodesFinished) {
-            for (SnapshotCompletionInterest interest : m_interests) {
+        if (hosts.length() == totalNodesFinished) {
+            Iterator<SnapshotCompletionInterest> iter = m_interests.iterator();
+            while (iter.hasNext()) {
+                SnapshotCompletionInterest interest = iter.next();
                 interest.snapshotCompleted(nonce, txnId, truncation);
             }
         }
     }
 
     public void addInterest(final SnapshotCompletionInterest interest) {
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                m_interests.add(interest);
-            }
-        });
+        m_interests.add(interest);
     }
 
     public void removeInterest(final SnapshotCompletionInterest interest) {
-        m_es.execute(new Runnable() {
-            @Override
-            public void run() {
-                m_interests.remove(interest);
-            }
-        });
+        m_interests.remove(interest);
     }
 
     public void shutdown() throws InterruptedException {

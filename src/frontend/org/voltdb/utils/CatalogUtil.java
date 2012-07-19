@@ -28,6 +28,7 @@ import java.net.MalformedURLException;
 import java.net.URL;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
+import java.security.SecureRandom;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashSet;
@@ -46,7 +47,6 @@ import javax.xml.validation.SchemaFactory;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
-import org.voltdb.VoltTypeException;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.CatalogType;
@@ -87,6 +87,8 @@ import org.voltdb.types.ConstraintType;
 import org.voltdb.types.IndexType;
 import org.xml.sax.SAXException;
 
+import org.mindrot.BCrypt;
+
 /**
  *
  */
@@ -94,23 +96,52 @@ public abstract class CatalogUtil {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
 
-    public static final String CATALOG_FILENAME = "catalog.txt";
+    // The minimum version of catalog that's compatible with this version of Volt
+    public static final int[] minCompatibleVersion = {2, 0};
 
-    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) {
+    public static final String CATALOG_FILENAME = "catalog.txt";
+    public static final String CATALOG_BUILDINFO_FILENAME = "buildinfo.txt";
+
+    /**
+     * Load a catalog from the jar bytes.
+     *
+     * @param catalogBytes
+     * @param log
+     * @return The serialized string of the catalog content.
+     * @throws Exception
+     *             If the catalog cannot be loaded because it's incompatible, or
+     *             if there is no version information in the catalog.
+     */
+    public static String loadCatalogFromJar(byte[] catalogBytes, VoltLogger log) throws IOException {
         assert(catalogBytes != null);
 
         String serializedCatalog = null;
-        try {
-            InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
-            byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
+        String voltVersionString = null;
+        InMemoryJarfile jarfile = new InMemoryJarfile(catalogBytes);
+        byte[] serializedCatalogBytes = jarfile.get(CATALOG_FILENAME);
 
-            if (null == serializedCatalogBytes) throw new VoltTypeException("Database catalog not found - please build your application using the current verison of VoltDB.");
+        if (null == serializedCatalogBytes) {
+            throw new IOException("Database catalog not found - please build your application using the current verison of VoltDB.");
+        }
 
-            serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
-        } catch (IOException e) {
-            if (log != null)
-                log.l7dlog( Level.FATAL, LogKeys.host_VoltDB_CatalogReadFailure.name(), e);
-            return null;
+        serializedCatalog = new String(serializedCatalogBytes, "UTF-8");
+
+        // Get Volt version string
+        byte[] buildInfoBytes = jarfile.get(CATALOG_BUILDINFO_FILENAME);
+        if (buildInfoBytes == null) {
+            throw new IOException("Catalog build information not found - please build your application using the current verison of VoltDB.");
+        }
+        String buildInfo = new String(buildInfoBytes, "UTF-8");
+        String[] buildInfoLines = buildInfo.split("\n");
+        if (buildInfoLines.length != 5) {
+            throw new IOException("Catalog built with an old version of VoltDB - please build your application using the current verison of VoltDB.");
+        }
+        voltVersionString = buildInfoLines[0].trim();
+
+        // Check if it's compatible
+        if (!isCatalogCompatible(voltVersionString)) {
+            throw new IOException("Catalog compiled with " + voltVersionString + " is not compatible with the current version of VoltDB (" +
+                    VoltDB.instance().getVersionString() + ") - " + " please build your application using the current verison of VoltDB.");
         }
 
         return serializedCatalog;
@@ -446,6 +477,41 @@ public abstract class CatalogUtil {
             }
         }
         return false;
+    }
+
+    /**
+     * Check if a catalog compiled with the given version of VoltDB is
+     * compatible with the current version of VoltDB.
+     *
+     * The rule is that the catalog must be compiled with a version of VoltDB
+     * that's within the range [minCompatibleVersion, currentVersion],
+     * inclusive.
+     *
+     * @param catalogVersionStr
+     *            The version string of the VoltDB that compiled the catalog.
+     * @return true if it's compatible, false otherwise.
+     */
+    public static boolean isCatalogCompatible(String catalogVersionStr)
+    {
+        if (catalogVersionStr == null || catalogVersionStr.isEmpty()) {
+            return false;
+        }
+
+        int[] catalogVersion = MiscUtils.parseVersionString(catalogVersionStr);
+        int[] currentVersion = MiscUtils.parseVersionString(VoltDB.instance().getVersionString());
+
+        if (catalogVersion == null) {
+            throw new IllegalArgumentException("Invalid version string " + catalogVersionStr);
+        }
+
+        int maxCmpResult = MiscUtils.compareVersions(catalogVersion, currentVersion);
+        int minCmpResult = MiscUtils.compareVersions(catalogVersion, minCompatibleVersion);
+
+        if (minCmpResult == -1 || maxCmpResult == 1) {
+            return false;
+        }
+
+        return true;
     }
 
     public static long compileDeploymentAndGetCRC(Catalog catalog, String deploymentURL, boolean crashOnFailedValidation) {
@@ -1175,10 +1241,14 @@ public abstract class CatalogUtil {
         // always be named "database", so I've temporarily hardcoded it here until a more robust solution is available.
         Database db = catalog.getClusters().get("cluster").getDatabases().get("database");
 
+        SecureRandom sr = new SecureRandom();
         for (UsersType.User user : users.getUser()) {
             org.voltdb.catalog.User catUser = db.getUsers().add(user.getName());
-            byte passwordHash[] = extractPassword(user.getPassword());
-            catUser.setShadowpassword(Encoder.hexEncode(passwordHash));
+            String hashedPW =
+                    BCrypt.hashpw(
+                            extractPassword(user.getPassword()),
+                            BCrypt.gensalt(BCrypt.GENSALT_DEFAULT_LOG2_ROUNDS,sr));
+            catUser.setShadowpassword(hashedPW);
 
             // process the @groups comma separated list
             if (user.getGroups() != null) {
@@ -1214,8 +1284,11 @@ public abstract class CatalogUtil {
         cluster.setJsonapi(jsonEnabled);
     }
 
-    /** Read a hashed password from password. */
-    private static byte[] extractPassword(String password) {
+    /** Read a hashed password from password.
+     *  SHA-1 hash it once to match what we will get from the wire protocol
+     *  and then hex encode it
+     * */
+    private static String extractPassword(String password) {
         MessageDigest md = null;
         try {
             md = MessageDigest.getInstance("SHA-1");
@@ -1223,8 +1296,8 @@ public abstract class CatalogUtil {
             hostLog.l7dlog(Level.FATAL, LogKeys.compiler_VoltCompiler_NoSuchAlgorithm.name(), e);
             System.exit(-1);
         }
-        final byte passwordHash[] = md.digest(md.digest(password.getBytes()));
-        return passwordHash;
+        final byte passwordHash[] = md.digest(password.getBytes());
+        return Encoder.hexEncode(passwordHash);
     }
 
 }

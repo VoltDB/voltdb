@@ -131,4 +131,37 @@ public class TestTransactionIdManager extends TestCase {
         System.out.printf("%d > %d\n", txnId1, txnId2);
     }
 
+    public void testTimeMovesBackwards() {
+        TransactionIdManager.Clock fakeClock = new TransactionIdManager.Clock() {
+
+            public long currentTime = 2000;
+            public long goBackTime = 10000;
+            public long goBackQuantity = 2000;
+            public boolean haveGoneBack = false;
+
+            @Override
+            public long get() {
+                currentTime++;
+                if (currentTime == goBackTime && !haveGoneBack) {
+                    haveGoneBack = true;
+                    currentTime -= goBackQuantity;
+                }
+                return currentTime;
+            }
+
+            @Override
+            public void sleep(long millis) throws InterruptedException {
+                if (millis < 0) {
+                    throw new IllegalArgumentException();
+                }
+                currentTime += millis;
+            }
+        };
+        tim = new TransactionIdManager(VoltDB.INITIATOR_SITE_ID, 0, fakeClock);
+        long sum = 0;
+        for (int  ii = 0; ii < 60000; ii++) {
+            sum += tim.getNextUniqueTransactionId();
+        }
+    }
+
 }

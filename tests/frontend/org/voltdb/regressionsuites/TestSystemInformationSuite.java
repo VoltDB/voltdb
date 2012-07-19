@@ -113,8 +113,8 @@ public class TestSystemInformationSuite extends RegressionSuite {
 
         // Add groups and users
         GroupInfo[] groups = new GroupInfo[2];
-        groups[0] = new GroupInfo("admins", true, true);
-        groups[1] = new GroupInfo("users", false, false);
+        groups[0] = new GroupInfo("admins", true, true, true);
+        groups[1] = new GroupInfo("users", false, false, true);
         project.addGroups(groups);
         UserInfo[] users = new UserInfo[3];
         users[0] = new UserInfo("joeadmin", "adminpass",

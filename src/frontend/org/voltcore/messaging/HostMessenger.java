@@ -724,7 +724,7 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
             public void send(long[] hsIds, VoltMessage message) {}
             @Override
             public void deliver(VoltMessage message) {
-                hostLog.warn("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
+                hostLog.info("No-op mailbox(" + CoreUtils.hsIdToString(hsId) + ") dropped message " + message);
             }
             @Override
             public void deliverFront(VoltMessage message) {}
@@ -758,6 +758,13 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         SiteMailbox sm = new SiteMailbox( this, hsId);
         m_siteMailboxes.put(hsId, sm);
         return sm;
+    }
+
+    /**
+     * Discard a mailbox
+     */
+    public void removeMailbox(long hsId) {
+        m_siteMailboxes.remove(hsId);
     }
 
     public void send(final long destinationHSId, final VoltMessage message)

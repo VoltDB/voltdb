@@ -49,7 +49,7 @@ import org.voltdb.messaging.FastSerializer.BufferGrowCallback;
 public class ExecutionEngineJNI extends ExecutionEngine {
 
     /** java.util.logging logger. */
-    private static final VoltLogger LOG = new VoltLogger(ExecutionEngine.class.getName());
+    private static final VoltLogger LOG = new VoltLogger("HOST");
 
     /** The HStoreEngine pointer. */
     private long pointer;
@@ -206,99 +206,29 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         checkErrorCode(errorCode);
     }
 
-    /**
-     * @param undoToken Token identifying undo quantum for generated undo info
-     */
     @Override
-    public VoltTable executePlanFragment(final long planFragmentId,
-                                              final int inputDepId,
-                                              final ParameterSet parameterSet,
-                                              final long txnId,
-                                              final long lastCommittedTxnId,
-                                              final long undoToken)
-      throws EEException
+    public long loadPlanFragment(byte[] plan) throws EEException
     {
-        if (LOG.isTraceEnabled()) {
-            LOG.trace("Executing planfragment:" + planFragmentId + ", params=" + parameterSet.toString());
-        }
-
-        // serialize the param set
-        // This should have been serialized sanely by VoltProcedure.slowPath()
-        // or failed and rolled back at that point.  This parameter set serialization
-        // had better not fail.
-        fsForParameterSet.clear();
-        try {
-            parameterSet.writeExternal(fsForParameterSet);
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception); // can't happen
-        }
-        // checkMaxFsSize();
-        // Execute the plan, passing a raw pointer to the byte buffer.
         deserializer.clear();
-        final int errorCode = nativeExecutePlanFragment(pointer, planFragmentId, 0, inputDepId,
-                                                        txnId, lastCommittedTxnId, undoToken);
-        try {
-            checkErrorCode(errorCode);
-            FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
-            try {
-                // read the complete size of the buffer used (ignored here)
-                fds.readInt();
-                // check if anything was changed
-                final boolean dirty = fds.readBoolean();
-                if (dirty)
-                    m_dirty = true;
-                // read the number of tables returned by this fragment
-                final int numDependencies = fds.readInt();
-                final VoltTable dependencies[] = new VoltTable[numDependencies];
-                final int depIds[] = new int[numDependencies];
-                for (int i = 0; i < numDependencies; ++i) {
-                    depIds[i] = fds.readInt();
-                    dependencies[i] = fds.readObject(VoltTable.class);
-                }
-                assert(depIds.length == 1);
-                return dependencies[0];
-            } catch (final IOException ex) {
-                LOG.error("Failed to deserialze result dependencies" + ex);
-                throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
-            }
-        } finally {
-            fallbackBuffer = null;
-        }
 
-    }
-
-    @Override
-    public VoltTable executeCustomPlanFragment(final String plan,
-            final int inputDepId, final long txnId, final long lastCommittedTxnId,
-            final long undoQuantumToken) throws EEException
-    {
-        fsForParameterSet.clear();
-        deserializer.clear();
         //C++ JSON deserializer is not thread safe, must synchronize
         int errorCode = 0;
         synchronized (ExecutionEngineJNI.class) {
-            errorCode = nativeExecuteCustomPlanFragment(pointer, getStringBytes(plan), 0, inputDepId,
-                                                        txnId, lastCommittedTxnId, undoQuantumToken);
+            errorCode = nativeLoadPlanFragment(pointer, plan);
         }
         try {
             checkErrorCode(errorCode);
             FastDeserializer fds = fallbackBuffer == null ? deserializer : new FastDeserializer(fallbackBuffer);
             try {
-                fds.readInt(); // total size of the data
-                // check if anything was changed
-                final boolean dirty = fds.readBoolean();
-                if (dirty)
-                    m_dirty = true;
-                final int numDependencies = fds.readInt();
-                assert(numDependencies == 1);
-                final VoltTable dependencies[] = new VoltTable[numDependencies];
-                for (int i = 0; i < numDependencies; ++i) {
-                    /*int depId =*/ fds.readInt();
-                    dependencies[i] = fds.readObject(VoltTable.class);
+                final long fragId = fds.readLong();
+                final boolean wasHit = fds.readBoolean();
+                final long cacheSize = fds.readLong();
+                if (fragId == 0) {
+                    throw new EEException(ERRORCODE_ERROR);
                 }
-                return dependencies[0];
+                return fragId;
             } catch (final IOException ex) {
-                LOG.error("Failed to deserialze result dependencies" + ex);
+                LOG.error("Failed to deserialze loadPlanFragment results" + ex);
                 throw new EEException(ERRORCODE_WRONG_SERIALIZED_BYTES);
             }
         } finally {
@@ -318,12 +248,15 @@ public class ExecutionEngineJNI extends ExecutionEngine {
      * @param undoToken Token identifying undo quantum for generated undo info
      */
     @Override
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
-            final long[] planFragmentIds,
+    public VoltTable[] executePlanFragments(
             final int numFragmentIds,
+            final long[] planFragmentIds,
+            final long[] inputDepIds,
             final ParameterSet[] parameterSets,
-            final int numParameterSets,
-            final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException {
+            final long txnId, final long lastCommittedTxnId, final long undoToken) throws EEException
+    {
+        // plan frag zero is invalid
+        assert((numFragmentIds == 0) || (planFragmentIds[0] != 0));
 
         if (numFragmentIds == 0) return new VoltTable[0];
         final int batchSize = numFragmentIds;
@@ -351,10 +284,11 @@ public class ExecutionEngineJNI extends ExecutionEngine {
         // Execute the plan, passing a raw pointer to the byte buffers for input and output
         deserializer.clear();
         final int errorCode =
-            nativeExecuteQueryPlanFragmentsAndGetResults(
+            nativeExecutePlanFragments(
                     pointer,
-                    planFragmentIds,
                     numFragmentIds,
+                    planFragmentIds,
+                    inputDepIds,
                     txnId,
                     lastCommittedTxnId,
                     undoToken);
