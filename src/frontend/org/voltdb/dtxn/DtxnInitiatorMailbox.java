@@ -275,6 +275,10 @@ public class DtxnInitiatorMailbox implements Mailbox
                                                        toSend.getStatus() != ClientResponse.SUCCESS,
                                                        false);
                 send(state.otherSiteIds, ft);
+
+                for (long hsId : state.coordinatorReplicas) {
+                    send(hsId, ft);
+                }
             }
         }, 0, -1, TimeUnit.SECONDS);
     }
