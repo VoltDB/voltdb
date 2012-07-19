@@ -70,6 +70,15 @@ public class MpScheduler extends Scheduler
     @Override
     public void updateReplicas(final List<Long> replicas)
     {
+        // Handle startup and promotion semi-gracefully
+        if (!m_isLeader) {
+            m_iv2Masters.clear();
+            m_iv2Masters.addAll(replicas);
+            return;
+        }
+
+        final List<Long> replicaCopy = new ArrayList<Long>(replicas);
+
         SiteTasker repairTask = new SiteTasker() {
             @Override
             public void run(SiteProcedureConnection connection) {
@@ -90,7 +99,7 @@ public class MpScheduler extends Scheduler
                         // InitiatorMailbox.updateReplicas() here, grab the lock manually
                         synchronized (initiatorMailbox) {
                             m_iv2Masters.clear();
-                            m_iv2Masters.addAll(replicas);
+                            m_iv2Masters.addAll(replicaCopy);
                         }
                     }
                     else {
