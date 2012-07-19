@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.types.PlanNodeType;
 
@@ -50,6 +51,12 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.MULTI_PARTITION.name()).value(m_multiPartition);
+    }
+    
+    // TODO:Members not loaded
+    @Override
+    public void loadFromJSONObject( JSONObject jobj ) {
+    	super.loadFromJSONObject(jobj);
     }
 
     @Override

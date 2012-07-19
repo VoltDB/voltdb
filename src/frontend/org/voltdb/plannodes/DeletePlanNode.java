@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.types.PlanNodeType;
 
@@ -52,7 +53,13 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
         stringer.key(Members.TRUNCATE.name()).value(m_truncate);
     }
 
-    @Override
+    // TODO:Members not loaded
+	@Override
+	public void loadFromJSONObject( JSONObject jobj ) {
+		super.loadFromJSONObject(jobj);
+	}
+
+	@Override
     protected String explainPlanForNode(String indent) {
         return "DELETE";
     }

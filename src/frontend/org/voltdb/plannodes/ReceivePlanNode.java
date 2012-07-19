@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
@@ -58,6 +59,11 @@ public class ReceivePlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
+    }
+    
+    @Override
+    public void loadFromJSONObject( JSONObject jobj ) {
+    	super.loadFromJSONObject(jobj);
     }
 
     @Override

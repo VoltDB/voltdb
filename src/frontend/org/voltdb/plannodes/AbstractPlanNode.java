@@ -700,7 +700,6 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 				}
 			}
 		} catch (JSONException e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
     }

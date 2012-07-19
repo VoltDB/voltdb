@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
@@ -250,7 +251,13 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
-    @Override
+    // TODO:Members not loaded
+	@Override
+	public void loadFromJSONObject( JSONObject jobj ) {
+		super.loadFromJSONObject(jobj);
+	}
+
+	@Override
     protected String explainPlanForNode(String indent) {
         StringBuilder sb = new StringBuilder();
         sb.append("AGGREGATION ops: ");

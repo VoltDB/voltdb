@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -190,6 +191,12 @@ public class OrderByPlanNode extends AbstractPlanNode {
             stringer.endObject();
         }
         stringer.endArray();
+    }
+    
+    // TODO:Members not loaded
+    @Override
+    public void loadFromJSONObject( JSONObject jobj ) {
+    	super.loadFromJSONObject(jobj);
     }
 
     @Override

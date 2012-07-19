@@ -17,6 +17,7 @@
 
 package org.voltdb.plannodes;
 
+import org.json_voltpatches.JSONObject;
 import org.voltdb.types.PlanNodeType;
 
 public class NestLoopPlanNode extends AbstractJoinPlanNode {
@@ -28,6 +29,12 @@ public class NestLoopPlanNode extends AbstractJoinPlanNode {
     @Override
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.NESTLOOP;
+    }
+    
+    // TODO:Members not loaded
+    @Override
+    public void loadFromJSONObject( JSONObject jobj ) {
+    	super.loadFromJSONObject(jobj);
     }
 
     @Override

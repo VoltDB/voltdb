@@ -21,9 +21,11 @@ import java.util.List;
 import java.util.TreeMap;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.*;
+import org.voltdb.plannodes.AbstractScanPlanNode.Members;
 import org.voltdb.types.*;
 
 public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
@@ -192,5 +194,11 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.JOIN_TYPE.name()).value(m_joinType.toString());
         stringer.key(Members.PREDICATE.name()).value(m_predicate);
+    }
+    
+ // TODO:Members not loaded
+    @Override
+    public void loadFromJSONObject( JSONObject jobj ) {
+    	super.loadFromJSONObject(jobj);
     }
 }

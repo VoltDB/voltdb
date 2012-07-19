@@ -23,30 +23,21 @@
 
 package org.voltdb.planner;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
 import java.util.ArrayList;
-import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
 import junit.framework.TestCase;
 
-import org.apache.commons.lang3.tuple.Pair;
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.utils.plannerTester;
 public class testPlannerTester extends TestCase {
     private PlannerTestAideDeCamp aide;
 
@@ -91,34 +82,32 @@ public class testPlannerTester extends TestCase {
         aide.tearDown();
     }
     
-//    public void testGetLeafLists() {
-//    	AbstractPlanNode pn = null;
-//        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-//        assertTrue(pn != null);
-//        
-//        ArrayList<AbstractPlanNode> collected = pn.getLeafLists();
-//        System.out.println( collected);
-//        System.out.println( collected.size() );
-//        for( AbstractPlanNode n : collected )
-//           System.out.println( n.toExplainPlanString() );
-//        //assertTrue( collected.size() == 1 );
-//        JSONObject j;
-//		try {
-//			j = new JSONObject( collected.get(0).toJSONString() );
-//			System.out.println(j.getString("PLAN_NODE_TYPE"));
-//		} catch (JSONException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//	
-//        //assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("LIMIT") = 1 );
-//    }
+    public void testGetLeafLists() {
+    	AbstractPlanNode pn = null;
+        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+        assertTrue(pn != null);
+        
+        ArrayList<AbstractPlanNode> collected = pn.getScanNodeList();
+        System.out.println( collected );
+        System.out.println( collected.size() );
+        for( AbstractPlanNode n : collected )
+           System.out.println( n.toExplainPlanString() );
+        assertTrue( collected.size() == 1 );
+        JSONObject j;
+		try {
+			j = new JSONObject( collected.get(0).toJSONString() );
+			System.out.println(j.getString("PLAN_NODE_TYPE"));
+			assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("INDEXSCAN")  );
+		} catch (JSONException e) {
+			e.printStackTrace();
+		}
+    }
+    
     public void testBatchCompileSave() {
     	try {
     		plannerTester.setUp("/home/zhengli/test1");
 			plannerTester.batchCompileSave();
 		} catch (Exception e) {
-			// TODO Auto-generated catch block
 			e.printStackTrace();
 		}
     }
@@ -136,7 +125,6 @@ public class testPlannerTester extends TestCase {
 					AbstractPlanNode pn = plannerTester.combinePlanNodes( pnList );
 					System.out.println( pn.toExplainPlanString() );
 				} catch (Exception e) {
-					// TODO Auto-generated catch block
 					e.printStackTrace();
 				}
     }
@@ -158,7 +146,7 @@ public class testPlannerTester extends TestCase {
     	System.out.println( pn.toExplainPlanString() );
     	plannerTester.writePlanToFile( pn, path, "prettyJson.txt");
     	
-    	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path);
+    	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt");
     	System.out.println( pnt.toJSONString() );
     	//System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
     	ArrayList<AbstractPlanNode> list1 = pn.getLists();
@@ -239,6 +227,7 @@ public class testPlannerTester extends TestCase {
 //			e.printStackTrace();
 //		}
 //    }
+    
     public void testGetLists() {
     	AbstractPlanNode pn1 = null;
         pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
@@ -326,8 +315,9 @@ public class testPlannerTester extends TestCase {
     
     public void testBatchDiff() {
     	int size = 7;
-    	String pathBaseline = "/tmp/volttest/baseline1/testplans-plannerTester-ddl.plan";
-    	String pathNew = "/tmp/volttest/new1/testplans-plannerTester-ddl.plan";
+    	String pathBaseline = "/tmp/volttest/test1Baseline/";
+    	String pathNew = "/tmp/volttest/test1New/";
+    	plannerTester.setTestName( "Test1" );
     	plannerTester.batchDiff(pathBaseline, pathNew, size);
     }
     
