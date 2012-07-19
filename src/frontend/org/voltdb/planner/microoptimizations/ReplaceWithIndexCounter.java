@@ -84,6 +84,8 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if ((child instanceof IndexScanPlanNode) == false)
             return plan;
 
+        if ((((IndexScanPlanNode)child)).getPredicate() == null)
+            return plan;
         // check index type
         Index idx = ((IndexScanPlanNode)child).getCatalogIndex();
         if (idx.getCountable() == false)

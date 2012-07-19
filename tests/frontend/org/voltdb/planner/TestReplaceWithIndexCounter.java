@@ -81,6 +81,11 @@ public class TestReplaceWithIndexCounter extends TestCase {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, true);
         checkIndexCounter(pn, true, false);
     }
+
+    public void testCountStar00() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 ORDER BY POINTS", 0, true);
+        checkIndexCounter(pn, true, false);
+    }
     // TODO(xin): Replace it with IndexCount node later
     public void testCountStar1() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS = ?", 0, true);
