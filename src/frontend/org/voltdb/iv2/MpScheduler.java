@@ -25,10 +25,16 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.logging.VoltLogger;
+
 import org.voltcore.messaging.VoltMessage;
+
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.Pair;
 
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
@@ -40,6 +46,8 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpScheduler extends Scheduler
 {
+    VoltLogger tmLog = new VoltLogger("TM");
+
     private final Map<Long, TransactionState> m_outstandingTxns =
         new HashMap<Long, TransactionState>();
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
@@ -60,10 +68,52 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
-    public void updateReplicas(List<Long> replicas)
+    public void updateReplicas(final List<Long> replicas)
     {
-        m_iv2Masters.clear();
-        m_iv2Masters.addAll(replicas);
+        SiteTasker repairTask = new SiteTasker() {
+            @Override
+            public void run(SiteProcedureConnection connection) {
+                try {
+                    String whoami = "MP leader repair " +
+                        CoreUtils.hsIdToString(m_mailbox.getHSId()) + " ";
+                    InitiatorMailbox initiatorMailbox =
+                        (InitiatorMailbox)m_mailbox;
+                    RepairAlgo algo = new MpPromoteAlgo(replicas,
+                            initiatorMailbox, whoami);
+                    initiatorMailbox.setRepairAlgo(algo);
+                    Pair<Boolean, Long> result = algo.start().get();
+                    boolean success = result.getFirst();
+                    if (success) {
+                        tmLog.info(whoami + "finished repair.");
+                        // We need to update the replicas with the InitiatorMailbox's
+                        // deliver() lock held.  Since we're not calling
+                        // InitiatorMailbox.updateReplicas() here, grab the lock manually
+                        synchronized (initiatorMailbox) {
+                            m_iv2Masters.clear();
+                            m_iv2Masters.addAll(replicas);
+                        }
+                    }
+                    else {
+                        tmLog.info(whoami + "interrupted during repair.  Retrying.");
+                    }
+                }
+                catch (Exception e) {
+                    VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
+                }
+            }
+
+            @Override
+            public void runForRejoin(SiteProcedureConnection siteConnection)
+            {
+                throw new RuntimeException("Rejoin while repairing the MPI should be impossible.");
+            }
+
+            @Override
+            public int priority() {
+                return 0;
+            }
+        };
+        m_pendingTasks.repair(repairTask);
     }
 
     @Override
@@ -159,6 +209,7 @@ public class MpScheduler extends Scheduler
             if (result == DuplicateCounter.DONE) {
                 m_duplicateCounters.remove(message.getTxnId());
                 m_repairLogTruncationHandle = message.getTxnId();
+                m_outstandingTxns.remove(message.getTxnId());
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
@@ -170,6 +221,7 @@ public class MpScheduler extends Scheduler
 
         // the initiatorHSId is the ClientInterface mailbox. Yeah. I know.
         m_repairLogTruncationHandle = message.getTxnId();
+        m_outstandingTxns.remove(message.getTxnId());
         m_mailbox.send(message.getInitiatorHSId(), message);
     }
 

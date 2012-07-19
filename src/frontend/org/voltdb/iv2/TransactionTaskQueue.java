@@ -23,6 +23,9 @@ import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 
+import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskMessage;
+
 public class TransactionTaskQueue
 {
     protected static final VoltLogger hostLog = new VoltLogger("HOST");
@@ -71,6 +74,25 @@ public class TransactionTaskQueue
             taskQueueOffer(task);
         }
         return retval;
+    }
+
+    // repair is used by MPI repair to inject a repair task into the
+    // SiteTaskerQueue.  Before it does this, it unblocks the MP transaction
+    // that may be running in the Site thread and causes it to rollback by
+    // faking an unsuccessful FragmentResponseMessage.
+    synchronized void repair(SiteTasker task)
+    {
+        m_taskQueue.offer(task);
+        if (!m_backlog.isEmpty()) {
+            // get head
+            MpTransactionState txn = (MpTransactionState)m_backlog.getFirst().getTransactionState();
+            // inject poison pill
+            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, false, false);
+            FragmentResponseMessage poison =
+                new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
+            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, null);
+            txn.offerReceivedFragmentResponse(poison);
+        }
     }
 
     // Add a local method to offer to the SiteTaskerQueue so we have
