@@ -569,6 +569,7 @@ public class DDLCompiler {
         if (indexNameNoCase.contains("tree"))
         {
             index.setType(IndexType.BALANCED_TREE.getValue());
+            index.setCountable(true);
         }
         else if (indexNameNoCase.contains("hash"))
         {
@@ -582,14 +583,14 @@ public class DDLCompiler {
                              " uses a non-hashable column" + nonint_col_name;
                 throw m_compiler.new VoltCompilerException(msg);
             }
-        }
-        else if (indexNameNoCase.contains("counter")) {
+        } else {
             index.setType(IndexType.BALANCED_TREE.getValue());
             index.setCountable(true);
         }
-        else
-        {
+
+        if (indexNameNoCase.contains("NoCounter")) {
             index.setType(IndexType.BALANCED_TREE.getValue());
+            index.setCountable(false);
         }
 
         // need to set other index data here (column, etc)

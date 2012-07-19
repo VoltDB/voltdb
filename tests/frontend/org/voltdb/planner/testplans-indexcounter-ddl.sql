@@ -4,7 +4,7 @@ CREATE TABLE T1 (
 	AGE TINYINT NOT NULL,
 	PRIMARY KEY (ID)
 );
-create index idx_1_COUNTER on T1 (POINTS);
+create index idx_1_tree on T1 (POINTS);
 
 CREATE TABLE T2 (
 	ID INTEGER NOT NULL,
@@ -13,4 +13,4 @@ CREATE TABLE T2 (
 	AGE TINYINT NOT NULL,
 	PRIMARY KEY (ID)
 );
-create unique index idx_2_COUNTER on T2 (USERNAME,POINTS);
+create unique index idx_2_tree on T2 (USERNAME,POINTS);
