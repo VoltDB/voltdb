@@ -175,33 +175,5 @@ public class TestReplaceWithIndexCounter extends TestCase {
         else
             assertTrue((p instanceof IndexCountPlanNode) == false);
 
-//        if (pushDownTypes != null) {
-//            for (ExpressionType type : pushDownTypes) {
-//                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-//                                                     type.toString() + "\""));
-//            }
-//        } else {
-//            for (ExpressionType type : aggTypes) {
-//                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-//                                                     type.toString() + "\""));
-//            }
-//        }
-//
-//        if (isMultiPart) {
-//            assertTrue(pn.size() == 2);
-//            p = pn.get(1).getChild(0);
-//        } else {
-//            p = p.getChild(0);
-//        }
-//
-//        if (pushDownTypes != null) {
-//            assertTrue(p instanceof HashAggregatePlanNode);
-//            for (ExpressionType type : aggTypes) {
-//                assertTrue(p.toJSONString().contains("\"AGGREGATE_TYPE\":\"" +
-//                                                     type.toString() + "\""));
-//            }
-//        } else {
-//            assertTrue(p instanceof AbstractScanPlanNode);
-//        }
     }
 }

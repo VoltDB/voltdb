@@ -305,8 +305,7 @@ protected:
         TableIndex(scheme),
         m_entries(true, KeyComparator(m_keySchema)),
         m_begin(true),
-        m_eq(m_keySchema),
-        m_cmp(m_keySchema)
+        m_eq(m_keySchema)
     {
         m_match = TableTuple(m_tupleSchema);
     }
@@ -334,7 +333,6 @@ protected:
 
     // comparison stuff
     KeyEqualityChecker m_eq;
-    KeyComparator m_cmp;
 };
 
 }
