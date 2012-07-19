@@ -106,6 +106,7 @@ public class MpScheduler extends Scheduler
                         tmLog.info(whoami + "interrupted during repair.  Retrying.");
                     }
                 }
+                catch (InterruptedException ie) {}
                 catch (Exception e) {
                     VoltDB.crashLocalVoltDB("Terminally failed MPI repair.", true, e);
                 }
