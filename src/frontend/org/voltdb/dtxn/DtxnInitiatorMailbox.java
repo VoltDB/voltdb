@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
 import java.util.Set;
+import java.util.concurrent.TimeUnit;
 
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HeartbeatResponseMessage;
@@ -33,11 +34,13 @@ import org.voltcore.messaging.HostMessenger;
 
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.VoltDB;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
+import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltcore.network.Connection;
 import org.voltdb.utils.ResponseSampler;
@@ -245,7 +248,34 @@ public class DtxnInitiatorMailbox implements Mailbox
                 ResponseSampler.offerResponse(this.getHSId(), state.txnId, state.invocation, toSend);
             // queue the response to be sent to the client
             enqueueResponse(toSend, state);
+
+            sendCommitNotice(toSend, state);
         }
+    }
+
+    /**
+     * Send commit notice to all known participants again in case the
+     * coordinator didn't see some of the sites because of rejoin. Those sites
+     * will be blocked waiting for work. Sending this commit notice will
+     * release those sites.
+     *
+     * @param toSend
+     * @param state
+     */
+    private void sendCommitNotice(final ClientResponseImpl toSend, final InFlightTxnState state) {
+        VoltDB.instance().scheduleWork(new Runnable() {
+            @Override
+            public void run() {
+                CompleteTransactionMessage ft =
+                        new CompleteTransactionMessage(getHSId(),
+                                                       state.firstCoordinatorId,
+                                                       state.txnId,
+                                                       state.isReadOnly,
+                                                       toSend.getStatus() != ClientResponse.SUCCESS,
+                                                       !state.isReadOnly);
+                send(state.otherSiteIds, ft);
+            }
+        }, 0, -1, TimeUnit.SECONDS);
     }
 
     private void demuxCoalescedHeartbeatMessage(
