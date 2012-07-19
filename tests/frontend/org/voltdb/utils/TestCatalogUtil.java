@@ -422,21 +422,10 @@ public class TestCatalogUtil extends TestCase {
         String longerVersion = currentVersion + ".2";
         assertFalse(CatalogUtil.isCatalogCompatible(longerVersion));
 
-        /*
-         * only test shorter version string if the min compatible version does
-         * not equal to the current version
-         */
-        int[] currentVersionInts = MiscUtils.parseVersionString(currentVersion);
-        if (MiscUtils.compareVersions(CatalogUtil.minCompatibleVersion, currentVersionInts) == -1) {
-            // shorter version string
-            String[] split = currentVersion.split("\\.");
-            String[] shorter = new String[split.length - 1];
-            for (int i = 0; i < shorter.length; i++) {
-                shorter[i] = split[i];
-            }
-            String shortVersion = Joiner.on('.').join(shorter);
-            assertTrue(CatalogUtil.isCatalogCompatible(shortVersion));
-        }
+        // shorter version string
+        int[] longVersion = MiscUtils.parseVersionString("2.3.1");
+        int[] shortVersion = MiscUtils.parseVersionString("2.3");
+        assertEquals(-1, MiscUtils.compareVersions(shortVersion, longVersion));
 
         // current version should work
         assertTrue(CatalogUtil.isCatalogCompatible(VoltDB.instance().getVersionString()));

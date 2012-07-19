@@ -29,6 +29,7 @@ import java.io.IOException;
 import java.io.UnsupportedEncodingException;
 import java.net.URL;
 import java.net.URLDecoder;
+import java.net.URLEncoder;
 import java.util.Random;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -645,7 +646,7 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
             out.write("PRIMARY KEY (C_FIRST));\n");
         }
         out.close();
-        return temp.getAbsolutePath();
+        return URLEncoder.encode(temp.getAbsolutePath(), "UTF-8");
     }
 
     /**
@@ -802,11 +803,11 @@ public class TestCatalogUpdateSuite extends RegressionSuite {
         config = new LocalCluster("catalogupdate-cluster-huge.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         project = new TPCCProjectBuilder();
         long t = System.currentTimeMillis();
-        String hugeSchemaPath = generateRandomDDL("catalogupdate-cluster-huge",
+        String hugeSchemaURL = generateRandomDDL("catalogupdate-cluster-huge",
                                                   HUGE_TABLES, HUGE_COLUMNS, HUGE_NAME_SIZE);
         project.addDefaultSchema();
         project.addDefaultPartitioning();
-        project.addSchema(hugeSchemaPath);
+        project.addSchema(hugeSchemaURL);
         project.addProcedures(BASEPROCS);
         compile = config.compile(project);
         assertTrue(compile);
