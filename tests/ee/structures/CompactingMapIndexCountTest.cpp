@@ -147,6 +147,24 @@ public:
     }
 };
 
+TEST_F(CompactingMapTest, SimpleUniqueRank) {
+    // Start the counting index feature
+    voltdb::CompactingMap<int, int, IntComparator, true> volt(true, IntComparator());
+    ASSERT_TRUE(volt.verify());
+
+    voltdb::CompactingMap<int, int, IntComparator, true>::iterator volti;
+    bool sucess;
+    int64_t rankasc;
+
+    sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(2, 2)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(!sucess);
+    rankasc = volt.rankAsc(1); ASSERT_TRUE(rankasc == 1);
+
+    ASSERT_TRUE(volt.verify());
+    ASSERT_TRUE(volt.verifyRank());
+}
+
 TEST_F(CompactingMapTest, RandomUniqueRank) {
     const int ITERATIONS = 1001;
     const int BIGGEST_VAL = 100;
@@ -182,12 +200,14 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 ASSERT_TRUE(sucess);
 
                 stli = stl.find(val);
-                int ct = 1;
+                int64_t ct = 1;
                 std::map<int,int>::const_iterator it;
                 for (it = stl.begin(); it != stli; it++) {
                         ct++;
                 }
-                int rankasc= volt.rankAsc(val);
+                int64_t rankasc = volt.rankAsc(val);
+                if (rankasc != ct)
+                    printf("false: unique_rankAsc expected %lld, but got %lld\n", ct, rankasc);
                 ASSERT_TRUE(rankasc == ct);
                 volti = volt.findRank(rankasc);
                 ASSERT_TRUE(volti.key() == val);
@@ -201,12 +221,14 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 bool sucess = volt.insert(std::pair<int,int>(val, val));
                 ASSERT_TRUE(!sucess);
 
-                int ct = 1;
+                int64_t ct = 1;
                 std::map<int,int>::const_iterator it;
                 for (it = stl.begin(); it != stli; it++) {
                         ct++;
                 }
-                int rankasc= volt.rankAsc(val);
+                int64_t rankasc= volt.rankAsc(val);
+                if (rankasc != ct)
+                    printf("false: DEPULICATE... unique_rankAsc expected %lld, but got %lld\n", ct, rankasc);
                 ASSERT_TRUE(rankasc == ct);
                 volti = volt.findRank(rankasc);
                 ASSERT_TRUE(volti.key() == val);
