@@ -19,13 +19,19 @@
 #define NodeCount int32_t
 #endif
 
+
 #ifndef COMPACTINGMAP_H_
 #define COMPACTINGMAP_H_
 
 #include <cstdlib>
 #include <utility>
+#include <limits>
 #include <cassert>
 #include "ContiguousAllocator.h"
+
+#ifndef SUBCTMAX
+#define SUBCTMAX INT_MAX
+#endif
 
 namespace voltdb {
 
@@ -137,8 +143,10 @@ public:
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
-    int64_t subct();
-    void updatect();
+    inline int64_t subct(TreeNode* x);
+    inline void incSubct(TreeNode* x);
+    inline void decSubct(TreeNode* x);
+    inline void updateSubct(TreeNode* x);
     // TODO(xin): later rename it to ranklower
     int64_t rankAsc(const Key& key);
     int64_t rankUpper(const Key& key);
@@ -690,14 +698,28 @@ bool CompactingMap<Key, Data, Compare, hasRank>::isReachableNode(const TreeNode*
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-int64_t CompactingMap<Key, Data, Compare, hasRank>::subct() {
-    // TODO(xin): add
-    return -1;
+inline int64_t CompactingMap<Key, Data, Compare, hasRank>::subct(TreeNode* x) {
+    if (x == &NIL) return 0;
+
+    if (x->subct < SUBCTMAX)
+        return x->subct;
+    else {
+        return subct(x->left) + subct(x->right);
+    }
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-void CompactingMap<Key, Data, Compare, hasRank>::updatect() {
-    // TODO(xin):
+inline void CompactingMap<Key, Data, Compare, hasRank>::incSubct(TreeNode* x) {
+    if (x->subct != SUBCTMAX)
+        x->subct++;
+}
+template<typename Key, typename Data, typename Compare, bool hasRank>
+inline void CompactingMap<Key, Data, Compare, hasRank>::decSubct(TreeNode* x) {
+
+}
+template<typename Key, typename Data, typename Compare, bool hasRank>
+inline void CompactingMap<Key, Data, Compare, hasRank>::updateSubct(TreeNode* x) {
+
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
