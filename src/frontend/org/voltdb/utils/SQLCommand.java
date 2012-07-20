@@ -68,17 +68,13 @@ public class SQLCommand
     
     // Test only
     public static String parseSQLFile(String filepath) {
-    	return readScriptFile(filepath);
+        return readScriptFile(filepath);
     }
-    // Test only
-    public static void testExecuteQuery (String qry) {
-    	try {
-			executeQuery(qry);
-		} catch (Exception e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
+
+    public static Pattern getExecuteCall() {
+        return ExecuteCall;
     }
+
     public static List<String> parseQuery(String query)
     {
         if (query == null)
