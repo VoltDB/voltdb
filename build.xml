@@ -1191,7 +1191,7 @@ TEST CASES
 <!--                <exclude name="**/TestHSQLBackend.class" /> -->
 <!--                <exclude name="**/TestAdHocQueries.class" /> -->
                 <exclude name="**/TestJSONInterface.class" />
-                <exclude name="**/TestRejoinEndToEnd.class" />
+<!--                <exclude name="**/TestRejoinEndToEnd.class" /> -->
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
                 <exclude name="**/TestReplicatedInvocation.class" />
