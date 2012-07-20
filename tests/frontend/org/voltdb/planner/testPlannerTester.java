@@ -23,6 +23,7 @@
 
 package org.voltdb.planner;
 
+import java.io.FileNotFoundException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -114,11 +115,14 @@ public class testPlannerTester extends TestCase {
     
     public void testCompile() {
 				try {
-					plannerTester.setUp("/home/zhengli/workspace/voltdb/examples/voter/ddl.sql",
-							"ddl", "votes", "phone_number");
-					//List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
-					List<AbstractPlanNode> pnList = plannerTester.compile("INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);", 4, false);
+//					plannerTester.setUp("/home/zhengli/workspace/voltdb/examples/voter/ddl.sql",
+//							"ddl", "l", "phone_number");
+					//List<AbstractPlanNode> pnList = plannerTester.compile("INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);", 4, false);
 					//assertTrue( pnList.size() == 2 );
+					
+					plannerTester.setUp("/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+							"testplans-plannerTester-ddl", "L", "a");
+					List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
 					System.out.println( pnList.size() );
 					System.out.println( pnList.get(0).toExplainPlanString() );
 					
@@ -148,6 +152,30 @@ public class testPlannerTester extends TestCase {
     	
     	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt");
     	System.out.println( pnt.toJSONString() );
+//        System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
+    	ArrayList<AbstractPlanNode> list1 = pn.getLists();
+    	ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getLists();
+    	assertTrue( list1.size() == list2.size() );
+    	for( int i = 0; i < list1.size(); i++ ) {
+    		Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
+    		Map<PlanNodeType, AbstractPlanNode> inlineNodes2 = list2.get(i).getInlinePlanNodes();
+    		if(  inlineNodes1 != null )
+    			assertTrue( inlineNodes1.size() == inlineNodes2.size() );
+    	}
+    }
+    
+    public void testLoadJoinType() throws FileNotFoundException {
+    	AbstractPlanNode pn = null;
+    	pn = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
+    	
+    	String path = "/home/zhengli/";
+    	System.out.println( pn.toExplainPlanString() );
+    	System.out.println( pn.toJSONString() );
+    	plannerTester.writePlanToFile( pn, path, "prettyJson.txt");
+    	
+    	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt");
+    	System.out.println( pnt.toJSONString() );
+    	System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
     	//System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
     	ArrayList<AbstractPlanNode> list1 = pn.getLists();
     	ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getLists();
@@ -187,7 +215,7 @@ public class testPlannerTester extends TestCase {
 //			//ArrayList<Integer> intlist =  
 //			System.out.println( jobj.toString() );
 //		} catch (JSONException e1) {
-//			// TODO Auto-generated catch block
+//			// 
 //			e1.printStackTrace();
 //		}
 //        //write plan to file
@@ -197,7 +225,7 @@ public class testPlannerTester extends TestCase {
 ////			writer.flush();
 ////			writer.close();
 ////		} catch (IOException e) {
-////			// TODO Auto-generated catch block
+////			// 
 ////			e.printStackTrace();
 ////		} 
 //        prettyJson = "";
@@ -211,7 +239,7 @@ public class testPlannerTester extends TestCase {
 //				}
 //			}
 //        catch (IOException e) {
-//    		// TODO Auto-generated catch block
+//    		// 
 //    		e.printStackTrace();
 //    	}
 //		System.out.println( prettyJson );
@@ -223,7 +251,7 @@ public class testPlannerTester extends TestCase {
 //			pnt1.loadFromJSONArray(jarray);
 //			System.out.println( pnt1.toJSONString() );
 //		} catch (JSONException e) {
-//			// TODO Auto-generated catch block
+//			// 
 //			e.printStackTrace();
 //		}
 //    }
@@ -253,7 +281,7 @@ public class testPlannerTester extends TestCase {
         assertTrue(pn2 != null);
         System.out.println( pn1.toExplainPlanString() );
         System.out.println( pn2.toExplainPlanString() );
-        plannerTester.diffInlineNodes(pn1, pn2);
+        plannerTester.diffInlineAndJoin(pn1, pn2);
     }
     
     public void testDiff() {
@@ -303,13 +331,17 @@ public class testPlannerTester extends TestCase {
         pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
         list1.add(pn1);
         list2.add(pn2);
+        pn1 = compile("select * from l, t where t.a=l.a;", 3, true);
+        pn2 = compile("select * from l, t where t.b=l.b order by a limit ?;", 3, true);
+        list1.add(pn1);
+        list2.add(pn2);
         int size = list1.size();
         for( int i = 0; i < size; i++ ) {
         	System.out.println(i);
         	System.out.println(list1.get(i).toExplainPlanString());
             System.out.println(list2.get(i).toExplainPlanString());
             plannerTester.diffScans(list1.get(i), list2.get(i));
-            plannerTester.diffInlineNodes(list1.get(i), list2.get(i));
+            plannerTester.diffInlineAndJoin(list1.get(i), list2.get(i));
         }
     }
     

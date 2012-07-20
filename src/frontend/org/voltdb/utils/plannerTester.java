@@ -297,8 +297,11 @@ public class plannerTester {
 			AbstractPlanNode pn1 = pnt1.getRootPlanNode();
 			AbstractPlanNode pn2 = pnt2.getRootPlanNode();
 			diffScans( pn1, pn2 );
-			diffInlineNodes( pn1, pn2);
+			diffInlineAndJoin( pn1, pn2);
 			System.out.println("");
+//			System.out.println( pn1.toExplainPlanString() );
+//			System.out.println( "===>");
+//			System.out.println( pn2.toExplainPlanString() );
 		}
 	}
 	
@@ -309,7 +312,7 @@ public class plannerTester {
 				"End of "+m_testName);
 	}
 	
-	public static void diffInlineNodes( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ) {
+	public static void diffInlineAndJoin( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ) {
 		m_treeSizeDiff = 0;
 		ArrayList<AbstractPlanNode> list1 = oldpn1.getLists();
 		ArrayList<AbstractPlanNode> list2 = newpn2.getLists();
@@ -331,6 +334,7 @@ public class plannerTester {
 				System.out.println( "New plan might be better");
 			}
 		}
+		//inline nodes diff
 		Map<Integer, AbstractPlanNode> projNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		Map<Integer, AbstractPlanNode> projNodes2 = new LinkedHashMap<Integer, AbstractPlanNode>();
 		Map<Integer, AbstractPlanNode> limitNodes1 = new LinkedHashMap<Integer, AbstractPlanNode>();
@@ -517,26 +521,48 @@ public class plannerTester {
 			System.out.println( stringPair.toString() );
 		}
 		indexList.clear();
-	}
-	
-	public static String getKeyInfo( ArrayList<AbstractPlanNode> pnList ) {
-		String str="";
-		for( AbstractPlanNode pn : pnList ) {
-			str += "[";
-			str += pn.getPlanNodeId();
-			str += "-";
-			str += pn.getPlanNodeType().toString();
-			str += ", ";
+		
+		//join nodes diff
+		ArrayList<AbstractPlanNode> joinNodes1 = getJoinNodes( list1 );
+		ArrayList<AbstractPlanNode> joinNodes2 = getJoinNodes( list2 );
+		size1 = joinNodes1.size();
+		size2 = joinNodes2.size();
+		if( size1 != size2 ) {
+			intPair.set( size1 , size2);
+			System.out.println("Join Nodes Number diff:");
+			System.out.println( intPair.toString() );
+			System.out.println("SQL statement might be changed.");
+			m_changedSQL = true;
+			String str1 = "";
+			String str2 = "";
+			for( AbstractPlanNode pn : joinNodes1 ) {
+				str1 = str1 + pn.getPlanNodeType() + ", ";
+			}
+			for( AbstractPlanNode pn : joinNodes2 ) {
+				str2 = str2 + pn.getPlanNodeType() + ", ";
+			}
+			if( str1.length() > 1  ){
+				str1.subSequence(0, str1.length()-2);
+			}
+			if( str2.length() > 1  ){
+				str2.subSequence(0, str2.length()-2);
+			}
+			stringPair.set( str1, str2);
 		}
-		if(str.length()>1)
-		{
-			str = str.substring(0, str.length()-2 );
-			str += "]";
+		else {
+			for( AbstractPlanNode pn1 : joinNodes1 ) {
+				for( AbstractPlanNode pn2 : joinNodes2 ) {
+					PlanNodeType pnt1 = pn1.getPlanNodeType();
+					PlanNodeType pnt2 = pn2.getPlanNodeType();
+					if( !pnt1.equals(pnt2) ) {
+						stringPair.set( pnt1+" at "+pn1.getPlanNodeId(), pnt2+" at "+pn2.getPlanNodeId());
+						System.out.println( "Join Node Type diff:");
+						System.out.println( stringPair );
+					}
+				}
+			}
 		}
-		else{
-			str += "[]";
-		}
-		return str;
+		
 	}
 	
 	public static void diffScans( AbstractPlanNode oldpn, AbstractPlanNode newpn ){
@@ -555,7 +581,7 @@ public class plannerTester {
 		}
 		if( size1 != size2 ){
 			intPair.set(size1, size2);
-			System.out.println( "Leaf size diff : " );
+			System.out.println( "Scan time diff : " );
 			System.out.println( intPair );
 			System.out.println( "SQL statement might be changed" );
 			m_changedSQL = true;
@@ -645,7 +671,7 @@ public class plannerTester {
 			System.out.println("same leaf size");
 			try{
 				if( max == 1 ) {
-					System.out.println("Single leaf plan");
+					System.out.println("Single scan plan");
 					JSONObject j1 = new JSONObject( list1.get(0).toJSONString() );
 					JSONObject j2 = new JSONObject( list2.get(0).toJSONString() );
 					String table1 = j1.getString(AbstractScanPlanNode.Members.TARGET_TABLE_NAME.name());
@@ -716,6 +742,39 @@ public class plannerTester {
 			catch ( JSONException e ) {
 				e.printStackTrace();
 			}
-		}	
+		}
+	
 	}
+
+	public static String getKeyInfo( ArrayList<AbstractPlanNode> pnList ) {
+		String str="";
+		for( AbstractPlanNode pn : pnList ) {
+			str += "[";
+			str += pn.getPlanNodeId();
+			str += "-";
+			str += pn.getPlanNodeType().toString();
+			str += ", ";
+		}
+		if(str.length()>1)
+		{
+			str = str.substring(0, str.length()-2 );
+			str += "]";
+		}
+		else{
+			str += "[]";
+		}
+		return str;
+	}
+	
+	public static ArrayList< AbstractPlanNode > getJoinNodes( ArrayList<AbstractPlanNode> pnlist ) {
+		ArrayList< AbstractPlanNode > joinNodeList = new ArrayList<AbstractPlanNode>();
+		
+		for( AbstractPlanNode pn : pnlist ) {
+			if( pn.getPlanNodeType().equals(PlanNodeType.NESTLOOP) ||
+					pn.getPlanNodeType().equals(PlanNodeType.NESTLOOPINDEX) ) {
+				joinNodeList.add(pn);
+			}
+		}
+		return joinNodeList;
+	} 
 }

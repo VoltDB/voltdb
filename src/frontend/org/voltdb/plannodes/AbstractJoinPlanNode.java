@@ -200,5 +200,10 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj ) {
     	super.loadFromJSONObject(jobj);
+    	try {
+			this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
+		} catch (JSONException e) {
+			System.out.println( e.getMessage() );
+		}
     }
 }

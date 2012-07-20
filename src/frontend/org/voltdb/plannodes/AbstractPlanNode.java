@@ -492,6 +492,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return collected;
     }
     
+    //postorder adding scan nodes
     public void getScanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
     	if (visited.contains(this)) {
@@ -520,6 +521,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         return collected;
     }
     
+    //postorder add nodes
     public void getLists_recurse(ArrayList<AbstractPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
     	if (visited.contains(this)) {
@@ -527,10 +529,11 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             return;
         }
         visited.add(this);
-        collected.add(this);
 
-        for (AbstractPlanNode n : m_children)
+        for (AbstractPlanNode n : m_children) {
             n.getLists_recurse(collected, visited);
+        }
+        collected.add(this);
 
         // NOTE: ignores inline nodes.
     }

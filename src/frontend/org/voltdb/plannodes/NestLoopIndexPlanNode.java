@@ -200,7 +200,6 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         return true;
     }
     
-    // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj ) {
     	super.loadFromJSONObject(jobj);
