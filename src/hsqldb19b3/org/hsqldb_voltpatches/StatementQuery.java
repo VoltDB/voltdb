@@ -227,7 +227,7 @@ public class StatementQuery extends StatementDMQL {
                     }
                 }
                 else {
-                    query.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId());
+                    query.attributes.put("offset_paramid", limitCondition.nodes[0].getUniqueId(session));
                 }
 
                 // read limit. it may be a parameter token.
@@ -236,7 +236,7 @@ public class StatementQuery extends StatementDMQL {
                     query.attributes.put("limit", limit.toString());
                 }
                 else {
-                    query.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId());
+                    query.attributes.put("limit_paramid", limitCondition.nodes[1].getUniqueId(session));
                 }
             } catch (HsqlException ex) {
                 // XXX really?
@@ -449,7 +449,7 @@ public class StatementQuery extends StatementDMQL {
 
             parameter.attributes.put("index", String.valueOf(i));
             ExpressionColumn param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId());
+            parameter.attributes.put("id", param.getUniqueId(session));
             parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
         }
 
