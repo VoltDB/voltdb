@@ -158,8 +158,15 @@ TEST_F(CompactingMapTest, SimpleUniqueRank) {
 
     sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(sucess);
     sucess = volt.insert(std::pair<int,int>(2, 2)); ASSERT_TRUE(sucess);
-    sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(!sucess);
-    rankasc = volt.rankAsc(1); ASSERT_TRUE(rankasc == 1);
+    sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(4, 4)); ASSERT_TRUE(sucess);
+    sucess = volt.insert(std::pair<int,int>(5, 5)); ASSERT_TRUE(sucess);
+
+    sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(!sucess);
+    rankasc = volt.rankAsc(3);
+    if (rankasc != 3)
+        printf("false: <SimpleUniqueRank> expected %d, but got %lld\n", 3, rankasc);
+    ASSERT_TRUE(rankasc == 3);
 
     ASSERT_TRUE(volt.verify());
     ASSERT_TRUE(volt.verifyRank());
@@ -497,7 +504,6 @@ TEST_F(CompactingMapTest, RandomMultiRank) {
     ASSERT_TRUE(volt.verify());
     ASSERT_TRUE(volt.verifyRank());
 }
-
 
 int main() {
     return TestSuite::globalInstance()->runAll();
