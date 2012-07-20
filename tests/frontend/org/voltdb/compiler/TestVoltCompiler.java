@@ -136,7 +136,8 @@ public class TestVoltCompiler extends TestCase {
         ArrayList<Feedback> fbs;
 
 
-        fbs = checkPartitionParam("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );",
+        fbs = checkPartitionParam("CREATE TABLE PKEY_BIGINT ( PKEY BIGINT NOT NULL, PRIMARY KEY (PKEY) );" +
+                                  "PARTITION TABLE PKEY_BIGINT ON COLUMN PKEY;",
                                   "org.voltdb.compiler.procedures.PartitionParamBigint", "PKEY_BIGINT");
         expectedError =
             "Type mismatch between partition column and partition parameter for procedure " +
@@ -144,7 +145,8 @@ public class TestVoltCompiler extends TestCase {
             "Partition column is type VoltType.BIGINT and partition parameter is type VoltType.STRING";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkPartitionParam("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );",
+        fbs = checkPartitionParam("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
+        		                  "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;",
                 "org.voltdb.compiler.procedures.PartitionParamInteger",
                 "PKEY_INTEGER");
         expectedError =
@@ -154,7 +156,8 @@ public class TestVoltCompiler extends TestCase {
                     "is type VoltType.BIGINT";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkPartitionParam("CREATE TABLE PKEY_SMALLINT ( PKEY SMALLINT NOT NULL, PRIMARY KEY (PKEY) );",
+        fbs = checkPartitionParam("CREATE TABLE PKEY_SMALLINT ( PKEY SMALLINT NOT NULL, PRIMARY KEY (PKEY) );" +
+                                  "PARTITION TABLE PKEY_SMALLINT ON COLUMN PKEY;",
                 "org.voltdb.compiler.procedures.PartitionParamSmallint",
                 "PKEY_SMALLINT");
         expectedError =
@@ -164,7 +167,8 @@ public class TestVoltCompiler extends TestCase {
                     "is type VoltType.BIGINT";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkPartitionParam("CREATE TABLE PKEY_TINYINT ( PKEY TINYINT NOT NULL, PRIMARY KEY (PKEY) );",
+        fbs = checkPartitionParam("CREATE TABLE PKEY_TINYINT ( PKEY TINYINT NOT NULL, PRIMARY KEY (PKEY) );" +
+                                  "PARTITION TABLE PKEY_TINYINT ON COLUMN PKEY;",
                 "org.voltdb.compiler.procedures.PartitionParamTinyint",
                 "PKEY_TINYINT");
         expectedError =
@@ -174,7 +178,8 @@ public class TestVoltCompiler extends TestCase {
                     "is type VoltType.SMALLINT";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
-        fbs = checkPartitionParam("CREATE TABLE PKEY_STRING ( PKEY VARCHAR(32) NOT NULL, PRIMARY KEY (PKEY) );",
+        fbs = checkPartitionParam("CREATE TABLE PKEY_STRING ( PKEY VARCHAR(32) NOT NULL, PRIMARY KEY (PKEY) );" +
+                                  "PARTITION TABLE PKEY_STRING ON COLUMN PKEY;",
                 "org.voltdb.compiler.procedures.PartitionParamString",
                 "PKEY_STRING");
         expectedError =
@@ -200,9 +205,6 @@ public class TestVoltCompiler extends TestCase {
             "<procedures>" +
             "<procedure class='" + procedureClass + "' />" +
             "</procedures>" +
-            "<partitions>" +
-            "<partition table='" + table + "' column='PKEY' />" +
-            "</partitions>" +
             "</database>" +
             "</project>";
 
@@ -489,7 +491,8 @@ public class TestVoltCompiler extends TestCase {
 
     public void testXMLFileWithDDL() throws IOException {
         final String simpleSchema1 =
-            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash)); " +
+            "PARTITION TABLE books ON COLUMN cash;";
         // newline inserted to test catalog friendliness
         final String simpleSchema2 =
             "create table books2\n (cash integer default 23 NOT NULL, title varchar(3) default 'foo', PRIMARY KEY(cash));";
@@ -519,7 +522,6 @@ public class TestVoltCompiler extends TestCase {
             "<sql>select * from books;</sql>" +
             "</procedure>" +
             "</procedures>" +
-            "  <partitions><partition table='books' column='cash'/></partitions> " +
             "<!-- xml comment check -->" +
             "</database>" +
             "<!-- xml comment check -->" +
@@ -608,7 +610,8 @@ public class TestVoltCompiler extends TestCase {
 
     public void testNullablePartitionColumn() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
+            "partition table books on column cash;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -619,7 +622,6 @@ public class TestVoltCompiler extends TestCase {
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook'/></procedures>" +
-            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
             "</database>" +
             "</project>";
 
@@ -843,7 +845,8 @@ public class TestVoltCompiler extends TestCase {
 
     public void testOverrideProcInfo() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
+            "PARTITION TABLE books ON COLUMN cash;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -854,7 +857,6 @@ public class TestVoltCompiler extends TestCase {
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
-            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
             "</database>" +
             "</project>";
 
@@ -910,7 +912,8 @@ public class TestVoltCompiler extends TestCase {
 
     public void testGoodStmtProcName() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
+            "PARTITION TABLE books ON COLUMN cash;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -921,7 +924,6 @@ public class TestVoltCompiler extends TestCase {
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='Foo'><sql>select * from books;</sql></procedure></procedures>" +
-            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
             "</database>" +
             "</project>";
 
@@ -937,6 +939,7 @@ public class TestVoltCompiler extends TestCase {
     public void testMaterializedView() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 NOT NULL, title varchar(10) default 'foo', PRIMARY KEY(cash));\n" +
+            "partition table books on column cash;\n" +
             "create view matt (title, num, foo) as select title, count(*), sum(cash) from books group by title;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
@@ -947,7 +950,6 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<partitions><partition table='books' column='cash'/></partitions> " +
             "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
             "</database>" +
             "</project>";
@@ -970,7 +972,8 @@ public class TestVoltCompiler extends TestCase {
 
     public void testVarbinary() throws IOException {
         final String simpleSchema =
-            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));";
+            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));" +
+            "partition table books on column cash;";
 
         final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
         final String schemaPath = schemaFile.getPath();
@@ -980,7 +983,6 @@ public class TestVoltCompiler extends TestCase {
             "<project>" +
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
-            "<partitions><partition table='books' column='cash'/></partitions> " +
             "<procedures>" +
             "<procedure class='get'><sql>select * from books;</sql></procedure>" +
             "<procedure class='i1'><sql>insert into books values(5, 'AA');</sql></procedure>" +
