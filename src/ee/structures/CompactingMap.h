@@ -401,7 +401,7 @@ typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key
 template<typename Key, typename Data, typename Compare, bool hasRank>
 void CompactingMap<Key, Data, Compare, hasRank>::leftRotate(TreeNode *x) {
     TreeNode *y = x->right;
-    NodeCount ctxl = 0, ctyr = 0, ctyl = 0;
+    int64_t ctxl = 0, ctyr = 0, ctyl = 0;
 
     if (hasRank) {
         if (x->left != &NIL)
@@ -435,7 +435,7 @@ void CompactingMap<Key, Data, Compare, hasRank>::leftRotate(TreeNode *x) {
 template<typename Key, typename Data, typename Compare, bool hasRank>
 void CompactingMap<Key, Data, Compare, hasRank>::rightRotate(TreeNode *x) {
     TreeNode *y = x->left;
-    NodeCount ctxr = 0, ctyr = 0, ctyl = 0;
+    int64_t ctxr = 0, ctyr = 0, ctyl = 0;
     if (hasRank) {
         if (x->right != &NIL)
                 ctxr = x->right->subct;
@@ -693,7 +693,7 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
         // must pass a key that already in map
         if (n == &NIL) return -1;
         TreeNode *x = m_root, *p = n;
-        NodeCount ct = 0,ctr = 0, ctl = 0;
+        int64_t ct = 0,ctr = 0, ctl = 0;
         int m = m_comper(key, x->key);
         if (m == 0) {
             if (x->right != &NIL)
@@ -755,8 +755,8 @@ typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key
         if (x == &NIL || ith > x->subct || ith <= 0)
                 return retval;
 
-        NodeCount rk = ith;
-        NodeCount xl = 0;
+        int64_t rk = ith;
+        int64_t xl = 0;
         while (x != &NIL && rk > 0) {
                 if (x->left != &NIL)
                         xl = x->left->subct;
@@ -820,7 +820,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
                         }
                         // test rankAsc
                         rkasc = rankAsc(k);
-                        NodeCount nc = 0;
+                        int64_t nc = 0;
                         it.movePrev();
                         while (k == it.key()) {
                                 nc++;
@@ -874,7 +874,7 @@ int CompactingMap<Key, Data, Compare, hasRank>::inOrderCounterChecking(const Tre
         if (n != &NIL) {
                 if ((res = inOrderCounterChecking(n->left)) < 0) return res;
                 // check counter for sub tree nodes
-                NodeCount ct = 1;
+                int64_t ct = 1;
                 if (n->left != &NIL) ct += n->left->subct;
                 if (n->right != &NIL) ct += n->right->subct;
                 if (ct != n->subct) {
