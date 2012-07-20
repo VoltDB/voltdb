@@ -85,7 +85,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         MAX_DESIRED_PENDING_BYTES = maxBytes;
         LESS_THAN_MAX_DESIRED_PENDING_BYTES = (int)(MAX_DESIRED_PENDING_BYTES * .8);
         MAX_DESIRED_PENDING_TXNS = maxRequests;
-        LESS_THAN_MAX_DESIRED_PENDING_TXNS = (int)(MAX_DESIRED_PENDING_BYTES * .8);
+        LESS_THAN_MAX_DESIRED_PENDING_TXNS = (int)(MAX_DESIRED_PENDING_TXNS * .8);
     }
 
     public void addMember(ACGMember member)
@@ -113,6 +113,7 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         }
         m_pendingTxnBytes += messageSize;
         m_pendingTxnCount++;
+
         checkAndLogInvariants();
         if (m_pendingTxnBytes > MAX_DESIRED_PENDING_BYTES || m_pendingTxnCount > MAX_DESIRED_PENDING_TXNS) {
             if (!m_hadBackPressure) {
@@ -221,7 +222,8 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         } else {
             m_pendingTxnBytes += bytes;
             checkAndLogInvariants();
-            if (m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES) {
+            if (m_pendingTxnBytes < LESS_THAN_MAX_DESIRED_PENDING_BYTES &&
+                    m_pendingTxnCount < LESS_THAN_MAX_DESIRED_PENDING_TXNS) {
                 if (m_hadBackPressure) {
                     hostLog.debug("TXN backpressure ended");
                     m_hadBackPressure = false;

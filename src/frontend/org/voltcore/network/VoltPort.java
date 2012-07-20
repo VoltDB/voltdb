@@ -318,7 +318,7 @@ public class VoltPort implements Connection
     }
 
     boolean readyForRead() {
-        return (readyOps() & SelectionKey.OP_READ) != 0;
+        return (readyOps() & SelectionKey.OP_READ) != 0 && (m_interestOps & SelectionKey.OP_READ) != 0;
     }
 
     boolean isRunning() {
