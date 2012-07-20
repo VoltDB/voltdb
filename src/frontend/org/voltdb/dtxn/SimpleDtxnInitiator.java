@@ -45,10 +45,13 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.apache.commons.lang3.ArrayUtils;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -374,11 +377,21 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      * reducing the amount of time when things are blocked.
      *
      * @param txn Information about the transaction to send.
+     * @param version Version of the site tracker used to get the participants
      */
     private void dispatchMultiPartitionTxn(InFlightTxnState txn)
     {
         m_mailbox.addPendingTxn(txn);
         increaseBackpressure(txn.messageSize);
+
+        /*
+         * Compose the set of non-coordinator sites and send it to the
+         * coordinator, so that the coordinator will send fragment work to all
+         * the sites that received the participant notice.
+         */
+        HashSet<Long> nonCoordinatorSites = new HashSet<Long>(txn.coordinatorReplicas);
+        List<Long> sites = Arrays.asList(ArrayUtils.toObject(txn.otherSiteIds));
+        nonCoordinatorSites.addAll(sites);
 
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
                 m_siteId, txn.firstCoordinatorId, txn.txnId, txn.isReadOnly);
@@ -396,7 +409,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 txn.isReadOnly,
                 txn.isSinglePartition,
                 txn.invocation,
-                newestSafeTxnId); // this will allow all transactions to run for now
+                newestSafeTxnId, // this will allow all transactions to run for now
+                ArrayUtils.toPrimitive(nonCoordinatorSites.toArray(new Long[0])));
 
         /*
          * Send the transaction to the coordinator as well as his replicas

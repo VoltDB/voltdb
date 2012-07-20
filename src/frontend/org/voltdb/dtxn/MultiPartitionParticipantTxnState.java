@@ -130,13 +130,21 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                 m_task = (InitiateTaskMessage) notice;
                 m_durabilityFlag = m_task.getDurabilityFlagIfItExists();
                 SiteTracker tracker = site.getSiteTracker();
-                // Add this check for tests which use a mock execution site
-                if (tracker != null) {
-                    m_nonCoordinatingSites = tracker.getAllSitesExcluding(m_hsId);
-                }
                 m_readyWorkUnits.add(new WorkUnit(tracker, m_task,
                                                   null, m_hsId,
                                                   null, false, m_allowMismatchedResults));
+
+                /*
+                 * Use the same set of non-coordinator sites the initiator sent
+                 * out the participant notices to, so that when the coordinator
+                 * send out the fragment works all participants will get them.
+                 *
+                 * During rejoin, the initiator's site tracker and the
+                 * coordinator's site tracker may not be consistent for a brief
+                 * period of time. So can't rely on the site tracker to tell the
+                 * coordinator which sites to send work to.
+                 */
+                m_nonCoordinatingSites = m_task.getNonCoordinatorSites();
             } else {
                 m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
                 m_task = null;
