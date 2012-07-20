@@ -184,7 +184,7 @@ public class ProcedureRunner {
         Object[] paramList = paramListIn;
 
         m_txnId = txnId;
-        assert(m_txnId > 0);
+        assert(m_txnId >= 0);
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
