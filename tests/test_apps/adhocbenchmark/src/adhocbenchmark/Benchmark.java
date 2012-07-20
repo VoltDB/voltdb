@@ -100,6 +100,7 @@ public class Benchmark {
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
                 this.errorStatus = clientResponse.getStatus();
                 this.errorString = clientResponse.getStatusString();
+                System.exit(-1);
             }
         }
     }
