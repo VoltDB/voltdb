@@ -1,4 +1,5 @@
 echo "Starting testlist"  \
+&& ant junitclass -Djunitclass=TestSaveRestoreSysprocSuite \
 && ant junitclass -Djunitclass=TestHSQLDB  \
 && ant junitclass -Djunitclass=TestJDBC  \
 && ant junitclass -Djunitclass=TestHostMessenger  \

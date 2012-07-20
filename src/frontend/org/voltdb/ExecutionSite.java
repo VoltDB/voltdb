@@ -27,8 +27,6 @@ import java.lang.reflect.InvocationTargetException;
 import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-
-import java.util.concurrent.Future;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -38,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -69,7 +68,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltdb.compiler.AsyncCompilerAgent;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.ReplayedTxnState;
@@ -2374,13 +2372,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     @Override
     public void loadTable(long txnId, int tableId, VoltTable data) {
-        long undo_token = getNextUndoToken();
         ee.loadTable(tableId, data,
                      txnId,
-                     lastCommittedTxnId,
-                     undo_token);
-        ee.releaseUndoToken(undo_token);
-        getNextUndoToken();
+                     lastCommittedTxnId);
     }
 
     @Override

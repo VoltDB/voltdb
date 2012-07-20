@@ -55,11 +55,11 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.Client;
-import org.voltdb.client.SyncCallback;
 import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
@@ -1990,71 +1990,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         config.revertCompile();
     }
 
-    /*
-     * ENG-3177 Test that a CSV snapshot of a replicated table provides status
-     * on only one node, the one that actually saved the snapshot.
-     */
-    public void testReplicatedTableCSVSnapshotStatus()
-    throws Exception
-    {
-        m_config.shutDown();
-
-        int host_count = 2;
-        int site_count = 1;
-        int k_factor = 0;
-        LocalCluster lc = new LocalCluster(JAR_NAME, site_count, host_count, k_factor,
-                                           BackendTarget.NATIVE_EE_JNI);
-        lc.setHasLocalServer(false);
-        SaveRestoreTestProjectBuilder project =
-            new SaveRestoreTestProjectBuilder();
-        project.addAllDefaults();
-        lc.compile(project);
-        lc.startUp();
-        String replicatedTableName = "REPLICATED_TESTER";
-        try {
-            Client client = ClientFactory.createClient();
-            client.createConnection(lc.getListenerAddresses().get(0));
-            try {
-                VoltTable repl_table = createReplicatedTable(100, 0, null);
-                loadTable(client, replicatedTableName, true, repl_table);
-                VoltTable[] results = saveTables(client, TMPDIR, TESTNONCE, true, true);
-                assertEquals("Wrong host/site count from @SnapshotSave.",
-                             host_count * site_count, results[0].getRowCount());
-            }
-            finally {
-                client.close();
-            }
-
-            // Connect to each host and check @SnapshotStatus.
-            // Only one host should say it saved the replicated table we're watching.
-            int nReplSaved = 0;
-            for (int iclient = 0; iclient < host_count; iclient++) {
-                client = ClientFactory.createClient();
-                client.createConnection(lc.getListenerAddresses().get(iclient));
-                try {
-                    SnapshotResult[] results =
-                            checkSnapshotStatus(client, null, TESTNONCE, null, "SUCCESS", null);
-                    for (SnapshotResult result : results) {
-                        if (result.table.equals(replicatedTableName)) {
-                            nReplSaved++;
-                        }
-                    }
-                }
-                finally {
-                    client.close();
-                }
-            }
-            assertEquals("Replicated table CSV is not saved on exactly one host.", 1, nReplSaved);
-        }
-        catch (Exception e) {
-            fail(String.format("Caught %s: %s", e.getClass().getName(), e.getMessage()));
-        }
-        finally {
-            lc.shutDown();
-        }
-    }
-
-    class SnapshotResult {
+    public static class SnapshotResult {
         Long hostID;
         String table;
         String path;
@@ -2065,7 +2001,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         String result;
     }
 
-    SnapshotResult[] checkSnapshotStatus(Client client, String path, String nonce, Integer endTime,
+    public static SnapshotResult[] checkSnapshotStatus(Client client, String path, String nonce, Integer endTime,
             String result, Integer rowCount)
             throws NoConnectionsException, IOException, ProcCallException {
 

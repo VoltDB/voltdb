@@ -17,13 +17,12 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.Future;
-
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 import java.util.concurrent.atomic.AtomicInteger;
 
 import org.voltcore.logging.Level;
@@ -476,16 +475,9 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     @Override
     public void loadTable(long txnId, int tableId, VoltTable data)
     {
-        long undo_token = getNextUndoToken();
         m_ee.loadTable(tableId, data,
                 txnId,
-                m_lastCommittedTxnId,
-                undo_token);
-        m_ee.releaseUndoToken(undo_token);
-        // I don't think this call is strictly necessary, but undo token
-        // management is so scrod in general that I'm going to leave it since
-        // it supposedly 'works'  --izzy
-        getNextUndoToken();
+                m_lastCommittedTxnId);
     }
 
     @Override
