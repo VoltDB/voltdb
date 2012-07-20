@@ -150,7 +150,6 @@ public class LeaderElector {
         m_done.set(true);
         zk.delete(node, -1);
         es.shutdown();
-        es.awaitTermination(356, TimeUnit.DAYS);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");

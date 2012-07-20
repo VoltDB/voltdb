@@ -106,6 +106,9 @@ public class InitiatorMailbox implements Mailbox
     public void shutdown() throws InterruptedException
     {
         m_masterMapCache.shutdown();
+        if (m_algo != null) {
+            m_algo.cancel();
+        }
     }
 
     // Change the replica set configuration (during or after promotion)

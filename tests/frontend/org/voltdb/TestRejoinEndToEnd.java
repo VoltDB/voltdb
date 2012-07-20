@@ -133,9 +133,8 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                                             //                       System.err.println(clientResponse.getStatusString());
                                         }
                                     }
-
-                                }, "@Statistics", "MANAGEMENT", 1);
-                                //clientForLoadThread.callProcedure("@Statistics", );
+                                }, "SelectCountPartitioned");
+                                //clientForLoadThread.callProcedure("SelectCountPartitioned");
                                 Thread.sleep(1);
                                 final long now = System.currentTimeMillis();
                                 if (now - startTime > 1000 * 10) {
