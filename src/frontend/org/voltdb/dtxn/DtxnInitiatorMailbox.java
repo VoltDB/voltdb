@@ -230,8 +230,14 @@ public class DtxnInitiatorMailbox implements Mailbox
                 toSend = state.addResponse(r.getCoordinatorHSId(), r.getClientResponseData());
             }
 
+            // send an extra commit notice to non-sysproc (except adhocs) MP txns
             if (state.isSinglePartition == false) {
-                sendCommitNotice(toSend, state);
+                String procName = state.invocation.getProcName();
+                boolean isSysproc = procName.startsWith("@");
+                isSysproc = procName.startsWith("@AdHoc") ? false : isSysproc;
+                if (!isSysproc) {
+                    sendCommitNotice(toSend, state);
+                }
             }
 
             if (state.hasAllResponses()) {
