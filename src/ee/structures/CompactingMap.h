@@ -136,9 +136,12 @@ public:
     std::pair<iterator, iterator> equalRange(const Key &key);
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
+
+    int64_t subct();
+    void updatect();
     // TODO(xin): later rename it to ranklower
-    int32_t rankAsc(const Key& key);
-    int32_t rankUpper(const Key& key);
+    int64_t rankAsc(const Key& key);
+    int64_t rankUpper(const Key& key);
 
     /**
      * For debugging: verify the RB-tree constraints are met. SLOW.
@@ -150,7 +153,7 @@ protected:
     // main internal functions
     void erase(TreeNode *z);
     TreeNode *lookup(const Key &key);
-    TreeNode *lookupRank(int32_t ith);
+    TreeNode *lookupRank(int64_t ith);
 
     // static for iterator use
     TreeNode *minimum(const TreeNode *subRoot) const;
@@ -687,7 +690,18 @@ bool CompactingMap<Key, Data, Compare, hasRank>::isReachableNode(const TreeNode*
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-int32_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
+int64_t CompactingMap<Key, Data, Compare, hasRank>::subct() {
+    // TODO(xin): add
+    return -1;
+}
+
+template<typename Key, typename Data, typename Compare, bool hasRank>
+void CompactingMap<Key, Data, Compare, hasRank>::updatect() {
+    // TODO(xin):
+}
+
+template<typename Key, typename Data, typename Compare, bool hasRank>
+int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
         if (!hasRank) return -1;
         TreeNode *n = lookup(key);
         // must pass a key that already in map
@@ -735,7 +749,7 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-int32_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
+int64_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
         if (!hasRank) return -1;
         if (m_unique) return rankAsc(key);
 
@@ -747,7 +761,7 @@ int32_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
-typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::lookupRank(int32_t ith) {
+typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::lookupRank(int64_t ith) {
         if (!hasRank) return &NIL;
 
         TreeNode *x = m_root;

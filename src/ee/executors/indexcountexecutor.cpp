@@ -306,7 +306,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // An index count has two parts: unique and multi
     //
 
-    int32_t rkStart = 0, rkEnd = 0, rkRes = 0;
+    int64_t rkStart = 0, rkEnd = 0, rkRes = 0;
 
     TableTuple& tmptup = m_outputTable->tempTuple();
     int leftIncluded = 0, rightIncluded = 0;
