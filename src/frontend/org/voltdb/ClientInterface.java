@@ -1044,21 +1044,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_initiator = initiator;
         m_cartographer = cartographer;
 
-        /*
-         * For the snapshot daemon create a noop ACG because it is privileged
-         */
-        m_connectionSpecificStuff.put(
-                m_snapshotDaemonAdapter.connectionId(),
-                Pair.of(
-                        new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter),
-                        new AdmissionControlGroup(Integer.MAX_VALUE, Integer.MAX_VALUE) {
-                            @Override
-                            public void increaseBackpressure(int messageSize) {}
-                            @Override
-                            public void reduceBackpressure(int messageSize) {}
-                            @Override
-                            public boolean queue(int bytes) { return false; }
-                        }));
         // pre-allocate single partition array
         m_allPartitions = allPartitions;
         m_acceptor = new ClientAcceptor(port, messenger.getNetwork(), false);
@@ -1218,7 +1203,26 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * Initializes the snapshot daemon so that it's ready to take snapshots
      */
     public void initializeSnapshotDaemon(ZooKeeper zk) {
-        m_snapshotDaemon.init(this, zk);
+        m_snapshotDaemon.init(this, zk, new Runnable() {
+            @Override
+            public void run() {
+                /*
+                 * For the snapshot daemon create a noop ACG because it is privileged
+                 */
+                m_connectionSpecificStuff.put(
+                        m_snapshotDaemonAdapter.connectionId(),
+                        Pair.of(
+                                new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter),
+                                new AdmissionControlGroup(Integer.MAX_VALUE, Integer.MAX_VALUE) {
+                                    @Override
+                                    public void increaseBackpressure(int messageSize) {}
+                                    @Override
+                                    public void reduceBackpressure(int messageSize) {}
+                                    @Override
+                                    public boolean queue(int bytes) { return false; }
+                                }));
+            }
+        });
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID

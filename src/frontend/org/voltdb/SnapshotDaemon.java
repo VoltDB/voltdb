@@ -202,7 +202,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
     }
 
-    public void init(DaemonInitiator initiator, ZooKeeper zk) {
+    public void init(DaemonInitiator initiator, ZooKeeper zk, Runnable threadLocalInit) {
         m_initiator = initiator;
         m_zk = zk;
 
@@ -212,6 +212,10 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
+
+        if (threadLocalInit != null) {
+            m_es.execute(threadLocalInit);
+        }
 
         // Really shouldn't leak this from a constructor, and twice to boot
         m_es.execute(new Runnable() {
