@@ -116,6 +116,69 @@ using namespace functionexpressions;
 
 namespace voltdb {
 
+/** implement a forced SQL ERROR function (for test and example purposes) for either integer or string types **/
+template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_SQL_ERROR>() const {
+    int64_t intValue = -1;
+    char buffer[1024];
+    const char* msgcode;
+    const char* msgtext;
+    const ValueType type = getValueType();
+    if (type == VALUE_TYPE_VARCHAR) {
+        const int32_t valueUTF8Length = getObjectLength();
+        const char *valueChars = reinterpret_cast<char*>(getObjectValue());
+        snprintf(buffer, std::min((int32_t)sizeof(buffer), valueUTF8Length), "%s", valueChars);
+        msgcode = SQLException::nonspecific_error_code_for_error_forced_by_user;
+        msgtext = buffer;
+    } else {
+        intValue = castAsBigIntAndGetValue(); // let cast throw if invalid
+        snprintf(buffer, sizeof(buffer), "%ld", (long) intValue);
+        msgcode = buffer;
+        msgtext = SQLException::specific_error_specified_by_user;
+    }
+    if (intValue != 0) {
+        throw SQLException(msgcode, msgtext);
+    }
+    return *this;
+}
+
+/** implement the 2-argument forced SQL ERROR function (for test and example purposes) */
+template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SQL_ERROR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    int64_t intValue = -1;
+    char buffer[1024];
+    char buffer2[1024];
+    const char* msgcode;
+    const char* msgtext;
+
+    const NValue& codeArg = arguments[0];
+    if (codeArg.isNull()) {
+        msgcode = SQLException::nonspecific_error_code_for_error_forced_by_user;
+    } else {
+        intValue = codeArg.castAsBigIntAndGetValue(); // let cast throw if invalid
+        snprintf(buffer, sizeof(buffer), "%ld", (long) intValue);
+        msgcode = buffer;
+    }
+
+    const NValue& strValue = arguments[1];
+    if (strValue.isNull()) {
+        msgtext = "";
+    } else {
+        if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
+            throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
+        }
+
+        const int32_t valueUTF8Length = strValue.getObjectLength();
+        char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+        snprintf(buffer2, std::min((int32_t)sizeof(buffer), valueUTF8Length), "%s", valueChars);
+        msgtext = buffer2;
+    }
+    if (intValue != 0) {
+        throw SQLException(msgcode, msgtext);
+    }
+    return codeArg;
+}
+
+
 AbstractExpression*
 ExpressionUtil::functionFactory(ExpressionType et, const std::vector<AbstractExpression*>* arguments) {
     assert(arguments);
@@ -129,8 +192,10 @@ ExpressionUtil::functionFactory(ExpressionType et, const std::vector<AbstractExp
     case 1:
         if (et == EXPRESSION_TYPE_FUNCTION_ABS) {
             ret = new UnaryFunctionExpression<EXPRESSION_TYPE_FUNCTION_ABS>((*arguments)[0]);
-            delete arguments;
+        } else if (et == EXPRESSION_TYPE_FUNCTION_SQL_ERROR) {
+            ret = new UnaryFunctionExpression<EXPRESSION_TYPE_FUNCTION_SQL_ERROR>((*arguments)[0]);
         }
+        delete arguments;
         break;
     default:
         // GeneralFunctions delete the arguments container when through with it.
@@ -138,9 +203,10 @@ ExpressionUtil::functionFactory(ExpressionType et, const std::vector<AbstractExp
             ret = new GeneralFunctionExpression<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(*arguments);
         } else if (et == EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR) {
             ret = new GeneralFunctionExpression<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(*arguments);
+        } else if (et == EXPRESSION_TYPE_FUNCTION_SQL_ERROR) {
+            ret = new GeneralFunctionExpression<EXPRESSION_TYPE_FUNCTION_SQL_ERROR>(*arguments);
         }
     }
-    assert(ret);
     return ret;
 }
 

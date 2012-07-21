@@ -72,16 +72,16 @@ public class FunctionSQL extends Expression {
     private final static int   FUNC_CEILING                          = 17;
     private final static int   FUNC_WIDTH_BUCKET                     = 20;
     protected final static int FUNC_SUBSTRING_CHAR                   = 21;    // string
-    private final static int   FUNC_SUBSTRING_REG_EXPR               = 22;
+    //NEVER USED private final static int   FUNC_SUBSTRING_REG_EXPR               = 22;
     private final static int   FUNC_SUBSTRING_REGEX                  = 23;
     protected final static int FUNC_FOLD_LOWER                       = 24;
     protected final static int FUNC_FOLD_UPPER                       = 25;
-    private final static int   FUNC_TRANSCODING                      = 26;
-    private final static int   FUNC_TRANSLITERATION                  = 27;
-    private final static int   FUNC_REGEX_TRANSLITERATION            = 28;
+    //NEVER USED private final static int   FUNC_TRANSCODING                      = 26;
+    //NEVER USED private final static int   FUNC_TRANSLITERATION                  = 27;
+    //NEVER USED private final static int   FUNC_REGEX_TRANSLITERATION            = 28;
     protected final static int FUNC_TRIM_CHAR                        = 29;
     final static int           FUNC_OVERLAY_CHAR                     = 30;
-    private final static int   FUNC_CHAR_NORMALIZE                   = 31;
+    //NEVER USED private final static int   FUNC_CHAR_NORMALIZE                   = 31;
     private final static int   FUNC_SUBSTRING_BINARY                 = 32;
     private final static int   FUNC_TRIM_BINARY                      = 33;
     private final static int   FUNC_OVERLAY_BINARY                   = 40;
@@ -537,6 +537,7 @@ public class FunctionSQL extends Expression {
     /**
      * Evaluates and returns this Function in the context of the session.<p>
      */
+    @Override
     public Object getValue(Session session) {
 
         Object[] data = new Object[nodes.length];
@@ -1055,6 +1056,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -1558,6 +1560,7 @@ public class FunctionSQL extends Expression {
         }
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -1839,6 +1842,7 @@ public class FunctionSQL extends Expression {
         return sb.toString();
     }
 
+    @Override
     public boolean equals(Object other) {
 
         if (other instanceof FunctionSQL
@@ -1849,6 +1853,7 @@ public class FunctionSQL extends Expression {
         return false;
     }
 
+    @Override
     public int hashCode() {
         return opType + funcType;
     }
@@ -1856,6 +1861,7 @@ public class FunctionSQL extends Expression {
     /**
      * Returns a String representation of this object. <p>
      */
+    @Override
     public String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();
@@ -1893,6 +1899,7 @@ public class FunctionSQL extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         // XXX Should this throw HSQLParseException instead?
@@ -1901,6 +1908,19 @@ public class FunctionSQL extends Expression {
         VoltXMLElement exp = new VoltXMLElement("function");
         exp.attributes.put("name", name);
         exp.attributes.put("type", dataType.getNameString());
+
+        switch (funcType) {
+        case FUNC_SUBSTRING_CHAR :
+            // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
+            if (nodes[2] == null) {
+                exp.attributes.put("volt_alias", "substring_from");
+            } else {
+                exp.attributes.put("volt_alias", "substring_from_for");
+            }
+            break;
+        default :
+            break;
+        }
 
         for (Expression expr : nodes) {
             if (expr != null) {

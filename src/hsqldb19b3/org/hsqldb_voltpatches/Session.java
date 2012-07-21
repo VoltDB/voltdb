@@ -216,6 +216,7 @@ public class Session implements SessionInterface {
      *
      * @return the session identifier for this Session
      */
+    @Override
     public long getId() {
         return sessionId;
     }
@@ -223,6 +224,7 @@ public class Session implements SessionInterface {
     /**
      * Closes this Session.
      */
+    @Override
     public synchronized void close() {
 
         if (isClosed) {
@@ -257,10 +259,12 @@ public class Session implements SessionInterface {
      *
      * @return true if this Session is closed
      */
+    @Override
     public boolean isClosed() {
         return isClosed;
     }
 
+    @Override
     public synchronized void setIsolationDefault(int level) {
 
         if (level == SessionInterface.TX_READ_UNCOMMITTED) {
@@ -300,6 +304,7 @@ public class Session implements SessionInterface {
         }
     }
 
+    @Override
     public synchronized int getIsolation() {
         return isolationMode;
     }
@@ -349,7 +354,7 @@ public class Session implements SessionInterface {
      * @return this Session's User object
      */
     public User getUser() {
-        return (User) user;
+        return user;
     }
 
     public Grantee getGrantee() {
@@ -461,6 +466,7 @@ public class Session implements SessionInterface {
      * @param  autocommit the new value
      * @throws  HsqlException
      */
+    @Override
     public synchronized void setAutoCommit(boolean autocommit) {
 
         if (isClosed) {
@@ -507,12 +513,14 @@ public class Session implements SessionInterface {
         database.txManager.beginTransaction(this);
     }
 
+    @Override
     public synchronized void startPhasedTransaction() {}
 
     /**
      * @todo - fredt - for two phased pre-commit - after this call, further
      * state changing calls should fail
      */
+    @Override
     public synchronized void prepareCommit() {
 
         if (isClosed) {
@@ -533,6 +541,7 @@ public class Session implements SessionInterface {
      *
      * @throws  HsqlException
      */
+    @Override
     public synchronized void commit(boolean chain) {
 
 //        tempActionHistory.add("commit " + actionTimestamp);
@@ -563,6 +572,7 @@ public class Session implements SessionInterface {
      *
      * @throws  HsqlException
      */
+    @Override
     public synchronized void rollback(boolean chain) {
 
         //        tempActionHistory.add("rollback " + actionTimestamp);
@@ -615,6 +625,7 @@ public class Session implements SessionInterface {
     /**
      * @todo no-op in this implementation. To be implemented for connection pooling
      */
+    @Override
     public synchronized void resetSession() {
         throw new HsqlException("", "", 0);
     }
@@ -626,6 +637,7 @@ public class Session implements SessionInterface {
      * @param  name name of the savepoint
      * @throws  HsqlException if there is no current transaction
      */
+    @Override
     public synchronized void savepoint(String name) {
 
         int index = sessionContext.savepoints.getIndex(name);
@@ -650,6 +662,7 @@ public class Session implements SessionInterface {
      * @param  name name of savepoint
      * @throws  HsqlException
      */
+    @Override
     public synchronized void rollbackToSavepoint(String name) {
 
         if (isClosed) {
@@ -695,6 +708,7 @@ public class Session implements SessionInterface {
      * @param  name name of savepoint
      * @throws  HsqlException if name does not correspond to a savepoint
      */
+    @Override
     public synchronized void releaseSavepoint(String name) {
 
         // remove this and all later savepoints
@@ -729,6 +743,7 @@ public class Session implements SessionInterface {
         isReadOnly = readonly;
     }
 
+    @Override
     public synchronized void setReadOnlyDefault(boolean readonly) {
 
         if (!readonly && database.databaseReadOnly) {
@@ -751,6 +766,7 @@ public class Session implements SessionInterface {
         return isReadOnly;
     }
 
+    @Override
     public synchronized boolean isReadOnlyDefault() {
         return isReadOnlyDefault;
     }
@@ -760,10 +776,12 @@ public class Session implements SessionInterface {
      *
      * @return the current value
      */
+    @Override
     public synchronized boolean isAutoCommit() {
         return isAutoCommit;
     }
 
+    @Override
     public synchronized int getStreamBlockSize() {
         return 512 * 1024;
     }
@@ -860,6 +878,7 @@ public class Session implements SessionInterface {
      * @param cmd the command to execute
      * @return the result of executing the command
      */
+    @Override
     public synchronized Result execute(Result cmd) {
 
         if (isClosed) {
@@ -1053,11 +1072,13 @@ public class Session implements SessionInterface {
         return result;
     }
 
+    @Override
     public RowSetNavigatorClient getRows(long navigatorId, int offset,
                                          int blockSize) {
         return sessionData.getRowSetSlice(navigatorId, offset, blockSize);
     }
 
+    @Override
     public synchronized void closeNavigator(long id) {
         sessionData.closeNavigator(id);
     }
@@ -1253,7 +1274,7 @@ public class Session implements SessionInterface {
         isBatch = true;
 
         while (nav.hasNext()) {
-            Object[] pvals = (Object[]) nav.getNext();
+            Object[] pvals = nav.getNext();
             Result   in    = executeCompiledStatement(cs, pvals);
 
             // On the client side, iterate over the vals and throw
@@ -1310,7 +1331,7 @@ public class Session implements SessionInterface {
 
         while (nav.hasNext()) {
             Result   in;
-            Object[] data = (Object[]) nav.getNext();
+            Object[] data = nav.getNext();
             String   sql  = (String) data[0];
 
             try {
@@ -1437,6 +1458,7 @@ public class Session implements SessionInterface {
      * CURRENT_XXXX calls in this scope will use this millisecond value.
      * (fredt@users)
      */
+    @Override
     public synchronized TimestampData getCurrentDate() {
 
         resetCurrentTimestamp();
@@ -1525,6 +1547,7 @@ public class Session implements SessionInterface {
         }
     }
 
+    @Override
     public int getZoneSeconds() {
         return timeZoneSeconds;
     }
@@ -1611,6 +1634,7 @@ public class Session implements SessionInterface {
         return Result.updateZeroResult;
     }
 
+    @Override
     public synchronized Object getAttribute(int id) {
 
         switch (id) {
@@ -1631,6 +1655,7 @@ public class Session implements SessionInterface {
         return null;
     }
 
+    @Override
     public synchronized void setAttribute(int id, Object object) {
 
         switch (id) {
@@ -1665,6 +1690,7 @@ public class Session implements SessionInterface {
     }
 
     // lobs
+    @Override
     public BlobDataID createBlob(long length) {
 
         long lobID = database.lobManager.createBlob(length);
@@ -1678,6 +1704,7 @@ public class Session implements SessionInterface {
         return new BlobDataID(lobID);
     }
 
+    @Override
     public ClobDataID createClob(long length) {
 
         long lobID = database.lobManager.createClob(length);
@@ -1695,6 +1722,7 @@ public class Session implements SessionInterface {
         sessionData.registerLobForResult(result);
     }
 
+    @Override
     public void allocateResultLob(ResultLob result, InputStream inputStream) {
         sessionData.allocateLobForResult(result, inputStream);
     }
@@ -1745,6 +1773,7 @@ public class Session implements SessionInterface {
 
     // DatabaseMetaData.getURL should work as specified for
     // internal connections too.
+    @Override
     public String getInternalConnectionURL() {
         return DatabaseURL.S_URL_PREFIX + database.getURI();
     }
@@ -1760,6 +1789,11 @@ public class Session implements SessionInterface {
     // schema object methods
     public void setSchema(String schema) {
         currentSchema = database.schemaManager.getSchemaHsqlName(schema);
+    }
+
+    // schema object methods
+    public void setSchemaNoThrow(String schema) {
+        currentSchema = database.schemaManager.getSchemaHsqlNameNoThrow(schema, currentSchema);
     }
 
     public void setCatalog(String catalog) {
@@ -1830,6 +1864,7 @@ public class Session implements SessionInterface {
     // warnings
     HsqlArrayList sqlWarnings;
 
+    @Override
     public void addWarning(HsqlException warning) {
 
         if (sqlWarnings == null) {
@@ -1886,6 +1921,7 @@ public class Session implements SessionInterface {
         return randomGenerator.nextDouble();
     }
 
+    @Override
     public Scanner getScanner() {
 
         if (secondaryScanner == null) {
