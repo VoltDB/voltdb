@@ -30,7 +30,7 @@
 #endif
 
 #ifndef SUBCTMAX
-#define SUBCTMAX 4
+#define SUBCTMAX INT32_MAX
 #endif
 
 #ifndef INVALIDCT
@@ -147,10 +147,6 @@ public:
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
-    inline int64_t getSubct(const TreeNode* x) const;
-    inline void incSubct(TreeNode* x);
-    inline void decSubct(TreeNode* x);
-    inline void updateSubct(TreeNode* x);
     // TODO(xin): later rename it to ranklower
     int64_t rankAsc(const Key& key);
     int64_t rankUpper(const Key& key);
@@ -166,6 +162,11 @@ protected:
     void erase(TreeNode *z);
     TreeNode *lookup(const Key &key);
     TreeNode *lookupRank(int64_t ith);
+
+    inline int64_t getSubct(const TreeNode* x) const;
+    inline void incSubct(TreeNode* x);
+    inline void decSubct(TreeNode* x);
+    inline void updateSubct(TreeNode* x);
 
     // static for iterator use
     TreeNode *minimum(const TreeNode *subRoot) const;
@@ -244,7 +245,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
                         if (hasRank) {
                                 while (x != &NIL) {
                                         x = x->parent;
-                                        updateSubct(x);
+                                        decSubct(x);
                                 }
                         }
                         return false;
@@ -380,8 +381,7 @@ void CompactingMap<Key, Data, Compare, hasRank>::erase(TreeNode *z) {
         TreeNode *ct = delnode;
         while (ct != &NIL) {
                 ct = ct->parent;
-                //decSubct(ct);
-                updateSubct(ct);
+                decSubct(ct);
         }
     }
 
@@ -709,10 +709,7 @@ template<typename Key, typename Data, typename Compare, bool hasRank>
 inline void CompactingMap<Key, Data, Compare, hasRank>::decSubct(TreeNode* x) {
     if (x == &NIL) return;
     if (x->subct == INVALIDCT) {
-        int64_t sum = getSubct(x);
-        if (sum - 1 == SUBCTMAX)
-            x->subct = SUBCTMAX;
-
+        updateSubct(x);
     } else
           x->subct--;
 }
@@ -720,9 +717,7 @@ template<typename Key, typename Data, typename Compare, bool hasRank>
 inline void CompactingMap<Key, Data, Compare, hasRank>::updateSubct(TreeNode* x) {
     if (x == &NIL) return;
 
-    int64_t ctl = getSubct(x->left);
-    int64_t ctr = getSubct(x->right);
-    int64_t sumct = ctl + ctr + 1;
+    int64_t sumct = getSubct(x->left) + getSubct(x->right) + 1;
     if (sumct <= SUBCTMAX)
         // assign the lower 32 value to subct, I think the compiler will automatically do it
         // tell me if I am wrong
