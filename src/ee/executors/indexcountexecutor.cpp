@@ -126,6 +126,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // We'll throw an error if the index is missing
     //
     m_index = m_targetTable->index(m_node->getTargetIndexName());
+    assert (m_index != NULL);
+
     // This index should have a true countable flag
     assert(m_index->is_countable_index_);
 
@@ -136,18 +138,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_endKey = TableTuple(m_index->getKeySchema());
         m_endKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
         m_endKey.moveNoHeader(m_endKeyBackingStore);
-    }
-
-    if (m_index == NULL)
-    {
-        VOLT_ERROR("Failed to retreive index '%s' from table '%s' for PlanNode"
-                   " '%s'", m_node->getTargetIndexName().c_str(),
-                   m_targetTable->name().c_str(), m_node->debug().c_str());
-        delete [] m_searchKeyBackingStore;
-        if (m_hasEndKey)
-            delete [] m_endKeyBackingStore;
-        return false;
-    VOLT_TRACE("Index key schema: '%s'", m_index->getKeySchema()->debug().c_str());
     }
 
     m_tuple = TableTuple(m_targetTable->schema());
@@ -256,7 +246,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             break;
         }
     }
-    assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
+    assert(activeNumOfSearchKeys > 0);
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
     int activeNumOfEndKeys = -1;
