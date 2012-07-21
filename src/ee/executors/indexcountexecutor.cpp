@@ -49,10 +49,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert(column_count == 1);
 
     std::string* column_names = new std::string[column_count];
-    for (int ctr = 0; ctr < column_count; ctr++)
-    {
-        column_names[ctr] = m_node->getOutputSchema()[ctr]->getColumnName();
-    }
+    column_names[0] = m_node->getOutputSchema()[0]->getColumnName();
 
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
                                                       m_node->getTargetTable()->name(),
