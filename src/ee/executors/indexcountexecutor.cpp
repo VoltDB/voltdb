@@ -216,7 +216,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                     if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
                         (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
 
-                        // gt or gte when key overflows returns nothing
+                        TableTuple& tmptup = m_outputTable->tempTuple();
+                        tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
+                        m_outputTable->insertTuple(tmptup);
                         return true;
                     }
                     else {
@@ -229,7 +231,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                     if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
                         (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
 
-                        // lt or lte when key underflows returns nothing
+                        TableTuple& tmptup = m_outputTable->tempTuple();
+                        tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
+                        m_outputTable->insertTuple(tmptup);
                         return true;
                     }
                     else {
@@ -241,6 +245,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             }
             // if a EQ comparison is out of range, then return no tuples
             else {
+                TableTuple& tmptup = m_outputTable->tempTuple();
+                tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
+                m_outputTable->insertTuple(tmptup);
                 return true;
             }
             break;
@@ -266,11 +273,46 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 m_endKey.setNValue(ctr, endKeyValue);
             }
             catch (SQLException e) {
-                // TODO(xin): do checking exception later
-                throw e;
+                // This next bit of logic handles underflow and overflow while
+                // setting up the search keys.
+                // e.g. TINYINT > 200 or INT <= 6000000000
+
+                // rethow if not an overflow - currently, it's expected to always be an overflow
+                if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+                    throw e;
+                }
+                IndexLookupType localEndType = m_endType;
+
+                // handle the case where this is a comparison, rather than equality match
+                // comparison is the only place where the executor might return matching tuples
+                // e.g. TINYINT < 1000 should return all values
+                if ((localEndType != INDEX_LOOKUP_TYPE_EQ) &&
+                        (ctr == (activeNumOfSearchKeys - 1))) {
+
+                    if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+                        if ((localEndType == INDEX_LOOKUP_TYPE_LT) ||
+                                (localEndType == INDEX_LOOKUP_TYPE_LTE)) {
+
+                            TableTuple& tmptup = m_outputTable->tempTuple();
+                            tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
+                            m_outputTable->insertTuple(tmptup);
+                            return true;
+                        }
+                        else {
+                            // VoltDB should only support LT or LTE for localEndType
+                            throw e;
+                        }
+                    }
+                    // localEndType should always be lt or lte
+                }
+                // there are no other cases left for end key type
+                else {
+                    throw e;
+                }
+                break;
             }
         }
-        assert((activeNumOfEndKeys == 0) || (m_endKey.getSchema()->columnCount() > 0));
+        //assert((activeNumOfEndKeys == 0) || (m_endKey.getSchema()->columnCount() > 0));
         VOLT_TRACE("End key after substitutions: '%s'", m_endKey.debugNoHeader().c_str());
     }
 
