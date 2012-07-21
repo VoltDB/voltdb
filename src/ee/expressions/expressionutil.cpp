@@ -421,13 +421,6 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
         ret = conjunctionFactory(et, lc, rc);
     break;
 
-    // Functions and pseudo-functions
-    case (EXPRESSION_TYPE_FUNCTION_ABS):
-    case (EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM):
-    case (EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR):
-        ret = functionFactory(et, args);
-        break;
-
     // Constant Values, parameters, tuples
     case (EXPRESSION_TYPE_VALUE_CONSTANT):
         ret = constantValueFactory(obj, vt, et, lc, rc);
@@ -447,6 +440,17 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
 
         // must handle all known expressions in this factory
     default:
+
+        // For ease of extending the EE with user-defined functions, they are
+        // allowed here by virtue of falling into the reserved EXPRESSION_TYPE_FUNCTION... range.
+        // Let the function factory sort out the details.
+        if (et >= EXPRESSION_TYPE_FUNCTION_ABS && et <= EXPRESSION_TYPE_FUNCTION_SQL_ERROR) {
+            ret = functionFactory(et, args);
+            if (ret) {
+                break;
+            }
+        }
+
         char message[256];
         snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
                 expressionToString(et).c_str(), (int)et);

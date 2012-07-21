@@ -34,8 +34,12 @@ public:
     static const char* data_exception_most_specific_type_mismatch;
     static const char* data_exception_numeric_value_out_of_range;
     static const char* data_exception_string_data_length_mismatch;
-    static const char* integrity_constraint_violation;
     static const char* dynamic_sql_error;
+    static const char* integrity_constraint_violation;
+
+    // This is non-standard -- keep it unique.
+    static const char* nonspecific_error_code_for_error_forced_by_user;
+    static const char* specific_error_specified_by_user;
 
     // These are ordered by error code. Names and codes are volt
     // specific - must find merge conflicts on duplicate codes.

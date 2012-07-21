@@ -29,8 +29,13 @@ const char* SQLException::data_exception_invalid_parameter = "22023";
 const char* SQLException::data_exception_most_specific_type_mismatch = "2200G";
 const char* SQLException::data_exception_numeric_value_out_of_range = "22003";
 const char* SQLException::data_exception_string_data_length_mismatch = "22026";
-const char* SQLException::integrity_constraint_violation = "23000";
 const char* SQLException::dynamic_sql_error = "07000";
+const char* SQLException::integrity_constraint_violation = "23000";
+
+// This is non-standard -- keep it unique.
+const char* SQLException::nonspecific_error_code_for_error_forced_by_user = "99999";
+const char* SQLException::specific_error_specified_by_user = "Specific error code specified by user invocation of SQL_ERROR";
+
 
 // These are ordered by error code. Names and codes are volt
 // specific - must find merge conflicts on duplicate codes.

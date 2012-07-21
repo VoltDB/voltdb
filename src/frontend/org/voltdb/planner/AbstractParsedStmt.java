@@ -372,13 +372,19 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseFunctionExpression(VoltXMLElement exprNode, Database db) {
         String name = exprNode.attributes.get("name").toLowerCase();
-        // Parameterized argument type of function. One parameter type is apparently all that SQL ever needs.
+        String volt_alias = exprNode.attributes.get("volt_alias");
         String value_type_name = exprNode.attributes.get("type");
         VoltType value_type = VoltType.typeFromString(value_type_name);
-        AbstractExpression expr = null;
+        if (volt_alias == null) {
+            volt_alias = name; // volt shares the function name with HSQL
+        }
+        ExpressionType exprType = ExpressionType.get(volt_alias);
+
+        if (exprType == ExpressionType.INVALID) {
+            throw new PlanningErrorException("Function '" + volt_alias + "' is not supported.");
+        }
 
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
-        // This needs to be conditional on an expected/allowed number/type of arguments.
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
@@ -387,39 +393,7 @@ public abstract class AbstractParsedStmt {
             args.add(argExpr);
         }
 
-        List<SQLFunction> overloads = SQLFunction.functionsByNameAndArgumentCount(name, args.size());
-        if (overloads == null) {
-            throw new PlanningErrorException("Function '" + name + "' with " + args.size() + " arguments is not supported");
-        }
-
-        // Validate/select specific named function overload against supported argument type(s?).
-        // This amounts to a not-yet-implemented performance feature that allows the planner to direct the
-        // executor to argument-type-specific functions instead of relying on its current tendency to
-        // type-check every row/value at runtime.
-        // Until that day, overloads can be a singleton list.
-        SQLFunction resolved = null;
-        for (SQLFunction supportedFunction : overloads) {
-            resolved = supportedFunction;
-            if ( ! supportedFunction.hasParameter()) {
-                break;
-            }
-            VoltType paramType = supportedFunction.paramType();
-            if (paramType.equals(value_type)) {
-                break;
-            }
-            if (paramType.equals(VoltType.NUMERIC) && (value_type.isExactNumeric() ||  value_type.equals(VoltType.FLOAT))) {
-                break;
-            }
-            // type was not acceptable or not supported
-            resolved = null;
-        }
-
-        if (resolved == null) {
-            throw new PlanningErrorException("Function '" + name + "' does not support argument type '" + value_type_name + "'");
-        }
-
-        ExpressionType exprType = resolved.getExpressionType();
-
+        AbstractExpression expr = null;
         try {
             expr = exprType.getExpressionClass().newInstance();
         } catch (Exception e) {
@@ -427,14 +401,8 @@ public abstract class AbstractParsedStmt {
             throw new RuntimeException(e.getMessage(), e);
         }
         expr.setExpressionType(exprType);
-
-        VoltType vt = resolved.getValueType();
-        // Null return type is a place-holder for the parser-provided parameter type.
-        if (vt != null) {
-            expr.setValueType(vt);
-            expr.setValueSize(vt.getMaxLengthInBytes());
-        }
-
+        expr.setValueType(value_type);
+        expr.setValueSize(value_type.getMaxLengthInBytes());
         expr.setArgs(args);
         return expr;
     }

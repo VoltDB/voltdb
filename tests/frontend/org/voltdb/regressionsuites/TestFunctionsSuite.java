@@ -53,6 +53,81 @@ public class TestFunctionsSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+    public void testExplicitErrorUDF() throws Exception
+    {
+        System.out.println("STARTING testExplicitErrorUDF");
+        Client client = getClient();
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PRIMARY KEY (ID)
+                );
+        */
+        for(int id=7; id < 15; id++) {
+            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1);
+            client.drain();
+        }
+        ClientResponse cr = null;
+
+        // Exercise basic syntax without runtime invocation.
+        cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123) from P1 where ID = 0");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        cr = client.callProcedure("@AdHoc", "select SQL_ERROR('abc') from P1 where ID = 0");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123, 'abc') from P1 where ID = 0");
+        assertTrue(cr.getStatus() == ClientResponse.SUCCESS);
+
+        boolean caught = false;
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123, 'abc') from P1");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("xception") != -1); // TODO match a more explicit pattern
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select SQL_ERROR(123) from P1");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("incompatible data type") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select SQL_ERROR('abc') from P1");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("xception") != -1); // TODO match a more explicit pattern
+            caught = true;
+        }
+        assertTrue(caught);
+
+    }
+
     public void testAbs() throws Exception
     {
         System.out.println("STARTING testAbs");

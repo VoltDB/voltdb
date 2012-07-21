@@ -277,9 +277,13 @@ enum ExpressionType {
     // -----------------------------
     // Functions
     // -----------------------------
+    // Important: the expression dispatcher requires EXPRESSION_TYPE_FUNCTION_... values
+    // to fall into the range between ...ABS and ...SQL_ERROR.
     EXPRESSION_TYPE_FUNCTION_ABS                    = 100,
     EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM         = 110,
     EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR     = 111,
+
+    EXPRESSION_TYPE_FUNCTION_SQL_ERROR              = 999,
 
 };
 

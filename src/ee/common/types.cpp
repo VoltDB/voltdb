@@ -497,6 +497,9 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR: {
         return "FUNCTION_SUBSTRING_FROM_FOR";
     }
+    case EXPRESSION_TYPE_FUNCTION_SQL_ERROR: {
+        return "FUNCTION_SQL_ERROR";
+    }
     }
     return "INVALID";
 }
@@ -569,6 +572,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM;
     } else if (str == "FUNCTION_SUBSTRING_FROM_FOR") {
         return EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR;
+    } else if (str == "FUNCTION_SQL_ERROR") {
+        return EXPRESSION_TYPE_FUNCTION_SQL_ERROR;
     }
 
     return EXPRESSION_TYPE_INVALID;
