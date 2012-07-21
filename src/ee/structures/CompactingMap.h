@@ -149,7 +149,7 @@ public:
 
     inline int64_t getSubct(const TreeNode* x) const;
     inline void incSubct(TreeNode* x);
-    inline void decSubct(TreeNode* x, bool isMax);
+    inline void decSubct(TreeNode* x);
     inline void updateSubct(TreeNode* x);
     // TODO(xin): later rename it to ranklower
     int64_t rankAsc(const Key& key);
@@ -244,8 +244,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
                         if (hasRank) {
                                 while (x != &NIL) {
                                         x = x->parent;
-                                        if (x->subct != INVALIDCT)
-                                            decSubct(x, false);
+                                        updateSubct(x);
                                 }
                         }
                         return false;
@@ -381,10 +380,10 @@ void CompactingMap<Key, Data, Compare, hasRank>::erase(TreeNode *z) {
         TreeNode *ct = delnode;
         while (ct != &NIL) {
                 ct = ct->parent;
-                decSubct(ct, true);
+                //decSubct(ct);
+                updateSubct(ct);
         }
     }
-
 
     if (y->color == BLACK)
         deleteFixup(x);
@@ -707,12 +706,13 @@ inline void CompactingMap<Key, Data, Compare, hasRank>::incSubct(TreeNode* x) {
 
 }
 template<typename Key, typename Data, typename Compare, bool hasRank>
-inline void CompactingMap<Key, Data, Compare, hasRank>::decSubct(TreeNode* x, bool isMax) {
+inline void CompactingMap<Key, Data, Compare, hasRank>::decSubct(TreeNode* x) {
     if (x == &NIL) return;
     if (x->subct == INVALIDCT) {
         int64_t sum = getSubct(x);
-        if (sum - 1 == SUBCTMAX && isMax)
+        if (sum - 1 == SUBCTMAX)
             x->subct = SUBCTMAX;
+
     } else
           x->subct--;
 }

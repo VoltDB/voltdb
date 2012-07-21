@@ -156,11 +156,10 @@ TEST_F(CompactingMapTest, SimpleUniqueRank) {
     bool sucess;
     int64_t rankasc;
 
-    sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(sucess);
-    sucess = volt.insert(std::pair<int,int>(2, 2)); ASSERT_TRUE(sucess);
-    sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(sucess);
-    sucess = volt.insert(std::pair<int,int>(4, 4)); ASSERT_TRUE(sucess);
-    sucess = volt.insert(std::pair<int,int>(5, 5)); ASSERT_TRUE(sucess);
+    for (int val = 1; val < 10; val++) {
+        sucess = volt.insert(std::pair<int,int>(val, val));
+        ASSERT_TRUE(sucess);
+    }
 
     sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(!sucess);
     rankasc = volt.rankAsc(3);
