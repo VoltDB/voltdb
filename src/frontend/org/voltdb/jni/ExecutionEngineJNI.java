@@ -434,7 +434,6 @@ public class ExecutionEngineJNI extends ExecutionEngine {
 
     @Override
     public boolean undoUndoToken(final long undoToken) {
-        new Throwable().printStackTrace();
         return nativeUndoUndoToken(pointer, undoToken);
     }
 
