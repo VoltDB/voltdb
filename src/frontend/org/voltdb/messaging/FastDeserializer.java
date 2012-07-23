@@ -173,7 +173,6 @@ public class FastDeserializer implements DataInput {
         return retval;
     }
 
-
     /**
      * Read a string in the standard VoltDB way. That is, four
      * bytes of length info followed by the bytes of characters
@@ -192,10 +191,6 @@ public class FastDeserializer implements DataInput {
             return null;
         assert len >= 0;
 
-        if (len > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Serializable strings cannot be longer then "
-                    + VoltType.MAX_VALUE_LENGTH + " bytes");
-        }
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("String length is negative " + len);
         }
@@ -230,10 +225,6 @@ public class FastDeserializer implements DataInput {
             return null;
         assert len >= 0;
 
-        if (len > VoltType.MAX_VALUE_LENGTH) {
-            throw new IOException("Serializable varbinary values cannot be longer then "
-                    + VoltType.MAX_VALUE_LENGTH + " bytes");
-        }
         if (len < NULL_STRING_INDICATOR) {
             throw new IOException("Varbinary length is negative " + len);
         }

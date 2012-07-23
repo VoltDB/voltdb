@@ -64,7 +64,8 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     LocalCluster.FailureState.ALL_RUNNING,
                     false, true);
         cluster.setMaxHeap(256);
-        if (cluster.isValgrind()) {
+        String build = System.getProperties().getProperty("build", "release");
+        if (cluster.isValgrind() || build.equalsIgnoreCase("MEMCHECK")) {
             //Way to much data in this test. Using less data makes it redundant
             return;
         }

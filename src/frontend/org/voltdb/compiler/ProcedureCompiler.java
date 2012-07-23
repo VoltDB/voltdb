@@ -154,6 +154,7 @@ public abstract class ProcedureCompiler {
         procedure.setClassname(className);
         // sysprocs don't use the procedure compiler
         procedure.setSystemproc(false);
+        procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(true);
 
         // get the annotation
@@ -501,6 +502,7 @@ public abstract class ProcedureCompiler {
         procedure.setClassname(className);
         // sysprocs don't use the procedure compiler
         procedure.setSystemproc(false);
+        procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(false);
 
         // get the annotation

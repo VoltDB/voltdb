@@ -62,7 +62,7 @@ function _benchmark() {
         --configfile=config.xml \
         --warmup=5 \
         --duration=20 \
-        --querytracefile=$1.queries.out \
+#--querytracefile=$1.queries.log.txt \
         --test=$1
     echo Sample queries:
     head -6 $1.queries.out

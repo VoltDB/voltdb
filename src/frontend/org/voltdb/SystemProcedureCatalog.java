@@ -96,6 +96,7 @@ public class SystemProcedureCatalog {
             p.setReadonly(readOnly);
             p.setEverysite(everySite);
             p.setSystemproc(true);
+            p.setDefaultproc(false);
             p.setHasjava(true);
             p.setPartitiontable(null);
             p.setPartitioncolumn(null);

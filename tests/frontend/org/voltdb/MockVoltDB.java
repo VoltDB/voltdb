@@ -147,6 +147,7 @@ public class MockVoltDB implements VoltDBInterface
         retval.setClassname(name);
         retval.setHasjava(true);
         retval.setSystemproc(false);
+        retval.setDefaultproc(false);
         return retval;
     }
 
