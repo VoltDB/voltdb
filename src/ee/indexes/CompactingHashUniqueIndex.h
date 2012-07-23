@@ -148,6 +148,11 @@ public:
         return retval;
     }
 
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
+    }
+
     size_t getSize() const { return m_entries.size(); }
 
     int64_t getMemoryEstimate() const

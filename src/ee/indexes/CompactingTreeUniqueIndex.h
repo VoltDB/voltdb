@@ -60,12 +60,12 @@ namespace voltdb {
  * Index implemented as a Binary Unique Map.
  * @see TableIndex
  */
-template<typename KeyType, class KeyComparator, class KeyEqualityChecker>
+template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=false>
 class CompactingTreeUniqueIndex : public TableIndex
 {
     friend class TableIndexFactory;
 
-    typedef CompactingMap<KeyType, const void*, KeyComparator> MapType;
+    typedef CompactingMap<KeyType, const void*, KeyComparator, hasRank> MapType;
 
 public:
 
@@ -236,6 +236,44 @@ public:
         }
 
         return !m_match.isNullTuple();
+    }
+
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
+    }
+    int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
+        if (!hasRank) return -1;
+
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries.lowerBound(m_tmp1);
+        if (m_keyIter.isEnd()) {
+            return m_entries.size() + 1;
+        } else {
+            return m_entries.rankAsc(m_keyIter.key());
+        }
+    }
+    int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
+        if (!hasRank) return -1;
+
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries.lowerBound(m_tmp1);
+
+        if (m_keyIter.isEnd())
+            return m_entries.size();
+
+        int cmp = m_eq(m_tmp1, m_keyIter.key());
+        KeyType tmpKey = m_keyIter.key();
+        if (cmp == 0) {
+            m_keyIter.movePrev();
+            if (m_keyIter.isEnd() == false)
+                return m_entries.rankAsc(m_keyIter.key());
+            else
+                //we can not find a previous key
+                return 0;
+        }
+        // return rank with the current key if equal
+        return m_entries.rankAsc(tmpKey);
     }
 
     size_t getSize() const { return static_cast<size_t>(m_entries.size()); }
