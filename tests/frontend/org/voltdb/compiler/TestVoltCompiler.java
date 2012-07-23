@@ -146,7 +146,7 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
         fbs = checkPartitionParam("CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
-        		                  "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;",
+                                  "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;",
                 "org.voltdb.compiler.procedures.PartitionParamInteger",
                 "PKEY_INTEGER");
         expectedError =
