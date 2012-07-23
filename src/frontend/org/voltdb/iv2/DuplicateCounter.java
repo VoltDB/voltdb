@@ -81,6 +81,8 @@ public class DuplicateCounter
             }
             else if (!m_responseHash.equals(hash)) {
                 System.out.printf("COMPARING: %d to %d\n", hash, m_responseHash);
+                System.out.println("PREV MESSAGE: " + m_lastResponse.toString());
+                System.out.println("CURR MESSAGE: " + message.toString());
                 return MISMATCH;
             }
             m_lastResponse = message;

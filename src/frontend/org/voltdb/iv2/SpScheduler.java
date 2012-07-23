@@ -255,7 +255,7 @@ public class SpScheduler extends Scheduler
                 m_mailbox.send(counter.m_destinationId, message);
             }
             else if (result == DuplicateCounter.MISMATCH) {
-                VoltDB.crashLocalVoltDB("HASH MISMATCH running every-site system procedure.", true, null);
+                VoltDB.crashLocalVoltDB("HASH MISMATCH: replicas produced different results.", true, null);
             }
             // doing duplicate suppresion: all done.
             return;
