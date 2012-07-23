@@ -15,7 +15,7 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-#include "IndexCountExecutor.h"
+#include "indexcountexecutor.h"
 
 #include "common/debuglog.h"
 #include "common/common.h"
