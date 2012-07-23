@@ -316,9 +316,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
             if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-                rkStart = m_index->getCounterLET(&m_searchKey, NULL);
+                rkStart = m_index->getCounterLET(&m_searchKey, false);
             } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-                rkStart = m_index->getCounterLET(&m_searchKey, NULL);
+                rkStart = m_index->getCounterLET(&m_searchKey, false);
                 if (m_index->hasKey(&m_searchKey))
                     leftIncluded = 1;
                 if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
@@ -340,9 +340,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             if (endKeyOverflow == false) {
                 IndexLookupType localEndType = m_endType;
                 if (localEndType == INDEX_LOOKUP_TYPE_LT) {
-                    rkEnd = m_index->getCounterGET(&m_endKey, NULL);
+                    rkEnd = m_index->getCounterGET(&m_endKey, false);
                 } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
-                    rkEnd = m_index->getCounterGET(&m_endKey, NULL);
+                    rkEnd = m_index->getCounterGET(&m_endKey, false);
                     if (m_index->hasKey(&m_endKey))
                         rightIncluded = 1;
                 } else {

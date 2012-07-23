@@ -305,7 +305,8 @@ public:
     /**
      * This function only supports countable tree index. It returns the counter value less than or equal to the serarchKey.
      * For unique index, it will return the rank with the searchKey in ascending order including itself.
-     * For non-unique index,
+     * For non-unique index.
+     * isUpper means nothing to Unique map
      */
     virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper)
     {
@@ -313,6 +314,7 @@ public:
     }
     /**
      * This function only supports countable tree index. It returns the counter value greater than the serarchKey.
+     * isUpper means nothing to Unique map
      */
     virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper)
     {
