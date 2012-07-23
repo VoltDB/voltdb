@@ -182,6 +182,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
+    bool searchKeyUnderflow = false, endKeyOverflow = false;
 
     //
     // SEARCH KEY
@@ -208,26 +209,29 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             // handle the case where this is a comparison, rather than equality match
             // comparison is the only place where the executor might return matching tuples
             // e.g. TINYINT < 1000 should return all values
+            TableTuple& tmptup = m_outputTable->tempTuple();
+            tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
+
             if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
                 (ctr == (activeNumOfSearchKeys - 1))) {
+                assert (localLookupType == INDEX_LOOKUP_TYPE_GT || localLookupType == INDEX_LOOKUP_TYPE_GTE);
 
                 if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_GT) ||
-                        (localLookupType == INDEX_LOOKUP_TYPE_GTE)) {
-
-                        TableTuple& tmptup = m_outputTable->tempTuple();
-                        tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
                         m_outputTable->insertTuple(tmptup);
                         return true;
-                    }
-                    else {
-                        // VoltDB should only support LT or LTE with
-                        // empty search keys for order-by without lookup
-                        throw e;
-                    }
+                } else if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+                    searchKeyUnderflow = true;
+                    break;
+                } else {
+                    throw e;
                 }
             }
-            throw e;
+            // if a EQ comparision is out of range, then return no tuples
+            else {
+                m_outputTable->insertTuple(tmptup);
+                return true;
+            }
+            break;
         }
     }
     assert(activeNumOfSearchKeys > 0);
@@ -258,31 +262,31 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
                     throw e;
                 }
-                IndexLookupType localEndType = m_endType;
 
                 // handle the case where this is a comparison, rather than equality match
                 // comparison is the only place where the executor might return matching tuples
                 // e.g. TINYINT < 1000 should return all values
-                if ((localEndType != INDEX_LOOKUP_TYPE_EQ) &&
-                        (ctr == (activeNumOfSearchKeys - 1))) {
+                TableTuple& tmptup = m_outputTable->tempTuple();
+                tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
 
-                    if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
-                        if ((localEndType == INDEX_LOOKUP_TYPE_LT) ||
-                                (localEndType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                            TableTuple& tmptup = m_outputTable->tempTuple();
-                            tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
-                            m_outputTable->insertTuple(tmptup);
-                            return true;
-                        }
-                        else {
-                            // VoltDB should only support LT or LTE for localEndType
-                            throw e;
-                        }
+                if (ctr == (activeNumOfSearchKeys - 1)) {
+                    assert (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
+                    if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
+                        m_outputTable->insertTuple(tmptup);
+                        return true;
+                    } else if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
+                        endKeyOverflow = true;
+                        break;
+                    } else {
+                        throw e;
                     }
-                    // localEndType should always be lt or lte
                 }
-                throw e;
+                // if a EQ comparision is out of range, then return no tuples
+                else {
+                    m_outputTable->insertTuple(tmptup);
+                    return true;
+                }
+                break;
             }
         }
         //assert((activeNumOfEndKeys == 0) || (m_endKey.getSchema()->columnCount() > 0));
@@ -292,21 +296,13 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     //
     // POST EXPRESSION
     //
-    AbstractExpression* post_expression = m_node->getPredicate();
-    if (post_expression != NULL)
-    {
-        if (m_needsSubstitutePostExpression) {
-            post_expression->substitute(params);
-        }
-        VOLT_DEBUG("Post Expression:\n%s", post_expression->debug(true).c_str());
-    }
+    assert(m_node->getPredicate() == NULL);
 
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
     assert(m_index->is_countable_index_);
 
     // An index count has two parts: unique and multi
-    //
 
     int64_t rkStart = 0, rkEnd = 0, rkRes = 0;
 
@@ -314,81 +310,96 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     int leftIncluded = 0, rightIncluded = 0;
 
     if (m_index->isUniqueIndex()) {
+        // Deal with unique map
         assert (activeNumOfSearchKeys > 0);
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                 localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-        if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            rkStart = m_index->getCounterLET(&m_searchKey, NULL);
-        } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            rkStart = m_index->getCounterLET(&m_searchKey, NULL);
-            if (m_index->hasKey(&m_searchKey))
-                leftIncluded = 1;
-            if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
-                // two columns index, no value for the second column
-                // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
-                // this may be changed if we can handle one column index case
-                // like: SELECT count(*) from T2 WHERE POINTS < ?
-                // because the searchKey is not complete, we should find it,
-                // but it actually finds the previous rank. Add 1 back.
-                rkStart++;
-                leftIncluded = 1;
+        if (searchKeyUnderflow == false) {
+            if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+                rkStart = m_index->getCounterLET(&m_searchKey, NULL);
+            } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+                rkStart = m_index->getCounterLET(&m_searchKey, NULL);
+                if (m_index->hasKey(&m_searchKey))
+                    leftIncluded = 1;
+                if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
+                    // two columns index, no value for the second column
+                    // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
+                    // this may be changed if we can handle one column index case
+                    // like: SELECT count(*) from T2 WHERE POINTS < ?
+                    // because the searchKey is not complete, we should find it,
+                    // but it actually finds the previous rank. Add 1 back.
+                    rkStart++;
+                    leftIncluded = 1;
+                }
+            } else {
+                return false;
             }
-        } else {
-            return false;
         }
 
         if (m_hasEndKey) {
-            IndexLookupType localEndType = m_endType;
-            if (localEndType == INDEX_LOOKUP_TYPE_LT) {
-                rkEnd = m_index->getCounterGET(&m_endKey, NULL);
-            } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
-                rkEnd = m_index->getCounterGET(&m_endKey, NULL);
-                if (m_index->hasKey(&m_endKey))
-                    rightIncluded = 1;
+            if (endKeyOverflow == false) {
+                IndexLookupType localEndType = m_endType;
+                if (localEndType == INDEX_LOOKUP_TYPE_LT) {
+                    rkEnd = m_index->getCounterGET(&m_endKey, NULL);
+                } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
+                    rkEnd = m_index->getCounterGET(&m_endKey, NULL);
+                    if (m_index->hasKey(&m_endKey))
+                        rightIncluded = 1;
+                } else {
+                    return false;
+                }
             } else {
-                return false;
+                rkEnd = m_index->getSize();
+                rightIncluded = 1;
             }
         } else {
             rkEnd = m_index->getSize();
             rightIncluded = 1;
         }
     } else {
+        // Deal with multi-map
         assert (activeNumOfSearchKeys > 0);
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                 localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-        if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-            rkStart = m_index->getCounterLET(&m_searchKey, true);
-        } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-            if (m_index->hasKey(&m_searchKey)) {
-                leftIncluded = 1;
-                rkStart = m_index->getCounterLET(&m_searchKey, false);
-            } else {
+        if (searchKeyUnderflow == false) {
+            if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
                 rkStart = m_index->getCounterLET(&m_searchKey, true);
-            }
-            if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
-                // two columns index, no value for the second column
-                // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
-                // this may be changed if we can handle one column index case
-                // like: SELECT count(*) from T2 WHERE POINTS < ?
-                // because the searchKey is not complete, we should find it,
-                // but it actually finds the previous rank. Add 1 back.
-                rkStart++;
-                leftIncluded = 1;
-            }
-        } else {
-            return false;
-        }
-
-        if (m_hasEndKey) {
-            IndexLookupType localEndType = m_endType;
-            if (localEndType == INDEX_LOOKUP_TYPE_LT) {
-                rkEnd = m_index->getCounterGET(&m_endKey, false);
-            } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
-                rkEnd = m_index->getCounterGET(&m_endKey, true);
-                if (m_index->hasKey(&m_endKey))
-                    rightIncluded = 1;
+            } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+                if (m_index->hasKey(&m_searchKey)) {
+                    leftIncluded = 1;
+                    rkStart = m_index->getCounterLET(&m_searchKey, false);
+                } else {
+                    rkStart = m_index->getCounterLET(&m_searchKey, true);
+                }
+                if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
+                    // two columns index, no value for the second column
+                    // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
+                    // this may be changed if we can handle one column index case
+                    // like: SELECT count(*) from T2 WHERE POINTS < ?
+                    // because the searchKey is not complete, we should find it,
+                    // but it actually finds the previous rank. Add 1 back.
+                    rkStart++;
+                    leftIncluded = 1;
+                }
             } else {
                 return false;
+            }
+        }
+        if (m_hasEndKey) {
+            if (endKeyOverflow == false) {
+                IndexLookupType localEndType = m_endType;
+                if (localEndType == INDEX_LOOKUP_TYPE_LT) {
+                    rkEnd = m_index->getCounterGET(&m_endKey, false);
+                } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
+                    rkEnd = m_index->getCounterGET(&m_endKey, true);
+                    if (m_index->hasKey(&m_endKey))
+                        rightIncluded = 1;
+                } else {
+                    return false;
+                }
+            } else {
+                rkEnd = m_index->getSize();
+                rightIncluded = 1;
             }
         } else {
             rkEnd = m_index->getSize();

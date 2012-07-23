@@ -105,7 +105,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
         m_LookupType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
-        m_predicate = isp.m_predicate;
+        m_predicate = null;
 
         if (isp.getEndExpression() != null)
             this.setEndKeyExpression(isp.getEndExpression());
