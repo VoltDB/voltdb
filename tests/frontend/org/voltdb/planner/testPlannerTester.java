@@ -38,7 +38,6 @@ import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlanNodeType;
-import org.voltdb.utils.plannerTester;
 public class testPlannerTester extends TestCase {
     private PlannerTestAideDeCamp aide;
 
@@ -385,7 +384,7 @@ public class testPlannerTester extends TestCase {
     }
     
     public void testMain() {
-    	String[] args = {"-d","-e","-C=/home/zhengli/test1", "-C=/home/zhengli/Voter","-C=/home/zhengli/voltcache","-C=/home/zhengli/voltkv"};
+    	String[] args = {"-d","-C=/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/config/voter"};
     	plannerTester.main(args);
     }
 }

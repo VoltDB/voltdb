@@ -23,26 +23,16 @@
 
 package org.voltdb.planner;
 
-import java.io.BufferedReader;
-import java.io.BufferedWriter;
-import java.io.FileNotFoundException;
-import java.io.FileReader;
-import java.io.FileWriter;
-import java.io.IOException;
-import java.util.ArrayList;
 import java.util.List;
 
 import junit.framework.TestCase;
 
-import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.PlanNodeList;
-import org.voltdb.plannodes.PlanNodeTree;
 
 public class TestIndexSelection extends TestCase {
 
@@ -105,48 +95,21 @@ public class TestIndexSelection extends TestCase {
         }
     }*/
 
-//    public void testEng2541Plan() throws JSONException
-//    {
-//        AbstractPlanNode pn = null;
-//        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-//        assertTrue(pn != null);
-//
-//        while( pn.getChildCount() > 0 )
-//        	pn = pn.getChild(0);
-//        //assertTrue(pn instanceof IndexScanPlanNode);
-//        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
-//
-//        if (pn != null) {
-//            JSONObject j = new JSONObject(pn.toJSONString());
-//            System.out.println(j.toString(2));
-//            System.out.println();
-//            System.out.println(pn.toExplainPlanString());
-//        }
-//    }
-    
-//    public void testGetLeafLists() {
-//    	AbstractPlanNode pn = null;
-//        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-//        assertTrue(pn != null);
-//        
-//        ArrayList<AbstractPlanNode> collected = pn.getLeafLists();
-//        System.out.println( collected);
-//        System.out.println( collected.size() );
-//        for( AbstractPlanNode n : collected )
-//           System.out.println( n.toExplainPlanString() );
-//        //assertTrue( collected.size() == 1 );
-//        JSONObject j;
-//		try {
-//			j = new JSONObject( collected.get(0).toJSONString() );
-//			System.out.println(j.getString("PLAN_NODE_TYPE"));
-//		} catch (JSONException e) {
-//			// TODO Auto-generated catch block
-//			e.printStackTrace();
-//		}
-//	
-//        //assertTrue( j.getString("PLAN_NODE_TYPE").equalsIgnoreCase("LIMIT") = 1 );
-//    }
-    
-    
-}
+    public void testEng2541Plan() throws JSONException
+    {
+        AbstractPlanNode pn = null;
+        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
+        assertTrue(pn != null);
 
+        pn = pn.getChild(0);
+        //assertTrue(pn instanceof IndexScanPlanNode);
+        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
+
+        if (pn != null) {
+            JSONObject j = new JSONObject(pn.toJSONString());
+            System.out.println(j.toString(2));
+            System.out.println();
+            System.out.println(pn.toExplainPlanString());
+        }
+    }
+}

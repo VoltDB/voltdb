@@ -1,4 +1,4 @@
-package org.voltdb.utils;
+package org.voltdb.planner;
 
 import java.io.BufferedReader;
 import java.io.BufferedWriter;
