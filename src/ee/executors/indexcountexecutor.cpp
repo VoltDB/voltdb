@@ -200,7 +200,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             // This next bit of logic handles underflow and overflow while
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
-
             // rethow if not an overflow - currently, it's expected to always be an overflow
             if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
                 throw e;
@@ -227,30 +226,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                         throw e;
                     }
                 }
-                if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
-                    if ((localLookupType == INDEX_LOOKUP_TYPE_LT) ||
-                        (localLookupType == INDEX_LOOKUP_TYPE_LTE)) {
-
-                        TableTuple& tmptup = m_outputTable->tempTuple();
-                        tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
-                        m_outputTable->insertTuple(tmptup);
-                        return true;
-                    }
-                    else {
-                        // don't allow GTE because it breaks null handling
-                        localLookupType = INDEX_LOOKUP_TYPE_GT;
-                    }
-                }
-
             }
-            // if a EQ comparison is out of range, then return no tuples
-            else {
-                TableTuple& tmptup = m_outputTable->tempTuple();
-                tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
-                m_outputTable->insertTuple(tmptup);
-                return true;
-            }
-            break;
+            throw e;
         }
     }
     assert(activeNumOfSearchKeys > 0);
@@ -305,11 +282,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                     }
                     // localEndType should always be lt or lte
                 }
-                // there are no other cases left for end key type
-                else {
-                    throw e;
-                }
-                break;
+                throw e;
             }
         }
         //assert((activeNumOfEndKeys == 0) || (m_endKey.getSchema()->columnCount() > 0));
