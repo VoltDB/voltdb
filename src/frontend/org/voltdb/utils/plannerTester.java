@@ -17,6 +17,7 @@ import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.planner.PlannerTestAideDeCamp;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -40,6 +41,7 @@ public class plannerTester {
 	private static boolean m_changedSQL;
 	private static boolean m_isCompileSave = false;
 	private static boolean m_isDiff = false;
+	private static boolean m_showExpainedPlan = false;
 	
 	public static class Pair {
 	    private Object first; //first member of pair
@@ -96,6 +98,9 @@ public class plannerTester {
 			}
 			else if( str.startsWith("-d") ) {
 				m_isDiff = true;
+			}
+			else if( str.startsWith("-e") ){
+				m_showExpainedPlan = true;
 			}
 		}
 		size = m_config.size();
@@ -179,7 +184,7 @@ public class plannerTester {
 		}
 	} 
 	
-    private static void setUpSchema() throws Exception {
+    public static void setUpSchema() throws Exception {
     	File ddlFile = new File(m_pathDDL);
         aide = new PlannerTestAideDeCamp(ddlFile.toURI().toURL(),
         		m_baseName);
@@ -264,7 +269,8 @@ public class plannerTester {
 			try {
 				jobj = new JSONObject( prettyJson );
 				JSONArray jarray = 	jobj.getJSONArray("PLAN_NODES");
-				pnt.loadFromJSONArray(jarray);
+				Database db = aide.getDatabase();
+				pnt.loadFromJSONArray(jarray, db);
 			} catch (JSONException e) {
 				e.printStackTrace();
 			}
@@ -299,9 +305,12 @@ public class plannerTester {
 			diffScans( pn1, pn2 );
 			diffInlineAndJoin( pn1, pn2);
 			System.out.println("");
-//			System.out.println( pn1.toExplainPlanString() );
-//			System.out.println( "===>");
-//			System.out.println( pn2.toExplainPlanString() );
+			if( m_showExpainedPlan ) {
+				System.out.print( pn1.toExplainPlanString() );
+				System.out.println( "===>");
+				System.out.println("");
+				System.out.println( pn2.toExplainPlanString() );
+			}
 		}
 	}
 	

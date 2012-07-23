@@ -19,6 +19,7 @@ package org.voltdb.plannodes;
 
 import java.util.*;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 import org.apache.tools.ant.types.resources.Union;
 import org.json_voltpatches.JSONArray;
@@ -117,7 +118,7 @@ public class PlanNodeTree implements JSONString {
     	return m_planNodes;
     }
     
-    public void loadFromJSONArray( JSONArray jArray ) {
+    public void loadFromJSONArray( JSONArray jArray, Database db ) {
     	int size = jArray.length();
     	
 		try {
@@ -182,7 +183,7 @@ public class PlanNodeTree implements JSONString {
 	    		else {
 	    			System.err.println("plan node type not support: "+nodeType);
 	    		}
-	    		apn.loadFromJSONObject(jobj);
+	    		apn.loadFromJSONObject(jobj, db);
 	    		m_planNodes.add(apn);
 			}
 			//link children and parents

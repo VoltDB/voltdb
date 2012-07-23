@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
@@ -61,8 +62,8 @@ public class SendPlanNode extends AbstractPlanNode {
     }
     
     @Override
-    public void loadFromJSONObject( JSONObject jobj ) {
-    	super.loadFromJSONObject(jobj);
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+    	super.loadFromJSONObject(jobj, db);
     }
 
     @Override

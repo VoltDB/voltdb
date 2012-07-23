@@ -138,21 +138,22 @@ public class testPlannerTester extends TestCase {
     	//pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
     	//pn = compile("select * from l where b = ? limit ?;", 3, true);
     	//pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
-    	//pn = compile("select * from t where a = ? order by a limit ?;",3, true);
+//    	pn = compile("select * from t where a = ? order by a limit ?;",3, true);
+    	String path = "/home/zhengli/";
     	plannerTester.setUp("/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
 				"testplans-plannerTester-ddl", "L", "a");
 		List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
 
-    	String path = "/home/zhengli/";
     	System.out.println( pnList.size() );
     	
     	pn = plannerTester.combinePlanNodes(pnList);
+    	System.out.println( pn.toJSONString() );
     	System.out.println( pn.toExplainPlanString() );
     	plannerTester.writePlanToFile( pn, path, "prettyJson.txt");
     	
     	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt");
     	System.out.println( pnt.toJSONString() );
-//        System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
+        System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
     	ArrayList<AbstractPlanNode> list1 = pn.getLists();
     	ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getLists();
     	assertTrue( list1.size() == list2.size() );
@@ -384,7 +385,7 @@ public class testPlannerTester extends TestCase {
     }
     
     public void testMain() {
-    	String[] args = {"-d","-C=/home/zhengli/test1", "-C=/home/zhengli/Voter","-C=/home/zhengli/voltcache","-C=/home/zhengli/voltkv"};
+    	String[] args = {"-d","-e","-C=/home/zhengli/test1", "-C=/home/zhengli/Voter","-C=/home/zhengli/voltcache","-C=/home/zhengli/voltkv"};
     	plannerTester.main(args);
     }
 }

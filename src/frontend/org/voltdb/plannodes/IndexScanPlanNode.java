@@ -42,6 +42,8 @@ import org.voltdb.types.IndexType;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.types.SortDirectionType;
 
+import com.sun.org.apache.xml.internal.resolver.Catalog;
+
 public class IndexScanPlanNode extends AbstractScanPlanNode {
 
     public enum Members {
@@ -367,10 +369,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         stringer.endArray();
     }
     
-    public void loadFromJSONObject( JSONObject jobj ) {
-    	super.loadFromJSONObject(jobj);
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+    	super.loadFromJSONObject(jobj, db);
     	try {
 			m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
+			m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
 //			JSONObject obj = jobj.getJSONObject(Members.END_EXPRESSION.name());
 //			m_endExpression.fromJSONObject( obj, null);
 		} catch (JSONException e) {

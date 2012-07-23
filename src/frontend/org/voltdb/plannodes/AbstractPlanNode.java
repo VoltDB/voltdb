@@ -679,7 +679,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         stringer.endArray();
     }
     
-    public void loadFromJSONObject( JSONObject jobj ) {
+    //TODO outputSchema not loaded 
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
     	if( jobj == null ) {
     		System.err.println("JSONObject is null");
     		return;
@@ -696,7 +697,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 			JSONArray jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
 			if( jarray.length() != 0 ) {
 				PlanNodeTree pnt = new PlanNodeTree();
-				pnt.loadFromJSONArray(jarray);
+				pnt.loadFromJSONArray(jarray, db);
 				List<AbstractPlanNode> list = pnt.getNodeList();
 				for( AbstractPlanNode pn : list ) {
 					 m_inlineNodes.put( pn.getPlanNodeType(), pn);

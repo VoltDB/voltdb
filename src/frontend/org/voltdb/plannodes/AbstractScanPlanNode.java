@@ -307,13 +307,16 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
     
     @Override
-    public void loadFromJSONObject( JSONObject jobj ) {
-    	super.loadFromJSONObject(jobj);
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+    	super.loadFromJSONObject(jobj, db);
     	try {
 			this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
-			//this.m_predicate.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name() ), null);
+			JSONObject jobj1 = jobj.getJSONObject( Members.PREDICATE.name() );
+			if( jobj1 != null ) {
+				this.m_predicate.fromJSONObject(jobj1, db);
+			}
 		} catch (JSONException e) {
-			System.out.println(e.getMessage());
+			//better to do nothing
 		}
     }
 

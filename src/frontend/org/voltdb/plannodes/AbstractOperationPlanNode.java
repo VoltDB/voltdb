@@ -146,7 +146,7 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     
     // TODO:Members not loaded
     @Override
-    public void loadFromJSONObject( JSONObject jobj ) {
-    	super.loadFromJSONObject(jobj);
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+    	super.loadFromJSONObject(jobj, db);
     }
 }
