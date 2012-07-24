@@ -36,7 +36,6 @@ import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -112,7 +111,7 @@ public class SpScheduler extends Scheduler
             handleInitiateResponseMessage((InitiateResponseMessage)message);
         }
         else if (message instanceof FragmentTaskMessage) {
-            handleFragmentTaskMessage((FragmentTaskMessage)message, null);
+            handleFragmentTaskMessage((FragmentTaskMessage)message);
         }
         else if (message instanceof FragmentResponseMessage) {
             handleFragmentResponseMessage((FragmentResponseMessage)message);
@@ -266,11 +265,43 @@ public class SpScheduler extends Scheduler
         m_mailbox.send(message.getInitiatorHSId(), message);
     }
 
-    // BorrowTaskMessages just encapsulate a FragmentTaskMessage along with
-    // its input dependency tables.
+    // BorrowTaskMessages encapsulate a FragmentTaskMessage along with
+    // input dependency tables. The MPI issues borrows to a local site
+    // to perform replicated reads or aggregation fragment work.
     private void handleBorrowTaskMessage(BorrowTaskMessage message) {
-        handleFragmentTaskMessage(message.getFragmentTaskMessage(),
-                message.getInputDepMap());
+        // borrows do not advance the sp handle. The handle would
+        // move backwards anyway once the next message is received
+        // from the SP leader.
+        long newSpHandle = m_txnId.get();
+        Iv2Trace.logFragmentTaskMessage(message.getFragmentTaskMessage(),
+                m_mailbox.getHSId(), newSpHandle, true);
+        TransactionState txn = m_outstandingTxns.get(message.getTxnId());
+
+        if (txn == null) {
+            // If the borrow is the first fragment for a transaction, run it as
+            // a single partition fragment; Must not  engage/pause this
+            // site on a MP transaction before the SP instructs to do so.
+            // Do not track the borrow task as outstanding - it completes
+            // immediately and is not a valid transaction state for
+            // full MP participation (it claims everything can run as SP).
+            txn = new BorrowTransactionState(newSpHandle, message);
+        }
+
+
+        if (message.getFragmentTaskMessage().isSysProcTask()) {
+            final SysprocFragmentTask task =
+                new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
+                                        m_pendingTasks, message.getFragmentTaskMessage(),
+                                        message.getInputDepMap());
+            m_pendingTasks.offer(task);
+        }
+        else {
+            final FragmentTask task =
+                new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
+                        m_pendingTasks, message.getFragmentTaskMessage(),
+                        message.getInputDepMap());
+            m_pendingTasks.offer(task);
+        }
     }
 
     // SpSchedulers will see FragmentTaskMessage for:
@@ -280,10 +311,8 @@ public class SpScheduler extends Scheduler
     //   aggregation fragments, or not, if it's a replicated table read.
     // For multi-batch MP transactions, we'll need to look up the transaction state
     // that gets created when the first batch arrives.
-    public void handleFragmentTaskMessage(FragmentTaskMessage message,
-                                          Map<Integer, List<VoltTable>> inputDeps)
+    void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
-        // See SUCKS comment below
         FragmentTaskMessage msg = message;
         long newSpHandle;
         if (m_isLeader) {
@@ -296,7 +325,7 @@ public class SpScheduler extends Scheduler
             msg.setSpHandle(newSpHandle);
             // If we have input dependencies, it's borrow work, there's no way we
             // can actually distribute it
-            if (m_sendToHSIds.size() > 0 && inputDeps == null) {
+            if (m_sendToHSIds.size() > 0) {
                 FragmentTaskMessage replmsg =
                     new FragmentTaskMessage(m_mailbox.getHSId(),
                             m_mailbox.getHSId(), msg);
@@ -320,8 +349,8 @@ public class SpScheduler extends Scheduler
             newSpHandle = msg.getSpHandle();
             m_txnId.set(newSpHandle);
         }
-        Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, (inputDeps != null));
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
+        Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
         // bit of a hack...we will probably not want to create and
         // offer FragmentTasks for txn ids that don't match if we have
         // something in progress already
@@ -333,13 +362,13 @@ public class SpScheduler extends Scheduler
         if (msg.isSysProcTask()) {
             final SysprocFragmentTask task =
                 new SysprocFragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                        m_pendingTasks, msg, inputDeps);
+                                        m_pendingTasks, msg, null);
             m_pendingTasks.offer(task);
         }
         else {
             final FragmentTask task =
                 new FragmentTask(m_mailbox, (ParticipantTransactionState)txn,
-                                 m_pendingTasks, msg, inputDeps);
+                                 m_pendingTasks, msg, null);
             m_pendingTasks.offer(task);
         }
     }
