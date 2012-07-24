@@ -279,6 +279,10 @@ public abstract class SubPlanAssembler {
                 if (ltColumns.containsKey(col) && (ltColumns.get(col).size() >= 0)) {
                     AbstractExpression expr = ltColumns.get(col).remove(0);
                     retval.endExprs.add(expr);
+                    if (retval.indexExprs.size() == 0) {
+                        // SearchKey is null,but has end key
+                        retval.lookupType = IndexLookupType.GTE;
+                    }
                 }
 
                 // if we didn't find an equality match, we can stop looking
@@ -288,7 +292,8 @@ public abstract class SubPlanAssembler {
         }
 
         // index not relevant to expression
-        if (retval.indexExprs.size() == 0 && retval.sortDirection == SortDirectionType.INVALID)
+        if (retval.indexExprs.size() == 0 && retval.endExprs.size() == 0
+                && retval.sortDirection == SortDirectionType.INVALID)
             return null;
 
         // If IndexUseType is the default of COVERING_UNIQUE_EQUALITY, and not
