@@ -23,7 +23,12 @@
 
 package org.voltdb.planner;
 
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
 import java.io.FileNotFoundException;
+import java.io.FileWriter;
+import java.io.IOException;
 import java.util.ArrayList;
 import java.util.List;
 import java.util.Map;
@@ -148,9 +153,10 @@ public class testPlannerTester extends TestCase {
     	pn = plannerTester.combinePlanNodes(pnList);
     	System.out.println( pn.toJSONString() );
     	System.out.println( pn.toExplainPlanString() );
-    	plannerTester.writePlanToFile( pn, path, "prettyJson.txt");
+    	plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
     	
-    	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt");
+    	ArrayList<String> getsql = new ArrayList<String>();
+    	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt", getsql);
     	System.out.println( pnt.toJSONString() );
         System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
     	ArrayList<AbstractPlanNode> list1 = pn.getLists();
@@ -171,9 +177,10 @@ public class testPlannerTester extends TestCase {
     	String path = "/home/zhengli/";
     	System.out.println( pn.toExplainPlanString() );
     	System.out.println( pn.toJSONString() );
-    	plannerTester.writePlanToFile( pn, path, "prettyJson.txt");
+    	plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
     	
-    	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt");
+    	ArrayList<String> getsql = new ArrayList<String>();
+    	PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt", getsql);
     	System.out.println( pnt.toJSONString() );
     	System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
     	//System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
@@ -338,10 +345,10 @@ public class testPlannerTester extends TestCase {
         int size = list1.size();
         for( int i = 0; i < size; i++ ) {
         	System.out.println(i);
+        	plannerTester.diff(list1.get(i), list2.get(i), true);
         	System.out.println(list1.get(i).toExplainPlanString());
             System.out.println(list2.get(i).toExplainPlanString());
-            plannerTester.diffScans(list1.get(i), list2.get(i));
-            plannerTester.diffInlineAndJoin(list1.get(i), list2.get(i));
+           
         }
     }
     
@@ -384,8 +391,26 @@ public class testPlannerTester extends TestCase {
     }
     
     public void testMain() {
-    	String[] args = {"-d","-C=/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/config/voter"};
+    	String[] args = {"-d","-s","-e","-C=/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/config/voter"};
     	plannerTester.main(args);
     }
+    
+//    public void testwrite() {
+//    	try {
+//			BufferedWriter writer = new BufferedWriter( new FileWriter("/home/zhengli/testwrite") );
+//			writer.write("abc");
+//			writer.write("\n");
+//			writer.write("def");
+//			writer.flush();
+//			writer.close();
+//		} catch (IOException e) {
+//			// TODO Auto-generated catch block
+//			e.printStackTrace();
+//		}
+//    }
+    
+//    public void testPrint() {
+//    	System.out.println("abc"+"\n"+"def");
+//    }
 }
 
