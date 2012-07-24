@@ -83,9 +83,15 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar00() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 ORDER BY POINTS", 0, true);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 ORDER BY POINTS ASC", 0, true);
         checkIndexCounter(pn, true, false);
     }
+
+    public void testCountStar01() {
+        List<AbstractPlanNode> pn = compile("SELECT COUNT(*) from T1 WHERE points < 4 ORDER BY POINTS DESC", 0, true);
+        checkIndexCounter(pn, true, false);
+    }
+
     // TODO(xin): Replace it with IndexCount node later
     public void testCountStar1() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS = ?", 0, true);
@@ -94,6 +100,11 @@ public class TestReplaceWithIndexCounter extends TestCase {
     // SeqScan is not supported right now
     public void testCountStar3() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
+        checkIndexCounter(pn, false, false);
+    }
+
+    public void testCountStar31() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ? ORDER BY ID DESC", 0, true);
         checkIndexCounter(pn, false, false);
     }
 

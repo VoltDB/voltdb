@@ -292,7 +292,7 @@ public abstract class SubPlanAssembler {
         }
 
         // index not relevant to expression
-        if (retval.indexExprs.size() == 0 && retval.endExprs.size() == 0
+        if (retval.indexExprs.size() == 0 ///&& retval.endExprs.size() == 0
                 && retval.sortDirection == SortDirectionType.INVALID)
             return null;
 
