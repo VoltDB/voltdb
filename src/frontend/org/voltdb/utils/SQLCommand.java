@@ -66,11 +66,6 @@ public class SQLCommand
     private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
 
-    // Test only
-    public static String parseSQLFile(String filepath) {
-        return readScriptFile(filepath);
-    }
-
     public static Pattern getExecuteCall() {
         return ExecuteCall;
     }
@@ -354,7 +349,7 @@ public class SQLCommand
         while(true);
     }
 
-    private static String readScriptFile(String filePath)
+    public static String readScriptFile(String filePath)
     {
         try
         {
