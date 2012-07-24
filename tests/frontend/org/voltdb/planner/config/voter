@@ -2,10 +2,10 @@ Name:
 voter
 
 Ref:
-/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/baseline/voter/
+./tests/frontend/org/voltdb/planner/baseline/voter/
 
 DDL:
-/home/zhengli/workspace/voltdb/examples/voter/ddl.sql
+./examples/voter/ddl.sql
 
 Base Name:
 ddl

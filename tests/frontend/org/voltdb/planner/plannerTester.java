@@ -51,6 +51,8 @@ public class plannerTester {
 	private static int m_numPass = 0;
 	private static int m_numFail = 0;
 	private static ArrayList<String> m_diffMessages = new ArrayList<String>();
+	private static String m_reportDir = "/tmp/";
+	private static BufferedWriter m_reportWriter;
 	
 	public static class Pair {
 	    private Object first; //first member of pair
@@ -95,7 +97,7 @@ public class plannerTester {
 	    }
 	}
 	
-	public static void main( String[] args ) {
+	public static int main( String[] args ) {
 		int size = args.length;
 		for( int i=0; i<size; i++ ) {
 			String str = args[i];
@@ -107,6 +109,9 @@ public class plannerTester {
 			}
 			else if( str.startsWith("-d") ) {
 				m_isDiff = true;
+			}
+			else if( str.startsWith("-r") ){
+				m_reportDir = str.split("=")[1];
 			}
 			else if( str.startsWith("-e") ){
 				m_showExpainedPlan = true;
@@ -130,7 +135,11 @@ public class plannerTester {
 			for( String config : m_config ) {
 				try {
 					setUp( config );
-					batchDiff();
+					if( !new File(m_reportDir).exists() ) {
+						new File(m_reportDir).mkdirs();
+					}
+				    m_reportWriter = new BufferedWriter(new FileWriter( m_reportDir+"plannerTester.report" ));
+					batchDiff( );
 				} catch (Exception e) {
 					e.printStackTrace();
 				}
@@ -138,7 +147,20 @@ public class plannerTester {
 			System.out.println("Test: "+m_numTest);
 			System.out.println("Pass: "+m_numPass);
 			System.out.println("Fail: "+m_numFail);
+			try {
+				m_reportWriter.write( "\nTest: "+m_numTest+"\n"
+						+"Pass: "+m_numPass+"\n"
+						+"Fail: "+m_numFail+"\n");
+				m_reportWriter.flush();
+				m_reportWriter.close();
+			} catch (IOException e) {
+				e.printStackTrace();
+			}
 		}
+		if( m_numFail == 0 )
+			return 1;
+		else
+			return -1;
 	}
 
 	public static void setUp( String pathConfigFile ) throws IOException {
@@ -155,11 +177,12 @@ public class plannerTester {
 			}
 			else if ( line.equalsIgnoreCase("Ref:") ) {
 				line = reader.readLine();
-				m_pathRefPlan = line;
+				m_pathRefPlan = new File( line ).getCanonicalPath();
+				m_pathRefPlan += "/";
 			}
 			else if( line.equalsIgnoreCase("DDL:")) {
 				line = reader.readLine();
-				m_pathDDL = line;
+				m_pathDDL = new File( line ).getCanonicalPath();
 			}
 			else if( line.equalsIgnoreCase("Base Name:") ) {
 				line = reader.readLine();
@@ -178,7 +201,8 @@ public class plannerTester {
 			}
 			else if( line.equalsIgnoreCase("Save Path:") ) {
 				line = reader.readLine();
-				m_savePlanPath = line;
+				m_savePlanPath = new File( line ).getCanonicalPath();
+				m_savePlanPath += "/";
 			}
 			else if( line.equalsIgnoreCase("Partition Columns:") ) {
 				line = reader.readLine();
@@ -314,7 +338,7 @@ public class plannerTester {
 	
 	//parameters : path to baseline and the new plans 
 	//size : number of total files in the baseline directory
-	public static void batchDiff( String pathBaseline, String pathNew, int size ) {
+	public static void batchDiff( String pathBaseline, String pathNew, int size ) throws IOException {
 		PlanNodeTree pnt1 = null;
 		PlanNodeTree pnt2 = null;
 		m_stmts.clear();
@@ -337,39 +361,50 @@ public class plannerTester {
 				m_numPass++;
 			else {
 				m_numFail++;
-				System.out.println("Statement "+i+" of "+m_testName+": ");
+//				System.out.println("Statement "+i+" of "+m_testName+": ");
+				m_reportWriter.write( "Statement "+i+" of "+m_testName+": \n" );
+				
 				for( String msg : m_diffMessages ) { 
-					System.out.println(msg);
+//					System.out.println(msg);
+					m_reportWriter.write( msg+"\n\n" );
 				}
-				System.out.println();
+//				System.out.println();
 				if( m_showSQLStatement ) {
-					System.out.println(m_stmtsBase.get(i));
-					System.out.println("==>");
-					System.out.println(m_stmts.get(i));
-					System.out.println();
+//					System.out.println(m_stmtsBase.get(i));
+//					System.out.println("==>");
+//					System.out.println(m_stmts.get(i));
+//					System.out.println();
+					m_reportWriter.write( "SQL statement:\n"+m_stmtsBase.get(i)+"\n==>\n"+m_stmts.get(i)+"\n");
 				}
 				
 				if( m_showExpainedPlan ) {
-					System.out.print( pn1.toExplainPlanString() );
-					System.out.println( "==>");
-					System.out.println("");
-					System.out.println( pn2.toExplainPlanString() );
-					System.out.println();
+//					System.out.print( pn1.toExplainPlanString() );
+//					System.out.println( "==>");
+//					System.out.println("");
+//					System.out.println( pn2.toExplainPlanString() );
+//					System.out.println();
+					m_reportWriter.write("\nExplained plan:\n"+pn1.toExplainPlanString()+"\n==>\n"+pn2.toExplainPlanString()+"\n");
 				}
 				
-				System.out.println("Path to the config file :"+m_currentConfig );
-				System.out.println("Path to the baseline file :"+pathBaseline+m_testName+".plan"+i );
-				System.out.println("Path to the baseline file :"+pathNew+m_testName+".plan"+i );
+//				System.out.println("Path to the config file :"+m_currentConfig );
+//				System.out.println("Path to the baseline file :"+pathBaseline+m_testName+".plan"+i );
+//				System.out.println("Path to the baseline file :"+pathNew+m_testName+".plan"+i );
+				m_reportWriter.write("Path to the config file :"+m_currentConfig+"\n"
+						+"Path to the baseline file :"+pathBaseline+m_testName+".plan"+i+"\n"
+						+"Path to the baseline file :"+pathNew+m_testName+".plan"+i+"\n");
 			}			
 			m_numTest++;
 		}
 	}
 	
-	public static void batchDiff() {
-		System.out.println( "====================================================Begin test: "+m_testName );
+	public static void batchDiff( ) throws IOException {
+//		System.out.println( "====================================================Begin test: "+m_testName );
+		m_reportWriter.write( "====================================================Begin test: "+m_testName );
 		batchDiff( m_pathRefPlan, m_savePlanPath, m_numSQL );
-		System.out.println("==================================================================="+
-				"End of "+m_testName);
+//		System.out.println("==================================================================="+
+//				"End of "+m_testName);
+		m_reportWriter.write( "==================================================================="+
+				"End of "+m_testName );
 	}
 	
 	public static boolean diffInlineAndJoin( AbstractPlanNode oldpn1, AbstractPlanNode newpn2 ) {

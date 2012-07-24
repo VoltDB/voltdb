@@ -357,7 +357,12 @@ public class testPlannerTester extends TestCase {
     	String pathBaseline = "/tmp/volttest/test1Baseline/";
     	String pathNew = "/tmp/volttest/test1New/";
     	plannerTester.setTestName( "Test1" );
-    	plannerTester.batchDiff(pathBaseline, pathNew, size);
+    	try {
+			plannerTester.batchDiff(pathBaseline, pathNew, size);
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
     }
     
     public void testWholeProcess() {
@@ -391,7 +396,7 @@ public class testPlannerTester extends TestCase {
     }
     
     public void testMain() {
-    	String[] args = {"-d","-s","-e","-C=/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/config/voter"};
+    	String[] args = {"-d","-s","-e","-C=/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/config/voter","-r=/home/zhengli/"};
     	plannerTester.main(args);
     }
     
@@ -409,8 +414,13 @@ public class testPlannerTester extends TestCase {
 //		}
 //    }
     
-//    public void testPrint() {
-//    	System.out.println("abc"+"\n"+"def");
-//    }
+    public void testPrint() {
+    	try {
+			System.out.println( new File("home/zhengli/tests/frontend/org/voltdb/planner/config/voter/").getCanonicalPath() );
+		} catch (IOException e) {
+			// TODO Auto-generated catch block
+			e.printStackTrace();
+		}
+    }
 }
 
