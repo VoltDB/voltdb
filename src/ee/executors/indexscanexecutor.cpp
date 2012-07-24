@@ -152,8 +152,7 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
         boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
     m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
 
-    VOLT_ERROR("<INDEX SCAN> for PlanNode '%s'\n", m_node->debug().c_str());
-    printf ("<INDEX SCAN> num of seach key: %d\n", m_numOfSearchkeys);
+    //printf ("<INDEX SCAN> num of seach key: %d\n", m_numOfSearchkeys);
     // if (m_numOfSearchkeys == 0)
     // {
     //     VOLT_ERROR("There are no search key expressions for PlanNode '%s'",
@@ -409,11 +408,7 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
 
-    printf("<INDEX SCAN>INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s\n",
-                               localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-
-    printf ("<INDEX SCAN> localSortDirection: %d\n", localSortDirection);
-
+    //printf ("<INDEX SCAN> localSortDirection: %d\n", localSortDirection);
     if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
         bool order_by_asc = true;
         printf ("Haha\n");
@@ -425,12 +420,10 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
 
         if (activeNumOfSearchKeys == 0) {
-            printf ("Haha1\n");
             m_index->moveToEnd(order_by_asc);
         }
     }
     else if (localSortDirection == SORT_DIRECTION_TYPE_INVALID && activeNumOfSearchKeys == 0) {
-        printf ("Haha10\n");
         m_index->moveToEnd(true);
     }
     //
@@ -442,8 +435,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             !(m_tuple = m_index->nextValue()).isNullTuple()))
     {
         VOLT_TRACE("LOOPING in indexscan: tuple: '%s'\n", m_tuple.debug("tablename").c_str());
-        printf ("Haha3\n");
-
         //
         // First check whether the end_expression is now false
         //

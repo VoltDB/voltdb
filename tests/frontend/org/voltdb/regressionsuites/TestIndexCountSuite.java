@@ -55,7 +55,7 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         VoltTable table;
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS < 6 ORDER BY POINTS ASC").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT Id, points FROM TU1 WHERE POINTS < 6").getResults()[0];
         assertTrue(table.advanceRow());
         System.err.println("RESULT:\n" + table);
         assertTrue(true);
