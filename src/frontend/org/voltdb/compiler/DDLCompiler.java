@@ -128,7 +128,7 @@ public class DDLCompiler {
                     // avoid embedded newlines so we can delimit statements
                     // with newline.
                     m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-                        m_hsql.runDDLCommand(stmt.statement);
+                    m_hsql.runDDLCommand(stmt.statement);
                 } catch (HSQLParseException e) {
                     String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
                     throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
@@ -145,7 +145,7 @@ public class DDLCompiler {
     }
 
     /**
-     * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE, and EXPORT.
+     * Process a VoltDB-specific DDL statement, like PARTITION and REPLICATE.
      * @param statement  DDL statement string
      * @return true if statement was handled, otherwise it should be passed to HSQL
      * @throws VoltCompilerException

@@ -1385,7 +1385,7 @@ public class VoltCompiler {
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
             System.exit(-1);
-            // Prevent fis possibly null warning below.
+            // Prevent warning  about fis possibly being null below.
             return;
         }
 

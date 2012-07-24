@@ -30,7 +30,5 @@ voltipc.xcodeproj/
 tests/test_apps/*/*.jar
 src/frontend/org/voltdb/compiler/projectfile/
 src/frontend/org/voltdb/compiler/deploymentfile/
-doc/tutorials/auction/auction.jar
+doc/tutorials/*/*.jar
 doc/tutorials/auction/csvloader_*.csv
-doc/tutorials/helloworld/helloworld.jar
-doc/tutorials/helloworldrevisited/helloworld.jar
