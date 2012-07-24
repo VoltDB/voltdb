@@ -337,22 +337,26 @@ public class VoltProjectBuilder {
         addSchema(URLEncoder.encode(temp.getAbsolutePath(), "UTF-8"));
     }
 
-    public void addSchema(String schemaPath) {
+    /**
+     * Add a schema based on a URL.
+     * @param schemaURL Schema file URL
+     */
+    public void addSchema(String schemaURL) {
         try {
-            schemaPath = URLDecoder.decode(schemaPath, "UTF-8");
+            schemaURL = URLDecoder.decode(schemaURL, "UTF-8");
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
             System.exit(-1);
         }
-        assert(m_schemas.contains(schemaPath) == false);
-        final File schemaFile = new File(schemaPath);
+        assert(m_schemas.contains(schemaURL) == false);
+        final File schemaFile = new File(schemaURL);
         assert(schemaFile != null);
         assert(schemaFile.isDirectory() == false);
         // this check below fails in some valid cases (like when the file is in a jar)
         //assert schemaFile.canRead()
         //    : "can't read file: " + schemaPath;
 
-        m_schemas.add(schemaPath);
+        m_schemas.add(schemaURL);
     }
 
     public void addStmtProcedure(String name, String sql) {
