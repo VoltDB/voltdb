@@ -1367,7 +1367,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     /**
-     * Handle rejoin message
+     * Handle rejoin message for live rejoin, not blocking rejoin
      * @param rm
      */
     private void handleRejoinMessage(RejoinMessage rm) {
