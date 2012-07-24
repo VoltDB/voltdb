@@ -23,15 +23,15 @@
 
 package org.voltdb;
 
+import static org.junit.Assert.assertEquals;
+import static org.mockito.Mockito.doReturn;
+import static org.mockito.Mockito.mock;
+
 import java.util.ArrayList;
 import java.util.List;
 
 import org.junit.Test;
-
 import org.voltcore.network.Connection;
-
-import static org.junit.Assert.*;
-import static org.mockito.Mockito.*;
 
 public class TestClientInterfaceHandleManager {
 
@@ -39,7 +39,11 @@ public class TestClientInterfaceHandleManager {
     public void testGetAndFind() throws Exception
     {
         Connection mockConnection = mock(Connection.class);
-        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager( false, mockConnection);
+        ClientInterfaceHandleManager dut =
+                new ClientInterfaceHandleManager(
+                        false,
+                        mockConnection,
+                        AdmissionControlGroup.getDummy());
         long handle = dut.getHandle(true, 7, 31337, 10, 10l);
         assertEquals(7, ClientInterfaceHandleManager.getPartIdFromHandle(handle));
         assertEquals(0, ClientInterfaceHandleManager.getSeqNumFromHandle(handle));
@@ -60,7 +64,11 @@ public class TestClientInterfaceHandleManager {
     public void testGetAndRemove() throws Exception
     {
         Connection mockConnection = mock(Connection.class);
-        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager(false, mockConnection);
+        ClientInterfaceHandleManager dut =
+                new ClientInterfaceHandleManager(
+                        false,
+                        mockConnection,
+                        AdmissionControlGroup.getDummy());
         List<Long> handles = new ArrayList<Long>();
         for (int i = 0; i < 10; i++) {
             handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l));
@@ -84,7 +92,12 @@ public class TestClientInterfaceHandleManager {
     public void testGetSkipMissingHandles() throws Exception
     {
         Connection mockConnection = mock(Connection.class);
-        ClientInterfaceHandleManager dut = new ClientInterfaceHandleManager(false, mockConnection);
+        doReturn(mock(org.voltcore.network.WriteStream.class)).when(mockConnection).writeStream();
+        ClientInterfaceHandleManager dut =
+                new ClientInterfaceHandleManager(
+                        false,
+                        mockConnection,
+                        AdmissionControlGroup.getDummy());
         List<Long> handles = new ArrayList<Long>();
         for (int i = 0; i < 10; i++) {
             handles.add(dut.getHandle(true, 7, 31337 + i, 10, 10l));

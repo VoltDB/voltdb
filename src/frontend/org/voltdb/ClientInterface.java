@@ -165,9 +165,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      *
      * The ? extends ugliness is due to the SnapshotDaemon having an ACG that is a noop
      */
-    private final COWMap<Long, Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup>>
-            m_connectionSpecificStuff =
-                new COWMap<Long, Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup>>();
+    private final COWMap<Long, ClientInterfaceHandleManager>
+            m_cihm =
+                new COWMap<Long, ClientInterfaceHandleManager>();
     private final Cartographer m_cartographer;
 
     /**
@@ -750,10 +750,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         public void started(final Connection c) {
             m_connection = c;
             if (VoltDB.instance().isIV2Enabled()) {
-                m_connectionSpecificStuff.put(c.connectionId(),
-                        Pair.of(new ClientInterfaceHandleManager( m_isAdmin, c),
-                                m_acg.get()));
+                m_cihm.put(c.connectionId(),
+                           new ClientInterfaceHandleManager( m_isAdmin, c, m_acg.get()));
                 m_acg.get().addMember(this);
+                System.out.println("Initial read selection is " + !m_acg.get().hasBackPressure());
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
@@ -774,12 +774,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
              * Outstanding requests may actually still be at large
              */
             if (VoltDB.instance().isIV2Enabled()) {
-                Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup> p =
-                        m_connectionSpecificStuff.remove(connectionId());
-                ClientInterfaceHandleManager cihm = p.getFirst();
-                AdmissionControlGroup acg = p.getSecond();
-                cihm.freeOutstandingTxns(acg);
-                acg.removeMember(this);
+                ClientInterfaceHandleManager cihm = m_cihm.remove(connectionId());
+                cihm.freeOutstandingTxns();
+                cihm.m_acg.removeMember(this);
             }
         }
 
@@ -871,6 +868,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void offBackpressure() {
+            System.out.println("Backpressure deactivated");
             m_connection.enableReadSelection();
         }
     }
@@ -943,10 +941,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final boolean allowMismatchedResults)
     {
         if (VoltDB.instance().isIV2Enabled()) {
-            Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup> p =
-                    m_connectionSpecificStuff.get(connectionId);
-            final AdmissionControlGroup acg = p.getSecond();
-            final ClientInterfaceHandleManager cihm = p.getFirst();
+            final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
                     messageSize, now);
@@ -965,7 +960,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 else {
                     initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
                 }
-                acg.increaseBackpressure(messageSize);
                 Iv2InitiateTaskMessage workRequest =
                     new Iv2InitiateTaskMessage(m_siteId,
                             initiatorHSId,
@@ -1060,12 +1054,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         // forward response; copy is annoying. want slice of response.
                         final InitiateResponseMessage response = (InitiateResponseMessage)message;
                         Iv2Trace.logFinishTransaction(response, m_mailbox.getHSId());
-                        Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup> p =
-                                m_connectionSpecificStuff.get(response.getClientConnectionId());
+                        final ClientInterfaceHandleManager cihm = m_cihm.get(response.getClientConnectionId());
                         //Can be null on hangup
-                        if (p != null) {
-                            final ClientInterfaceHandleManager cihm = p.getFirst();
-                            final AdmissionControlGroup acg = p.getSecond();
+                        if (cihm != null) {
                             //Pass it to the network thread like a ninja
                             //Only the network can use the CIHM
                             cihm.connection.writeStream().enqueue(
@@ -1076,7 +1067,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                 throws IOException {
                                             ClientInterfaceHandleManager.Iv2InFlight clientData =
                                                     cihm.findHandle(response.getClientInterfaceHandle());
-                                            acg.reduceBackpressure(clientData.m_messageSize);
                                             response.getClientResponseData().setClientHandle(clientData.m_clientHandle);
                                             final long now = System.currentTimeMillis();
                                             final int delta = (int)(now - clientData.m_creationTime);
@@ -1209,18 +1199,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 /*
                  * For the snapshot daemon create a noop ACG because it is privileged
                  */
-                m_connectionSpecificStuff.put(
+                m_cihm.put(
                         m_snapshotDaemonAdapter.connectionId(),
-                        Pair.of(
-                                new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter),
-                                new AdmissionControlGroup(Integer.MAX_VALUE, Integer.MAX_VALUE) {
-                                    @Override
-                                    public void increaseBackpressure(int messageSize) {}
-                                    @Override
-                                    public void reduceBackpressure(int messageSize) {}
-                                    @Override
-                                    public boolean queue(int bytes) { return false; }
-                                }));
+                        new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter,
+                                AdmissionControlGroup.getDummy()));
             }
         });
     }
@@ -2194,11 +2176,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         Map<Long, long[]> inflight_txn_stats;
         if (VoltDB.instance().isIV2Enabled()) {
             inflight_txn_stats = new HashMap<Long, long[]>();
-            for (Map.Entry<Long, Pair<ClientInterfaceHandleManager, ? extends AdmissionControlGroup>> e :
-                    m_connectionSpecificStuff.entrySet()) {
+            for (Map.Entry<Long, ClientInterfaceHandleManager> e :
+                    m_cihm.entrySet()) {
                 long values[] = new long[2];
-                values[0] = e.getValue().getFirst().isAdmin ? 1 : 0;
-                values[1] = e.getValue().getFirst().getOutstandingTxns();
+                values[0] = e.getValue().isAdmin ? 1 : 0;
+                values[1] = e.getValue().getOutstandingTxns();
                 inflight_txn_stats.put(e.getKey(), values);
             }
         } else {

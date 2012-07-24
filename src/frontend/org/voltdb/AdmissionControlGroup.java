@@ -88,6 +88,21 @@ public class AdmissionControlGroup implements org.voltcore.network.QueueMonitor
         LESS_THAN_MAX_DESIRED_PENDING_TXNS = (int)(MAX_DESIRED_PENDING_TXNS * .8);
     }
 
+    public static AdmissionControlGroup getDummy() {
+        return new AdmissionControlGroup(Integer.MAX_VALUE, Integer.MAX_VALUE) {
+            @Override
+            public void addMember(ACGMember member) {}
+            @Override
+            public void removeMember(ACGMember member) {}
+            @Override
+            public void increaseBackpressure(int messageSize) {}
+            @Override
+            public void reduceBackpressure(int messageSize) {}
+            @Override
+            public boolean queue(int bytes) { return false; }
+        };
+    }
+
     public void addMember(ACGMember member)
     {
         assert(m_expectedThreadId == Thread.currentThread().getId());

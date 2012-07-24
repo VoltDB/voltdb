@@ -18,7 +18,6 @@
 package org.voltdb;
 
 import java.nio.ByteBuffer;
-
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
@@ -51,6 +50,7 @@ public class ClientInterfaceHandleManager
     public final boolean isAdmin;
     public final Connection connection;
     private final long m_expectedThreadId = Thread.currentThread().getId();
+    final AdmissionControlGroup m_acg;
 
     private static class HandleGenerator
     {
@@ -107,10 +107,11 @@ public class ClientInterfaceHandleManager
     private ImmutableMap<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>> m_partitionStuff =
             new Builder<Integer, Pair<HandleGenerator, Deque<Iv2InFlight>>>().build();
 
-    ClientInterfaceHandleManager(boolean isAdmin, Connection connection)
+    ClientInterfaceHandleManager(boolean isAdmin, Connection connection, AdmissionControlGroup acg)
     {
         this.isAdmin = isAdmin;
         this.connection = connection;
+        m_acg = acg;
     }
 
     /**
@@ -146,6 +147,7 @@ public class ClientInterfaceHandleManager
         Iv2InFlight inFlight = new Iv2InFlight(ciHandle, clientHandle, messageSize, creationTime);
         perPartDeque.addLast(inFlight);
         m_outstandingTxns++;
+        m_acg.increaseBackpressure(messageSize);
         return ciHandle;
     }
 
@@ -172,6 +174,7 @@ public class ClientInterfaceHandleManager
 
                 iter.remove();
                 m_outstandingTxns--;
+                m_acg.reduceBackpressure(inflight.m_messageSize);
                 return true;
             }
         }
@@ -212,6 +215,7 @@ public class ClientInterfaceHandleManager
                 buf.flip();
                 connection.writeStream().enqueue(buf);
                 m_outstandingTxns--;
+                m_acg.reduceBackpressure(inFlight.m_messageSize);
             }
             else if (inFlight.m_ciHandle > ciHandle) {
                 // we've gone too far, need to jam this back into the front of the deque and run away.
@@ -221,6 +225,7 @@ public class ClientInterfaceHandleManager
                 break;
             }
             else {
+                m_acg.reduceBackpressure(inFlight.m_messageSize);
                 m_outstandingTxns--;
                 return inFlight;
             }
@@ -241,11 +246,11 @@ public class ClientInterfaceHandleManager
      * still be outstanding in the cluster, but once the client goes away so does
      * does the mapping to the resources allocated to it.
      */
-    void freeOutstandingTxns(AdmissionControlGroup acg) {
+    void freeOutstandingTxns() {
         assert(m_expectedThreadId == Thread.currentThread().getId());
         for (Pair<HandleGenerator, Deque<Iv2InFlight>> p : m_partitionStuff.values()) {
             for (Iv2InFlight inflight : p.getSecond()) {
-                acg.reduceBackpressure(inflight.m_messageSize);
+                m_acg.reduceBackpressure(inflight.m_messageSize);
             }
         }
     }
