@@ -59,12 +59,12 @@ namespace voltdb {
  * Index implemented as a Binary Tree Multimap.
  * @see TableIndex
  */
-template<typename KeyType, class KeyComparator, class KeyEqualityChecker>
+template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=false>
 class CompactingTreeMultiMapIndex : public TableIndex
 {
     friend class TableIndexFactory;
 
-    typedef CompactingMap<KeyType, const void*, KeyComparator> MapType;
+    typedef CompactingMap<KeyType, const void*, KeyComparator, hasRank> MapType;
     typedef typename MapType::iterator MMIter;
 
 public:
@@ -218,6 +218,57 @@ public:
         if (m_keyIter.second.isEnd())
             return false;
         return moveToKey(m_keyIter.second.key());
+    }
+
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
+    }
+
+    int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
+        if (!hasRank) return -1;
+
+        m_tmp1.setFromKey(searchKey);
+        m_seqIter = m_entries.lowerBound(m_tmp1);
+
+        if (m_seqIter.isEnd()) {
+            return m_entries.size() + 1;
+        } else {
+            if (isUpper) {
+                return m_entries.rankUpper(m_seqIter.key());
+            } else {
+                return m_entries.rankAsc(m_seqIter.key());
+            }
+        }
+    }
+    int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
+        if (!hasRank) return -1;
+
+        m_tmp1.setFromKey(searchKey);
+        m_seqIter = m_entries.lowerBound(m_tmp1);
+
+        if (m_seqIter.isEnd()) {
+            return m_entries.size();
+        }
+
+        int cmp = m_eq(m_tmp1, m_seqIter.key());
+        if (m_seqIter.isEnd()) {
+            return m_entries.size();
+        }
+
+        KeyType tmpKey = m_seqIter.key();
+        if (cmp == 0) {
+            m_seqIter.movePrev();
+            if (m_seqIter.isEnd() == false) {
+                if (isUpper) return m_entries.rankUpper(m_seqIter.key());
+                else return m_entries.rankAsc(m_seqIter.key());
+            } else
+                //we can not find a previous key
+                return 0;
+        }
+        // return rank with the current key if equal
+        if (isUpper) return m_entries.rankUpper(tmpKey);
+        else return m_entries.rankAsc(tmpKey);
     }
 
     size_t getSize() const { return m_entries.size(); }

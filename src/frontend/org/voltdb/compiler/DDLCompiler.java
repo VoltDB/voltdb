@@ -561,6 +561,7 @@ public class DDLCompiler {
         }
 
         Index index = table.getIndexes().add(name);
+        index.setCountable(false);
 
         // set the type of the index based on the index name and column types
         // Currently, only int types can use hash or array indexes
@@ -568,6 +569,7 @@ public class DDLCompiler {
         if (indexNameNoCase.contains("tree"))
         {
             index.setType(IndexType.BALANCED_TREE.getValue());
+            index.setCountable(true);
         }
         else if (indexNameNoCase.contains("hash"))
         {
@@ -581,10 +583,14 @@ public class DDLCompiler {
                              " uses a non-hashable column" + nonint_col_name;
                 throw m_compiler.new VoltCompilerException(msg);
             }
-        }
-        else
-        {
+        } else {
             index.setType(IndexType.BALANCED_TREE.getValue());
+            index.setCountable(true);
+        }
+
+        if (indexNameNoCase.contains("NoCounter")) {
+            index.setType(IndexType.BALANCED_TREE.getValue());
+            index.setCountable(false);
         }
 
         // need to set other index data here (column, etc)
