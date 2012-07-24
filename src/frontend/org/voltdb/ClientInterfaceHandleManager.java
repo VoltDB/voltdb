@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.nio.ByteBuffer;
+
 import java.util.ArrayDeque;
 import java.util.Deque;
 import java.util.Iterator;
@@ -199,6 +201,16 @@ public class ClientInterfaceHandleManager
                 tmLog.info("CI found dropped transaction with handle: " + inFlight.m_ciHandle +
                         " for partition: " + partitionId + " while searching for handle " +
                         ciHandle);
+                ClientResponseImpl errorResponse =
+                    new ClientResponseImpl(
+                            ClientResponseImpl.RESPONSE_UNKNOWN,
+                            new VoltTable[0], "Transaction dropped during fault recovery",
+                            inFlight.m_clientHandle);
+                ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
+                buf.putInt(buf.capacity() - 4);
+                errorResponse.flattenToBuffer(buf);
+                buf.flip();
+                connection.writeStream().enqueue(buf);
                 m_outstandingTxns--;
             }
             else if (inFlight.m_ciHandle > ciHandle) {
