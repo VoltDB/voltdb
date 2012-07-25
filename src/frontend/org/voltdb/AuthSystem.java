@@ -23,15 +23,14 @@ import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
 
+import org.mindrot.BCrypt;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
-import org.voltcore.logging.Level;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
-
-import org.mindrot.BCrypt;
 
 
 /**
@@ -437,34 +436,36 @@ public class AuthSystem {
         }
     }
 
+    private final AuthUser m_authDisabledUser = new AuthUser(null, null, null, false, false, false) {
+        @Override
+        public boolean hasPermission(Procedure proc) {
+            return true;
+        }
+
+        @Override
+        public boolean hasAdhocPermission() {
+            return true;
+        }
+
+        @Override
+        public boolean hasSystemProcPermission() {
+            return true;
+        }
+
+        @Override
+        public boolean hasDefaultProcPermission() {
+            return true;
+        }
+
+        @Override
+        public boolean authorizeConnector(String connectorName) {
+            return true;
+        }
+    };
+
     AuthUser getUser(String name) {
         if (!m_enabled) {
-            return new AuthUser(null, null, null, false, false, false) {
-                @Override
-                public boolean hasPermission(Procedure proc) {
-                    return true;
-                }
-
-                @Override
-                public boolean hasAdhocPermission() {
-                    return true;
-                }
-
-                @Override
-                public boolean hasSystemProcPermission() {
-                    return true;
-                }
-
-                @Override
-                public boolean hasDefaultProcPermission() {
-                    return true;
-                }
-
-                @Override
-                public boolean authorizeConnector(String connectorName) {
-                    return true;
-                }
-            };
+            return m_authDisabledUser;
         }
         return m_users.get(name);
     }

@@ -334,6 +334,7 @@ public class MockVoltDB implements VoltDBInterface
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
+        voltconfig = config;
     }
 
     @Override
@@ -477,6 +478,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public SiteTracker getSiteTrackerForSnapshot() {
+        return m_siteTracker;
+    }
+
+    @Override
     public MailboxPublisher getMailboxPublisher() {
         return m_mailboxPublisher;
     }
@@ -532,5 +538,10 @@ public class MockVoltDB implements VoltDBInterface
                 return true;
             }
         };
+    }
+
+    @Override
+    public boolean isIV2Enabled() {
+        return voltconfig.m_enableIV2;
     }
 }
