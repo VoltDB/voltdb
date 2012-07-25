@@ -37,7 +37,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE host $HOST enableiv2
+        license $LICENSE host $HOST
 }
 
 # run the voltdb server locally
@@ -46,7 +46,7 @@ function rejoin() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB deployment deployment.xml \
-        license $LICENSE host $HOST enableiv2
+        license $LICENSE host $HOST
 }
 
 function serverlegacy() {
