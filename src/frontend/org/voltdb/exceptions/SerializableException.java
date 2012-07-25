@@ -85,6 +85,10 @@ public class SerializableException extends VoltProcedure.VoltAbortException impl
         m_message = null;
     }
 
+    public SerializableException(String message) {
+        m_message = message;
+    }
+
     public SerializableException(Throwable t) {
         final StringWriter sw = new StringWriter();
         final PrintWriter pw = new PrintWriter(sw);

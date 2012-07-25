@@ -230,8 +230,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void shutdown()
     {
-        // rtb: better to schedule a shutdown SiteTasker?
-        // than to play java interrupt() games?
+        // set the shutdown flag on the site thread.
         if (m_executionSite != null) {
             m_executionSite.startShutdown();
         }
@@ -239,24 +238,32 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             if (m_leaderElector != null) {
                 m_leaderElector.shutdown();
             }
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.", e);
+        }
+
+        try {
             if (m_term != null) {
                 m_term.shutdown();
             }
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.", e );
+        }
+
+        try {
             if (m_initiatorMailbox != null) {
                 m_initiatorMailbox.shutdown();
             }
-        } catch (InterruptedException e) {
-            // what to do here?
-        } catch (KeeperException e) {
-            // What to do here?
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.", e);
         }
-        if (m_siteThread != null) {
-            try {
+
+        try {
+            if (m_siteThread != null) {
                 m_siteThread.interrupt();
-                m_siteThread.join();
             }
-            catch (InterruptedException giveup) {
-            }
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.");
         }
     }
 
