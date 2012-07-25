@@ -1,0 +1,18 @@
+--Instruction:
+--This is a template. Feel free to add/remove any string you want.
+--The only REQUIRED string is the key string '--num=' followed by a number
+--indicating the number of sql statements are in this file.
+--end of Instruction
+--num=5
+--- this is comments 123!@#
+exec @SystemCatalog,tables
+select * from votes         --comments
+select * fRom        CONTESTANTS
+         delete from votes where PHONE_NUMBER = 3082086134    select * from AREA_CODE_STATE
+    
+/* 
+   -- select * from V_VOTES_BY_PHONE_NUMBER
+   this is a commenting line inside a block 
+   another comment 
+   more comments 
+*/
