@@ -312,26 +312,21 @@ public class TestSystemProcedureSuite extends RegressionSuite {
         }
 
         try {
-            client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
+            try {
+                client.callProcedure("@LoadMultipartitionTable", "WAREHOUSE",
                                  partitioned_table);
+                fail();
+            } catch (ProcCallException e) {}
             client.callProcedure("@LoadMultipartitionTable", "ITEM",
                                  replicated_table);
             VoltTable results[] = client.callProcedure("@Statistics", "table", 0).getResults();
 
             int foundItem = 0;
-            // to verify, each of the 2 sites should have 5 warehouses.
-            int foundWarehouse = 0;
 
             System.out.println(results[0]);
 
             // Check that tables loaded correctly
             while(results[0].advanceRow()) {
-                if (results[0].getString("TABLE_NAME").equals("WAREHOUSE")) {
-                    ++foundWarehouse;
-                    //Different values depending on which partition
-                    assertTrue(6 == results[0].getLong("TUPLE_COUNT") ||
-                               7 == results[0].getLong("TUPLE_COUNT"));
-                }
                 if (results[0].getString("TABLE_NAME").equals("ITEM"))
                 {
                     ++foundItem;
@@ -339,8 +334,6 @@ public class TestSystemProcedureSuite extends RegressionSuite {
                     assertEquals(20, results[0].getLong("TUPLE_COUNT"));
                 }
             }
-            // make sure both warehouses were located
-            assertEquals(6, foundWarehouse);
             assertEquals(6, foundItem);
         }
         catch (Exception e) {
