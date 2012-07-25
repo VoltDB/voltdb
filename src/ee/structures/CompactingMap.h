@@ -720,7 +720,7 @@ inline void CompactingMap<Key, Data, Compare, hasRank>::updateSubct(TreeNode* x)
     int64_t sumct = getSubct(x->left) + getSubct(x->right) + 1;
     if (sumct <= SUBCTMAX)
         // assign the lower 32 value to subct
-        x->subct = static_cast<u_int32_t>(sumct);
+        x->subct = static_cast<NodeCount>(sumct);
     else
         x->subct = INVALIDCT;
 }
