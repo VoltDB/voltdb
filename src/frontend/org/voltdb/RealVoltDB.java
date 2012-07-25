@@ -346,7 +346,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ResponseSampler.initializeIfEnabled();
 
             buildClusterMesh(isRejoin);
+
+            //Start validating the build string in the background
             final Future<?> buildStringValidation = validateBuildString(getBuildString(), m_messenger.getZK());
+
             m_mailboxPublisher = new MailboxPublisher(VoltZK.mailboxes + "/" + m_messenger.getHostId());
             final int numberOfNodes = readDeploymentAndCreateStarterCatalogContext();
             if (!isRejoin) {
@@ -663,6 +666,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         m_catalogContext, Long.MIN_VALUE, true);
             }
 
+            /*
+             * Make sure the build string successfully validated
+             * before continuing to do operations
+             * that might return wrongs answers or lose data.
+             */
             try {
                 buildStringValidation.get();
             } catch (Exception e) {
@@ -2015,6 +2023,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         return deploymentXMLFile.getAbsolutePath();
     }
 
+    /*
+     * Validate the build string with the rest of the cluster
+     * by racing to publish it to ZK and then comparing the one this process
+     * has to the one in ZK. They should all match. The method returns a future
+     * so that init can continue while the ZK call is pending since it ZK is pretty
+     * slow.
+     */
     private Future<?> validateBuildString(final String buildString, ZooKeeper zk) {
         final SettableFuture<Object> retval = SettableFuture.create();
         byte buildStringBytes[] = null;
@@ -2025,7 +2040,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
         }
         final byte buildStringBytesFinal[] = buildStringBytes;
 
-        //Can use a void callback because ZK will execute them in order
+        //Can use a void callback because ZK will execute the create and then the get in order
+        //It's a race so it doesn't have to succeed
         zk.create(
                 VoltZK.buildstring,
                 buildStringBytes,
