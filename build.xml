@@ -1192,6 +1192,7 @@ TEST CASES
 <!--                <exclude name="**/TestAdHocQueries.class" /> -->
                 <exclude name="**/TestJSONInterface.class" />
 <!--                <exclude name="**/TestRejoinEndToEnd.class" /> -->
+                <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
                 <exclude name="**/TestRejoinWithCatalogUpdates.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />

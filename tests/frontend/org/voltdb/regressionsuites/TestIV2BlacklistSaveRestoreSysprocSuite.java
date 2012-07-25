@@ -327,7 +327,7 @@ public class TestIV2BlacklistSaveRestoreSysprocSuite extends RegressionSuite {
         VoltServerConfig config = null;
 
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(TestSaveRestoreSysprocSuite.class);
+            new MultiConfigSuiteBuilder(TestIV2BlacklistSaveRestoreSysprocSuite.class);
 
         SaveRestoreTestProjectBuilder project =
             new SaveRestoreTestProjectBuilder();
