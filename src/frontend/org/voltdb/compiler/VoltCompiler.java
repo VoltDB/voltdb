@@ -525,6 +525,7 @@ public class VoltCompiler {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
                 catGroup.setAdhoc(group.isAdhoc());
                 catGroup.setSysproc(group.isSysproc());
+                catGroup.setDefaultproc(group.isDefaultproc());
             }
         }
 

@@ -224,8 +224,13 @@ public class TestCRUDSuite extends RegressionSuite {
         assertTrue(t2);
         builder.addServerConfig(config);
 
+        // IV2 CLUSTER
+        config = new LocalCluster("sqltypes-iv2cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
+                false, true); // LocalCluster constructor to enable IV2.  We have to drag along the isRejoinTest arg
+        boolean t3 = config.compile(project);
+        assertTrue(t3);
+        builder.addServerConfig(config);
+
         return builder;
-
     }
-
 }
