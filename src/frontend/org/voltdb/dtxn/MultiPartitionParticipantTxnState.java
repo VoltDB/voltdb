@@ -135,9 +135,10 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                                   null, false, m_allowMismatchedResults));
 
                 /*
-                 * Use the same set of non-coordinator sites the initiator sent
-                 * out the participant notices to, so that when the coordinator
-                 * send out the fragment works all participants will get them.
+                 * ENG-3374: Use the same set of non-coordinator sites the
+                 * initiator sent out the participant notices to, so that when
+                 * the coordinator send out the fragment works all participants
+                 * will get them.
                  *
                  * During rejoin, the initiator's site tracker and the
                  * coordinator's site tracker may not be consistent for a brief

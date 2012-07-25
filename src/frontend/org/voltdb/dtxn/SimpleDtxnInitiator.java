@@ -377,7 +377,6 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
      * reducing the amount of time when things are blocked.
      *
      * @param txn Information about the transaction to send.
-     * @param version Version of the site tracker used to get the participants
      */
     private void dispatchMultiPartitionTxn(InFlightTxnState txn)
     {
