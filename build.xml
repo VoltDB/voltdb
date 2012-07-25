@@ -1015,33 +1015,6 @@ TEST CASES
     </exec>
 </target>
 
-<target name='with.emma' description="enable code coverage analysis" >
-    <!-- set up emma -->
-    <path id="emma.lib" >
-        <pathelement location="${vendor.lib.dir}/emma.jar" />
-        <pathelement location="${vendor.lib.dir}/emma_ant.jar" />
-    </path>
-    <taskdef resource="emma_ant.properties" classpathref="emma.lib" />
-    <!-- enable emma -->
-    <property name="emma.enabled" value="true" />
-    <!-- instrument the code -->
-    <property name="emma.dir" location="${build.dir}/emma" />
-    <mkdir dir="${emma.dir}" />
-    <emma>
-        <instr destdir="${build.instr.dir}/org/"
-               metadatafile="${emma.dir}/metadata.emma"
-               merge="true">
-          <instrpath path="${build.prod.dir}/org"/>
-
-          <filter includes="*voltdb.*"/>
-          <filter includes="*voltcore.*"/>
-          <!--pmsg is the protobuf-generated code for dragent-->
-          <filter excludes="*pmsg.*"/>
-          <filter excludes="*exampleutils.*"/>
-        </instr>
-    </emma>
-</target>
-
 <!-- script that runs junit_onesuite for each class in a fileset -->
 <!-- if there's a better way to do this than embedding javascript, please help... -->
 <scriptdef name="junit-files" language="javascript">
@@ -1351,10 +1324,46 @@ TEST CASES
     </run_junit>
 </target>
 
+<target name='emma_junit'
+        description="run junit target and generate coverage report"
+        depends="with.emma, junit, emma-report"
+/>
+
+<target name='emma_junit_iv2'
+        description="run junit_iv2 target and generate coverage report"
+        depends="with.emma, junit_iv2, emma-report"
+/>
+
+<target name='with.emma' description="enable code coverage analysis" >
+    <!-- set up emma -->
+    <path id="emma.lib" >
+        <pathelement location="${vendor.lib.dir}/emma.jar" />
+        <pathelement location="${vendor.lib.dir}/emma_ant.jar" />
+    </path>
+    <taskdef resource="emma_ant.properties" classpathref="emma.lib" />
+    <!-- enable emma -->
+    <property name="emma.enabled" value="true" />
+    <!-- instrument the code -->
+    <property name="emma.dir" location="${build.dir}/emma" />
+    <mkdir dir="${emma.dir}" />
+    <emma>
+        <instr destdir="${build.instr.dir}/org/"
+               metadatafile="${emma.dir}/metadata.emma"
+               merge="true">
+          <instrpath path="${build.prod.dir}/org"/>
+
+          <filter includes="*voltdb.*"/>
+          <filter includes="*voltcore.*"/>
+          <!--pmsg is the protobuf-generated code for dragent-->
+          <filter excludes="*pmsg.*"/>
+          <filter excludes="*exampleutils.*"/>
+        </instr>
+    </emma>
+</target>
+
 <target
     name='emma-report'
-    depends='with.emma, junit'
-    description="Generate code coverage reports, if appropriate.">
+    description="Generate code coverage reports.  You need call the with.emma target before your test target">
     <emma>
         <report
             sourcepath="${src.gpl.dir}"
@@ -1371,6 +1380,7 @@ TEST CASES
         </report>
     </emma>
 </target>
+
 
 <!--
     this target is intended to be called only with antcall!
