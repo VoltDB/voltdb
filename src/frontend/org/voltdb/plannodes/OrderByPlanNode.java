@@ -60,18 +60,18 @@ public class OrderByPlanNode extends AbstractPlanNode {
         // Make sure that they have the same # of columns and directions
         if (m_sortExpressions.size() != m_sortDirections.size()) {
             throw new Exception("ERROR: PlanNode '" + toString() + "' has " +
-                                "'" + m_sortExpressions.size() + "' sort expressions but " +
-                                "'" + m_sortDirections.size() + "' sort directions");
+                    "'" + m_sortExpressions.size() + "' sort expressions but " +
+                    "'" + m_sortDirections.size() + "' sort directions");
         }
 
         // Make sure that none of the items are null
         for (int ctr = 0, cnt = m_sortExpressions.size(); ctr < cnt; ctr++) {
             if (m_sortExpressions.get(ctr) == null) {
                 throw new Exception("ERROR: PlanNode '" + toString() + "' has a null " +
-                                    "sort expression at position " + ctr);
+                        "sort expression at position " + ctr);
             } else if (m_sortDirections.get(ctr) == null) {
                 throw new Exception("ERROR: PlanNode '" + toString() + "' has a null " +
-                                    "sort direction at position " + ctr);
+                        "sort direction at position " + ctr);
             }
         }
     }
@@ -165,7 +165,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
         List<TupleValueExpression> sort_tves =
-            new ArrayList<TupleValueExpression>();
+                new ArrayList<TupleValueExpression>();
         for (AbstractExpression sort_exps : m_sortExpressions)
         {
             sort_tves.addAll(ExpressionUtil.getTupleValueExpressions(sort_exps));
@@ -193,11 +193,11 @@ public class OrderByPlanNode extends AbstractPlanNode {
         }
         stringer.endArray();
     }
-    
+
     // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
 
     @Override

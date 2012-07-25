@@ -111,7 +111,7 @@ public class NodeSchema
     int getIndexOfTve(TupleValueExpression tve)
     {
         return getIndexOf(tve.getTableName(), tve.getColumnName(),
-                          tve.getColumnAlias());
+                tve.getColumnAlias());
     }
 
     /** Convenience method to sort the SchemaColumns.  Only applies if they
@@ -125,14 +125,14 @@ public class NodeSchema
             public int compare(SchemaColumn col1, SchemaColumn col2)
             {
                 if (!(col1.getExpression() instanceof TupleValueExpression) ||
-                    !(col2.getExpression() instanceof TupleValueExpression))
+                        !(col2.getExpression() instanceof TupleValueExpression))
                 {
                     throw new ClassCastException();
                 }
                 TupleValueExpression tve1 =
-                    (TupleValueExpression) col1.getExpression();
+                        (TupleValueExpression) col1.getExpression();
                 TupleValueExpression tve2 =
-                    (TupleValueExpression) col2.getExpression();
+                        (TupleValueExpression) col2.getExpression();
                 if (tve1.getColumnIndex() < tve2.getColumnIndex())
                 {
                     return -1;
@@ -148,12 +148,13 @@ public class NodeSchema
         Collections.sort(m_columns, new TveColCompare());
     }
 
+    @Override
     public NodeSchema clone()
     {
         NodeSchema copy = new NodeSchema();
         for (int i = 0; i < m_columns.size(); ++i)
         {
-            copy.addColumn((SchemaColumn)m_columns.get(i).clone());
+            copy.addColumn(m_columns.get(i).clone());
         }
         return copy;
     }
@@ -184,11 +185,12 @@ public class NodeSchema
         copy = schema.clone();
         for (int i = 0; i < m_columns.size(); ++i)
         {
-            copy.addColumn((SchemaColumn)m_columns.get(i).clone());
+            copy.addColumn(m_columns.get(i).clone());
         }
         return copy;
     }
 
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
@@ -201,5 +203,5 @@ public class NodeSchema
         return sb.toString();
     }
 
-    private ArrayList<SchemaColumn> m_columns;
+    private final ArrayList<SchemaColumn> m_columns;
 }

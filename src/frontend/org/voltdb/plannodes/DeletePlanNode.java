@@ -55,12 +55,12 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
     }
 
     // TODO:Members not loaded
-	@Override
-	public void loadFromJSONObject( JSONObject jobj, Database db ) {
-		super.loadFromJSONObject(jobj, db);
-	}
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+        super.loadFromJSONObject(jobj, db);
+    }
 
-	@Override
+    @Override
     protected String explainPlanForNode(String indent) {
         return "DELETE";
     }

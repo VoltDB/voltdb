@@ -90,7 +90,7 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     {
         // get all the TVEs in the output columns
         List<TupleValueExpression> output_tves =
-            new ArrayList<TupleValueExpression>();
+                new ArrayList<TupleValueExpression>();
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
             output_tves.addAll(ExpressionUtil.getTupleValueExpressions(col.getExpression()));
@@ -119,21 +119,21 @@ public class ProjectionPlanNode extends AbstractPlanNode {
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
             if (col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_SUM ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_COUNT ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_MIN ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_MAX ||
-                col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_AVG)
+                    col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_COUNT ||
+                    col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_COUNT_STAR ||
+                    col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_MIN ||
+                    col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_MAX ||
+                    col.getExpression().getExpressionType() == ExpressionType.AGGREGATE_AVG)
             {
                 NodeSchema input_schema = m_children.get(0).getOutputSchema();
                 SchemaColumn agg_col = input_schema.find(col.getTableName(),
-                                                         col.getColumnName(),
-                                                         col.getColumnAlias());
+                        col.getColumnName(),
+                        col.getColumnAlias());
                 if (agg_col == null)
                 {
                     throw new RuntimeException("Unable to find matching " +
-                                               "input column for projection: " +
-                                               col.toString());
+                            "input column for projection: " +
+                            col.toString());
                 }
                 new_schema.addColumn(col.copyAndReplaceWithTVE());
             }
@@ -158,10 +158,10 @@ public class ProjectionPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
     }
-    
+
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
 
     @Override

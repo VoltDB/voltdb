@@ -53,11 +53,11 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.MULTI_PARTITION.name()).value(m_multiPartition);
     }
-    
+
     // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
 
     @Override

@@ -104,7 +104,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
 
         // Now resolve the indexes in the distinct expression
         List<TupleValueExpression> distinct_tves =
-            ExpressionUtil.getTupleValueExpressions(m_distinctExpression);
+                ExpressionUtil.getTupleValueExpressions(m_distinctExpression);
         for (TupleValueExpression tve : distinct_tves)
         {
             int index = input_schema.getIndexOfTve(tve);
@@ -125,13 +125,13 @@ public class DistinctPlanNode extends AbstractPlanNode {
         m_distinctExpression.toJSONString(stringer);
         stringer.endObject();
     }
-    
+
     // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
-    
+
     @Override
     protected String explainPlanForNode(String indent) {
         return "DISTINCT";

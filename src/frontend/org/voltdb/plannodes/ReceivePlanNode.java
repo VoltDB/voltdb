@@ -61,10 +61,10 @@ public class ReceivePlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
     }
-    
+
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
 
     @Override

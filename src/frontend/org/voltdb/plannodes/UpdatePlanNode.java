@@ -53,13 +53,13 @@ public class UpdatePlanNode extends AbstractOperationPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.UPDATES_INDEXES.name()).value(m_updatesIndexes);
     }
-    
+
     // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
-    
+
     @Override
     protected String explainPlanForNode(String indent) {
         return "UPDATE";

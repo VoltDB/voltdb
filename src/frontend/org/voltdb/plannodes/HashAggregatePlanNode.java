@@ -34,10 +34,10 @@ public class HashAggregatePlanNode extends AggregatePlanNode {
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.HASHAGGREGATE;
     }
-    
+
     // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
 }

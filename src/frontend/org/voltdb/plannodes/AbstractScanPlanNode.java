@@ -20,12 +20,16 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.VoltType;
-import org.voltdb.catalog.*;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.expressions.*;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -73,8 +77,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             if (!m_targetTableName.equals(col.getTableName()))
             {
                 throw new Exception("ERROR: The scan column: " + col.getColumnName() +
-                                    " in table: " + m_targetTableName + " refers to " +
-                                    " table: " + col.getTableName());
+                        " in table: " + m_targetTableName + " refers to " +
+                        " table: " + col.getTableName());
             }
         }
     }
@@ -177,7 +181,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         {
             m_tableSchema = new NodeSchema();
             CatalogMap<Column> cols =
-                db.getTables().getIgnoreCase(m_targetTableName).getColumns();
+                    db.getTables().getIgnoreCase(m_targetTableName).getColumns();
             // you don't strictly need to sort this, but it makes diff-ing easier
             for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
             {
@@ -190,9 +194,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 tve.setColumnAlias(col.getTypeName());
                 tve.setColumnName(col.getTypeName());
                 m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
-                                                         col.getTypeName(),
-                                                         col.getTypeName(),
-                                                         tve));
+                        col.getTypeName(),
+                        col.getTypeName(),
+                        tve));
             }
         }
 
@@ -213,7 +217,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // to overwrite the inline projection and still have the right thing
         // happen
         ProjectionPlanNode proj =
-            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+                (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
         if (proj != null)
         {
             // Does this operation needs to change complex expressions
@@ -228,7 +232,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 // Order the scan columns according to the table schema
                 // before we stick them in the projection output
                 List<TupleValueExpression> scan_tves =
-                    new ArrayList<TupleValueExpression>();
+                        new ArrayList<TupleValueExpression>();
                 for (SchemaColumn col : m_tableScanSchema.getColumns())
                 {
                     assert(col.getExpression() instanceof TupleValueExpression);
@@ -256,6 +260,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+    @Override
     public void resolveColumnIndexes()
     {
         // The following applies to both seq and index scan.  Index scan has
@@ -263,7 +268,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         // predicate expression
         List<TupleValueExpression> predicate_tves =
-            ExpressionUtil.getTupleValueExpressions(m_predicate);
+                ExpressionUtil.getTupleValueExpressions(m_predicate);
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = m_tableSchema.getIndexOfTve(tve);
@@ -272,7 +277,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         // inline projection
         ProjectionPlanNode proj =
-            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+                (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
         if (proj != null)
         {
             proj.resolveColumnIndexesUsingSchema(m_tableSchema);
@@ -305,19 +310,19 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.value(m_predicate);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
     }
-    
+
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
-    	try {
-			this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
-			JSONObject jobj1 = jobj.getJSONObject( Members.PREDICATE.name() );
-			if( jobj1 != null ) {
-				this.m_predicate.fromJSONObject(jobj1, db);
-			}
-		} catch (JSONException e) {
-			//better to do nothing
-		}
+        super.loadFromJSONObject(jobj, db);
+        try {
+            this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+            JSONObject jobj1 = jobj.getJSONObject( Members.PREDICATE.name() );
+            if( jobj1 != null ) {
+                this.m_predicate.fromJSONObject(jobj1, db);
+            }
+        } catch (JSONException e) {
+            //better to do nothing
+        }
     }
 
 }

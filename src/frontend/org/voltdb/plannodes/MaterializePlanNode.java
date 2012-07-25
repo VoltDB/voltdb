@@ -69,13 +69,13 @@ public class MaterializePlanNode extends ProjectionPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.BATCHED.name()).value(m_batched);
     }
-    
+
     // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
-    
+
     @Override
     protected String explainPlanForNode(String indent) {
         return "MATERIALIZE TUPLE from parameters and/or literals";

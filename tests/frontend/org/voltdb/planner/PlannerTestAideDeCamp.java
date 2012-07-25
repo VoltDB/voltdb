@@ -91,9 +91,9 @@ public class PlannerTestAideDeCamp {
     public Catalog getCatalog() {
         return catalog;
     }
-    
+
     public Database getDatabase() {
-    	return db;
+        return db;
     }
     /**
      * Compile a statement and return the head of the plan.
@@ -158,13 +158,13 @@ public class PlannerTestAideDeCamp {
         TrivialCostModel costModel = new TrivialCostModel();
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
         QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
-                             hsql, estimates, false);
+                new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
+                        hsql, estimates, false);
 
         CompiledPlan plan = null;
         plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
+                catalogStmt.getParent().getTypeName(),
+                StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
 
         if (plan == null)
         {

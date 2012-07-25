@@ -24,9 +24,11 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.expressions.*;
-import org.voltdb.plannodes.AbstractScanPlanNode.Members;
-import org.voltdb.types.*;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.types.JoinType;
+import org.voltdb.types.PlanNodeType;
 
 public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
@@ -112,8 +114,8 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         }
         // Join the schema together to form the output schema
         m_outputSchema =
-            m_children.get(0).getOutputSchema().
-            join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
+                m_children.get(0).getOutputSchema().
+                join(m_children.get(1).getOutputSchema()).copyAndReplaceWithTVE();
     }
 
     // Given any non-inlined type of join, this method will resolve the column
@@ -124,7 +126,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         // First, assert that our topology is sane and then
         // recursively resolve all child/inline column indexes
         IndexScanPlanNode index_scan =
-            (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+                (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(m_children.size() == 2 && index_scan == null);
         for (AbstractPlanNode child : m_children)
         {
@@ -139,7 +141,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         // need to order the combined input schema coherently.  We make the
         // output schema ordered: [outer table columns][inner table columns]
         TreeMap<Integer, SchemaColumn> sort_cols =
-            new TreeMap<Integer, SchemaColumn>();
+                new TreeMap<Integer, SchemaColumn>();
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
             // Right now these all need to be TVEs
@@ -152,7 +154,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for column: " +
-                                               col.toString());
+                            col.toString());
                 }
                 sort_cols.put(index + outer_schema.size(), col);
             }
@@ -172,7 +174,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
         // Finally, resolve m_predicate
         List<TupleValueExpression> predicate_tves =
-            ExpressionUtil.getTupleValueExpressions(m_predicate);
+                ExpressionUtil.getTupleValueExpressions(m_predicate);
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = outer_schema.getIndexOfTve(tve);
@@ -182,7 +184,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for join TVE: " +
-                                               tve.toString());
+                            tve.toString());
                 }
             }
             tve.setColumnIndex(index);
@@ -195,15 +197,15 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         stringer.key(Members.JOIN_TYPE.name()).value(m_joinType.toString());
         stringer.key(Members.PREDICATE.name()).value(m_predicate);
     }
-    
- // TODO:Members not loaded
+
+    // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
-    	try {
-			this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
-		} catch (JSONException e) {
-			System.out.println( e.getMessage() );
-		}
+        super.loadFromJSONObject(jobj, db);
+        try {
+            this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
+        } catch (JSONException e) {
+            System.out.println( e.getMessage() );
+        }
     }
 }

@@ -60,18 +60,19 @@ public class SendPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
     }
-    
+
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
 
     @Override
     protected String explainPlanForNode(String indent) {
-        if (m_parents.size() == 0)
+        if (m_parents.size() == 0) {
             return "RETURN RESULTS TO STORED PROCEDURE";
-        else
+        } else {
             return "SEND PARTITION RESULTS TO COORDINATOR";
+        }
 
 
     }

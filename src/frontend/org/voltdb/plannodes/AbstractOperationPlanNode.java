@@ -93,8 +93,8 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         // Delete nodes have a special case with no child node when they
         // are truncating the entire table
         assert(m_children.size() == 1 ||
-               ((this instanceof DeletePlanNode) &&
-                (((DeletePlanNode)this).m_truncate)));
+                ((this instanceof DeletePlanNode) &&
+                        (((DeletePlanNode)this).m_truncate)));
         if (m_children.size() == 1)
         {
             m_children.get(0).generateOutputSchema(db);
@@ -113,9 +113,9 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
             tve.setColumnName("modified_tuples");
             tve.setColumnAlias("modified_tuples");
             SchemaColumn col = new SchemaColumn("VOLT_TEMP_TABLE",
-                                                "modified_tuples",
-                                                "modified_tuples",
-                                                tve);
+                    "modified_tuples",
+                    "modified_tuples",
+                    tve);
             m_outputSchema.addColumn(col);
         }
         return;
@@ -125,8 +125,8 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     public void resolveColumnIndexes()
     {
         assert(m_children.size() == 1 ||
-               ((this instanceof DeletePlanNode) &&
-                (((DeletePlanNode)this).m_truncate)));
+                ((this instanceof DeletePlanNode) &&
+                        (((DeletePlanNode)this).m_truncate)));
         if (m_children.size() == 1)
         {
             m_children.get(0).resolveColumnIndexes();
@@ -143,10 +143,10 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         super.toJSONString(stringer);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
     }
-    
+
     // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
-    	super.loadFromJSONObject(jobj, db);
+        super.loadFromJSONObject(jobj, db);
     }
 }
