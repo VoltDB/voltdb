@@ -26,9 +26,19 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+
+import org.junit.runner.RunWith;
+
+import org.junit.runners.Parameterized;
+
+import org.junit.runners.Parameterized.Parameters;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -38,13 +48,30 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
+@RunWith(value = Parameterized.class)
 public class TestAdHocQueries extends AdHocQueryTester {
+
+    @Parameters
+    public static Collection<Object[]> useIv2() {
+        return Arrays.asList(new Object[][] {{false}, {true}});
+    }
 
     Client m_client;
     private final static boolean m_debug = false;
 
+    protected final boolean m_useIv2;
+    public TestAdHocQueries(boolean useIv2)
+    {
+        m_useIv2 = useIv2;
+    }
+
+    // IMPORTANT SAFETY TIP
+    // The use of junit parameters to toggle between iv2 and non-iv2 cases
+    // means that all test cases MUST BE annotated with @Test or THEY WILL NOT RUN.
+
+    @Test
     public void testProcedureAdhoc() throws Exception {
-        VoltDB.Configuration config = setUpSPDB();
+        VoltDB.Configuration config = setUpSPDB(m_useIv2);
         ServerThread localServer = new ServerThread(config);
 
         try {
@@ -184,8 +211,10 @@ public class TestAdHocQueries extends AdHocQueryTester {
             System.gc();
         }
     }
+
+    @Test
     public void testSP() throws Exception {
-        VoltDB.Configuration config = setUpSPDB();
+        VoltDB.Configuration config = setUpSPDB(m_useIv2);
         ServerThread localServer = new ServerThread(config);
 
         try {
@@ -290,8 +319,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
     String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
     String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
+    @Test
     public void testSimple() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1, m_useIv2);
         try {
             env.setUp();
 
@@ -363,8 +393,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
     public void testAdHocBatches() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, m_useIv2);
         try {
             env.setUp();
             Batcher batcher = new Batcher(env);
@@ -512,7 +543,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         Client m_client = null;
 
         TestEnv(String pathToCatalog, String pathToDeployment,
-                     int siteCount, int hostCount, int kFactor) {
+                     int siteCount, int hostCount, int kFactor, boolean enableIv2) {
             m_builder = new VoltProjectBuilder();
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +
@@ -535,7 +566,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
                                          BackendTarget.NATIVE_EE_JNI,
                                          LocalCluster.FailureState.ALL_RUNNING,
-                                         m_debug, false);
+                                         m_debug, false, enableIv2);
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

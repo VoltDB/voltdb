@@ -23,11 +23,18 @@
 
 package org.voltdb;
 
-import java.io.File;
-import java.io.FilenameFilter;
 import java.net.InetSocketAddress;
 
-import org.apache.zookeeper_voltpatches.ZooKeeper;
+import java.util.Arrays;
+import java.util.Collection;
+
+import org.junit.runner.RunWith;
+
+import org.junit.runners.Parameterized;
+
+import org.junit.runners.Parameterized.Parameters;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.client.Client;
@@ -43,39 +50,26 @@ import org.voltdb.exportclient.ExportDecoderBase;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
+@RunWith(value = Parameterized.class)
 public class TestRejoinEndToEnd extends RejoinTestBase {
+
+    @Parameters
+    public static Collection<Object[]> useIv2() {
+        return Arrays.asList(new Object[][] {{false}, {true}});
+    }
+
+    protected final boolean m_useIv2;
+    public TestRejoinEndToEnd(boolean useIv2)
+    {
+        m_useIv2 = useIv2;
+    }
 
     final int FAIL_NO_OPEN_SOCKET = 0;
     final int FAIL_TIMEOUT_ON_SOCKET = 1;
     final int FAIL_SKEW = 2;
     final int DONT_FAIL = 3;
 
-    private static final String TMPDIR = "/tmp";
-    private static final String TESTNONCE = "testnonce";
-
-    private void deleteTestFiles()
-    {
-        FilenameFilter cleaner = new FilenameFilter()
-        {
-            @Override
-            public boolean accept(File dir, String file)
-            {
-                return file.startsWith(TESTNONCE) ||
-                file.endsWith(".vpt") ||
-                file.endsWith(".digest") ||
-                file.endsWith(".tsv") ||
-                file.endsWith(".csv");
-            }
-        };
-
-        File tmp_dir = new File(TMPDIR);
-        File[] tmp_files = tmp_dir.listFiles(cleaner);
-        for (File tmp_file : tmp_files)
-        {
-            tmp_file.delete();
-        }
-    }
-
+    @Test
     public void testRejoinWithMultipartLoad() throws Exception {
         ExecutionSite.m_recoveryPermit.drainPermits();
         ExecutionSite.m_recoveryPermit.release();
@@ -87,7 +81,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false, true);
+                    false, true, m_useIv2);
             cluster.setMaxHeap(256);
             cluster.overrideAnyRequestForValgrind();
             boolean success = cluster.compile(builder);
@@ -258,22 +252,18 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         }
     }
 
-    private boolean didRestore() throws Exception {
-        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
-        return null != zk.exists(VoltZK.restoreMarker, false);
-    }
-
     // These tests have moved to TestRejoinWithCatalogUpdate.java pending IV2 implementation of update catalog.
     // public void testRestoreThenRejoinPropagatesRestore() throws Exception;
     // public void testCatalogUpdateAfterRejoin() throws Exception;
 
+    @Test
     public void testLocalClusterRecoveringMode() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_FAILURE,
-                false, false);
+                false, false, m_useIv2);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
@@ -289,7 +279,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
                 BackendTarget.NATIVE_EE_JNI,
                 LocalCluster.FailureState.ONE_RECOVERING,
-                false, true);
+                false, true, m_useIv2);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         success = cluster.compile(builder);
@@ -303,11 +293,12 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
+    @Test
     public void testRejoinInlineStringBug() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 1, 2, 1,
-                BackendTarget.NATIVE_EE_JNI, false);
+                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
@@ -360,6 +351,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
+    @Test
     public void testRejoin() throws Exception {
         //Reset the VoltFile prefix that may have been set by previous tests in this suite
         org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
@@ -367,7 +359,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, false);
+                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
         cluster.setMaxHeap(256);
         cluster.overrideAnyRequestForValgrind();
         boolean success = cluster.compile(builder);
@@ -440,6 +432,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
+    @Test
     public void testRejoinPropogateAdminMode() throws Exception {
         //Reset the VoltFile prefix that may have been set by previous tests in this suite
         org.voltdb.utils.VoltFile.resetSubrootForThisProcess();
@@ -447,7 +440,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, false);
+                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compileWithAdminMode(builder, 21211, false); // note this admin port is ignored
@@ -532,6 +525,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
 
     }
 
+    @Test
     public void testRejoinWithExport() throws Exception {
         VoltProjectBuilder builder = getBuilderForTest();
         //builder.setTableAsExportOnly("blah", false);
@@ -543,7 +537,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
                 null);  // authGroups (off)
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 3, 1,
-                BackendTarget.NATIVE_EE_JNI, false);
+                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
@@ -642,13 +636,14 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         cluster.shutDown();
     }
 
+    @Test
     public void testRejoinDataTransfer() throws Exception {
         System.out.println("testRejoinDataTransfer");
         VoltProjectBuilder builder = getBuilderForTest();
         builder.setSecurityEnabled(true);
 
         LocalCluster cluster = new LocalCluster("rejoin.jar", 2, 2, 1,
-                BackendTarget.NATIVE_EE_JNI, false);
+                BackendTarget.NATIVE_EE_JNI, false, m_useIv2);
         cluster.overrideAnyRequestForValgrind();
         cluster.setMaxHeap(256);
         boolean success = cluster.compile(builder);
