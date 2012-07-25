@@ -55,11 +55,6 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         VoltTable table;
 
-        table = client.callProcedure("@AdHoc","SELECT Id, points FROM TU1 WHERE POINTS < 6").getResults()[0];
-        assertTrue(table.advanceRow());
-        System.err.println("RESULT:\n" + table);
-        assertTrue(true);
-/*
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS > -1000").getResults()[0];
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
@@ -154,9 +149,9 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(2, table.getLong(0));
-        assertTrue(true);*/
+        assertTrue(true);
     }
-/*
+
     public void testTwoOrMoreColumnsUniqueIndex() throws Exception {
         Client client = getClient();
 
@@ -483,7 +478,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertEquals(1, table.getLong(0));
         assertTrue(true);
     }
-*/
+
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
