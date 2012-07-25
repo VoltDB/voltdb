@@ -34,6 +34,7 @@ import java.io.InputStreamReader;
 import java.io.OutputStream;
 import java.io.PrintStream;
 import java.io.UnsupportedEncodingException;
+import java.util.ArrayList;
 import java.util.HashSet;
 import java.util.Set;
 import java.util.TreeSet;
@@ -58,6 +59,7 @@ import org.voltdb.client.ClientFactory;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.utils.SnapshotConverter;
 import org.voltdb.utils.SnapshotVerifier;
@@ -262,14 +264,31 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         return partition_table;
     }
 
-    private VoltTable[] loadTable(Client client, String tableName,
+    private VoltTable[] loadTable(Client client, String tableName, boolean replicated,
                                   VoltTable table)
     {
         VoltTable[] results = null;
         try
         {
-            client.callProcedure("@LoadMultipartitionTable", tableName,
-                                 table);
+            if (replicated) {
+                client.callProcedure("@LoadMultipartitionTable", tableName,
+                            table);
+            } else {
+                ArrayList<SyncCallback> callbacks = new ArrayList<SyncCallback>();
+                VoltType columnTypes[] = new VoltType[table.getColumnCount()];
+                for (int ii = 0; ii < columnTypes.length; ii++) {
+                    columnTypes[ii] = table.getColumnType(ii);
+                }
+                while (table.advanceRow()) {
+                    SyncCallback cb = new SyncCallback();
+                    callbacks.add(cb);
+                    Object params[] = new Object[table.getColumnCount()];
+                    for (int ii = 0; ii < columnTypes.length; ii++) {
+                        params[ii] = table.get(ii, columnTypes[ii]);
+                    }
+                    client.callProcedure(cb, tableName + ".insert", params);
+                }
+            }
         }
         catch (Exception ex)
         {
@@ -291,7 +310,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             VoltTable repl_table =
                 createReplicatedTable(itemsPerChunk, i * itemsPerChunk, expectedText, generateCSV);
-            loadTable(client, tableName, repl_table);
+            loadTable(client, tableName, true, repl_table);
         }
     }
 
@@ -302,7 +321,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         {
             VoltTable part_table =
                 createPartitionedTable(itemsPerChunk, i * itemsPerChunk);
-            loadTable(client, tableName, part_table);
+            loadTable(client, tableName, false, part_table);
         }
     }
 
@@ -432,8 +451,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
                 VoltTable partition_table =
                     createPartitionedTable(num_partitioned_items, 0);
 
-                loadTable(client, "REPLICATED_TESTER", repl_table);
-                loadTable(client, "PARTITION_TESTER", partition_table);
+                loadTable(client, "REPLICATED_TESTER", true, repl_table);
+                loadTable(client, "PARTITION_TESTER", false, partition_table);
                 saveTablesWithDefaultOptions(client);
 
                 boolean skipFirst = true;
@@ -1503,8 +1522,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable partition_table =
             createPartitionedTable(num_partitioned_items, 0);
 
-        loadTable(client, "REPLICATED_TESTER", repl_table);
-        loadTable(client, "PARTITION_TESTER", partition_table);
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
         saveTablesWithDefaultOptions(client);
 
         validateSnapshot(true);
@@ -1543,8 +1562,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             VoltTable partition_table =
                 createPartitionedTable(num_partitioned_items, 0);
 
-            loadTable(client, "REPLICATED_TESTER", repl_table);
-            loadTable(client, "PARTITION_TESTER", partition_table);
+            loadTable(client, "REPLICATED_TESTER", true, repl_table);
+            loadTable(client, "PARTITION_TESTER", false, partition_table);
             VoltTable results[] = saveTablesWithDefaultOptions(client);
             validateSnapshot(true);
             while (results[0].advanceRow()) {
@@ -1603,8 +1622,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             VoltTable partition_table =
                 createPartitionedTable(num_partitioned_items, 0);
 
-            loadTable(client, "REPLICATED_TESTER", repl_table);
-            loadTable(client, "PARTITION_TESTER", partition_table);
+            loadTable(client, "REPLICATED_TESTER", true, repl_table);
+            loadTable(client, "PARTITION_TESTER", false, partition_table);
             saveTablesWithDefaultOptions(client);
             validateSnapshot(true);
             releaseClient(client);
@@ -1654,8 +1673,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         VoltTable partition_table =
             createPartitionedTable(num_partitioned_items, 0);
 
-        loadTable(client, "REPLICATED_TESTER", repl_table);
-        loadTable(client, "PARTITION_TESTER", partition_table);
+        loadTable(client, "REPLICATED_TESTER", true, repl_table);
+        loadTable(client, "PARTITION_TESTER", false, partition_table);
         saveTablesWithDefaultOptions(client);
 
         // Kill and restart all the execution sites.
@@ -1764,8 +1783,8 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
             eng_2025_table.addRow(new Object[] {Integer.toString(i), new byte[64]});
         }
 
-        loadTable(client, "CHANGE_COLUMNS", change_table);
-        loadTable(client, "ENG_2025", eng_2025_table);
+        loadTable(client, "CHANGE_COLUMNS", false, change_table);
+        loadTable(client, "ENG_2025", true, eng_2025_table);
 
         VoltTable[] results = null;
         results = saveTablesWithDefaultOptions(client);
@@ -1852,7 +1871,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         change_types.addRow(1, VoltType.NULL_TINYINT, VoltType.NULL_INTEGER,
                             VoltType.NULL_INTEGER);
 
-        loadTable(client, "CHANGE_TYPES", change_types);
+        loadTable(client, "CHANGE_TYPES", true, change_types);
 
         saveTablesWithDefaultOptions(client);
         validateSnapshot(true);
@@ -1920,7 +1939,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
 
         change_types.addRow(0, 100, 100, 100000);
 
-        loadTable(client, "CHANGE_TYPES", change_types);
+        loadTable(client, "CHANGE_TYPES", true, change_types);
 
         VoltTable[] results = null;
         results = saveTablesWithDefaultOptions(client);
@@ -1971,71 +1990,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         config.revertCompile();
     }
 
-    /*
-     * ENG-3177 Test that a CSV snapshot of a replicated table provides status
-     * on only one node, the one that actually saved the snapshot.
-     */
-    public void testReplicatedTableCSVSnapshotStatus()
-    throws Exception
-    {
-        m_config.shutDown();
-
-        int host_count = 2;
-        int site_count = 1;
-        int k_factor = 0;
-        LocalCluster lc = new LocalCluster(JAR_NAME, site_count, host_count, k_factor,
-                                           BackendTarget.NATIVE_EE_JNI);
-        lc.setHasLocalServer(false);
-        SaveRestoreTestProjectBuilder project =
-            new SaveRestoreTestProjectBuilder();
-        project.addAllDefaults();
-        lc.compile(project);
-        lc.startUp();
-        String replicatedTableName = "REPLICATED_TESTER";
-        try {
-            Client client = ClientFactory.createClient();
-            client.createConnection(lc.getListenerAddresses().get(0));
-            try {
-                VoltTable repl_table = createReplicatedTable(100, 0, null);
-                loadTable(client, replicatedTableName, repl_table);
-                VoltTable[] results = saveTables(client, TMPDIR, TESTNONCE, true, true);
-                assertEquals("Wrong host/site count from @SnapshotSave.",
-                             host_count * site_count, results[0].getRowCount());
-            }
-            finally {
-                client.close();
-            }
-
-            // Connect to each host and check @SnapshotStatus.
-            // Only one host should say it saved the replicated table we're watching.
-            int nReplSaved = 0;
-            for (int iclient = 0; iclient < host_count; iclient++) {
-                client = ClientFactory.createClient();
-                client.createConnection(lc.getListenerAddresses().get(iclient));
-                try {
-                    SnapshotResult[] results =
-                            checkSnapshotStatus(client, null, TESTNONCE, null, "SUCCESS", null);
-                    for (SnapshotResult result : results) {
-                        if (result.table.equals(replicatedTableName)) {
-                            nReplSaved++;
-                        }
-                    }
-                }
-                finally {
-                    client.close();
-                }
-            }
-            assertEquals("Replicated table CSV is not saved on exactly one host.", 1, nReplSaved);
-        }
-        catch (Exception e) {
-            fail(String.format("Caught %s: %s", e.getClass().getName(), e.getMessage()));
-        }
-        finally {
-            lc.shutDown();
-        }
-    }
-
-    class SnapshotResult {
+    public static class SnapshotResult {
         Long hostID;
         String table;
         String path;
@@ -2046,7 +2001,7 @@ public class TestSaveRestoreSysprocSuite extends RegressionSuite {
         String result;
     }
 
-    SnapshotResult[] checkSnapshotStatus(Client client, String path, String nonce, Integer endTime,
+    public static SnapshotResult[] checkSnapshotStatus(Client client, String path, String nonce, Integer endTime,
             String result, Integer rowCount)
             throws NoConnectionsException, IOException, ProcCallException {
 

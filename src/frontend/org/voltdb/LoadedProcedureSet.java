@@ -32,6 +32,7 @@ import org.voltdb.utils.LogKeys;
 public class LoadedProcedureSet {
 
     private static final VoltLogger hostLog = new VoltLogger("HOST");
+
     // user procedures.
     final HashMap<String, ProcedureRunner> procs =
         new HashMap<String, ProcedureRunner>(16, (float) .1);
@@ -46,7 +47,7 @@ public class LoadedProcedureSet {
     final int m_numberOfPartitions;
     final SiteProcedureConnection m_site;
 
-    public LoadedProcedureSet(ExecutionSite site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex, int numberOfPartitions) {
+    public LoadedProcedureSet(SiteProcedureConnection site, ProcedureRunnerFactory runnerFactory, long siteId, int siteIndex, int numberOfPartitions) {
         m_runnerFactory = runnerFactory;
         m_siteId = siteId;
         m_siteIndex = siteIndex;
@@ -54,7 +55,7 @@ public class LoadedProcedureSet {
         m_site = site;
     }
 
-    public ProcedureRunner getSysproc(long fragmentId) {
+   public ProcedureRunner getSysproc(long fragmentId) {
         synchronized (m_registeredSysProcPlanFragments) {
             return m_registeredSysProcPlanFragments.get(fragmentId);
         }
@@ -67,7 +68,7 @@ public class LoadedProcedureSet {
         }
     }
 
-    void loadProcedures(
+    public void loadProcedures(
             CatalogContext catalogContext,
             BackendTarget backendTarget,
             CatalogSpecificPlanner csp) {
@@ -179,4 +180,8 @@ public class LoadedProcedureSet {
         }
     }
 
+    public ProcedureRunner getProcByName(String procName)
+    {
+        return procs.get(procName);
+    }
 }
