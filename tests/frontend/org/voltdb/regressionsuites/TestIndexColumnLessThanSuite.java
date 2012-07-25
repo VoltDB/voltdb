@@ -57,7 +57,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
 
         VoltTable table;
 
-        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10").getResults()[0];
         assertTrue(table.advanceRow());
         System.err.println("RESULT:\n" + table);
         assertTrue(true);

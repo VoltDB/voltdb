@@ -76,6 +76,11 @@ public class TestReplaceWithIndexCounter extends TestCase {
         aide.tearDown();
     }
 
+    public void testCountStar02() {
+        List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, true);
+        checkIndexCounter(pn, true, false);
+    }
+
     // DOES NOT support the cases down below right now
     public void testCountStar0() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, true);
