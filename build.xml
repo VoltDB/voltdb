@@ -1215,7 +1215,7 @@ TEST CASES
 <!--                <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
 <!--                <exclude name="**/TestIndexesSuite.class" /> -->
 <!--                <exclude name="**/TestLimitOffsetSuite.class" /> -->
-                <exclude name="**/TestLoadingSuite.class" />
+<!--                <exclude name="**/TestLoadingSuite.class" /> -->
                 <exclude name="**/TestMaliciousClientSuite.class" />
 <!--                <exclude name="**/TestMaterializedViewSuite.class" /> -->
 <!--                <exclude name="**/TestMultiPartitionSuite.class" /> -->
@@ -1223,7 +1223,7 @@ TEST CASES
                 <exclude name="**/TestPartitionDetection.class" />
 <!--                <exclude name="**/TestPlansGroupBySuite.class" /> -->
                 <exclude name="**/TestReplicationSuite.class" />
-                <exclude name="**/TestRollbackSuite.class" />
+<!--                <exclude name="**/TestRollbackSuite.class" /> -->
                 <exclude name="**/TestSQLFeaturesSuite.class" />
 <!--                <exclude name="**/TestSQLTypesSuite.class" /> -->
 <!--                <exclude name="**/TestSecuritySuite.class" /> -->

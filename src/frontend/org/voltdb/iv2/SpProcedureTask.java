@@ -59,6 +59,9 @@ public class SpProcedureTask extends ProcedureTask
         // cast up here .. ugly.
         SpTransactionState txn = (SpTransactionState)m_txn;
         final InitiateResponseMessage response = processInitiateTask(txn.m_task);
+        if (!response.shouldCommit()) {
+            m_txn.setNeedsRollback();
+        }
         completeInitiateTask(siteConnection);
         response.m_sourceHSId = m_initiator.getHSId();
         m_initiator.deliver(response);
