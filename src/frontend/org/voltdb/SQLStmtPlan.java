@@ -19,7 +19,6 @@ package org.voltdb;
 
 public class SQLStmtPlan {
 
-    private final String sqlText;
     private final byte[] aggregatorFragment;
     private final byte[] collectorFragment;
     private final boolean isReplicatedTableDML;
@@ -27,25 +26,15 @@ public class SQLStmtPlan {
     /**
      * Constructor
      *
-     * @param sqlText               VoltDB SQL text
      * @param aggregatorFragment    Compiled plan aggregator fragment
      * @param collectorFragment     Compiled plan collector fragment
      * @param isReplicatedTableDML  True if replicated
      */
-    public SQLStmtPlan(String sqlText, byte[] aggregatorFragment, byte[] collectorFragment,
+    public SQLStmtPlan(byte[] aggregatorFragment, byte[] collectorFragment,
             boolean isReplicatedTableDML) {
-        this.sqlText = sqlText;
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.isReplicatedTableDML = isReplicatedTableDML;
-    }
-
-    /**
-     * Get the SQL text
-     * @return  SQL text
-     */
-    public String getSqlText() {
-        return sqlText;
     }
 
     /**

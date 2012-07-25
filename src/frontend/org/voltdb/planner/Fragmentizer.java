@@ -17,12 +17,11 @@
 
 package org.voltdb.planner;
 
-import java.util.List;
-
 import org.voltdb.catalog.Database;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.types.PlanNodeType;
 
 /**
  * Wrapper class for one static method that accepts a CompiledPlan
@@ -43,14 +42,11 @@ public class Fragmentizer {
      */
     static CompiledPlan fragmentize(CompiledPlan plan, Database db) {
         assert(plan != null);
-        assert(plan.fragments != null);
-        assert(plan.fragments.size() == 1);
-
-        // there should be only one fragment in the plan at this point
-        CompiledPlan.Fragment rootFragment = plan.fragments.get(0);
+        assert(plan.rootPlanGraph != null);
+        assert(plan.subPlanGraph == null);
 
         // chop up the plan and set all the proper dependencies recursively
-        recursiveFindFragment(rootFragment, rootFragment.planGraph, plan.fragments);
+        recursiveFindFragment(plan, plan.rootPlanGraph);
 
         return plan;
     }
@@ -66,9 +62,8 @@ public class Fragmentizer {
      * as the method splits up the plan.
      */
     static void recursiveFindFragment(
-            CompiledPlan.Fragment currentFragment,
-            AbstractPlanNode currentNode,
-            List<CompiledPlan.Fragment> fragments) {
+            CompiledPlan plan,
+            AbstractPlanNode currentNode) {
 
         // the place to split is the send-recv node pairing
         if (currentNode instanceof ReceivePlanNode) {
@@ -83,19 +78,8 @@ public class Fragmentizer {
             recvNode.cacheDeterminism();
             recvNode.clearChildren();
 
-            // make a new plan fragment rooted at the send
-            CompiledPlan.Fragment subFrag = new CompiledPlan.Fragment();
-
-            // put the multipartition hint from planning in the metadata
-            // for the new planfragment
-            subFrag.multiPartition = sendNode.isMultiPartition;
-
-            subFrag.planGraph = sendNode;
-            currentFragment.hasDependencies = true;
-            fragments.add(subFrag);
-
-            // recursive call on the new fragment
-            recursiveFindFragment(subFrag, sendNode, fragments);
+            plan.subPlanGraph = sendNode;
+            assert(plan.subPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE).size() == 0);
 
             // stop here if we found a recv node
             return;
@@ -105,7 +89,7 @@ public class Fragmentizer {
         // stopping condition is when there are no children
         for (int i = 0; i < currentNode.getChildCount(); i++) {
             AbstractPlanNode childNode = currentNode.getChild(i);
-            recursiveFindFragment(currentFragment, childNode, fragments);
+            recursiveFindFragment(plan, childNode);
         }
     }
 }

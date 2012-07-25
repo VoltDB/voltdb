@@ -47,7 +47,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
@@ -73,13 +72,13 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocCompilerCache;
-import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
+import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
@@ -1069,17 +1068,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                           handler.isAdmin(),
                                           ccxn);
         for (String sqlStatement : sqlStatements) {
-            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sql, partitionParam != null);
+            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sqlStatement, partitionParam != null);
             // check the catalog version if there is a cached plan
             if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
                 break;
             }
-            planBatch.addStatement(sqlStatement,
-                                   plannedStatement.aggregatorFragment,
-                                   plannedStatement.collectorFragment,
-                                   plannedStatement.isReplicatedTableDML,
-                                   plannedStatement.isNonDeterministic,
-                                   null);
+            planBatch.addStatement(plannedStatement);
         }
         // All statements retrieved from cache?
         if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
@@ -1451,25 +1445,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // Set up the parameters.
-        // Need separate lists due to limitations on the kind of objects that can be dispatched.
-        // Convert to arrays, preferring primitive types.
-        List<byte[]> aggregatorFragmentList = plannedStmtBatch.getAggregatorFragments();
-        byte[][] aggregatorFragments = aggregatorFragmentList.toArray(
-                new byte[aggregatorFragmentList.size()][]);
-        List<byte[]> collectorFragmentList = plannedStmtBatch.getCollectorFragments();
-        byte[][] collectorFragments = collectorFragmentList.toArray(
-                new byte[collectorFragmentList.size()][]);
-        List<String> sqlStatementList = plannedStmtBatch.getSQLStatements();
-        String[] sqlStatements = sqlStatementList.toArray(
-                new String[sqlStatementList.size()]);
-        List<Integer> replicatedTableDMLFlagList = plannedStmtBatch.getReplicatedTableDMLFlags();
-        int[] replicatedTableDMLFlags = ArrayUtils.toPrimitive(
-                replicatedTableDMLFlagList.toArray(
-                        new Integer[replicatedTableDMLFlagList.size()]));
-        task.setParams(aggregatorFragments,
-                       collectorFragments,
-                       sqlStatements,
-                       replicatedTableDMLFlags);
+        ByteBuffer buf = ByteBuffer.allocate(plannedStmtBatch.getPlanArraySerializedSize());
+        plannedStmtBatch.flattenPlanArrayToBuffer(buf);
+        assert(buf.hasArray());
+        task.setParams(buf.array());
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         /*
@@ -1630,6 +1609,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     StringWriter sw = new StringWriter();
                     PrintWriter pw = new PrintWriter(sw);
                     e.printStackTrace(pw);
+                    e.printStackTrace();
                     pw.flush();
                     ClientResponseImpl errorResponse =
                             new ClientResponseImpl(
