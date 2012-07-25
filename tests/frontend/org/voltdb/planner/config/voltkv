@@ -2,10 +2,10 @@ Name:
 votekv
 
 Ref:
-/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/baseline/votekv/
+./tests/frontend/org/voltdb/planner/baseline/voltkv/
 
 DDL:
-/home/zhengli/workspace/voltdb/examples/voltkv/ddl.sql
+./examples/voltkv/ddl.sql
 
 Base Name:
 ddl

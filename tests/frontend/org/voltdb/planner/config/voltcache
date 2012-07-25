@@ -2,10 +2,10 @@ Name:
 voltcache
 
 Ref:
-/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/baseline/voltcache/
+./tests/frontend/org/voltdb/planner/baseline/voltcache/
 
 DDL:
-/home/zhengli/workspace/voltdb/examples/voltcache/ddl.sql
+./examples/voltcache/ddl.sql
 
 Base Name:
 ddl

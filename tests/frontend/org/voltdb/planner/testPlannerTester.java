@@ -45,6 +45,8 @@ import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.types.PlanNodeType;
 public class testPlannerTester extends TestCase {
     private PlannerTestAideDeCamp aide;
+    private String m_currentDir;
+    private String m_homeDir;
 
     private AbstractPlanNode compile(String sql, int paramCount,
                                      boolean singlePartition)
@@ -79,6 +81,8 @@ public class testPlannerTester extends TestCase {
         for (Table t : tmap) {
             t.setIsreplicated(false);
         }
+        m_currentDir = new File(".").getCanonicalPath();
+        m_homeDir = System.getProperty("user.home"); 
     }
 
     @Override
@@ -110,7 +114,7 @@ public class testPlannerTester extends TestCase {
     
     public void testBatchCompileSave() {
     	try {
-    		plannerTester.setUp("/home/zhengli/test1");
+    		plannerTester.setUp(m_homeDir+"/test1");
 			plannerTester.batchCompileSave();
 		} catch (Exception e) {
 			e.printStackTrace();
@@ -119,12 +123,12 @@ public class testPlannerTester extends TestCase {
     
     public void testCompile() {
 				try {
-//					plannerTester.setUp("/home/zhengli/workspace/voltdb/examples/voter/ddl.sql",
+//					plannerTester.setUp(m_currentDir+"/examples/voter/ddl.sql",
 //							"ddl", "l", "phone_number");
 					//List<AbstractPlanNode> pnList = plannerTester.compile("INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);", 4, false);
 					//assertTrue( pnList.size() == 2 );
 					
-					plannerTester.setUp("/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+					plannerTester.setUp(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
 							"testplans-plannerTester-ddl", "L", "a");
 					List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
 					System.out.println( pnList.size() );
@@ -143,8 +147,8 @@ public class testPlannerTester extends TestCase {
     	//pn = compile("select * from l where b = ? limit ?;", 3, true);
     	//pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
 //    	pn = compile("select * from t where a = ? order by a limit ?;",3, true);
-    	String path = "/home/zhengli/";
-    	plannerTester.setUp("/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+    	String path = m_homeDir+"/";
+    	plannerTester.setUp(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
 				"testplans-plannerTester-ddl", "L", "a");
 		List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
 
@@ -174,7 +178,7 @@ public class testPlannerTester extends TestCase {
     	AbstractPlanNode pn = null;
     	pn = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
     	
-    	String path = "/home/zhengli/";
+    	String path = m_homeDir+"/";
     	System.out.println( pn.toExplainPlanString() );
     	System.out.println( pn.toJSONString() );
     	plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
@@ -227,7 +231,7 @@ public class testPlannerTester extends TestCase {
 //		}
 //        //write plan to file
 ////        try {
-////			BufferedWriter writer = new BufferedWriter( new FileWriter("/home/zhengli/prettyJson.txt") );
+////			BufferedWriter writer = new BufferedWriter( new FileWriter(m_homeDir+"/prettyJson.txt") );
 ////			writer.write( prettyJson );
 ////			writer.flush();
 ////			writer.close();
@@ -239,7 +243,7 @@ public class testPlannerTester extends TestCase {
 //        String line = null;
 //        //load plan from file
 //        try {
-//			BufferedReader reader = new BufferedReader( new FileReader( "/home/zhengli/prettyJson.txt" ));
+//			BufferedReader reader = new BufferedReader( new FileReader( m_homeDir+"/prettyJson.txt" ));
 //				while( (line = reader.readLine() ) != null ){
 //					line = line.trim();
 //					prettyJson += line;
@@ -352,75 +356,83 @@ public class testPlannerTester extends TestCase {
         }
     }
     
-    public void testBatchDiff() {
-    	int size = 7;
-    	String pathBaseline = "/tmp/volttest/test1Baseline/";
-    	String pathNew = "/tmp/volttest/test1New/";
-    	plannerTester.setTestName( "Test1" );
-    	try {
-			plannerTester.batchDiff(pathBaseline, pathNew, size);
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-    }
+//    public void testBatchDiff() {
+//    	int size = 7;
+//    	String pathBaseline = "/tmp/volttest/test1Baseline/";
+//    	String pathNew = "/tmp/volttest/test1New/";
+//    	plannerTester.setTestName( "Test1" );
+//    	try {
+//			plannerTester.batchDiff(pathBaseline, pathNew, size);
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//    }
     
-    public void testWholeProcess() {
-    	try {
-			plannerTester.setUp("/home/zhengli/test1");
-			plannerTester.batchCompileSave();
-			plannerTester.batchDiff();
-		} catch (Exception e) {
-			e.printStackTrace();
-		}
-    }
+//    public void testWholeProcess() {
+//    	try {
+//			plannerTester.setUp(m_homeDir+"/test1");
+//			plannerTester.batchCompileSave();
+//			plannerTester.batchDiff();
+//		} catch (Exception e) {
+//			e.printStackTrace();
+//		}
+//    }
     
     //make sure plan files are already in baseline directories 
-    public void testDiffVoltExamples() {
-    	try {
-    		plannerTester.setUp("/home/zhengli/test1");
-    		plannerTester.batchDiff();
-    	
-    		plannerTester.setUp("/home/zhengli/Voter");
-    		plannerTester.batchDiff();
-    	
-    		plannerTester.setUp("/home/zhengli/voltcache");
-    		plannerTester.batchDiff();
-    	
-    		plannerTester.setUp("/home/zhengli/voltkv");
-    		plannerTester.batchDiff();
-    	}
-    	catch ( Exception e ) {
-    		e.printStackTrace();
-    	}
-    }
+//    public void testDiffVoltExamples() {
+//    	try {
+//    		plannerTester.setUp(m_homeDir+"/test1");
+//    		plannerTester.batchDiff();
+//    	
+//    		plannerTester.setUp(m_homeDir+"/Voter");
+//    		plannerTester.batchDiff();
+//    	
+//    		plannerTester.setUp(m_homeDir+"/voltcache");
+//    		plannerTester.batchDiff();
+//    	
+//    		plannerTester.setUp(m_homeDir+"/voltkv");
+//    		plannerTester.batchDiff();
+//    	}
+//    	catch ( Exception e ) {
+//    		e.printStackTrace();
+//    	}
+//    }
     
     public void testMain() {
-    	String[] args = {"-d","-s","-e","-C=/home/zhengli/workspace/voltdb/tests/frontend/org/voltdb/planner/config/voter","-r=/home/zhengli/"};
+    	String[] args = {"-cs","-d","-s","-e",
+    			"-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voter",
+    			"-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/test1",
+    			"-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltcache",
+    			"-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltkv",
+    			"-r="+m_homeDir+"/"};
     	plannerTester.main(args);
     }
     
 //    public void testwrite() {
 //    	try {
-//			BufferedWriter writer = new BufferedWriter( new FileWriter("/home/zhengli/testwrite") );
+//			BufferedWriter writer = new BufferedWriter( new FileWriter(m_homeDir+"/testwrite") );
 //			writer.write("abc");
 //			writer.write("\n");
 //			writer.write("def");
+//			
+//			writer.flush();
+//			writer.close();
+//			writer = new BufferedWriter( new FileWriter(m_homeDir+"/testwrite") );
+//			writer.append("\nabcde");
 //			writer.flush();
 //			writer.close();
 //		} catch (IOException e) {
-//			// TODO Auto-generated catch block
+//			// 
 //			e.printStackTrace();
 //		}
 //    }
     
-    public void testPrint() {
-    	try {
-			System.out.println( new File("home/zhengli/tests/frontend/org/voltdb/planner/config/voter/").getCanonicalPath() );
-		} catch (IOException e) {
-			// TODO Auto-generated catch block
-			e.printStackTrace();
-		}
-    }
+//    public void testPrint() {
+//    	try {
+//			System.out.println( new File(".").getCanonicalPath() );
+//		} catch (IOException e) {
+//			e.printStackTrace();
+//		}
+//    }
 }
 
