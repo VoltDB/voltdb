@@ -36,9 +36,21 @@ import org.junit.After;
 import org.junit.Before;
 import org.junit.Test;
 
+import com.google.common.collect.ImmutableMap;
+
 public class TestMapCache extends ZKTestBase {
 
     private final int NUM_AGREEMENT_SITES = 8;
+
+    public static class TestCallback extends MapCache.Callback
+    {
+        ImmutableMap<String, JSONObject> m_cache = null;
+
+        public void run(ImmutableMap<String, JSONObject> cache)
+        {
+            m_cache = cache;
+        }
+    }
 
     @Before
     public void setUp() throws Exception
@@ -83,6 +95,25 @@ public class TestMapCache extends ZKTestBase {
     }
 
     @Test
+    public void testInitialCacheWithCallback() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        configure("/cache01", zk);
+
+        TestCallback cb = new TestCallback();
+        MapCache dut = new  MapCache(zk, "/cache01", cb);
+        dut.start(true);
+
+        assertEquals("3 items cached.", 3, cb.m_cache.size());
+        assertEquals("aaval", cb.m_cache.get("/cache01/aa").get("key"));
+        assertEquals("bbval", cb.m_cache.get("/cache01/bb").get("key"));
+        assertEquals("ccval", cb.m_cache.get("/cache01/cc").get("key"));
+
+        dut.shutdown();
+        zk.close();
+    }
+
+    @Test
     public void testModifyChild() throws Exception
     {
         ZooKeeper zk = getClient(0);
@@ -113,6 +144,37 @@ public class TestMapCache extends ZKTestBase {
     }
 
     @Test
+    public void testModifyChildWithCallback() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        configure("/cache03", zk);
+
+        TestCallback cb = new TestCallback();
+        MapCache dut = new  MapCache(zk, "/cache03", cb);
+        dut.start(true);
+        Map<String, JSONObject> cache = cb.m_cache;
+
+        assertEquals("3 items cached.", 3, cache.size());
+        assertEquals("aaval", cache.get("/cache03/aa").get("key"));
+
+        JSONObject aa = new JSONObject("{key:aaval2}");
+        zk.setData("/cache03/aa", aa.toString().getBytes(), -1);
+        while(true) {
+            cache = cb.m_cache;
+            if (cache.get("/cache03/aa").get("key").equals("aaval2")) {
+                break;
+            }
+        }
+        assertEquals("3 items cached.", 3, cache.size());
+        assertEquals("aaval2", cache.get("/cache03/aa").get("key"));
+        assertEquals("bbval", cache.get("/cache03/bb").get("key"));
+        assertEquals("ccval", cache.get("/cache03/cc").get("key"));
+
+        dut.shutdown();
+        zk.close();
+    }
+
+    @Test
     public void testDeleteChild() throws Exception
     {
         ZooKeeper zk = getClient(0);
@@ -126,6 +188,37 @@ public class TestMapCache extends ZKTestBase {
         zk.delete("/cache02/bb", -1);
         while(true) {
             cache = dut.pointInTimeCache();
+            if (cache.size() == 3) {
+                Thread.sleep(1);
+            }
+            else {
+                break;
+            }
+        }
+        assertEquals("Item removed", 2, cache.size());
+        assertEquals(null, cache.get("/cache02/bb"));
+        assertEquals("aaval", cache.get("/cache02/aa").get("key"));
+        assertEquals("ccval", cache.get("/cache02/cc").get("key"));
+
+        dut.shutdown();
+        zk.close();
+    }
+
+    @Test
+    public void testDeleteChildWithCallback() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        configure("/cache02", zk);
+
+        TestCallback cb = new TestCallback();
+        MapCache dut = new MapCache(zk, "/cache02", cb);
+        dut.start(true);
+        Map<String, JSONObject> cache = cb.m_cache;
+        assertEquals("3 items cached.", 3, cache.size());
+
+        zk.delete("/cache02/bb", -1);
+        while(true) {
+            cache = cb.m_cache;
             if (cache.size() == 3) {
                 Thread.sleep(1);
             }
@@ -186,4 +279,48 @@ public class TestMapCache extends ZKTestBase {
         zk.close();
     }
 
+    @Test
+    public void testAddChildWithPutWithCallback() throws Exception
+    {
+        ZooKeeper zk = getClient(0);
+        configure("/cache04", zk);
+
+        TestCallback cb = new TestCallback();
+        MapCache dut = new MapCache(zk, "/cache04", cb);
+        dut.start(true);
+        Map<String, JSONObject> cache = cb.m_cache;
+
+        JSONObject dd = new JSONObject("{key:ddval}");
+        dut.put("dd", dd);
+
+        while(true) {
+            cache = cb.m_cache;
+            if (cache.size() == 3) {
+                Thread.sleep(1);
+            }
+            else {
+                break;
+            }
+        }
+        assertEquals("Item added", 4, cache.size());
+        assertEquals("aaval", cache.get("/cache04/aa").get("key"));
+        assertEquals("bbval", cache.get("/cache04/bb").get("key"));
+        assertEquals("ccval", cache.get("/cache04/cc").get("key"));
+        assertEquals("ddval", cache.get("/cache04/dd").get("key"));
+
+        // modify the new child and make sure it has a watch set.
+        JSONObject dd2 = new JSONObject("{key:ddval2}");
+        dut.put("dd", dd2);
+        while(true) {
+            cache = cb.m_cache;
+            if (cache.get("/cache04/dd").get("key").equals("ddval2")) {
+                break;
+            }
+        }
+        assertEquals("Items accounted for.", 4, cache.size());
+        assertEquals("ddval2", cache.get("/cache04/dd").get("key"));
+
+        dut.shutdown();
+        zk.close();
+    }
 }

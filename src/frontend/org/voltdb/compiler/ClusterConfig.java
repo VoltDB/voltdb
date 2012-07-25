@@ -62,6 +62,17 @@ public class ClusterConfig
         m_errorMsg = "Config is unvalidated";
     }
 
+    // Construct a ClusterConfig object from the JSON topology.  The computations
+    // for this object are currently deterministic given the three values below, so
+    // this all magically works.  If you change that fact, good luck Chuck.
+    public ClusterConfig(JSONObject topo) throws JSONException
+    {
+        m_hostCount = topo.getInt("hostcount");
+        m_sitesPerHost = topo.getInt("sites_per_host");
+        m_replicationFactor = topo.getInt("kfactor");
+        m_errorMsg = "Config is unvalidated";
+    }
+
     public int getHostCount()
     {
         return m_hostCount;
@@ -156,6 +167,9 @@ public class ClusterConfig
         stringer.key("hostcount").value(m_hostCount);
         stringer.key("kfactor").value(getReplicationFactor());
         stringer.key("sites_per_host").value(sitesPerHost);
+        // XXX-IZZY HACK hardwire this to 0 for now, until
+        // replication works
+        stringer.key("MPI").value(0);
         stringer.key("partitions").array();
         for (int part = 0; part < partitionCount; part++)
         {
@@ -173,8 +187,7 @@ public class ClusterConfig
         stringer.endObject();
 
         JSONObject topo = new JSONObject(stringer.toString());
-        hostLog.debug("TOPO: " + topo.toString(2));
-
+        hostLog.info("TOPO: " + topo.toString(2));
         return topo;
     }
 

@@ -60,6 +60,8 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.ClientInterface.ClientInputHandler;
+
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
@@ -82,6 +84,7 @@ public class TestClientInterface {
     private HostMessenger m_messenger;
     private TransactionInitiator m_initiator;
     private ClientInputHandler m_handler;
+    private Cartographer m_cartographer;
 
     // real context
     private static CatalogContext m_context = null;
@@ -107,6 +110,7 @@ public class TestClientInterface {
         m_messenger = mock(HostMessenger.class);
         m_initiator = mock(TransactionInitiator.class);
         m_handler = mock(ClientInputHandler.class);
+        m_cartographer = mock(Cartographer.class);
 
         /*
          * Setup the mock objects so that they return expected objects in CI
@@ -122,7 +126,8 @@ public class TestClientInterface {
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
-                                       m_context, m_messenger, ReplicationRole.NONE, m_initiator, m_allPartitions));
+                                       m_context, m_messenger, ReplicationRole.NONE, m_initiator,
+                                       m_cartographer, m_allPartitions));
 
         m_mb = m_ci.m_mailbox;
     }
