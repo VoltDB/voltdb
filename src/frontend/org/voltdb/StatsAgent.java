@@ -188,17 +188,7 @@ public class StatsAgent {
     }
 
     private void collectStatsImpl(Connection c, long clientHandle, String selector) throws Exception {
-        if (selector.equals("TOPO")) {
-            PendingStatsRequest psr = new PendingStatsRequest(
-                selector,
-                c,
-                clientHandle,
-                new VoltTable[1],
-                System.currentTimeMillis());
-            collectTopoStats(psr);
-            return;
-        }
-
+        assert(selector.equals("DR"));
         if (m_pendingRequests.size() > MAX_IN_FLIGHT_REQUESTS) {
             /*
              * Defensively check for an expired request not caught
@@ -309,17 +299,6 @@ public class StatsAgent {
         SysProcSelector selector = SysProcSelector.valueOf(selectorString);
         if (selector == SysProcSelector.DRNODE) {
             collectDRStats(obj);
-        }
-    }
-
-    private void collectTopoStats(PendingStatsRequest psr)
-    {
-        List<Long> catalogIds = Arrays.asList(new Long[] { 0L });
-        psr.aggregateTables[0] = getStats(SysProcSelector.TOPO, catalogIds, false, psr.startTime);
-        try {
-            sendStatsResponse(psr);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Screwed", true, e);
         }
     }
 

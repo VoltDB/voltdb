@@ -274,11 +274,4 @@ public class TestReplayTxnState extends TestCase {
                 any(HashMap.class),
                 any(VoltMessage.class));
     }
-
-    public void testReturnInvocation() {
-        ExecutionSite site = mock(ExecutionSite.class);
-        InitiateTaskMessage task = new InitiateTaskMessage(0, 0, 0, false, true, invocation, 0);
-        ReplayedTxnState txnState = new ReplayedTxnState(site, task);
-        assertNotNull(txnState.getInvocation());
-    }
 }

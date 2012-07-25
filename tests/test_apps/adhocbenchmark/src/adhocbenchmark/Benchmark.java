@@ -67,25 +67,39 @@ public class Benchmark {
     // Benchmark start time
     long benchmarkStartTS;
 
-    final QueryTracer tracer;
+    // Counters
+    private static final class Counters {
+        // Number of queries generated.
+        long queriesGenerated = 0;
+        // Number of queries that failed;
+        long queriesFailed = 0;
+        // Number of queries processed (in call-back).
+        long queriesProcessed = 0;
+
+        public Counters() {
+        }
+    }
+    Counters counters = new Counters();
 
     // Statistics manager objects from the client
     final ClientStatsContext periodicStatsContext;
     final ClientStatsContext fullStatsContext;
 
-    private final class CallProcedureCallback implements ProcedureCallback {
-        final String query;
-        final long queryIndex;
-
-        public CallProcedureCallback(long queryIndex, final String query) {
-            this.queryIndex = queryIndex;
-            this.query = query;
+    private static final class CallProcedureCallback implements ProcedureCallback {
+        int errorStatus = ClientResponse.SUCCESS;
+        String errorString = null;
+        final Counters counters;
+        public CallProcedureCallback(final Counters counters) {
+            this.counters = counters;
         }
-
         @Override
         public void clientCallback(ClientResponse clientResponse) throws Exception {
+            if (this.counters != null) {
+                this.counters.queriesProcessed++;
+            }
             if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                tracer.logQueryFailedAndExit(queryIndex, query, clientResponse);
+                this.errorStatus = clientResponse.getStatus();
+                this.errorString = clientResponse.getStatusString();
             }
         }
     }
@@ -126,20 +140,20 @@ public class Benchmark {
 
         @Override
         public void validate() {
-            if (displayinterval <= 0)
+            if (this.displayinterval <= 0)
                 exitWithMessageAndUsage("displayinterval must be > 0");
-            if (duration < 0)
+            if (this.duration < 0)
                 exitWithMessageAndUsage("duration must be 0 or a positive integer");
-            if (warmup < 0)
+            if (this.warmup < 0)
                 exitWithMessageAndUsage("warmup must be 0 or a positive integer");
-            if (querythrottle < 0)
+            if (this.querythrottle < 0)
                 exitWithMessageAndUsage("querythrottle must 0 or a positive integer");
             // We don't know the test names here. Ask for them and use them to validate.
             Set<String> tests = BenchmarkConfiguration.getTestNames();
-            test = test.toLowerCase();
-            if (!tests.contains(test)) {
+            this.test = this.test.toLowerCase();
+            if (!tests.contains(this.test)) {
                 StringBuilder validTests = new StringBuilder()
-                    .append("test '").append(test).append("' is unknown, use one of: {");
+                    .append("test '").append(this.test).append("' is unknown, use one of: {");
                 for (String test : tests) {
                     validTests.append(" ");
                     validTests.append(test);
@@ -173,24 +187,20 @@ public class Benchmark {
 
         ClientConfig clientConfig = new ClientConfig("", "", new StatusListener());
         // Throttle so that ad hoc queries don't get rejected with "planner not available".
-        if (cliConfig.querythrottle > 0) {
+        if (this.cliConfig.querythrottle > 0) {
             System.out.printf("Throttling maximum outstanding transactions to %d\n",
-                              cliConfig.querythrottle);
-            clientConfig.setMaxOutstandingTxns(cliConfig.querythrottle);
+                              this.cliConfig.querythrottle);
+            clientConfig.setMaxOutstandingTxns(this.cliConfig.querythrottle);
         }
-        client = ClientFactory.createClient(clientConfig);
+        this.client = ClientFactory.createClient(clientConfig);
 
-        periodicStatsContext = client.createStatsContext();
-        fullStatsContext = client.createStatsContext();
-
-        tracer = new QueryTracer(cliConfig.querytracefile);
+        this.periodicStatsContext = this.client.createStatsContext();
+        this.fullStatsContext = this.client.createStatsContext();
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Command Line Configuration");
         System.out.println(HORIZONTAL_RULE);
         System.out.println(cliConfig.getConfigDumpString());
-
-
     }
 
     /**
@@ -204,7 +214,7 @@ public class Benchmark {
         int sleep = 1000;
         while (true) {
             try {
-                client.createConnection(server);
+                this.client.createConnection(server);
                 break;
             }
             catch (Exception e) {
@@ -248,14 +258,14 @@ public class Benchmark {
      * Create a Timer task to display performance data every displayInterval seconds
      */
     public void schedulePeriodicStats() {
-        timer = new Timer();
+        this.timer = new Timer();
         TimerTask statsPrinting = new TimerTask() {
             @Override
             public void run() { printStatistics(); }
         };
-        timer.scheduleAtFixedRate(statsPrinting,
-                                  cliConfig.displayinterval * 1000,
-                                  cliConfig.displayinterval * 1000);
+        this.timer.scheduleAtFixedRate(statsPrinting,
+                                       this.cliConfig.displayinterval * 1000,
+                                       this.cliConfig.displayinterval * 1000);
     }
 
     /**
@@ -263,12 +273,14 @@ public class Benchmark {
      * periodically during a benchmark.
      */
     public synchronized void printStatistics() {
-        ClientStats stats = periodicStatsContext.fetchAndResetBaseline().getStats();
-        long time = Math.round((stats.getEndTimestamp() - benchmarkStartTS) / 1000.0);
+        ClientStats stats = this.periodicStatsContext.fetchAndResetBaseline().getStats();
+        long time = Math.round((stats.getEndTimestamp() - this.benchmarkStartTS) / 1000.0);
 
+        System.out.printf("Count %d ", this.counters.queriesGenerated);
         System.out.printf("%02d:%02d:%02d ", time / 3600, (time / 60) % 60, time % 60);
         System.out.printf("Throughput %d/s, ", stats.getTxnThroughput());
-        System.out.printf("Txns Completed %d ", stats.getInvocationsCompleted());
+        System.out.printf("Aborts/Failures %d/%d, ",
+                stats.getInvocationAborts(), stats.getInvocationErrors());
         System.out.printf("Avg/95%% Latency %d/%dms\n", stats.getAverageLatency(),
                 stats.kPercentileLatency(0.95));
     }
@@ -280,13 +292,18 @@ public class Benchmark {
      * @throws Exception if anything unexpected happens.
      */
     public synchronized void printResults(long totalElapsedMS, long queryElapsedMS) throws IOException {
-        ClientStats stats = fullStatsContext.fetch().getStats();
+        ClientStats stats = this.fullStatsContext.fetch().getStats();
 
         // 1. Results and performance statistics
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Results");
         System.out.println(HORIZONTAL_RULE);
-        System.out.printf("Total queries completed:       %9d\n", stats.getInvocationsCompleted());
+        System.out.printf("Total queries generated:       %9d\n", this.counters.queriesGenerated);
+        System.out.printf("Total queries succeeded:       %9d\n", this.counters.queriesGenerated - this.counters.queriesFailed);
+        System.out.printf("Total queries failed:          %9d\n", this.counters.queriesFailed);
+        System.out.printf("Query elapsed time:            %9.2f seconds\n", queryElapsedMS / 1000.0);
+        System.out.printf("Test overhead elapsed time:    %9.2f seconds\n", (totalElapsedMS - queryElapsedMS)/ 1000.0);
+        System.out.printf("Total elapsed time:            %9.2f seconds\n\n", totalElapsedMS / 1000.0);
 
         // 2. Performance statistics
         System.out.print(HORIZONTAL_RULE);
@@ -305,7 +322,7 @@ public class Benchmark {
         System.out.printf("Reported Internal Avg Latency: %,9d ms\n", stats.getAverageInternalLatency());
 
         // 3. Write stats to file if requested
-        client.writeSummaryCSV(stats, cliConfig.statsfile);
+        this.client.writeSummaryCSV(stats, this.cliConfig.statsfile);
     }
 
     /**
@@ -325,22 +342,22 @@ public class Benchmark {
         public QueryIterator(final List<QueryTestBase> tests, final int duration) {
             this.tests = tests;
             this.duration = duration;
-            startTimeMS = System.currentTimeMillis();
-            testIterator = tests.listIterator();
+            this.startTimeMS = System.currentTimeMillis();
+            this.testIterator = this.tests.listIterator();
             // Prepare to run the first test
-            nextTest();
+            this.nextTest();
         }
 
         /**
          * Prepare for the next test.
          */
         public void nextTest() {
-            currentTest = testIterator.next();
-            if (currentTest != null) {
+            this.currentTest = this.testIterator.next();
+            if (this.currentTest != null) {
                 // Prepare the random numbers.
-                shuffledNumbers = new ArrayList<Integer>(currentTest.nRandomNumbers);
-                for (int i = 0; i < currentTest.nRandomNumbers; i++) {
-                    shuffledNumbers.add(i);
+                this.shuffledNumbers = new ArrayList<Integer>(this.currentTest.nRandomNumbers);
+                for (int i = 0; i < this.currentTest.nRandomNumbers; i++) {
+                    this.shuffledNumbers.add(i);
                 }
             }
         }
@@ -349,21 +366,21 @@ public class Benchmark {
          *  Advance to the next test.
          */
         private void advance() {
-            if (currentTest == null) {
+            if (this.currentTest == null) {
                 throw new NoSuchElementException();
             }
-            if (duration > 0 && System.currentTimeMillis() > startTimeMS + (duration * 1000)) {
+            if (this.duration > 0 && System.currentTimeMillis() > this.startTimeMS + (duration * 1000)) {
                 // Time expired.
-                currentTest = null;
+                this.currentTest = null;
             } else {
-                iGeneratedQueries++;
-                if (testIterator.hasNext()) {
+                this.iGeneratedQueries++;
+                if (this.testIterator.hasNext()) {
                     // Keep going as long as tests remain.
-                    nextTest();
+                    this.nextTest();
                 } else {
                     // Wrap around until time expires.
-                    testIterator = tests.listIterator();
-                    currentTest = testIterator.next();
+                    this.testIterator = this.tests.listIterator();
+                    this.currentTest = this.testIterator.next();
                 }
             }
         }
@@ -371,48 +388,48 @@ public class Benchmark {
         // Generate table name from prefix and zero-based table index.
         @Override
         public String tableName(int iTable) {
-            return String.format("%s_%d", currentTest.tablePrefix, iTable + 1);
+            return String.format("%s_%d", this.currentTest.tablePrefix, iTable + 1);
         }
 
         // Generate column name from prefix and zero-based table index.
         @Override
         public String columnName(int iColumn) {
-            return String.format("%s_%d", currentTest.columnPrefix,
-                                          (iColumn % currentTest.nColumns) + 1);
+            return String.format("%s_%d", this.currentTest.columnPrefix,
+                                          (iColumn % this.currentTest.nColumns) + 1);
         }
 
         // Generate table.column name from prefix and zero-based table index.
         @Override
         public String tableColumnName(int iTable, int iColumn) {
-            return String.format("%s.%s", tableName(iTable), columnName(iColumn));
+            return String.format("%s.%s", this.tableName(iTable), this.columnName(iColumn));
         }
 
         // Get an indexed shuffled number.
         @Override
         public int getShuffledNumber(final int i) {
-            return shuffledNumbers.get(i % shuffledNumbers.size());
+            return this.shuffledNumbers.get(i % this.shuffledNumbers.size());
         }
 
         // Check if a next query is available. Pre-determined by previous next()/advance() call.
         @Override
         public boolean hasNext() {
             // As soon as tests are exhausted currentTest is set to null in advance().
-            return (currentTest != null);
+            return (this.currentTest != null);
         }
 
         // Get the next query string.
         @Override
         public String next() {
             // Exhausted all tests?
-            if (currentTest == null) {
+            if (this.currentTest == null) {
                 throw new NoSuchElementException();
             }
             // Shuffle the numbers used by the query generator.
-            java.util.Collections.shuffle(shuffledNumbers, rnd);
+            java.util.Collections.shuffle(this.shuffledNumbers, rnd);
             // Ask the derived class to generate the query. Subtract 1 for zero-based query counter.
-            String query = currentTest.getQuery(iGeneratedQueries, this);
+            String query = this.currentTest.getQuery(this.iGeneratedQueries, this);
             // Get ready for the next one (sets currentTest to null when testing is complete).
-            advance();
+            this.advance();
             return query;
         }
 
@@ -437,80 +454,43 @@ public class Benchmark {
 
         @Override
         public Iterator<String> iterator() {
-            return new QueryIterator(tests, duration);
+            return new QueryIterator(this.tests, this.duration);
         }
     }
 
     private static class QueryTracer {
-        private OutputStreamWriter writer = null;
+        private final OutputStreamWriter writer;
+        private final boolean doGood;
 
-        QueryTracer(String path) {
+        QueryTracer(String path) throws IOException {
             if (path != null && !path.isEmpty()) {
-                try {
-                    writer = new FileWriter(path);
-                }
-                catch (IOException e) {
-                    e.printStackTrace();
-                    System.exit(-1);
-                }
+                this.writer = new FileWriter(path);
+                this.doGood = true;
+            } else {
+                this.writer = null;
+                this.doGood = false;
             }
         }
 
-        private String getQueryIndexStr(long queryIndex) {
-            if (queryIndex < 0) {
-                return String.format("WARM%9d", queryIndex * -1);
-            }
-            else {
-                return String.format("%9d", queryIndex);
-            }
-        }
-
-        synchronized void logQueryInvoked(long queryIndex, String query) throws IOException {
-            // skip warmups
-            if (queryIndex < 0) {
-                return;
-            }
-
-            String msg = String.format("[QUERY %9s]: INVOKED WITH SQL: %s\n", getQueryIndexStr(queryIndex), query);
-
-            // write the log
-            if (writer != null) {
-                writer.write(msg);
-                // don't flush for invocations // writer.flush();
+        private void write(String format, Object... args) throws IOException {
+            String msg = String.format(format, args);
+            if (this.writer != null) {
+                this.writer.write(msg);
+                this.writer.write("\n");
+            } else {
+                System.out.println(msg);
             }
         }
 
-        synchronized void logQueryFailedAndExit(long queryIndex, String query, ClientResponse response) throws IOException {
-            String queryIndexStr = getQueryIndexStr(queryIndex);
-            String err =  String.format("[QUERY %s]: **FAILED** WITH STATUS %d\n", queryIndexStr, response.getStatus());
-                   err += String.format("[QUERY %s]:   SQL: %s\n", queryIndexStr, query);
-                   err += String.format("[QUERY %s]:   STATUS STRING: %s\n\n", queryIndexStr, response.getStatusString());
-
-            // write the err to standard err
-            System.err.print(err);
-            System.err.flush();
-
-            // write the err to the log if it exists
-            if (writer != null) {
-                writer.write(err);
-
-                // flush and close in anticipation of impending death
-                writer.flush();
-                writer.close();
+        void traceGood(String query) throws IOException {
+            if (this.doGood) {
+                this.write("[QUERY] %s", query);
             }
-
-            System.exit(-1);
         }
 
-        synchronized void close() {
-            if (writer != null) {
-                try {
-                    writer.flush();
-                    writer.close();
-                } catch (IOException e) {
-                    e.printStackTrace();
-                }
-            }
+        void traceBad(String query, int errorStatus, String errorString) throws IOException {
+            this.write("[BAD] %s", query);
+            this.write("[ERROR(%d)] %s", errorStatus, errorString);
         }
     }
 
@@ -526,32 +506,35 @@ public class Benchmark {
      * @throws NoConnectionsException
      */
     public void runBenchmark(String configPath)
-            throws ConfigurationException, InterruptedException, NoConnectionsException, IOException
-    {
+            throws ConfigurationException, InterruptedException, NoConnectionsException, IOException {
         System.out.print(HORIZONTAL_RULE);
         System.out.println(" Setup & Initialization");
         System.out.println(HORIZONTAL_RULE);
 
         // Parse the XML test configuration.
         System.out.printf("Reading configuration file '%s'...\n", configPath);
-        List<QueryTestBase> tests = BenchmarkConfiguration.configureTests(configPath, cliConfig.test);
+        List<QueryTestBase> tests = BenchmarkConfiguration.configureTests(configPath, this.cliConfig.test);
 
         // connect to one or more servers, loop until success
-        connect(cliConfig.servers);
+        connect(this.cliConfig.servers);
 
         System.out.print(HORIZONTAL_RULE);
         System.out.println("Starting Benchmark");
         System.out.println(HORIZONTAL_RULE);
 
+        // Set up optional query tracer.
+        QueryTracer tracer = new QueryTracer(cliConfig.querytracefile);
+
         // Run the benchmark loop for the requested warmup time
         // The throughput may be throttled depending on client configuration
-        long queryIndex = 1;
-        if (cliConfig.warmup > 0) {
+        if (this.cliConfig.warmup > 0) {
             System.out.println("Warming up...");
-            for (String query : new QueryGenerator(tests, cliConfig.warmup)) {
-                // negative query index means warmup to query tracer
-                client.callProcedure(new CallProcedureCallback(queryIndex * -1, query), "@AdHoc", query);
-                queryIndex++;
+            CallProcedureCallback cb1 = new CallProcedureCallback(null);
+            for (String query : new QueryGenerator(tests, this.cliConfig.warmup)) {
+                this.client.callProcedure(cb1, "@AdHoc", query);
+                if (cb1.errorStatus != ClientResponse.SUCCESS) {
+                    tracer.traceBad(query, cb1.errorStatus, cb1.errorString);
+                }
             }
         }
 
@@ -560,38 +543,46 @@ public class Benchmark {
         periodicStatsContext.fetchAndResetBaseline();
 
         // print periodic statistics to the console
-        benchmarkStartTS = System.currentTimeMillis();
+        this.benchmarkStartTS = System.currentTimeMillis();
         long queryElapsedMS = 0;
         schedulePeriodicStats();
 
         // Run the benchmark for the requested duration.
-        System.out.printf("\nRunning '%s' benchmark...\n", cliConfig.test);
-        queryIndex = 1;
-        for (String query : new QueryGenerator(tests, cliConfig.duration)) {
-            client.callProcedure(new CallProcedureCallback(queryIndex, query), "@AdHoc", query);
-            tracer.logQueryInvoked(queryIndex, query);
-            queryIndex++;
+        System.out.printf("\nRunning '%s' benchmark...\n", this.cliConfig.test);
+        CallProcedureCallback cb2 = new CallProcedureCallback(this.counters);
+        for (String query : new QueryGenerator(tests, this.cliConfig.duration)) {
+            long startTS = System.currentTimeMillis();
+            this.client.callProcedure(cb2, "@AdHoc", query);
+            if (cb2.errorStatus != ClientResponse.SUCCESS) {
+                tracer.traceBad(query, cb2.errorStatus, cb2.errorString);
+                this.counters.queriesFailed++;
+            } else {
+                tracer.traceGood(query);
+            }
+            queryElapsedMS += (System.currentTimeMillis() - startTS);
+            this.counters.queriesGenerated++;
         }
 
-        printStatistics();
-        System.out.println();
+        System.out.printf("\n%d queries generated\n", this.counters.queriesGenerated);
+        System.out.printf("%d queries processed\n", this.counters.queriesProcessed);
+        System.out.printf("%d queries to drain\n\n", this.counters.queriesGenerated - this.counters.queriesProcessed);
 
-        long totalElapsedMS = System.currentTimeMillis() - benchmarkStartTS;
+        printStatistics();
+        System.out.println("");
+
+        long totalElapsedMS = System.currentTimeMillis() - this.benchmarkStartTS;
 
         // cancel periodic stats printing
-        timer.cancel();
+        this.timer.cancel();
 
         // block until all outstanding txns return
-        client.drain();
-
-        // close the logfile if it exists
-        tracer.close();
+        this.client.drain();
 
         // print the summary results
         printResults(totalElapsedMS, queryElapsedMS);
 
         // close down the client connections
-        client.close();
+        this.client.close();
     }
 
     /**

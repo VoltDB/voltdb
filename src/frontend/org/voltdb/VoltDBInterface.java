@@ -17,9 +17,9 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.Map;
 import java.util.concurrent.ScheduledFuture;
 import java.util.concurrent.TimeUnit;
-import java.util.Map;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
@@ -27,6 +27,7 @@ import org.voltcore.utils.Pair;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.FaultDistributorInterface;
+
 import org.voltdb.licensetool.LicenseApi;
 
 import com.google.common.util.concurrent.ListeningExecutorService;
@@ -80,7 +81,7 @@ public interface VoltDBInterface
     public BackendTarget getBackendTargetType();
     public String getLocalMetadata();
     public MailboxPublisher getMailboxPublisher();
-    public SiteTracker getSiteTrackerForSnapshot();
+
 
     /**
      * Update the global logging context in the server.
@@ -177,6 +178,4 @@ public interface VoltDBInterface
      * Return the license api. This may be null in community editions!
      */
      public LicenseApi getLicenseApi();
-
-     public boolean isIV2Enabled();
 }

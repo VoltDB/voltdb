@@ -65,11 +65,6 @@ public interface ClientResponse {
     public static final byte CONNECTION_TIMEOUT = -6;
 
     /**
-     * Status code indicating that the response was lost, and the outcome of the invocation is unknown.
-     */
-    public static final byte RESPONSE_UNKNOWN = -7;
-
-    /**
      * Retrieve the status code returned by the server
      * @return Status code
      */

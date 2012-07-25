@@ -318,12 +318,7 @@ public class Inits {
                 }
             } while (catalogBytes == null);
 
-            try {
-                m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
-            } catch (IOException e) {
-                VoltDB.crashLocalVoltDB("Unable to load catalog: " + e.getMessage(), false, null);
-            }
-
+            m_rvdb.m_serializedCatalog = CatalogUtil.loadCatalogFromJar(catalogBytes, hostLog);
             if ((m_rvdb.m_serializedCatalog == null) || (m_rvdb.m_serializedCatalog.length() == 0))
                 VoltDB.crashLocalVoltDB("Catalog loading failure", false, null);
 

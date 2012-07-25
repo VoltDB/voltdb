@@ -202,7 +202,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         VoltDB.instance().getSnapshotCompletionMonitor().addInterest(this);
     }
 
-    public void init(DaemonInitiator initiator, ZooKeeper zk, Runnable threadLocalInit) {
+    public void init(DaemonInitiator initiator, ZooKeeper zk) {
         m_initiator = initiator;
         m_zk = zk;
 
@@ -212,10 +212,6 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
         try {
             zk.create(VoltZK.completed_snapshots, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
         } catch (Exception e) {}
-
-        if (threadLocalInit != null) {
-            m_es.execute(threadLocalInit);
-        }
 
         // Really shouldn't leak this from a constructor, and twice to boot
         m_es.execute(new Runnable() {
@@ -532,7 +528,7 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                 "Unexpected error deleting truncation snapshot request", true, e);
                     }
 
-                    SiteTracker st = VoltDB.instance().getSiteTrackerForSnapshot();
+                    SiteTracker st = VoltDB.instance().getSiteTracker();
                     int hostId = SiteTracker.getHostForSite(st.getLocalSites()[0]);
                     if (!SnapshotSaveAPI.createSnapshotCompletionNode(nonce, snapshotTxnId,
                                                                       hostId, true)) {
@@ -1109,14 +1105,12 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
      * @param response
      * @return
      */
-    public Future<Void> processClientResponse(final Callable<ClientResponseImpl> response) {
+    public Future<Void> processClientResponse(final ClientResponse response, final long handle) {
         return m_es.submit(new Callable<Void>() {
             @Override
             public Void call() throws Exception {
                 try {
-                    ClientResponseImpl resp = response.call();
-                    long handle = resp.getClientHandle();
-                    m_procedureCallbacks.remove(handle).clientCallback(resp);
+                    m_procedureCallbacks.remove(handle).clientCallback(response);
                 } catch (Exception e) {
                     hostLog.warn("Error when SnapshotDaemon invoked callback for a procedure invocation", e);
                     throw e;

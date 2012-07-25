@@ -36,8 +36,6 @@ public class InvocationPermissionPolicy extends InvocationAcceptancePolicy {
 
     /**
      * Determine whether or not the current user has permission to call this procedure.
-     * AuthSystem.hasPermission() handles both user-written procedures and default
-     * auto-generated ones.
      *
      * @see org.voltdb.InvocationAcceptancePolicy#shouldAccept(org.voltdb.AuthSystem.AuthUser,
      *      org.voltdb.StoredProcedureInvocation, org.voltdb.catalog.Procedure,

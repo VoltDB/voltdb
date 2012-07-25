@@ -47,6 +47,8 @@ import org.voltdb.messaging.InitiateTaskMessage;
 
 public class MultiPartitionParticipantTxnState extends TransactionState {
 
+
+
     protected final ArrayDeque<WorkUnit> m_readyWorkUnits = new ArrayDeque<WorkUnit>();
     protected boolean m_isCoordinator;
     protected final long m_hsId;

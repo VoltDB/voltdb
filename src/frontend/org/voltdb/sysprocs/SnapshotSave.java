@@ -314,11 +314,7 @@ public class SnapshotSave extends VoltSystemProcedure
         final SnapshotFormat format = SnapshotFormat.getEnumIgnoreCase(formatStr);
         final String data = jsObj.optString("data");
 
-        if (format == SnapshotFormat.STREAM) {
-            HOST_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
-        } else {
-            HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
-        }
+        HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
 
         ColumnInfo[] error_result_columns = new ColumnInfo[2];
         int ii = 0;

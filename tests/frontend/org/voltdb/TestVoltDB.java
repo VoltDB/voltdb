@@ -173,11 +173,6 @@ public class TestVoltDB extends TestCase {
         String[] args250 = {"rejoin"};
         config = new VoltDB.Configuration(args250);
         assertFalse(config.validate());
-
-        // rejoinhost should still work
-        String[] args201 = {"rejoinhost", "localhost"};
-        config = new VoltDB.Configuration(args201);
-        assertTrue(config.validate());
     }
 
     /**
@@ -195,8 +190,8 @@ public class TestVoltDB extends TestCase {
 
         project.setSecurityEnabled(true);
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false, false),
-                new GroupInfo("blah", false, false, false)
+                new GroupInfo("foo", false, false),
+                new GroupInfo("blah", false, false)
         };
         project.addGroups(groups);
         UserInfo users[] = new UserInfo[] {
@@ -237,8 +232,8 @@ public class TestVoltDB extends TestCase {
 
         project.setSecurityEnabled(true);
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false, false),
-                new GroupInfo("blah", false, false, false)
+                new GroupInfo("foo", false, false),
+                new GroupInfo("blah", false, false)
         };
         project.addGroups(groups);
         UserInfo users[] = new UserInfo[] {};
