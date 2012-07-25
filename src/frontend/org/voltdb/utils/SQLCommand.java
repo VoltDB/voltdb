@@ -912,11 +912,25 @@ public class SQLCommand
     {
        try
         {
-            byte[] bytes = new byte[1024 * 4];
+            int len = 1024 * 4;
+            //byte[] bytes = new byte[len];
             InputStream is = SQLCommand.class.getResourceAsStream("SQLCommandReadme.txt");
+            int i = 0;
             while (is.available() > 0) {
+                byte[] bytes = new byte[len];
                 is.read(bytes, 0, bytes.length);
-                System.out.write(bytes);
+                i = getLength(bytes);
+                if(i < len) {
+                    String tailStr = "\n\n";
+                    byte[] tail = new byte[tailStr.length()];
+                    tail = tailStr.getBytes();
+                    byte[] newbytes = new byte[i];
+                    System.arraycopy(bytes, 0, newbytes, 0, i); // Fix for ENG-3440
+                    System.out.write(newbytes);
+                    System.out.write(tail);
+                }
+                else
+                    System.out.write(bytes);
             }
         }
         catch(Exception x)
@@ -924,6 +938,18 @@ public class SQLCommand
             System.err.println(x.getMessage());
             System.exit(-1);
         }
+    }
+
+    private static int getLength(byte[] buf) {
+        int lastGoodChar = buf.length;
+        for(int i = 0; i < buf.length; i++) {
+            int bint = new Byte(buf[i]).intValue();
+            if(bint == 0) {
+                lastGoodChar = i;
+                break;
+            }
+        }
+        return lastGoodChar;
     }
 
     private static Object[] GetTableList() throws Exception
