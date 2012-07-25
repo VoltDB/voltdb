@@ -45,13 +45,10 @@
 package org.voltdb.dtxn;
 
 import java.util.ArrayList;
-import java.util.Arrays;
-import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -388,9 +385,14 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
          * coordinator, so that the coordinator will send fragment work to all
          * the sites that received the participant notice.
          */
-        HashSet<Long> nonCoordinatorSites = new HashSet<Long>(txn.coordinatorReplicas);
-        List<Long> sites = Arrays.asList(ArrayUtils.toObject(txn.otherSiteIds));
-        nonCoordinatorSites.addAll(sites);
+        long[] nonCoordinatorSites = new long[txn.coordinatorReplicas.size() + txn.otherSiteIds.length];
+        int i = 0;
+        for (long hsId : txn.coordinatorReplicas) {
+            nonCoordinatorSites[i++] = hsId;
+        }
+        for (long hsId : txn.otherSiteIds) {
+            nonCoordinatorSites[i++] = hsId;
+        }
 
         MultiPartitionParticipantMessage notice = new MultiPartitionParticipantMessage(
                 m_siteId, txn.firstCoordinatorId, txn.txnId, txn.isReadOnly);
@@ -409,7 +411,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                 txn.isSinglePartition,
                 txn.invocation,
                 newestSafeTxnId, // this will allow all transactions to run for now
-                ArrayUtils.toPrimitive(nonCoordinatorSites.toArray(new Long[0])));
+                nonCoordinatorSites);
 
         /*
          * Send the transaction to the coordinator as well as his replicas

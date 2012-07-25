@@ -49,7 +49,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
      * Only the coordinator will have this, coordinator replicas and other sites
      * won't have this.
      */
-    long[] m_nonCoordinatorSites;
+    long[] m_nonCoordinatorSites = null;
 
     /** Empty constructor for de-serialization */
     InitiateTaskMessage() {
@@ -89,7 +89,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_lastSafeTxnID = lastSafeTxnID;
-        m_nonCoordinatorSites = new long[0];
+        m_nonCoordinatorSites = null;
     }
 
     @Override
@@ -148,7 +148,11 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
         int msgsize = super.getSerializedSize();
         msgsize += 8 // m_lastSafeTxnId
             + 1 // is single partition flag?
-            + 4 + (m_nonCoordinatorSites.length * 8); // m_nonCoordinatorSites
+            + 1; // is m_nonCoordinatorSites null?
+
+        if (m_nonCoordinatorSites != null) {
+            msgsize += 4 + (m_nonCoordinatorSites.length * 8); // m_nonCoordinatorSites
+        }
 
         msgsize += m_invocation.getSerializedSize();
 
@@ -163,10 +167,15 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
         buf.putLong(m_lastSafeTxnID);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
-        buf.putInt(m_nonCoordinatorSites.length);
-        for (long hsId : m_nonCoordinatorSites) {
-            buf.putLong(hsId);
+
+        buf.put(m_nonCoordinatorSites == null ? 1 : (byte) 0);
+        if (m_nonCoordinatorSites != null) {
+            buf.putInt(m_nonCoordinatorSites.length);
+            for (long hsId : m_nonCoordinatorSites) {
+                buf.putLong(hsId);
+            }
         }
+
         m_invocation.flattenToBuffer(buf);
 
         assert(buf.capacity() == buf.position());
@@ -179,10 +188,14 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
 
         m_lastSafeTxnID = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
-        m_nonCoordinatorSites = new long[buf.getInt()];
-        for (int i = 0; i < m_nonCoordinatorSites.length; i++) {
-            m_nonCoordinatorSites[i] = buf.getLong();
+
+        if (buf.get() == 0) {
+            m_nonCoordinatorSites = new long[buf.getInt()];
+            for (int i = 0; i < m_nonCoordinatorSites.length; i++) {
+                m_nonCoordinatorSites[i] = buf.getLong();
+            }
         }
+
         m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
     }
