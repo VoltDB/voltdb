@@ -719,9 +719,8 @@ inline void CompactingMap<Key, Data, Compare, hasRank>::updateSubct(TreeNode* x)
 
     int64_t sumct = getSubct(x->left) + getSubct(x->right) + 1;
     if (sumct <= SUBCTMAX)
-        // assign the lower 32 value to subct, I think the compiler will automatically do it
-        // tell me if I am wrong
-        x->subct = sumct;
+        // assign the lower 32 value to subct
+        x->subct = static_cast<NodeCount>(sumct);
     else
         x->subct = INVALIDCT;
 }
