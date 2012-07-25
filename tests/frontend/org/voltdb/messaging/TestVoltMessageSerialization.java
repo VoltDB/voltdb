@@ -78,6 +78,31 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getLastSafeTxnId(), itask2.getLastSafeTxnId());
     }
 
+    public void testIv2InitiateTask() throws IOException {
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setClientHandle(25);
+        spi.setProcName("johnisgreat");
+        spi.setParams(57, "gooniestoo", "dudemandude");
+
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, true, false, spi, 2101, 3101);
+        itask.setSpHandle(31337);
+        Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltMessage(itask);
+
+        assertEquals(10L, itask.getTruncationHandle());
+        assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
+        assertEquals(itask.getTruncationHandle(), itask2.getTruncationHandle());
+        assertEquals(itask.getTxnId(), itask2.getTxnId());
+        assertEquals(itask.isReadOnly(), itask2.isReadOnly());
+        assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
+        assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
+        assertEquals(itask.getParameterCount(), itask2.getParameterCount());
+        assertEquals(itask.getClientInterfaceHandle(), itask2.getClientInterfaceHandle());
+        assertEquals(itask.getClientInterfaceHandle(), 2101);
+        assertEquals(itask.getConnectionId(), 3101);
+        assertEquals(itask.getSpHandle(), itask2.getSpHandle());
+        assertEquals(31337, itask.getSpHandle());
+    }
+
     public void testInitiateResponse() throws IOException {
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
         spi.setClientHandle(25);
@@ -120,8 +145,8 @@ public class TestVoltMessageSerialization extends TestCase {
     }
 
     public void testFragmentTaskWithTwoFrags() throws IOException {
-        Object[] params1 = {(Integer)10, (Double)10.1};
-        Object[] params2 = {(Integer)20, (Double)20.2};
+        Object[] params1 = {10, 10.1};
+        Object[] params2 = {20, 20.2};
 
         ParameterSet param_set1 = new ParameterSet();
         param_set1.setParameters(params1);
@@ -257,5 +282,57 @@ public class TestVoltMessageSerialization extends TestCase {
             (CompleteTransactionResponseMessage) checkVoltMessage(ctrm);
         assertEquals(ctrm.getExecutionSiteId(), ctrm.getExecutionSiteId());
         assertEquals(ctrm.getTxnId(), ctrm2.getTxnId());
+    }
+
+    public void testIv2RepairLogRequestMessage() throws IOException
+    {
+        Iv2RepairLogRequestMessage rlm = new Iv2RepairLogRequestMessage(100, Iv2RepairLogRequestMessage.SPREQUEST);
+        Iv2RepairLogRequestMessage rlm2 = (Iv2RepairLogRequestMessage) checkVoltMessage(rlm);
+        assertEquals(rlm.getRequestId(), rlm2.getRequestId());
+        assertEquals(rlm.isMPIRequest(), rlm2.isMPIRequest());
+    }
+
+    public void testIv2RepairLogResponseMessage() throws Exception
+    {
+        // make a first itask
+        StoredProcedureInvocation spi = new StoredProcedureInvocation();
+        spi.setClientHandle(25);
+        spi.setProcName("johnisgreat");
+        spi.setParams(57, "gooniestoo", "dudemandude");
+
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 100044, 100045, true, false, spi, 2101, 3101);
+        itask.setSpHandle(31337);
+
+        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, itask);
+        Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
+        assertEquals(r1.getOfTotal(), r2.getOfTotal());
+        assertEquals(r1.getHandle(), r2.getHandle());
+        assertEquals(r1.getRequestId(), r2.getRequestId());
+        assertEquals(r1.getSequence(), r2.getSequence());
+
+        // make sure the payload was round-tripped correctly.
+        Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage)r2.getPayload();
+        assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
+        assertEquals(itask.getTxnId(), itask2.getTxnId());
+        assertEquals(itask.isReadOnly(), itask2.isReadOnly());
+        assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
+        assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
+        assertEquals(itask.getParameterCount(), itask2.getParameterCount());
+        assertEquals(itask.getClientInterfaceHandle(), itask2.getClientInterfaceHandle());
+        assertEquals(itask.getClientInterfaceHandle(), 2101);
+        assertEquals(itask.getConnectionId(), 3101);
+        assertEquals(itask.getSpHandle(), itask2.getSpHandle());
+        assertEquals(31337, itask.getSpHandle());
+    }
+
+    public void testFirstIv2RepairLogResponseMessage() throws Exception
+    {
+        // simulate the first message in the sequence, sequence must be 0
+        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 0, 10, Long.MAX_VALUE, null);
+        Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
+        assertEquals(r1.getOfTotal(), r2.getOfTotal());
+        assertEquals(r1.getHandle(), r2.getHandle());
+        assertEquals(r1.getRequestId(), r2.getRequestId());
+        assertEquals(r1.getSequence(), r2.getSequence());
     }
 }
