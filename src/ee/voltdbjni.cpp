@@ -390,8 +390,7 @@ Java_org_voltdb_jni_ExecutionEngine_nativeUpdateCatalog(
 SHAREDLIB_JNIEXPORT jint JNICALL
 Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
     JNIEnv *env, jobject obj, jlong engine_ptr, jint table_id,
-    jbyteArray serialized_table, jlong txnId, jlong lastCommittedTxnId,
-    jlong undoToken)
+    jbyteArray serialized_table, jlong txnId, jlong lastCommittedTxnId)
 {
     VoltDBEngine *engine = castToEngine(engine_ptr);
     Topend *topend = static_cast<JNITopend*>(engine->getTopend())->updateJNIEnv(env);
@@ -401,7 +400,6 @@ Java_org_voltdb_jni_ExecutionEngine_nativeLoadTable (
 
     //JNIEnv pointer can change between calls, must be updated
     updateJNILogProxy(engine);
-    engine->setUndoToken(undoToken);
     VOLT_DEBUG("loading table %d in C++...", table_id);
 
     // deserialize dependency.

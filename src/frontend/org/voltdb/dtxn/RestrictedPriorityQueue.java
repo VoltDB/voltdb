@@ -43,7 +43,7 @@ import org.voltcore.logging.VoltLogger;
  */
 public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> {
     private static final long serialVersionUID = 1L;
-    private final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
+    private final VoltLogger m_joinLog = new VoltLogger("JOIN");
 
     public enum QueueState {
         UNBLOCKED,
@@ -104,7 +104,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
         RoadBlock roadblock = m_roadblocks.peek();
         if (roadblock != null && roadblock.m_transactionId < txnId) {
             roadblock = m_roadblocks.poll();
-            m_recoveryLog.info("Delivering roadblock action: " +
+            m_joinLog.info("Delivering roadblock action: " +
                                roadblock.m_action + " for txnId: " +
                                roadblock.m_transactionId);
             if (roadblock.m_action != null) {
@@ -457,7 +457,7 @@ public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction>
             } else if (m_state == QueueState.BLOCKED_ORDERING){
                 return null;
             }
-            m_recoveryLog.error("Unexpected RPQ state " + m_state + " when attempting to start recovery at " +
+            m_joinLog.error("Unexpected RPQ state " + m_state + " when attempting to start recovery at " +
                     " the source site. Consider killing the recovering node and trying again");
             return null; // unreachable
         }
