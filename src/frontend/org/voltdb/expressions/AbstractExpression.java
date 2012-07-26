@@ -519,5 +519,5 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public boolean needsRightExpression() {
         return false;
     }
-
+    
 }

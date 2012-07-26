@@ -48,19 +48,30 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         Client client = getClient();
 
         client.callProcedure("P1.insert", 1, "1", 1, 1);
-        client.callProcedure("P1.insert", 2, "1", 2, 2);
-        client.callProcedure("P1.insert", 3, "1", 3, 3);
+        client.callProcedure("P1.insert", 2, "1", 1, 2);
+        client.callProcedure("P1.insert", 3, "1", 1, 3);
 
         client.callProcedure("P2.insert", 1, "1", 1, 1);
-        client.callProcedure("P2.insert", 2, "1", 2, 2);
-        client.callProcedure("P2.insert", 3, "1", 3, 3);
+        client.callProcedure("P2.insert", 2, "1", 1, 2);
+        client.callProcedure("P2.insert", 3, "1", 1, 3);
 
         VoltTable table;
 
-        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10").getResults()[0];
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID > P2.P2_ID order by P1.ID, P2.P2_ID limit 10").getResults()[0];
         assertTrue(table.advanceRow());
-        System.err.println("RESULT:\n" + table);
+        System.err.println("RESULT0:\n" + table);
         assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT * from P1, P2 where P1_NUM1 = P2_NUM1 AND P1_NUM2 >= P2_NUM2 order by P1.ID, P2.P2_ID limit 10").getResults()[0];
+        assertTrue(table.advanceRow());
+        System.err.println("RESULT1:\n" + table);
+        assertTrue(true);
+        
+        table = client.callProcedure("@AdHoc","SELECT * from P1, P2 where P1_NUM1 = P2_NUM1 AND P2_NUM2 <= P1_NUM2 order by P1.ID, P2.P2_ID limit 10").getResults()[0];
+        assertTrue(table.advanceRow());
+        System.err.println("RESULT2:\n" + table);
+        assertTrue(true);
+        
 
     }
 
@@ -82,12 +93,12 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         VoltProjectBuilder project = new VoltProjectBuilder();
         project.addSchema(BatchedMultiPartitionTest.class.getResource("sqlindex-ddl.sql"));
         project.addProcedures(PROCEDURES);
-//        project.addPartitionInfo("TU1", "ID");
-//        project.addPartitionInfo("TU2", "UNAME");
-//        project.addPartitionInfo("TU3", "TEL");
-//        project.addPartitionInfo("TU4", "UNAME");
-//        project.addPartitionInfo("TM1", "ID");
-//        project.addPartitionInfo("TM2", "UNAME");
+        project.addPartitionInfo("TU1", "ID");
+        project.addPartitionInfo("TU2", "UNAME");
+        project.addPartitionInfo("TU3", "TEL");
+        project.addPartitionInfo("TU4", "UNAME");
+        project.addPartitionInfo("TM1", "ID");
+        project.addPartitionInfo("TM2", "UNAME");
 
         boolean success;
 
@@ -96,7 +107,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("sqlCountingIndex-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile
         success = config.compile(project);
