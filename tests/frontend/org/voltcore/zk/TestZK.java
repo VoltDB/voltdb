@@ -28,14 +28,6 @@ import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 import static org.junit.Assert.fail;
 
-import org.voltcore.messaging.HostMessenger;
-import org.voltcore.zk.LeaderElector;
-import org.apache.zookeeper_voltpatches.*;
-import org.apache.zookeeper_voltpatches.KeeperException.NoNodeException;
-import org.apache.zookeeper_voltpatches.Watcher.Event.EventType;
-import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
-import org.apache.zookeeper_voltpatches.data.Stat;
-
 import java.net.InetSocketAddress;
 import java.util.ArrayList;
 import java.util.Iterator;
@@ -246,20 +238,17 @@ public class TestZK extends ZKTestBase {
 
         zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
-        LeaderElector elector1 = new LeaderElector(zk, "/election", "node", null, null);
-        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", null, null);
-        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", null, null);
-        elector1.start(true);
-        elector2.start(true);
-        elector3.start(true);
+        LeaderElector elector1 = new LeaderElector(zk, "/election", new byte[0], null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", new byte[0], null);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", new byte[0], null);
 
         assertTrue(elector1.isLeader());
         assertFalse(elector2.isLeader());
         assertFalse(elector3.isLeader());
 
-        elector1.shutdown();
-        elector2.shutdown();
-        elector3.shutdown();
+        elector1.done();
+        elector2.done();
+        elector3.done();
 
         zk.close();
         zk2.close();
@@ -275,26 +264,23 @@ public class TestZK extends ZKTestBase {
         zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         final Semaphore sem2 = new Semaphore(0);
-        LeaderNoticeHandler r2 = new LeaderNoticeHandler() {
+        Runnable r2 = new Runnable() {
             @Override
-            public void becomeLeader() {
+            public void run() {
                 sem2.release();
             }
         };
         final Semaphore sem3 = new Semaphore(0);
-        LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
+        Runnable r3 = new Runnable() {
             @Override
-            public void becomeLeader() {
+            public void run() {
                 sem3.release();
             }
         };
 
-        LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
-        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", new byte[0], r2);
-        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", new byte[0], r3);
-        elector1.start(true);
-        elector2.start(true);
-        elector3.start(true);
+        LeaderElector elector1 = new LeaderElector(zk, "/election", new byte[0], null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", new byte[0], r2);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", new byte[0], r3);
 
         assertTrue(elector1.isLeader());
         assertFalse(elector2.isLeader());
@@ -323,19 +309,16 @@ public class TestZK extends ZKTestBase {
         zk.create("/election", new byte[0], Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
 
         final Semaphore sem3 = new Semaphore(0);
-        LeaderNoticeHandler r3 = new LeaderNoticeHandler() {
+        Runnable r3 = new Runnable() {
             @Override
-            public void becomeLeader() {
+            public void run() {
                 sem3.release();
             }
         };
 
-        LeaderElector elector1 = new LeaderElector(zk, "/election", "node", new byte[0], null);
-        LeaderElector elector2 = new LeaderElector(zk2, "/election", "node", new byte[0], null);
-        LeaderElector elector3 = new LeaderElector(zk3, "/election", "node", new byte[0], r3);
-        elector1.start(true);
-        elector2.start(true);
-        elector3.start(true);
+        LeaderElector elector1 = new LeaderElector(zk, "/election", new byte[0], null);
+        LeaderElector elector2 = new LeaderElector(zk2, "/election", new byte[0], null);
+        LeaderElector elector3 = new LeaderElector(zk3, "/election", new byte[0], r3);
 
         assertTrue(elector1.isLeader());
         assertFalse(elector2.isLeader());
@@ -355,13 +338,11 @@ public class TestZK extends ZKTestBase {
         zk3.close();
     }
 
-    @Test
-    public void testMassiveNode() throws Exception {
-        ZooKeeper zk = getClient(0);
-//        byte bytes[] = new byte[50331648];
-        byte bytes[] = new byte[40000000];
-        zk.create("/bar", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-        zk.create("/foo", bytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
-        zk.getData("/foo", false, null);
-    }
+//    @Test
+//    public void testMassiveNode() throws Exception {
+//        ZooKeeper zk = getClient(0);
+//        byte bytes[] = new byte[1048400];
+//        zk.create("/bar", null, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+//        zk.create("/foo", bytes, Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
+//    }
 }

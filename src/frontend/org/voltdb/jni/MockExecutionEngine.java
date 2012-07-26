@@ -128,7 +128,7 @@ public class MockExecutionEngine extends ExecutionEngine {
 
     @Override
     public void loadTable(final int tableId, final VoltTable table, final long txnId,
-        final long lastCommittedTxnId)
+        final long lastCommittedTxnId, final long undoToken)
     throws EEException
     {
     }

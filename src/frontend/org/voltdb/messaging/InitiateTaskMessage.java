@@ -120,6 +120,7 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
     {
         buf.put(VoltDbMessageFactory.INITIATE_TASK_ID);
         super.flattenToBuffer(buf);
+
         buf.putLong(m_lastSafeTxnID);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
         m_invocation.flattenToBuffer(buf);

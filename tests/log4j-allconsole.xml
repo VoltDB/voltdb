@@ -36,7 +36,7 @@
         <level value="INFO"/>
     </logger -->
 
-    <!-- logger name="JOIN">
+    <!-- logger name="RECOVERY">
         <level value="INFO"/>
     </logger -->
 

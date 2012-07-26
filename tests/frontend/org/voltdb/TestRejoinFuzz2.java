@@ -62,11 +62,9 @@ public class TestRejoinFuzz2 extends RejoinTestBase {
                     kfactor,
                     BackendTarget.NATIVE_EE_JNI,
                     LocalCluster.FailureState.ALL_RUNNING,
-                    false, true,
-                    false); // doesnt run with IV2 yet
+                    false, true);
         cluster.setMaxHeap(256);
-        String build = System.getProperties().getProperty("build", "release");
-        if (cluster.isValgrind() || build.equalsIgnoreCase("MEMCHECK")) {
+        if (cluster.isValgrind()) {
             //Way to much data in this test. Using less data makes it redundant
             return;
         }

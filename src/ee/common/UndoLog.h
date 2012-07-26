@@ -78,6 +78,7 @@ namespace voltdb
             //          << " lastUndo: " << m_lastUndoToken
             //          << " lastRelease: " << m_lastReleaseToken << std::endl;
             // This ensures that undo is only ever called after
+            // generateUndoToken has been called
             assert(m_lastReleaseToken < m_lastUndoToken);
             // This ensures that we don't attempt to undo something in
             // the distant past.  In some cases ExecutionSite may hand

@@ -32,7 +32,7 @@ import org.voltdb.utils.CompressionService;
  */
 public class StreamSnapshotDataReceiver extends StreamSnapshotBase
 implements Runnable {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     private final SocketChannel m_sock;
     private final LinkedBlockingQueue<BBContainer> m_queue =

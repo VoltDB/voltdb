@@ -354,10 +354,6 @@ public class SystemInformation extends VoltSystemProcedure
         vt.addRow(hostId, "CATALOGCRC",
                 Long.toString(VoltDB.instance().getCatalogContext().getCatalogCRC()));
 
-        if (VoltDB.instance().isIV2Enabled()) {
-            vt.addRow(hostId, "IV2ENABLED", "true");
-        }
-
         return vt;
     }
 
