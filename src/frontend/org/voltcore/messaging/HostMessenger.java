@@ -622,8 +622,14 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         try {
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                if (m_zk.getChildren(CoreZK.hosts, fw).size() == expectedHosts) {
+                final int numChildren = m_zk.getChildren(CoreZK.hosts, fw).size();
+                if ( numChildren == expectedHosts) {
                     break;
+                }
+                if ( numChildren > expectedHosts) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Expected to find " + expectedHosts +
+                            " hosts in cluster at startup but found " + numChildren +
+                            ".  Terminating this host.", false, null);
                 }
                 fw.get();
             }
