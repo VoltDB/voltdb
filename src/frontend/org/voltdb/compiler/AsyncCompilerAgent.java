@@ -19,6 +19,7 @@ package org.voltdb.compiler;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -37,6 +38,7 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
+import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 
 public class AsyncCompilerAgent {
@@ -242,6 +244,11 @@ public class AsyncCompilerAgent {
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
+            // check if the resulting string is small enough to fit in our parameter sets (about 2mb)
+            if (retval.encodedDiffCommands.length() > (2 * 1000 * 1000)) {
+                throw new Exception("The requested catalog change is too large for this version of VoltDB. " +
+                                    "Try a series of smaller updates.");
+            }
         }
         catch (Exception e) {
             e.printStackTrace();

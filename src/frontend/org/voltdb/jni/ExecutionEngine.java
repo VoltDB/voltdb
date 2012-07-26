@@ -295,7 +295,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
 
     abstract public void loadTable(
         int tableId, VoltTable table, long txnId,
-        long lastCommittedTxnId) throws EEException;
+        long lastCommittedTxnId, long undoToken) throws EEException;
 
     /**
      * Set the log levels to be used when logging in this engine
@@ -473,7 +473,7 @@ public abstract class ExecutionEngine implements FastDeserializer.Deserializatio
      * @param undoToken token for undo quantum where changes should be logged.
      */
     protected native int nativeLoadTable(long pointer, int table_id, byte[] serialized_table,
-            long txnId, long lastCommittedTxnId);
+            long txnId, long lastCommittedTxnId, long undoToken);
 
     protected native int nativeLoadPlanFragment(long pointer, byte[] plan);
 

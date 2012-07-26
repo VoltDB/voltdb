@@ -28,7 +28,6 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNull;
 import static org.junit.Assert.assertTrue;
 
-import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 import org.json_voltpatches.JSONException;
@@ -40,11 +39,8 @@ import org.junit.Test;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.exceptions.SerializableException;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.SnapshotScan;
-
-import com.google.common.util.concurrent.Callables;
 
 public class TestSnapshotDaemon {
 
@@ -92,12 +88,12 @@ public class TestSnapshotDaemon {
                     e.printStackTrace();
                 }
 
-                ClientResponseImpl response =
+                ClientResponse response =
                         new ClientResponseImpl(ClientResponse.SUCCESS,
                                                (byte) 0, stringer.toString(),
                                                new VoltTable[] {result}, null);
-                response.setClientHandle(clientData);
-                this.daemon.processClientResponse(Callables.returning(response));
+
+                this.daemon.processClientResponse(response, clientData);
             }
         }
 
@@ -136,7 +132,7 @@ public class TestSnapshotDaemon {
         VoltDB.replaceVoltDBInstanceForTest(m_mockVoltDB);
         m_initiator = new Initiator();
         m_daemon = new SnapshotDaemon();
-        m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK(), null);
+        m_daemon.init(m_initiator, m_mockVoltDB.getHostMessenger().getZK());
         return m_daemon;
     }
 
@@ -147,7 +143,7 @@ public class TestSnapshotDaemon {
         assertNull(m_initiator.procedureName);
         boolean threwException = false;
         try {
-            Future<Void> future = noSnapshots.processClientResponse(null);
+            Future<Void> future = noSnapshots.processClientResponse(null, 0);
             future.get();
         } catch (Throwable t) {
             threwException = true;
@@ -178,7 +174,7 @@ public class TestSnapshotDaemon {
         d.makeActive(schedule);
         threwException = false;
         try {
-            Future<Void> future = d.processClientResponse(null);
+            Future<Void> future = d.processClientResponse(null, 0);
             future.get();
         } catch (Throwable t) {
             threwException = true;
@@ -208,11 +204,11 @@ public class TestSnapshotDaemon {
         assertTrue(initiator.procedureName.equals("@SnapshotScan"));
     }
 
-    public Callable<ClientResponseImpl> getFailureResponse(final long handle) {
-        ClientResponseImpl response = new ClientResponseImpl() {
+    public ClientResponse getFailureResponse() {
+        return new ClientResponse() {
 
             @Override
-            public SerializableException getException() {
+            public Exception getException() {
                 return null;
             }
 
@@ -251,17 +247,11 @@ public class TestSnapshotDaemon {
                 return null;
             }
 
-            @Override
-            public long getClientHandle() {
-                return handle;
-            }
-
         };
-        return Callables.returning(response);
     }
 
-    public Callable<ClientResponseImpl> getSuccessResponse(final long txnId, final long handle) {
-        ClientResponseImpl response = new ClientResponseImpl() {
+    public ClientResponse getSuccessResponse(final long txnId) {
+        return new ClientResponse() {
 
             @Override
             public byte getStatus() {
@@ -304,7 +294,7 @@ public class TestSnapshotDaemon {
             }
 
             @Override
-            public SerializableException getException() {
+            public Exception getException() {
                 // TODO Auto-generated method stub
                 return null;
             }
@@ -321,21 +311,14 @@ public class TestSnapshotDaemon {
                 return 0;
             }
 
-            @Override
-            public long getClientHandle() {
-                return handle;
-            }
-
         };
-
-        return Callables.returning(response);
     }
 
-    public Callable<ClientResponseImpl> getErrMsgResponse(final long handle) {
-        ClientResponseImpl response =  new ClientResponseImpl() {
+    public ClientResponse getErrMsgResponse() {
+        return new ClientResponse() {
 
             @Override
-            public SerializableException getException() {
+            public Exception getException() {
                 return null;
             }
 
@@ -376,12 +359,7 @@ public class TestSnapshotDaemon {
                 return null;
             }
 
-            @Override
-            public long getClientHandle() {
-                return handle;
-            }
         };
-        return Callables.returning(response);
     }
 
     @Test
@@ -399,26 +377,26 @@ public class TestSnapshotDaemon {
 
         assertNull(m_initiator.params);
 
-        daemon.processClientResponse(getFailureResponse(handle));
+        daemon.processClientResponse(getFailureResponse(), handle);
         Thread.sleep(60);
         assertNull(m_initiator.params);
 
-        daemon.processClientResponse(null);
+        daemon.processClientResponse(null, 0);
         Thread.sleep(60);
         assertNull(m_initiator.params);
 
         daemon = getBasicDaemon();
 
         assertNotNull(m_initiator.params);
-        daemon.processClientResponse(getErrMsgResponse(m_initiator.clientData)).get();
+        daemon.processClientResponse(getErrMsgResponse(), m_initiator.clientData).get();
         assertEquals(SnapshotDaemon.State.FAILURE, daemon.getState());
     }
 
-    public Callable<ClientResponseImpl> getSuccessfulScanOneResult(final long handle) {
-        ClientResponseImpl response = new ClientResponseImpl() {
+    public ClientResponse getSuccessfulScanOneResult() {
+        return new ClientResponse() {
 
             @Override
-            public SerializableException getException() {
+            public Exception getException() {
                 return null;
             }
 
@@ -468,19 +446,14 @@ public class TestSnapshotDaemon {
                 return null;
             }
 
-            @Override
-            public long getClientHandle() {
-                return handle;
-            }
         };
-        return Callables.returning(response);
     }
 
-    public Callable<ClientResponseImpl> getSuccessfulScanThreeResults(final long handle) {
-        ClientResponseImpl response = new ClientResponseImpl() {
+    public ClientResponse getSuccessfulScanThreeResults() {
+        return new ClientResponse() {
 
             @Override
-            public SerializableException getException() {
+            public Exception getException() {
                 return null;
             }
 
@@ -550,12 +523,7 @@ public class TestSnapshotDaemon {
                 return null;
             }
 
-            @Override
-            public long getClientHandle() {
-                return handle;
-            }
         };
-        return Callables.returning(response);
     }
 
     @Test
@@ -564,14 +532,14 @@ public class TestSnapshotDaemon {
 
         long handle = m_initiator.clientData;
         m_initiator.clear();
-        daemon.processClientResponse(getSuccessfulScanOneResult(handle)).get();
+        daemon.processClientResponse(getSuccessfulScanOneResult(), handle).get();
         Thread.sleep(60);
         assertNull(m_initiator.procedureName);
 
         daemon = getBasicDaemon();
 
         handle = m_initiator.clientData;
-        daemon.processClientResponse(getSuccessfulScanThreeResults(handle)).get();
+        daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
         assertNotNull(m_initiator.procedureName);
         assertTrue("@SnapshotDelete".equals(m_initiator.procedureName));
         String path = ((String[])m_initiator.params[0])[0];
@@ -583,15 +551,15 @@ public class TestSnapshotDaemon {
         Thread.sleep(60);
         assertNull(m_initiator.procedureName);
 
-        daemon.processClientResponse(getFailureResponse(handle)).get();
+        daemon.processClientResponse(getFailureResponse(), handle).get();
         assertNull(m_initiator.procedureName);
         assertEquals(daemon.getState(), SnapshotDaemon.State.FAILURE);
 
         daemon = getBasicDaemon();
 
         handle = m_initiator.clientData;
-        daemon.processClientResponse(getSuccessfulScanThreeResults(handle)).get();
-        daemon.processClientResponse(getErrMsgResponse(1));
+        daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
+        daemon.processClientResponse(getErrMsgResponse(), 1);
         Thread.sleep(60);
         assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
     }
@@ -602,7 +570,7 @@ public class TestSnapshotDaemon {
 
         long handle = m_initiator.clientData;
         m_initiator.clear();
-        daemon.processClientResponse(getSuccessfulScanOneResult(handle)).get();
+        daemon.processClientResponse(getSuccessfulScanOneResult(), handle).get();
         assertNull(m_initiator.procedureName);
         Thread.sleep(500);
         assertNull(m_initiator.procedureName);
@@ -616,7 +584,7 @@ public class TestSnapshotDaemon {
 
         handle = m_initiator.clientData;
         m_initiator.clear();
-        daemon.processClientResponse(getFailureResponse(handle)).get();
+        daemon.processClientResponse(getFailureResponse(), handle).get();
         assertNull(m_initiator.procedureName);
         assertEquals(SnapshotDaemon.State.FAILURE, daemon.getState());
 
@@ -625,12 +593,12 @@ public class TestSnapshotDaemon {
         assertNotNull(m_initiator.procedureName);
         handle = m_initiator.clientData;
         m_initiator.clear();
-        daemon.processClientResponse(getSuccessfulScanOneResult(handle));
+        daemon.processClientResponse(getSuccessfulScanOneResult(), handle);
         Thread.sleep(1200);
         assertNotNull(m_initiator.procedureName);
         handle = m_initiator.clientData;
         m_initiator.clear();
-        daemon.processClientResponse(getErrMsgResponse(handle)).get();
+        daemon.processClientResponse(getErrMsgResponse(), handle).get();
         assertEquals(daemon.getState(), SnapshotDaemon.State.WAITING);
 
         daemon = getBasicDaemon();
@@ -638,11 +606,11 @@ public class TestSnapshotDaemon {
         assertNotNull(m_initiator.procedureName);
         handle = m_initiator.clientData;
         m_initiator.clear();
-        daemon.processClientResponse(getSuccessfulScanThreeResults(handle)).get();
+        daemon.processClientResponse(getSuccessfulScanThreeResults(), handle).get();
         assertNotNull(m_initiator.procedureName);
         handle = m_initiator.clientData;
         m_initiator.clear();
-        daemon.processClientResponse(getErrMsgResponse(handle)).get();
+        daemon.processClientResponse(getErrMsgResponse(), handle).get();
         assertNull(m_initiator.procedureName);
         Thread.sleep(1200);
         assertNotNull(m_initiator.procedureName);
@@ -650,11 +618,10 @@ public class TestSnapshotDaemon {
         m_initiator.clear();
         Thread.sleep(1200);
         assertNull(m_initiator.procedureName);
-        final long handleForClosure1 = handle;
-        ClientResponseImpl response = new ClientResponseImpl() {
+        daemon.processClientResponse(new ClientResponse() {
 
             @Override
-            public SerializableException getException() {
+            public Exception getException() {
                 return null;
             }
 
@@ -695,12 +662,7 @@ public class TestSnapshotDaemon {
                 return null;
             }
 
-            @Override
-            public long getClientHandle() {
-                return handleForClosure1;
-            }
-        };
-        daemon.processClientResponse(Callables.returning(response)).get();
+        }, handle).get();
         assertEquals(SnapshotDaemon.State.WAITING, daemon.getState());
         assertNull(m_initiator.procedureName);
 
@@ -709,11 +671,10 @@ public class TestSnapshotDaemon {
         assertTrue("@SnapshotSave".equals(m_initiator.procedureName));
         handle = m_initiator.clientData;
         m_initiator.clear();
-        final long handleForClosure2 = handle;
-        response = new ClientResponseImpl() {
+        daemon.processClientResponse(new ClientResponse() {
 
             @Override
-            public SerializableException getException() {
+            public Exception getException() {
                 return null;
             }
 
@@ -754,12 +715,7 @@ public class TestSnapshotDaemon {
                 return null;
             }
 
-            @Override
-            public long getClientHandle() {
-                return handleForClosure2;
-            }
-        };
-        daemon.processClientResponse(Callables.returning(response));
+        }, handle);
 
         Thread.sleep(1200);
         assertNotNull(m_initiator.procedureName);

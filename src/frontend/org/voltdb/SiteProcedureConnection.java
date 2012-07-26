@@ -17,8 +17,6 @@
 
 package org.voltdb;
 
-import java.util.concurrent.Future;
-
 import java.util.List;
 import java.util.Map;
 
@@ -31,9 +29,6 @@ import org.voltdb.exceptions.EEException;
  * manipulate or request services from an ExecutionSite.
  */
 public interface SiteProcedureConnection {
-
-    public long getLatestUndoToken();
-    public long getNextUndoToken();
 
     /**
      * Get the HSQL backend, if any.  Returns null if we're not configured
@@ -61,9 +56,6 @@ public interface SiteProcedureConnection {
      */
     public void updateBackendLogLevels();
 
-    /**
-     * loadTable method used by user-facing voltLoadTable() call in ProcedureRunner
-     */
     public void loadTable(
             long txnId,
             String clusterName,
@@ -71,11 +63,6 @@ public interface SiteProcedureConnection {
             String tableName,
             VoltTable data)
     throws VoltAbortException;
-
-    /**
-     * loadTable method used internally by ExecutionSite/Site clients
-     */
-    public void loadTable(long txnId, int tableId, VoltTable data);
 
     /**
      * Get the EE's plan fragment ID for a given JSON plan.
@@ -108,9 +95,6 @@ public interface SiteProcedureConnection {
      */
     public void simulateExecutePlanFragments(long txnId, boolean readOnly);
 
-    /**
-     * Legacy recursable execution interface for MP transaction states.
-     */
     public Map<Integer, List<VoltTable>> recursableRun(TransactionState currentTxnState);
 
     /**
@@ -131,8 +115,6 @@ public interface SiteProcedureConnection {
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params);
 
-    public void setRejoinComplete();
-
     public long[] getUSOForExportTable(String signature);
 
     public void toggleProfiler(int toggle);
@@ -147,7 +129,4 @@ public interface SiteProcedureConnection {
 
     public VoltTable[] getStats(SysProcSelector selector, int[] locators,
                                 boolean interval, Long now);
-
-    // Snapshot services provided by the site
-    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
 }

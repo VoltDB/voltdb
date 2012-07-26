@@ -190,7 +190,7 @@ public class SnapshotSiteProcessor {
         return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
     }
 
-    public SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority) {
+    SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority) {
         m_onPotentialSnapshotWork = onPotentialSnapshotWork;
         m_snapshotPriority = snapshotPriority;
         initializeBufferPool();

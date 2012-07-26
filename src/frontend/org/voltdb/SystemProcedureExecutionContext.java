@@ -49,11 +49,6 @@ public interface SystemProcedureExecutionContext {
 
     public SiteTracker getSiteTracker();
 
-    // Separate SiteTracker accessor for IV2 use.
-    // Snapshot services that need this can get a SiteTracker in IV2, but
-    // all other calls to the regular getSiteTracker() are going to throw.
-    public SiteTracker getSiteTrackerForSnapshot();
-
     public int getNumberOfPartitions();
 
     public SiteProcedureConnection getSiteProcedureConnection();

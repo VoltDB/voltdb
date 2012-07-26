@@ -17,6 +17,7 @@
 
 package org.voltcore.network;
 
+import java.util.concurrent.Callable;
 import java.util.concurrent.Future;
 
 public interface Connection {

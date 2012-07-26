@@ -558,7 +558,6 @@ public class TestExecutionSite extends TestCase {
         }
 
         @Override
-        public
         ClientResponseImpl call(long txnId, Object... paramList) {
             m_site.simulateExecutePlanFragments(m_txnState.txnId, m_procedure.testReadOnly());
 
@@ -670,7 +669,6 @@ public class TestExecutionSite extends TestCase {
         }
 
         @Override
-        public
         ClientResponseImpl call(long txnId, Object... paramList)
         {
             try {

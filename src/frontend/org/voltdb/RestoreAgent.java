@@ -362,7 +362,7 @@ SnapshotCompletionInterest {
 
         @Override
         public long connectionId() {
-            return Long.MIN_VALUE + 1;
+            return -1;
         }
 
         @Override
@@ -548,9 +548,7 @@ SnapshotCompletionInterest {
     void enterRestore() {
         try {
             m_leaderElector = new LeaderElector(m_zk, VoltZK.restore_barrier,
-                                                "restore",
                                                 new byte[0], null);
-            m_leaderElector.start(true);
             m_isLeader = m_leaderElector.isLeader();
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -597,7 +595,7 @@ SnapshotCompletionInterest {
         }
 
         try {
-            m_leaderElector.shutdown();
+            m_leaderElector.done();
         } catch (Exception ignore) {}
 
         // Clean up the ZK snapshot ID node so that we're good for next time.
@@ -1113,7 +1111,7 @@ SnapshotCompletionInterest {
         });
 
         if (txnId == null) {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true, spi,
+            m_initiator.createTransaction(-1, "CommandLog", true, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),
@@ -1122,7 +1120,7 @@ SnapshotCompletionInterest {
                                           EstTime.currentTimeMillis(),
                                           false);
         } else {
-            m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
+            m_initiator.createTransaction(-1, "CommandLog", true,
                                           txnId, spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),

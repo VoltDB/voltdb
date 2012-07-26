@@ -29,6 +29,8 @@ import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Database;
+import org.voltdb.dtxn.DtxnConstants;
 
 /**
  * This procedure is not available to users. It is not added to
@@ -38,41 +40,71 @@ import org.voltdb.VoltType;
 @ProcInfo(singlePartition = false)
 public class ProfCtl extends VoltSystemProcedure {
 
+    Database m_db = null;
+    static final int DEP_ID = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
+
     @Override
-    public void init() {
+        public void init() {
+        registerPlanFragment(SysProcFragmentId.PF_startSampler);
+        m_db = m_cluster.getDatabases().get("database");
     }
 
     @Override
     public DependencyPair executePlanFragment(Map<Integer, List<VoltTable>> dependencies, long fragmentId,
-            ParameterSet params, SystemProcedureExecutionContext context)
-    {
-        throw new RuntimeException("Promote was given an " +
-                                   "invalid fragment id: " + String.valueOf(fragmentId));
-    }
+            ParameterSet params, SystemProcedureExecutionContext context) {
 
-    public VoltTable[] run(SystemProcedureExecutionContext ctx, String command)
-    {
         VoltTable table = new VoltTable(new ColumnInfo("Result", VoltType.STRING));
 
-        if (command.equalsIgnoreCase("SAMPLER_START")) {
-            VoltDB.instance().startSampler();
-            table.addRow(command);
-        }
-        else if (command.equalsIgnoreCase("GPERF_ENABLE") || command.equalsIgnoreCase("GPERF_DISABLE")) {
-            // Choose the lowest site ID on this host to do the work.
-            table.addRow(command);
-            if (ctx.isLowestSiteId()) {
+        if (params.toArray()[0] != null) {
+            String command = (String)params.toArray()[0];
+            if (command.equalsIgnoreCase("SAMPLER_START")) {
+                VoltDB.instance().startSampler();
+                table.addRow("SAMPLER_START");
+                return new DependencyPair(DEP_ID, table);
+            }
+            else if (command.equalsIgnoreCase("GPERF_ENABLE") || command.equalsIgnoreCase("GPERF_DISABLE")) {
+                // Choose the lowest site ID on this host to do the work.
+                if (!context.isLowestSiteId())
+                {
+                    table.addRow("GPERF_NOOP");
+                    return new DependencyPair(DEP_ID, table);
+                }
                 if (command.equalsIgnoreCase("GPERF_ENABLE")) {
-                    ctx.getSiteProcedureConnection().toggleProfiler(1);
+                    context.getSiteProcedureConnection().toggleProfiler(1);
+                    table.addRow("GPERF_ENABLE");
+                    return new DependencyPair(DEP_ID, table);
                 }
                 else {
-                    ctx.getSiteProcedureConnection().toggleProfiler(0);
+                    context.getSiteProcedureConnection().toggleProfiler(0);
+                    table.addRow("GPERF_DISABLE");
+                    return new DependencyPair(DEP_ID, table);
                 }
+
+            }
+            else {
+                table.addRow("Invalid command: " + command);
+                return new DependencyPair(DEP_ID, table);
             }
         }
-        else {
-            table.addRow("Invalid command: " + command);
-        }
-        return (new VoltTable[] {table});
+        table.addRow("No command.");
+        return new DependencyPair(DEP_ID, table);
+    }
+
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String command) {
+
+        SynthesizedPlanFragment spf = new SynthesizedPlanFragment();
+        spf.fragmentId = SysProcFragmentId.PF_startSampler;
+        spf.outputDepId = DEP_ID;
+        spf.inputDepIds = new int[] {};
+        spf.multipartition = true;
+
+        ParameterSet params = new ParameterSet();
+        params.setParameters(command);
+        spf.parameters = params;
+
+        // distribute and execute these fragments providing pfs and id of the
+        // aggregator's output dependency table.
+        return executeSysProcPlanFragments(
+                new SynthesizedPlanFragment[] { spf }, DEP_ID);
     }
 }

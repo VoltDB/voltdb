@@ -43,7 +43,7 @@ import com.google.common.util.concurrent.ListenableFuture;
  */
 public class StreamSnapshotDataTarget extends StreamSnapshotBase
 implements SnapshotDataTarget {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
 
     // schemas for all the tables on this partition
     private final Map<Integer, byte[]> m_schemas;

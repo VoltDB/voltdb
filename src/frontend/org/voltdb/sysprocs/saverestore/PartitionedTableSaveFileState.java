@@ -32,7 +32,6 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
-import org.voltdb.dtxn.SiteTracker;
 import org.voltcore.logging.VoltLogger;
 import org.voltdb.sysprocs.SysProcFragmentId;
 import org.voltcore.utils.Pair;
@@ -107,14 +106,14 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
 
     @Override
     public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable, SiteTracker st)
+    generateRestorePlan(Table catalogTable)
     {
         SynthesizedPlanFragment[] restore_plan = null;
         LOG.info("Total partitions for Table: " + getTableName() + ": " +
                  getTotalPartitions());
         if (!catalogTable.getIsreplicated())
         {
-            restore_plan = generatePartitionedToPartitionedPlan(st);
+            restore_plan = generatePartitionedToPartitionedPlan();
         }
         else
         {
@@ -148,7 +147,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
         }
     }
 
-    private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan(SiteTracker st) {
+    private SynthesizedPlanFragment[] generatePartitionedToPartitionedPlan() {
         LOG.info("Partition set: " + m_partitionsSeen);
         ArrayList<SynthesizedPlanFragment> restorePlan = new ArrayList<SynthesizedPlanFragment>();
         HashSet<Integer> coveredPartitions = new HashSet<Integer>();
@@ -220,7 +219,7 @@ public class PartitionedTableSaveFileState extends TableSaveFileState
                     .get(host);
             ArrayList<Integer> originalHosts = hostsToOriginalHosts.get(host);
 
-            List<Long> sitesAtHost = VoltDB.instance().getSiteTrackerForSnapshot()
+            List<Long> sitesAtHost = VoltDB.instance().getSiteTracker()
                     .getSitesForHost(host);
 
             int originalHostsArray[] = new int[originalHosts.size()];

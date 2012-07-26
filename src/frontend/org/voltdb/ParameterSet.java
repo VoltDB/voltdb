@@ -88,10 +88,6 @@ import org.voltdb.types.VoltDecimalHelper;
         return m_serializedSize;
     }
 
-    /*
-     * Get a single indexed parameter. No size limits are enforced.
-     * Do not use for large strings or varbinary (> 1MB).
-     */
     static Object getParameterAtIndex(int partitionIndex, ByteBuffer unserializedParams) throws IOException {
         FastDeserializer in = new FastDeserializer(unserializedParams);
         int paramLen = in.readShort();
@@ -401,8 +397,7 @@ import org.voltdb.types.VoltDecimalHelper;
         return value;
     }
 
-    static private Object readOneParameter(FastDeserializer in)
-            throws IOException {
+    static private Object readOneParameter(FastDeserializer in) throws IOException {
         byte nextTypeByte = in.readByte();
         if (nextTypeByte == ARRAY) {
             VoltType nextType = VoltType.get(in.readByte());
