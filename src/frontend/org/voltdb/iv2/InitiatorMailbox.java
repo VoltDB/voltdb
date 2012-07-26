@@ -103,12 +103,13 @@ public class InitiatorMailbox implements Mailbox
         }
     }
 
-    public void shutdown() throws InterruptedException
+    synchronized public void shutdown() throws InterruptedException
     {
         m_masterMapCache.shutdown();
         if (m_algo != null) {
             m_algo.cancel();
         }
+        m_scheduler.shutdown();
     }
 
     // Change the replica set configuration (during or after promotion)

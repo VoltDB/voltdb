@@ -23,6 +23,8 @@ import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
 
+import org.voltdb.exceptions.SerializableException;
+
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -90,7 +92,12 @@ public class TransactionTaskQueue
             FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, false, false);
             FragmentResponseMessage poison =
                 new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
-            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, null);
+            // Provide a serializable exception so that the procedure runner sees
+            // this as an Expected (allowed) exception and doesn't take the crash-
+            // cluster-path.
+            SerializableException forcedTermination = new SerializableException(
+                    "Transaction rolled back by fault recovery or shutdown.");
+            poison.setStatus(FragmentResponseMessage.UNEXPECTED_ERROR, forcedTermination);
             txn.offerReceivedFragmentResponse(poison);
         }
     }

@@ -68,6 +68,31 @@ public class MpScheduler extends Scheduler
     }
 
     @Override
+    public void shutdown()
+    {
+        // cancel any in-progress transaction by creating a fragement
+        // response to roll back. This function must be called with
+        // the deliver lock held to be correct. The null task should
+        // never run; the site thread is expected to be told to stop.
+        SiteTasker nullTask = new SiteTasker() {
+            @Override
+            public void run(SiteProcedureConnection siteConnection) {
+            }
+
+            @Override
+            public void runForRejoin(SiteProcedureConnection siteConnection) {
+            }
+
+            @Override
+            public int priority() {
+                return 0;
+            }
+        };
+        m_pendingTasks.repair(nullTask);
+    }
+
+
+    @Override
     public void updateReplicas(final List<Long> replicas)
     {
         // Handle startup and promotion semi-gracefully
@@ -79,6 +104,10 @@ public class MpScheduler extends Scheduler
 
         final List<Long> replicaCopy = new ArrayList<Long>(replicas);
 
+        // Must run the repair while pausing the site task queue;
+        // Otherwise, a new MP might immediately be blocked in a
+        // confused world of semi-repair. So just do the repair
+        // work on the site thread....
         SiteTasker repairTask = new SiteTasker() {
             @Override
             public void run(SiteProcedureConnection connection) {
@@ -203,7 +232,8 @@ public class MpScheduler extends Scheduler
 
     @Override
     public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
-        // not yet implemented.
+        // MP initiate tasks are never repaired.
+        throw new RuntimeException("Impossible code path through MPI repair.");
     }
 
     // The MpScheduler will see InitiateResponseMessages from the Partition masters when

@@ -364,12 +364,23 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 runLoop();
             }
         }
-        catch (final RuntimeException e) {
-            hostLog.l7dlog(Level.ERROR, LogKeys.host_ExecutionSite_RuntimeException.name(), e);
-            throw e;
-        }
         catch (final InterruptedException e) {
             // acceptable - this is how site blocked on an empty scheduler terminates.
+        }
+        catch (OutOfMemoryError e)
+        {
+            // Even though OOM should be caught by the Throwable section below,
+            // it sadly needs to be handled seperately. The goal here is to make
+            // sure VoltDB crashes.
+            String errmsg = "Site: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) +
+                " ran out of Java memory. " + "This node will shut down.";
+            VoltDB.crashLocalVoltDB(errmsg, true, e);
+        }
+        catch (Throwable t)
+        {
+            String errmsg = "Site: " + org.voltcore.utils.CoreUtils.hsIdToString(m_siteId) +
+                " encountered an " + "unexpected error and will die, taking this VoltDB node down.";
+            VoltDB.crashLocalVoltDB(errmsg, true, t);
         }
         shutdown();
     }
