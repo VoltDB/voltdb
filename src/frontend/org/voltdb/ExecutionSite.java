@@ -2459,6 +2459,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             {
                 assert(!currentTxnState.isSinglePartition());
                 tryToSneakInASinglePartitionProcedure();
+                if (m_recoveryProcessor != null) {
+                    m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
+                }
             }
             else
             {
