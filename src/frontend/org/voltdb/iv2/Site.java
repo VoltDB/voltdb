@@ -399,8 +399,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 task.run(getSiteProcedureConnection());
             }
         }
-
-        m_snapshotter.doSnapshotWork(m_ee, true);
     }
 
     public void startShutdown()

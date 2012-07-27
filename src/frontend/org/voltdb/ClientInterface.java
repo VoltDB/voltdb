@@ -752,7 +752,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_cihm.put(c.connectionId(),
                            new ClientInterfaceHandleManager( m_isAdmin, c, m_acg.get()));
                 m_acg.get().addMember(this);
-                System.out.println("Initial read selection is " + !m_acg.get().hasBackPressure());
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
