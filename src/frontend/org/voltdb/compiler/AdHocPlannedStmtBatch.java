@@ -39,9 +39,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     // Also not persisted across serializations
     public Object partitionParam;
 
-    // not persisted across serializations
-    public int catalogVersion = -1;
-
     // The planned statements.
     // Do not add statements directly. Use addStatement so that the readOnly flag
     // is updated
@@ -70,7 +67,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     public AdHocPlannedStmtBatch(
             String sqlBatchText,
             Object partitionParam,
-            int catalogVersion,
             long clientHandle,
             long connectionId,
             String hostname,
@@ -78,7 +74,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             Object clientData) {
         this.sqlBatchText = sqlBatchText;
         this.partitionParam = partitionParam;
-        this.catalogVersion = catalogVersion;
         this.clientHandle = clientHandle;
         this.connectionId = connectionId;
         this.hostname = hostname;
@@ -117,23 +112,9 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     }
 
     /**
-     * Convenience method to create a new AdHocPlannedStatement. Copies redundant
-     * data from AsyncCompilerResult base class to new object because it is also
-     * derived from that class.
-     *
-     * IMPORTANT: This does not update sqlBatchText. The caller is responsible for
-     * splitting the batch text and assuring that the individual SQL statements
-     * correspond to the original.
-     *
-     * @param sqlStatement          SQL statement text (must be single statement)
-     * @param aggregatorFragment    aggregator fragment
-     * @param collectorFragment     collector fragment
-     * @param isReplicatedTableDML  replicated table DML flag
-     * @param isNonDeterministic    non-deterministic SQL flag
-     * @return                      statement object
+     * Add an AdHocPlannedStatement to this batch.
      */
     public void addStatement(AdHocPlannedStatement plannedStmt) {
-        plannedStmt.catalogVersion = catalogVersion;
         // The first non-select statement makes it not read-only.
         if (!plannedStmt.readOnly) {
             readOnly = false;

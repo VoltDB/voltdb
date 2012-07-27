@@ -60,8 +60,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.ClientInterface.ClientInputHandler;
-
-import org.voltdb.iv2.Cartographer;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
@@ -74,6 +72,7 @@ import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -281,7 +280,7 @@ public class TestClientInterface {
 
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
-                "select * from a", null, 0, 0, 0, "localhost", false, null);
+                "select * from a", null, 0, 0, "localhost", false, null);
         AdHocPlannedStatement s = new AdHocPlannedStatement(
                 "select * from a".getBytes(VoltDB.UTF8ENCODING),
                 new byte[0], new byte[0], false, false, true, null, 0);

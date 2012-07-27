@@ -107,7 +107,9 @@ public class CompiledPlan {
 
     void resetPlanNodeIds() {
         int nextId = resetPlanNodeIds(rootPlanGraph, 1);
-        resetPlanNodeIds(rootPlanGraph, nextId);
+        if (subPlanGraph != null) {
+            resetPlanNodeIds(subPlanGraph, nextId);
+        }
     }
 
     private int resetPlanNodeIds(AbstractPlanNode node, int nextId) {

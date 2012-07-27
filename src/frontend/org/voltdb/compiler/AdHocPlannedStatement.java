@@ -36,7 +36,7 @@ public class AdHocPlannedStatement implements Cloneable {
     public boolean isReplicatedTableDML;
     public boolean isNonDeterministic;
     public boolean readOnly;
-    public int catalogVersion; // not serialized
+    public int catalogVersion;
     public VoltType[] params;
     public Object partitionParam; // not serialized
 
@@ -63,7 +63,7 @@ public class AdHocPlannedStatement implements Cloneable {
      * @param isReplicatedTableDML      replication flag
      * @param isNonDeterministic        non-deterministic SQL flag
      * @param isReadOnly                does it write
-     * @param partitionParam            partition parameter
+     * @param params                    parameter type array
      * @param catalogVersion            catalog version
      */
     public AdHocPlannedStatement(byte[] sql,
@@ -138,6 +138,8 @@ public class AdHocPlannedStatement implements Cloneable {
     }
 
     void flattenToBuffer(ByteBuffer buf) {
+        validate(); // assertions for extra safety
+
         buf.putShort((short) sql.length);
         buf.put(sql);
 
@@ -156,6 +158,8 @@ public class AdHocPlannedStatement implements Cloneable {
         buf.put((byte) (isNonDeterministic ? 1 : 0));
         buf.put((byte) (readOnly ? 1 : 0));
 
+        buf.putInt(catalogVersion);
+
         if (params != null) {
             buf.putShort((short) params.length);
             for (VoltType type : params) {
@@ -165,8 +169,6 @@ public class AdHocPlannedStatement implements Cloneable {
         else {
             buf.putShort((short) 0);
         }
-
-        validate();
     }
 
     public static AdHocPlannedStatement fromBuffer(ByteBuffer buf) {
@@ -187,6 +189,8 @@ public class AdHocPlannedStatement implements Cloneable {
         boolean isNonDeterministic = buf.get() == 1;
         boolean isReadOnly = buf.get() == 1;
 
+        int catalogVersion = buf.getInt();
+
         short paramCount = buf.getShort();
         VoltType[] params = new VoltType[paramCount];
         for (int i = 0; i < paramCount; ++i) {
@@ -201,6 +205,6 @@ public class AdHocPlannedStatement implements Cloneable {
                 isNonDeterministic,
                 isReadOnly,
                 params,
-                -1);
+                catalogVersion);
     }
 }

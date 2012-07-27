@@ -80,13 +80,13 @@ import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.compiler.AdHocCompilerCache;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
@@ -1276,7 +1276,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AdHocPlannedStmtBatch planBatch =
                 new AdHocPlannedStmtBatch(sql,
                                           partitionParam,
-                                          m_catalogContext.get().catalogVersion,
                                           task.clientHandle,
                                           handler.connectionId(),
                                           handler.m_hostname,
@@ -1752,7 +1751,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (result.errorMsg == null) {
                     if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                        if (plannedStmtBatch.catalogVersion != m_catalogContext.get().catalogVersion) {
+                        // assume all stmts have the same catalog version
+                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
+                            (plannedStmtBatch.getPlannedStatement(0).catalogVersion != m_catalogContext.get().catalogVersion)) {
 
                             /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an
@@ -1851,7 +1852,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     StringWriter sw = new StringWriter();
                     PrintWriter pw = new PrintWriter(sw);
                     e.printStackTrace(pw);
-                    e.printStackTrace();
                     pw.flush();
                     ClientResponseImpl errorResponse =
                             new ClientResponseImpl(

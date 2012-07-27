@@ -233,7 +233,7 @@ public class QueryPlanner {
         }
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
-        bestPlan = Fragmentizer.fragmentize(bestPlan, m_db);
+        Fragmentizer.fragmentize(bestPlan, m_db);
         return bestPlan;
     }
 

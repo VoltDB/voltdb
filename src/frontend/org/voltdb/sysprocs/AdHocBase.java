@@ -26,6 +26,7 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.compiler.AdHocPlannedStatement;
@@ -78,7 +79,17 @@ public abstract class AdHocBase extends VoltSystemProcedure {
             return new VoltTable[]{};
         }
 
+        int currentCatalogVersion = ctx.getCatalogVersion();
+
         for (AdHocPlannedStatement statement : statements) {
+            if (currentCatalogVersion != statement.catalogVersion) {
+                String msg = String.format("AdHoc transaction %d wasn't planned " +
+                        "against the current catalog version. Statement: %s",
+                        ctx.getCurrentTxnId(),
+                        new String(statement.sql, VoltDB.UTF8ENCODING));
+                throw new VoltAbortException(msg);
+            }
+
             SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
                     statement.sql,
                     statement.aggregatorFragment,

@@ -17,6 +17,8 @@
 
 package org.voltdb.planner;
 
+import java.util.List;
+
 import org.voltdb.catalog.Database;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
@@ -40,56 +42,26 @@ public class Fragmentizer {
      * @param plan The plan to chop up.
      * @return The chopped up plan.
      */
-    static CompiledPlan fragmentize(CompiledPlan plan, Database db) {
-        assert(plan != null);
-        assert(plan.rootPlanGraph != null);
-        assert(plan.subPlanGraph == null);
+    static void fragmentize(CompiledPlan plan, Database db) {
+        List<AbstractPlanNode> receives = plan.rootPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE);
 
-        // chop up the plan and set all the proper dependencies recursively
-        recursiveFindFragment(plan, plan.rootPlanGraph);
+        if (receives.isEmpty()) return;
 
-        return plan;
-    }
+        assert (receives.size() == 1);
 
-    /**
-     * Chop up the plan and set all the proper dependencies recursively
-     *
-     * @param currentFragment The fragment currently being examined recurively. This
-     * will likely contain the root of plan-subgraph currently being walked.
-     * @param currentNode The node in the plan graph currently being visited. This is
-     * the main unit of recursion here.
-     * @param fragments The list of fragments (initially one) that will be appended to
-     * as the method splits up the plan.
-     */
-    static void recursiveFindFragment(
-            CompiledPlan plan,
-            AbstractPlanNode currentNode) {
+        ReceivePlanNode recvNode = (ReceivePlanNode) receives.get(0);
+        assert(recvNode.getChildCount() == 1);
+        AbstractPlanNode childNode = recvNode.getChild(0);
+        assert(childNode instanceof SendPlanNode);
+        SendPlanNode sendNode = (SendPlanNode) childNode;
 
-        // the place to split is the send-recv node pairing
-        if (currentNode instanceof ReceivePlanNode) {
-            ReceivePlanNode recvNode = (ReceivePlanNode) currentNode;
-            assert(recvNode.getChildCount() == 1);
-            AbstractPlanNode childNode = recvNode.getChild(0);
-            assert(childNode instanceof SendPlanNode);
-            SendPlanNode sendNode = (SendPlanNode) childNode;
+        // disconnect the send and receive nodes
+        sendNode.clearParents();
+        recvNode.cacheDeterminism();
+        recvNode.clearChildren();
 
-            // disconnect the send and receive nodes
-            sendNode.clearParents();
-            recvNode.cacheDeterminism();
-            recvNode.clearChildren();
+        plan.subPlanGraph = sendNode;
 
-            plan.subPlanGraph = sendNode;
-            assert(plan.subPlanGraph.findAllNodesOfType(PlanNodeType.RECEIVE).size() == 0);
-
-            // stop here if we found a recv node
-            return;
-        }
-
-        // if not a recv node, just do a boring recursive call
-        // stopping condition is when there are no children
-        for (int i = 0; i < currentNode.getChildCount(); i++) {
-            AbstractPlanNode childNode = currentNode.getChild(i);
-            recursiveFindFragment(plan, childNode);
-        }
+        return;
     }
 }

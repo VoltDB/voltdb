@@ -206,6 +206,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
+        public int getCatalogVersion() {
+            return m_context.catalogVersion;
+        }
+
+        @Override
         public SiteTracker getSiteTracker() {
             throw new RuntimeException("Not implemented in iv2");
         }
