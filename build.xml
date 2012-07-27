@@ -1308,6 +1308,7 @@ TEST CASES
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
+                <exclude name="**/TestRejoinEndToEnd.class" />
             </fileset>
         </tests>
     </run_junit>
