@@ -165,8 +165,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * The ? extends ugliness is due to the SnapshotDaemon having an ACG that is a noop
      */
     private final COWMap<Long, ClientInterfaceHandleManager>
-            m_cihm =
-                new COWMap<Long, ClientInterfaceHandleManager>();
+            m_cihm = new COWMap<Long, ClientInterfaceHandleManager>();
     private final Cartographer m_cartographer;
 
     /**
@@ -2150,50 +2149,52 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public Map<Long, Pair<String, long[]>> getLiveClientStats()
     {
-        Map<Long, Pair<String, long[]>> client_stats =
+        final Map<Long, Pair<String, long[]>> client_stats =
             new HashMap<Long, Pair<String, long[]>>();
 
-        Map<Long, long[]> inflight_txn_stats;
         if (VoltDB.instance().isIV2Enabled()) {
-            inflight_txn_stats = new HashMap<Long, long[]>();
-            for (Map.Entry<Long, ClientInterfaceHandleManager> e :
-                    m_cihm.entrySet()) {
-                long values[] = new long[2];
-                values[0] = e.getValue().isAdmin ? 1 : 0;
-                values[1] = e.getValue().getOutstandingTxns();
-                inflight_txn_stats.put(e.getKey(), values);
-            }
-        } else {
-            inflight_txn_stats = m_initiator.getOutstandingTxnStats();
-        }
-
-        // put all the live connections in the stats map, then fill in admin and
-        // outstanding txn info from the inflight stats
-
-        for (Connection c : m_connections)
-        {
-            if (!client_stats.containsKey(c.connectionId()))
-            {
-                client_stats.put(
-                    c.connectionId(),
-                    new Pair<String, long[]>(c.getHostnameOrIP(),
-                            new long[]{0,
-                                       c.readStream().dataAvailable(),
-                                       c.writeStream().getOutstandingMessageCount(),
-                                       0})
-                                 );
+            // m_cihm hashes connectionId to a ClientInterfaceHandleManager
+            // ClientInterfaceHandleManager has the connection object.
+            for (Map.Entry<Long, ClientInterfaceHandleManager> e : m_cihm.entrySet()) {
+                // The internal CI adapters report negative connection ids and
+                // aren't included in public stats.
+                if (e.getKey() > 0) {
+                    long adminMode = e.getValue().isAdmin ? 1 : 0;
+                    long readWait = e.getValue().connection.readStream().dataAvailable();
+                    long writeWait = e.getValue().connection.writeStream().getOutstandingMessageCount();
+                    long outstandingTxns = e.getValue().getOutstandingTxns();
+                    client_stats.put(
+                            e.getKey(), new Pair<String, long[]>(
+                                e.getValue().connection.getHostnameOrIP(),
+                                new long[] {adminMode, readWait, writeWait, outstandingTxns}));
+                }
             }
         }
+        else {
+            Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
 
-        for (Entry<Long, long[]> stat : inflight_txn_stats.entrySet())
-        {
-            if (client_stats.containsKey(stat.getKey()))
-            {
-                client_stats.get(stat.getKey()).getSecond()[0] = stat.getValue()[0];
-                client_stats.get(stat.getKey()).getSecond()[3] = stat.getValue()[1];
+            // put all the live connections in the stats map, then fill in admin and
+            // outstanding txn info from the inflight stats
+            for (Connection c : m_connections) {
+                if (!client_stats.containsKey(c.connectionId())) {
+                    client_stats.put(
+                            c.connectionId(),
+                            new Pair<String, long[]>(c.getHostnameOrIP(),
+                                new long[]{0,
+                                    c.readStream().dataAvailable(),
+                                    c.writeStream().getOutstandingMessageCount(),
+                                    0})
+                            );
+                }
+            }
+
+            for (Entry<Long, long[]> stat : inflight_txn_stats.entrySet()) {
+                if (client_stats.containsKey(stat.getKey())) {
+                    client_stats.get(stat.getKey()).getSecond()[0] = stat.getValue()[0];
+                    client_stats.get(stat.getKey()).getSecond()[3] = stat.getValue()[1];
+                }
             }
         }
-
         return client_stats;
     }
 
