@@ -56,18 +56,19 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
 //        client.callProcedure("P2.insert", 2, "1", 1, 2);
 //        client.callProcedure("P2.insert", 3, "1", 1, 3);
 
-        client.callProcedure("P1.insert",0, "VsjXIIYQnwoFIpNob", -16556, 5.47315658172998098507e-01);
-        client.callProcedure("P1.insert",1, "yGSKfTbpaJATfvBvh", -27838, 4.08313508830880467215e-01);
-        client.callProcedure("P2.insert",4, "vIwoHCHtWbYaJaNeJ", 28494, 23683);
-        client.callProcedure("P2.insert",5, "jPiUvMLcKGrrsMXrT", 23951, 25679);
-
+//        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(0, 'JOUmtGnsKFCGOaWvg', -27392, 7.30754864900605705103e-01);");
+        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(1, 'aXwwPrkDwabomDdAZ', 30036, 1.09425040281800223241e-01);");
+//        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(4, 'xJAmmYpKGJJyflOMw', -7060, 14977);");
+//        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(5, 'xybOXumtYDvBNhbUs', 13529, -2025);");
 
 
         VoltTable table;
 
-        ClientResponse cr = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10");
+        ClientResponse cr = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;");
         //assertTrue(table.advanceRow());
-        System.err.println(cr.getStatusString());
+        System.err.println(cr.getStatus() + " " + cr.getStatusString());
+        if (cr.getException() != null)
+            cr.getException().printStackTrace();
         //System.err.println("RESULT0:\n" + table);
         assertTrue(true);
 
@@ -108,6 +109,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         project.addPartitionInfo("TU4", "UNAME");
         project.addPartitionInfo("TM1", "ID");
         project.addPartitionInfo("TM2", "UNAME");
+        project.addPartitionInfo("P1", "ID");
 
         boolean success;
 
@@ -116,7 +118,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        config = new LocalCluster("sql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
 
         // build the jarfile
         success = config.compile(project);

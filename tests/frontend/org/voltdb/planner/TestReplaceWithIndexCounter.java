@@ -60,12 +60,15 @@ public class TestReplaceWithIndexCounter extends TestCase {
         aide = new PlannerTestAideDeCamp(getClass().getResource("testplans-indexcounter-ddl.sql"),
                                          "testindexcounter");
 
-        // Set all tables except for D1 to non-replicated.
+        // Set all tables except for P1 to non-replicated.
         Cluster cluster = aide.getCatalog().getClusters().get("cluster");
         CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
         for (Table t : tmap) {
-            if (!t.getTypeName().equalsIgnoreCase("d1")) {
+            if (t.getTypeName().equalsIgnoreCase("p1")) {
                 t.setIsreplicated(false);
+                t.setPartitioncolumn(t.getColumns().get("ID"));
+            } else {
+                t.setIsreplicated(true);
             }
         }
     }
@@ -77,7 +80,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar02() {
-        List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, true);
+        List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, false);
         checkIndexCounter(pn, true, false);
     }
 
@@ -181,26 +184,16 @@ public class TestReplaceWithIndexCounter extends TestCase {
      *            The generated plan
      * @param isMultiPart
      *            Whether or not the plan is distributed
-     * @param aggTypes
-     *            The expected aggregate types for the original aggregate node.
-     * @param pushDownTypes
-     *            The expected aggregate types for the top aggregate node after
-     *            pushing the original aggregate node down.
      */
     private void checkIndexCounter(List<AbstractPlanNode> pn, boolean isMultiPart, boolean isReplaceable) {
         assertTrue(pn.size() > 0);
 
-        AbstractPlanNode p = pn.get(0).getChild(0);
-        for (AbstractPlanNode ap: pn) {
-            System.out.println("Explan tree:\n" + ap.toExplainPlanString());
-        }
-
-
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode DOT string:\n" + nd.toDOTString());
             System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
-
         }
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        //System.out.println("PlanNode DOT string:\n" + p.toDOTString());
+        //System.out.println("PlanNode Explan string:\n" + p.toExplainPlanString());
         if (isReplaceable)
             assertTrue(p instanceof IndexCountPlanNode);
         else
