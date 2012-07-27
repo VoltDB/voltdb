@@ -20,6 +20,8 @@ package org.voltdb.compiler;
 import java.util.LinkedHashMap;
 import java.util.Map;
 
+import org.voltdb.VoltDB;
+
 /**
  * Keep a cache of the last 100 results from the adhoc planner.
  */
@@ -45,6 +47,6 @@ public class AdHocCompilerCache {
     }
 
     public synchronized void put (AdHocPlannedStatement result) {
-        m_cache.put(result.sql, result);
+        m_cache.put(new String(result.sql, VoltDB.UTF8ENCODING), result);
     }
 }
