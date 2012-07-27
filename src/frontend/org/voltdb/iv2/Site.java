@@ -67,6 +67,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // HSId of this site's initiator.
     final long m_siteId;
 
+    final int m_snapshotPriority;
+
     // Partition count is important for some reason.
     final int m_numberOfPartitions;
 
@@ -253,7 +255,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long txnId,
             int partitionId,
             int numPartitions,
-            boolean createForRejoin)
+            boolean createForRejoin,
+            int snapshotPriority)
     {
         m_siteId = siteId;
         m_context = context;
@@ -262,7 +265,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_scheduler = scheduler;
         m_backend = backend;
         m_isRejoining = createForRejoin;
-
+        m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, txnId);
     }
@@ -289,15 +292,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_hsql = null;
             m_ee = initializeEE(serializedCatalog, txnId);
         }
-        // IZZY- Get me from the deployment file in some sane way somehow some day
-        int snapshotPriority = 6;
+
         m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
             @Override
             public void run() {
                 m_scheduler.offer(new SnapshotTask());
             }
         },
-        snapshotPriority);
+        m_snapshotPriority);
     }
 
     /** Create a native VoltDB execution engine */
