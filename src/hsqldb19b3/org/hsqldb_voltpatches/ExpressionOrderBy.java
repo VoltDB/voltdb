@@ -81,10 +81,12 @@ public class ExpressionOrderBy extends Expression {
         return isNullsLast;
     }
 
+    @Override
     public Object getValue(Session session) {
         return nodes[LEFT].getValue(session);
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         nodes[LEFT].resolveTypes(session, parent);
@@ -96,6 +98,7 @@ public class ExpressionOrderBy extends Expression {
         dataType = nodes[LEFT].dataType;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -115,6 +118,7 @@ public class ExpressionOrderBy extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer();
@@ -146,11 +150,12 @@ public class ExpressionOrderBy extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         VoltXMLElement exp = new VoltXMLElement("operation");
         // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("id", getUniqueId(session));
         exp.attributes.put("type", "orderby");
         if ((this.alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());
