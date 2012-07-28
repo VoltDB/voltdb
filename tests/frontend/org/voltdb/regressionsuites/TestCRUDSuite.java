@@ -213,13 +213,13 @@ public class TestCRUDSuite extends RegressionSuite {
         }
 
         // JNI
-        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
 
         // CLUSTER
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        /*config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         boolean t2 = config.compile(project);
         assertTrue(t2);
         builder.addServerConfig(config);
@@ -229,7 +229,7 @@ public class TestCRUDSuite extends RegressionSuite {
                 false, true); // LocalCluster constructor to enable IV2.  We have to drag along the isRejoinTest arg
         boolean t3 = config.compile(project);
         assertTrue(t3);
-        builder.addServerConfig(config);
+        builder.addServerConfig(config);*/
 
         return builder;
     }

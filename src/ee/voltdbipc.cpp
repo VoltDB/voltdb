@@ -1119,9 +1119,11 @@ int main(int argc, char **argv) {
 
     int port = 0;
 
+    // allow called to override port with the first argument
     if (argc == 2) {
-        printf("Binding to a specific socket is no longer supported\n");
-        exit(-1);
+        char *portStr = argv[1];
+        assert(portStr);
+        port = atoi(portStr);
     }
 
     struct sockaddr_in address;
