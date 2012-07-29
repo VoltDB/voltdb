@@ -79,11 +79,6 @@ public class TestReplaceWithIndexCounter extends TestCase {
         aide.tearDown();
     }
 
-    public void testCountStar02() {
-        List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, false);
-        checkIndexCounter(pn, true, false);
-    }
-
     // DOES NOT support the cases down below right now
     public void testCountStar0() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, true);
@@ -96,7 +91,17 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar01() {
-        List<AbstractPlanNode> pn = compile("SELECT COUNT(*) from T1 WHERE points < 4 ORDER BY POINTS DESC", 0, true);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS", 0, true);
+        checkIndexCounter(pn, true, true);
+    }
+    
+    public void testCountStar02() {
+        List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, false);
+        checkIndexCounter(pn, true, false);
+    }
+    
+    public void testCountStar03() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC", 0, true);
         checkIndexCounter(pn, true, false);
     }
 
@@ -108,7 +113,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
     // SeqScan is not supported right now
     public void testCountStar3() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, true);
-        checkIndexCounter(pn, false, false);
+        checkIndexCounter(pn, false, true);
     }
 
     public void testCountStar31() {
