@@ -1,10 +1,16 @@
 #!/usr/bin/python
 
-# Find all the merged branches and print a script
-# (to console) for a dry-run and real run.
+# Print out scripts for removing either
+#  - branches already merged to trunk
+#  - branches not merged, but with no current checkins
+# This script DOES NOT do the removals - you need to run the
+# console output.
+
+
+# TODO: Make this find branches where the delete will findfail
+# because of matching tag and branch name
 
 from datetime import date, datetime, timedelta
-import getopt
 import os
 from subprocess import Popen
 import subprocess
@@ -69,11 +75,9 @@ def weed_out_newer_branches(branches,maxage):
             if (date.today() - d) > timedelta(days = maxage):
                 old_branches.append(b)
             else:
-                print "#%s is too new: %s" % (b, stdout)
+                print "#  %s is too new: %s" % (b, stdout.strip())
 
     return old_branches
-
-
 
 if __name__ == "__main__":
 
@@ -94,13 +98,13 @@ if __name__ == "__main__":
     branch_list = get_branch_list(merged)
 
     if merged:
-        print ('\n----------------\ndry-run script:\n----------------')
+        print ('\n#----------------\n#dry-run script:\n#----------------')
         make_delete_branches_script(branch_list, False)
-        print ('\n----------------\nreal script:\n----------------')
+        print ('\n#----------------\n#real script:\n#----------------')
         make_delete_branches_script(branch_list, True)
     else:
-        print ('\n----------------\ntag- script:\n----------------')
+        print ('\n#----------------\n#tag- script:\n#----------------')
         old_branches = weed_out_newer_branches(branch_list,cutoffday)
         make_archive_branches_script(old_branches)
-        print "Don't forget to git push --tags"
+        print ('\n#----------------\n#Don\'t forget to git push --tags\n#----------------')
 
