@@ -840,24 +840,6 @@ public class TestIndexCountSuite extends RegressionSuite {
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlCountingIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #3: Local Cluster (of processes) with failed node
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlCountingIndex-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
-
         return builder;
     }
 
