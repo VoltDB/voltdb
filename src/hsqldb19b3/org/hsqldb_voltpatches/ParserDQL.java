@@ -3779,13 +3779,13 @@ public class ParserDQL extends ParserBase {
         return l;
     }
 
-    /** This wraps either an Expression result of readSQLFunction or a throwable Exception discovered 
+    /** This wraps either an Expression result of readSQLFunction or a throwable Exception discovered
      *  in the process of reading that Expression.
      *  It allows different parser paths to be tried without losing exception
      *  information OR needlessly throwing, catching, and recovering from those exceptions.
-     *  The main purpose of this class is to avoid using Exception for "normal case" flow control, so
-     *  that more significant exception throws can be tracked down more easily. This helped a lot in the
-     *  development of VoltDB-specific SQL functions.
+     *  The main purpose of this class is to avoid using Exception for "normal case" flow control,
+     *  so that more significant exception throws can be tracked down more easily.
+     *  This helped a lot in the development of VoltDB-specific SQL functions.
      *  It might have been slightly more traditional to collect the HsqlException 's initializers and
      *  only construct the HsqlException when ready to throw it.
      *  But having an HsqlException handy allowed better integration with the existing logic for

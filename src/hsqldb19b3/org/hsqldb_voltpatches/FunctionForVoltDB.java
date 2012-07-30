@@ -52,7 +52,9 @@ public class FunctionForVoltDB extends FunctionSQL {
         final private String m_name;
         final private int m_id;
         final private Type m_type;
-        final private short[] m_paramList;
+        final private int m_typeParameter;
+        final private Type[] m_paramTypes;
+        final private short[] m_paramParseList;
 
         public String getName() {
             return m_name;
@@ -66,19 +68,30 @@ public class FunctionForVoltDB extends FunctionSQL {
             return m_type;
         }
 
-        public short[] getParamList() {
-            return m_paramList;
+        public Type[] getParamTypes() {
+            return m_paramTypes;
         }
 
-        private FunctionId(String name, Type type, int id, short[] paramTypes) { m_name = name; m_type = type; m_id = id; m_paramList = paramTypes; }
+        public short[] getParamParseList() {
+            return m_paramParseList;
+        }
+
+        private FunctionId(String name, Type type, int id, int typeParameter, Type[] paramTypes, short[] paramParseList) {
+            m_name = name;
+            m_type = type;
+            m_id = id;
+            m_typeParameter = typeParameter;
+            m_paramTypes = paramTypes;
+            m_paramParseList = paramParseList;
+        }
+
+        // These ID numbers need to be unique values for FunctionSQL.functType.
+        // Assume that 1-19999 are reserved for existing HSQL functions.
+        // That leaves new VoltDB-specific functions free to use values in the 20000s.
+        private static final int FUNC_VOLT_SQL_ERROR = 20000;
 
         private static final FunctionId[] instances = {
-            // These ID numbers need to be unique values for FunctionSQL.functType.
-            // For now assume that 1001-2000 are reserved for us.
-            // A possible alternative MIGHT be to reserve a single FunctionSQL.functType value and let
-            // HSQL pretend that it just has one generic function -- or maybe one per signature? or return type?
-            // It depends how smart/useful we can get HSQL to be for us.
-            new FunctionId("sql_error", null, 1001, new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
+            new FunctionId("sql_error", null, FUNC_VOLT_SQL_ERROR, 0, new Type[] { null, Type.SQL_VARCHAR }, new short[] { Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET }),
         };
 
         private static Map<String, FunctionId> by_LC_name = new HashMap<String, FunctionId>();
@@ -92,6 +105,10 @@ public class FunctionForVoltDB extends FunctionSQL {
         static FunctionId fn_by_name(String anyCase) {
             String upCase = anyCase.toLowerCase();
             return by_LC_name.get(upCase);
+        }
+
+        public int getTypeParameter() {
+            return m_typeParameter;
         }
 
     }
@@ -112,12 +129,13 @@ public class FunctionForVoltDB extends FunctionSQL {
         m_def     = fn;
         funcType  = m_def.getId();
         name      = m_def.getName();
-        parseList = m_def.getParamList();
+        parseList = m_def.getParamParseList();
+        parameterArg = m_def.getTypeParameter();
     }
 
     @Override
     public void setArguments(Expression[] nodes) {
-        //TODO; type-check arguments here? Possibly determine alternative result type for overloads? Possibly insert default values?
+        //TODO; Here's where we might re-order arguments or insert implied values for functions that were implemented as aliases for other functions.
         /*
         switch (m_def.getId()) {
         default :
@@ -129,7 +147,7 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     @Override
     public Expression getFunctionExpression() {
-        //TODO; Here's where any complex aliases can get deconstructed into more explicit expression trees.
+        //TODO; Here's where we might substitute wholesale some other HSQL Expression for a function expression that is really just an alias.
         /*
         switch (m_def.getId()) {
         default :
@@ -141,20 +159,31 @@ public class FunctionForVoltDB extends FunctionSQL {
 
     @Override
     Object getValue(Session session, Object[] data) {
-        //TODO; Here's where you implement the function for HSQL backends so it can be used for regression testing -- GOOD LUCK!
-
-        switch (funcType) {
+        //TODO; Here's where we implement the function for HSQL backends so it can be used for regression testing -- GOOD LUCK!
+        /*
+        switch (m_def.getId()) {
         default :
-            throw Error.runtimeError(ErrorCode.U_S0500, "This FunctionForVoltDB is not implemented in HSQL backends -- or in HSQL constant-folding.");
+            break;
         }
+        */
+        throw Error.runtimeError(ErrorCode.U_S0500, "This FunctionForVoltDB is not implemented in HSQL backends -- or in HSQL constant-folding.");
     }
 
     @Override
     public void resolveTypes(Session session, Expression parent) {
 
+        Type[] paramTypes = m_def.getParamTypes();
+
         for (int i = 0; i < nodes.length; i++) {
             if (nodes[i] != null) {
                 nodes[i].resolveTypes(session, this);
+                if (paramTypes[i] == null) {
+                    continue; // accept all argument types
+                }
+                if (paramTypes[i].canConvertFrom(nodes[i].dataType)) {
+                    continue; // accept compatible argument types
+                }
+                throw Error.error(ErrorCode.X_42565); // incompatible data type
             }
         }
 
@@ -165,6 +194,8 @@ public class FunctionForVoltDB extends FunctionSQL {
                 dataType = like_child.dataType;
             }
         }
+
+
     }
 
     @Override

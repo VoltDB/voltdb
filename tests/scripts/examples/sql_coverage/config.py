@@ -23,6 +23,10 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 {
+    "statement": {"schema": "schema.py",
+              "ddl": "DDL.sql",
+              "template": "statement.sql",
+              "normalizer": "normalizer.py"},
     "basic": {"schema": "schema.py",
               "ddl": "DDL.sql",
               "template": "basic.sql",

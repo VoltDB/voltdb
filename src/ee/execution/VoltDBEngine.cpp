@@ -847,17 +847,21 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
     if (iter != m_executorMap.end()) {
         VOLT_ERROR("Duplicate PlanNodeList entry for PlanFragment '%jd' during"
                    " initialization", (intmax_t)fragId);
+printf("\nDEBUG ipf FAIL EARLIEST\n");
         return false;
     }
 
     // catalog method plannodetree returns PlanNodeList.java
     PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree);
-    VOLT_TRACE("\n%s\n", pnf->debug().c_str());
+#undef VOLT_TRACE
+#define VOLT_TRACE(A, B) printf(A, B)
+    VOLT_TRACE("\nDEBUG ipf %s\n", pnf->debug().c_str());
     assert(pnf->getRootNode());
 
     if (!pnf->getRootNode()) {
         VOLT_ERROR("Deserialized PlanNodeFragment for PlanFragment '%jd' "
                    "does not have a root PlanNode", (intmax_t)fragId);
+printf("\nDEBUG ipf FAIL EARLY\n");
         return false;
     }
 
@@ -871,6 +875,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
         frag_temptable_limit = -1;
     }
 
+printf("\nDEBUG ipf MIDDLE\n");
     boost::shared_ptr<ExecutorVector> ev =
         boost::shared_ptr<ExecutorVector>
         (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit, pnf));
@@ -884,6 +889,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
                        " for PlanFragment '%jd'",
                        pnf->getExecuteList()[ctr]->debug().c_str(), ctr,
                        (intmax_t)fragId);
+printf("\nDEBUG ipf FAIL\n");
             return false;
         }
     }
@@ -894,6 +900,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
         ev->list.push_back(pnf->getExecuteList()[ctr]->getExecutor());
     }
     m_executorMap[fragId] = ev;
+printf("\nDEBUG ipf SUCCEED\n");
 
     return true;
 }

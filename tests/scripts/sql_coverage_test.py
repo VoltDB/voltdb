@@ -270,6 +270,8 @@ if __name__ == "__main__":
                       help="only generate and report SQL statements, do not start any database servers")
     (options, args) = parser.parse_args()
 
+    print "DEBUG: ", (options, args)
+    
     if options.seed == None:
         seed = random.randint(0, 2**63)
         print "Random seed: %d" % seed

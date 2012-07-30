@@ -89,7 +89,7 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             if (child.name.equalsIgnoreCase("columns"))
                 parseDisplayColumns(child, db);
             else if (child.name.equalsIgnoreCase("querycondition"))
-                parseQueryCondition(child, db);
+                parseConditions(child, db);
             else if (child.name.equalsIgnoreCase("ordercolumns"))
                 parseOrderColumns(child, db);
             else if (child.name.equalsIgnoreCase("groupcolumns")) {
@@ -102,8 +102,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         for (VoltXMLElement child : columnsNode.children) {
             ParsedColInfo col = new ParsedColInfo();
             col.expression = parseExpressionTree(child, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(col.expression);
-            ExpressionUtil.assignOutputValueTypesRecursively(col.expression);
+            if (col.expression instanceof ConstantValueExpression) {
+                assert(col.expression.getValueType() != VoltType.NUMERIC);
+            }
+            ExpressionUtil.finalizeValueTypes(col.expression);
             assert(col.expression != null);
             col.alias = child.attributes.get("alias");
 
@@ -126,16 +128,6 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
             col.index = displayColumns.size();
             displayColumns.add(col);
         }
-    }
-
-    void parseQueryCondition(VoltXMLElement conditionNode, Database db) {
-        if (conditionNode.children.size() == 0)
-            return;
-
-        VoltXMLElement exprNode = conditionNode.children.get(0);
-        where = parseExpressionTree(exprNode, db);
-        ExpressionUtil.assignLiteralConstantTypesRecursively(where);
-        ExpressionUtil.assignOutputValueTypesRecursively(where);
     }
 
     void parseGroupByColumns(VoltXMLElement columnsNode, Database db) {
@@ -286,8 +278,10 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
         {
             throw new RuntimeException("ORDER BY parsed with strange child node type: " + child.name);
         }
-        ExpressionUtil.assignLiteralConstantTypesRecursively(order_exp);
-        ExpressionUtil.assignOutputValueTypesRecursively(order_exp);
+        if (order_exp instanceof ConstantValueExpression) {
+            assert(order_exp.getValueType() != VoltType.NUMERIC);
+        }
+        ExpressionUtil.finalizeValueTypes(order_exp);
         order_col.expression = order_exp;
         orderColumns.add(order_col);
     }

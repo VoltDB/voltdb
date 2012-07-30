@@ -112,15 +112,8 @@ public enum ExpressionType {
     // ----------------------------
     //TODO: Should there be multiple classes for function expressions
     // maybe based on their support for optimization methods?
-    //TODO: Should there be very few or possibly only one FunctionExpression ExpressionType
-    // so that these codes get moved into a separate FunctionExpression tag attribute?
-    FUNCTION_ABS                  (FunctionExpression.class,  100),
-    FUNCTION_SUBSTRING_FROM       (FunctionExpression.class,  110),
-    FUNCTION_SUBSTRING_FROM_FOR   (FunctionExpression.class,  111),
-
-    // Define other SQL functions above this line.
-    // Give each unique EE function its own integer value
-    FUNCTION_SQL_ERROR            (FunctionExpression.class,  999), // IMPORTANT: Keep this last in the contiguous FunctionExpression range.
+    //TODO: Should there be multiple FunctionExpression ExpressionTypes?
+    FUNCTION                      (FunctionExpression.class,  100),
     ;
 
     private final int val;

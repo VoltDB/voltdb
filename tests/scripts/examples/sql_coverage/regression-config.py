@@ -59,6 +59,10 @@
 # which will cause the successful statements to be written to stdout.
 {
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
+    "paul": {"schema": "schema.py",
+              "ddl": "DDL.sql",
+              "template": "statement.sql",
+              "normalizer": "normalizer.py"},
     "basic": {"schema": "schema.py",
               "ddl": "DDL.sql",
               "template": "basic.sql",

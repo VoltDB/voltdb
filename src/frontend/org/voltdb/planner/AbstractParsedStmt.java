@@ -34,6 +34,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
@@ -372,16 +373,21 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseFunctionExpression(VoltXMLElement exprNode, Database db) {
         String name = exprNode.attributes.get("name").toLowerCase();
-        String volt_alias = exprNode.attributes.get("volt_alias");
         String value_type_name = exprNode.attributes.get("type");
         VoltType value_type = VoltType.typeFromString(value_type_name);
+        String id = exprNode.attributes.get("id");
+        assert(id != null);
+        int idArg = Integer.parseInt(id);
+        String parameter = exprNode.attributes.get("parameter");
+        int parameter_idx = -1;
+        if (parameter != null) {
+            try {
+                parameter_idx = Integer.parseInt(parameter);
+            } catch (NumberFormatException nfe) {}
+        }
+        String volt_alias = exprNode.attributes.get("volt_alias");
         if (volt_alias == null) {
             volt_alias = name; // volt shares the function name with HSQL
-        }
-        ExpressionType exprType = ExpressionType.get(volt_alias);
-
-        if (exprType == ExpressionType.INVALID) {
-            throw new PlanningErrorException("Function '" + volt_alias + "' is not supported.");
         }
 
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
@@ -393,16 +399,38 @@ public abstract class AbstractParsedStmt {
             args.add(argExpr);
         }
 
-        AbstractExpression expr = null;
-        try {
-            expr = exprType.getExpressionClass().newInstance();
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e.getMessage(), e);
+        if (parameter_idx != -1) {
+            // Avoid a non-castable types runtime exception by negotiating the type(s) of the parameterized function's result
+            // and its parameter argument. Either of these types could be null or a specific supported value type, or a generic
+            // NUMERIC. Replace any "generic" type (null or NUMERIC) with the more specific type without over-specifying
+            // -- the BEST type might only become clear when the context/caller of this function is parsed.
+            AbstractExpression param_arg = args.get(parameter_idx);
+            // Use the type chosen by HSQL for the parameterized function as a specific type hint
+            // for numeric constant arguments that could either go decimal or float.
+            VoltType param_type = param_arg.getValueType();
+            // Anything is better than NUMERIC which is better than nothing.
+            if (value_type != param_type) {
+                if (value_type == null) {
+                    value_type = param_type;
+                } else if (value_type == VoltType.NUMERIC) {
+                    if (param_type != null) {
+                        value_type = param_type;
+                    }
+                    // Pushing a type DOWN to the argument is a lot like work, and not worth it just for NUMERIC,
+                    // since it will likely have to be repeated when a more specific type is inferred.
+                    // It's purpose is to force a more specific refinement of NUMERIC than would be taken by default "out of context".
+                } else if ((param_type == null) || (param_type == VoltType.NUMERIC)) {
+                    param_arg.refineValueType(value_type);
+                }
+            }
         }
-        expr.setExpressionType(exprType);
-        expr.setValueType(value_type);
-        expr.setValueSize(value_type.getMaxLengthInBytes());
+
+        FunctionExpression expr = new FunctionExpression();
+        expr.setAttributes(name, volt_alias, idArg, parameter_idx);
+        if (value_type != null) {
+            expr.setValueType(value_type);
+            expr.setValueSize(value_type.getMaxLengthInBytes());
+        }
         expr.setArgs(args);
         return expr;
     }
@@ -422,8 +450,6 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement child : columnsNode.children) {
             assert(child.name.equals("columnref"));
             AbstractExpression col_exp = parseExpressionTree(child, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(col_exp);
-            ExpressionUtil.assignOutputValueTypesRecursively(col_exp);
             assert(col_exp != null);
             assert(col_exp instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col_exp;
@@ -684,6 +710,17 @@ public abstract class AbstractParsedStmt {
             valueEquivalence.put(rightExpr, eqSet1);
             eqSet1.add(rightExpr);
         }
+    }
+
+    protected void parseConditions(VoltXMLElement conditionNode, Database db) {
+        if (conditionNode.children.size() == 0)
+            return;
+
+        VoltXMLElement exprNode = conditionNode.children.get(0);
+        assert(where == null); // Should be non-reentrant -- not overwriting any previous value!
+        where = parseExpressionTree(exprNode, db);
+        assert(where != null);
+        ExpressionUtil.finalizeValueTypes(where);
     }
 
 }

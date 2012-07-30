@@ -520,4 +520,90 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         return false;
     }
 
+    /**
+     * Constant literals have a place-holder type of NUMERIC. These types
+     * need to be converted to DECIMAL or FLOAT when used in a binary operator,
+     * the choice based on the other operand's type
+     * -- DECIMAL goes with DECIMAL, FLOAT goes with anything else.
+     * This gets specialized as a NO-OP for leaf Expressions (AbstractValueExpression)
+     */
+    public void normalizeOperandTypes_recurse()
+    {
+        // Depth first search for NUMERIC children.
+        if (m_left != null) {
+            m_left.normalizeOperandTypes_recurse();
+        }
+        if (m_right != null) {
+            m_right.normalizeOperandTypes_recurse();
+
+            // XXX: There's no check here that the Numeric operands are actually constants.
+            // Can a sub-expression of type Numeric arise in any other case?
+            // Would that case always be amenable to having its valueType/valueSize redefined here?
+            if (m_left != null) {
+                if (m_left.m_valueType == VoltType.NUMERIC) {
+                    m_left.refineOperandType(m_right.m_valueType);
+                }
+                if (m_right.m_valueType == VoltType.NUMERIC) {
+                    m_right.refineOperandType(m_left.m_valueType);
+                }
+            }
+
+        }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.normalizeOperandTypes_recurse();
+            }
+        }
+    }
+
+    /**
+     * Helper function to patch up NUMERIC typed constant operands and
+     * the functions and operators that they parameterize.
+     */
+    void refineOperandType(VoltType valueType)
+    {
+        if (m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        if (valueType == VoltType.DECIMAL) {
+            m_valueType = VoltType.DECIMAL;
+            m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
+        } else {
+            m_valueType = VoltType.FLOAT;
+            m_valueSize = VoltType.FLOAT.getLengthInBytesForFixedTypes();
+        }
+    }
+
+    /**
+     * Helper function to patch up NUMERIC typed constants and
+     * the functions and operators that they parameterize,
+     * especially when they need to match an expected INSERT/UPDATE column
+     * or to match a parameterized function that HSQL or other planner
+     * processing has determined the return type for.
+     */
+    public void refineValueType(VoltType columnType) {
+        if ((m_valueType != null) && (m_valueType != VoltType.NUMERIC)) {
+            return;
+        }
+        assert(false);
+    }
+
+    /** Instead of recursing by default, allow derived classes to recurse as needed
+     * using finalizeChildValueTypes.
+     */
+    public abstract void finalizeValueTypes();
+
+    /** Do the recursive part of finalizeValueTypes as requested. */
+    public final void finalizeChildValueTypes() {
+        if (m_left != null)
+            m_left.finalizeValueTypes();
+        if (m_right != null)
+            m_right.finalizeValueTypes();
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.finalizeValueTypes();
+            }
+        }
+    }
+
 }
