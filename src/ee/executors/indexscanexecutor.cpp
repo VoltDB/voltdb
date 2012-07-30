@@ -151,6 +151,8 @@ bool IndexScanExecutor::p_init(AbstractPlanNode *abstractNode,
     m_needsSubstituteSearchKeyPtr =
         boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
     m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
+
+    //printf ("<INDEX SCAN> num of seach key: %d\n", m_numOfSearchkeys);
     // if (m_numOfSearchkeys == 0)
     // {
     //     VOLT_ERROR("There are no search key expressions for PlanNode '%s'",
@@ -346,7 +348,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     assert((activeNumOfSearchKeys == 0) || (m_searchKey.getSchema()->columnCount() > 0));
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
-
     //
     // END EXPRESSION
     //
@@ -407,9 +408,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
 
+    //printf ("<INDEX SCAN> localSortDirection: %d\n", localSortDirection);
     if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
         bool order_by_asc = true;
-
         if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
             // nothing now
         }
@@ -422,9 +423,8 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
         }
     }
     else if (localSortDirection == SORT_DIRECTION_TYPE_INVALID && activeNumOfSearchKeys == 0) {
-        return false;
+        m_index->moveToEnd(true);
     }
-
     //
     // We have to different nextValue() methods for different lookup types
     //

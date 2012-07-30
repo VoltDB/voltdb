@@ -269,7 +269,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 TableTuple& tmptup = m_outputTable->tempTuple();
                 tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
 
-                if (ctr == (activeNumOfSearchKeys - 1)) {
+                if (ctr == (activeNumOfEndKeys - 1)) {
                     assert (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                         m_outputTable->insertTuple(tmptup);
@@ -296,11 +296,11 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     //
     // POST EXPRESSION
     //
-    assert(m_node->getPredicate() == NULL);
+    assert (m_node->getPredicate() == NULL);
 
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
-    assert(m_index->is_countable_index_);
+    assert (m_index->is_countable_index_);
 
     // An index count has two parts: unique and multi
 
@@ -311,7 +311,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     if (m_index->isUniqueIndex()) {
         // Deal with unique map
-        assert (activeNumOfSearchKeys > 0);
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                 localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
@@ -322,12 +321,11 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 if (m_index->hasKey(&m_searchKey))
                     leftIncluded = 1;
                 if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
-                    // two columns index, no value for the second column
+                    // search key is not complete:
                     // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
-                    // this may be changed if we can handle one column index case
                     // like: SELECT count(*) from T2 WHERE POINTS < ?
-                    // because the searchKey is not complete, we should find it,
-                    // but it actually finds the previous rank. Add 1 back.
+                    // but it actually finds the previous rank. (If m_searchKey is null, find 0 rank)
+                    // Add 1 back.
                     rkStart++;
                     leftIncluded = 1;
                 }
@@ -358,7 +356,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
     } else {
         // Deal with multi-map
-        assert (activeNumOfSearchKeys > 0);
         VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
                 localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
         if (searchKeyUnderflow == false) {
@@ -372,12 +369,11 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                     rkStart = m_index->getCounterLET(&m_searchKey, true);
                 }
                 if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
-                    // two columns index, no value for the second column
+                    // search key is not complete:
                     // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
-                    // this may be changed if we can handle one column index case
                     // like: SELECT count(*) from T2 WHERE POINTS < ?
-                    // because the searchKey is not complete, we should find it,
-                    // but it actually finds the previous rank. Add 1 back.
+                    // but it actually finds the previous rank. (If m_searchKey is null, find 0 rank)
+                    // Add 1 back.
                     rkStart++;
                     leftIncluded = 1;
                 }
@@ -391,9 +387,11 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 if (localEndType == INDEX_LOOKUP_TYPE_LT) {
                     rkEnd = m_index->getCounterGET(&m_endKey, false);
                 } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
-                    rkEnd = m_index->getCounterGET(&m_endKey, true);
-                    if (m_index->hasKey(&m_endKey))
+                    if (m_index->hasKey(&m_endKey)) {
+                        rkEnd = m_index->getCounterGET(&m_endKey, true);
                         rightIncluded = 1;
+                    } else
+                        rkEnd = m_index->getCounterGET(&m_endKey, false);
                 } else {
                     return false;
                 }
@@ -407,7 +405,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
     }
     rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
-    //printf("ANSWER %d = %d - %d - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
+    VOLT_DEBUG("ANSWER %lld = %lld - %lld - 1 + %d + %d\n", rkRes, rkEnd, rkStart, leftIncluded, rightIncluded);
     tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes ));
     m_outputTable->insertTuple(tmptup);
 

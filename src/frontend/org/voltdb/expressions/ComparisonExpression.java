@@ -17,6 +17,9 @@
 
 package org.voltdb.expressions;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
@@ -51,6 +54,22 @@ public class ComparisonExpression extends AbstractExpression {
     @Override
     public boolean needsRightExpression() {
         return true;
+    }
+
+    private static Map<ExpressionType,ExpressionType> reverses = new HashMap<ExpressionType, ExpressionType>();
+    static {
+        reverses.put(ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL);
+        reverses.put(ExpressionType.COMPARE_NOTEQUAL, ExpressionType.COMPARE_NOTEQUAL);
+        reverses.put(ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_GREATERTHAN);
+        reverses.put(ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_LESSTHAN);
+        reverses.put(ExpressionType.COMPARE_LESSTHANOREQUALTO, ExpressionType.COMPARE_GREATERTHANOREQUALTO);
+        reverses.put(ExpressionType.COMPARE_GREATERTHANOREQUALTO, ExpressionType.COMPARE_LESSTHANOREQUALTO);
+    }
+
+    public ComparisonExpression reverseOperator() {
+        ExpressionType reverseType = reverses.get(this.m_type);
+        // Left and right exprs are reversed on purpose
+        return new ComparisonExpression(reverseType, m_right, m_left);
     }
 
 }

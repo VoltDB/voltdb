@@ -84,7 +84,10 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if ((child instanceof IndexScanPlanNode) == false)
             return plan;
 
-        if ((((IndexScanPlanNode)child)).getPredicate() == null)
+        IndexScanPlanNode isp = (IndexScanPlanNode)child;
+        // rule out query without where clause
+        if (isp.getPredicate() == null && isp.getEndExpression() == null &&
+                isp.getSearchKeyExpressions().size() == 0)
             return plan;
         // check index type
         Index idx = ((IndexScanPlanNode)child).getCatalogIndex();
@@ -126,10 +129,12 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         return plan;
     }
 
+    // Rule it out of index count case if there is post expression for index scan
     boolean isReplaceable(IndexScanPlanNode child) {
+        AbstractExpression predicateExpr = child.getPredicate();
+        if (predicateExpr == null) return true;
 
         AbstractExpression endExpr = child.getEndExpression();
-        AbstractExpression predicateExpr = child.getPredicate();
         ArrayList<AbstractExpression> subEndExpr = null;
         if (endExpr != null) {
             subEndExpr = endExpr.findAllSubexpressionsOfClass(TupleValueExpression.class);
