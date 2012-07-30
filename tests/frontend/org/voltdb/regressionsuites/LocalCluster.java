@@ -206,14 +206,7 @@ public class LocalCluster implements VoltServerConfig {
             log4j = "file://" + System.getProperty("user.dir") + "/tests/log4j-allconsole.xml";
         }
 
-        // see if IV2 was enabled in the constructor, and fall back to the environment variable
-        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-        if (enableIv2 || (iv2 != null && iv2.equals("true")))
-        {
-            m_enableIv2 = true;
-        }
-        System.out.println("LOCALCLUSTER ENABLE IV2: " + m_enableIv2);
-
+        m_enableIv2 = enableIv2 || VoltDB.checkTestEnvForIv2();
         m_procBuilder = new ProcessBuilder();
 
         // set the working directory to obj/release/prod
