@@ -3,6 +3,7 @@
 # Find all the merged branches and print a script
 # (to console) for a dry-run and real run.
 
+from datetime import date, datetime, timedelta
 import getopt
 import os
 from subprocess import Popen
@@ -27,10 +28,12 @@ def get_current_branch():
         branch = branch[0][2:]
     return branch
 
-def get_merged_branch_list():
+def get_branch_list(merged):
     branches = []
-    (returncode, stdout, stderr) = run_cmd ('git branch -r --merged')
-    #Find branches that have been merged (but not master)
+
+    print ('git branch -r %s' % '--merged' if merged else '--no-merged' )
+    (returncode, stdout, stderr) = run_cmd ('git branch -r %s' % ('--merged' if merged else '--no-merged' ))
+
     branches = [b.strip() for b in stdout.splitlines() if b.find('/master') < 0]
     #print branches
     #Filter others from list
@@ -49,6 +52,29 @@ def make_delete_branches_script(branches, do_it):
             (b.split('origin/')[1], other_args)
         print cmd
 
+def make_archive_branches_script(branches):
+    for b in branches:
+        shortname = b.split('origin/')[1]
+        print 'git tag -m "archiving branch %s" archive/%s %s' % (shortname, shortname, b)
+        print 'git push origin --delete %s' % shortname
+
+def weed_out_newer_branches(branches,maxage):
+    old_branches = []
+    for b in branches:
+        cmd = 'git show -s --pretty=format:"%%ci" %s' % b
+        (ret,stdout,stderr) = run_cmd(cmd)
+        if not ret:
+            #print stdout + b
+            d = datetime.strptime(stdout.split(' ')[0],'"%Y-%m-%d').date()
+            if (date.today() - d) > timedelta(days = maxage):
+                old_branches.append(b)
+            else:
+                print "#%s is too new: %s" % (b, stdout)
+
+    return old_branches
+
+
+
 if __name__ == "__main__":
 
     delete = False
@@ -56,12 +82,25 @@ if __name__ == "__main__":
     current_branch = get_current_branch()
     if current_branch != 'master':
         sys.exit('You must be on master. Your current branch is %s.' % current_branch)
-    delete = False
-    branch_list = get_merged_branch_list()
 
-    print ('\n----------------\ndry-run script:\n----------------')
-    make_delete_branches_script(branch_list, False)
 
-    print ('\n----------------\nreal script:\n----------------')
+    merged=True
+    if len(sys.argv) >= 2 and sys.argv[1] == 'unmerged':
+        merged=False
+        cutoffday=21
+        #if len(sys.argv) == 3:
+        #    cutoffday=sys.argv[2]
 
-    make_delete_branches_script(branch_list, True)
+    branch_list = get_branch_list(merged)
+
+    if merged:
+        print ('\n----------------\ndry-run script:\n----------------')
+        make_delete_branches_script(branch_list, False)
+        print ('\n----------------\nreal script:\n----------------')
+        make_delete_branches_script(branch_list, True)
+    else:
+        print ('\n----------------\ntag- script:\n----------------')
+        old_branches = weed_out_newer_branches(branch_list,cutoffday)
+        make_archive_branches_script(old_branches)
+        print "Don't forget to git push --tags"
+
