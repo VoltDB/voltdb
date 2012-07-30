@@ -76,11 +76,13 @@ public class LocalCluster implements VoltServerConfig {
     protected int m_siteCount;
     int m_hostCount;
     int m_kfactor = 0;
+    boolean m_enableIv2 = false;
     protected final BackendTarget m_target;
     protected String m_jarFileName;
     boolean m_running = false;
     private final boolean m_debug;
     FailureState m_failureState;
+    int m_nextIPCPort = 10000;
     ArrayList<Process> m_cluster = new ArrayList<Process>();
     int perLocalClusterExtProcessIndex = 0;
 
@@ -114,15 +116,15 @@ public class LocalCluster implements VoltServerConfig {
             int hostCount, int kfactor, BackendTarget target) {
         this(jarFileName, siteCount,
              hostCount, kfactor, target,
-             FailureState.ALL_RUNNING, false, false);
+             FailureState.ALL_RUNNING, false, false, false);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
                         int hostCount, int kfactor, BackendTarget target,
-                        boolean isRejoinTest) {
+                        boolean isRejoinTest, boolean enableIv2) {
         this(jarFileName, siteCount,
              hostCount, kfactor, target,
-             FailureState.ALL_RUNNING, false, isRejoinTest);
+             FailureState.ALL_RUNNING, false, isRejoinTest, enableIv2);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
@@ -130,13 +132,13 @@ public class LocalCluster implements VoltServerConfig {
                         FailureState failureState,
                         boolean debug) {
         this(jarFileName, siteCount, hostCount, kfactor, target,
-             failureState, debug, false);
+             failureState, debug, false, false);
     }
 
     public LocalCluster(String jarFileName, int siteCount,
                         int hostCount, int kfactor, BackendTarget target,
                         FailureState failureState,
-                        boolean debug, boolean isRejoinTest)
+                        boolean debug, boolean isRejoinTest, boolean enableIv2)
     {
         assert (jarFileName != null);
         assert (siteCount > 0);
@@ -204,6 +206,14 @@ public class LocalCluster implements VoltServerConfig {
             log4j = "file://" + System.getProperty("user.dir") + "/tests/log4j-allconsole.xml";
         }
 
+        // see if IV2 was enabled in the constructor, and fall back to the environment variable
+        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+        if (enableIv2 || (iv2 != null && iv2.equals("true")))
+        {
+            m_enableIv2 = true;
+        }
+        System.out.println("LOCALCLUSTER ENABLE IV2: " + m_enableIv2);
+
         m_procBuilder = new ProcessBuilder();
 
         // set the working directory to obj/release/prod
@@ -224,7 +234,8 @@ public class LocalCluster implements VoltServerConfig {
             javaLibraryPath(java_library_path).
             classPath(classPath).
             pathToLicense(ServerThread.getTestLicensePath()).
-            log4j(log4j);
+            log4j(log4j).
+            enableIV2(m_enableIv2);
         this.templateCmdLine.m_noLoadLibVOLTDB = m_target == BackendTarget.HSQLDB_BACKEND;
         // "tag" this command line so it's clear which test started it
         this.templateCmdLine.m_tag = m_callingClassName + ":" + m_callingMethodName;
@@ -322,9 +333,17 @@ public class LocalCluster implements VoltServerConfig {
         cmdln.drAgentStartPort(portGenerator.next());
         portGenerator.next();
         portGenerator.next();
-        for (EEProcess proc : m_eeProcs.get(0)) {
-            assert(proc != null);
-            cmdln.ipcPort(proc.port());
+        if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+            for (EEProcess proc : m_eeProcs.get(0)) {
+                assert(proc != null);
+                cmdln.ipcPort(proc.port());
+            }
+        }
+        if (m_target == BackendTarget.NATIVE_EE_IPC) {
+            // set 1 port per site
+            for (int i = 0; i < m_siteCount; i++) {
+                cmdln.m_ipcPorts.add(portGenerator.next());
+            }
         }
 
         // for debug, dump the command line to a unique file.
@@ -532,6 +551,14 @@ public class LocalCluster implements VoltServerConfig {
             cmdln.drAgentStartPort(portGenerator.next());
             portGenerator.next();
             portGenerator.next();
+
+            // add the ipc ports
+            if (m_target == BackendTarget.NATIVE_EE_IPC) {
+                // set 1 port per site
+                for (int i = 0; i < m_siteCount; i++) {
+                    cmdln.m_ipcPorts.add(portGenerator.next());
+                }
+            }
 
             cmdln.port(portGenerator.nextClient());
             cmdln.adminPort(portGenerator.nextAdmin());
@@ -919,7 +946,9 @@ public class LocalCluster implements VoltServerConfig {
             prefix += "OneFail";
         if (m_failureState == FailureState.ONE_RECOVERING)
             prefix += "OneRecov";
-
+        if (m_enableIv2) {
+            prefix += "-IV2";
+        }
         return prefix +
             "-" + String.valueOf(m_siteCount) +
             "-" + String.valueOf(m_hostCount) +
@@ -932,6 +961,9 @@ public class LocalCluster implements VoltServerConfig {
             prefix += "-OneFail";
         if (m_failureState == FailureState.ONE_RECOVERING)
             prefix += "-OneRecov";
+        if (m_enableIv2) {
+            prefix += "-IV2";
+        }
 
         return prefix +
             "-" + String.valueOf(m_siteCount) +

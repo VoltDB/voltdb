@@ -70,7 +70,9 @@ import java.io.InputStream;
 import java.text.SimpleDateFormat;
 import java.util.Calendar;
 import java.util.GregorianCalendar;
+import java.util.HashMap;
 import java.util.Locale;
+import java.util.Map;
 import java.util.Random;
 import java.util.SimpleTimeZone;
 import java.util.TimeZone;
@@ -2058,5 +2060,25 @@ public class Session implements SessionInterface {
 
     String getSetSchemaStatement() {
         return "SET SCHEMA " + currentSchema.statementName;
+    }
+
+
+    /*************** VOLTDB *********************/
+
+    long nextExpressionNodeId = 1;
+    Map<Long, Long> hsqlExpressionNodeIdsToVoltNodeIds = new HashMap<Long, Long>();
+
+    public long getNodeIdForExpression(long hsqlId) {
+        Long id = hsqlExpressionNodeIdsToVoltNodeIds.get(hsqlId);
+        if (id == null) {
+            id = nextExpressionNodeId++;
+            hsqlExpressionNodeIdsToVoltNodeIds.put(hsqlId, id);
+        }
+        return id;
+    }
+
+    public void resetVoltNodeIds() {
+        nextExpressionNodeId = 1;
+        hsqlExpressionNodeIdsToVoltNodeIds.clear();
     }
 }

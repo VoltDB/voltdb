@@ -355,10 +355,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
         if (id != -1) {
             ParameterValueExpression parameter = new ParameterValueExpression();
-            ParameterInfo paramInfo = paramsById.get(id);
-            parameter.setParameterIndex(paramInfo.index);
-            parameter.setValueType(paramInfo.type);
-            parameter.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
+            assert(paramsById.containsKey(id));
+            int index = paramsById.get(id);
+            parameter.setParameterIndex(index);
+            parameter.setValueType(paramList[index]);
+            parameter.setValueSize(paramList[index].getLengthInBytesForFixedTypes());
             return parameter;
         }
         else {

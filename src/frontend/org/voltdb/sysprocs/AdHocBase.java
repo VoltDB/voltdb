@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
 
@@ -25,8 +26,11 @@ import org.voltdb.ParameterSet;
 import org.voltdb.SQLStmt;
 import org.voltdb.SQLStmtAdHocHelper;
 import org.voltdb.SystemProcedureExecutionContext;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.compiler.AdHocPlannedStatement;
+import org.voltdb.compiler.AdHocPlannedStmtBatch;
 
 /**
  * Base class for @AdHoc... system procedures.
@@ -39,9 +43,7 @@ public abstract class AdHocBase extends VoltSystemProcedure {
      * @see org.voltdb.VoltSystemProcedure#init()
      */
     @Override
-    public void init()
-    {
-    }
+    public void init() {}
 
     /* (non-Javadoc)
      * @see org.voltdb.VoltSystemProcedure#executePlanFragment(java.util.Map, long, org.voltdb.ParameterSet, org.voltdb.SystemProcedureExecutionContext)
@@ -65,29 +67,35 @@ public abstract class AdHocBase extends VoltSystemProcedure {
      * @param replicatedTableDMLFlags
      * @return
      */
-    public VoltTable[] runAdHoc(SystemProcedureExecutionContext ctx,
-            byte[][] aggregatorFragments, byte[][] collectorFragments,
-            String[] sqlStatements, int[] replicatedTableDMLFlags) {
+    public VoltTable[] runAdHoc(SystemProcedureExecutionContext ctx, byte[] serializedBatchData) {
 
         // Collections must be the same size since they all contain slices of the same data.
-        assert(sqlStatements != null);
-        assert(aggregatorFragments != null);
-        assert(aggregatorFragments.length == sqlStatements.length);
-        assert(collectorFragments != null);
-        assert(collectorFragments.length == sqlStatements.length);
-        assert(replicatedTableDMLFlags != null);
-        assert(replicatedTableDMLFlags.length == sqlStatements.length);
+        assert(serializedBatchData != null);
 
-        if (sqlStatements.length == 0) {
+        ByteBuffer buf = ByteBuffer.wrap(serializedBatchData);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
+
+        if (statements.length == 0) {
             return new VoltTable[]{};
         }
 
-        for (int i = 0; i < sqlStatements.length; i++) {
-            SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(sqlStatements[i],
-                                                             aggregatorFragments[i],
-                                                             collectorFragments[i],
-                                                             replicatedTableDMLFlags[i] == 1,
-                                                             null);
+        int currentCatalogVersion = ctx.getCatalogVersion();
+
+        for (AdHocPlannedStatement statement : statements) {
+            if (currentCatalogVersion != statement.catalogVersion) {
+                String msg = String.format("AdHoc transaction %d wasn't planned " +
+                        "against the current catalog version. Statement: %s",
+                        ctx.getCurrentTxnId(),
+                        new String(statement.sql, VoltDB.UTF8ENCODING));
+                throw new VoltAbortException(msg);
+            }
+
+            SQLStmt stmt = SQLStmtAdHocHelper.createWithPlan(
+                    statement.sql,
+                    statement.aggregatorFragment,
+                    statement.collectorFragment,
+                    statement.isReplicatedTableDML,
+                    statement.params);
             voltQueueSQL(stmt);
         }
 
