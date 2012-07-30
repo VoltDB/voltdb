@@ -156,6 +156,18 @@ public class SnapshotSiteProcessor {
     private final Random m_random = new Random();
 
     /*
+     * Interface that will be checked when scheduling snapshot work in IV2.
+     * Reports whether the site is "idle" for whatever definition that may be.
+     * If the site is idle then work will be scheduled immediately instead of being
+     * throttled
+     */
+    public interface IdlePredicate {
+        public boolean idle(long now);
+    }
+
+    private final IdlePredicate m_idlePredicate;
+
+    /*
      * Synchronization is handled by SnapshotSaveAPI.startSnapshotting
      * Store the export sequence numbers for every table and partition. This will
      * be called by every execution site before the snapshot starts. Then the execution
@@ -193,13 +205,27 @@ public class SnapshotSiteProcessor {
     private long m_quietUntil = 0;
 
     private boolean inQuietPeriod() {
-        return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
+        if (m_isIV2Enabled) {
+            return false;
+        } else {
+            return org.voltcore.utils.EstTime.currentTimeMillis() < m_quietUntil;
+        }
     }
 
     public SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority) {
+        this(onPotentialSnapshotWork, snapshotPriority, new IdlePredicate() {
+            @Override
+            public boolean idle(long now) {
+                throw new UnsupportedOperationException();
+            }
+        });
+    }
+
+    public SnapshotSiteProcessor(Runnable onPotentialSnapshotWork, int snapshotPriority, IdlePredicate idlePredicate) {
         m_onPotentialSnapshotWork = onPotentialSnapshotWork;
         m_snapshotPriority = snapshotPriority;
         initializeBufferPool();
+        m_idlePredicate = idlePredicate;
     }
 
     public void shutdown() {
@@ -237,6 +263,11 @@ public class SnapshotSiteProcessor {
                      */
                     if (m_isIV2Enabled && m_snapshotPriority > 0) {
                         final long now = System.currentTimeMillis();
+                        //Ask if the site is idle, and if it is queue the work immediately
+                        if (m_idlePredicate.idle(now)) {
+                            m_onPotentialSnapshotWork.run();
+                            return;
+                        }
 
                         //Cache the value locally, the dirty secret is that in edge cases multiple threads
                         //will read/write briefly, but it isn't a big deal since the scheduling can be wrong
