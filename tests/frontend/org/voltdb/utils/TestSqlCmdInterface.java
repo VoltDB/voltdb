@@ -29,10 +29,14 @@ import static org.junit.Assert.assertNotNull;
 import static org.junit.Assert.assertNotSame;
 import static org.junit.Assert.assertTrue;
 
+import java.io.BufferedReader;
+import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.IOException;
 import java.io.InputStream;
+import java.io.InputStreamReader;
 import java.util.List;
 import java.util.Scanner;
 import java.util.regex.Matcher;
@@ -411,7 +415,29 @@ public class TestSqlCmdInterface
         expected = expected.replaceAll("\\s+", "");
         //assertThis2(query, expected, 2, ID);   // Uncomment this line after 3422 is fixed
         notAssertThis2(query, expected, 2, ID);  // Comment out this line after 3422 is fixed
+    }
 
+    // To assert the help page printed by SQLCommand.printHelp() is identical to the
+    // original static help file 'SQLCommandReadme.txt'. For ENG-3440
+    @Test
+    public void testPrintHelpMenu26() throws IOException {
+        ID = 26;
+        SQLCommand.setDebugPrintHelp(true);
+        String log = SQLCommand.getLogFilename();
+        String orgReadme = "./src/frontend/org/voltdb/utils/" + SQLCommand.getReadme();
+        SQLCommand.printHelp();
+        FileInputStream fstream1 = new FileInputStream(log);
+        FileInputStream fstream2 = new FileInputStream(orgReadme);
+
+        DataInputStream in1 = new DataInputStream(fstream1);
+        BufferedReader br1 = new BufferedReader(new InputStreamReader(in1));
+        DataInputStream in2 = new DataInputStream(fstream2);
+        BufferedReader br2 = new BufferedReader(new InputStreamReader(in2));
+
+        String strLine1, strLine2;
+        while((strLine1 = br1.readLine()) != null && (strLine2 = br2.readLine()) != null)   {
+            assertTrue(strLine1.equals(strLine2));
+        }
     }
 
     private static void setQryString(File QryFileHandle) throws FileNotFoundException {

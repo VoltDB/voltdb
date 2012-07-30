@@ -22,6 +22,7 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
@@ -65,6 +66,21 @@ public class SQLCommand
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
+    private static boolean logPrintHelp = false;
+    private final static String logFilename = "/tmp/logHelp.txt";
+    private final static String readme = "SQLCommandReadme.txt";
+
+    public static void setDebugPrintHelp(boolean tf) {
+        logPrintHelp = tf;
+    }
+
+    public static String getLogFilename() {
+        return logFilename;
+    }
+
+    public static String getReadme() {
+        return readme;
+    }
 
     public static Pattern getExecuteCall() {
         return ExecuteCall;
@@ -910,17 +926,23 @@ public class SQLCommand
     }
     public static void printHelp()
     {
-       try
+        try
         {
             InputStream is = SQLCommand.class.getResourceAsStream("SQLCommandReadme.txt");
-            if(is.available() > 0) {
+            while(is.available() > 0) {
                 byte[] bytes = new byte[is.available()]; // Fix for ENG-3440
                 is.read(bytes, 0, bytes.length);
-                System.out.write(bytes);
-                String tailStr = "\n\n";
-                byte[] tail = new byte[tailStr.length()];
-                tail = tailStr.getBytes();
-                System.out.write(tail);
+                if(logPrintHelp == true) {
+                    FileOutputStream fos = new FileOutputStream(logFilename);
+                    fos.write(bytes); // For JUnit test
+                }
+                else {
+                    System.out.write(bytes);
+                    String tailStr = "\n\n";
+                    byte[] tail = new byte[tailStr.length()];
+                    tail = tailStr.getBytes();
+                    System.out.write(tail);
+                }
             }
         }
         catch(Exception x)
