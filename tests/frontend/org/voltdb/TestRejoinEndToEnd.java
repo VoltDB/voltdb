@@ -405,7 +405,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
-        localServer.waitForInitialization();
+        localServer.waitForRejoin();
 
         Thread.sleep(5000);
 
@@ -475,7 +475,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
-        localServer.waitForInitialization();
+        localServer.waitForRejoin();
 
         Thread.sleep(1000);
 
@@ -597,7 +597,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
-        localServer.waitForInitialization();
+        localServer.waitForRejoin();
 
         Thread.sleep(1000);
         while (VoltDB.instance().rejoining()) {
@@ -683,7 +683,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
-        localServer.waitForInitialization();
+        localServer.waitForRejoin();
 
         Thread.sleep(2000);
 
