@@ -2075,6 +2075,19 @@ public class FunctionSQL extends Expression {
 
         exp.attributes.put("id", String.valueOf(volt_funcType));
 
+        switch (funcType) {
+        case FUNC_SUBSTRING_CHAR :
+            // A little tweaking is needed here because VoltDB wants to define separate functions for 2-argument and 3-argument SUBSTRING
+            if (nodes[2] == null) {
+                exp.attributes.put("volt_alias", "substring_from");
+            } else {
+                exp.attributes.put("volt_alias", "substring_from_for");
+            }
+            break;
+        default :
+            break;
+        }
+
         for (Expression expr : nodes) {
             if (expr != null) {
                 VoltXMLElement vxmle = expr.voltGetXML(session);

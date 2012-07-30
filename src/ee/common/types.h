@@ -277,7 +277,7 @@ enum ExpressionType {
     // -----------------------------
     // Functions
     // -----------------------------
-    EXPRESSION_TYPE_FUNCTION              = 100,
+    EXPRESSION_TYPE_FUNCTION                        = 100,
 
 };
 

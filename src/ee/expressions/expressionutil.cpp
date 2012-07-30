@@ -480,6 +480,7 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
 
         // must handle all known expressions in this factory
     default:
+
         char message[256];
         snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
                 expressionToString(et).c_str(), (int)et);

@@ -194,8 +194,6 @@ public class FunctionForVoltDB extends FunctionSQL {
                 dataType = like_child.dataType;
             }
         }
-
-
     }
 
     @Override
