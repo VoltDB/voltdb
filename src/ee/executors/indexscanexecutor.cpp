@@ -411,7 +411,6 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
     //printf ("<INDEX SCAN> localSortDirection: %d\n", localSortDirection);
     if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
         bool order_by_asc = true;
-        printf ("Haha\n");
         if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
             // nothing now
         }
