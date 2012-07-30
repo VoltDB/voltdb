@@ -55,7 +55,7 @@ public class ComparisonExpression extends AbstractExpression {
     public boolean needsRightExpression() {
         return true;
     }
-    
+
     private static Map<ExpressionType,ExpressionType> reverses = new HashMap<ExpressionType, ExpressionType>();
     static {
         reverses.put(ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL);
@@ -65,7 +65,7 @@ public class ComparisonExpression extends AbstractExpression {
         reverses.put(ExpressionType.COMPARE_LESSTHANOREQUALTO, ExpressionType.COMPARE_GREATERTHANOREQUALTO);
         reverses.put(ExpressionType.COMPARE_GREATERTHANOREQUALTO, ExpressionType.COMPARE_LESSTHANOREQUALTO);
     }
-        
+
     public ComparisonExpression reverseOperator() {
         ExpressionType reverseType = reverses.get(this.m_type);
         // Left and right exprs are reversed on purpose

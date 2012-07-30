@@ -56,28 +56,28 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
 //
 //        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
 //        assertTrue(table.advanceRow() == false);
-//        
+//
 //        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID <= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
 //        assertTrue(table.advanceRow() == false);
-//        
+//
 //        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID <= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
 //        assertTrue(table.getRowCount() == 4);
 //        assertTrue(table.advanceRow());
 //        //System.err.println("RESULT01:\n" + table);
-//        
+//
 //        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID >= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
 //        assertTrue(table.getRowCount() == 4);
 //        assertTrue(table.advanceRow());
 //        //System.err.println("RESULT02:\n" + table);
 //    }
-    
+
     public void testTwoTableJoinBug() throws Exception {
         Client client = getClient();
 
         client.callProcedure("P2.insert", 1, "1", 1, 1);
         client.callProcedure("P2.insert", 2, "1", 1, 2);
         client.callProcedure("P2.insert", 3, "1", 1, 3);
-        
+
         client.callProcedure("P3.insert", 1, "1", 1, 1);
         client.callProcedure("P3.insert", 2, "1", 1, 2);
         client.callProcedure("P3.insert", 3, "1", 1, 3);

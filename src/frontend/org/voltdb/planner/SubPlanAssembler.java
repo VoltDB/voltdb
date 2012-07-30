@@ -162,11 +162,11 @@ public abstract class SubPlanAssembler {
             if (expr != null) {
                 AbstractExpression indexable = expr.getLeft();
                 assert(indexable.getExpressionType() == ExpressionType.VALUE_TUPLE);
-                
+
                 TupleValueExpression tve = (TupleValueExpression)indexable;
                 Column col = getTableColumn(table, tve.getColumnName());
                 assert(col != null);
-           
+
                 if (expr.getExpressionType() == ExpressionType.COMPARE_EQUAL)
                 {
                     if (eqColumns.containsKey(col) == false)
@@ -190,7 +190,7 @@ public abstract class SubPlanAssembler {
                     ltColumns.get(col).add(expr);
                     continue;
                 }
-                
+
             }
             retval.otherExprs.add(ae);
         }
@@ -405,7 +405,7 @@ public abstract class SubPlanAssembler {
             }
             indexableExpr = expr.getRight();
             normalizedExpr = normalizedExpr.reverseOperator();
-            
+
             otherType = expr.getLeft().getValueType();
         }
 

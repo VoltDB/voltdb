@@ -94,12 +94,12 @@ public class TestReplaceWithIndexCounter extends TestCase {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS", 0, true);
         checkIndexCounter(pn, true, true);
     }
-    
+
     public void testCountStar02() {
         List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, false);
         checkIndexCounter(pn, true, false);
     }
-    
+
     public void testCountStar03() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC", 0, true);
         checkIndexCounter(pn, true, false);
