@@ -47,7 +47,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
@@ -1275,24 +1274,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         AdHocPlannedStmtBatch planBatch =
                 new AdHocPlannedStmtBatch(sql,
                                           partitionParam,
-                                          m_catalogContext.get().catalogVersion,
                                           task.clientHandle,
                                           handler.connectionId(),
                                           handler.m_hostname,
                                           handler.isAdmin(),
                                           ccxn);
         for (String sqlStatement : sqlStatements) {
-            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sql, partitionParam != null);
+            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sqlStatement, partitionParam != null);
             // check the catalog version if there is a cached plan
             if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
                 break;
             }
-            planBatch.addStatement(sqlStatement,
-                                   plannedStatement.aggregatorFragment,
-                                   plannedStatement.collectorFragment,
-                                   plannedStatement.isReplicatedTableDML,
-                                   plannedStatement.isNonDeterministic,
-                                   null);
+            planBatch.addStatement(plannedStatement);
         }
         // All statements retrieved from cache?
         if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
@@ -1689,25 +1682,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // Set up the parameters.
-        // Need separate lists due to limitations on the kind of objects that can be dispatched.
-        // Convert to arrays, preferring primitive types.
-        List<byte[]> aggregatorFragmentList = plannedStmtBatch.getAggregatorFragments();
-        byte[][] aggregatorFragments = aggregatorFragmentList.toArray(
-                new byte[aggregatorFragmentList.size()][]);
-        List<byte[]> collectorFragmentList = plannedStmtBatch.getCollectorFragments();
-        byte[][] collectorFragments = collectorFragmentList.toArray(
-                new byte[collectorFragmentList.size()][]);
-        List<String> sqlStatementList = plannedStmtBatch.getSQLStatements();
-        String[] sqlStatements = sqlStatementList.toArray(
-                new String[sqlStatementList.size()]);
-        List<Integer> replicatedTableDMLFlagList = plannedStmtBatch.getReplicatedTableDMLFlags();
-        int[] replicatedTableDMLFlags = ArrayUtils.toPrimitive(
-                replicatedTableDMLFlagList.toArray(
-                        new Integer[replicatedTableDMLFlagList.size()]));
-        task.setParams(aggregatorFragments,
-                       collectorFragments,
-                       sqlStatements,
-                       replicatedTableDMLFlags);
+        ByteBuffer buf = ByteBuffer.allocate(plannedStmtBatch.getPlanArraySerializedSize());
+        plannedStmtBatch.flattenPlanArrayToBuffer(buf);
+        assert(buf.hasArray());
+        task.setParams(buf.array());
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         /*
@@ -1771,7 +1749,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (result.errorMsg == null) {
                     if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                        if (plannedStmtBatch.catalogVersion != m_catalogContext.get().catalogVersion) {
+                        // assume all stmts have the same catalog version
+                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
+                            (plannedStmtBatch.getPlannedStatement(0).catalogVersion != m_catalogContext.get().catalogVersion)) {
 
                             /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an

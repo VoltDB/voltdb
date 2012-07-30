@@ -130,6 +130,7 @@ public class ExpressionOp extends Expression {
         this.alias = e.alias;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb    = new StringBuffer(64);
@@ -199,6 +200,7 @@ public class ExpressionOp extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -252,6 +254,7 @@ public class ExpressionOp extends Expression {
         return sb.toString();
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -278,6 +281,7 @@ public class ExpressionOp extends Expression {
         return unresolvedSet;
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -430,6 +434,7 @@ public class ExpressionOp extends Expression {
         }
     }
 
+    @Override
     public Object getValue(Session session) {
 
         switch (opType) {
@@ -515,6 +520,7 @@ public class ExpressionOp extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
@@ -548,7 +554,7 @@ public class ExpressionOp extends Expression {
 
         VoltXMLElement exp = new VoltXMLElement("operation");
         // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("id", getUniqueId(session));
 
         exp.attributes.put("type", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {

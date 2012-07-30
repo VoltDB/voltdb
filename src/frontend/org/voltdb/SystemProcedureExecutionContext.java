@@ -47,6 +47,8 @@ public interface SystemProcedureExecutionContext {
 
     public long getCatalogCRC();
 
+    public int getCatalogVersion();
+
     public SiteTracker getSiteTracker();
 
     // Separate SiteTracker accessor for IV2 use.
