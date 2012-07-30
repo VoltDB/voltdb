@@ -17,9 +17,11 @@
 
 package org.voltdb.compiler;
 
-import java.util.List;
+import java.nio.ByteBuffer;
 
-import org.voltdb.planner.ParameterInfo;
+import org.voltdb.VoltDB;
+import org.voltdb.VoltType;
+import org.voltdb.planner.CompiledPlan;
 
 /**
  * Holds the plan and original SQL source for a single statement.
@@ -27,16 +29,30 @@ import org.voltdb.planner.ParameterInfo;
  * Will typically be contained by AdHocPlannedStmtBatch. Both this class and the batch extend
  * AsyncCompilerResult to allow working at either the batch or the individual statement level.
  */
-public class AdHocPlannedStatement extends AsyncCompilerResult implements Cloneable {
-    private static final long serialVersionUID = 1144100816601598092L;
-    public String sql;
-    public byte[] aggregatorFragment;
-    public byte[] collectorFragment;
+public class AdHocPlannedStatement implements Cloneable {
+    public byte[] sql;
+    public byte[] aggregatorFragment = null;
+    public byte[] collectorFragment = null;
     public boolean isReplicatedTableDML;
     public boolean isNonDeterministic;
-    public Object partitionParam;
+    public boolean readOnly;
     public int catalogVersion;
-    public List<ParameterInfo> params;
+    public VoltType[] params;
+    public Object partitionParam; // not serialized
+
+    AdHocPlannedStatement(CompiledPlan plan) {
+        sql = plan.sql.getBytes(VoltDB.UTF8ENCODING);
+        aggregatorFragment = CompiledPlan.bytesForPlan(plan.rootPlanGraph);
+        collectorFragment = CompiledPlan.bytesForPlan(plan.subPlanGraph);
+        isReplicatedTableDML = plan.replicatedTableDML;
+        isNonDeterministic = (!plan.isContentDeterministic()) || (!plan.isOrderDeterministic());
+        catalogVersion = -1;
+        params = plan.parameters;
+        readOnly = plan.readOnly;
+        partitionParam = plan.getPartitioningKey();
+
+        validate();
+    }
 
     /***
      * Constructor
@@ -46,31 +62,50 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
      * @param collectorFragment         planned collector fragment
      * @param isReplicatedTableDML      replication flag
      * @param isNonDeterministic        non-deterministic SQL flag
-     * @param partitionParam partition  parameter
+     * @param isReadOnly                does it write
+     * @param params                    parameter type array
      * @param catalogVersion            catalog version
      */
-    public AdHocPlannedStatement(String sql,
+    public AdHocPlannedStatement(byte[] sql,
                                  byte[] aggregatorFragment,
                                  byte[] collectorFragment,
                                  boolean isReplicatedTableDML,
                                  boolean isNonDeterministic,
-                                 Object partitionParam,
+                                 boolean isReadOnly,
+                                 VoltType[] params,
                                  int catalogVersion) {
         this.sql = sql;
         this.aggregatorFragment = aggregatorFragment;
         this.collectorFragment = collectorFragment;
         this.isReplicatedTableDML = isReplicatedTableDML;
         this.isNonDeterministic = isNonDeterministic;
-        this.partitionParam = partitionParam;
+        this.readOnly = isReadOnly;
+        this.params = params;
         this.catalogVersion = catalogVersion;
+
+        // as this constructor is used for deserializaton on the proc-running side,
+        // no partitioning param object is needed
+
+        validate();
+    }
+
+    private void validate() {
+        assert(aggregatorFragment != null);
+        assert((isNonDeterministic == false) || (readOnly == true)); // nondet => readonly
+        assert((isReplicatedTableDML == false) || (readOnly == false)); // dml => !readonly
+        assert((isReplicatedTableDML == false) || (collectorFragment != null)); // repdml => 2partplan
     }
 
     @Override
     public String toString() {
-        String retval = super.toString();
-        retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
-        retval += "\n  sql: " + ((sql != null) ? sql : "null");
-        return retval;
+        StringBuilder sb = new StringBuilder();
+        sb.append("COMPILED PLAN {\n");
+        sb.append("  SQL: ").append((sql != null) ? new String(sql, VoltDB.UTF8ENCODING) : "null").append("\n");
+        sb.append("  ONE: ").append(aggregatorFragment == null ? "null" : new String(aggregatorFragment, VoltDB.UTF8ENCODING)).append("\n");
+        sb.append("  ALL: ").append(collectorFragment == null ? "null" : new String(collectorFragment, VoltDB.UTF8ENCODING)).append("\n");
+        sb.append("  RTD: ").append(isReplicatedTableDML ? "true" : "false").append("\n");
+        sb.append("}");
+        return sb.toString();
     }
 
     @Override
@@ -80,5 +115,96 @@ public class AdHocPlannedStatement extends AsyncCompilerResult implements Clonea
         } catch (CloneNotSupportedException e) {
             throw new RuntimeException(e);
         }
+    }
+
+    public int getSerializedSize() {
+        int size = 2 + sql.length;
+        size += 4 + aggregatorFragment.length;
+        if (collectorFragment != null) {
+            size += 4 + collectorFragment.length;
+        }
+        else {
+            size += 4;
+        }
+        size += 3; // booleans
+        size += 4; // catalog version
+
+        size += 2; // params count
+        if (params != null) {
+            size += params.length;
+        }
+
+        return size;
+    }
+
+    void flattenToBuffer(ByteBuffer buf) {
+        validate(); // assertions for extra safety
+
+        buf.putShort((short) sql.length);
+        buf.put(sql);
+
+        buf.putInt(aggregatorFragment.length);
+        buf.put(aggregatorFragment);
+
+        if (collectorFragment == null) {
+            buf.putInt(-1);
+        }
+        else {
+            buf.putInt(collectorFragment.length);
+            buf.put(collectorFragment);
+        }
+
+        buf.put((byte) (isReplicatedTableDML ? 1 : 0));
+        buf.put((byte) (isNonDeterministic ? 1 : 0));
+        buf.put((byte) (readOnly ? 1 : 0));
+
+        buf.putInt(catalogVersion);
+
+        if (params != null) {
+            buf.putShort((short) params.length);
+            for (VoltType type : params) {
+                buf.put(type.getValue());
+            }
+        }
+        else {
+            buf.putShort((short) 0);
+        }
+    }
+
+    public static AdHocPlannedStatement fromBuffer(ByteBuffer buf) {
+        byte[] sql = new byte[buf.getShort()];
+        buf.get(sql);
+
+        byte[] aggregatorFragment = new byte[buf.getInt()];
+        buf.get(aggregatorFragment);
+
+        byte[] collectorFragment = null;
+        int cflen = buf.getInt();
+        if (cflen >= 0) {
+            collectorFragment = new byte[cflen];
+            buf.get(collectorFragment);
+        }
+
+        boolean isReplicatedTableDML = buf.get() == 1;
+        boolean isNonDeterministic = buf.get() == 1;
+        boolean isReadOnly = buf.get() == 1;
+
+        int catalogVersion = buf.getInt();
+
+        short paramCount = buf.getShort();
+        VoltType[] params = new VoltType[paramCount];
+        for (int i = 0; i < paramCount; ++i) {
+            params[i] = VoltType.get(buf.get());
+        }
+
+        return new AdHocPlannedStatement(
+                sql,
+                aggregatorFragment,
+                collectorFragment,
+                isReplicatedTableDML,
+                isNonDeterministic,
+                isReadOnly,
+                params,
+                catalogVersion);
     }
 }

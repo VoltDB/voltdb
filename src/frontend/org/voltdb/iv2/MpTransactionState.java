@@ -200,10 +200,9 @@ public class MpTransactionState extends TransactionState
                     FragmentResponseMessage msg = m_newDeps.take();
                     handleReceivedFragResponse(msg);
                 } catch (InterruptedException e) {
-                    // this is a valid shutdown path.
-                    hostLog.warn("Interrupted coordinating a multi-partition transaction. " +
-                            "Terminating the transaction. " + e);
-                    terminateTransaction();
+                    // can't leave yet - the transaction is inconsistent.
+                    // could retry; but this is unexpected. Crash.
+                    throw new RuntimeException(e);
                 }
             }
         }
@@ -222,10 +221,8 @@ public class MpTransactionState extends TransactionState
             m_localWork = null;
         }
         catch (InterruptedException e) {
-            // this is a valid shutdown path.
-            hostLog.warn("Interrupted coordinating a multi-partition transaction. " +
-                         "Terminating the transaction. " + e);
-            terminateTransaction();
+            // see above Interrupt commentary.
+            throw new RuntimeException(e);
         }
 
         // If the final fragment caused an error we'll need to trip rollback

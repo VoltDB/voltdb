@@ -692,33 +692,35 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
         @Override
-        public Database getDatabase()                         { return m_context.database; }
+        public Database getDatabase()                           { return m_context.database; }
         @Override
-        public Cluster getCluster()                           { return m_context.cluster; }
+        public Cluster getCluster()                             { return m_context.cluster; }
         @Override
-        public long getLastCommittedTxnId()                   { return lastCommittedTxnId; }
+        public long getLastCommittedTxnId()                     { return lastCommittedTxnId; }
         @Override
-        public long getCurrentTxnId()                         { return m_currentTransactionState.txnId; }
+        public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
-        public long getNextUndo()                             { return getNextUndoToken(); }
+        public long getNextUndo()                               { return getNextUndoToken(); }
         @Override
         public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
-        public long getSiteId()                               { return m_siteId; }
+        public long getSiteId()                                 { return m_siteId; }
         @Override
-        public boolean isLowestSiteId()                       { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
+        public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
         @Override
-        public int getHostId()                                { return SiteTracker.getHostForSite(m_siteId); }
+        public int getHostId()                                  { return SiteTracker.getHostForSite(m_siteId); }
         @Override
-        public int getPartitionId()                           { return m_tracker.getPartitionForSite(m_siteId); }
+        public int getPartitionId()                             { return m_tracker.getPartitionForSite(m_siteId); }
         @Override
-        public long getCatalogCRC()                           { return m_context.getCatalogCRC(); }
+        public long getCatalogCRC()                             { return m_context.getCatalogCRC(); }
         @Override
-        public SiteTracker getSiteTracker()                   { return m_tracker; }
+        public int getCatalogVersion()                          { return m_context.catalogVersion; }
         @Override
-        public SiteTracker getSiteTrackerForSnapshot()        { return m_tracker; }
+        public SiteTracker getSiteTracker()                     { return m_tracker; }
         @Override
-        public int getNumberOfPartitions()                    { return m_tracker.m_numberOfPartitions; }
+        public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }
+        @Override
+        public int getNumberOfPartitions()                      { return m_tracker.m_numberOfPartitions; }
         @Override
         public SiteProcedureConnection getSiteProcedureConnection()
         {

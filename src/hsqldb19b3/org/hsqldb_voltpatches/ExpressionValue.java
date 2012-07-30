@@ -118,7 +118,7 @@ public class ExpressionValue extends Expression {
     {
         VoltXMLElement exp = new VoltXMLElement("unset");
         // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("id", getUniqueId(session));
 
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
