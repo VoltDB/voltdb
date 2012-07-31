@@ -60,8 +60,6 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.ClientInterface.ClientInputHandler;
-
-import org.voltdb.iv2.Cartographer;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
@@ -70,9 +68,11 @@ import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compiler.ExplainPlannerWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -126,8 +126,8 @@ public class TestClientInterface {
         doReturn(32L).when(m_messenger).getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         doReturn(mock(MailboxPublisher.class)).when(m_volt).getMailboxPublisher();
         m_ci = spy(new ClientInterface(VoltDB.DEFAULT_PORT, VoltDB.DEFAULT_ADMIN_PORT,
-                                       m_context, m_messenger, ReplicationRole.NONE, m_initiator,
-                                       m_cartographer, m_allPartitions));
+                m_context, m_messenger, ReplicationRole.NONE, m_initiator,
+                m_cartographer, m_allPartitions));
 
         m_mb = m_ci.m_mailbox;
     }
@@ -180,12 +180,13 @@ public class TestClientInterface {
      * @throws IOException
      */
     private static ByteBuffer createMsg(Long origTxnId, String name,
-                                        final Object...params) throws IOException {
+            final Object...params) throws IOException {
         FastSerializer fs = new FastSerializer();
         StoredProcedureInvocation proc = new StoredProcedureInvocation();
         proc.setProcName(name);
-        if (origTxnId != null)
+        if (origTxnId != null) {
             proc.setOriginalTxnId(origTxnId);
+        }
         proc.setParams(params);
         fs.writeObject(proc);
         return fs.getBuffer();
@@ -208,13 +209,13 @@ public class TestClientInterface {
      * @throws IOException
      */
     private StoredProcedureInvocation readAndCheck(ByteBuffer msg, String procName, Object partitionParam,
-                                                   boolean isAdmin, boolean isReadonly, boolean isSinglePart,
-                                                   boolean isEverySite) throws IOException {
+            boolean isAdmin, boolean isReadonly, boolean isSinglePart,
+            boolean isEverySite) throws IOException {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
-                                           any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
-                                           any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
+                any(StoredProcedureInvocation.class),
+                anyBoolean(), anyBoolean(), anyBoolean(),
+                any(int[].class), anyInt(), anyObject(),
+                anyInt(), anyLong(), anyBoolean())).thenReturn(true);
 
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
         assertNull(resp);
@@ -224,12 +225,12 @@ public class TestClientInterface {
                 ArgumentCaptor.forClass(StoredProcedureInvocation.class);
         ArgumentCaptor<int[]> partitionCaptor = ArgumentCaptor.forClass(int[].class);
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
-                                              invocationCaptor.capture(),
-                                              boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(),
-                                              partitionCaptor.capture(),
-                                              anyInt(), anyObject(), anyInt(), anyLong(),
-                                              boolCaptor.capture());
+                invocationCaptor.capture(),
+                boolCaptor.capture(), boolCaptor.capture(),
+                boolCaptor.capture(),
+                partitionCaptor.capture(),
+                anyInt(), anyObject(), anyInt(), anyLong(),
+                boolCaptor.capture());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertEquals(isAdmin, boolValues.get(0)); // is admin
         assertEquals(isReadonly, boolValues.get(1)); // readonly
@@ -247,6 +248,18 @@ public class TestClientInterface {
     }
 
     @Test
+    public void testExplain() throws IOException {
+        ByteBuffer msg = createMsg("@Explain", "select * from a");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNull(resp);
+        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
+        verify(m_messenger).send(eq(32L), captor.capture());
+        assertTrue(captor.getValue().payload instanceof ExplainPlannerWork );
+        System.out.println( captor.getValue().payload.toString() );
+        assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
+    }
+
+    @Test
     public void testAdHoc() throws IOException {
         ByteBuffer msg = createMsg("@AdHoc", "select * from a");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
@@ -254,6 +267,7 @@ public class TestClientInterface {
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
         verify(m_messenger).send(eq(32L), captor.capture());
         assertTrue(captor.getValue().payload instanceof AdHocPlannerWork);
+        System.out.println( captor.getValue().payload.toString() );
         assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
 
         // single-part adhoc
@@ -273,10 +287,10 @@ public class TestClientInterface {
     @Test
     public void testFinishedAdHocPlanning() throws Exception {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
-                                           any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
-                                           any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
+                any(StoredProcedureInvocation.class),
+                anyBoolean(), anyBoolean(), anyBoolean(),
+                any(int[].class), anyInt(), anyObject(),
+                anyInt(), anyLong(), anyBoolean())).thenReturn(true);
 
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
@@ -288,12 +302,12 @@ public class TestClientInterface {
         ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
                 ArgumentCaptor.forClass(StoredProcedureInvocation.class);
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
-                                              invocationCaptor.capture(),
-                                              boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(),
-                                              any(int[].class), anyInt(),
-                                              anyObject(), anyInt(), anyLong(),
-                                              boolCaptor.capture());
+                invocationCaptor.capture(),
+                boolCaptor.capture(), boolCaptor.capture(),
+                boolCaptor.capture(),
+                any(int[].class), anyInt(),
+                anyObject(), anyInt(), anyLong(),
+                boolCaptor.capture());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
         assertTrue(boolValues.get(1));  // readonly
@@ -314,7 +328,7 @@ public class TestClientInterface {
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
         verify(m_messenger).send(eq(32L), // A fixed number set in setUpOnce()
-                                 captor.capture());
+                captor.capture());
         assertTrue(captor.getValue().payload instanceof CatalogChangeWork);
     }
 
@@ -335,10 +349,10 @@ public class TestClientInterface {
     @Test
     public void testFinishedCatalogDiffing() {
         when(m_initiator.createTransaction(anyLong(), anyString(), anyBoolean(),
-                                           any(StoredProcedureInvocation.class),
-                                           anyBoolean(), anyBoolean(), anyBoolean(),
-                                           any(int[].class), anyInt(), anyObject(),
-                                           anyInt(), anyLong(), anyBoolean())).thenReturn(true);
+                any(StoredProcedureInvocation.class),
+                anyBoolean(), anyBoolean(), anyBoolean(),
+                any(int[].class), anyInt(), anyObject(),
+                anyInt(), anyLong(), anyBoolean())).thenReturn(true);
 
         CatalogChangeResult catalogResult = new CatalogChangeResult();
         catalogResult.clientData = null;
@@ -358,12 +372,12 @@ public class TestClientInterface {
         ArgumentCaptor<StoredProcedureInvocation> invocationCaptor =
                 ArgumentCaptor.forClass(StoredProcedureInvocation.class);
         verify(m_initiator).createTransaction(anyLong(), anyString(), boolCaptor.capture(),
-                                              invocationCaptor.capture(),
-                                              boolCaptor.capture(), boolCaptor.capture(),
-                                              boolCaptor.capture(),
-                                              any(int[].class),
-                                              anyInt(), anyObject(), anyInt(), anyLong(),
-                                              boolCaptor.capture());
+                invocationCaptor.capture(),
+                boolCaptor.capture(), boolCaptor.capture(),
+                boolCaptor.capture(),
+                any(int[].class),
+                anyInt(), anyObject(), anyInt(), anyLong(),
+                boolCaptor.capture());
         List<Boolean> boolValues = boolCaptor.getAllValues();
         assertFalse(boolValues.get(0)); // is admin
         assertFalse(boolValues.get(1)); // readonly

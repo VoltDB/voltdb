@@ -106,7 +106,7 @@ public class SystemProcedureCatalog {
     }
 
     public static final HashMap<String, Config> listing =
-        new HashMap<String, Config>();
+            new HashMap<String, Config>();
 
     static {                                                                                            // SP     RO     Every  Pro  (DR: kill, skip, replica-ok)
         listing.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, false, false, false, true));
@@ -132,5 +132,6 @@ public class SystemProcedureCatalog {
         listing.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, false, false, false, false));
         listing.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, false, false, false, false));
         listing.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true, false, false, true, true));
+        listing.put("@Explain",                 new Config("org.voltdb.sysprocs.Explain",                  true,  true,  false, false, false, false, true));
     }
 }
