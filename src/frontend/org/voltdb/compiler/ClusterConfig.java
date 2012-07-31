@@ -155,11 +155,10 @@ public class ClusterConfig
             partToHosts.get(partition).add(hostForSite);
         }
 
+        // We need to sort the hostID lists for each partition so that
+        // the leader assignment magic in the loop below will work.
         for (Entry<Integer, ArrayList<Integer>> e : partToHosts.entrySet()) {
             Collections.sort(e.getValue());
-        }
-
-        for (int i = 0; i < partitionCount; i++) {
         }
 
         // {"kfactor" : 2,
@@ -179,14 +178,13 @@ public class ClusterConfig
         stringer.key("hostcount").value(m_hostCount);
         stringer.key("kfactor").value(getReplicationFactor());
         stringer.key("sites_per_host").value(sitesPerHost);
-        // XXX-IZZY HACK hardwire this to 0 for now, until
-        // replication works
-        stringer.key("MPI").value(0);
         stringer.key("partitions").array();
         for (int part = 0; part < partitionCount; part++)
         {
             stringer.object();
             stringer.key("partition_id").value(part);
+            // This two-line magic deterministically spreads the partition leaders
+            // evenly across the cluster at startup.
             int index = part % (getReplicationFactor() + 1);
             int master = partToHosts.get(part).get(index);
             stringer.key("master").value(master);
