@@ -33,6 +33,7 @@ import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 
 import org.voltdb.VoltDB;
+import org.voltdb.VoltZK;
 
 import com.google.common.collect.Sets;
 
@@ -74,7 +75,7 @@ public class SpTerm implements Term
                 Sets.SetView<String> added = Sets.difference(updatedReplicas, SpTerm.this.m_knownReplicas);
                 int newReplicas = added.size();
                 m_knownReplicas.addAll(updatedReplicas);
-                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(updatedReplicas);
+                List<Long> replicas = VoltZK.childrenToReplicaHSIds(updatedReplicas);
                 m_mailbox.updateReplicas(replicas);
                 for (int i=0; i < newReplicas; i++) {
                     SpTerm.this.m_missingStartupSites.countDown();
@@ -82,7 +83,7 @@ public class SpTerm implements Term
             }
             else {
                 // remove the leader; convert to hsids; deal with the replica change.
-                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(children);
+                List<Long> replicas = VoltZK.childrenToReplicaHSIds(children);
                 tmLog.info(m_whoami
                         + "replica change handler updating replica list to: "
                         + CoreUtils.hsIdCollectionToString(replicas));
@@ -144,7 +145,7 @@ public class SpTerm implements Term
     public List<Long> getInterestingHSIds()
     {
         List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  BaseInitiator.childrenToReplicaHSIds(survivorsNames);
+        List<Long> survivors =  VoltZK.childrenToReplicaHSIds(survivorsNames);
         return survivors;
     }
 }

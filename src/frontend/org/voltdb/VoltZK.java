@@ -32,6 +32,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 
 /**
@@ -182,16 +183,12 @@ public class VoltZK {
         }
     }
 
-    public static String getPrefixFromChildName(String childName) {
-        return childName.split("_")[0];
-    }
-
     // conversion helper.
     public static List<Long> childrenToReplicaHSIds(Collection<String> children)
     {
         List<Long> replicas = new ArrayList<Long>(children.size());
         for (String child : children) {
-            long HSId = Long.parseLong(getPrefixFromChildName(child));
+            long HSId = Long.parseLong(CoreZK.getPrefixFromChildName(child));
             replicas.add(HSId);
         }
         return replicas;

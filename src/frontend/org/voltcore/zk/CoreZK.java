@@ -70,4 +70,8 @@ public class CoreZK {
                     e.getMessage(), false, e);
         }
     }
+
+    public static String getPrefixFromChildName(String childName) {
+        return childName.split("_")[0];
+    }
 }

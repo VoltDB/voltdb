@@ -73,17 +73,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
 
-    // conversion helper.
-    static List<Long> childrenToReplicaHSIds(Collection<String> children)
-    {
-        List<Long> replicas = new ArrayList<Long>(children.size());
-        for (String child : children) {
-            long HSId = Long.parseLong(LeaderElector.getPrefixFromChildName(child));
-            replicas.add(HSId);
-        }
-        return replicas;
-    }
-
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix)
     {
