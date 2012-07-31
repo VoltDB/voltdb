@@ -25,12 +25,21 @@ import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+
 import org.voltcore.messaging.HostMessenger;
+
+import org.voltcore.zk.MapCache;
+import org.voltcore.zk.MapCache.Callback;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -39,11 +48,37 @@ import org.voltdb.VoltZK;
  */
 public class SpInitiator extends BaseInitiator
 {
+    final private MapCache m_mapCache;
+
+    Callback m_leadersChangeHandler = new Callback()
+    {
+        @Override
+        public void run(ImmutableMap<String, JSONObject> cache)
+        {
+            for (JSONObject thing : cache.values()) {
+                try {
+                    if (Long.valueOf(thing.getLong("appointee")) == getInitiatorHSId()) {
+                        SpInitiator.this.becomeSPLeader();
+                        break;
+                    }
+                } catch (JSONException e) {
+                    VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
+                }
+            }
+        }
+    };
+
     public SpInitiator(HostMessenger messenger, Integer partition)
     {
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(new SiteTaskerQueue()),
                 "SP");
+        m_mapCache = new MapCache(messenger.getZK(), VoltZK.iv2masters, m_leadersChangeHandler);
+    }
+
+    private void becomeSPLeader()
+    {
+        super.becomeLeader();
     }
 
     @Override
@@ -54,6 +89,11 @@ public class SpInitiator extends BaseInitiator
                           boolean createForRejoin)
         throws KeeperException, InterruptedException, ExecutionException
     {
+        try {
+            m_mapCache.start(true);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
+        }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 kfactor + 1, csp, numberOfPartitions,
                 createForRejoin && isRejoinable());
@@ -81,5 +121,12 @@ public class SpInitiator extends BaseInitiator
             String whoami)
     {
         return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
+    }
+
+    @Override
+    public void becomeLeader()
+    {
+        // SpInitiator's leader election doesn't result in any actions, but we need the ZK
+        // nodes for babysitter to watch/replication/etc.
     }
 }

@@ -17,8 +17,11 @@
 package org.voltdb.compiler;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+
+import java.util.Map.Entry;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -152,12 +155,21 @@ public class ClusterConfig
             partToHosts.get(partition).add(hostForSite);
         }
 
+        for (Entry<Integer, ArrayList<Integer>> e : partToHosts.entrySet()) {
+            Collections.sort(e.getValue());
+        }
+
+        for (int i = 0; i < partitionCount; i++) {
+        }
+
         // {"kfactor" : 2,
         //  "sites_per_host" : 3,
         //  "partitions" :
         //    [{"partition_id" : 0,
+        //      "master" : <hostid1>,
         //      "replicas" : [hostid1, hostid2, hostid3]},
         //     {"partition_id" : 1,
+        //      "master" : <hostid2>,
         //      "replicas" : [hostid1, hostid2, hostid3]}
         //    ]
         // }
@@ -175,6 +187,9 @@ public class ClusterConfig
         {
             stringer.object();
             stringer.key("partition_id").value(part);
+            int index = part % (getReplicationFactor() + 1);
+            int master = partToHosts.get(part).get(index);
+            stringer.key("master").value(master);
             stringer.key("replicas").array();
             for (int host_pos : partToHosts.get(part))
             {

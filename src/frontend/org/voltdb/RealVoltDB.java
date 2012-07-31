@@ -74,6 +74,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.iv2.Cartographer;
+import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
@@ -181,6 +182,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     // IV2 things
     List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
     Cartographer m_cartographer = null;
+    LeaderAppointer m_leaderAppointer = null;
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -402,9 +404,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
+            JSONObject topo = getTopology(isRejoin);
             try {
-                JSONObject topo = getTopology(isRejoin);
-
                 // IV2 mailbox stuff
                 if (isIV2Enabled()) {
                     ClusterConfig iv2config = new ClusterConfig(topo);
@@ -562,6 +563,15 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              */
             if (isIV2Enabled()) {
                 try {
+                    if (m_myHostId == 0) {
+                        m_leaderAppointer = new LeaderAppointer(
+                                m_messenger.getZK(),
+                                new CountDownLatch(clusterConfig.getPartitionCount()),
+                                m_deployment.getCluster().getKfactor(),
+                                topo);
+                        m_leaderAppointer.start();
+                    }
+
                     for (Initiator iv2init : m_iv2Initiators) {
                         iv2init.configure(
                                 getBackendTargetType(),

@@ -88,4 +88,10 @@ public class MpInitiator extends BaseInitiator
     {
         return new MpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
     }
+
+    @Override
+    public void becomeLeader()
+    {
+        super.becomeLeader();
+    }
 }

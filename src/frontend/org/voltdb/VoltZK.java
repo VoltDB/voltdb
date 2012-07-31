@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -177,5 +178,20 @@ public class VoltZK {
                clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
             } catch (KeeperException.NoNodeException e){}
         }
+    }
+
+    public static String getPrefixFromChildName(String childName) {
+        return childName.split("_")[0];
+    }
+
+    // conversion helper.
+    public static List<Long> childrenToReplicaHSIds(Collection<String> children)
+    {
+        List<Long> replicas = new ArrayList<Long>(children.size());
+        for (String child : children) {
+            long HSId = Long.parseLong(getPrefixFromChildName(child));
+            replicas.add(HSId);
+        }
+        return replicas;
     }
 }
