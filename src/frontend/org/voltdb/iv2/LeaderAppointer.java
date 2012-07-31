@@ -50,7 +50,6 @@ import org.voltdb.VoltZK;
 public class LeaderAppointer
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
-    private final MapCacheReader m_iv2Masters;
     private final ZooKeeper m_zk;
     private final CountDownLatch m_partitionCountLatch;
     private final BabySitter[] m_partitionWatchers;
@@ -83,15 +82,9 @@ public class LeaderAppointer
         m_zk = zk;
         m_kfactor = kfactor;
         m_topo = topology;
-        m_iv2Masters = new MapCache(m_zk, VoltZK.iv2masters);
         m_partitionCountLatch = numberOfPartitions;
         m_callbacks = new PartitionCallback[(int)numberOfPartitions.getCount()];
         m_partitionWatchers = new BabySitter[(int)numberOfPartitions.getCount()];
-        try {
-            m_iv2Masters.start(true);
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Screwed", true, e);
-        }
     }
 
     public void start() throws InterruptedException, ExecutionException, KeeperException
@@ -142,17 +135,12 @@ public class LeaderAppointer
                 break;
             }
         }
-        MapCacheWriter iv2masters = new MapCache(m_zk, VoltZK.iv2masters);
+        MapCacheWriter iv2appointees = new MapCache(m_zk, VoltZK.iv2appointees);
         try {
-            iv2masters.put(Integer.toString(partitionId), new JSONObject("{appointee:" + masterHSId + "}"));
+            iv2appointees.put(Integer.toString(partitionId), new JSONObject("{appointee:" + masterHSId + "}"));
         }
         catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
         }
-    }
-
-    public void shutdown() throws InterruptedException
-    {
-        m_iv2Masters.shutdown();
     }
 }

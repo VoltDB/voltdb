@@ -73,7 +73,7 @@ public class SpInitiator extends BaseInitiator
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(new SiteTaskerQueue()),
                 "SP");
-        m_mapCache = new MapCache(messenger.getZK(), VoltZK.iv2masters, m_leadersChangeHandler);
+        m_mapCache = new MapCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
     }
 
     private void becomeSPLeader()
