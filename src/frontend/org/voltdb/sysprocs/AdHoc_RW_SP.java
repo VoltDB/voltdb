@@ -47,10 +47,8 @@ public class AdHoc_RW_SP extends AdHocBase {
      *
      * @return  results as VoltTable array
      */
-    public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String[] aggregatorFragments, String[] collectorFragments,
-            String[] sqlStatements, int[] replicatedTableDMLFlags) {
-        return runAdHoc(ctx, aggregatorFragments, collectorFragments, sqlStatements, replicatedTableDMLFlags);
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, byte[] serializedBatchData) {
+        return runAdHoc(ctx, serializedBatchData);
     }
 
 }

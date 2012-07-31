@@ -56,10 +56,26 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
     // API
     //
 
+    /**
+     * Callback is passed an immutable cache when a child (dis)appears/changes.
+     * Callback runs in the MapCache's ES (not the zk trigger thread).
+     */
+    public abstract static class Callback
+    {
+        abstract public void run(ImmutableMap<String, JSONObject> cache);
+    }
+
     /** Instantiate a MapCache of parent rootNode. The rootNode must exist. */
-    public MapCache(ZooKeeper zk, String rootNode) {
+    public MapCache(ZooKeeper zk, String rootNode)
+    {
+        this(zk, rootNode, null);
+    }
+
+    public MapCache(ZooKeeper zk, String rootNode, Callback cb)
+    {
         m_zk = zk;
         m_rootNode = rootNode;
+        m_cb = cb;
     }
 
     /** Initialize and start watching the cache. */
@@ -107,10 +123,8 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
         try {
             String createdNode = m_zk.create(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(),
                     Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            System.out.println("\t\tCREATED MAPCACHE NODE path:" + createdNode + " key:" + key + " value:" + value.toString());
         } catch (KeeperException.NodeExistsException e) {
             m_zk.setData(ZKUtil.joinZKPath(m_rootNode, key), value.toString().getBytes(), -1);
-            System.out.println("\t\tUPDATED MAPCACHE NODE. key:" + key + " val:" + value.toString());
         }
     }
 
@@ -120,6 +134,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
 
     private final ZooKeeper m_zk;
     private final AtomicBoolean m_shutdown = new AtomicBoolean(false);
+    private final Callback m_cb; // the callback when the cache changes
 
     // the children of this node are observed.
     private final String m_rootNode;
@@ -127,7 +142,7 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
     // All watch processing is run serially in this thread.
     private final ListeningExecutorService m_es =
             MoreExecutors.listeningDecorator(
-                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("Mailbox tracker", 1024 * 128)));
+                    Executors.newSingleThreadExecutor(CoreUtils.getThreadFactory("MapCache", 1024 * 128)));
 
     // previous children snapshot for internal use.
     private Set<String> m_lastChildren = new HashSet<String>();
@@ -253,6 +268,9 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
         }
 
         m_publicCache.set(ImmutableMap.copyOf(cache));
+        if (m_cb != null) {
+            m_cb.run(m_publicCache.get());
+        }
     }
 
     /**
@@ -271,5 +289,8 @@ public class MapCache implements MapCacheReader, MapCacheWriter {
             cacheCopy.remove(event.getPath());
         }
         m_publicCache.set(ImmutableMap.copyOf(cacheCopy));
+        if (m_cb != null) {
+            m_cb.run(m_publicCache.get());
+        }
     }
 }

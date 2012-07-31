@@ -187,12 +187,6 @@ public class PlanAssembler {
      * Clear any old state and get ready to plan a new plan. The next call to
      * getNextPlan() will return the first candidate plan for these parameters.
      *
-     * @param xmlSQL
-     *            The parsed/analyzed SQL in XML form from HSQLDB to be planned.
-     * @param readOnly
-     *            Is the SQL statement read only.
-     * @param singlePartition
-     *            Does the SQL statement use only a single partition?
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt)
     {
@@ -201,40 +195,22 @@ public class PlanAssembler {
         // Do we have a need for a distributed scan at all?
         // Iterate over the tables to collect partition columns.
         for (Table table : parsedStmt.tableList) {
-            Table viewTable = null;
-            // Get to the root table of views.
-            Table baseTable = table.getMaterializer();
-            while (baseTable != null) {
-                if (viewTable == null) {
-                    viewTable = table; // remember original (materialized view) table
-                }
-                table = baseTable;
-                baseTable = table.getMaterializer();
-            }
-
             if (table.getIsreplicated()) {
                 continue;
             }
             ++countOfPartitionedTables;
             String colName = null;
             Column partitionCol = table.getPartitioncolumn();
-            // "(partitionCol != null)" tests around an obscure edge case exercised far too regularly by lazy unit tests.
+            // "(partitionCol != null)" tests around an obscure edge case.
             // The table is declared non-replicated yet specifies no partitioning column.
-            // One interpretation of this edge case is that the table has "randomly distributed data".
-            // "(viewTable == null)" account for the fact that there is no guarantee that a materialized view of a
-            // partitioned table projects the partitioning column as a grouping column (by the same name?).
-            // For now, we operate as if it does not group by the partitioning column, so that materialized views
-            // also present themselves as "randomly distributed data".
-            // In either case, the table is valid for use by MP queries only and can only be joined with replicated tables
+            // This can occur legitimately when views based on partitioned tables neglect to group by the partition column.
+            // The interpretation of this edge case is that the table has "randomly distributed data".
+            // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
             // because it has no recognized partitioning join key.
-            if ((partitionCol != null) && (viewTable == null)) {
+            if (partitionCol != null) {
                 colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
             }
 
-            if (viewTable != null) {
-                // refer back to the original materialized view table being scanned
-                table = viewTable;
-            }
             //TODO: This map really wants to be indexed by table "alias" (the in-query table scan identifier)
             // so self-joins can be supported without ambiguity.
             String partitionedTable = table.getTypeName();
@@ -318,13 +294,12 @@ public class PlanAssembler {
         //PlanColumn.resetAll();
 
         CompiledPlan retval = new CompiledPlan();
-        CompiledPlan.Fragment fragment = new CompiledPlan.Fragment();
-        retval.fragments.add(fragment);
         AbstractParsedStmt nextStmt = null;
         if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
-            fragment.planGraph = getNextSelectPlan();
-            if (fragment.planGraph != null)
+            retval.rootPlanGraph = getNextSelectPlan();
+            retval.readOnly = true;
+            if (retval.rootPlanGraph != null)
             {
                 // only add the output columns if we actually have a plan
                 // avoid PlanColumn resource leakage
@@ -334,17 +309,18 @@ public class PlanAssembler {
                 retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
             }
         } else {
+            retval.readOnly = false;
             if (m_parsedInsert != null) {
                 nextStmt = m_parsedInsert;
-                fragment.planGraph = getNextInsertPlan();
+                retval.rootPlanGraph = getNextInsertPlan();
             } else if (m_parsedUpdate != null) {
                 nextStmt = m_parsedUpdate;
-                fragment.planGraph = getNextUpdatePlan();
+                retval.rootPlanGraph = getNextUpdatePlan();
                 // note that for replicated tables, multi-fragment plans
                 // need to divide the result by the number of partitions
             } else if (m_parsedDelete != null) {
                 nextStmt = m_parsedDelete;
-                fragment.planGraph = getNextDeletePlan();
+                retval.rootPlanGraph = getNextDeletePlan();
                 // note that for replicated tables, multi-fragment plans
                 // need to divide the result by the number of partitions
             } else {
@@ -357,23 +333,22 @@ public class PlanAssembler {
             retval.statementGuaranteesDeterminism(true, true); // Until we support DML w/ subqueries/limits
         }
 
-        if (fragment.planGraph == null)
-        {
+        if (retval.rootPlanGraph == null) {
             return null;
         }
 
         assert (nextStmt != null);
         addParameters(retval, nextStmt);
         retval.fullWhereClause = nextStmt.where;
-        retval.fullWinnerPlan = fragment.planGraph;
+        retval.fullWinnerPlan = retval.rootPlanGraph;
         // Do a final generateOutputSchema pass.
-        fragment.planGraph.generateOutputSchema(m_catalogDb);
+        retval.rootPlanGraph.generateOutputSchema(m_catalogDb);
         retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
     }
 
     private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
-        NodeSchema output_schema = plan.fragments.get(0).planGraph.getOutputSchema();
+        NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
         // Sanity-check the output NodeSchema columns against the display columns
         if (stmt.displayColumns.size() != output_schema.size())
         {
@@ -395,19 +370,16 @@ public class PlanAssembler {
     }
 
     private void addParameters(CompiledPlan plan, AbstractParsedStmt stmt) {
-        ParameterInfo outParam = null;
-        for (ParameterInfo param : stmt.paramList) {
-            outParam = new ParameterInfo();
-            outParam.index = param.index;
+        plan.parameters = new VoltType[stmt.paramList.length];
 
-            VoltType override = m_paramTypeOverrideMap.get(param.index);
+        for (int i = 0; i < stmt.paramList.length; ++i) {
+            VoltType override = m_paramTypeOverrideMap.get(i);
             if (override != null) {
-                outParam.type = override;
+                plan.parameters[i] = override;
             }
             else {
-                outParam.type = param.type;
+                plan.parameters[i] = stmt.paramList[i];
             }
-            plan.parameters.add(outParam);
         }
     }
 

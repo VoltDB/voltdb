@@ -192,7 +192,8 @@ public class TestReplayTxnState extends TestCase {
         frmColReal.addDependency(13, result);
         frmColReal.setStatus(FragmentResponseMessage.SUCCESS, null);
 
-        InitiateTaskMessage initiateNotice = new InitiateTaskMessage(0, 1, 2, false, false, invocation, 2);
+        InitiateTaskMessage initiateNotice = new InitiateTaskMessage(0, 1, 2, false, false, invocation, 2,
+                                                                     tracker.getAllSitesExcluding(1));
         irm = new InitiateResponseMessage(initiateNotice);
         final ClientResponseImpl response = new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
         irm.setResults(response);
@@ -273,5 +274,12 @@ public class TestReplayTxnState extends TestCase {
                 Mockito.any(TransactionState.class),
                 any(HashMap.class),
                 any(VoltMessage.class));
+    }
+
+    public void testReturnInvocation() {
+        ExecutionSite site = mock(ExecutionSite.class);
+        InitiateTaskMessage task = new InitiateTaskMessage(0, 0, 0, false, true, invocation, 0);
+        ReplayedTxnState txnState = new ReplayedTxnState(site, task);
+        assertNotNull(txnState.getInvocation());
     }
 }

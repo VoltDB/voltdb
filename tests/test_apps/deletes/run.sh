@@ -6,7 +6,7 @@ CLASSPATH="$VOLTJAR:../../../lib" #:./obj/com:./obj/com/procedures"
 VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"
 LICENSE="../../../voltdb/license.xml"
-LEADER="localhost"
+HOST="localhost"
 
 
 # remove build artifacts
@@ -38,7 +38,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader $LEADER
+        license $LICENSE host $HOST
 }
 
 # run the client that drives the example

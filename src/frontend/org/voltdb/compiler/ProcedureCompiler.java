@@ -21,7 +21,6 @@ import java.lang.reflect.Field;
 import java.lang.reflect.Method;
 import java.lang.reflect.Modifier;
 import java.util.HashMap;
-import java.util.List;
 import java.util.Map;
 import java.util.Map.Entry;
 
@@ -154,6 +153,7 @@ public abstract class ProcedureCompiler {
         procedure.setClassname(className);
         // sysprocs don't use the procedure compiler
         procedure.setSystemproc(false);
+        procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(true);
 
         // get the annotation
@@ -501,6 +501,7 @@ public abstract class ProcedureCompiler {
         procedure.setClassname(className);
         // sysprocs don't use the procedure compiler
         procedure.setSystemproc(false);
+        procedure.setDefaultproc(procedureDescriptor.m_builtInStmt);
         procedure.setHasjava(false);
 
         // get the annotation

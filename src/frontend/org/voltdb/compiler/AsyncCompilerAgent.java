@@ -19,7 +19,6 @@ package org.voltdb.compiler;
 
 import java.util.ArrayList;
 import java.util.List;
-import java.util.concurrent.Callable;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
@@ -38,7 +37,6 @@ import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
-import com.google.common.util.concurrent.ListenableFuture;
 import com.google.common.util.concurrent.ListeningExecutorService;
 
 public class AsyncCompilerAgent {
@@ -136,7 +134,6 @@ public class AsyncCompilerAgent {
         AdHocPlannedStmtBatch plannedStmtBatch =
                 new AdHocPlannedStmtBatch(work.sqlBatchText,
                                           work.partitionParam,
-                                          context.catalogVersion,
                                           work.clientHandle,
                                           work.connectionId,
                                           work.hostname,
@@ -151,17 +148,13 @@ public class AsyncCompilerAgent {
             // Single statement batch.
             try {
                 String sqlStatement = work.sqlStatements[0];
-                PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
-                                                          work.inferSinglePartition, work.allowParameterization);
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
+                                                             work.inferSinglePartition, work.allowParameterization);
+                result.catalogVersion = context.catalogVersion;
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 plannedStmtBatch.partitionParam = result.partitionParam;
-                plannedStmtBatch.addStatement(sqlStatement,
-                                              result.onePlan,
-                                              result.allPlan,
-                                              result.replicatedDML,
-                                              result.nonDeterministic,
-                                              result.params);
+                plannedStmtBatch.addStatement(result);
             }
             catch (Exception e) {
                 errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
@@ -171,15 +164,10 @@ public class AsyncCompilerAgent {
             // Multi-statement batch.
             for (final String sqlStatement : work.sqlStatements) {
                 try {
-                    PlannerTool.Result result = ptool.planSql(sqlStatement, work.partitionParam,
-                                                                false, work.allowParameterization);
-
-                    plannedStmtBatch.addStatement(sqlStatement,
-                                                  result.onePlan,
-                                                  result.allPlan,
-                                                  result.replicatedDML,
-                                                  result.nonDeterministic,
-                                                  result.params);
+                    AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
+                                                                 false, work.allowParameterization);
+                    result.catalogVersion = context.catalogVersion;
+                    plannedStmtBatch.addStatement(result);
                 }
                 catch (Exception e) {
                     errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
@@ -244,11 +232,6 @@ public class AsyncCompilerAgent {
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
-            // check if the resulting string is small enough to fit in our parameter sets (about 2mb)
-            if (retval.encodedDiffCommands.length() > (2 * 1000 * 1000)) {
-                throw new Exception("The requested catalog change is too large for this version of VoltDB. " +
-                                    "Try a series of smaller updates.");
-            }
         }
         catch (Exception e) {
             e.printStackTrace();

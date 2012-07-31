@@ -250,24 +250,87 @@ public class MiscUtils {
         String[] splitted = fullBuildString.split("=", 2);
         if (splitted.length == 2) {
             build = splitted[1].trim();
-                if (build.length() == 0) {
-                        return null;
-                        }
-                return build;
+            if (build.length() == 0) {
+                return null;
+            }
+            return build;
 
-                }
+        }
 
         // Test for git build string - example: 2.0 voltdb-2.0-70-gb39f43e-dirty
         Pattern p = Pattern.compile("-(\\d*-\\w{8}(?:-.*)?)");
         Matcher m = p.matcher(fullBuildString);
         if (! m.find())
-                return null;
+            return null;
         build = m.group(1).trim();
         if (build.length() == 0) {
             return null;
         }
         return build;
+    }
 
+    /**
+     * Parse a version string in the form of x.y.z. It doesn't require that
+     * there are exactly three parts in the version. Each part must be seperated
+     * by a dot.
+     *
+     * @param versionString
+     * @return an array of each part as integer.
+     */
+    public static int[] parseVersionString(String versionString) {
+        if (versionString == null) {
+            return null;
+        }
+
+        String[] split = versionString.split("\\.");
+        int[] v = new int[split.length];
+        int i = 0;
+        for (String s : split) {
+            try {
+                v[i++] = Integer.parseInt(s.trim());
+            } catch (NumberFormatException e) {
+                return null;
+            }
+        }
+
+        return v;
+    }
+
+    /**
+     * Compare two versions. Version should be represented as an array of
+     * integers.
+     *
+     * @param left
+     * @param right
+     * @return -1 if left is smaller than right, 0 if they are equal, 1 if left
+     *         is greater than right.
+     */
+    public static int compareVersions(int[] left, int[] right) {
+        if (left == null || right == null) {
+            throw new IllegalArgumentException("Invalid versions");
+        }
+
+        int i = 0;
+        for (int part : right) {
+            // left is shorter than right and share the same prefix, must be smaller
+            if (left.length == i) {
+                return -1;
+            }
+
+            if (left[i] > part) {
+                return 1;
+            } else if (left[i] < part) {
+                return -1;
+            }
+
+            i++;
+        }
+
+        // left is longer than right and share the same prefix, must be greater
+        if (left.length > i) {
+            return 1;
+        }
+        return 0;
     }
 
     public static String formatHostMetadataFromJSON(String json) {

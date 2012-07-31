@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import java.io.File;
-import java.io.PrintStream;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -181,11 +180,11 @@ public class QueryPlanner {
                     plan.sql = sql;
 
                     // this plan is final, resolve all the column index references
-                    plan.fragments.get(0).planGraph.resolveColumnIndexes();
+                    plan.rootPlanGraph.resolveColumnIndexes();
 
                     // compute resource usage using the single stats collector
                     stats = new PlanStatistics();
-                    AbstractPlanNode planGraph = plan.fragments.get(0).planGraph;
+                    AbstractPlanNode planGraph = plan.rootPlanGraph;
 
                     // compute statistics about a plan
                     boolean result = planGraph.computeEstimatesRecursively(stats, m_cluster, m_db, m_estimates, paramHints);
@@ -234,17 +233,7 @@ public class QueryPlanner {
         }
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
-        bestPlan = Fragmentizer.fragmentize(bestPlan, m_db);
-
-        // DTXN/EE can't handle plans that have more than 2 fragments yet.
-        if (bestPlan.fragments.size() > 2) {
-            m_recentErrorMsg = "Unable to plan for statement. Possibly " +
-                "joining partitioned tables in a multi-partition procedure " +
-                "using a column that is not the partitioning attribute " +
-                "or a non-equality operator. " +
-                "This is statement not supported at this time.";
-            return null;
-        }
+        Fragmentizer.fragmentize(bestPlan, m_db);
         return bestPlan;
     }
 

@@ -221,6 +221,9 @@ VoltDBEngine::~VoltDBEngine() {
     // object multiple times.  Change at your own risk.
     // --izzy 8/19/2009
 
+    // clean up execution plans
+    m_executorMap.clear();
+
     // Get rid of any dummy undo quantum first so m_undoLog.clear()
     // doesn't wipe this out before we do it.
     if (m_currentUndoQuantum != NULL && m_currentUndoQuantum->isDummy()) {
@@ -232,10 +235,6 @@ VoltDBEngine::~VoltDBEngine() {
     // actually find the memory that has been allocated to non-inlined
     // strings and deallocated it.
     m_undoLog.clear();
-
-    for (int ii = 0; ii < m_planFragments.size(); ii++) {
-        delete m_planFragments[ii];
-    }
 
     // clean up memory for the template memory for the single long (int) table
     if (m_templateSingleLongTable) {
@@ -310,6 +309,8 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                int64_t txnId, int64_t lastCommittedTxnId,
                                bool first, bool last)
 {
+    assert(planfragmentId != 0);
+
     m_currentOutputDepId = outputDependencyId;
     m_currentInputDepId = inputDependencyId;
 
@@ -342,11 +343,10 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
                                              txnId,
                                              lastCommittedTxnId);
 
-   // count the number of plan fragments executed
+    // count the number of plan fragments executed
     ++m_pfCount;
 
     // execution lists for planfragments are cached by planfragment id
-    assert (planfragmentId >= -1);
     //printf("Looking to execute fragid %jd\n", (intmax_t)planfragmentId);
     map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter = m_executorMap.find(planfragmentId);
     assert (iter != m_executorMap.end());
@@ -426,69 +426,47 @@ int VoltDBEngine::executeQuery(int64_t planfragmentId,
     return ENGINE_ERRORCODE_SUCCESS;
 }
 
-/*
- * Execute the supplied fragment in the context of the specified
- * cluster and database with the supplied parameters as arguments. A
- * catalog with all the necessary tables needs to already have been
- * loaded.
- */
-int VoltDBEngine::executePlanFragment(string fragmentString,
-                                      int32_t outputDependencyId,
-                                      int32_t inputDependencyId,
-                                      const NValueArray &params,
-                                      int64_t txnId,
-                                      int64_t lastCommittedTxnId)
+int VoltDBEngine::loadFragment(const char *plan, int32_t length, int64_t &fragId, bool &wasHit, int64_t &cacheSize)
 {
-    int retval = ENGINE_ERRORCODE_ERROR;
+    fragId = 0;
 
-    m_currentOutputDepId = outputDependencyId;
-    m_currentInputDepId = inputDependencyId;
-
-    // how many current plans (too see if we added any)
-    size_t frags = m_planFragments.size();
-
-    try
-    {
-        if (initPlanFragment(AD_HOC_FRAG_ID, fragmentString))
+    wasHit = m_fragmentManager.upsert(plan, length, fragId);
+    cacheSize = m_fragmentManager.size();
+    if (!wasHit) {
+        try
         {
-            retval = executeQuery(AD_HOC_FRAG_ID, outputDependencyId,
-                                  inputDependencyId, params,
-                                  txnId, lastCommittedTxnId, true, true);
+            std::string fragmentString(plan, length);
+            if (!initPlanFragment(fragId, fragmentString))
+            {
+                char message[128];
+                snprintf(message, 128, "Unable to load plan fragment for"
+                         " fragment id %jd.", (intmax_t)fragId);
+                throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                              message);
+            }
         }
-        else
+        catch (SerializableEEException &e)
         {
-            char message[128];
-            snprintf(message, 128, "Unable to load ad-hoc plan fragment for"
-                    " transaction %jd.", (intmax_t)txnId);
-            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
-                                          message);
+            VOLT_TRACE("loadFragment: failed to initialize plan fragment");
+            e.serialize(getExceptionOutputSerializer());
+            fragId = 0;
+            return 1;
         }
     }
-    catch (SerializableEEException &e)
-    {
-        VOLT_TRACE("executePlanFragment: failed to initialize "
-                   "ad-hoc plan fragment");
-        resetReusedResultOutputBuffer();
-        e.serialize(getExceptionOutputSerializer());
-        retval = ENGINE_ERRORCODE_ERROR;
+
+    // nonzero on failure
+    return fragId == 0 ? 1 : 0;
+}
+
+void VoltDBEngine::resizePlanCache() {
+    while (int64_t purgeFragId = m_fragmentManager.purgeNext()) {
+        std::map<int64_t, boost::shared_ptr<ExecutorVector> >::const_iterator iter;
+        iter = m_executorMap.find(purgeFragId);
+        if (iter != m_executorMap.end()) {
+            // clean up stuff
+            m_executorMap.erase(purgeFragId);
+        }
     }
-
-    // clean up stuff
-    m_executorMap.erase(AD_HOC_FRAG_ID);
-
-    // delete any generated plan
-    size_t nowFrags = m_planFragments.size();
-    if (nowFrags > frags) {
-        assert ((nowFrags - frags) == 1);
-        delete m_planFragments.back();
-        m_planFragments.pop_back();
-    }
-
-    // set these back to -1 for error handling
-    m_currentOutputDepId = -1;
-    m_currentInputDepId = -1;
-
-    return retval;
 }
 
 // -------------------------------------------------
@@ -807,10 +785,8 @@ bool VoltDBEngine::rebuildTableCollections() {
  * Delete and rebuild all plan fragments.
  */
 bool VoltDBEngine::rebuildPlanFragmentCollections() {
-    for (int ii = 0; ii < m_planFragments.size(); ii++)
-        delete m_planFragments[ii];
-    m_planFragments.clear();
     m_executorMap.clear();
+    m_fragmentManager.clear();
 
     // initialize all the planfragments.
     map<string, catalog::Procedure*>::const_iterator proc_iterator;
@@ -872,7 +848,6 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
 
     // catalog method plannodetree returns PlanNodeList.java
     PlanNodeFragment *pnf = PlanNodeFragment::createFromCatalog(planNodeTree);
-    m_planFragments.push_back(pnf);
     VOLT_TRACE("\n%s\n", pnf->debug().c_str());
     assert(pnf->getRootNode());
 
@@ -894,7 +869,7 @@ bool VoltDBEngine::initPlanFragment(const int64_t fragId,
 
     boost::shared_ptr<ExecutorVector> ev =
         boost::shared_ptr<ExecutorVector>
-        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit));
+        (new ExecutorVector(frag_temptable_log_limit, frag_temptable_limit, pnf));
 
     // Initialize each node!
     for (int ctr = 0, cnt = (int)pnf->getExecuteList().size();
