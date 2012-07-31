@@ -1179,8 +1179,10 @@ TEST CASES
                 <exclude name="**/TestAdminMode.class" />
                 <exclude name="**/TestCatalogUpdateSuite.class" />
 <!--                <exclude name="**/TestCRUDSuite.class" /> -->
-<!--                <exclude name="**/TestExecutionSiteDeath.class" /> -->
 <!--                <exclude name="**/TestFailureDetectSuite.class" /> -->
+                <!-- ExecutionSite not relevant to Iv2. -->
+                <exclude name="**/TestExecutionSite.class" />
+<!--                <exclude name="**/TestExecutionSiteDeath.class" /> -->
 <!--                <exclude name="**/TestFailuresSuite.class" /> -->
 <!--                <exclude name="**/TestFixedSQLSuite.class" /> -->
 <!--                <exclude name="**/TestFunctionsSuite.class" /> -->
