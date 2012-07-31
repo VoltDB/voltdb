@@ -2068,7 +2068,7 @@ public class FunctionSQL extends Expression {
 
         default :
             if (voltDisabled != null) {
-                throw new HSQLParseException("Function '" + name + "' is not supported in VoltDB: " + voltDisabled);
+                exp.attributes.put("disabled", voltDisabled);
             }
             break;
         }

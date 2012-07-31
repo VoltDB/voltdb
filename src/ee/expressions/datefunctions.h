@@ -21,136 +21,118 @@
 #include "boost/date_time/posix_time/conversion.hpp"
 #include <ctime>
 
-static inline boost::gregorian::date date_from_epoch_nanos(int64_t epoch_nanos) {
-    time_t epoch_seconds = epoch_nanos / 1000000000;
+static inline boost::gregorian::date date_from_epoch_micros(int64_t epoch_micros) {
+    time_t epoch_seconds = epoch_micros / 1000000;
     return boost::posix_time::from_time_t(epoch_seconds).date();
 }
 
-static inline boost::posix_time::time_duration time_of_day_from_epoch_nanos(int64_t epoch_nanos) {
-    time_t epoch_seconds = epoch_nanos / 1000000000;
+static inline boost::posix_time::time_duration time_of_day_from_epoch_micros(int64_t epoch_micros) {
+    time_t epoch_seconds = epoch_micros / 1000000;
     return boost::posix_time::from_time_t(epoch_seconds).time_of_day();
 }
 
 namespace voltdb {
 
-/** implement the timestamp year extract function **/
+/** implement the timestamp YEAR extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_YEAR>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_nanos(epoch_nanos);
-    NValue result(VALUE_TYPE_INTEGER);
-    result.getInteger() = as_date.year();
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    return getIntegerValue(as_date.year());
 }
 
-/** implement the timestamp month extract function **/
+/** implement the timestamp MONTH extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_MONTH>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_nanos(epoch_nanos);
-    NValue result(VALUE_TYPE_TINYINT);
-    result.getTinyInt() = (int8_t)as_date.month();
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    return getTinyIntValue((int8_t)as_date.month());
 }
 
-/** implement the timestamp ? extract function **/
+/** implement the timestamp DAY extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_nanos(epoch_nanos);
-    NValue result(VALUE_TYPE_TINYINT);
-    result.getTinyInt() = (int8_t)as_date.day();
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    return getTinyIntValue((int8_t)as_date.day());
 }
 
-/** implement the timestamp ? extract function **/
+/** implement the timestamp DAY OF WEEK extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY_OF_WEEK>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_nanos(epoch_nanos);
-    NValue result(VALUE_TYPE_TINYINT);
-    result.getTinyInt() = (int8_t)(as_date.day_of_week() + 1); // Have 0-based, want 1-based.
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    return getTinyIntValue((int8_t)(as_date.day_of_week() + 1)); // Have 0-based, want 1-based.
 }
 
-/** implement the timestamp ? extract function **/
+/** implement the timestamp WEEK OF YEAR extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_WEEK_OF_YEAR>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_nanos(epoch_nanos);
-    NValue result(VALUE_TYPE_TINYINT);
-    result.getTinyInt() = (int8_t)as_date.week_number();
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    return getTinyIntValue((int8_t)as_date.week_number());
 }
 
-/** implement the timestamp extract function **/
+/** implement the timestamp DAY OF YEAR extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_DAY_OF_YEAR>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_nanos(epoch_nanos);
-    NValue result(VALUE_TYPE_SMALLINT);
-    result.getSmallInt() = (int16_t)as_date.day_of_year();
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    return getSmallIntValue((int16_t)as_date.day_of_year());
 }
 
-/** implement the timestamp extract function **/
+/** implement the timestamp QUARTER extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_QUARTER>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    boost::gregorian::date as_date = date_from_epoch_nanos(epoch_nanos);
-    NValue result(VALUE_TYPE_TINYINT);
-    result.getTinyInt() = (int8_t)((as_date.month() + 2) / 3);
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    boost::gregorian::date as_date = date_from_epoch_micros(epoch_micros);
+    return getTinyIntValue((int8_t)((as_date.month() + 2) / 3));
 }
 
-/** implement the timestamp ? extract function **/
+/** implement the timestamp HOUR extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_HOUR>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
+    int64_t epoch_micros = getTimestamp();
     // time_of_day manages the wrap at 24 hours
-    boost::posix_time::time_duration as_time = time_of_day_from_epoch_nanos(epoch_nanos);
-    NValue result(VALUE_TYPE_TINYINT);
-    result.getTinyInt() = (int8_t)as_time.hours();
-    return result;
+    boost::posix_time::time_duration as_time = time_of_day_from_epoch_micros(epoch_micros);
+    return getTinyIntValue((int8_t)as_time.hours());
 }
 
-/** implement the timestamp ? extract function **/
+/** implement the timestamp MINUTE extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_MINUTE>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    NValue result(VALUE_TYPE_TINYINT);
-    // divide by 60 million nanos, and wrap at 60.
-    result.getTinyInt() = (int8_t)((epoch_nanos / 60000000000) % 60);
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    // divide by 60 million micros, and wrap at 60.
+    return getTinyIntValue((int8_t)((epoch_micros / 60000000) % 60));
 }
 
-/** implement the timestamp ? extract function **/
+/** implement the timestamp SECOND extract function **/
 template<> inline NValue NValue::callUnary<FUNC_EXTRACT_SECOND>() const {
     if (isNull()) {
         return *this;
     }
-    int64_t epoch_nanos = getTimestamp();
-    NValue result(VALUE_TYPE_DOUBLE);
-    result.getDouble() = ((double)(epoch_nanos % 60000000000))/1000000000.0;
-    return result;
+    int64_t epoch_micros = getTimestamp();
+    TTInt retval(epoch_micros % 60000000);
+    retval *= NValue::kMaxScaleFactor/1000000;
+    return getDecimalValue(retval);
 }
 
 }

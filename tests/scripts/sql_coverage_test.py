@@ -23,16 +23,18 @@
 # OTHER DEALINGS IN THE SOFTWARE.
 
 import sys
+# add the path to the volt python client, just based on knowing
+# where we are now
+sys.path.append('../../src/py_client')
+
 import random
 import time
 import subprocess
 import cPickle
 import os.path
 import imp
-from base64 import encodestring
 from voltdbclient import *
 from optparse import OptionParser
-from xml2 import XMLGenerator
 from Query import VoltQueryClient
 from SQLCoverageReport import generate_html_reports, generate_summary
 from SQLGenerator import SQLGenerator
@@ -51,7 +53,15 @@ class Config:
     def get_config(self, config_name):
         return self.__config[config_name]
 
-def run_once(name, command, statements):
+def run_once(name, command, statements_path, results_path):
+
+    print "Running \"run_once\":"
+    print "  name: %s" % (name)
+    print "  command: %s" % (command)
+    print "  statements_path: %s" % (statements_path)
+    print "  results_path: %s" % (results_path)
+    sys.stdout.flush()
+
     global normalize
     server = subprocess.Popen(command + " backend=" + name, shell = True)
     client = None
@@ -66,9 +76,18 @@ def run_once(name, command, statements):
             time.sleep(1)
 
     if client == None:
+        print >> sys.stderr, "Unable to connect/create client"
+        sys.stderr.flush()
         return -1
 
-    for statement in statements:
+    statements_file = open(statements_path, "rb")
+    results_file = open(results_path, "wb")
+    while True:
+        try:
+            statement = cPickle.load(statements_file)
+        except EOFError:
+            break
+
         try:
             client.onecmd("adhoc " + statement["SQL"])
         except:
@@ -81,28 +100,44 @@ def run_once(name, command, statements):
                 print >> sys.stderr, \
                     "Failed to kill the server process %d" % (server.pid)
             break
+        tables = None
+        if client.response == None:
+            print >> sys.stderr, "No error, but an unexpected null client response (server crash?) from executing statement '%s': %s" % \
+                (statement["SQL"], sys.exc_info()[1])
+            killer = subprocess.Popen("kill -9 %d" % (server.pid), shell = True)
+            killer.communicate()
+            if killer.returncode != 0:
+                print >> sys.stderr, \
+                    "Failed to kill the server process %d" % (server.pid)
+            break
         if client.response.tables != None:
             tables = [normalize(t, statement["SQL"]) for t in client.response.tables]
-            tablestr = cPickle.dumps(tables, cPickle.HIGHEST_PROTOCOL)
-        else:
-            tablestr = cPickle.dumps(None, cPickle.HIGHEST_PROTOCOL)
-        statement[name] = {"Status": client.response.status,
-                           "Info": client.response.statusString,
-                           "Result": encodestring(tablestr)}
-        if client.response.exception != None:
-            statement[name]["Exception"] = str(client.response.exception)
+        cPickle.dump({"Status": client.response.status,
+                      "Info": client.response.statusString,
+                      "Result": tables,
+                      "Exception": str(client.response.exception)},
+                     results_file)
+    results_file.close()
+    statements_file.close()
 
     client.onecmd("shutdown")
     server.communicate()
 
+    sys.stdout.flush()
+    sys.stderr.flush()
+
     return server.returncode
 
-def run_config(config, basedir, output_dir, random_seed, report_all, args):
+def run_config(config, basedir, output_dir, random_seed, report_all, generate_only, args):
     for key in config.iterkeys():
         if not os.path.isabs(config[key]):
             config[key] = os.path.abspath(os.path.join(basedir, config[key]))
-    report_filename = "report.xml"
-    report_filename = os.path.abspath(os.path.join(output_dir, report_filename))
+    if not os.path.exists(output_dir):
+        os.makedirs(output_dir)
+
+    statements_path = os.path.abspath(os.path.join(output_dir, "statements.data"))
+    hsql_path = os.path.abspath(os.path.join(output_dir, "hsql.data"))
+    jni_path = os.path.abspath(os.path.join(output_dir, "jni.data"))
     template = config["template"]
 
     global normalize
@@ -118,16 +153,22 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     if "template-jni" in config:
         template = config["template-jni"]
     generator = SQLGenerator(config["schema"], template, True)
-    statements = []
     counter = 0
 
+    statements_file = open(statements_path, "wb")
     for i in generator.generate():
-        statements.append({"id": counter,
-                           "SQL": i})
+        cPickle.dump({"id": counter, "SQL": i}, statements_file)
         counter += 1
+    statements_file.close()
 
-    if run_once("jni", command, statements) != 0:
+    if (generate_only):
+        # Claim success without running servers.
+        return [0,0]
+
+    if run_once("jni", command, statements_path, jni_path) != 0:
         print >> sys.stderr, "Test with the JNI backend had errors."
+        print >> sys.stderr, "  jni_path: %s" % (jni_path)
+        sys.stderr.flush()
         exit(1)
 
     random.seed(random_seed)
@@ -141,23 +182,18 @@ def run_config(config, basedir, output_dir, random_seed, report_all, args):
     generator = SQLGenerator(config["schema"], template, False)
     counter = 0
 
+    statements_file = open(statements_path, "wb")
     for i in generator.generate():
-        statements[counter]["SQL"] = i
+        cPickle.dump({"id": counter, "SQL": i}, statements_file)
         counter += 1
+    statements_file.close()
 
-    if run_once("hsqldb", command, statements) != 0:
+    if run_once("hsqldb", command, statements_path, hsql_path) != 0:
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
         exit(1)
 
-    report_dict = {"Seed": random_seed, "Statements": statements}
-    report = XMLGenerator(report_dict)
-    if not os.path.exists(output_dir):
-        os.makedirs(output_dir)
-    fd = open(report_filename, "w")
-    fd.write(report.toXML())
-    fd.close()
-
-    success = generate_html_reports(report_dict, output_dir, report_all)
+    success = generate_html_reports(random_seed, statements_path, hsql_path,
+                                    jni_path, output_dir, report_all)
     return success
 
 def usage():
@@ -212,9 +248,13 @@ The following place holders are supported,
 \t_cmp\t\tWill be replaced with a comparison operator
 \t_math\t\tWill be replaced with a arithmatic operator
 \t_agg\t\tWill be replaced with an aggregation operator
-\t_singleton\t\tWill be replaced with an operator like NOT
+\t_maybe\t\tWill be replaced with NOT or simply removed
+\t_distinct\t\tWill be replaced with DISTINCT or simply removed
+\t_like\t\tWill be replaced with LIKE or NOT LIKE
 \t_set\t\tWill be replaced with a set operator
-\t_logic\t\tWill be replaced with a logic operator"""
+\t_logic\t\tWill be replaced with a logic operator
+\t_sortordert\tWill be replaced with ASC, DESC, or 'blank' (implicitly ascending)
+"""
 
 if __name__ == "__main__":
     parser = OptionParser()
@@ -225,6 +265,9 @@ if __name__ == "__main__":
     parser.add_option("-r", "--report-all", action="store_true",
                       dest="report_all", default=False,
                       help="report all attempted SQL statements rather than mismatches")
+    parser.add_option("-g", "--generate-only", action="store_true",
+                      dest="generate_only", default=False,
+                      help="only generate and report SQL statements, do not start any database servers")
     (options, args) = parser.parse_args()
 
     if options.seed == None:
@@ -262,7 +305,7 @@ if __name__ == "__main__":
         report_dir = output_dir + '/' + config_name
         config = config_list.get_config(config_name)
         result = run_config(config, basedir, report_dir, seed,
-                            options.report_all, args)
+                            options.report_all, options.generate_only, args)
         statistics[config_name] = result
         if result[1] != 0:
             success = False

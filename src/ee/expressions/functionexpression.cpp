@@ -99,7 +99,9 @@ public:
     }
 
     std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "ConstantFunctionExpression " + expressionToString(getExpressionType()));
+        std::stringstream buffer;
+        buffer << spacer << "ConstantFunctionExpression " << F << std::endl;
+        return (buffer.str());
     }
 };
 
@@ -126,7 +128,9 @@ public:
     }
 
     std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "UnaryFunctionExpression " + expressionToString(getExpressionType()));
+        std::stringstream buffer;
+        buffer << spacer << "UnaryFunctionExpression " << F << std::endl;
+        return (buffer.str());
     }
 };
 
@@ -159,7 +163,9 @@ public:
     }
 
     std::string debugInfo(const std::string &spacer) const {
-        return (spacer + "GeneralFunctionExpression " + expressionToString(getExpressionType()));
+        std::stringstream buffer;
+        buffer << spacer << "GeneralFunctionExpression " << F << std::endl;
+        return (buffer.str());
     }
 
 private:
@@ -178,7 +184,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     switch(nArgs) {
     case 0:
         // ret = new ConstantFunctionExpression<???>();
-        delete arguments;
+        if (ret) {
+            delete arguments;
+        }
         break;
     case 1:
         if (functionId == FUNC_ABS) {
@@ -203,10 +211,12 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_MINUTE>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_SECOND) {
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_SECOND>((*arguments)[0]);
+        } else if (functionId == FUNC_VOLT_SQL_ERROR) {
+            ret = new UnaryFunctionExpression<FUNC_VOLT_SQL_ERROR>((*arguments)[0]);
         }
-
-
-        delete arguments;
+        if (ret) {
+            delete arguments;
+        }
         break;
     default:
         // GeneralFunctions defer deleting the arguments container until through with it.
@@ -214,9 +224,9 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new GeneralFunctionExpression<FUNC_VOLT_SUBSTRING_CHAR_FROM>(*arguments);
         } else if (functionId == FUNC_SUBSTRING_CHAR) {
             ret = new GeneralFunctionExpression<FUNC_SUBSTRING_CHAR>(*arguments);
+        } else if (functionId == FUNC_VOLT_SQL_ERROR) {
+            ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
         }
-
-
     }
     // May return null, leaving it to the caller (with more context) to generate an exception.
     return ret;

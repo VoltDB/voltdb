@@ -24,6 +24,7 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
 import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
@@ -54,9 +55,9 @@ public class TestFunctionsSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
-    public void testExtract() throws Exception
+    public void testAbs() throws Exception
     {
-        System.out.println("STARTING testExtract");
+        System.out.println("STARTING testAbs");
         Client client = getClient();
         ProcedureCallback callback = new ProcedureCallback() {
             @Override
@@ -77,91 +78,6 @@ public class TestFunctionsSuite extends RegressionSuite {
                 PRIMARY KEY (ID)
                 );
         */
-        client.callProcedure(callback, "P1.insert", 0, "X0", 10, 1.1, new Timestamp(100000000L));
-        client.drain();
-        ClientResponse cr = null;
-        VoltTable r = null;
-        long result;
-
-        cr = client.callProcedure("@AdHoc",
-                                  "select " +
-                                  "EXTRACT(YEAR FROM PAST) " +
-                                  //"EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
-                                  //"EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), " +
-                                  //"EXTRACT(WEEK_OF_YEAR FROM PAST), " +
-                                  //"EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) " +
-                                  "from P1;");
-
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        r.advanceRow();
-        int columnIndex = 0;
-
-        /*
-        final int EXPECTED_YEAR = 2001;
-        result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_YEAR, result);
-
-        final int EXPECTED_MONTH = 9;
-        result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MONTH, result);
-
-        final int EXPECTED_DAY = 9;
-        result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DAY, result);
-
-        final int EXPECTED_DOW = 6;
-        result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOW, result);
-
-        final int EXPECTED_DOY = 400;
-        result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_DOY, result);
-
-//        final int EXPECTED_WOY = 400;
-//        result = r.getLong(columnIndex++);
-//        assertEquals(EXPECTED_WOY, result);
-
-        final int EXPECTED_QUARTER = 3;
-        result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_QUARTER, result);
-
-        final int EXPECTED_HOUR = 1;
-        result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_HOUR, result);
-
-        final int EXPECTED_MINUTE = 46;
-        result = r.getLong(columnIndex++);
-        assertEquals(EXPECTED_MINUTE, result);
-
-        final double EXPECTED_SECONDS = 40.0;
-        double floatresult = r.getDouble(columnIndex++);
-        assertEquals(EXPECTED_SECONDS, floatresult);
-*/
-    }
-
-    public void testAbs() throws Exception
-    {
-        System.out.println("STARTING testAbs");
-        Client client = getClient();
-        ProcedureCallback callback = new ProcedureCallback() {
-            @Override
-            public void clientCallback(ClientResponse clientResponse)
-                    throws Exception {
-                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
-                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
-                }
-            }
-        };
-        /*
-        CREATE TABLE P1 (
-                ID INTEGER DEFAULT '0' NOT NULL,
-                DESC VARCHAR(300),
-                NUM INTEGER,
-                RATIO FLOAT,
-                PRIMARY KEY (ID)
-                );
-        */
         for(int id=7; id < 15; id++) {
             client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             client.drain();
@@ -173,6 +89,184 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         assertEquals(5, r.asScalarLong());
+
+        try {
+            // test decimal support and non-column expressions
+            cr = client.callProcedure("WHERE_ABSFF");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            assertEquals(5, r.asScalarLong());
+        } catch (ProcCallException hsqlFailed) {
+            // Give HSQLDB a pass on this query.
+            String msg = hsqlFailed.getMessage();
+            assertTrue(msg.matches(".*ExpectedProcedureException.*HSQLDB.*"));
+        }
+
+        // Test type promotions
+        cr = client.callProcedure("WHERE_ABSIF");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+
+        try {
+            cr = client.callProcedure("WHERE_ABSFI");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+        } catch (ProcCallException hsqlFailed) {
+            // Give HSQLDB a pass on this query.
+            String msg = hsqlFailed.getMessage();
+            assertTrue(msg.matches(".*ExpectedProcedureException.*HSQLDB.*"));
+        }
+
+
+        // Test application to weakly typed NUMERIC constants
+        try {
+            cr = client.callProcedure("WHERE_ABSWEAK");
+            assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+            r = cr.getResults()[0];
+            assertEquals(5, r.asScalarLong());
+        } catch (ProcCallException hsqlFailed) {
+            // Give HSQLDB a pass on this query.
+            String msg = hsqlFailed.getMessage();
+            assertTrue(msg.matches(".*ExpectedProcedureException.*HSQLDB.*"));
+        }
+
+        cr = client.callProcedure("DISPLAY_ABS");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+
+        cr = client.callProcedure("ORDER_ABS");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        long value = r.getLong(0);
+        assertEquals(5, value);
+/*
+        cr = client.callProcedure("GROUP_ABS");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+*/
+        cr = client.callProcedure("AGG_OF_ABS");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+/*
+        cr = client.callProcedure("ABS_OF_AGG");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        assertEquals(5, r.asScalarLong());
+*/
+        // Test null propagation
+        cr = client.callProcedure("INSERT_NULL", 99);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INSERT_NULL", 98);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INSERT_NULL", 97);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INSERT_NULL", 96);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        cr = client.callProcedure("INSERT_NULL", 95);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        long resultA;
+        long resultB;
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where NUM > 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(NUM) > 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(0-NUM) > 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not NUM > 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(0-NUM) > 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(NUM) > 9");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID = -2 - NUM");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        // These cases were originally failed attempts to trigger ENG-3191, but they still seem worth trying.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) = 2 + NUM");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(NUM) = (2 - ID)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID < 0");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultA = r.asScalarLong();
+
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ABS(ID) = (0 - ID)");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        // Here's the ENG-3191 case, all better now.
+        cr = client.callProcedure("@AdHoc", "select count(*) from P1 where ID = (0 - ABS(ID))");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        resultB = r.asScalarLong();
+        assertEquals(resultA, resultB);
+
+        boolean caught = false;
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(DESC) > 9");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("incompatible data type") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(DESC) > 'ABC'");
+            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
+        } catch (ProcCallException e) {
+            String msg = e.getMessage();
+            assertTrue(msg.indexOf("incompatible data type") != -1);
+            caught = true;
+        }
+        assertTrue(caught);
 
     }
 
@@ -195,6 +289,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 DESC VARCHAR(300),
                 NUM INTEGER,
                 RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
                 PRIMARY KEY (ID)
                 );
         */
@@ -340,6 +435,90 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
+    public void testExtract() throws Exception
+    {
+        System.out.println("STARTING testExtract");
+        Client client = getClient();
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        client.callProcedure(callback, "P1.insert", 0, "X0", 10, 1.1, new Timestamp(1000000000000L));
+        client.drain();
+        ClientResponse cr = null;
+        VoltTable r = null;
+        long result;
+
+        cr = client.callProcedure("@AdHoc",
+                                  "select " +
+                                  "EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
+                                  "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), " +
+                                  //"EXTRACT(WEEK_OF_YEAR FROM PAST), " +
+                                  "EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) " +
+                                  "from P1;");
+
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        int columnIndex = 0;
+
+        final int EXPECTED_YEAR = 2001;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_YEAR, result);
+
+        final int EXPECTED_MONTH = 9;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MONTH, result);
+
+        final int EXPECTED_DAY = 9;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DAY, result);
+
+        final int EXPECTED_DOW = 1;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOW, result);
+
+        final int EXPECTED_DOY = 252;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOY, result);
+
+//        final int EXPECTED_WOY = 36;
+//        result = r.getLong(columnIndex++);
+//        assertEquals(EXPECTED_WOY, result);
+
+        final int EXPECTED_QUARTER = 3;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_QUARTER, result);
+
+        final int EXPECTED_HOUR = 1;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_HOUR, result);
+
+        final int EXPECTED_MINUTE = 46;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MINUTE, result);
+
+        final BigDecimal EXPECTED_SECONDS = new BigDecimal("40.000000000000");
+        BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
+        assertEquals(EXPECTED_SECONDS, decimalResult);
+
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -402,6 +581,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        //config = new LocalCluster("fixedsql-threesite.jar", 3/*HACK*/-2, 1, 0, BackendTarget.NATIVE_EE_IPC); //JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

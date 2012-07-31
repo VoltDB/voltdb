@@ -369,6 +369,10 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseFunctionExpression(VoltXMLElement exprNode, Database db) {
         String name = exprNode.attributes.get("name").toLowerCase();
+        String disabled = exprNode.attributes.get("disabled");
+        if (disabled != null) {
+            throw new PlanningErrorException("Function '" + name + "' is not supported in VoltDB: " + disabled);
+        }
         String value_type_name = exprNode.attributes.get("type");
         VoltType value_type = VoltType.typeFromString(value_type_name);
         String id = exprNode.attributes.get("id");
@@ -399,12 +403,15 @@ public abstract class AbstractParsedStmt {
             // Avoid a non-castable types runtime exception by negotiating the type(s) of the parameterized function's result
             // and its parameter argument. Either of these types could be null or a specific supported value type, or a generic
             // NUMERIC. Replace any "generic" type (null or NUMERIC) with the more specific type without over-specifying
-            // -- the BEST type might only become clear when the context/caller of this function is parsed.
+            // -- the BEST type might only become clear later when the context/caller of this function is parsed, so don't
+            // risk guessing wrong here just for the sake of specificity.
+            // There will be a "finalize" pass over the completed expression tree to finish specifying any remaining "generics".
             AbstractExpression param_arg = args.get(parameter_idx);
-            // Use the type chosen by HSQL for the parameterized function as a specific type hint
+            // But DO use the type chosen by HSQL for the parameterized function as a specific type hint
             // for numeric constant arguments that could either go decimal or float.
             VoltType param_type = param_arg.getValueType();
-            // Anything is better than NUMERIC which is better than nothing.
+            // The heuristic for which types to change is that any type (parameter type or return type) specified so far,
+            // including "NUMERIC" is better than nothing. And that anything else is better than NUMERIC.
             if (value_type != param_type) {
                 if (value_type == null) {
                     value_type = param_type;
@@ -412,10 +419,14 @@ public abstract class AbstractParsedStmt {
                     if (param_type != null) {
                         value_type = param_type;
                     }
-                    // Pushing a type DOWN to the argument is a lot like work, and not worth it just for NUMERIC,
-                    // since it will likely have to be repeated when a more specific type is inferred.
-                    // It's purpose is to force a more specific refinement of NUMERIC than would be taken by default "out of context".
+                    // Pushing a type DOWN to the argument is a lot like work, and not worth it just to
+                    // propagate down a known NUMERIC return type,
+                    // since it will just have to be re-specialized when a more specific type is inferred from
+                    // the context or finalized when the expression is complete.
                 } else if ((param_type == null) || (param_type == VoltType.NUMERIC)) {
+                    // The only purpose of refining the parameter argument's type is to force a more specific
+                    // refinement than NUMERIC as implied by HSQL, in case that might be more specific than
+                    // what can be be inferred later from the function call context.
                     param_arg.refineValueType(value_type);
                 }
             }
@@ -446,6 +457,8 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement child : columnsNode.children) {
             assert(child.name.equals("columnref"));
             AbstractExpression col_exp = parseExpressionTree(child, db);
+            // TupleValueExpressions are always specifically typed,
+            // so there is no need for expression type specialization, here.
             assert(col_exp != null);
             assert(col_exp instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col_exp;
@@ -707,6 +720,13 @@ public abstract class AbstractParsedStmt {
         }
     }
 
+    /** Parse a where clause. This behavior is common to all kinds of statements.
+     *  TODO: It's not clear why ParsedDeleteStmt has its own VERY SIMILAR code to do this in method parseCondition.
+     *  There's a minor difference in how "ANDs" are modeled -- are they multiple condition nodes or
+     *  single condition nodes with multiple children? That distinction may be due to an arbitrary difference
+     *  in the parser's handling of different statements, but even if it's justified, this method could easily
+     *  be extended to handle multiple multi-child conditionNodes.
+     */
     protected void parseConditions(VoltXMLElement conditionNode, Database db) {
         if (conditionNode.children.size() == 0)
             return;

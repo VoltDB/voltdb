@@ -25,12 +25,18 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.voltdb.catalog.*;
-import org.voltdb.plannodes.*;
+import junit.framework.TestCase;
+
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Table;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.DistinctPlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
-
-import junit.framework.TestCase;
 
 public class TestPushDownAggregates extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -42,7 +48,7 @@ public class TestPushDownAggregates extends TestCase {
         try {
             pn = aide.compile(sql, paramCount, singlePartition);
         }
-        catch (NullPointerException ex) {
+        catch (PlanningErrorException ex) {
             throw ex;
         }
         catch (Exception ex) {
@@ -175,7 +181,7 @@ public class TestPushDownAggregates extends TestCase {
     public void testGroupByNotInDisplayColumn() {
         try {
             compile("SELECT count(A1) FROM T1 GROUP BY A1", 0, false);
-        } catch (NullPointerException e) {
+        } catch (PlanningErrorException e) {
             // There shouldn't be any plan
             return;
         }

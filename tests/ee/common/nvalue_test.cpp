@@ -2192,7 +2192,7 @@ TEST_F(NValueTest, TestExtract)
     ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
 
     NValue result;
-    NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000000);
+    NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
 
     const int EXPECTED_YEAR = 2001;
     result = midSeptember.callUnary<FUNC_EXTRACT_YEAR>();
@@ -2230,9 +2230,9 @@ TEST_F(NValueTest, TestExtract)
     result = midSeptember.callUnary<FUNC_EXTRACT_MINUTE>();
     EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
 
-    const double EXPECTED_SECONDS = 40.0;
+    const std::string EXPECTED_SECONDS = "40";
     result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
-    EXPECT_EQ(0, result.compare(ValueFactory::getDoubleValue(EXPECTED_SECONDS)));
+    EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
 
     delete poolHolder;
     delete testPool;

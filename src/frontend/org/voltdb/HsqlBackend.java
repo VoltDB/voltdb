@@ -287,7 +287,7 @@ public class HsqlBackend {
                     throw new RuntimeException("Inserting date into mismatched column type in HSQL.");
                 TimestampType d = (TimestampType) paramObjs[i];
                 // convert VoltDB's microsecond granularity to millis.
-                Timestamp t = new Timestamp(d.getTime() * 1000);
+                Timestamp t = new Timestamp(d.getTime() / 1000);
                 sqlOut.append('\'').append(t.toString()).append('\'');
             }
             else if (paramObjs[i] instanceof byte[]) {
