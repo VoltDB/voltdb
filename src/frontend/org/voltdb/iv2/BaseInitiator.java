@@ -186,13 +186,13 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             m_term.start();
             while (!success) {
                 RepairAlgo repair = null;
-                if (m_missingStartupSites != null) {
+                //if (m_missingStartupSites != null) {
                     repair = new StartupAlgo(m_missingStartupSites, m_whoami);
-                }
-                else {
-                    repair = createPromoteAlgo(m_term.getInterestingHSIds(),
-                            m_initiatorMailbox, m_whoami);
-                }
+                //}
+                //else {
+                //    repair = createPromoteAlgo(m_term.getInterestingHSIds(),
+                //            m_initiatorMailbox, m_whoami);
+                //}
 
                 m_initiatorMailbox.setRepairAlgo(repair);
                 // term syslogs the start of leader promotion.

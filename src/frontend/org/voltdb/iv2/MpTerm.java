@@ -78,6 +78,7 @@ public class MpTerm implements Term
                 }
             }
             List<Long> leaders = new ArrayList<Long>(updatedLeaders);
+            tmLog.info(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
             // Need to handle startup separately from runtime updates.
             if (MpTerm.this.m_missingStartupSites.getCount() > 0) {
 
@@ -97,6 +98,9 @@ public class MpTerm implements Term
                 for (int i=0; i < newLeaders; i++) {
                     MpTerm.this.m_missingStartupSites.countDown();
                 }
+                tmLog.info(m_whoami +
+                        "continuing leader promotion.  Waiting for " +
+                        m_missingStartupSites.getCount() + " more for configured k-safety.");
             }
             else {
                 // remove the leader; convert to hsids; deal with the replica change.

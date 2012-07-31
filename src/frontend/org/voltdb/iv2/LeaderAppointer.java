@@ -49,7 +49,7 @@ import org.voltdb.VoltZK;
 
 public class LeaderAppointer
 {
-    private static final VoltLogger hostLog = new VoltLogger("HOST");
+    private static final VoltLogger tmLog = new VoltLogger("TM");
     private final ZooKeeper m_zk;
     private final CountDownLatch m_partitionCountLatch;
     private final BabySitter[] m_partitionWatchers;
@@ -69,6 +69,8 @@ public class LeaderAppointer
         @Override
         public void run(List<String> children)
         {
+            tmLog.info("Handling babysitter callback for partition " + m_partitionId + ": children: " +
+                    CoreUtils.hsIdCollectionToString(VoltZK.childrenToReplicaHSIds(children)));
             if (children.size() == (m_kfactor + 1)) {
                 assignLeader(m_partitionId, VoltZK.childrenToReplicaHSIds(children));
                 m_partitionCountLatch.countDown();
@@ -89,7 +91,8 @@ public class LeaderAppointer
 
     public void start() throws InterruptedException, ExecutionException, KeeperException
     {
-        for (int i = 0; i < m_partitionCountLatch.getCount(); i++) {
+        long partCount = m_partitionCountLatch.getCount();
+        for (int i = 0; i < partCount; i++) {
             String dir = LeaderElector.electionDirForPartition(i);
             try {
                 m_zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -100,6 +103,7 @@ public class LeaderAppointer
             Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, m_callbacks[i]);
             m_partitionWatchers[i] = sitterstuff.getFirst();
             if (sitterstuff.getSecond().size() == (m_kfactor + 1)) {
+                tmLog.info("Partition complete on start(): " + i);
                 assignLeader(i, VoltZK.childrenToReplicaHSIds(sitterstuff.getSecond()));
                 m_partitionCountLatch.countDown();
             }
@@ -122,7 +126,7 @@ public class LeaderAppointer
                 }
             }
             catch (JSONException jse) {
-                hostLog.error("Failed to find master for partition " + partitionId + ", defaulting to 0");
+                tmLog.error("Failed to find master for partition " + partitionId + ", defaulting to 0");
                 jse.printStackTrace();
                 masterHostId = -1; // stupid default
             }
@@ -135,6 +139,8 @@ public class LeaderAppointer
                 break;
             }
         }
+        tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
+                partitionId);
         MapCacheWriter iv2appointees = new MapCache(m_zk, VoltZK.iv2appointees);
         try {
             iv2appointees.put(Integer.toString(partitionId), new JSONObject("{appointee:" + masterHSId + "}"));
