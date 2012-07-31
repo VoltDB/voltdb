@@ -207,7 +207,7 @@ class Global:
         provides    = 'voltdb',
         conflicts   = 'voltdb',
         replaces    = 'voltdb',
-        depends     = 'default-jre,libc6',
+        depends     = 'default-jdk,libc6',
         priority    = 'extra',
         section     = 'database',
         maintainer  = 'VoltDB',
@@ -319,17 +319,22 @@ actions = (
 #### Install
 
 def install():
+    ncommands = 0
     with ChDir(Global.source_root):
         info('Installing files to prefix "%s"...' % Global.options.prefix)
         for action in actions:
             debug(str(action))
             for cmd in action.getcmds():
+                ncommands += 1
                 if cmd.working_dir:
                     with ChDir(cmd.working_dir):
                         run_cmd(*cmd.args)
                 else:
                     run_cmd(*cmd.args)
-        info('Installation is complete.')
+        if ncommands == 0:
+            abort('Nothing was installed - you may need to do a build.')
+        else:
+            info('Installation is complete.')
 
 #### Uninstall
 
