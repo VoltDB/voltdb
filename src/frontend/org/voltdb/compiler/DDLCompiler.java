@@ -122,7 +122,15 @@ public class DDLCompiler {
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
             // Some statements are processed by VoltDB and the rest are handled by HSQL.
-            if (!processVoltDBStatement(stmt.statement)) {
+            boolean processed = false;
+            try {
+                processed = processVoltDBStatement(stmt.statement);
+            } catch (VoltCompilerException e) {
+                // Reformat the message thrown by VoltDB DDL processing to have a line number.
+                String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+            if (!processed) {
                 try {
                     // kind of ugly.  We hex-encode each statement so we can
                     // avoid embedded newlines so we can delimit statements
