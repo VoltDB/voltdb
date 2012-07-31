@@ -97,6 +97,7 @@ public class StatementInsert extends StatementDML {
      *
      * @return the result of executing the statement
      */
+    @Override
     Result getResult(Session session) {
 
         Table           table              = baseTable;
@@ -265,7 +266,7 @@ public class StatementInsert extends StatementDML {
 
             parameter.attributes.put("index", String.valueOf(i));
             Expression param = parameters[i];
-            parameter.attributes.put("id", param.getUniqueId());
+            parameter.attributes.put("id", param.getUniqueId(session));
             parameter.attributes.put("type", Types.getTypeName(param.getDataType().typeCode));
         }
     }
@@ -278,6 +279,7 @@ public class StatementInsert extends StatementDML {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session)
     throws HSQLParseException
     {

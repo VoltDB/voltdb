@@ -121,11 +121,10 @@ public class TestLoadingSuite extends RegressionSuite {
             table.addRow(2, 1, 2, "2", 2.0);
             table.addRow(3, 2, 3, "3", 3.0);
             table.addRow(4, 2, 4, "4", 4.0);
-            r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", table);
-            assertEquals(ClientResponse.SUCCESS, r.getStatus());
-            assertEquals(1, r.getResults().length);
-            assertEquals(4, r.getResults()[0].asScalarLong());
-            assertEquals(4, countPartitionedRows(client));
+            try {
+                r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", table);
+                fail();
+            } catch (ProcCallException e) {}
 
             // test rollback to a replicated table (constraint)
             table = m_template.clone(100);
@@ -136,7 +135,7 @@ public class TestLoadingSuite extends RegressionSuite {
                 fail(); // prev stmt should throw exception
             } catch (ProcCallException e) {}
             // 4 rows in the db from the previous test
-            assertEquals(4, countPartitionedRows(client));
+            assertEquals(4, countReplicatedRows(client));
         }
     }
 

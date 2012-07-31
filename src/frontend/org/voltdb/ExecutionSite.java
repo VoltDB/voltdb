@@ -36,6 +36,7 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
@@ -123,7 +124,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
-    static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
         new ExecutionSiteNodeFailureFaultHandler();
@@ -185,6 +185,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     public final static long kInvalidUndoToken = -1L;
     private long latestUndoToken = 0L;
 
+    @Override
+    public long getLatestUndoToken() {
+        return latestUndoToken;
+    }
+
+    @Override
     public long getNextUndoToken() {
         return ++latestUndoToken;
     }
@@ -534,7 +540,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                         " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
                         " with " + megabytes + " megabytes transferred " +
                         " at a rate of " + megabytesPerSecond + " megabytes/sec");
-                int remaining = recoveringSiteCount.decrementAndGet();
+                int remaining = SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
                     ee.toggleProfiler(0);
 
@@ -686,31 +692,35 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      */
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
         @Override
-        public Database getDatabase()                         { return m_context.database; }
+        public Database getDatabase()                           { return m_context.database; }
         @Override
-        public Cluster getCluster()                           { return m_context.cluster; }
+        public Cluster getCluster()                             { return m_context.cluster; }
         @Override
-        public long getLastCommittedTxnId()                   { return lastCommittedTxnId; }
+        public long getLastCommittedTxnId()                     { return lastCommittedTxnId; }
         @Override
-        public long getCurrentTxnId()                         { return m_currentTransactionState.txnId; }
+        public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
-        public long getNextUndo()                             { return getNextUndoToken(); }
+        public long getNextUndo()                               { return getNextUndoToken(); }
         @Override
         public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
-        public long getSiteId()                               { return m_siteId; }
+        public long getSiteId()                                 { return m_siteId; }
         @Override
-        public boolean isLowestSiteId()                       { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
+        public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
         @Override
-        public int getHostId()                                { return SiteTracker.getHostForSite(m_siteId); }
+        public int getHostId()                                  { return SiteTracker.getHostForSite(m_siteId); }
         @Override
-        public int getPartitionId()                           { return m_tracker.getPartitionForSite(m_siteId); }
+        public int getPartitionId()                             { return m_tracker.getPartitionForSite(m_siteId); }
         @Override
-        public long getCatalogCRC()                           { return m_context.getCatalogCRC(); }
+        public long getCatalogCRC()                             { return m_context.getCatalogCRC(); }
         @Override
-        public SiteTracker getSiteTracker()                   { return m_tracker; }
+        public int getCatalogVersion()                          { return m_context.catalogVersion; }
         @Override
-        public int getNumberOfPartitions()                    { return m_tracker.m_numberOfPartitions; }
+        public SiteTracker getSiteTracker()                     { return m_tracker; }
+        @Override
+        public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }
+        @Override
+        public int getNumberOfPartitions()                      { return m_tracker.m_numberOfPartitions; }
         @Override
         public SiteProcedureConnection getSiteProcedureConnection()
         {
@@ -1359,7 +1369,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     }
 
     /**
-     * Handle rejoin message
+     * Handle rejoin message for live rejoin, not blocking rejoin
      * @param rm
      */
     private void handleRejoinMessage(RejoinMessage rm) {
@@ -2362,14 +2372,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
      * @param data
      * @param table
      */
-    private void loadTable(long txnId, int tableId, VoltTable data) {
-        long undo_token = getNextUndoToken();
+    @Override
+    public void loadTable(long txnId, int tableId, VoltTable data) {
         ee.loadTable(tableId, data,
                      txnId,
-                     lastCommittedTxnId,
-                     undo_token);
-        ee.releaseUndoToken(undo_token);
-        getNextUndoToken();
+                     lastCommittedTxnId);
     }
 
     @Override
@@ -2454,6 +2461,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             {
                 assert(!currentTxnState.isSinglePartition());
                 tryToSneakInASinglePartitionProcedure();
+                if (m_recoveryProcessor != null) {
+                    m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
+                }
             }
             else
             {
@@ -2551,7 +2561,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         {
             if (dependencies != null)
             {
-                ee.stashWorkUnitDependencies(dependencies);
+                stashWorkUnitDependencies(dependencies);
             }
         }
 
@@ -2593,6 +2603,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                  * abort type errors that should result in a roll back.
                  * Assume that it is ninja: succeeds or doesn't return.
                  * No roll back support.
+                 *
+                 * AW in 2012, the preceding comment might be wrong,
+                 * I am pretty sure what we don't support is partial rollback.
+                 * The entire procedure will roll back successfully on failure
                  */
                 try {
                     // if custom fragment, load the plan
@@ -2679,7 +2693,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                     // call the proc
                     runner.setupTransaction(txnState);
                     cr = runner.call(txnId, itask.getParameters());
-                    response.setResults(cr, itask);
+                    response.setResults(cr);
 
                     // record the results of write transactions to the transaction state
                     // this may be used to verify the DR replica cluster gets the same value
@@ -2792,6 +2806,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params) {
         throw new RuntimeException("Unsupported IV2-only API.");
+     }
+
+    @Override
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    {
+        throw new RuntimeException("Unsupported IV2-only API.");
     }
 
     @Override
@@ -2840,5 +2860,10 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                 boolean interval, Long now)
     {
         return ee.getStats(selector, locators, interval, now);
+    }
+
+    @Override
+    public void setRejoinComplete() {
+        throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 }

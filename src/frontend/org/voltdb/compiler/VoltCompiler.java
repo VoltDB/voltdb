@@ -1436,6 +1436,7 @@ public class VoltCompiler {
             catEntry = jarIn.getNextJarEntry();
         }
         if (catEntry == null) {
+            jarIn.close();
             return null;
         }
 

@@ -28,6 +28,7 @@ import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.sysprocs.SysProcFragmentId;
 
 public class ReplicatedTableSaveFileState extends TableSaveFileState
@@ -65,16 +66,16 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
 
     @Override
     public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable)
+    generateRestorePlan(Table catalogTable, SiteTracker st)
     {
         for (int hostId : m_hostsWithThisTable) {
-            m_sitesWithThisTable.addAll(VoltDB.instance().getSiteTracker().getSitesForHost(hostId));
+            m_sitesWithThisTable.addAll(st.getSitesForHost(hostId));
         }
 
         SynthesizedPlanFragment[] restore_plan = null;
         if (catalogTable.getIsreplicated())
         {
-            restore_plan = generateReplicatedToReplicatedPlan();
+            restore_plan = generateReplicatedToReplicatedPlan(st);
         }
         else
         {
@@ -98,11 +99,11 @@ public class ReplicatedTableSaveFileState extends TableSaveFileState
     }
 
     private SynthesizedPlanFragment[]
-    generateReplicatedToReplicatedPlan()
+    generateReplicatedToReplicatedPlan(SiteTracker st)
     {
         SynthesizedPlanFragment[] restore_plan = null;
         Set<Long> execution_site_ids =
-            VoltDB.instance().getSiteTracker().getAllSites();
+            st.getAllSites();
         Set<Long> sites_missing_table =
             getSitesMissingTable(execution_site_ids);
         // not sure we want to deal with handling expected load failures,
