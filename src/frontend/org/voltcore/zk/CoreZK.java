@@ -71,6 +71,11 @@ public class CoreZK {
         }
     }
 
+    /**
+     * Given a ZK node name of the form PREFIX_SUFFIX (for example, the
+     * format used by the LeaderElector which is HSID_SEQUENCENUM), return
+     * the prefix.
+     */
     public static String getPrefixFromChildName(String childName) {
         return childName.split("_")[0];
     }

@@ -183,7 +183,10 @@ public class VoltZK {
         }
     }
 
-    // conversion helper.
+    /**
+     * Convert a list of ZK nodes named HSID_SUFFIX (such as that used by LeaderElector)
+     * into a list of HSIDs.
+     */
     public static List<Long> childrenToReplicaHSIds(Collection<String> children)
     {
         List<Long> replicas = new ArrayList<Long>(children.size());
