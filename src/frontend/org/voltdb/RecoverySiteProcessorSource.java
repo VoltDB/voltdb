@@ -67,7 +67,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
     final int blockIndexOffset = siteIdOffset + 8;
     final int messageTypeOffset = blockIndexOffset + 4;
 
-    private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
+    private static final VoltLogger recoveryLog = new VoltLogger("JOIN");
 
     /**
      * List of tables that need to be streamed

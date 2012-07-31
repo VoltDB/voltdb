@@ -18,7 +18,6 @@
 package org.voltdb.planner;
 
 import java.io.File;
-import java.io.PrintStream;
 import java.util.List;
 
 import org.hsqldb_voltpatches.HSQLInterface;
@@ -143,7 +142,6 @@ public class QueryPlanner {
         // get ready to find the plan with minimal cost
         CompiledPlan rawplan = null;
         CompiledPlan bestPlan = null;
-        Object bestPartitioningKey = null;
         String bestFilename = null;
         double minCost = Double.MAX_VALUE;
 
@@ -182,11 +180,11 @@ public class QueryPlanner {
                     plan.sql = sql;
 
                     // this plan is final, resolve all the column index references
-                    plan.fragments.get(0).planGraph.resolveColumnIndexes();
+                    plan.rootPlanGraph.resolveColumnIndexes();
 
                     // compute resource usage using the single stats collector
                     stats = new PlanStatistics();
-                    AbstractPlanNode planGraph = plan.fragments.get(0).planGraph;
+                    AbstractPlanNode planGraph = plan.rootPlanGraph;
 
                     // compute statistics about a plan
                     boolean result = planGraph.computeEstimatesRecursively(stats, m_cluster, m_db, m_estimates, paramHints);
@@ -204,7 +202,6 @@ public class QueryPlanner {
                         // free the PlanColumns held by the previous best plan
                         bestPlan = plan;
                         bestFilename = filename;
-                        bestPartitioningKey = plan.getPartitioningKey();
                     }
 
                     if (!m_quietPlanner) {
@@ -236,20 +233,7 @@ public class QueryPlanner {
         }
 
         // split up the plan everywhere we see send/recieve into multiple plan fragments
-        bestPlan = Fragmentizer.fragmentize(bestPlan, m_db);
-
-        // DTXN/EE can't handle plans that have more than 2 fragments yet.
-        if (bestPlan.fragments.size() > 2) {
-            m_recentErrorMsg = "Unable to plan for statement. Possibly " +
-                "joining partitioned tables in a multi-partition procedure " +
-                "using a column that is not the partitioning attribute " +
-                "or a non-equality operator. " +
-                "This is statement not supported at this time.";
-            return null;
-        }
-        // Restore the result partitioning key to correspond to its setting for the best plan.
-        // This writable state is shared by m_assembler and the caller.
-        m_assembler.resetPartitioningKey(bestPartitioningKey);
+        Fragmentizer.fragmentize(bestPlan, m_db);
         return bestPlan;
     }
 

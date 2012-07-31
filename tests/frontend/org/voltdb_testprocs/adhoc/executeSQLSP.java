@@ -40,8 +40,9 @@ import org.voltdb.VoltTable;
     singlePartition = true
 )
 public class executeSQLSP extends VoltProcedure {
-    public static final SQLStmt testStmt = new SQLStmt("select * from PARTED1");
+    public static final SQLStmt testStmt = new SQLStmt("select * from PARTED1 order by partval");
 
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(long partval, String sql) {
         voltQueueSQLExperimental(sql);
         voltQueueSQL(testStmt);

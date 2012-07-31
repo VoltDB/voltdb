@@ -30,7 +30,7 @@ import org.voltdb.VoltDB;
  * Sends acks of snapshot blocks to the snapshot sender.
  */
 public class StreamSnapshotAckSender implements Runnable {
-    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
     private final long m_HSId;
     private final SocketChannel m_sock;

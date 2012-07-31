@@ -24,6 +24,7 @@ import java.util.Set;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTableRow;
 import org.voltdb.catalog.Table;
+import org.voltdb.dtxn.SiteTracker;
 
 public abstract class TableSaveFileState
 {
@@ -45,7 +46,7 @@ public abstract class TableSaveFileState
     }
 
     abstract public SynthesizedPlanFragment[]
-    generateRestorePlan(Table catalogTable);
+    generateRestorePlan(Table catalogTable, SiteTracker st);
 
     String getTableName()
     {

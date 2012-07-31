@@ -1737,7 +1737,7 @@ public class ExpressionLogical extends Expression {
 
         VoltXMLElement exp = new VoltXMLElement("operation");
         // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("id", getUniqueId(session));
 
         exp.attributes.put("type", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {

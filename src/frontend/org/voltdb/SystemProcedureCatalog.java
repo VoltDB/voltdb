@@ -96,6 +96,7 @@ public class SystemProcedureCatalog {
             p.setReadonly(readOnly);
             p.setEverysite(everySite);
             p.setSystemproc(true);
+            p.setDefaultproc(false);
             p.setHasjava(true);
             p.setPartitiontable(null);
             p.setPartitioncolumn(null);
@@ -121,7 +122,7 @@ public class SystemProcedureCatalog {
         listing.put("@SnapshotScan",            new Config("org.voltdb.sysprocs.SnapshotScan",             false, false, false, false, false, true, true));
         listing.put("@SnapshotDelete",          new Config("org.voltdb.sysprocs.SnapshotDelete",           false, false, false, false, false, true, true));
         listing.put("@Shutdown",                new Config("org.voltdb.sysprocs.Shutdown",                 false, false, false, false, false, true, true));
-        listing.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",                  false, false, false, false, false, true, true));
+        listing.put("@ProfCtl",                 new Config("org.voltdb.sysprocs.ProfCtl",                  false, false, true, false, false, true, true));
         listing.put("@Statistics",              new Config("org.voltdb.sysprocs.Statistics",               false, true,  false, false, false, true, true));
         listing.put("@SystemCatalog",           new Config("org.voltdb.sysprocs.SystemCatalog",            true,  true,  false, false, false, true, true));
         listing.put("@SystemInformation",       new Config("org.voltdb.sysprocs.SystemInformation",        false, true,  false, false, false, true, true));
@@ -132,5 +133,4 @@ public class SystemProcedureCatalog {
         listing.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, false, false, false, false));
         listing.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true, false, false, true, true));
     }
-
 }

@@ -17,10 +17,7 @@
 
 package org.voltdb;
 
-import java.util.List;
-
 import org.voltdb.catalog.Statement;
-import org.voltdb.planner.ParameterInfo;
 
 /**
  * <p>A simple wrapper of a parameterized SQL statement. VoltDB uses this instead of
@@ -33,7 +30,7 @@ import org.voltdb.planner.ParameterInfo;
  */
 public class SQLStmt {
     // Used for uncompiled SQL.
-    String sqlText;
+    byte[] sqlText;
     String joinOrder;
 
     // Used for compiled SQL
@@ -50,6 +47,13 @@ public class SQLStmt {
     }
 
     /**
+     * Construct a SQLStmt instance from a byte array for internal use.
+     */
+    private SQLStmt(byte[] sqlText) {
+        this.sqlText = sqlText;
+    }
+
+    /**
      * Construct a SQLStmt instance from a SQL statement.
      *
      * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
@@ -57,7 +61,7 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this.sqlText = sqlText;
+        this.sqlText = sqlText.getBytes(VoltDB.UTF8ENCODING);
         this.joinOrder = joinOrder;
     }
 
@@ -71,25 +75,25 @@ public class SQLStmt {
      * @param params Description of parameters expected by the statement
      * @return SQLStmt object with plan added
      */
-    static SQLStmt createWithPlan(String sqlText,
-                                  String aggregatorFragment,
-                                  String collectorFragment,
+    static SQLStmt createWithPlan(byte[] sqlText,
+                                  byte[] aggregatorFragment,
+                                  byte[] collectorFragment,
                                   boolean isReplicatedTableDML,
-                                  List<ParameterInfo> params) {
-        SQLStmt stmt = new SQLStmt(sqlText, null);
+                                  VoltType[] params) {
+        SQLStmt stmt = new SQLStmt(sqlText);
 
         /*
          * Fill out the parameter types
          */
         if (params != null) {
-            stmt.statementParamJavaTypes = new byte[params.size()];
-            stmt.numStatementParamJavaTypes = params.size();
-            for (ParameterInfo pi : params) {
-                stmt.statementParamJavaTypes[pi.index] = pi.type.getValue();
+            stmt.statementParamJavaTypes = new byte[params.length];
+            stmt.numStatementParamJavaTypes = params.length;
+            for (int i = 0; i < params.length; i++) {
+                stmt.statementParamJavaTypes[i] = params[i].getValue();
             }
         }
 
-        stmt.plan = new SQLStmtPlan(sqlText, aggregatorFragment, collectorFragment, isReplicatedTableDML);
+        stmt.plan = new SQLStmtPlan(aggregatorFragment, collectorFragment, isReplicatedTableDML);
         return stmt;
     }
 
@@ -99,7 +103,7 @@ public class SQLStmt {
      * @return String containing the text of the SQL statement represented.
      */
     public String getText() {
-        return sqlText;
+        return new String(sqlText, VoltDB.UTF8ENCODING);
     }
 
     /**

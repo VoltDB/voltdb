@@ -25,7 +25,7 @@ public class PathUtils {
 
     /**
      * validate the provided znode path string
-     * 
+     *
      * @param path
      *            znode path string
      * @param isSequential
@@ -40,7 +40,7 @@ public class PathUtils {
 
     /**
      * Validate the provided znode path string
-     * 
+     *
      * @param path
      *            znode path string
      * @throws IllegalArgumentException
@@ -56,7 +56,7 @@ public class PathUtils {
         }
         if (path.charAt(0) != '/') {
             throw new IllegalArgumentException(
-                    "Path must start with / character");
+                    "Path \"" + path + "\" must start with / character");
         }
         if (path.length() == 1) { // done checking - it's the root
             return;

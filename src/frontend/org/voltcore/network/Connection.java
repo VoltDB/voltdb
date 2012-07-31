@@ -44,6 +44,8 @@ public interface Connection {
     String getHostnameOrIP();
     long connectionId();
 
+    void queueTask(Runnable r);
+
     /**
      * Schedule the connection to be unregistered and closed
      */

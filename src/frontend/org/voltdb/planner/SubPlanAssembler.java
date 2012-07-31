@@ -45,7 +45,6 @@ import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.IndexType;
 import org.voltdb.types.SortDirectionType;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.VoltTypeUtil;
 
 public abstract class SubPlanAssembler {
 
@@ -95,8 +94,6 @@ public abstract class SubPlanAssembler {
 
         List<AbstractExpression> filterExprs = m_parsedStmt.tableFilterList.get(table);
         if (filterExprs != null) {
-            for (AbstractExpression expr : filterExprs)
-                expr.m_isJoiningClause = false;
             allExprs.addAll(filterExprs);
             naivePath.otherExprs.addAll(filterExprs);
         }
@@ -110,8 +107,6 @@ public abstract class SubPlanAssembler {
             List<AbstractExpression> joinExprs = m_parsedStmt.joinSelectionList.get(pair);
 
             if (joinExprs != null) {
-                for (AbstractExpression expr : joinExprs)
-                    expr.m_isJoiningClause = true;
                 allExprs.addAll(joinExprs);
                 naivePath.joinExprs.addAll(joinExprs);
             }
@@ -120,9 +115,7 @@ public abstract class SubPlanAssembler {
         CatalogMap<Index> indexes = table.getIndexes();
 
         for (Index index : indexes) {
-            AccessPath path = null;
-
-            path = getRelevantAccessPathForIndex(table, allExprs, index);
+            AccessPath path = getRelevantAccessPathForIndex(table, allExprs, index);
             if (path != null) {
                 paths.add(path);
             }
@@ -411,7 +404,7 @@ public abstract class SubPlanAssembler {
         }
 
         VoltType keyType = indexableExpr.getValueType();
-        if (!VoltTypeUtil.isAllowableCastForKeyComparator(keyType, otherType))
+        if (! keyType.canExactlyRepresentAnyValueOf(otherType))
         {
             return null;
         }

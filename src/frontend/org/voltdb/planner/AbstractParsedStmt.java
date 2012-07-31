@@ -23,6 +23,7 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
@@ -65,9 +66,9 @@ public abstract class AbstractParsedStmt {
 
     public String sql;
 
-    public ArrayList<ParameterInfo> paramList = new ArrayList<ParameterInfo>();
+    public VoltType[] paramList = new VoltType[0];
 
-    public HashMap<Long, ParameterInfo> paramsById = new HashMap<Long, ParameterInfo>();
+    public HashMap<Long, Integer> paramsById = new HashMap<Long, Integer>();
 
     public ArrayList<Table> tableList = new ArrayList<Table>();
 
@@ -82,6 +83,8 @@ public abstract class AbstractParsedStmt {
     public HashMap<Table, ArrayList<AbstractExpression>> tableFilterList = new HashMap<Table, ArrayList<AbstractExpression>>();
 
     public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
+
+    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
 
     //User specified join order, null if none is specified
     public String joinOrder = null;
@@ -110,29 +113,25 @@ public abstract class AbstractParsedStmt {
             throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
         }
 
-        assert(xmlSQL.name.equals("statement"));
-
-        VoltXMLElement stmtTypeElement = xmlSQL.children.get(0);
-
         // create non-abstract instances
-        if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
+        if (xmlSQL.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
             retval = new ParsedInsertStmt();
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
+        else if (xmlSQL.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
             retval = new ParsedUpdateStmt();
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
+        else if (xmlSQL.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
             retval = new ParsedDeleteStmt();
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+        else if (xmlSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
             retval = new ParsedSelectStmt();
         }
         else {
-            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
+            throw new RuntimeException("Unexpected Element: " + xmlSQL.name);
         }
 
         // parse tables and parameters
-        for (VoltXMLElement node : stmtTypeElement.children) {
+        for (VoltXMLElement node : xmlSQL.children) {
             if (node.name.equalsIgnoreCase("parameters")) {
                 retval.parseParameters(node, db);
             }
@@ -146,7 +145,7 @@ public abstract class AbstractParsedStmt {
         }
 
         // parse specifics
-        retval.parse(stmtTypeElement, db);
+        retval.parse(xmlSQL, db);
 
         // split up the where expression into categories
         retval.analyzeWhereExpression(db);
@@ -488,16 +487,16 @@ public abstract class AbstractParsedStmt {
     }
 
     private void parseParameters(VoltXMLElement paramsNode, Database db) {
+        paramList = new VoltType[paramsNode.children.size()];
+
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
-                ParameterInfo param = new ParameterInfo();
-
                 long id = Long.parseLong(node.attributes.get("id"));
-                param.index = Integer.parseInt(node.attributes.get("index"));
+                int index = Integer.parseInt(node.attributes.get("index"));
                 String typeName = node.attributes.get("type");
-                param.type = VoltType.typeFromString(typeName);
-                paramsById.put(id, param);
-                paramList.add(param);
+                VoltType type = VoltType.typeFromString(typeName);
+                paramsById.put(id, index);
+                paramList[index] = type;
             }
         }
     }
@@ -551,6 +550,8 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     tableFilterList.put(table, exprs);
                 }
+                expr.m_isJoiningClause = false;
+                addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
             else if (tableSet.size() == 2) {
@@ -566,6 +567,8 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     joinSelectionList.put(pair, exprs);
                 }
+                expr.m_isJoiningClause = true;
+                addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
             else if (tableSet.size() > 2) {
@@ -594,7 +597,7 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (ParameterInfo param : paramList) {
+        for (VoltType param : paramList) {
             retval += param.toString() + " ";
         }
 
@@ -658,9 +661,56 @@ public abstract class AbstractParsedStmt {
         if (paramId == -1) {
             return -1;
         }
-        ParameterInfo param = paramsById.get(paramId);
-        assert(param != null);
-        return param.index;
+        assert(paramsById.containsKey(paramId));
+        return paramsById.get(paramId);
+    }
+
+    private void addExprToEquivalenceSets(AbstractExpression expr) {
+        // Ignore expressions that are not of COMPARE_EQUAL type
+        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return;
+        }
+
+        AbstractExpression leftExpr = expr.getLeft();
+        AbstractExpression rightExpr = expr.getRight();
+        // Can't use an expression based on a column value that is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return;
+        }
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return;
+        }
+
+        // Any two asserted-equal expressions need to map to the same equivalence set,
+        // which must contain them and must be the only such set that contains them.
+        Set<AbstractExpression> eqSet1 = null;
+        if (valueEquivalence.containsKey(leftExpr)) {
+            eqSet1 = valueEquivalence.get(leftExpr);
+        }
+        if (valueEquivalence.containsKey(rightExpr)) {
+            Set<AbstractExpression> eqSet2 = valueEquivalence.get(rightExpr);
+            if (eqSet1 == null) {
+                // Add new leftExpr into existing rightExpr's eqSet.
+                valueEquivalence.put(leftExpr, eqSet2);
+                eqSet2.add(leftExpr);
+            } else {
+                // Merge eqSets, re-mapping all the rightExpr's equivalents into leftExpr's eqset.
+                for (AbstractExpression eqMember : eqSet2) {
+                    eqSet1.add(eqMember);
+                    valueEquivalence.put(eqMember, eqSet1);
+                }
+            }
+        } else {
+            if (eqSet1 == null) {
+                // Both leftExpr and rightExpr are new -- add leftExpr to the new eqSet first.
+                eqSet1 = new HashSet<AbstractExpression>();
+                valueEquivalence.put(leftExpr, eqSet1);
+                eqSet1.add(leftExpr);
+            }
+            // Add new rightExpr into leftExpr's eqSet.
+            valueEquivalence.put(rightExpr, eqSet1);
+            eqSet1.add(rightExpr);
+        }
     }
 
 }

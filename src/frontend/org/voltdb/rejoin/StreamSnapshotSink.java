@@ -45,7 +45,7 @@ import org.voltdb.VoltDB;
  * This class is not thread-safe.
  */
 public class StreamSnapshotSink implements RejoinSiteProcessor {
-    private static final VoltLogger rejoinLog = new VoltLogger("REJOIN");
+    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
     private final long m_HSId;
 
