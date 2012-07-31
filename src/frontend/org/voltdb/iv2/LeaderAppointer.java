@@ -39,10 +39,7 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheReader;
 import org.voltcore.zk.MapCacheWriter;
-
-import org.voltdb.compiler.ClusterConfig;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -69,7 +66,7 @@ public class LeaderAppointer
         @Override
         public void run(List<String> children)
         {
-            tmLog.info("Handling babysitter callback for partition " + m_partitionId + ": children: " +
+            tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
                     CoreUtils.hsIdCollectionToString(VoltZK.childrenToReplicaHSIds(children)));
             if (children.size() == (m_kfactor + 1)) {
                 assignLeader(m_partitionId, VoltZK.childrenToReplicaHSIds(children));
@@ -103,7 +100,7 @@ public class LeaderAppointer
             Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, m_callbacks[i]);
             m_partitionWatchers[i] = sitterstuff.getFirst();
             if (sitterstuff.getSecond().size() == (m_kfactor + 1)) {
-                tmLog.info("Partition complete on start(): " + i);
+                tmLog.debug("Partition complete on start(): " + i);
                 assignLeader(i, VoltZK.childrenToReplicaHSIds(sitterstuff.getSecond()));
                 m_partitionCountLatch.countDown();
             }

@@ -78,7 +78,7 @@ public class MpTerm implements Term
                 }
             }
             List<Long> leaders = new ArrayList<Long>(updatedLeaders);
-            tmLog.info(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
+            tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
             // Need to handle startup separately from runtime updates.
             if (MpTerm.this.m_missingStartupSites.getCount() > 0) {
 
