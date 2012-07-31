@@ -22,10 +22,10 @@ import java.io.File;
 import java.io.FileDescriptor;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
-import java.io.FileOutputStream;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
@@ -66,17 +66,7 @@ public class SQLCommand
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
-    private static boolean logPrintHelp = false;
-    private final static String logFilename = "/tmp/logHelp.txt";
-    private final static String readme = "SQLCommandReadme.txt";
-
-    public static void setDebugPrintHelp(boolean tf) {
-        logPrintHelp = tf;
-    }
-
-    public static String getLogFilename() {
-        return logFilename;
-    }
+    private static final String readme = "SQLCommandReadme.txt";
 
     public static String getReadme() {
         return readme;
@@ -924,25 +914,18 @@ public class SQLCommand
         );
         System.exit(exitCode);
     }
-    public static void printHelp()
+
+    // printHelp() can print readme either to a file or to the screen
+    // depending on the argument passed in
+    public static void printHelp(OutputStream prtStr)
     {
         try
         {
-            InputStream is = SQLCommand.class.getResourceAsStream("SQLCommandReadme.txt");
+            InputStream is = SQLCommand.class.getResourceAsStream(readme);
             while(is.available() > 0) {
                 byte[] bytes = new byte[is.available()]; // Fix for ENG-3440
                 is.read(bytes, 0, bytes.length);
-                if(logPrintHelp == true) {
-                    FileOutputStream fos = new FileOutputStream(logFilename);
-                    fos.write(bytes); // For JUnit test
-                }
-                else {
-                    System.out.write(bytes);
-                    String tailStr = "\n\n";
-                    byte[] tail = new byte[tailStr.length()];
-                    tail = tailStr.getBytes();
-                    System.out.write(tail);
-                }
+                prtStr.write(bytes); // For JUnit test
             }
         }
         catch(Exception x)
@@ -1104,7 +1087,8 @@ public class SQLCommand
                     debug = true;
                 else if (arg.equals("--help"))
                 {
-                    printHelp();
+                    printHelp(System.out); // Print readme to the screen
+                    System.out.println("\n\n");
                     printUsage(0);
                 }
                 else if ((arg.equals("--usage")) || (arg.equals("-?")))

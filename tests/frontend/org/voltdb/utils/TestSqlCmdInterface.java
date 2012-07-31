@@ -34,6 +34,7 @@ import java.io.DataInputStream;
 import java.io.File;
 import java.io.FileInputStream;
 import java.io.FileNotFoundException;
+import java.io.FileOutputStream;
 import java.io.IOException;
 import java.io.InputStream;
 import java.io.InputStreamReader;
@@ -53,6 +54,7 @@ public class TestSqlCmdInterface
     private static boolean noBlockComment = true;
     private int ID = -1;
     private final static String sqlFile = "./tests/frontend/org/voltdb/utils/localQry.txt";
+    private final String logFilename = "/tmp/logHelp.txt"; // For ENG-3440
     private static int numOfQueries = -1;
     private static String qryFrmFile = "";
     private final static String[] firstKeyQryWord =
@@ -62,9 +64,6 @@ public class TestSqlCmdInterface
 
     @BeforeClass
     public static void prepare() throws FileNotFoundException {
-
-
-        //String mySb = new IOUtils.copyToString(sqlFile);
         File fh = new File(sqlFile);
         if(fh.exists()) {
             String contents = readFile2String(fh);
@@ -253,8 +252,6 @@ public class TestSqlCmdInterface
         //assertThis(raw, expected, 2, ID); // Uncomment this line when Test 12 is failed
     }
 
-
-
     // 14) To test a bogus string containing semicolon(s).
     @Test
     public void testParseQuery14() {
@@ -422,11 +419,13 @@ public class TestSqlCmdInterface
     @Test
     public void testPrintHelpMenu26() throws IOException {
         ID = 26;
-        SQLCommand.setDebugPrintHelp(true);
-        String log = SQLCommand.getLogFilename();
+        String msg = "\nTest ID: " + ID + "\n";
+        String err1 = null, err2 = null;
+
         String orgReadme = "./src/frontend/org/voltdb/utils/" + SQLCommand.getReadme();
-        SQLCommand.printHelp();
-        FileInputStream fstream1 = new FileInputStream(log);
+        FileOutputStream fos = new FileOutputStream(logFilename);
+        SQLCommand.printHelp(fos);
+        FileInputStream fstream1 = new FileInputStream(logFilename);
         FileInputStream fstream2 = new FileInputStream(orgReadme);
 
         DataInputStream in1 = new DataInputStream(fstream1);
@@ -434,10 +433,16 @@ public class TestSqlCmdInterface
         DataInputStream in2 = new DataInputStream(fstream2);
         BufferedReader br2 = new BufferedReader(new InputStreamReader(in2));
 
-        String strLine1, strLine2;
+        String strLine1 = null, strLine2 = null;
+        int cnt = 0;
         while((strLine1 = br1.readLine()) != null && (strLine2 = br2.readLine()) != null)   {
-            assertTrue(strLine1.equals(strLine2));
+            err1 = "Expected Content: #" + strLine1 + "#\n";
+            err1 = "  Actual Content: #" + strLine2 + "#\n";
+            assertTrue(msg+err1, strLine1.equals(strLine2));
+            cnt++;
         }
+        err2 = "The value of line count cannot be zero! cnt = " + cnt + "\n";
+        assertNotSame(msg+err2, 0, cnt);
     }
 
     private static void setQryString(File QryFileHandle) throws FileNotFoundException {
