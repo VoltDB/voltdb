@@ -93,7 +93,8 @@ public class QueryPlanner {
             String stmtName,
             String procName,
             int maxTablesPerJoin,
-            ScalarValueHints[] paramHints) {
+            ScalarValueHints[] paramHints,
+            boolean parameterize) {
         assert(costModel != null);
         assert(sql != null);
         assert(stmtName != null);
@@ -120,6 +121,49 @@ public class QueryPlanner {
             outputCompiledStatement(stmtName, procName, xmlSQL);
         }
 
+        // transform as appropriate for CVE-based caching
+        Object[] extractedParams = null;
+        VoltXMLElement parameterizedXmlSQL = xmlSQL.duplicate();
+        Parameterizer pzer = new Parameterizer(parameterizedXmlSQL);
+        int preExistingParams = pzer.countParams();
+        if (parameterize && (preExistingParams == 0)) {
+            extractedParams = pzer.parameterize().toArray();
+            // if requested output the second version of the parsed plan
+            if (!m_quietPlanner && m_fullDebug) {
+                outputParameterizedCompiledStatement(stmtName, procName, xmlSQL);
+            }
+
+            try {
+                CompiledPlan plan = compileFromXML(parameterizedXmlSQL,
+                        costModel, sql, joinOrder, stmtName, procName, maxTablesPerJoin,
+                        paramHints, preExistingParams);
+                for (int i = 0; i < plan.parameters.length; i++) {
+                    extractedParams[i] = Parameterizer.valueForStringWithType((String)extractedParams[i], plan.parameters[i]);
+                }
+                plan.extractedParamValues.setParameters(extractedParams);
+                return plan;
+            }
+            catch (Exception e) {
+                System.err.println("Failled to plan, but will continue without parameterization.");
+                e.printStackTrace();
+            }
+        }
+
+        return compileFromXML(xmlSQL, costModel, sql, joinOrder, stmtName,
+                procName, maxTablesPerJoin, paramHints, preExistingParams);
+    }
+
+    private CompiledPlan compileFromXML(
+            VoltXMLElement xmlSQL,
+            AbstractCostModel costModel,
+            String sql,
+            String joinOrder,
+            String stmtName,
+            String procName,
+            int maxTablesPerJoin,
+            ScalarValueHints[] paramHints,
+            int preExistingParams)
+    {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
         AbstractParsedStmt parsedStmt = AbstractParsedStmt.parse(sql, xmlSQL, m_db, joinOrder);
@@ -150,72 +194,70 @@ public class QueryPlanner {
 
         PlanStatistics stats = null;
 
-        {   // XXX: remove this brace and reformat the code when ready to open a whole new can of whitespace diffs.
-            // set up the plan assembler for this statement
-            m_assembler.setupForNewPlans(parsedStmt);
+        // set up the plan assembler for this statement
+        m_assembler.setupForNewPlans(parsedStmt);
 
-            // loop over all possible plans
-            while (true) {
+        // loop over all possible plans
+        while (true) {
 
-                try {
-                    rawplan = m_assembler.getNextPlan();
+            try {
+                rawplan = m_assembler.getNextPlan();
+            }
+            // on exception, set the error message and bail...
+            catch (PlanningErrorException e) {
+                m_recentErrorMsg = e.getMessage();
+                return null;
+            }
+
+            // stop this while loop when no more plans are generated
+            if (rawplan == null)
+                break;
+
+            // run the set of microptimizations, which may return many plans (or not)
+            List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan);
+
+            // iterate through the subset of plans
+            for (CompiledPlan plan : optimizedPlans) {
+
+                // add in the sql to the plan
+                plan.sql = sql;
+
+                // this plan is final, resolve all the column index references
+                plan.rootPlanGraph.resolveColumnIndexes();
+
+                // compute resource usage using the single stats collector
+                stats = new PlanStatistics();
+                AbstractPlanNode planGraph = plan.rootPlanGraph;
+
+                // compute statistics about a plan
+                boolean result = planGraph.computeEstimatesRecursively(stats, m_cluster, m_db, m_estimates, paramHints);
+                assert(result);
+
+                // compute the cost based on the resources using the current cost model
+                plan.cost = costModel.getPlanCost(stats);
+
+                // filename for debug output
+                String filename = String.valueOf(planCounter++);
+
+                // find the minimum cost plan
+                if (plan.cost < minCost) {
+                    minCost = plan.cost;
+                    // free the PlanColumns held by the previous best plan
+                    bestPlan = plan;
+                    bestFilename = filename;
                 }
-                // on exception, set the error message and bail...
-                catch (PlanningErrorException e) {
-                    m_recentErrorMsg = e.getMessage();
-                    return null;
-                }
 
-                // stop this while loop when no more plans are generated
-                if (rawplan == null)
-                    break;
-
-                // run the set of microptimizations, which may return many plans (or not)
-                List<CompiledPlan> optimizedPlans = MicroOptimizationRunner.applyAll(rawplan);
-
-                // iterate through the subset of plans
-                for (CompiledPlan plan : optimizedPlans) {
-
-                    // add in the sql to the plan
-                    plan.sql = sql;
-
-                    // this plan is final, resolve all the column index references
-                    plan.rootPlanGraph.resolveColumnIndexes();
-
-                    // compute resource usage using the single stats collector
-                    stats = new PlanStatistics();
-                    AbstractPlanNode planGraph = plan.rootPlanGraph;
-
-                    // compute statistics about a plan
-                    boolean result = planGraph.computeEstimatesRecursively(stats, m_cluster, m_db, m_estimates, paramHints);
-                    assert(result);
-
-                    // compute the cost based on the resources using the current cost model
-                    plan.cost = costModel.getPlanCost(stats);
-
-                    // filename for debug output
-                    String filename = String.valueOf(planCounter++);
-
-                    // find the minimum cost plan
-                    if (plan.cost < minCost) {
-                        minCost = plan.cost;
-                        // free the PlanColumns held by the previous best plan
-                        bestPlan = plan;
-                        bestFilename = filename;
+                if (!m_quietPlanner) {
+                    if (m_fullDebug) {
+                        outputPlanFullDebug(plan, planGraph, stmtName, procName, filename);
                     }
 
-                    if (!m_quietPlanner) {
-                        if (m_fullDebug) {
-                            outputPlanFullDebug(plan, planGraph, stmtName, procName, filename);
-                        }
-
-                        // get the explained plan for the node
-                        plan.explainedPlan = planGraph.toExplainPlanString();
-                        outputExplainedPlan(stmtName, procName, plan, filename);
-                    }
+                    // get the explained plan for the node
+                    plan.explainedPlan = planGraph.toExplainPlanString();
+                    outputExplainedPlan(stmtName, procName, plan, filename);
                 }
             }
-        }   // XXX: remove this brace and reformat the code when ready to open a whole new can of whitespace diffs.
+        }
 
         // make sure we got a winner
         if (bestPlan == null) {
@@ -267,6 +309,16 @@ public class QueryPlanner {
     private void outputCompiledStatement(String stmtName, String procName, VoltXMLElement xmlSQL) {
         // output the xml from hsql to disk for debugging
         BuildDirectoryUtils.writeFile("statement-hsql-xml", procName + "_" + stmtName + ".xml", xmlSQL.toString());
+    }
+
+    /**
+     * @param stmtName
+     * @param procName
+     * @param xmlSQL
+     */
+    private void outputParameterizedCompiledStatement(String stmtName, String procName, VoltXMLElement xmlSQL) {
+        // output the xml from hsql to disk for debugging
+        BuildDirectoryUtils.writeFile("statement-hsql-xml", procName + "_" + stmtName + "-parameterized.xml", xmlSQL.toString());
     }
 
     /**
