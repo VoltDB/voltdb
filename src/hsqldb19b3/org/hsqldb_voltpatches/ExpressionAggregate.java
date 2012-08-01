@@ -64,10 +64,12 @@ public class ExpressionAggregate extends Expression {
         nodes               = e.nodes;
     }
 
+    @Override
     boolean isSelfAggregate() {
         return true;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb   = new StringBuffer(64);
@@ -137,6 +139,7 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
+    @Override
     protected String describe(Session session, int blanks) {
 
         StringBuffer sb = new StringBuffer(64);
@@ -203,6 +206,7 @@ public class ExpressionAggregate extends Expression {
         return sb.toString();
     }
 
+    @Override
     public HsqlList resolveColumnReferences(RangeVariable[] rangeVarArray,
             int rangeCount, HsqlList unresolvedSet, boolean acceptsSequences) {
 
@@ -215,6 +219,7 @@ public class ExpressionAggregate extends Expression {
         return unresolvedSet;
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -230,6 +235,7 @@ public class ExpressionAggregate extends Expression {
         dataType = SetFunction.getType(opType, nodes[LEFT].dataType);
     }
 
+    @Override
     public boolean equals(Expression other) {
 
         if (other == this) {
@@ -289,6 +295,7 @@ public class ExpressionAggregate extends Expression {
      * @return XML, correctly indented, representing this object.
      * @throws HSQLParseException
      */
+    @Override
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
@@ -323,7 +330,7 @@ public class ExpressionAggregate extends Expression {
 
         VoltXMLElement exp = new VoltXMLElement("operation");
 
-        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("id", getUniqueId(session));
         exp.attributes.put("type", element);
         if ((this.alias != null) && (getAlias().length() > 0)) {
             exp.attributes.put("alias", getAlias());

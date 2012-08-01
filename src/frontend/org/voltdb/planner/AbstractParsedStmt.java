@@ -66,9 +66,9 @@ public abstract class AbstractParsedStmt {
 
     public String sql;
 
-    public ArrayList<ParameterInfo> paramList = new ArrayList<ParameterInfo>();
+    public VoltType[] paramList = new VoltType[0];
 
-    public HashMap<Long, ParameterInfo> paramsById = new HashMap<Long, ParameterInfo>();
+    public HashMap<Long, Integer> paramsById = new HashMap<Long, Integer>();
 
     public ArrayList<Table> tableList = new ArrayList<Table>();
 
@@ -113,29 +113,25 @@ public abstract class AbstractParsedStmt {
             throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
         }
 
-        assert(xmlSQL.name.equals("statement"));
-
-        VoltXMLElement stmtTypeElement = xmlSQL.children.get(0);
-
         // create non-abstract instances
-        if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
+        if (xmlSQL.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
             retval = new ParsedInsertStmt();
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
+        else if (xmlSQL.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
             retval = new ParsedUpdateStmt();
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
+        else if (xmlSQL.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
             retval = new ParsedDeleteStmt();
         }
-        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+        else if (xmlSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
             retval = new ParsedSelectStmt();
         }
         else {
-            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
+            throw new RuntimeException("Unexpected Element: " + xmlSQL.name);
         }
 
         // parse tables and parameters
-        for (VoltXMLElement node : stmtTypeElement.children) {
+        for (VoltXMLElement node : xmlSQL.children) {
             if (node.name.equalsIgnoreCase("parameters")) {
                 retval.parseParameters(node, db);
             }
@@ -149,7 +145,7 @@ public abstract class AbstractParsedStmt {
         }
 
         // parse specifics
-        retval.parse(stmtTypeElement, db);
+        retval.parse(xmlSQL, db);
 
         // split up the where expression into categories
         retval.analyzeWhereExpression(db);
@@ -491,16 +487,16 @@ public abstract class AbstractParsedStmt {
     }
 
     private void parseParameters(VoltXMLElement paramsNode, Database db) {
+        paramList = new VoltType[paramsNode.children.size()];
+
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
-                ParameterInfo param = new ParameterInfo();
-
                 long id = Long.parseLong(node.attributes.get("id"));
-                param.index = Integer.parseInt(node.attributes.get("index"));
+                int index = Integer.parseInt(node.attributes.get("index"));
                 String typeName = node.attributes.get("type");
-                param.type = VoltType.typeFromString(typeName);
-                paramsById.put(id, param);
-                paramList.add(param);
+                VoltType type = VoltType.typeFromString(typeName);
+                paramsById.put(id, index);
+                paramList[index] = type;
             }
         }
     }
@@ -601,7 +597,7 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (ParameterInfo param : paramList) {
+        for (VoltType param : paramList) {
             retval += param.toString() + " ";
         }
 
@@ -665,9 +661,8 @@ public abstract class AbstractParsedStmt {
         if (paramId == -1) {
             return -1;
         }
-        ParameterInfo param = paramsById.get(paramId);
-        assert(param != null);
-        return param.index;
+        assert(paramsById.containsKey(paramId));
+        return paramsById.get(paramId);
     }
 
     private void addExprToEquivalenceSets(AbstractExpression expr) {

@@ -60,12 +60,11 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.network.Connection;
 import org.voltcore.network.VoltNetworkPool;
 import org.voltdb.ClientInterface.ClientInputHandler;
-
-import org.voltdb.iv2.Cartographer;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
@@ -73,6 +72,7 @@ import org.voltdb.compiler.CatalogChangeWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -280,8 +280,11 @@ public class TestClientInterface {
 
         // Need a batch and a statement
         AdHocPlannedStmtBatch plannedStmtBatch = new AdHocPlannedStmtBatch(
-                "select * from a", null, 0, 0, 0, "localhost", false, null);
-        plannedStmtBatch.addStatement("select * from a", new byte[0], new byte[0], false, false, null);
+                "select * from a", null, 0, 0, "localhost", false, null);
+        AdHocPlannedStatement s = new AdHocPlannedStatement(
+                "select * from a".getBytes(VoltDB.UTF8ENCODING),
+                new byte[0], new byte[0], false, false, true, null, 0);
+        plannedStmtBatch.addStatement(s);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
         ArgumentCaptor<Boolean> boolCaptor = ArgumentCaptor.forClass(Boolean.class);
@@ -300,10 +303,12 @@ public class TestClientInterface {
         assertFalse(boolValues.get(2)); // single-part
         assertFalse(boolValues.get(3)); // every site
         assertEquals("@AdHoc_RO_MP", invocationCaptor.getValue().getProcName());
-        String[] sqlStatements = (String[]) invocationCaptor.getValue().getParameterAtIndex(2);
-        assertNotNull(sqlStatements);
-        assertEquals(1, sqlStatements.length);
-        assertEquals("select * from a", sqlStatements[0]);
+
+        byte[] serializedData = (byte[]) invocationCaptor.getValue().getParameterAtIndex(0);
+        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(ByteBuffer.wrap(serializedData));
+        assertEquals(1, statements.length);
+        String sql = new String(statements[0].sql, VoltDB.UTF8ENCODING);
+        assertEquals("select * from a", sql);
     }
 
     @Test
