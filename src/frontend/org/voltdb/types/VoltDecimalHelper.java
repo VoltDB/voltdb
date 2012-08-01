@@ -221,9 +221,12 @@ public class VoltDecimalHelper {
         if (decimal == null) {
             return null;
         }
-        final BigDecimal bd = new BigDecimal(decimal);
+        BigDecimal bd = new BigDecimal(decimal);
         if (bd.scale() > 12) {
-            throw new IOException("Decimal " + bd + " has more then 12 digits of scale");
+            bd = bd.stripTrailingZeros();
+            if (bd.scale() > 12) {
+                throw new IOException("Decimal " + bd + " has more then 12 digits of scale");
+            }
         }
         if (bd.precision() > 38) {
             throw new RuntimeException("Decimal " + bd + " has more than  38 digits of precision.");
