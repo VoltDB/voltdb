@@ -259,6 +259,7 @@ public class TestClientInterface {
         assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
     }
 
+
     @Test
     public void testAdHoc() throws IOException {
         ByteBuffer msg = createMsg("@AdHoc", "select * from a");

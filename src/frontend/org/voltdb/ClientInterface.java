@@ -1334,7 +1334,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
                     pnt.loadFromJSONArray(jarray, null);
                     String str = pnt.getRootPlanNode().toExplainPlanString();
-                    vt[i++] = new VoltTable(new VoltTable.ColumnInfo( str, VoltType.STRING));
+                    vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Explained Plan-SP", VoltType.STRING));
+                    vt[i].addRow(str);
+                    i++;
                 } catch (JSONException e) {
                     System.out.println(e.getMessage());
                 }
@@ -1342,7 +1344,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         else{
             //multi-partition query plan
-
             planByteArray = planBatch.getCollectorFragments();
             int i = 0;
             for( byte[] planByte : planByteArray ){
@@ -1354,7 +1355,9 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     //TODO combine plan fragments
                     pnt.loadFromJSONArray(jarray, null);
                     String str = pnt.getRootPlanNode().toExplainPlanString();
-                    vt[i++] = new VoltTable(new VoltTable.ColumnInfo( str, VoltType.STRING));
+                    vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Explained Plan-MP", VoltType.STRING));
+                    vt[i].addRow(str);
+                    i++;
                 } catch (JSONException e) {
                     System.out.println(e.getMessage());
                 }
@@ -1367,6 +1370,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         null,
                         vt,
                         null);
+        response.setClientHandle( planBatch.clientHandle );
         ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf.putInt(buf.capacity() - 4);
         response.flattenToBuffer(buf);
@@ -1625,6 +1629,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             assert(sysProc != null);
         }
 
+        else if ( sysProc == null && task.procName.equals("@Explain") ) {
+            return dispatchExplain(task, handler, ccxn);
+        }
+
         if (user == null) {
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -1667,8 +1675,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return dispatchStatistics(sysProc, buf, task, handler, ccxn);
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(sysProc, buf, task, handler, ccxn);
-            } else if (task.procName.equals("@Explain")) {
-                return dispatchExplain(task, handler, ccxn);
             }
 
 

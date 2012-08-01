@@ -132,6 +132,5 @@ public class SystemProcedureCatalog {
         listing.put("@LoadMultipartitionTable", new Config("org.voltdb.sysprocs.LoadMultipartitionTable",  false, false, false, false, false, false, false));
         listing.put("@LoadSinglepartitionTable",new Config("org.voltdb.sysprocs.LoadSinglepartitionTable", true,  false, false, false, false, false, false));
         listing.put("@Promote",                 new Config("org.voltdb.sysprocs.Promote",                  false, false, true, false, false, true, true));
-        listing.put("@Explain",                 new Config("org.voltdb.sysprocs.Explain",                  true,  true,  false, false, false, false, true));
     }
 }
