@@ -54,11 +54,11 @@ public class TablePartitionMap {
             throw m_compiler.new VoltCompilerException("PARTITION or REPLICATE has no TABLE specified");
         }
 
-        if (m_map.containsKey(tableName)) {
+        if (m_map.containsKey(tableName.toLowerCase())) {
             throw m_compiler.new VoltCompilerException(String.format(
                     "Partitioning already specified for table \"%s\"", tableName));
         }
 
-        m_map.put(tableName, colName);
+        m_map.put(tableName.toLowerCase(), colName);
     }
 }
