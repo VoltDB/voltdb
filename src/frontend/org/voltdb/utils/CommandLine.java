@@ -496,6 +496,11 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add(customCmdLn);
         }
 
+        if ((m_ipcPorts != null) && (m_ipcPorts.size() > 0)) {
+            cmdline.add("ipcports");
+            cmdline.add(org.apache.commons.lang3.StringUtils.join(m_ipcPorts, ","));
+        }
+
         if (m_tag != null) {
             cmdline.add("tag"); cmdline.add(m_tag);
         }

@@ -82,6 +82,7 @@ public class LocalCluster implements VoltServerConfig {
     boolean m_running = false;
     private final boolean m_debug;
     FailureState m_failureState;
+    int m_nextIPCPort = 10000;
     ArrayList<Process> m_cluster = new ArrayList<Process>();
     int perLocalClusterExtProcessIndex = 0;
 
@@ -205,14 +206,7 @@ public class LocalCluster implements VoltServerConfig {
             log4j = "file://" + System.getProperty("user.dir") + "/tests/log4j-allconsole.xml";
         }
 
-        // see if IV2 was enabled in the constructor, and fall back to the environment variable
-        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-        if (enableIv2 || (iv2 != null && iv2.equals("true")))
-        {
-            m_enableIv2 = true;
-        }
-        System.out.println("LOCALCLUSTER ENABLE IV2: " + m_enableIv2);
-
+        m_enableIv2 = enableIv2 || VoltDB.checkTestEnvForIv2();
         m_procBuilder = new ProcessBuilder();
 
         // set the working directory to obj/release/prod
@@ -332,9 +326,17 @@ public class LocalCluster implements VoltServerConfig {
         cmdln.drAgentStartPort(portGenerator.next());
         portGenerator.next();
         portGenerator.next();
-        for (EEProcess proc : m_eeProcs.get(0)) {
-            assert(proc != null);
-            cmdln.ipcPort(proc.port());
+        if (m_target == BackendTarget.NATIVE_EE_VALGRIND_IPC) {
+            for (EEProcess proc : m_eeProcs.get(0)) {
+                assert(proc != null);
+                cmdln.ipcPort(proc.port());
+            }
+        }
+        if (m_target == BackendTarget.NATIVE_EE_IPC) {
+            // set 1 port per site
+            for (int i = 0; i < m_siteCount; i++) {
+                cmdln.m_ipcPorts.add(portGenerator.next());
+            }
         }
 
         // for debug, dump the command line to a unique file.
@@ -542,6 +544,14 @@ public class LocalCluster implements VoltServerConfig {
             cmdln.drAgentStartPort(portGenerator.next());
             portGenerator.next();
             portGenerator.next();
+
+            // add the ipc ports
+            if (m_target == BackendTarget.NATIVE_EE_IPC) {
+                // set 1 port per site
+                for (int i = 0; i < m_siteCount; i++) {
+                    cmdln.m_ipcPorts.add(portGenerator.next());
+                }
+            }
 
             cmdln.port(portGenerator.nextClient());
             cmdln.adminPort(portGenerator.nextAdmin());
