@@ -622,8 +622,27 @@ public class HostMessenger implements SocketJoiner.JoinHandler, InterfaceToMesse
         try {
             while (true) {
                 ZKUtil.FutureWatcher fw = new ZKUtil.FutureWatcher();
-                if (m_zk.getChildren(CoreZK.hosts, fw).size() == expectedHosts) {
+                final int numChildren = m_zk.getChildren(CoreZK.hosts, fw).size();
+
+                /*
+                 * If the target number of hosts has been reached
+                 * break out
+                 */
+                if ( numChildren == expectedHosts) {
                     break;
+                }
+
+
+                /*
+                 * If there are extra hosts that means too many Volt procs were started.
+                 * Kill this node based on the assumption that we are the extra one. In most
+                 * cases this is correct and fine and in the worst case the cluster will hang coming up
+                 * because two or more hosts killed themselves
+                 */
+                if ( numChildren > expectedHosts) {
+                    org.voltdb.VoltDB.crashLocalVoltDB("Expected to find " + expectedHosts +
+                            " hosts in cluster at startup but found " + numChildren +
+                            ".  Terminating this host.", false, null);
                 }
                 fw.get();
             }

@@ -53,6 +53,27 @@ public class VoltDB {
     public static final int SITES_TO_HOST_DIVISOR = 100;
     public static final int MAX_SITES_PER_HOST = 128;
 
+    // Utility to calculate whether Iv2 is enabled or not for test cases.
+    // There are several ways to enable Iv2, of course. Ideally, use a cluster
+    // command line flag (enableiv2). Second best, use the VOLT_ENABLEIV2
+    // environment variable.
+    //
+    // IMPORTANT: To determine if Iv2 is enabled at runtime,
+    // call RealVoltDB.isIV2Enabled();
+    public static boolean checkTestEnvForIv2()
+    {
+        String iv2 = System.getenv().get("VOLT_ENABLEIV2");
+        if (iv2 == null) {
+            iv2 = System.getProperty("VOLT_ENABLEIV2");
+        }
+        if (iv2 != null && iv2.equalsIgnoreCase("true")) {
+            return true;
+        }
+        else {
+            return false;
+        }
+    }
+
     // The name of the SQLStmt implied by a statement procedure's sql statement.
     public static final String ANON_STMT_NAME = "sql";
 
@@ -163,13 +184,7 @@ public class VoltDB {
         public boolean m_enableIV2 = false;
 
         public Configuration() {
-            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
-            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
-            if (iv2 != null && iv2.equals("true"))
-            {
-                m_enableIV2 = true;
-            }
+            m_enableIV2 = VoltDB.checkTestEnvForIv2();
         }
 
         /** Behavior-less arg used to differentiate command lines from "ps" */
@@ -180,13 +195,9 @@ public class VoltDB {
         }
 
         public Configuration(PortGenerator ports) {
-            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
-            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
-            if (iv2 != null && iv2.equals("true"))
-            {
-                m_enableIV2 = true;
-            }
+            // Default iv2 configuration to the environment settings.
+            // Let explicit command line override the environment.
+            m_enableIV2 = VoltDB.checkTestEnvForIv2();
             m_port = ports.nextClient();
             m_adminPort = ports.nextAdmin();
             m_internalPort = ports.next();
@@ -196,10 +207,8 @@ public class VoltDB {
         public Configuration(String args[]) {
             String arg;
 
-            // Arguments are accepted in any order.
-            //
-            // options:
-            // [noloadlib] [hsqldb|jni|ipc] [catalog path_to_catalog] [deployment path_to_deployment]
+            // let the command line override the environment setting for enable iv2.
+            m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
             for (int i=0; i < args.length; ++i) {
                 arg = args[i];
@@ -371,13 +380,6 @@ public class VoltDB {
                 (m_startAction != START_ACTION.REJOIN &&
                  m_startAction != START_ACTION.LIVE_REJOIN)) {
                 m_leader = "localhost";
-            }
-            // MASSIVE HACK TO GLOBALLY OVERRIDE ENABLEIV2 ANYWHERE WE MIGHT CARE
-            String iv2 = System.getenv().get("VOLT_ENABLEIV2");
-            System.out.println("CONFIGURATION ENABLE IV2: " + iv2);
-            if (iv2 != null && iv2.equals("true"))
-            {
-                m_enableIV2 = true;
             }
         }
 
