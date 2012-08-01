@@ -162,9 +162,14 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         return isLeader;
     }
 
-    // runs on the leader elector callback thread.
     @Override
     public void becomeLeader()
+    {
+        acceptPromotion();
+    }
+
+    @Override
+    public void acceptPromotion()
     {
         try {
             long startTime = System.currentTimeMillis();
