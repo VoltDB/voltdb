@@ -27,6 +27,9 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 
 import org.voltcore.messaging.HostMessenger;
 
+import org.voltcore.zk.LeaderElector;
+import org.voltcore.zk.LeaderNoticeHandler;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -37,9 +40,10 @@ import org.voltdb.VoltZK;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class MpInitiator extends BaseInitiator
+public class MpInitiator extends BaseInitiator implements LeaderNoticeHandler
 {
     private static final int MP_INIT_PID = -1;
+    protected LeaderElector m_leaderElector = null;
 
     public MpInitiator(HostMessenger messenger, long buddyHSId)
     {
@@ -63,6 +67,13 @@ public class MpInitiator extends BaseInitiator
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 numberOfPartitions, csp, numberOfPartitions,
                 createForRejoin && isRejoinable());
+        // Join the leader election process after the object is fully
+        // configured.  If we do this earlier, rejoining sites will be
+        // given transactions before they're ready to handle them.
+        // FUTURE: Consider possibly returning this and the
+        // m_siteThread.start() in a Runnable which RealVoltDB can use for
+        // configure/run sequencing in the future.
+        joinElectoralCollege(numberOfPartitions);
     }
 
     /**
@@ -92,6 +103,39 @@ public class MpInitiator extends BaseInitiator
     @Override
     public void becomeLeader()
     {
-        super.becomeLeader();
+        acceptPromotion();
+    }
+
+    // Register with m_partition's leader elector node
+    // On the leader, becomeLeader() will run before joinElectoralCollage returns.
+    boolean joinElectoralCollege(int startupCount) throws InterruptedException, ExecutionException, KeeperException
+    {
+        m_missingStartupSites = new CountDownLatch(startupCount);
+        m_leaderElector = new LeaderElector(m_messenger.getZK(),
+                LeaderElector.electionDirForPartition(m_partitionId),
+                Long.toString(getInitiatorHSId()), null, this);
+        m_leaderElector.start(true);
+        m_missingStartupSites = null;
+        boolean isLeader = m_leaderElector.isLeader();
+        if (isLeader) {
+            tmLog.info(m_whoami + "published as leader.");
+        }
+        else {
+            tmLog.info(m_whoami + "running as replica.");
+        }
+        return isLeader;
+    }
+
+    @Override
+    public void shutdown()
+    {
+        try {
+            if (m_leaderElector != null) {
+                m_leaderElector.shutdown();
+            }
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.", e);
+        }
+        super.shutdown();
     }
 }

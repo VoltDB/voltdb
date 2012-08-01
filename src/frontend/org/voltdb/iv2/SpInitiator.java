@@ -30,6 +30,7 @@ import org.json_voltpatches.JSONObject;
 
 import org.voltcore.messaging.HostMessenger;
 
+import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCache.Callback;
 
@@ -58,7 +59,7 @@ public class SpInitiator extends BaseInitiator
             for (JSONObject thing : cache.values()) {
                 try {
                     if (Long.valueOf(thing.getLong("appointee")) == getInitiatorHSId()) {
-                        SpInitiator.this.becomeSPLeader();
+                        acceptPromotion();
                         break;
                     }
                 } catch (JSONException e) {
@@ -74,11 +75,6 @@ public class SpInitiator extends BaseInitiator
                 new SpScheduler(new SiteTaskerQueue()),
                 "SP");
         m_mapCache = new MapCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
-    }
-
-    private void becomeSPLeader()
-    {
-        super.becomeLeader();
     }
 
     @Override
@@ -97,6 +93,11 @@ public class SpInitiator extends BaseInitiator
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 kfactor + 1, csp, numberOfPartitions,
                 createForRejoin && isRejoinable());
+        // add ourselves to the ephemeral node list which BabySitters will watch for this
+        // partition
+        LeaderElector.createParticipantNode(m_messenger.getZK(),
+                LeaderElector.electionDirForPartition(m_partitionId),
+                Long.toString(getInitiatorHSId()), null);
     }
 
     /**
@@ -121,12 +122,5 @@ public class SpInitiator extends BaseInitiator
             String whoami)
     {
         return new SpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
-    }
-
-    @Override
-    public void becomeLeader()
-    {
-        // SpInitiator's leader election doesn't result in any actions, but we need the ZK
-        // nodes for babysitter to watch/replication/etc.
     }
 }

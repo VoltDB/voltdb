@@ -17,13 +17,9 @@
 
 package org.voltdb.iv2;
 
-import java.util.ArrayList;
-import java.util.Collection;
-
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
-import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
 
 import org.json_voltpatches.JSONObject;
@@ -33,8 +29,6 @@ import org.voltcore.messaging.HostMessenger;
 
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.LeaderElector;
-import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
@@ -53,14 +47,14 @@ import org.voltdb.VoltDB;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
+public abstract class BaseInitiator implements Initiator
 {
     VoltLogger tmLog = new VoltLogger("TM");
 
     // External references/config
     protected final HostMessenger m_messenger;
     protected final int m_partitionId;
-    private CountDownLatch m_missingStartupSites;
+    protected CountDownLatch m_missingStartupSites;
     protected final String m_zkMailboxNode;
     protected final String m_whoami;
 
@@ -69,7 +63,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     protected final InitiatorMailbox m_initiatorMailbox;
     protected Term m_term = null;
     protected Site m_executionSite = null;
-    protected LeaderElector m_leaderElector = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
 
@@ -133,39 +126,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
 
-            // Join the leader election process after the object is fully
-            // configured.  If we do this earlier, rejoining sites will be
-            // given transactions before they're ready to handle them.
-            // FUTURE: Consider possibly returning this and the
-            // m_siteThread.start() in a Runnable which RealVoltDB can use for
-            // configure/run sequencing in the future.
-            joinElectoralCollege(startupCount);
-    }
-
-    // Register with m_partition's leader elector node
-    // On the leader, becomeLeader() will run before joinElectoralCollage returns.
-    boolean joinElectoralCollege(int startupCount) throws InterruptedException, ExecutionException, KeeperException
-    {
-        m_missingStartupSites = new CountDownLatch(startupCount);
-        m_leaderElector = new LeaderElector(m_messenger.getZK(),
-                LeaderElector.electionDirForPartition(m_partitionId),
-                Long.toString(getInitiatorHSId()), null, this);
-        m_leaderElector.start(true);
-        m_missingStartupSites = null;
-        boolean isLeader = m_leaderElector.isLeader();
-        if (isLeader) {
-            tmLog.info(m_whoami + "published as leader.");
-        }
-        else {
-            tmLog.info(m_whoami + "running as replica.");
-        }
-        return isLeader;
-    }
-
-    @Override
-    public void becomeLeader()
-    {
-        acceptPromotion();
     }
 
     @Override
@@ -228,14 +188,6 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
         if (m_executionSite != null) {
             m_executionSite.startShutdown();
         }
-        try {
-            if (m_leaderElector != null) {
-                m_leaderElector.shutdown();
-            }
-        } catch (Exception e) {
-            tmLog.info("Exception during shutdown.", e);
-        }
-
         try {
             if (m_term != null) {
                 m_term.shutdown();
