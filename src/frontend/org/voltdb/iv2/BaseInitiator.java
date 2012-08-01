@@ -136,7 +136,7 @@ public abstract class BaseInitiator implements Initiator
             Boolean success = false;
             m_term = createTerm(m_missingStartupSites, m_messenger.getZK(),
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
-                    m_zkMailboxNode, m_whoami);
+                    m_whoami);
             m_term.start();
             while (!success) {
                 RepairAlgo repair = null;

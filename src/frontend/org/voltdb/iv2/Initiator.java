@@ -58,7 +58,7 @@ public interface Initiator
     /** Create a Term implementation appropriate for the subclass */
     public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami);
+            String whoami);
 
     /** Create a Promotion implementation appropriate for the subclass */
     public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,

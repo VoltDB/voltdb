@@ -88,7 +88,7 @@ public class MpInitiator extends BaseInitiator implements LeaderNoticeHandler
     @Override
     public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+            String whoami)
     {
         return new MpTerm(missingStartupSites, zk, initiatorHSId, mailbox, whoami);
     }
