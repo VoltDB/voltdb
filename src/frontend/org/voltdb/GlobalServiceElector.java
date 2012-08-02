@@ -23,6 +23,8 @@ import java.util.concurrent.ExecutionException;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
+import org.voltcore.logging.VoltLogger;
+
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.LeaderNoticeHandler;
 
@@ -33,13 +35,16 @@ import org.voltcore.zk.LeaderNoticeHandler;
  */
 class GlobalServiceElector implements LeaderNoticeHandler
 {
+    private static final VoltLogger hostLog = new VoltLogger("HOST");
     private final LeaderElector m_leaderElector;
     private final List<Promotable> m_services = new ArrayList<Promotable>();
+    private final int m_hostId;
 
-    GlobalServiceElector(ZooKeeper zk)
+    GlobalServiceElector(ZooKeeper zk, int hostId)
     {
         m_leaderElector = new LeaderElector(zk, VoltZK.leaders_globalservice,
-                "globalservice", null, this);
+                Integer.toString(hostId), null, this);
+        m_hostId = hostId;
     }
 
     /** Add a service to be notified if this node becomes the global leader */
@@ -57,13 +62,18 @@ class GlobalServiceElector implements LeaderNoticeHandler
     @Override
     synchronized public void becomeLeader()
     {
+        hostLog.info("Host " + m_hostId + " promoted to be the global service provider");
         for (Promotable service : m_services) {
             service.acceptPromotion();
         }
     }
 
-    void shutdown() throws InterruptedException, KeeperException
+    void shutdown()
     {
-        m_leaderElector.shutdown();
+        try {
+            m_leaderElector.shutdown();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Error shutting down GlobalServiceElector's LeaderElector", true, e);
+        }
     }
 }
