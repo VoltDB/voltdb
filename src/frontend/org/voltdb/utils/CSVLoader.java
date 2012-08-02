@@ -17,127 +17,281 @@
 
 package org.voltdb.utils;
 
-import java.io.*;
-import java.util.TimeZone;
+import java.io.BufferedReader;
+import java.io.BufferedWriter;
+import java.io.File;
+import java.io.FileNotFoundException;
+import java.io.FileReader;
+import java.io.FileWriter;
+import java.io.IOException;
+import java.io.InputStreamReader;
+import java.util.Map;
+import java.util.TreeMap;
 import java.util.concurrent.atomic.AtomicLong;
-import java.util.regex.Matcher;
-import java.util.regex.Pattern;
-import org.voltdb.client.*;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltdb.CLIConfig;
+import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
+import org.voltdb.client.Client;
+import org.voltdb.client.ClientConfig;
+import org.voltdb.client.ClientFactory;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.ProcedureCallback;
+
+import au.com.bytecode.opencsv_voltpatches.CSVParser;
 import au.com.bytecode.opencsv_voltpatches.CSVReader;
 
 /**
- * CSVLoader is a simple utility to load data from a CSV formatted file to a table
- * (or pass it to any stored proc, but ignoring any result other than the success code.).
- *
- * TODO:
- *   - Nulls are not handled (or at least I didn't test them).
- *   - Assumes localhost
- *   - Assumes no username/password
- *   - Usage help is ugly and cryptic: options are listed but not described.
- *   - No associated test suite.
- *   - Forces JVM into UTC. All input date TZs assumed to be GMT+0
- *   - Requires canonical JDBC SQL timestamp format
+ * CSVLoader is a simple utility to load data from a CSV formatted file to a
+ * table (or pass it to any stored proc, but ignoring any result other than the
+ * success code.).
  */
-class CSVLoader {
-
-    public synchronized static void setDefaultTimezone() {
-        TimeZone.setDefault(TimeZone.getTimeZone("GMT+0"));
-    }
+public class CSVLoader {
 
     private static final AtomicLong inCount = new AtomicLong(0);
     private static final AtomicLong outCount = new AtomicLong(0);
+    private static final int reportEveryNRows = 10000;
+    private static final int waitSeconds = 10;
 
-    private static int reportEveryNRows = 10000;
-    private static int limitRows = Integer.MAX_VALUE;
-    private static int skipRows = 0;
-    private static int auditRows = 0;
-    private static int waitSeconds = 10;
-    private static boolean stripQuotes = false;
-    private static int[] colProjection = null;
+    private static CSVConfig config = null;
+    private static long latency = -1;
+    private static boolean standin = false;
+
+    public static String pathInvalidrowfile = "";
+    public static String pathReportfile = "csvloaderReport.log";
+    public static String pathLogfile = "csvloaderLog.log";
+
+    private static BufferedWriter out_invaliderowfile;
+    private static BufferedWriter out_logfile;
+    private static BufferedWriter out_reportfile;
+
+    private static String insertProcedure = "";
+    private static Map<Long, String[]> errorInfo = new TreeMap<Long, String[]>();
+
+    private static CSVReader csvReader;
+    private static Client csvClient;
+    protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
     private static final class MyCallback implements ProcedureCallback {
-        private final long m_sentCount;
-        MyCallback(long sent)
-        {
-            m_sentCount = sent;
+        private final long m_lineNum;
+        private final CSVConfig m_config;
+        private final String m_rowdata;
+
+        MyCallback(long lineNumber, CSVConfig cfg, String rowdata) {
+            m_lineNum = lineNumber;
+            m_config = cfg;
+            m_rowdata = rowdata;
         }
+
         @Override
         public void clientCallback(ClientResponse response) throws Exception {
             if (response.getStatus() != ClientResponse.SUCCESS) {
-                if (m_sentCount == 0) {
-                    System.err.print("Line ~" + inCount.get() + "-" + outCount.get() + ":");
-                } else {
-                    System.err.print("Line " + m_sentCount + ":");
+                m_log.error( response.getStatusString() );
+                synchronized (errorInfo) {
+                    if (!errorInfo.containsKey(m_lineNum)) {
+                        String[] info = { m_rowdata, response.getStatusString() };
+                        errorInfo.put(m_lineNum, info);
+                    }
+                    if (errorInfo.size() >= m_config.maxerrors) {
+                        m_log.error("The number of Failure row data exceeds " + m_config.maxerrors);
+                        close_cleanup();
+                        System.exit(-1);
+                    }
                 }
-                System.err.println(response.getStatusString());
-                System.exit(1);
+                return;
             }
 
             long currentCount = inCount.incrementAndGet();
+
             if (currentCount % reportEveryNRows == 0) {
-                System.out.println("Inserted " + currentCount + " rows");
+                m_log.info( "Inserted " + currentCount + " rows" );
             }
         }
     }
 
+    private static class CSVConfig extends CLIConfig {
+        @Option(shortOpt = "f", desc = "location of CSV input file")
+        String file = "";
 
-    public static void main(String[] args) {
-        if (args.length < 2) {
-            System.err.println("Two arguments, csv filename and insert procedure name, required");
-            System.exit(1);
+        @Option(shortOpt = "p", desc = "procedure name to insert the data into the database")
+        String procedure = "";
+
+        @Option(desc = "maximum rows to be read from the CSV file")
+        int limitrows = Integer.MAX_VALUE;
+
+        @Option(shortOpt = "r", desc = "directory path for report files")
+        String reportdir = System.getProperty("user.dir");
+
+        @Option(shortOpt = "m", desc = "maximum errors allowed")
+        int maxerrors = 100;
+
+        @Option(desc = "delimiter to use for separating entries")
+        char separator = CSVParser.DEFAULT_SEPARATOR;
+
+        @Option(desc = "character to use for quoted elements (default: \")")
+        char quotechar = CSVParser.DEFAULT_QUOTE_CHARACTER;
+
+        @Option(desc = "character to use for escaping a separator or quote (default: \\)")
+        char escape = CSVParser.DEFAULT_ESCAPE_CHARACTER;
+
+        @Option(desc = "require all input values to be enclosed in quotation marks", hasArg = false)
+        boolean strictquotes = CSVParser.DEFAULT_STRICT_QUOTES;
+
+        @Option(desc = "number of lines to skip before inserting rows into the database")
+        int skip = CSVReader.DEFAULT_SKIP_LINES;
+
+        @Option(desc = "do not allow whitespace between values and separators", hasArg = false)
+        boolean nowhitespace = !CSVParser.DEFAULT_IGNORE_LEADING_WHITESPACE;
+
+        @Option(shortOpt = "s", desc = "list of servers to connect to (default: localhost)")
+        String servers = "localhost";
+
+        @Option(desc = "username when connecting to the servers")
+        String user = "";
+
+        @Option(desc = "password to use when connecting to servers")
+        String password = "";
+
+        @Option(desc = "port to use when connecting to database (default: 21212)")
+        int port = Client.VOLTDB_SERVER_PORT;
+
+        @AdditionalArgs(desc = "insert the data into database by TABLENAME.insert procedure by default")
+        String table = "";
+
+        @Override
+        public void validate() {
+            if (maxerrors < 0)
+                exitWithMessageAndUsage("abortfailurecount must be >=0");
+            if (procedure.equals("") && table.equals(""))
+                exitWithMessageAndUsage("procedure name or a table name required");
+            if (!procedure.equals("") && !table.equals(""))
+                exitWithMessageAndUsage("Only a procedure name or a table name required, pass only one please");
+            if (skip < 0)
+                exitWithMessageAndUsage("skipline must be >= 0");
+            if (limitrows > Integer.MAX_VALUE)
+                exitWithMessageAndUsage("limitrows to read must be < "
+                        + Integer.MAX_VALUE);
+            if (port < 0)
+                exitWithMessageAndUsage("port number must be >= 0");
         }
 
-        final String filename = args[0];
-        final String insertProcedure = args[1];
-        int argsUsed = 2;
+        @Override
+        public void printUsage() {
+            System.out
+                .println("Usage: csvloader [args] tablename");
+            System.out
+                .println("       csvloader [args] -p procedurename");
+            super.printUsage();
+        }
+    }
 
-        processCommandLineOptions(argsUsed, args);
-
+    public static void main(String[] args) throws IOException,
+            InterruptedException {
+        long start = System.currentTimeMillis();
         int waits = 0;
         int shortWaits = 0;
 
-        try {
-            final CSVReader reader = new CSVReader(new FileReader(filename));
-            final ProcedureCallback oneCallbackFitsAll = new MyCallback(0);
-            ProcedureCallback cb = oneCallbackFitsAll;
+        CSVConfig cfg = new CSVConfig();
+        cfg.parse(CSVLoader.class.getName(), args);
 
-            final Client client = ClientFactory.createClient();
-            client.createConnection("localhost");
+        config = cfg;
+        configuration();
+        try {
+            if (CSVLoader.standin)
+                csvReader = new CSVReader(new BufferedReader(
+                        new InputStreamReader(System.in)), config.separator,
+                        config.quotechar, config.escape, config.skip,
+                        config.strictquotes, config.nowhitespace);
+            else
+                csvReader = new CSVReader(new FileReader(config.file),
+                        config.separator, config.quotechar, config.escape,
+                        config.skip, config.strictquotes, config.nowhitespace);
+
+        } catch (FileNotFoundException e) {
+            m_log.error("CSV file '" + config.file + "' could not be found.");
+            System.exit(-1);
+        }
+        // Split server list
+        String[] serverlist = config.servers.split(",");
+
+        // Create connection
+        ClientConfig c_config = new ClientConfig(config.user, config.password);
+        c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
+                                             // timeout, see ENG-2670
+        try {
+            csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
+        } catch (Exception e) {
+            m_log.error("Error to connect to the servers:"
+                    + config.servers);
+            System.exit(-1);
+        }
+
+        try {
+            ProcedureCallback cb = null;
 
             boolean lastOK = true;
             String line[] = null;
 
-            for (int i = 0; i < skipRows; ++i) {
-                reader.readNext();
-                // Keep these sync'ed with line numbers.
-                outCount.incrementAndGet();
-                inCount.incrementAndGet();
+            int columnCnt = 0;
+            VoltTable procInfo = null;
+            boolean isProcExist = false;
+            try {
+                procInfo = csvClient.callProcedure("@SystemCatalog",
+                        "PROCEDURECOLUMNS").getResults()[0];
+                while (procInfo.advanceRow()) {
+                    if (insertProcedure.matches((String) procInfo.get(
+                            "PROCEDURE_NAME", VoltType.STRING))) {
+                        columnCnt++;
+                        isProcExist = true;
+                    }
+                }
+            } catch (Exception e) {
+                m_log.error(e.getMessage(), e);
+                System.exit(-1);
+            }
+            if (isProcExist == false) {
+                m_log.error("No matching insert procedure available");
+                close_cleanup();
+                System.exit(-1);
             }
 
-            while ((limitRows-- > 0) && (line = reader.readNext()) != null) {
-                long counter = outCount.incrementAndGet();
+            while ((config.limitrows-- > 0)
+                    && (line = csvReader.readNext()) != null) {
+                outCount.incrementAndGet();
                 boolean queued = false;
                 while (queued == false) {
+                    StringBuilder linedata = new StringBuilder();
+                    for (int i = 0; i < line.length; i++) {
+                        linedata.append("\"" + line[i] + "\"");
+                        if (i != line.length - 1)
+                            linedata.append(",");
+                    }
                     String[] correctedLine = line;
-                    if (colProjection != null) {
-                        correctedLine = projectColumns(colProjection, correctedLine);
+                    cb = new MyCallback(outCount.get(), config,
+                            linedata.toString());
+                    String lineCheckResult;
+
+                    if ((lineCheckResult = checkparams_trimspace(correctedLine,
+                            columnCnt)) != null) {
+                        synchronized (errorInfo) {
+                            if (!errorInfo.containsKey(outCount.get())) {
+                                String[] info = { linedata.toString(),
+                                        lineCheckResult };
+                                errorInfo.put(outCount.get(), info);
+                            }
+                            if (errorInfo.size() >= config.maxerrors) {
+                                m_log.error("The number of Failure row data exceeds "
+                                        + config.maxerrors);
+                                close_cleanup();
+                                System.exit(-1);
+                            }
+                        }
+                        break;
                     }
 
-                    if (stripQuotes) {
-                        correctedLine = stripMatchingColumnQuotes(correctedLine);
-                    }
-
-                    if (auditRows > 0) {
-                        --auditRows;
-                        System.err.println(joinIntoString(", ", line));
-                        System.err.println(joinIntoString(", ", correctedLine));
-                        System.err.println("----------");
-                        cb = new MyCallback(counter);
-                    } else {
-                        cb = oneCallbackFitsAll;
-                    }
-
-                    queued = client.callProcedure(cb, insertProcedure, (Object[])correctedLine);
+                    queued = csvClient.callProcedure(cb, insertProcedure,
+                            (Object[]) correctedLine);
 
                     if (queued == false) {
                         ++waits;
@@ -149,166 +303,160 @@ class CSVLoader {
                     lastOK = queued;
                 }
             }
+            csvClient.drain();
 
-            reader.close();
-            client.drain();
-            client.close();
         } catch (Exception e) {
             e.printStackTrace();
         }
 
-        System.out.println("Inserted " + (outCount.get() - skipRows) + " and acknowledged " + (inCount.get() - skipRows) + " rows (final)");
+        m_log.info("Inserted " + outCount.get() + " and acknowledged "
+                + inCount.get() + " rows (final)");
         if (waits > 0) {
-            System.out.println("Waited " + waits + " times");
+            m_log.info("Waited " + waits + " times");
             if (shortWaits > 0) {
-                System.out.println("Waited too briefly? " + shortWaits + " times");
+                m_log.info( "Waited too briefly? " + shortWaits
+                        + " times" );
             }
         }
+
+        latency = System.currentTimeMillis() - start;
+        m_log.info("CSVLoader elaspsed: " + latency / 1000F
+                + " seconds");
+        produceFiles();
+        close_cleanup();
     }
 
-    private static void processCommandLineOptions(int argsUsed, String args[]) {
-        final String columnsMatch = "--columns";
-        final String stripMatch = "--stripquotes";
-        final String waitMatch = "--wait";
-        final String auditMatch = "--audit";
-        final String limitMatch = "--limit";
-        final String skipMatch = "--skip";
-        final String reportMatch = "--report";
-        final String columnsStyle = "comma-separated-zero-based-column-numbers";
+    private static String checkparams_trimspace(String[] slot,
+            int columnCnt) {
+        if (slot.length == 1 && slot[0].equals("")) {
+            return "Error: blank line";
+        }
+        if (slot.length != columnCnt) {
+            return "Error: Incorrect number of columns. " + slot.length
+                    + " found, " + columnCnt + " expected.";
+        }
+        for (int i = 0; i < slot.length; i++) {
+            // trim white space in this line.
+            slot[i] = slot[i].trim();
+            // treat NULL, \N and "\N" as actual null value
+            if ((slot[i]).equals("NULL") || slot[i].equals("\\N")
+                    || !config.strictquotes && slot[i].equals("\"\\N\""))
+                slot[i] = null;
+        }
 
-        while (argsUsed < args.length) {
+        return null;
+    }
 
-            final String optionPrefix = args[argsUsed++];
-
-            if (optionPrefix.equalsIgnoreCase(columnsMatch)) {
-                if (argsUsed < args.length) {
-                    final String colsListed = args[argsUsed++];
-                    final String[] cols = colsListed.split(",");
-                    if (cols != null && cols.length > 0) {
-                        colProjection = new int[cols.length];
-                        for (int i = 0; i < cols.length; i++) {
-                            try {
-                                colProjection[i] = Integer.parseInt(cols[i]);
-                                continue;
-                            } catch (NumberFormatException e) {
-                            }
-                        }
-                        if (colProjection.length == cols.length) {
-                            continue;
-                        }
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(waitMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        waitSeconds = Integer.parseInt(args[argsUsed++]);
-                        if (waitSeconds >= 0) {
-                            continue;
-                        }
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(auditMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        auditRows = Integer.parseInt(args[argsUsed++]);
-                        continue;
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(limitMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        limitRows = Integer.parseInt(args[argsUsed++]);
-                        continue;
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(skipMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        skipRows = Integer.parseInt(args[argsUsed++]);
-                        continue;
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(reportMatch)) {
-                if (argsUsed < args.length) {
-                    try {
-                        reportEveryNRows = Integer.parseInt(args[argsUsed++]);
-                        if (reportEveryNRows > 0) {
-                            continue;
-                        }
-                    } catch (NumberFormatException e) {
-                    }
-                }
-            } else if (optionPrefix.equalsIgnoreCase(stripMatch)) {
-                stripQuotes = true;
-                continue;
+    private static void configuration() {
+        if (config.file.equals(""))
+            standin = true;
+        if (!config.table.equals("")) {
+            insertProcedure = config.table.toUpperCase() + ".insert";
+        } else {
+            insertProcedure = config.procedure;
+        }
+        if (!config.reportdir.endsWith("/"))
+            config.reportdir += "/";
+        try {
+            File dir = new File(config.reportdir);
+            if (!dir.exists()) {
+                dir.mkdirs();
             }
-            // Fall through means an error.
-            System.err.println("Option arguments are invalid, expected csv filename and insert procedure name (required) and optionally" +
-                    " '" + columnsMatch + " " + columnsStyle + "'," +
-                    " '" + waitMatch + " s (default=10 seconds)'," +
-                    " '" + auditMatch + " n (default=0 rows)'," +
-                    " '" + limitMatch + " n (default=all rows)'," +
-                    " '" + skipMatch + " n (default=0 rows)'," +
-                    " '" + reportMatch + " n (default=10000)'," +
-                    " and/or '" + stripMatch + " (disabled by default)'");
-            System.exit(2);
+        } catch (Exception x) {
+            m_log.error(x.getMessage(), x);
+            System.exit(-1);
+        }
+
+        String myinsert = insertProcedure;
+        myinsert = myinsert.replaceAll("\\.", "_");
+        pathInvalidrowfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "invalidrows.csv";
+        pathLogfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "log.log";
+        pathReportfile = config.reportdir + "csvloader_" + myinsert + "_"
+                + "report.log";
+
+        try {
+            out_invaliderowfile = new BufferedWriter(new FileWriter(
+                    pathInvalidrowfile));
+            out_logfile = new BufferedWriter(new FileWriter(pathLogfile));
+            out_reportfile = new BufferedWriter(new FileWriter(pathReportfile));
+        } catch (IOException e) {
+            m_log.error(e.getMessage());
+            System.exit(-1);
         }
     }
 
-    private static String[] stripMatchingColumnQuotes(String[] line) {
-        final String[] strippedLine = new String[line.length];
-        Pattern pattern = Pattern.compile("^([\"'])(.*)\\1$");
-        for (int i = 0; i < line.length; i++) {
-            Matcher matcher = pattern.matcher(line[i]);
-            if (matcher.find()) {
-                strippedLine[i] = matcher.group(2);
-            } else {
-                strippedLine[i] = line[i];
+    private static Client getClient(ClientConfig config, String[] servers,
+            int port) throws Exception {
+        final Client client = ClientFactory.createClient(config);
+
+        for (String server : servers)
+            client.createConnection(server.trim(), port);
+        return client;
+    }
+
+    private static void produceFiles() {
+
+        int bulkflush = 300; // by default right now
+        try {
+            long linect = 0;
+            for (Long irow : errorInfo.keySet()) {
+                String info[] = errorInfo.get(irow);
+                if (info.length != 2)
+                    System.out
+                            .println("internal error, infomation is not enough");
+                linect++;
+                out_invaliderowfile.write(info[0] + "\n");
+                String message = "Invalid input on line " + irow + ".\n  Contents:" + info[0];
+                m_log.error(message);
+                out_logfile.write(message + "\n  " + info[1] + "\n");
+                if (linect % bulkflush == 0) {
+                    out_invaliderowfile.flush();
+                    out_logfile.flush();
+                }
             }
+            // Get elapsed time in seconds
+            float elapsedTimeSec = latency / 1000F;
+            out_reportfile.write("csvloader elaspsed: " + elapsedTimeSec
+                    + " seconds\n");
+            out_reportfile.write("Number of rows read from input: "
+                    + outCount.get() + "\n");
+            out_reportfile.write("Number of rows successfully inserted: "
+                    + inCount.get() + "\n");
+            // if prompted msg changed, change it also for test case
+            out_reportfile.write("Number of rows that could not be inserted: "
+                    + errorInfo.size() + "\n");
+            out_reportfile.write("CSVLoader rate: " + outCount.get()
+                    / elapsedTimeSec + " row/s\n");
+
+            m_log.info("invalid row file is generated to:" + pathInvalidrowfile);
+            m_log.info("log file is generated to:" + pathLogfile);
+            m_log.info("report file is generated to:" + pathReportfile);
+
+            out_invaliderowfile.flush();
+            out_logfile.flush();
+            out_reportfile.flush();
+        } catch (FileNotFoundException e) {
+            m_log.error("CSV report directory '" + config.reportdir
+                    + "' does not exist.");
+        } catch (Exception x) {
+            m_log.error(x.getMessage());
         }
-        return strippedLine;
+
     }
 
-    private static String[] projectColumns(int[] colSelection, String[] line) {
-        final String[] projectedLine = new String[colSelection.length];
-        for (int i = 0; i < projectedLine.length; i++) {
-            projectedLine[i] = line[colSelection[i]];
-        }
-        return projectedLine;
-    }
+    private static void close_cleanup() throws IOException,
+            InterruptedException {
+        inCount.set(0);
+        outCount.set(0);
+        errorInfo.clear();
 
-    // This function borrowed/mutated from http:/stackoverflow.com/questions/1515437
-    static String joinIntoString(String glue, Object... elements)
-    {
-        int k = elements.length;
-        if (k == 0) {
-            return null;
-        }
-        StringBuilder out = new StringBuilder();
-        out.append(elements[0].toString());
-        for (int i = 1; i < k; ++i) {
-            out.append(glue).append(elements[i]);
-        }
-        return out.toString();
-    }
+        csvReader.close();
+        csvClient.close();
 
-    // This function borrowed/mutated from http:/stackoverflow.com/questions/1515437
-    static String joinIntoString(String glue, String... elements)
-    {
-        int k = elements.length;
-        if (k == 0) {
-            return null;
-        }
-        StringBuilder out = new StringBuilder();
-        out.append(elements[0]);
-        for (int i = 1; i < k; ++i) {
-            out.append(glue).append(elements[i]);
-        }
-        return out.toString();
+        out_invaliderowfile.close();
+        out_logfile.close();
+        out_reportfile.close();
     }
-
 }

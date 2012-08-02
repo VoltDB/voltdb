@@ -16,11 +16,17 @@
  */
 
 #include "common/NValue.hpp"
+#include "common/executorcontext.hpp"
 
 #include <cstdio>
 #include <sstream>
 
 using namespace voltdb;
+
+Pool* NValue::getTempStringPool() {
+    return ExecutorContext::getTempStringPool();
+}
+
 
 // For x<op>y where x is an integer,
 // promote x and y to s_intPromotionTable[y]
@@ -149,67 +155,12 @@ std::string NValue::debug() const {
         buffer << createStringFromDecimal();
         break;
       default:
-          throwFatalException ("unknown type %d", (int) type);
+          buffer << getTypeName(type);
     }
     std::string ret(buffer.str());
     return (ret);
 }
 
-
-/*
- * Convert ValueType to a string. One might say that,
- * strictly speaking, this has no business here.
- */
-std::string NValue::getTypeName(ValueType type) {
-    std::string ret;
-    switch (type) {
-      case (VALUE_TYPE_TINYINT):
-        ret = "tinyint";
-        break;
-      case (VALUE_TYPE_SMALLINT):
-        ret = "smallint";
-        break;
-      case (VALUE_TYPE_INTEGER):
-        ret = "integer";
-        break;
-      case (VALUE_TYPE_BIGINT):
-        ret = "bigint";
-        break;
-      case (VALUE_TYPE_DOUBLE):
-        ret = "double";
-        break;
-      case (VALUE_TYPE_VARCHAR):
-        ret = "varchar";
-        break;
-      case (VALUE_TYPE_VARBINARY):
-        ret = "varbinary";
-        break;
-      case (VALUE_TYPE_TIMESTAMP):
-        ret = "timestamp";
-        break;
-      case (VALUE_TYPE_DECIMAL):
-        ret = "decimal";
-        break;
-      case (VALUE_TYPE_INVALID):
-        ret = "INVALID";
-        break;
-      case (VALUE_TYPE_NULL):
-        ret = "NULL";
-        break;
-      case (VALUE_TYPE_BOOLEAN):
-        ret = "boolean";
-        break;
-      case (VALUE_TYPE_ADDRESS):
-        ret = "address";
-        break;
-      default: {
-          char buffer[32];
-          snprintf(buffer, 32, "UNKNOWN[%d]", type);
-          ret = buffer;
-      }
-    }
-    return (ret);
-}
 
 /**
  * Serialize sign and value using radix point (no exponent).
@@ -331,7 +282,7 @@ NValue NValue::opMultiplyDecimals(const NValue &lhs, const NValue &rhs) const {
     if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) &&
         (rhs.getValueType() != VALUE_TYPE_DECIMAL))
     {
-        throwFatalException("No decimal NValue in decimal multiply.");
+        throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal multiply");
     }
 
     if (lhs.isNull() || rhs.isNull()) {
@@ -412,7 +363,7 @@ NValue NValue::opDivideDecimals(const NValue lhs, const NValue rhs) const {
     if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
         (rhs.getValueType() != VALUE_TYPE_DECIMAL))
     {
-        throwFatalException("Non-decimal NValue in decimal subtract.");
+        throw SQLException(SQLException::dynamic_sql_error, "No decimal NValue in decimal subtract");
     }
 
     if (lhs.isNull() || rhs.isNull()) {

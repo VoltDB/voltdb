@@ -41,6 +41,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.messaging.HostMessenger;
+import org.voltcore.utils.Pair;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltZK.MailboxType;
@@ -146,6 +147,7 @@ public class MockVoltDB implements VoltDBInterface
         retval.setClassname(name);
         retval.setHasjava(true);
         retval.setSystemproc(false);
+        retval.setDefaultproc(false);
         return retval;
     }
 
@@ -332,6 +334,7 @@ public class MockVoltDB implements VoltDBInterface
     public void initialize(Configuration config)
     {
         m_noLoadLib = config.m_noLoadLibVOLTDB;
+        voltconfig = config;
     }
 
     @Override
@@ -372,7 +375,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public CatalogContext catalogUpdate(String diffCommands,
+    public Pair<CatalogContext, CatalogSpecificPlanner> catalogUpdate(String diffCommands,
             byte[] catalogBytes, int expectedCatalogVersion,
             long currentTxnId, long deploymentCRC)
     {
@@ -390,7 +393,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public void onExecutionSiteRecoveryCompletion(long transferred) {
+    public void onExecutionSiteRejoinCompletion(long transferred) {
     }
 
     @Override
@@ -399,7 +402,7 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
-    public boolean recovering() {
+    public boolean rejoining() {
         return false;
     }
 
@@ -475,6 +478,11 @@ public class MockVoltDB implements VoltDBInterface
     }
 
     @Override
+    public SiteTracker getSiteTrackerForSnapshot() {
+        return m_siteTracker;
+    }
+
+    @Override
     public MailboxPublisher getMailboxPublisher() {
         return m_mailboxPublisher;
     }
@@ -484,6 +492,7 @@ public class MockVoltDB implements VoltDBInterface
         // TODO Auto-generated method stub
     }
 
+    @Override
     public LicenseApi getLicenseApi()
     {
         return new LicenseApi() {
@@ -529,5 +538,10 @@ public class MockVoltDB implements VoltDBInterface
                 return true;
             }
         };
+    }
+
+    @Override
+    public boolean isIV2Enabled() {
+        return voltconfig.m_enableIV2;
     }
 }

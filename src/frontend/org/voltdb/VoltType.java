@@ -498,6 +498,29 @@ public enum VoltType {
         }
     }
 
+    /* Indicate whether a value can be assigned to this type without loss of range or precision,
+     * important for index key and partition key initialization. */
+    public boolean canExactlyRepresentAnyValueOf(VoltType otherType) {
+        // self to self conversion is obviously fine.
+        if (this == otherType)
+            return true;
+
+        if (otherType.isInteger()) {
+            if (this.isInteger()) {
+                // Don't allow integers getting smaller.
+                return this.getMaxLengthInBytes() >= otherType.getMaxLengthInBytes();
+            }
+            else if (this == VoltType.FLOAT) {
+                // Non-big integers make acceptable (exact) floats
+                if (otherType != VoltType.BIGINT) {
+                    return true;
+                }
+            }
+            // Not sure about integer-to-decimal: for now, just give up.
+        }
+        return false;
+    }
+
     /**
      * Get a char that uniquely identifies a type. Used to create
      * concise schema signatures.

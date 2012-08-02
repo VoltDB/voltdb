@@ -47,7 +47,7 @@ PRIMARY ENTRY POINTS
         <arg value="catalog.jar"/>
         <arg value="deployment"/>
         <arg value="deployment.xml"/>
-        <arg value="leader"/>
+        <arg value="host"/>
         <arg value="volt7b"/>
         <classpath refid='project.classpath'/>
         <assertions><disable/></assertions>

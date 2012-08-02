@@ -99,7 +99,7 @@ public class TestExecutionEngine extends TestCase {
         }
 
         System.out.println(warehousedata.toString());
-        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0, Long.MAX_VALUE);
+        engine.loadTable(WAREHOUSE_TABLEID, warehousedata, 0, 0);
 
         VoltTable stockdata = new VoltTable(
                 new VoltTable.ColumnInfo("S_I_ID", VoltType.INTEGER),
@@ -125,7 +125,7 @@ public class TestExecutionEngine extends TestCase {
                              "sdist4", "sdist5", "sdist6", "sdist7", "sdist8",
                              "sdist9", "sdist10", 0, 0, 0, "sdata");
         }
-        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0, Long.MAX_VALUE);
+        engine.loadTable(STOCK_TABLEID, stockdata, 0, 0);
     }
 
     public void testLoadTable() throws Exception {
@@ -142,8 +142,19 @@ public class TestExecutionEngine extends TestCase {
 
     public void testStreamTables() throws Exception {
         sourceEngine.loadCatalog( 0, m_catalog.serialize());
-        ExecutionEngine destinationEngine = new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, 0, 0, "", 100, 1);
-        destinationEngine.loadCatalog( 0, m_catalog.serialize());
+
+        // Each EE needs its own thread for correct initialization.
+        final AtomicReference<ExecutionEngine> destinationEngine = new AtomicReference<ExecutionEngine>();
+        Thread destEEThread = new Thread() {
+            @Override
+            public void run() {
+                destinationEngine.set(new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, 0, 0, "", 100, 1));
+            }
+        };
+        destEEThread.start();
+        destEEThread.join();
+
+        destinationEngine.get().loadCatalog( 0, m_catalog.serialize());
 
         int WAREHOUSE_TABLEID = warehouseTableId(m_catalog);
         int STOCK_TABLEID = stockTableId(m_catalog);
@@ -166,20 +177,20 @@ public class TestExecutionEngine extends TestCase {
             int serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
             assertTrue(serialized > 0);
             container.b.limit(serialized);
-            destinationEngine.processRecoveryMessage( container.b, container.address);
+            destinationEngine.get().processRecoveryMessage( container.b, container.address);
 
 
             serialized = sourceEngine.tableStreamSerializeMore( container, WAREHOUSE_TABLEID, TableStreamType.RECOVERY);
             assertEquals( 5, serialized);
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
 
-            assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.tableHashCode(WAREHOUSE_TABLEID));
+            assertEquals( sourceEngine.tableHashCode(WAREHOUSE_TABLEID), destinationEngine.get().tableHashCode(WAREHOUSE_TABLEID));
 
             container.b.clear();
             serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
             assertTrue(serialized > 0);
             container.b.limit(serialized);
-            destinationEngine.processRecoveryMessage( container.b, container.address);
+            destinationEngine.get().processRecoveryMessage( container.b, container.address);
 
 
             serialized = sourceEngine.tableStreamSerializeMore( container, STOCK_TABLEID, TableStreamType.RECOVERY);
@@ -187,7 +198,7 @@ public class TestExecutionEngine extends TestCase {
             assertEquals( RecoveryMessageType.Complete.ordinal(), container.b.get());
             assertEquals( STOCK_TABLEID, container.b.getInt());
 
-            assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.tableHashCode(STOCK_TABLEID));
+            assertEquals( sourceEngine.tableHashCode(STOCK_TABLEID), destinationEngine.get().tableHashCode(STOCK_TABLEID));
         } finally {
             origin.discard();
         }

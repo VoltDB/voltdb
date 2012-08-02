@@ -258,14 +258,104 @@ class NValue {
      */
     NValue like(const NValue rhs) const;
 
+    /*
+     * callConstant, callUnary, and call are templates for arbitrary NValue member functions that implement
+     * SQL "column functions". They differ in how many arguments they accept:
+     * 0 for callConstant, 1 ("this") for callUnary, and any number (packaged in a vector) for call.
+     * The main benefit of these functions being (always explicit) template instantiations for each
+     * ExepressionType "EXPRESSION_TYPE_FUNCTION_*" value instead of a more normal named member function
+     * of NValue is that it allows them to be invoked from the default eval method of the
+     * correspondingly templated expression subclass
+     * (ConstantFunctionExpression, UnaryFunctionExpression, or GeneralFunctionExpression).
+     * The alternative would be to name each function (abs, substring, etc.)
+     * and explicitly implement the eval method for every expression subclass template instantiation
+     * (UnaryFunctionExpression<EXPRESSION_TYPE_FUNCTION_ABS>::eval,
+     * GeneralFunctionExpression<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>::eval, etc.
+     * to call the corresponding NValue member function.
+     * So, these member function templates save a bit of boilerplate for each SQL function and allow
+     * the function expression subclass templates to be implemented completely generically.
+     */
     template <ExpressionType E> // template for SQL functions returning constants (like pi)
     static NValue callConstant();
 
-    template <ExpressionType E> // template for SQL functions of one NValue
+    template <ExpressionType E> // template for SQL functions of one NValue ("this")
     NValue callUnary() const;
 
     template <ExpressionType E> // template for SQL functions of multiple NValues
     static NValue call(const std::vector<NValue>& arguments);
+
+    /// Iterates over UTF8 strings one character "code point" at a time, being careful not to walk off the end.
+    class UTF8Iterator {
+    public:
+        UTF8Iterator(const char *start, const char *end) :
+            m_cursor(start),
+            m_end(end)
+            // TODO: We could validate up front that the string is well-formed UTF8,
+            // at least to the extent that multi-byte characters have a valid
+            // prefix byte and continuation bytes that will not cause a read
+            // off the end of the buffer.
+            // That done, extractCodePoint could be considerably simpler/faster.
+            { assert(m_cursor <= m_end); }
+
+        //Construct a one-off with an alternative current cursor position
+        UTF8Iterator(const UTF8Iterator& other, const char *start) :
+            m_cursor(start),
+            m_end(other.m_end)
+            { assert(m_cursor <= m_end); }
+
+        const char * getCursor() { return m_cursor; }
+
+        bool atEnd() { return m_cursor >= m_end; }
+
+        const char * skipCodePoints(int64_t skips) {
+            while (skips-- > 0 && ! atEnd()) {
+                // TODO: since the returned code point is ignored, it might be better
+                // to call a faster, simpler, skipCodePoint method -- maybe once that
+                // becomes trivial due to up-front validation.
+                extractCodePoint();
+            }
+            if (atEnd()) {
+                return m_end;
+            }
+            return m_cursor;
+        }
+
+        /*
+         * Go through a lot of trouble to make sure that corrupt
+         * utf8 data doesn't result in touching uninitialized memory
+         * by copying the character data onto the stack.
+         * That wouldn't be needed if we pre-validated the buffer.
+         */
+        uint32_t extractCodePoint() {
+            assert(m_cursor < m_end); // Caller should have tested and handled atEnd() condition
+            /*
+             * Copy the next 6 bytes to a temp buffer and retrieve.
+             * We should only get 4 byte code points, and the library
+             * should only accept 4 byte code points, but once upon a time there
+             * were 6 byte code points in UTF-8 so be careful here.
+             */
+            char nextPotentialCodePoint[] = { 0, 0, 0, 0, 0, 0 };
+            char *nextPotentialCodePointIter = nextPotentialCodePoint;
+            //Copy 6 bytes or until the end
+            ::memcpy( nextPotentialCodePoint, m_cursor, std::min( 6L, m_end - m_cursor));
+
+            /*
+             * Extract the code point, find out how many bytes it was
+             */
+            uint32_t codePoint = utf8::unchecked::next(nextPotentialCodePointIter);
+            long int delta = nextPotentialCodePointIter - nextPotentialCodePoint;
+
+            /*
+             * Increment the iterator that was passed in by ref, by the delta
+             */
+            m_cursor += delta;
+            return codePoint;
+        }
+
+        const char * m_cursor;
+        const char * const m_end;
+    };
+
 
     /* For boost hashing */
     void hashCombine(std::size_t &seed) const;
@@ -314,7 +404,6 @@ class NValue {
      */
 
     // Function declarations for NValue.cpp definitions.
-    static std::string getTypeName(ValueType type);
     void createDecimalFromString(const std::string &txt);
     std::string createStringFromDecimal() const;
     NValue opDivideDecimals(const NValue lhs, const NValue rhs) const;
@@ -395,6 +484,14 @@ class NValue {
         return m_valueType;
     }
 
+    /**
+     * Get the type of the value. This information is private
+     * to prevent code outside of NValue from branching based on the type of a value.
+     */
+    std::string getValueTypeString() const {
+        return getTypeName(m_valueType);
+    }
+
     void setSourceInlined(bool sourceInlined)
     {
         m_sourceInlined = sourceInlined;
@@ -416,12 +513,14 @@ class NValue {
             // length 0. In practice, this code path is often a defect
             // in code not correctly handling null. May favor a more
             // defensive "return 0" in the future? (rtb)
-            throwFatalException("Must not ask  for object length on sql null object.");
+            throw SQLException(SQLException::dynamic_sql_error,
+                    "Must not ask  for object length on sql null object.");
         }
         if ((getValueType() != VALUE_TYPE_VARCHAR) && (getValueType() != VALUE_TYPE_VARBINARY)) {
             // probably want getTupleStorageSize() for non-object types.
             // at the moment, only varchars are using getObjectLength().
-            throwFatalException("Must not ask for object length for non-object types");
+            throw SQLException(SQLException::dynamic_sql_error,
+                    "Must not ask for object length for non-object types");
         }
 
         // now safe to read and return the length preceding value.
@@ -515,7 +614,7 @@ class NValue {
     static void setObjectLengthToLocation(int32_t length, char *location) {
         int32_t beNumber = htonl(length);
         if (length < -1) {
-            throwFatalException("Object length cannot be < -1");
+            throw SQLException(SQLException::dynamic_sql_error, "Object length cannot be < -1");
         } else if (length == -1) {
             location[0] = OBJECT_NULL_BIT;
         } if (length <= OBJECT_MAX_LENGTH_SHORT_LENGTH) {
@@ -1111,7 +1210,10 @@ class NValue {
         case VALUE_TYPE_BIGINT:
             lhsValue = getBigInt(); break;
         default: {
-            throwFatalException("non comparable types lhs '%d' rhs '%d'", getValueType(), rhs.getValueType());
+            throwDynamicSQLException(
+                    "non comparable types lhs '%s' rhs '%s'",
+                    getValueTypeString().c_str(),
+                    rhs.getValueTypeString().c_str());
         }
         }
 
@@ -1482,7 +1584,7 @@ class NValue {
         if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
             (rhs.getValueType() != VALUE_TYPE_DECIMAL))
         {
-            throwFatalException("Non-decimal NValue in decimal adder.");
+            throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal adder.");
         }
 
         if (lhs.isNull() || rhs.isNull()) {
@@ -1507,7 +1609,7 @@ class NValue {
         if ((lhs.getValueType() != VALUE_TYPE_DECIMAL) ||
             (rhs.getValueType() != VALUE_TYPE_DECIMAL))
         {
-            throwFatalException("Non-decimal NValue in decimal subtract.");
+            throw SQLException(SQLException::dynamic_sql_error, "Non-decimal NValue in decimal subtract.");
         }
 
         if (lhs.isNull() || rhs.isNull()) {
@@ -1572,13 +1674,25 @@ class NValue {
 
     static NValue getStringValue(std::string value) {
         NValue retval(VALUE_TYPE_VARCHAR);
-        const int32_t length = static_cast<int32_t>(value.length());
+        const size_t length = value.length();
+        return getStringValue(value.c_str(), length);
+    }
+
+    static Pool* getTempStringPool();
+
+    static NValue getTempStringValue(const char* value, size_t size) {
+        return getStringValue(value, size, getTempStringPool());
+    }
+
+    static NValue getStringValue(const char* value, size_t size, Pool* stringPool=0) {
+        NValue retval(VALUE_TYPE_VARCHAR);
+        const int32_t length = static_cast<int32_t>(size);
         const int8_t lengthLength = getAppropriateObjectLengthLength(length);
         const int32_t minLength = length + lengthLength;
-        StringRef* sref = StringRef::create(minLength);
+        StringRef* sref = StringRef::create(minLength, stringPool);
         char* storage = sref->get();
         setObjectLengthToLocation(length, storage);
-        ::memcpy( storage + lengthLength, value.c_str(), length);
+        ::memcpy( storage + lengthLength, value, length);
         retval.setObjectValue(sref);
         retval.setObjectLength(length);
         retval.setObjectLengthLength(lengthLength);
@@ -1719,7 +1833,7 @@ inline bool NValue::isNegative() const {
         case VALUE_TYPE_DECIMAL:
             return getDecimal().IsSign();
         default: {
-            throwFatalException( "Invalid value type '%s' for checking negativity", getTypeName(type).c_str());
+            throwDynamicSQLException( "Invalid value type '%s' for checking negativity", getValueTypeString().c_str());
         }
         }
     }
@@ -1831,7 +1945,10 @@ inline int NValue::compare(const NValue rhs) const {
       case VALUE_TYPE_DECIMAL:
         return compareDecimalValue(rhs);
       default: {
-          throwFatalException( "non comparable type '%d'", rhs.getValueType());
+          throwDynamicSQLException(
+                  "non comparable types lhs '%s' rhs '%s'",
+                  getValueTypeString().c_str(),
+                  rhs.getValueTypeString().c_str());
       }
     }
 }
@@ -1870,7 +1987,7 @@ inline void NValue::setNull() {
         getDecimal().SetMin();
         break;
       default: {
-          throwFatalException( "NValue::setNull() called with ValueType '%d'", getValueType());
+          throwDynamicSQLException("NValue::setNull() called with unsupported ValueType '%d'", getValueType());
       }
     }
 }
@@ -1942,7 +2059,9 @@ inline const NValue NValue::deserializeFromTupleStorage(const void *storage,
         break;
     }
     default:
-        throwFatalException( "NValue::getLength() unrecognized type '%d'", type);
+        throwDynamicSQLException(
+                "NValue::getLength() unrecognized type '%s'",
+                getTypeName(type).c_str());
     }
     return retval;
 }
@@ -2013,7 +2132,9 @@ inline void NValue::serializeToTupleStorageAllocateForObjects(void *storage, con
         }
         break;
       default: {
-          throwFatalException("NValue::serializeToTupleStorageAllocateForObjects() unrecognized type '%d'", type);
+          throwDynamicSQLException(
+                  "NValue::serializeToTupleStorageAllocateForObjects() unrecognized type '%s'",
+                  getTypeName(type).c_str());
       }
     }
 }
@@ -2060,7 +2181,8 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             if (isNull() || getObjectLength() <= maxLength) {
                 if (m_sourceInlined && !isInlined)
                 {
-                    throwFatalException("Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
+                    throwDynamicSQLException(
+                            "Cannot serialize an inlined string to non-inlined tuple storage in serializeToTupleStorage()");
                 }
                 // copy the StringRef pointers
                 *reinterpret_cast<StringRef**>(storage) =
@@ -2068,12 +2190,8 @@ inline void NValue::serializeToTupleStorage(void *storage, const bool isInlined,
             }
             else {
                 const int32_t length = getObjectLength();
-                char msg[1024];
-                snprintf(msg, 1024, "In NValue::serializeToTupleStorage(), Object exceeds specified size. Size is %d and max is %d", length, maxLength);
-                throw SQLException(
-                    SQLException::data_exception_string_data_length_mismatch,
-                    msg);
-
+                throwDynamicSQLException(
+                        "In NValue::serializeToTupleStorage(), Object exceeds specified size. Size is %d and max is %d", length, maxLength);
             }
         }
         break;
@@ -2223,7 +2341,9 @@ inline const NValue NValue::deserializeFromAllocateForStorage(SerializeInput &in
           break;
       }
       default:
-          throwFatalException("NValue::deserializeFromAllocateForStorage() unrecognized type '%d'", type);
+          throwDynamicSQLException(
+                  "NValue::deserializeFromAllocateForStorage() unrecognized type '%s'",
+                  getTypeName(type).c_str());
     }
     return retval;
 }
@@ -2243,7 +2363,7 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
           }
           const int32_t length = getObjectLength();
           if (length < OBJECTLENGTH_NULL) {
-              throwFatalException("Attempted to serialize an NValue with a negative length");
+              throwDynamicSQLException("Attempted to serialize an NValue with a negative length");
           }
           output.writeInt(static_cast<int32_t>(length));
           if (length != OBJECTLENGTH_NULL) {
@@ -2287,8 +2407,8 @@ inline void NValue::serializeTo(SerializeOutput &output) const {
           break;
       }
       default:
-          throwFatalException("NValue::serializeTo() found a column "
-                   "with ValueType '%d' that is not handled", type);
+          throwDynamicSQLException( "NValue::serializeTo() found a column "
+                   "with ValueType '%s' that is not handled", getValueTypeString().c_str());
     }
 }
 
@@ -2329,8 +2449,9 @@ inline void NValue::serializeToExport(ExportSerializeOutput &io) const
       case VALUE_TYPE_NULL:
       case VALUE_TYPE_BOOLEAN:
       case VALUE_TYPE_ADDRESS:
+      case VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC:
           char message[128];
-          snprintf(message, 128, "Invalid type in serializeToExport: %d", getValueType());
+          snprintf(message, sizeof(message), "Invalid type in serializeToExport: %s", getTypeName(getValueType()).c_str());
           throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
                                         message);
     }
@@ -2367,7 +2488,9 @@ inline bool NValue::isNull() const {
           return getDecimal() == min;
       }
       default:
-          throwFatalException("NValue::isNull() called with ValueType '%d'", getValueType());
+          throwDynamicSQLException(
+                  "NValue::isNull() called with unknown ValueType '%s'",
+                  getValueTypeString().c_str());
     }
     return false;
 }
@@ -2457,7 +2580,7 @@ inline void NValue::hashCombine(std::size_t &seed) const {
       case VALUE_TYPE_DECIMAL:
         getDecimal().hash(seed); break;
       default:
-          throwFatalException ("unknown type %d", (int) type);
+          throwDynamicSQLException( "NValue::hashCombine unknown type %s", getValueTypeString().c_str());
     }
 }
 
@@ -2506,7 +2629,9 @@ inline void* NValue::castAsAddress() const {
       case VALUE_TYPE_ADDRESS:
         return *reinterpret_cast<void* const*>(m_data);
       default:
-          throwFatalException ("Type %d not a recognized type for casting as an address", (int) type);
+          throwDynamicSQLException(
+                  "Type %s not a recognized type for casting as an address",
+                  getValueTypeString().c_str());
     }
 }
 
@@ -2542,7 +2667,7 @@ inline NValue NValue::op_increment() const {
         case VALUE_TYPE_DOUBLE:
             retval.getDouble() = getDouble() + 1; break;
         default:
-            throwFatalException ("type %d is not incrementable", (int) type);
+            throwDynamicSQLException( "type %s is not incrementable", getValueTypeString().c_str());
             break;
         }
         return retval;
@@ -2580,7 +2705,7 @@ inline NValue NValue::op_decrement() const {
         case VALUE_TYPE_DOUBLE:
             retval.getDouble() = getDouble() - 1; break;
         default:
-            throwFatalException ("type %d is not decrementable", (int) type);
+            throwDynamicSQLException( "type %s is not decrementable", getValueTypeString().c_str());
             break;
         }
         return retval;
@@ -2601,7 +2726,9 @@ inline bool NValue::isZero() const {
       case VALUE_TYPE_DECIMAL:
         return getDecimal().IsZero();
       default:
-          throwFatalException ("type %d is not a numeric type that implements isZero()", (int) type);
+          throwDynamicSQLException(
+                  "type %s is not a numeric type that implements isZero()",
+                  getValueTypeString().c_str());
     }
 }
 
@@ -2627,7 +2754,7 @@ inline NValue NValue::op_subtract(const NValue rhs) const {
       default:
         break;
     }
-    throwFatalException("Promotion of %s and %s failed in op_subtract.",
+    throwDynamicSQLException("Promotion of %s and %s failed in op_subtract.",
                getTypeName(getValueType()).c_str(),
                getTypeName(rhs.getValueType()).c_str());
 }
@@ -2654,9 +2781,9 @@ inline NValue NValue::op_add(const NValue rhs) const {
       default:
         break;
     }
-    throwFatalException("Promotion of %s and %s failed in op_add.",
-               getTypeName(getValueType()).c_str(),
-               getTypeName(rhs.getValueType()).c_str());
+    throwDynamicSQLException("Promotion of %s and %s failed in op_add.",
+               getValueTypeString().c_str(),
+               getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_multiply(const NValue rhs) const {
@@ -2680,9 +2807,9 @@ inline NValue NValue::op_multiply(const NValue rhs) const {
       default:
         break;
     }
-    throwFatalException("Promotion of %s and %s failed in op_multiply.",
-               getTypeName(getValueType()).c_str(),
-               getTypeName(rhs.getValueType()).c_str());
+    throwDynamicSQLException("Promotion of %s and %s failed in op_multiply.",
+               getValueTypeString().c_str(),
+               rhs.getValueTypeString().c_str());
 }
 
 inline NValue NValue::op_divide(const NValue rhs) const {
@@ -2707,9 +2834,9 @@ inline NValue NValue::op_divide(const NValue rhs) const {
       default:
         break;
     }
-    throwFatalException("Promotion of %s and %s failed in op_divide.",
-               getTypeName(getValueType()).c_str(),
-               getTypeName(rhs.getValueType()).c_str());
+    throwDynamicSQLException("Promotion of %s and %s failed in op_divide.",
+               getValueTypeString().c_str(),
+               rhs.getValueTypeString().c_str());
 }
 
 /*
@@ -2729,12 +2856,18 @@ inline NValue NValue::like(const NValue rhs) const {
      */
     const ValueType mType = getValueType();
     if (mType != VALUE_TYPE_VARCHAR) {
-        throwFatalException("lhs of LIKE expression is %d not VALUE_TYPE_VARCHAR(%d)", mType, VALUE_TYPE_VARCHAR);
+        throwDynamicSQLException(
+                "lhs of LIKE expression is %s not %s",
+                getValueTypeString().c_str(),
+                getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
 
     const ValueType rhsType = rhs.getValueType();
     if (rhsType != VALUE_TYPE_VARCHAR) {
-        throwFatalException("rhs of LIKE expression is %d not VALUE_TYPE_VARCHAR(%d)", mType, VALUE_TYPE_VARCHAR);
+        throwDynamicSQLException(
+                "rhs of LIKE expression is %s not %s",
+                rhs.getValueTypeString().c_str(),
+                getTypeName(VALUE_TYPE_VARCHAR).c_str());
     }
 
     const int32_t valueUTF8Length = getObjectLength();
@@ -2758,59 +2891,30 @@ inline NValue NValue::like(const NValue rhs) const {
      */
     class Liker {
 
+    private:
+        // Constructor used internally for temporary recursion contexts.
+        Liker( const Liker& original, const char* valueChars, const char* patternChars) :
+            m_value(original.m_value, valueChars),
+            m_pattern(original.m_pattern, patternChars)
+             {}
+
     public:
         Liker(char *valueChars, char* patternChars, int32_t valueUTF8Length, int32_t patternUTF8Length) :
-            valueChars_(valueChars), patternChars_(patternChars),
-            valueCharsEnd_(valueChars + valueUTF8Length), patternCharsEnd_(patternChars + patternUTF8Length)
+            m_value(valueChars, valueChars + valueUTF8Length),
+            m_pattern(patternChars, patternChars + patternUTF8Length)
              {}
 
         bool like() {
-            return compareAt( patternChars_, valueChars_);
-        }
-
-    private:
-        /*
-         * Go through a lot of trouble to make sure that corrupt
-         * utf8 data doesn't result in touching uninitialized memory
-         * by copying the character data onto the stack.
-         */
-        uint32_t extractCodePoint( const char *&iterator, const char *endIterator) {
-            /*
-             * Copy the next 6 bytes to a temp buffer and retrieve.
-             * We should only get 4 byte code points, and the library
-             * should only accept 4 byte code points, but once upon a time there
-             * were 6 byte code points in UTF-8 so be careful here.
-             */
-            char nextPotentialCodePoint[] = { 0, 0, 0, 0, 0, 0 };
-            char *nextPotentialCodePointIter = nextPotentialCodePoint;
-            //Copy 6 bytes or until the end
-            ::memcpy( nextPotentialCodePoint, iterator, std::min( 6L, endIterator - iterator));
-
-            /*
-             * Extract the code point, find out how many bytes it was
-             */
-            uint32_t codePoint = utf8::unchecked::next(nextPotentialCodePointIter);
-            long int delta = nextPotentialCodePointIter - nextPotentialCodePoint;
-
-            /*
-             * Increment the iterator that was passed in by ref, by the delta
-             */
-            iterator += delta;
-            return codePoint;
-        }
-
-        bool compareAt(const char *patternIterator, const char *valueIterator) {
-            while (patternIterator < patternCharsEnd_) {
-                const uint32_t nextPatternCodePoint = extractCodePoint(patternIterator, patternCharsEnd_);
+            while ( ! m_pattern.atEnd()) {
+                const uint32_t nextPatternCodePoint = m_pattern.extractCodePoint();
                 switch (nextPatternCodePoint) {
                 case '%': {
-                    if (patternIterator  >= patternCharsEnd_) {
+                    if (m_pattern.atEnd()) {
                         return true;
                     }
 
-                    const char *postPercentPatternIterator = patternIterator;
-                    const uint32_t nextPatternCodePointAfterPercent =
-                            extractCodePoint( patternIterator, patternCharsEnd_);
+                    const char *postPercentPatternIterator = m_pattern.getCursor();
+                    const uint32_t nextPatternCodePointAfterPercent = m_pattern.extractCodePoint();
                     const bool nextPatternCodePointAfterPercentIsSpecial =
                             (nextPatternCodePointAfterPercent == '_') ||
                             (nextPatternCodePointAfterPercent == '%');
@@ -2826,35 +2930,37 @@ inline NValue NValue::like(const NValue rhs) const {
                      * For a regular character it will recurse if the value character matches the pattern character.
                      * This saves doing a function call per character and allows us to skip if there is no match.
                      */
-                    while (valueIterator < valueCharsEnd_) {
+                    while ( ! m_value.atEnd()) {
 
-                        const char *preExtractionValueIterator = valueIterator;
-                        const uint32_t nextValueCodePoint = extractCodePoint( valueIterator, valueCharsEnd_);
+                        const char *preExtractionValueIterator = m_value.getCursor();
+                        const uint32_t nextValueCodePoint = m_value.extractCodePoint();
 
                         const bool nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint =
                                 (nextPatternCodePointAfterPercentIsSpecial ||
                                         (nextPatternCodePointAfterPercent == nextValueCodePoint));
 
-                        if ( nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint &&
-                                compareAt( postPercentPatternIterator, preExtractionValueIterator)) {
-                            return true;
+                        if ( nextPatternCodePointIsSpecialOrItEqualsNextValueCodePoint) {
+                            Liker recursionContext( *this, preExtractionValueIterator, postPercentPatternIterator);
+                            if (recursionContext.like()) {
+                                return true;
+                            }
                         }
                     }
                     return false;
                 }
                 case '_': {
-                    if (valueIterator >= valueCharsEnd_) {
+                    if ( m_value.atEnd()) {
                         return false;
                     }
                     //Extract a code point to consume a character
-                    extractCodePoint( valueIterator, valueCharsEnd_);
+                    m_value.extractCodePoint();
                     break;
                 }
                 default: {
-                    if ((valueIterator >= valueCharsEnd_)) {
+                    if ( m_value.atEnd()) {
                         return false;
                     }
-                    const int nextValueCodePoint = extractCodePoint( valueIterator, valueCharsEnd_);
+                    const int nextValueCodePoint = m_value.extractCodePoint();
                     if (nextPatternCodePoint != nextValueCodePoint) {
                         return false;
                     }
@@ -2862,15 +2968,12 @@ inline NValue NValue::like(const NValue rhs) const {
                 }
                 }
             }
-            if (valueIterator < valueCharsEnd_) {
-                return false;
-            }
-            return true;
+            //A matching value ends exactly where the pattern ends (having already accounted for '%')
+            return m_value.atEnd();
         }
-        const char *valueChars_;
-        const char *patternChars_;
-        const char *valueCharsEnd_;
-        const char *patternCharsEnd_;
+
+        UTF8Iterator m_value;
+        UTF8Iterator m_pattern;
     };
 
     Liker liker(valueChars, patternChars, valueUTF8Length, patternUTF8Length);
@@ -2878,6 +2981,7 @@ inline NValue NValue::like(const NValue rhs) const {
     return liker.like() ? getTrue() : getFalse();
 }
 
+/** implement the SQL ABS (absolute value) function for all numeric types */
 template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const {
     const ValueType type = getValueType();
     NValue retval(type);
@@ -2894,10 +2998,72 @@ template<> inline NValue NValue::callUnary<EXPRESSION_TYPE_FUNCTION_ABS>() const
         retval.getDouble() = std::abs(getDouble()); break;
     case VALUE_TYPE_TIMESTAMP:
     default:
-        throwFatalException ("type %d is not numeric", (int) type);
+        throwCastSQLException (type, VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC);
         break;
     }
     return retval;
+}
+
+/** implement the 2-argument SQL SUBSTRING function */
+template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& strValue = arguments[0];
+    if (strValue.isNull()) {
+        return strValue;
+    }
+    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const NValue& startArg = arguments[1];
+    if (startArg.isNull()) {
+        return getNullStringValue();
+    }
+
+    const int32_t valueUTF8Length = strValue.getObjectLength();
+    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const char *valueEnd = valueChars+valueUTF8Length;
+
+    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
+
+    UTF8Iterator iter(valueChars, valueEnd);
+    const char* startChar = iter.skipCodePoints(start-1);
+    return getTempStringValue(startChar, (int32_t)(valueEnd - startChar));
+}
+
+/** implement the 3-argument SQL SUBSTRING function */
+template<> inline NValue NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 3);
+    const NValue& strValue = arguments[0];
+    if (strValue.isNull()) {
+        return strValue;
+    }
+    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const NValue& startArg = arguments[1];
+    if (startArg.isNull()) {
+        return getNullStringValue();
+    }
+    const NValue& lengthArg = arguments[2];
+    if (lengthArg.isNull()) {
+        return getNullStringValue();
+    }
+    const int32_t valueUTF8Length = strValue.getObjectLength();
+    const char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const char *valueEnd = valueChars+valueUTF8Length;
+    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
+    int64_t length = lengthArg.castAsBigIntAndGetValue();
+    if (length < 0) {
+        char message[128];
+        snprintf(message, 128, "data exception -- substring error, negative length argument %ld", (long)length);
+        throw SQLException( SQLException::data_exception_numeric_value_out_of_range, message);
+    }
+    UTF8Iterator iter(valueChars, valueEnd);
+    const char* startChar = iter.skipCodePoints(start-1);
+    const char* endChar = iter.skipCodePoints(length);
+    return getTempStringValue(startChar, endChar - startChar);
 }
 
 } // namespace voltdb

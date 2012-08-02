@@ -47,8 +47,8 @@ public class ParameterConverter {
     {
         if (param == null ||
             param == VoltType.NULL_STRING_OR_VARBINARY ||
-            param == VoltType.NULL_DECIMAL)
-        {
+            param == VoltType.NULL_DECIMAL ||
+            (param instanceof String && ((String)param).equals("\\N") )) {
             if (isPrimitive) {
                 VoltType type = VoltType.typeFromClass(paramType);
                 switch (type) {
@@ -80,7 +80,7 @@ public class ParameterConverter {
             return sparam;
         }
 
-        // hack to make varbinary work with input as string
+        // hack to make varbinary work with input as hex string
         if ((paramType == byte[].class) && (pclass == String.class)) {
             return Encoder.hexDecode((String) param);
         }
@@ -92,6 +92,8 @@ public class ParameterConverter {
         if (isArray) {
             Class<?> pSubCls = pclass.getComponentType();
             Class<?> sSubCls = paramTypeComponentType;
+            int inputLength = Array.getLength(param);
+
             if (pSubCls == sSubCls) {
                 return param;
             }
@@ -99,8 +101,24 @@ public class ParameterConverter {
             // this is a bit ugly as it might hide passing
             //  arrays of the wrong type, but it "does the right thing"
             //  more often that not I guess...
-            else if (Array.getLength(param) == 0) {
+            else if (inputLength == 0) {
                 return Array.newInstance(sSubCls, 0);
+            }
+            // hack to make strings work with input as bytes
+            else if ((pSubCls == byte[].class) && (sSubCls == String.class)) {
+                String[] values = new String[inputLength];
+                for (int i = 0; i < inputLength; i++) {
+                    values[i] = new String((byte[]) Array.get(param, i), "UTF-8");
+                }
+                return values;
+            }
+            // hack to make varbinary work with input as hex string
+            else if ((pSubCls == String.class) && (sSubCls == byte[].class)) {
+                byte[][] values = new byte[inputLength][];
+                for (int i = 0; i < inputLength; i++) {
+                    values[i] = Encoder.hexDecode((String) Array.get(param, i));
+                }
+                return values;
             }
             else {
                 /*
@@ -130,8 +148,14 @@ public class ParameterConverter {
             if (pclass == Date.class) return new TimestampType((Date) param);
             // if a string is given for a date, use java's JDBC parsing
             if (pclass == String.class) {
+                String longtime = ((String) param).trim();
                 try {
-                    return new TimestampType((String)param);
+                        return new TimestampType(Long.parseLong(longtime));
+                } catch (IllegalArgumentException e) {
+                        // Defer errors to the generic Exception throw below, if it's not the right format
+                }
+                try {
+                    return new TimestampType(longtime);
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
@@ -144,12 +168,19 @@ public class ParameterConverter {
             if (param instanceof TimestampType) return ((TimestampType) param).asJavaTimestamp();
             // If a string is given for a date, use java's JDBC parsing.
             if (pclass == String.class) {
+                String longtime = ((String) param).trim();
                 try {
-                    return java.sql.Timestamp.valueOf((String) param);
+                        return new java.sql.Timestamp(Long.parseLong(longtime));
                 }
                 catch (IllegalArgumentException e) {
                     // Defer errors to the generic Exception throw below, if it's not the right format
                 }
+                try {
+                        return java.sql.Timestamp.valueOf(longtime);
+                } catch (IllegalArgumentException e) {
+                        // Defer errors to the generic Exception throw below, if it's not the right format
+                }
+
             }
         }
         else if (slot == java.sql.Date.class) {
@@ -233,17 +264,22 @@ public class ParameterConverter {
         // Coerce strings to primitive numbers.
         else if (pclass == String.class) {
             try {
+                String value = ((String) param).trim();
+                value = value.replaceAll("\\,","");
                 if (slot == byte.class) {
-                    return Byte.parseByte((String) param);
+                    return Byte.parseByte(value);
                 }
                 if (slot == short.class) {
-                    return Short.parseShort((String) param);
+                    return Short.parseShort(value);
                 }
                 if (slot == int.class) {
-                    return Integer.parseInt((String) param);
+                    return Integer.parseInt(value);
                 }
                 if (slot == long.class) {
-                    return Long.parseLong((String) param);
+                    return Long.parseLong(value);
+                }
+                if (slot == double.class) {
+                        return Double.parseDouble(value);
                 }
             }
             catch (NumberFormatException nfe) {
@@ -256,7 +292,7 @@ public class ParameterConverter {
 
         throw new Exception(
                 "tryToMakeCompatible: The provided value: (" + param.toString() + ") of type: " + pclass.getName() +
-                "is not a match or is out of range for the target parameter type: " + slot.getName());
+                " is not a match or is out of range for the target parameter type: " + slot.getName());
     }
 
 

@@ -21,6 +21,7 @@ import java.util.concurrent.CountDownLatch;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltdb.compiler.AsyncCompilerAgent;
 
 /**
  * A class that instantiates an ExecutionSite and then waits for notification before
@@ -42,6 +43,7 @@ public class ExecutionSiteRunner implements Runnable {
     private final long m_txnId;
     private final Mailbox m_mailbox;
     private final int m_configuredNumberOfPartitions;
+    private final CatalogSpecificPlanner m_csp;
 
     public ExecutionSiteRunner(
             Mailbox mailbox,
@@ -50,13 +52,15 @@ public class ExecutionSiteRunner implements Runnable {
             boolean recovering,
             boolean replicationActive,
             VoltLogger hostLog,
-            int configuredNumberOfPartitions) {
+            int configuredNumberOfPartitions,
+            CatalogSpecificPlanner csp) {
         m_mailbox = mailbox;
         m_serializedCatalog = serializedCatalog;
         m_recovering = recovering;
         m_replicationActive = replicationActive;
         m_txnId = context.m_transactionId;
         m_configuredNumberOfPartitions = configuredNumberOfPartitions;
+        m_csp = csp;
     }
 
     @Override
@@ -71,7 +75,8 @@ public class ExecutionSiteRunner implements Runnable {
                                           m_recovering,
                                           m_replicationActive,
                                           m_txnId,
-                                          m_configuredNumberOfPartitions);
+                                          m_configuredNumberOfPartitions,
+                                          m_csp);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
         }

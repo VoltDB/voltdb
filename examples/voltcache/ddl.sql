@@ -14,3 +14,5 @@ CREATE TABLE cache
 
 -- Support index for cleanup operations
 CREATE INDEX IX_cache_expires ON cache ( Expires );
+
+PARTITION TABLE cache ON COLUMN Key;

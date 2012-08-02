@@ -113,7 +113,8 @@ public enum ExpressionType {
     //TODO: Should there be multiple classes for function expressions
     // maybe based on their support for optimization methods?
     FUNCTION_ABS                  (FunctionExpression.class,  100),
-
+    FUNCTION_SUBSTRING_FROM       (FunctionExpression.class,  110),
+    FUNCTION_SUBSTRING_FROM_FOR   (FunctionExpression.class,  111),
     ;
 
     private final int val;

@@ -423,6 +423,8 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
 
     // Functions and pseudo-functions
     case (EXPRESSION_TYPE_FUNCTION_ABS):
+    case (EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM):
+    case (EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR):
         ret = functionFactory(et, args);
         break;
 

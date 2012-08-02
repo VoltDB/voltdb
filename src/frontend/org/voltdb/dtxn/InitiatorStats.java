@@ -143,7 +143,7 @@ public class InitiatorStats extends SiteStatsSource {
         LinkedList<String> keysToRemove = new LinkedList<String>();
         for (String key : keySet) {
             // note: use lastIndexOf below to support inner classes as procedures
-            int cId = Integer.parseInt(key.substring(key.lastIndexOf('$') + 1));
+            long cId = Long.parseLong(key.substring(key.lastIndexOf('$') + 1));
             if (cId == connectionId) {
                 keysToRemove.add(key);
             }
@@ -158,7 +158,7 @@ public class InitiatorStats extends SiteStatsSource {
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns) {
         super.populateColumnSchema(columns);
-        columns.add(new ColumnInfo("CONNECTION_ID", VoltType.INTEGER));
+        columns.add(new ColumnInfo("CONNECTION_ID", VoltType.BIGINT));
         columns.add(new ColumnInfo("CONNECTION_HOSTNAME", VoltType.STRING));
         columns.add(new ColumnInfo("PROCEDURE_NAME", VoltType.STRING));
         columns.add(new ColumnInfo("INVOCATIONS", VoltType.BIGINT));
@@ -203,7 +203,7 @@ public class InitiatorStats extends SiteStatsSource {
             info.lastFailureCount = info.failureCount;
         }
 
-        rowValues[columnNameToIndex.get("CONNECTION_ID")] = new Integer(connectionId);
+        rowValues[columnNameToIndex.get("CONNECTION_ID")] = new Long(connectionId);
         rowValues[columnNameToIndex.get("CONNECTION_HOSTNAME")] = info.connectionHostname;
         rowValues[columnNameToIndex.get("PROCEDURE_NAME")] = procName;
         rowValues[columnNameToIndex.get("INVOCATIONS")] = invocationCount;

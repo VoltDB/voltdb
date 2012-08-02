@@ -79,9 +79,11 @@ public class HSQLInterface {
         this.sessionProxy = sessionProxy;
     }
 
-    public void close() {
+    @Override
+    public void finalize() {
+        final Database db = sessionProxy.getDatabase();
         sessionProxy.close();
-        DatabaseManager.closeDatabases(Database.CLOSEMODE_IMMEDIATELY);
+        db.close(Database.CLOSEMODE_IMMEDIATELY);
         sessionProxy = null;
     }
 
@@ -156,6 +158,8 @@ public class HSQLInterface {
     public VoltXMLElement getXMLCompiledStatement(String sql) throws HSQLParseException
     {
         Statement cs = null;
+        // clear the expression node id set for determinism
+        sessionProxy.resetVoltNodeIds();
 
         try {
             cs = sessionProxy.compileStatement(sql);
@@ -175,11 +179,9 @@ public class HSQLInterface {
         VoltXMLElement xml = null;
         xml = cs.voltGetXML(sessionProxy);
 
-        VoltXMLElement statement = new VoltXMLElement("statement");
-        statement.children.add(xml);
         assert(xml != null);
 
-        return statement;
+        return xml;
     }
 
     /**

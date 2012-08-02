@@ -25,6 +25,7 @@ import java.io.FileNotFoundException;
 import java.io.FileReader;
 import java.io.IOException;
 import java.io.InputStream;
+import java.io.OutputStream;
 import java.io.OutputStreamWriter;
 import java.io.PrintWriter;
 import java.io.Writer;
@@ -65,6 +66,16 @@ public class SQLCommand
     private static final Pattern Extract = Pattern.compile("'[^']*'", Pattern.MULTILINE);
     private static final Pattern AutoSplit = Pattern.compile("\\s(select|insert|update|delete|exec|execute)\\s", Pattern.MULTILINE + Pattern.CASE_INSENSITIVE);
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
+    private static final String readme = "SQLCommandReadme.txt";
+
+    public static String getReadme() {
+        return readme;
+    }
+
+    public static Pattern getExecuteCall() {
+        return ExecuteCall;
+    }
+
     public static List<String> parseQuery(String query)
     {
         if (query == null)
@@ -344,7 +355,7 @@ public class SQLCommand
         while(true);
     }
 
-    private static String readScriptFile(String filePath)
+    public static String readScriptFile(String filePath)
     {
         try
         {
@@ -566,7 +577,13 @@ public class SQLCommand
                         if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
                         else
-                            objectParams[i] = hexStringToByteArray(Unquote.matcher(param).replaceAll("").replace("''","'"));
+                        {
+                            // Make sure we have an even amount of characters, otherwise it is an invalid hex string
+                            if (param.length() % 2 == 1)
+                                throw new Exception("Invalid varbinary value: input must have an even amount of characters to be a valid hex string.");
+                            String val = Unquote.matcher(param).replaceAll("").replace("''","'");
+                            objectParams[i] = hexStringToByteArray(val);
+                        }
                     }
                     else
                         throw new Exception("Unsupported Data Type: " + paramType);
@@ -616,6 +633,7 @@ public class SQLCommand
         }
         return hexString.toString();
     }
+
     private static byte[] hexStringToByteArray(String s)
     {
         int len = s.length();
@@ -678,8 +696,16 @@ public class SQLCommand
                     for (int i = 0; i < columnCount; i++)
                     {
                         Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull()) v = "NULL";
-                        int l = t.getColumnType(i) == VoltType.VARBINARY ? ((byte[])v).length*2 : v.toString().length();
+                        if (t.wasNull())
+                            v = "NULL";
+                        int l = 0;  // length
+                        if (t.getColumnType(i) == VoltType.VARBINARY && !t.wasNull()) {
+                            l = ((byte[])v).length*2;
+                        }
+                        else {
+                            l= v.toString().length();
+                        }
+
                         if (padding[i] < l)
                             padding[i] = l;
                     }
@@ -778,7 +804,7 @@ public class SQLCommand
 
     // VoltDB connection support
     private static Client VoltDB;
-    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR");
+    private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
         Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
@@ -888,15 +914,18 @@ public class SQLCommand
         );
         System.exit(exitCode);
     }
-    public static void printHelp()
+
+    // printHelp() can print readme either to a file or to the screen
+    // depending on the argument passed in
+    public static void printHelp(OutputStream prtStr)
     {
         try
         {
-            byte[] bytes = new byte[1024 * 4];
-            InputStream is = SQLCommand.class.getResourceAsStream("SQLCommandReadme.txt");
-            while (is.available() > 0) {
+            InputStream is = SQLCommand.class.getResourceAsStream(readme);
+            while(is.available() > 0) {
+                byte[] bytes = new byte[is.available()]; // Fix for ENG-3440
                 is.read(bytes, 0, bytes.length);
-                System.out.write(bytes);
+                prtStr.write(bytes); // For JUnit test
             }
         }
         catch(Exception x)
@@ -1014,6 +1043,10 @@ public class SQLCommand
         }
     }
 
+    static public void mockVoltDBForTest(Client testVoltDB) {
+        VoltDB = testVoltDB;
+    }
+
     private static InputStream in = null;
     private static Writer out = null;
     // Application entry point
@@ -1054,7 +1087,8 @@ public class SQLCommand
                     debug = true;
                 else if (arg.equals("--help"))
                 {
-                    printHelp();
+                    printHelp(System.out); // Print readme to the screen
+                    System.out.println("\n\n");
                     printUsage(0);
                 }
                 else if ((arg.equals("--usage")) || (arg.equals("-?")))

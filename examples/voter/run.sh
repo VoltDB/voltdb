@@ -6,7 +6,7 @@ VOLTDB="../../bin/voltdb"
 VOLTCOMPILER="../../bin/voltcompiler"
 LOG4J="`pwd`/../../voltdb/log4j.xml"
 LICENSE="../../voltdb/license.xml"
-LEADER="localhost"
+HOST="localhost"
 
 # remove build artifacts
 function clean() {
@@ -37,7 +37,24 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader $LEADER
+        license $LICENSE host $HOST
+}
+
+# run the voltdb server locally
+function rejoin() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB deployment deployment.xml \
+        license $LICENSE host $HOST
+}
+
+function serverlegacy() {
+    # if a catalog doesn't exist, build one
+    if [ ! -f $APPNAME.jar ]; then catalog; fi
+    # run the server
+    $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
+        license $LICENSE host $HOST
 }
 
 # run the client that drives the example
@@ -65,6 +82,12 @@ function async-benchmark() {
         --ratelimit=100000 \
         --autotune=true \
         --latencytarget=6
+}
+
+function simple-benchmark() {
+    srccompile
+    java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
+        voter.SimpleBenchmark localhost
 }
 
 # Multi-threaded synchronous benchmark sample

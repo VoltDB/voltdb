@@ -26,9 +26,19 @@ package org.voltdb;
 import java.io.IOException;
 import java.net.UnknownHostException;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collection;
 import java.util.List;
 
 import org.apache.commons.lang3.StringUtils;
+
+import org.junit.runner.RunWith;
+
+import org.junit.runners.Parameterized;
+
+import org.junit.runners.Parameterized.Parameters;
+
+import org.junit.Test;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientFactory;
@@ -38,13 +48,30 @@ import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.regressionsuites.LocalCluster;
 import org.voltdb.utils.MiscUtils;
 
+@RunWith(value = Parameterized.class)
 public class TestAdHocQueries extends AdHocQueryTester {
+
+    @Parameters
+    public static Collection<Object[]> useIv2() {
+        return Arrays.asList(new Object[][] {{false}, {true}});
+    }
 
     Client m_client;
     private final static boolean m_debug = false;
 
-    public void testSP() throws Exception {
-        VoltDB.Configuration config = setUpSPDB();
+    protected final boolean m_useIv2;
+    public TestAdHocQueries(boolean useIv2)
+    {
+        m_useIv2 = useIv2;
+    }
+
+    // IMPORTANT SAFETY TIP
+    // The use of junit parameters to toggle between iv2 and non-iv2 cases
+    // means that all test cases MUST BE annotated with @Test or THEY WILL NOT RUN.
+
+    @Test
+    public void testProcedureAdhoc() throws Exception {
+        VoltDB.Configuration config = setUpSPDB(m_useIv2);
         ServerThread localServer = new ServerThread(config);
 
         try {
@@ -53,7 +80,150 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
             // do the test
             m_client = ClientFactory.createClient();
-            m_client.createConnection("localhost");
+            m_client.createConnection("localhost", config.m_port);
+
+            m_client.callProcedure("@AdHoc", "insert into PARTED1 values ( 23, 3 )");
+
+            /*
+             * Test that a basic multipartition select works as well as a parameterized
+             * query (it's in the procedure)
+             */
+            VoltTable results[] = m_client.callProcedure(
+                    "executeSQLSP",
+                    23,
+                    "select * from PARTED1").getResults();
+            assertTrue(
+                    results[0].advanceRow());
+            assertTrue(results[1].advanceRow());
+
+            results = m_client.callProcedure(
+                    "executeSQLMP",
+                    23,
+                    "       select * from PARTED1").getResults();
+            assertTrue(
+                    results[0].advanceRow());
+            assertTrue(results[1].advanceRow());
+
+            /*
+             * Validate that doing an insert from a RO procedure fails
+             */
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5)");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+            try {
+                m_client.callProcedure("executeSQLMP", 24, "insert into parted1 values (24,5)");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+            /*
+             * Validate one sql statement per
+             */
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "insert into parted1 values (24,5); select * from parted1;");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+            try {
+                m_client.callProcedure("executeSQLSP", 24, "drop table parted1");
+                fail("Procedure call should not have succeded");
+            } catch (ProcCallException e) {}
+
+
+            /*
+             * Validate that an insert does work from a write procedure
+             */
+            m_client.callProcedure("executeSQLSPWRITE", 24, "insert into parted1 values (24, 4);");
+            m_client.callProcedure("executeSQLMPWRITE", 25, "insert into parted1 values (25, 5);");
+
+            /*
+             * Query the inserts and all the rest do it once for singe and once for multi
+             */
+            results = m_client.callProcedure("executeSQLMP", 24, "select * from parted1 order by partval").getResults();
+
+            assertEquals( 3, results[0].getRowCount());
+            for (int ii = 3; ii < 6; ii++) {
+                assertTrue(results[0].advanceRow());
+                assertEquals(20 + ii, results[0].getLong(0));
+                assertEquals(ii, results[0].getLong(1));
+            }
+
+            //Output from the first preplanned statement
+            assertEquals( 3, results[1].getRowCount());
+            assertTrue(results[1].advanceRow());
+            assertEquals( 23, results[1].getLong(0));
+            assertEquals( 3, results[1].getLong(1));
+
+            //Output from the second adhoc statement
+            assertEquals( 1, results[2].getRowCount());
+            assertTrue(results[2].advanceRow());
+            assertEquals( 24, results[2].getLong(0));
+            assertEquals( 4, results[2].getLong(1));
+
+            //Output from the second preplanned statement
+            assertEquals( 3, results[3].getRowCount());
+            assertTrue(results[3].advanceRow());
+            assertEquals( 23, results[3].getLong(0));
+            assertEquals( 3, results[3].getLong(1));
+
+
+            results = m_client.callProcedure("executeSQLSP", 24, "select * from parted1 order by partval").getResults();
+
+            assertEquals( 1, results[0].getRowCount());
+            assertTrue(results[0].advanceRow());
+            assertEquals(24, results[0].getLong(0));
+            assertEquals( 4, results[0].getLong(1));
+
+            //Output from the first preplanned statement
+            assertEquals( 1, results[1].getRowCount());
+            assertTrue(results[1].advanceRow());
+            assertEquals( 24, results[1].getLong(0));
+            assertEquals( 4, results[1].getLong(1));
+
+            //Output from the second adhoc statement
+            assertEquals( 1, results[2].getRowCount());
+            assertTrue(results[2].advanceRow());
+            assertEquals( 24, results[2].getLong(0));
+            assertEquals( 4, results[2].getLong(1));
+
+            //Output from the second preplanned statement
+            assertEquals( 1, results[3].getRowCount());
+            assertTrue(results[3].advanceRow());
+            assertEquals( 24, results[3].getLong(0));
+            assertEquals( 4, results[3].getLong(1));
+        }
+        catch (Exception e) {
+            e.printStackTrace();
+            fail();
+        }
+        finally {
+            if (m_client != null) m_client.close();
+            m_client = null;
+
+            if (localServer != null) {
+                localServer.shutdown();
+                localServer.join();
+            }
+            localServer = null;
+
+            // no clue how helpful this is
+            System.gc();
+        }
+    }
+
+    @Test
+    public void testSP() throws Exception {
+        VoltDB.Configuration config = setUpSPDB(m_useIv2);
+        ServerThread localServer = new ServerThread(config);
+
+        try {
+            localServer.start();
+            localServer.waitForInitialization();
+
+            // do the test
+            m_client = ClientFactory.createClient();
+            m_client.createConnection("localhost", config.m_port);
 
             VoltTable modCount;
 
@@ -149,8 +319,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
     String m_pathToCatalog = Configuration.getPathToCatalogForTest(m_catalogJar);
     String m_pathToDeployment = Configuration.getPathToCatalogForTest("adhoc.xml");
 
+    @Test
     public void testSimple() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 2, 1, m_useIv2);
         try {
             env.setUp();
 
@@ -222,8 +393,9 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
+    @Test
     public void testAdHocBatches() throws Exception {
-        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, m_useIv2);
         try {
             env.setUp();
             Batcher batcher = new Batcher(env);
@@ -371,7 +543,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
         Client m_client = null;
 
         TestEnv(String pathToCatalog, String pathToDeployment,
-                     int siteCount, int hostCount, int kFactor) {
+                     int siteCount, int hostCount, int kFactor, boolean enableIv2) {
             m_builder = new VoltProjectBuilder();
             try {
                 m_builder.addLiteralSchema("create table BLAH (" +
@@ -394,11 +566,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
             m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
                                          BackendTarget.NATIVE_EE_JNI,
                                          LocalCluster.FailureState.ALL_RUNNING,
-                                         m_debug, false);
-            // Valgrind and LocalCluster using more than localhost do not get along for now.
-            if (hostCount > 1) {
-                m_cluster.overrideAnyRequestForValgrind();
-            }
+                                         m_debug, false, enableIv2);
             boolean success = m_cluster.compile(m_builder);
             assert(success);
 

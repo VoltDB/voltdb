@@ -16,8 +16,9 @@ CREATE TABLE votes
   phone_number       bigint     NOT NULL
 , state              varchar(2) NOT NULL
 , contestant_number  integer    NOT NULL
--- PARTITION BY ( phone_number )
 );
+
+PARTITION TABLE votes ON COLUMN phone_number;
 
 -- Map of Area Codes and States for geolocation classification of incoming calls
 CREATE TABLE area_code_state

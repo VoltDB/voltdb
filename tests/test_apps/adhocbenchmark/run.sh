@@ -6,7 +6,7 @@ VOLTDB="../../../bin/voltdb"
 VOLTCOMPILER="../../../bin/voltcompiler"
 LOG4J="`pwd`/../../../voltdb/log4j.xml"
 LICENSE="../../../voltdb/license.xml"
-LEADER="localhost"
+HOST="localhost"
 GENERATE="python2.6 scripts/generate.py"
 
 # remove build artifacts
@@ -38,7 +38,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader $LEADER
+        license $LICENSE host $HOST
 }
 
 # run the client that drives the example
@@ -62,7 +62,7 @@ function _benchmark() {
         --configfile=config.xml \
         --warmup=5 \
         --duration=20 \
-        --querytracefile=$1.queries.out \
+#--querytracefile=$1.queries.log.txt \
         --test=$1
     echo Sample queries:
     head -6 $1.queries.out

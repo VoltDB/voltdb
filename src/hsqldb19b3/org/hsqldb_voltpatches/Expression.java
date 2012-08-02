@@ -441,6 +441,7 @@ public class Expression {
         }
     }
 
+    @Override
     public boolean equals(Object other) {
 
         if (other == this) {
@@ -454,6 +455,7 @@ public class Expression {
         return false;
     }
 
+    @Override
     public int hashCode() {
 
         int val = opType + exprSubType;
@@ -1443,7 +1445,7 @@ public class Expression {
         VoltXMLElement exp = new VoltXMLElement("unset");
 
         // We want to keep track of which expressions are the same in the XML output
-        exp.attributes.put("id", getUniqueId());
+        exp.attributes.put("id", getUniqueId(session));
 
         // LEAF TYPES
         if (getType() == OpTypes.VALUE) {
@@ -1487,48 +1489,53 @@ public class Expression {
      * to be used as a unique identifier.
      * @return The hex address of the pointer to this object.
      */
-    protected String getUniqueId() {
+    protected String getUniqueId(final Session session) {
+        if (cached_id != null) {
+            return cached_id;
+        }
+
         //
         // Calculated an new Id
         //
-        if (this.cached_id == null) {
-            // this line ripped from the "describe" method
-            // seems to help with some types like "equal"
-            this.cached_id = new String();
-            int hashCode = 0;
-            //
-            // If object is a leaf node, then we'll use John's original code...
-            //
-            if (getType() == OpTypes.VALUE || getType() == OpTypes.COLUMN) {
-                hashCode = super.hashCode();
-            //
-            // Otherwise we need to generate and Id based on what our children are
-            //
-            } else {
-                //
-                // Horribly inefficient, but it works for now...
-                //
-                final List<String> id_list = new Vector<String>();
-                new Object() {
-                    public void traverse(Expression exp) {
-                        for (Expression expr : exp.nodes) {
-                            if (expr != null)
-                                id_list.add(expr.getUniqueId());
-                        }
-                    }
-                }.traverse(this);
 
-                if (id_list.size() > 0) {
-                    // Flatten the id list, intern it, and then do the same trick from above
-                    for (String temp : id_list)
-                        this.cached_id += temp;
-                    hashCode = this.cached_id.intern().hashCode();
+        // this line ripped from the "describe" method
+        // seems to help with some types like "equal"
+        cached_id = new String();
+        int hashCode = 0;
+        //
+        // If object is a leaf node, then we'll use John's original code...
+        //
+        if (getType() == OpTypes.VALUE || getType() == OpTypes.COLUMN) {
+            hashCode = super.hashCode();
+        //
+        // Otherwise we need to generate and Id based on what our children are
+        //
+        } else {
+            //
+            // Horribly inefficient, but it works for now...
+            //
+            final List<String> id_list = new Vector<String>();
+            new Object() {
+                public void traverse(Expression exp) {
+                    for (Expression expr : exp.nodes) {
+                        if (expr != null)
+                            id_list.add(expr.getUniqueId(session));
+                    }
                 }
-                else
-                    hashCode = super.hashCode();
+            }.traverse(this);
+
+            if (id_list.size() > 0) {
+                // Flatten the id list, intern it, and then do the same trick from above
+                for (String temp : id_list)
+                    this.cached_id += temp;
+                hashCode = this.cached_id.intern().hashCode();
             }
-            this.cached_id = Integer.toString(hashCode);
+            else
+                hashCode = super.hashCode();
         }
-        return (this.cached_id);
+
+        long id = session.getNodeIdForExpression(hashCode);
+        cached_id = Long.toString(id);
+        return cached_id;
     }
 }

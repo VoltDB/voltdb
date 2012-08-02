@@ -24,6 +24,7 @@ import org.voltdb.ExecutionSite;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.messaging.InitiateTaskMessage;
 
 public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
 
@@ -34,7 +35,8 @@ public class RecoveringSinglePartitionTxnState extends SinglePartitionTxnState {
     @Override
     public boolean doWork(boolean recovering) {
         if (!m_done) {
-            InitiateResponseMessage response = new InitiateResponseMessage(m_task);
+            InitiateTaskMessage task = (InitiateTaskMessage) m_notice;
+            InitiateResponseMessage response = new InitiateResponseMessage(task);
 
             // add an empty dummy response
             response.setResults(new ClientResponseImpl(

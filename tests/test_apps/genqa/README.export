@@ -7,8 +7,8 @@ Quick hacky description on running the long-running export test.
 -- In 1, run the server:
 ./run.sh server
 -- In 2, run the export client:
-./run.sh export
+./run.sh export-tofile
 -- In 3, start the app client:
 ./run.sh async-export
 -- In 4, start the verifier:
-./run.sh export-verify
+./run.sh exportverify
