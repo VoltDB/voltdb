@@ -120,7 +120,7 @@ public class plannerTester {
         }
     }
 
-    public static int main( String[] args ) {
+    public static void main( String[] args ) {
         int size = args.length;
         for( int i=0; i<size; i++ ) {
             String str = args[i];
@@ -186,9 +186,9 @@ public class plannerTester {
             System.out.println("Report file created at "+m_reportDir+"plannerTester.report");
         }
         if( m_numFail == 0 ) {
-            return 1;
+            System.exit(0);
         } else {
-            return -1;
+            System.exit(-1);
         }
     }
 
@@ -453,7 +453,7 @@ public class plannerTester {
                 //                              System.out.println("Path to the baseline file :"+pathNew+m_testName+".plan"+i );
                 m_reportWriter.write("Path to the config file :"+m_currentConfig+"\n"
                         +"Path to the baseline file :"+pathBaseline+m_testName+".plan"+i+"\n"
-                        +"Path to the baseline file :"+pathNew+m_testName+".plan"+i+"\n");
+                        +"Path to the current plan file :"+pathNew+m_testName+".plan"+i+"\n");
             }
             m_numTest++;
         }
