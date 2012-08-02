@@ -28,6 +28,8 @@ import java.util.HashMap;
 import java.util.List;
 import java.util.Map.Entry;
 
+import org.apache.commons.lang3.ArrayUtils;
+import org.apache.commons.lang3.StringUtils;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.hsqldb_voltpatches.VoltXMLElement;
@@ -67,19 +69,27 @@ public class DDLCompiler {
     String m_fullDDL = "";
     int m_currLineNo = 1;
 
+    /// Partition descriptors parsed from DDL PARTITION or REPLICATE statements.
+    final TablePartitionMap m_partitionMap;
+
     HashMap<String, Column> columnMap = new HashMap<String, Column>();
     HashMap<String, Index> indexMap = new HashMap<String, Index>();
     HashMap<Table, String> matViewMap = new HashMap<Table, String>();
 
     private class DDLStatement {
+        public DDLStatement() {
+        }
         String statement = "";
         int lineNo;
     }
 
-    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql) {
+    public DDLCompiler(VoltCompiler compiler, HSQLInterface hsql, TablePartitionMap partitionMap) {
+        assert(compiler != null);
         assert(hsql != null);
+        assert(partitionMap != null);
         this.m_hsql = hsql;
         this.m_compiler = compiler;
+        this.m_partitionMap = partitionMap;
     }
 
     /**
@@ -108,20 +118,31 @@ public class DDLCompiler {
      * @throws VoltCompiler.VoltCompilerException
      */
     public void loadSchema(String path, FileReader reader)
-    throws VoltCompiler.VoltCompilerException {
+            throws VoltCompiler.VoltCompilerException {
         DDLStatement stmt = getNextStatement(reader, m_compiler);
         while (stmt != null) {
+            // Some statements are processed by VoltDB and the rest are handled by HSQL.
+            boolean processed = false;
             try {
-                // kind of ugly.  We hex-encode each statement so we can
-                // avoid embedded newlines so we can delimit statements
-                // with newline.
-                m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
-                m_hsql.runDDLCommand(stmt.statement);
-                stmt = getNextStatement(reader, m_compiler);
-            } catch (HSQLParseException e) {
-                String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
-                throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
+                processed = processVoltDBStatement(stmt.statement);
+            } catch (VoltCompilerException e) {
+                // Reformat the message thrown by VoltDB DDL processing to have a line number.
+                String msg = "VoltDB DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
+                throw m_compiler.new VoltCompilerException(msg);
             }
+            if (!processed) {
+                try {
+                    // kind of ugly.  We hex-encode each statement so we can
+                    // avoid embedded newlines so we can delimit statements
+                    // with newline.
+                    m_fullDDL += Encoder.hexEncode(stmt.statement) + "\n";
+                    m_hsql.runDDLCommand(stmt.statement);
+                } catch (HSQLParseException e) {
+                    String msg = "DDL Error: \"" + e.getMessage() + "\" in statement starting on lineno: " + stmt.lineNo;
+                    throw m_compiler.new VoltCompilerException(msg, stmt.lineNo);
+                }
+            }
+            stmt = getNextStatement(reader, m_compiler);
         }
 
         try {
@@ -129,6 +150,86 @@ public class DDLCompiler {
         } catch (IOException e) {
             throw m_compiler.new VoltCompilerException("Error closing schema file");
         }
+    }
+
+    /**
+     * Process a VoltDB-specific DDL statement, like PARTITION and REPLICATE.
+     * @param statement  DDL statement string
+     * @return true if statement was handled, otherwise it should be passed to HSQL
+     * @throws VoltCompilerException
+     */
+    private boolean processVoltDBStatement(String statement) throws VoltCompilerException {
+        if (statement == null) {
+            return false;
+        }
+
+        // Split the statement on whitespace. For now the supported statements
+        // don't have quoted strings or anything else more than simple tokens.
+        String[] tokens = statement.trim().split("\\s+");
+        if (tokens.length == 0) {
+            return false;
+        }
+
+        // Handle PARTITION statement.
+        if (tokens[0].equalsIgnoreCase("PARTITION")) {
+            // Check and strip semi-colon terminator.
+            tokens = cleanupVoltDBDDLTerminator("PARTITION", tokens);
+            // Validate tokens.
+            if (   tokens.length != 6
+                || !tokens[1].equalsIgnoreCase("table")
+                || !tokens[3].equalsIgnoreCase("on")
+                || !tokens[4].equalsIgnoreCase("column")) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Bad PARTITION DDL statement: \"%s\", " +
+                        "expected syntax: PARTITION TABLE <table> ON COLUMN <column>",
+                        StringUtils.join(tokens, ' ')));
+            }
+            m_partitionMap.put(tokens[2], tokens[5]);
+
+            return true;
+        }
+
+        // Handle REPLICATE statement.
+        else if (tokens[0].equalsIgnoreCase("REPLICATE")) {
+            // Check and strip semi-colon terminator.
+            tokens = cleanupVoltDBDDLTerminator("REPLICATE", tokens);
+            // Validate tokens.
+            if (   tokens.length != 3
+                || !tokens[1].equalsIgnoreCase("table")) {
+                throw m_compiler.new VoltCompilerException(String.format(
+                        "Bad REPLICATE DDL statement: \"%s\", " +
+                        "expected syntax: REPLICATE TABLE <table>",
+                        StringUtils.join(tokens, ' ')));
+            }
+            m_partitionMap.put(tokens[2], null);
+            return true;
+        }
+
+        // Not a VoltDB-specific DDL statement.
+        return false;
+    }
+
+    /**
+     * Strip trailing semi-colon, either as it's own token or at the end
+     * of the last token. Throw exception if there is no semi-colon.
+     * @param tokens
+     * @return processed tokens
+     * @throws VoltCompilerException
+     */
+    private String[] cleanupVoltDBDDLTerminator(final String statementName, final String[] tokens)
+            throws VoltCompilerException {
+        assert(tokens.length > 0);
+        String[] startTokens = ArrayUtils.subarray(tokens, 0, tokens.length-1);
+        String endToken = tokens[tokens.length-1];
+        if (!endToken.endsWith(";")) {
+            throw m_compiler.new VoltCompilerException(String.format(
+                    "%s DDL statement is not terminated by a semi-colon: \"%s\".",
+                    StringUtils.join(tokens, ' ')));
+        }
+        if (endToken.equals(";")) {
+            return startTokens;
+        }
+        return ArrayUtils.add(startTokens, endToken.substring(0, endToken.length()-1));
     }
 
     public void compileToCatalog(Catalog catalog, Database db) throws VoltCompilerException {
@@ -259,7 +360,7 @@ public class DDLCompiler {
     }
 
     DDLStatement getNextStatement(FileReader reader, VoltCompiler compiler)
-    throws VoltCompiler.VoltCompilerException {
+            throws VoltCompiler.VoltCompilerException {
 
         int state = kStateInvalid;
 
