@@ -42,6 +42,7 @@ import org.voltcore.zk.ZKUtil;
 public class VoltZK {
     public static final String root = "/db";
 
+    public static final String buildstring = "/db/buildstring";
     public static final String catalogbytes = "/db/catalogbytes";
     public static final String topology = "/db/topology";
     public static final String replicationrole = "/db/replicationrole";

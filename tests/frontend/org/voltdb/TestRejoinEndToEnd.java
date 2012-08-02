@@ -61,7 +61,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     protected final boolean m_useIv2;
     public TestRejoinEndToEnd(boolean useIv2)
     {
-        m_useIv2 = useIv2;
+        m_useIv2 = useIv2 || VoltDB.checkTestEnvForIv2();
     }
 
     final int FAIL_NO_OPEN_SOCKET = 0;

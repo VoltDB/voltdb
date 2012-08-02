@@ -122,6 +122,7 @@ class RateLimiter {
         m_autoTune = true;
         m_targetTxnsPerSecond = Integer.MAX_VALUE;
         m_maxOutstandingTxns = 20;
+        m_latencyTarget = latencyTarget;
     }
 
     /**
