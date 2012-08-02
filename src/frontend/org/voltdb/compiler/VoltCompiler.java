@@ -92,7 +92,7 @@ import org.xml.sax.SAXParseException;
  */
 public class VoltCompiler {
     /** Represents the level of severity for a Feedback message generated during compiling. */
-    public static enum Severity { INFORMATIONAL, WARNING, ERROR, UNEXPECTED };
+    public static enum Severity { INFORMATIONAL, WARNING, ERROR, UNEXPECTED }
     public static final int NO_LINE_NUMBER = -1;
 
     // feedback by filename
@@ -497,7 +497,7 @@ public class VoltCompiler {
         final ArrayList<String> schemas = new ArrayList<String>();
         final ArrayList<ProcedureDescriptor> procedures = new ArrayList<ProcedureDescriptor>();
         final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
-        final ArrayList<String[]> partitions = new ArrayList<String[]>();
+        final TablePartitionMap partitionMap = new TablePartitionMap(this);
 
         final String databaseName = database.getName();
 
@@ -546,7 +546,7 @@ public class VoltCompiler {
         // partitions/table
         if (database.getPartitions() != null) {
             for (org.voltdb.compiler.projectfile.PartitionsType.Partition table : database.getPartitions().getPartition()) {
-                partitions.add(getPartition(table));
+                partitionMap.put(table.getTable(), table.getColumn());
             }
         }
 
@@ -559,7 +559,9 @@ public class VoltCompiler {
         }
 
         // Actually parse and handle all the DDL
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql);
+        // DDLCompiler also provides partition descriptors for DDL PARTITION
+        // and REPLICATE statements.
+        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, partitionMap);
 
         for (final String schemaPath : schemas) {
             File schemaFile = null;
@@ -593,52 +595,55 @@ public class VoltCompiler {
         // this needs to happen before procedures are compiled
         String msg = "In database \"" + databaseName + "\", ";
         final CatalogMap<Table> tables = db.getTables();
-        for (final String[] partition : partitions) {
-            final String tableName = partition[0];
-            final String colName = partition[1];
-            final Table t = tables.getIgnoreCase(tableName);
-            if (t == null) {
-                msg += "\"partition\" element has unknown \"table\" attribute '" + tableName + "'";
-                throw new VoltCompilerException(msg);
-            }
-            final Column c = t.getColumns().getIgnoreCase(colName);
-            // make sure the column exists
-            if (c == null) {
-                msg += "\"partition\" element has unknown \"column\" attribute '" + colName + "'";
-                throw new VoltCompilerException(msg);
-            }
-            // make sure the column is marked not-nullable
-            if (c.getNullable() == true) {
-                msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
-                    "Partition columns must be constrained \"NOT NULL\".";
-                throw new VoltCompilerException(msg);
-            }
-            // verify that the partition column is a supported type
-            VoltType pcolType = VoltType.get((byte) c.getType());
-            switch (pcolType) {
-                case TINYINT:
-                case SMALLINT:
-                case INTEGER:
-                case BIGINT:
-                case STRING:
-                    break;
-                default:
-                    msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
-                    "Partition columns must be an integer or varchar type.";
+        for (String tableName : partitionMap.m_map.keySet()) {
+            String colName = partitionMap.m_map.get(tableName);
+            // A null column name indicates a replicated table. Ignore it here
+            // because it defaults to replicated in the catalog.
+            if (colName != null) {
+                final Table t = tables.getIgnoreCase(tableName);
+                if (t == null) {
+                    msg += "PARTITION has unknown TABLE '" + tableName + "'";
                     throw new VoltCompilerException(msg);
-            }
+                }
+                final Column c = t.getColumns().getIgnoreCase(colName);
+                // make sure the column exists
+                if (c == null) {
+                    msg += "PARTITION has unknown COLUMN '" + colName + "'";
+                    throw new VoltCompilerException(msg);
+                }
+                // make sure the column is marked not-nullable
+                if (c.getNullable() == true) {
+                    msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
+                        "Partition columns must be constrained \"NOT NULL\".";
+                    throw new VoltCompilerException(msg);
+                }
+                // verify that the partition column is a supported type
+                VoltType pcolType = VoltType.get((byte) c.getType());
+                switch (pcolType) {
+                    case TINYINT:
+                    case SMALLINT:
+                    case INTEGER:
+                    case BIGINT:
+                    case STRING:
+                        break;
+                    default:
+                        msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
+                        "Partition columns must be an integer or varchar type.";
+                        throw new VoltCompilerException(msg);
+                }
 
-            t.setPartitioncolumn(c);
-            t.setIsreplicated(false);
+                t.setPartitioncolumn(c);
+                t.setIsreplicated(false);
 
-            // Set the destination tables of associated views non-replicated.
-            // If a view's source table is replicated, then a full scan of the
-            // associated view is singled-sited. If the source is partitioned,
-            // a full scan of the view must be distributed.
-            final CatalogMap<MaterializedViewInfo> views = t.getViews();
-            for (final MaterializedViewInfo mvi : views) {
-                mvi.getDest().setIsreplicated(false);
-                setGroupedTablePartitionColumn(mvi, c);
+                // Set the destination tables of associated views non-replicated.
+                // If a view's source table is replicated, then a full scan of the
+                // associated view is singled-sited. If the source is partitioned,
+                // a full scan of the view must be distributed.
+                final CatalogMap<MaterializedViewInfo> views = t.getViews();
+                for (final MaterializedViewInfo mvi : views) {
+                    mvi.getDest().setIsreplicated(false);
+                    setGroupedTablePartitionColumn(mvi, c);
+                }
             }
         }
 
@@ -823,6 +828,9 @@ public class VoltCompiler {
 
     /** Helper to sort table columns by table column order */
     private static class TableColumnComparator implements Comparator<Column> {
+        public TableColumnComparator() {
+        }
+
         @Override
         public int compare(Column o1, Column o2) {
             return o1.getIndex() - o2.getIndex();
@@ -831,6 +839,9 @@ public class VoltCompiler {
 
     /** Helper to sort index columnrefs by index column order */
     private static class ColumnRefComparator implements Comparator<ColumnRef> {
+        public ColumnRefComparator() {
+        }
+
         @Override
         public int compare(ColumnRef o1, ColumnRef o2) {
             return o1.getIndex() - o2.getIndex();
@@ -1148,28 +1159,6 @@ public class VoltCompiler {
         return cls;
     }
 
-    String[] getPartition(org.voltdb.compiler.projectfile.PartitionsType.Partition xmltable)
-    throws VoltCompilerException
-    {
-        String msg = "";
-        final String tableName = xmltable.getTable();
-        final String columnName = xmltable.getColumn();
-
-        // where is table and column validity checked?
-        if (tableName.length() == 0) {
-            msg += "\"partition\" element has empty \"table\" attribute";
-            throw new VoltCompilerException(msg);
-        }
-
-        if (columnName.length() == 0) {
-            msg += "\"partition\" element has empty \"column\" attribute";
-            throw new VoltCompilerException(msg);
-        }
-
-        final String[] retval = { tableName, columnName };
-        return retval;
-    }
-
     void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
@@ -1396,6 +1385,8 @@ public class VoltCompiler {
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
             System.exit(-1);
+            // Prevent warning  about fis possibly being null below.
+            return;
         }
 
         assert(fileSize > 0);

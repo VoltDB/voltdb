@@ -16,8 +16,5 @@
             <procedure class='voter.procedures.ContestantWinningStates' />
             <procedure class='voter.procedures.GetStateHeatmap' />
         </procedures>
-        <partitions>
-            <partition table='votes' column='phone_number' />
-        </partitions>
     </database>
 </project>
