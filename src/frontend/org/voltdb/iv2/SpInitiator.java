@@ -30,9 +30,13 @@ import org.json_voltpatches.JSONObject;
 
 import org.voltcore.messaging.HostMessenger;
 
+import org.voltcore.utils.Pair;
+
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCache.Callback;
+
+import org.voltcore.zk.MapCacheWriter;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -50,6 +54,7 @@ import com.google.common.collect.ImmutableMap;
 public class SpInitiator extends BaseInitiator
 {
     final private MapCache m_mapCache;
+    private boolean m_promoted = false;
 
     Callback m_leadersChangeHandler = new Callback()
     {
@@ -59,7 +64,10 @@ public class SpInitiator extends BaseInitiator
             for (JSONObject thing : cache.values()) {
                 try {
                     if (Long.valueOf(thing.getLong("appointee")) == getInitiatorHSId()) {
-                        acceptPromotion();
+                        if (!m_promoted) {
+                            acceptPromotion();
+                            m_promoted = true;
+                        }
                         break;
                     }
                 } catch (JSONException e) {
@@ -98,6 +106,54 @@ public class SpInitiator extends BaseInitiator
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+    }
+
+    @Override
+    public void acceptPromotion()
+    {
+        try {
+            long startTime = System.currentTimeMillis();
+            Boolean success = false;
+            m_term = createTerm(m_missingStartupSites, m_messenger.getZK(),
+                    m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                    m_whoami);
+            m_term.start();
+            while (!success) {
+                RepairAlgo repair = null;
+                repair = createPromoteAlgo(m_term.getInterestingHSIds(),
+                        m_initiatorMailbox, m_whoami);
+
+                m_initiatorMailbox.setRepairAlgo(repair);
+                // term syslogs the start of leader promotion.
+                Pair<Boolean, Long> result = repair.start().get();
+                success = result.getFirst();
+                if (success) {
+                    m_initiatorMailbox.setLeaderState(result.getSecond());
+                    tmLog.info(m_whoami
+                            + "finished leader promotion. Took "
+                            + (System.currentTimeMillis() - startTime) + " ms.");
+
+                    // THIS IS where map cache should be updated, not
+                    // in the promotion algorithm.
+                    MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(),
+                            m_zkMailboxNode);
+                    iv2masters.put(Integer.toString(m_partitionId),
+                            new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
+                }
+                else {
+                    // The only known reason to fail is a failed replica during
+                    // recovery; that's a bounded event (by k-safety).
+                    // CrashVoltDB here means one node failure causing another.
+                    // Don't create a cascading failure - just try again.
+                    tmLog.info(m_whoami
+                            + "interrupted during leader promotion after "
+                            + (System.currentTimeMillis() - startTime) + " ms. of "
+                            + "trying. Retrying.");
+                }
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
+        }
     }
 
     /**
