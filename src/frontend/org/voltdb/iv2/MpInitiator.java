@@ -50,6 +50,7 @@ import org.voltdb.VoltZK;
 public class MpInitiator extends BaseInitiator implements LeaderNoticeHandler
 {
     private static final int MP_INIT_PID = -1;
+    private CountDownLatch m_missingStartupSites;
     protected LeaderElector m_leaderElector = null;
 
     public MpInitiator(HostMessenger messenger, long buddyHSId)

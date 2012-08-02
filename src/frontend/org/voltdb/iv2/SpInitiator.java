@@ -114,7 +114,7 @@ public class SpInitiator extends BaseInitiator
         try {
             long startTime = System.currentTimeMillis();
             Boolean success = false;
-            m_term = createTerm(m_missingStartupSites, m_messenger.getZK(),
+            m_term = createTerm(null, m_messenger.getZK(),
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
@@ -170,7 +170,7 @@ public class SpInitiator extends BaseInitiator
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami)
     {
-        return new SpTerm(missingStartupSites, zk, partitionId, initiatorHSId, mailbox, whoami);
+        return new SpTerm(zk, partitionId, initiatorHSId, mailbox, whoami);
     }
 
     @Override

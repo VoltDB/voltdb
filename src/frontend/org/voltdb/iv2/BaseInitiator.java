@@ -46,7 +46,6 @@ public abstract class BaseInitiator implements Initiator
     // External references/config
     protected final HostMessenger m_messenger;
     protected final int m_partitionId;
-    protected CountDownLatch m_missingStartupSites;
     protected final String m_zkMailboxNode;
     protected final String m_whoami;
 
