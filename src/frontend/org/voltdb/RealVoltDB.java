@@ -184,6 +184,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
     Cartographer m_cartographer = null;
     LeaderAppointer m_leaderAppointer = null;
+    GlobalServiceElector m_globalServiceElector = null;
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -393,6 +394,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         "See previous log message for details.", false, null);
             }
 
+            // Create the GlobalServiceElector.  Do this here so we can register the MPI with it
+            // when we construct it below
+            m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
+
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
              * in one atomic shot.
@@ -426,8 +431,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                    Initiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
+                    MpInitiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
                     m_iv2Initiators.add(initiator);
+                    m_globalServiceElector.registerService(initiator);
                 }
 
                 /*
@@ -664,6 +670,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     assert(runner.m_siteObj != null);
                     m_localSites.put(runner.m_siteId, runner.m_siteObj);
                 }
+            }
+
+            // Start the GlobalServiceElector.  Not sure where this will actually belong.
+            try {
+                m_globalServiceElector.start();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
             }
 
             /*
@@ -1556,6 +1569,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_periodicWorkThread.shutdown();
                 heartbeatThread.interrupt();
                 heartbeatThread.join();
+
+                m_globalServiceElector.shutdown();
 
                 if (m_hasStartedSampler.get()) {
                     m_sampler.setShouldStop();

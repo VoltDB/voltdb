@@ -165,7 +165,7 @@ public class MpInitiator extends BaseInitiator implements LeaderNoticeHandler, P
     @Override
     public void becomeLeader()
     {
-        acceptPromotion();
+        //acceptPromotion();
     }
 
     // Register with m_partition's leader elector node
