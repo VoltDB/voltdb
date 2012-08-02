@@ -39,6 +39,7 @@ import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.Promotable;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -47,7 +48,7 @@ import org.voltdb.VoltZK;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class MpInitiator extends BaseInitiator implements LeaderNoticeHandler
+public class MpInitiator extends BaseInitiator implements LeaderNoticeHandler, Promotable
 {
     private static final int MP_INIT_PID = -1;
     private CountDownLatch m_missingStartupSites;

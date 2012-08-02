@@ -41,6 +41,7 @@ import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.Promotable;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
@@ -51,7 +52,7 @@ import com.google.common.collect.ImmutableMap;
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class SpInitiator extends BaseInitiator
+public class SpInitiator extends BaseInitiator implements Promotable
 {
     final private MapCache m_mapCache;
     private boolean m_promoted = false;

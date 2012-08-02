@@ -52,9 +52,6 @@ public interface Initiator
     /** This initiator participates in rejoin processing */
     public boolean isRejoinable();
 
-    /** Perform the tasks necessary to promote this initiator to be a leader */
-    public void acceptPromotion();
-
     /** Create a Term implementation appropriate for the subclass */
     public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
             int partitionId, long initiatorHSId, InitiatorMailbox mailbox,

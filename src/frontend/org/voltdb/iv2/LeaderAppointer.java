@@ -128,6 +128,9 @@ public class LeaderAppointer
                 masterHostId = -1; // stupid default
             }
         }
+        else {
+            masterHostId = -1;
+        }
 
         long masterHSId = children.get(0);
         for (Long child : children) {
