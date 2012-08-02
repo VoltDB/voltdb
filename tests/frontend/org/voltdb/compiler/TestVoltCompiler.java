@@ -1415,6 +1415,48 @@ public class TestVoltCompiler extends TestCase {
         // System.out.println(diagnostics);
     }
 
+    public void testBadDDLErrorLineNumber() throws IOException {
+        final String schema =
+            "-- a comment\n" +                          // 1
+            "create table books (\n" +                  // 2
+            " id integer default 0,\n" +                // 3
+            " strval varchar(33000) default '',\n" +    // 4
+            " PRIMARY KEY(id)\n" +                      // 5
+            ");\n" +                                    // 6
+            "\n" +                                      // 7
+            "-- another comment\n" +                    // 8
+            "create view badview (\n" +                 // 9 * error reported here *
+            " id,\n" +
+            " COUNT(*),\n" +
+            " total\n" +
+            " as\n" +
+            "select id, COUNT(*), SUM(cnt)\n" +
+            " from books\n" +
+            " group by id;";
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(schema);
+        final String schemaPath = schemaFile.getPath();
+
+        final String project =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(project);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compile(projectPath, testout_jar);
+        assertFalse(success);
+        for (Feedback error: compiler.m_errors) {
+            assertEquals(9, error.lineNo);
+        }
+    }
+
     private int countStringsMatching(List<String> diagnostics, String pattern) {
         int count = 0;
         for (String string : diagnostics) {

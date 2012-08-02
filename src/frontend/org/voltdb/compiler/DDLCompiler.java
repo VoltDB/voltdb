@@ -107,7 +107,7 @@ public class DDLCompiler {
             throw m_compiler.new VoltCompilerException("Unable to open schema file for reading");
         }
 
-        m_currLineNo = 0;
+        m_currLineNo = 1;
         this.loadSchema(path, reader);
     }
 
@@ -365,6 +365,7 @@ public class DDLCompiler {
         int state = kStateInvalid;
 
         char[] nchar = new char[1];
+        @SuppressWarnings("synthetic-access")
         DDLStatement retval = new DDLStatement();
         retval.lineNo = m_currLineNo;
 
@@ -416,6 +417,8 @@ public class DDLCompiler {
                 else {
                     retval.statement += nchar[0];
                     state = kStateReading;
+                    // Set the line number to the start of the real statement.
+                    retval.lineNo = m_currLineNo;
                     break;
                 }
             } while (true);
