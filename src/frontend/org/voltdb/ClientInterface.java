@@ -1321,13 +1321,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     private void processExplainPlannedStmtBatch(  ExplainPlannedStmtBatch planBatch ) {
         final Connection c = (Connection)planBatch.clientData;
-        List<byte[]> planByteArray = planBatch.getAggregatorFragments();
-        VoltTable[] vt = new VoltTable[ planBatch.getSQLStatements().size()];
-        if( planByteArray != null ) {
-            //signle partition query plan
-            int i = 0;
-            for( byte[] planByte : planByteArray ){
-                String plan = new String( planByte, VoltDB.UTF8ENCODING);
+        List<byte[]> aggByteArray = planBatch.getAggregatorFragments();
+        List<byte[]> collByteArray = planBatch.getCollectorFragments();
+        int size = planBatch.getPlannedStatementCount();
+        VoltTable[] vt = new VoltTable[ size ];
+
+        for( int i = 0; i<size; i++ ) {
+            byte[] aggByte = aggByteArray.get(i);
+            byte[] collByte = collByteArray.get(i);
+            if( collByte == null ) {
+                //signle partition query plan
+                String plan = new String( aggByte, VoltDB.UTF8ENCODING);
                 PlanNodeTree pnt = new PlanNodeTree();
                 try {
                     JSONObject jobj = new JSONObject( plan );
@@ -1341,19 +1345,23 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     System.out.println(e.getMessage());
                 }
             }
-        }
-        else{
-            //multi-partition query plan
-            planByteArray = planBatch.getCollectorFragments();
-            int i = 0;
-            for( byte[] planByte : planByteArray ){
-                String plan = new String( planByte, VoltDB.UTF8ENCODING);
+            else {
+                //multi-partition query plan
+                String aggplan = new String( aggByte, VoltDB.UTF8ENCODING);
+                String collplan = new String( collByte, VoltDB.UTF8ENCODING);
                 PlanNodeTree pnt = new PlanNodeTree();
+                PlanNodeTree collpnt = new PlanNodeTree();
                 try {
-                    JSONObject jobj = new JSONObject( plan );
+                    JSONObject jobj = new JSONObject( aggplan );
                     JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-                    //TODO combine plan fragments
+                    //TODO  db is null, may need to be set up in some cases.
                     pnt.loadFromJSONArray(jarray, null);
+                    //combine plan fragments
+                    jobj = new JSONObject( collplan );
+                    jarray =  jobj.getJSONArray("PLAN_NODES");
+                    collpnt.loadFromJSONArray(jarray, null);
+                    pnt.concatenate( collpnt.getRootPlanNode() );
+
                     String str = pnt.getRootPlanNode().toExplainPlanString();
                     vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Explained Plan-MP", VoltType.STRING));
                     vt[i].addRow(str);
@@ -1363,6 +1371,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
         }
+
         ClientResponseImpl response =
                 new ClientResponseImpl(
                         ClientResponseImpl.SUCCESS,
