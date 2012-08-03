@@ -424,9 +424,4 @@ public class SpScheduler extends Scheduler
             m_pendingTasks.offer(task);
         }
     }
-
-    @Override
-    public void setMaxSeenTxnId(long maxSeenTxnId) {
-        assert(maxSeenTxnId < (1l << 40));
-    }
 }

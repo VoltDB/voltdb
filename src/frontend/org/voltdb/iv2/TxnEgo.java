@@ -32,7 +32,7 @@ final public class TxnEgo {
 
     // maximum values for the fields
     static final long SEQUENCE_MAX_VALUE = (1L << SEQUENCE_BITS) - 1L;
-    static final long PARTITIONID_MAX_VALUE = (1L << PARTITIONID_BITS) - 1L;
+    static final int PARTITIONID_MAX_VALUE = (1 << PARTITIONID_BITS) - 1;
 
     // (Copy/Pasted (on purpose) from voltdb.TransactionIdManager)
     // The legacy transaction id included 40-bits of timestamp starting
@@ -82,9 +82,9 @@ final public class TxnEgo {
     /**
      * Make the next sequence-valued TxnEgo
      */
-    public static TxnEgo makeNext(final TxnEgo prev)
+    public TxnEgo makeNext()
     {
-        return new TxnEgo(prev.getSequence() + 1, prev.getPartitionId());
+        return new TxnEgo(getSequence() + 1, getPartitionId());
     }
 
     public TxnEgo(long sequence, long partitionId)

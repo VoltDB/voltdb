@@ -146,7 +146,7 @@ public class Cartographer extends StatsSource
     public long getHSIdForMultiPartitionInitiator()
     {
         try {
-            return m_iv2Mpi.get(Integer.toString(-1)).getLong("hsid");
+            return m_iv2Mpi.get(Integer.toString(MpInitiator.MP_INIT_PID)).getLong("hsid");
         }
         catch (JSONException je) {
             // IZZY: Probably need a more coherent failure strategy here later
@@ -161,7 +161,7 @@ public class Cartographer extends StatsSource
         // constructor, then go looking for a matching host ID.
         List<MailboxNodeContent> sitesList = getMailboxNodeContentList();
         for (MailboxNodeContent site : sitesList) {
-            if (site.partitionId != -1 && host == CoreUtils.getHostIdFromHSId(site.HSId)) {
+            if (site.partitionId != MpInitiator.MP_INIT_PID && host == CoreUtils.getHostIdFromHSId(site.HSId)) {
                 return site.HSId;
             }
         }

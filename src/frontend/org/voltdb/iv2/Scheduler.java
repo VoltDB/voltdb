@@ -55,13 +55,28 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
-    protected TxnEgo m_txnEgo;
+    private TxnEgo m_txnEgo;
 
     Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
         m_txnEgo = TxnEgo.makeZero(partitionId);
+    }
+
+    final public void setMaxSeenTxnId(long maxSeenTxnId)
+    {
+        m_txnEgo = new TxnEgo(maxSeenTxnId, m_txnEgo.getPartitionId());
+    }
+
+    final protected void advanceTxnEgo()
+    {
+        m_txnEgo = m_txnEgo.makeNext();
+    }
+
+    final protected long currentTxnEgoSequence()
+    {
+        return m_txnEgo.getSequence();
     }
 
     @Override
@@ -92,7 +107,5 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     @Override
     abstract public void deliver(VoltMessage message);
-
-    abstract public void setMaxSeenTxnId(long maxSeenTxnId);
 
 }

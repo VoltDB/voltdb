@@ -41,9 +41,9 @@ public class ClientInterfaceHandleManager
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
-    static final int PART_ID_BITS = 10;
+    static final int PART_ID_BITS = 14;
     static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
-    static final int PART_ID_SHIFT = 54;
+    static final int PART_ID_SHIFT = 50;
     static final int SEQNUM_MAX = (1 << PART_ID_SHIFT) - 1;
 
     private long m_outstandingTxns;
