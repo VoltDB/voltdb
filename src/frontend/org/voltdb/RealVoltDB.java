@@ -415,6 +415,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
             JSONObject topo = getTopology(isRejoin);
+            MpInitiator mpi = null;
             try {
                 // IV2 mailbox stuff
                 if (isIV2Enabled()) {
@@ -431,9 +432,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                    MpInitiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
-                    m_iv2Initiators.add(initiator);
-                    m_globalServiceElector.registerService(initiator);
+                    mpi = new MpInitiator(m_messenger, mpiBuddyHSId);
+                    m_iv2Initiators.add(mpi);
+                    m_globalServiceElector.registerService(mpi);
                 }
 
                 /*
@@ -579,7 +580,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_messenger.getZK(),
                                 new CountDownLatch(clusterConfig.getPartitionCount()),
                                 m_deployment.getCluster().getKfactor(),
-                                topo);
+                                topo, mpi);
                         m_leaderAppointer.acceptPromotion();
                     }
 

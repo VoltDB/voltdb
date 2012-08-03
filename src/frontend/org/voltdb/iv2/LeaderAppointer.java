@@ -57,6 +57,7 @@ public class LeaderAppointer implements Promotable
     private final PartitionCallback[] m_callbacks;
     private final int m_kfactor;
     private final JSONObject m_topo;
+    private final MpInitiator m_MPI;
 
     private class PartitionCallback extends BabySitter.Callback
     {
@@ -87,11 +88,12 @@ public class LeaderAppointer implements Promotable
     };
 
     public LeaderAppointer(ZooKeeper zk, CountDownLatch numberOfPartitions,
-            int kfactor, JSONObject topology)
+            int kfactor, JSONObject topology, MpInitiator mpi)
     {
         m_zk = zk;
         m_kfactor = kfactor;
         m_topo = topology;
+        m_MPI = mpi;
         m_partitionCountLatch = numberOfPartitions;
         m_callbacks = new PartitionCallback[(int)numberOfPartitions.getCount()];
         m_partitionWatchers = new BabySitter[(int)numberOfPartitions.getCount()];
