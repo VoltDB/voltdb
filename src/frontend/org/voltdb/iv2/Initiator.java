@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import java.util.List;
@@ -53,8 +52,7 @@ public interface Initiator
     public boolean isRejoinable();
 
     /** Create a Term implementation appropriate for the subclass */
-    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+    public Term createTerm(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami);
 
     /** Create a Promotion implementation appropriate for the subclass */

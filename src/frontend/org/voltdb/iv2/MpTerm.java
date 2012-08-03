@@ -52,7 +52,6 @@ public class MpTerm implements Term
 
     private final InitiatorMailbox m_mailbox;
     private final ZooKeeper m_zk;
-    private final CountDownLatch m_missingStartupSites;
     private final TreeSet<Long> m_knownLeaders = new TreeSet<Long>();
 
     // Initialized in start() -- when the term begins.
@@ -79,58 +78,23 @@ public class MpTerm implements Term
             }
             List<Long> leaders = new ArrayList<Long>(updatedLeaders);
             tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
-            // Need to handle startup separately from runtime updates.
-            if (MpTerm.this.m_missingStartupSites.getCount() > 0) {
-
-                Sets.SetView<Long> removed = Sets.difference(MpTerm.this.m_knownLeaders, updatedLeaders);
-                if (!removed.isEmpty()) {
-                    tmLog.error(m_whoami
-                            + "leader(s) failed during startup. Initialization can not complete."
-                            + " Failed leaders: " + removed);
-                    VoltDB.crashLocalVoltDB("Leaders failed during startup.", true, null);
-                    return;
-                }
-                Sets.SetView<Long> added = Sets.difference(updatedLeaders, MpTerm.this.m_knownLeaders);
-                int newLeaders = added.size();
-                m_knownLeaders.clear();
-                m_knownLeaders.addAll(updatedLeaders);
-                m_mailbox.updateReplicas(leaders);
-                for (int i=0; i < newLeaders; i++) {
-                    MpTerm.this.m_missingStartupSites.countDown();
-                }
-                tmLog.info(m_whoami +
-                        "continuing leader promotion.  Waiting for " +
-                        m_missingStartupSites.getCount() + " more for configured k-safety.");
-            }
-            else {
-                // remove the leader; convert to hsids; deal with the replica change.
-                tmLog.info(m_whoami
-                        + "MapCache change handler updating leader list to: "
-                        + CoreUtils.hsIdCollectionToString(leaders));
-                m_knownLeaders.clear();
-                m_knownLeaders.addAll(updatedLeaders);
-                m_mailbox.updateReplicas(leaders);
-            }
+            tmLog.info(m_whoami
+                    + "MapCache change handler updating leader list to: "
+                    + CoreUtils.hsIdCollectionToString(leaders));
+            m_knownLeaders.clear();
+            m_knownLeaders.addAll(updatedLeaders);
+            m_mailbox.updateReplicas(leaders);
         }
     };
 
     /**
      * Setup a new Term but don't take any action to take responsibility.
      */
-    public MpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            long initiatorHSId, InitiatorMailbox mailbox,
+    public MpTerm(ZooKeeper zk, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami)
     {
         m_zk = zk;
         m_mailbox = mailbox;
-
-        if (missingStartupSites != null) {
-            m_missingStartupSites = missingStartupSites;
-        }
-        else {
-            m_missingStartupSites = new CountDownLatch(0);
-        }
-
         m_whoami = whoami;
     }
 

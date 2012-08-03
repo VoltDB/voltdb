@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import java.util.List;
@@ -32,7 +31,6 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.Pair;
 
 import org.voltcore.zk.LeaderElector;
-import org.voltcore.zk.LeaderNoticeHandler;
 import org.voltcore.zk.MapCache;
 import org.voltcore.zk.MapCacheWriter;
 
@@ -87,7 +85,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         try {
             long startTime = System.currentTimeMillis();
             Boolean success = false;
-            m_term = createTerm(null, m_messenger.getZK(),
+            m_term = createTerm(m_messenger.getZK(),
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
@@ -139,11 +137,10 @@ public class MpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+    public Term createTerm(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami)
     {
-        return new MpTerm(missingStartupSites, zk, initiatorHSId, mailbox, whoami);
+        return new MpTerm(zk, initiatorHSId, mailbox, whoami);
     }
 
     @Override

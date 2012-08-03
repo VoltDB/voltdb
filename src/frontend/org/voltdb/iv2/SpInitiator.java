@@ -17,7 +17,6 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import java.util.List;
@@ -115,7 +114,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         try {
             long startTime = System.currentTimeMillis();
             Boolean success = false;
-            m_term = createTerm(null, m_messenger.getZK(),
+            m_term = createTerm(m_messenger.getZK(),
                     m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
                     m_whoami);
             m_term.start();
@@ -167,8 +166,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
     }
 
     @Override
-    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+    public Term createTerm(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami)
     {
         return new SpTerm(zk, partitionId, initiatorHSId, mailbox, whoami);
