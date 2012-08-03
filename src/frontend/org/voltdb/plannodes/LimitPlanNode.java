@@ -81,7 +81,7 @@ public class LimitPlanNode extends AbstractPlanNode {
             return true;
         }
         m_nondeterminismDetail = "a limit on unordered content may return different rows: " +
-                m_children.get(0).nondeterminismDetail();
+            m_children.get(0).nondeterminismDetail();
         return false;
     }
 
@@ -154,7 +154,7 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_outputSchema.sortByTveIndex();
     }
 
-    // TODO:Members not loaded
+ // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
         super.loadFromJSONObject(jobj, db);
@@ -163,12 +163,10 @@ public class LimitPlanNode extends AbstractPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         String retval = "";
-        if (m_limit >= 0) {
+        if (m_limit >= 0)
             retval += "LIMIT " + String.valueOf(m_limit) + " ";
-        }
-        if (m_offset > 0) {
+        if (m_offset > 0)
             retval += "OFFSET " + String.valueOf(m_offset) + " ";
-        }
         if (retval.length() > 0) {
             // remove the last space
             return retval.substring(0, retval.length() - 1);
@@ -177,6 +175,4 @@ public class LimitPlanNode extends AbstractPlanNode {
             return "LIMIT with parameter";
         }
     }
-
-
 }
