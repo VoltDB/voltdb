@@ -61,7 +61,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
     protected final boolean m_useIv2;
     public TestRejoinEndToEnd(boolean useIv2)
     {
-        m_useIv2 = useIv2;
+        m_useIv2 = useIv2 || VoltDB.checkTestEnvForIv2();
     }
 
     final int FAIL_NO_OPEN_SOCKET = 0;
@@ -155,18 +155,17 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
             ServerThread localServer = null;
             try {
                 VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+                config.m_enableIV2 = m_useIv2;
                 config.m_startAction = START_ACTION.REJOIN;
                 config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
                 config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
                 config.m_leader = ":" + cluster.internalPort(1);
-
                 config.m_isRejoinTest = true;
                 cluster.setPortsFromConfig(0, config);
-                localServer = new ServerThread(config);
 
+                localServer = new ServerThread(config);
                 localServer.start();
                 localServer.waitForRejoin();
-
                 Thread.sleep(2000);
 
                 client = ClientFactory.createClient(m_cconfig);
@@ -395,6 +394,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+        config.m_enableIV2 = m_useIv2;
         config.m_startAction = START_ACTION.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
@@ -405,7 +405,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
-        localServer.waitForInitialization();
+        localServer.waitForRejoin();
 
         Thread.sleep(5000);
 
@@ -464,6 +464,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+        config.m_enableIV2 = m_useIv2;
         config.m_startAction = START_ACTION.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
@@ -474,7 +475,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
-        localServer.waitForInitialization();
+        localServer.waitForRejoin();
 
         Thread.sleep(1000);
 
@@ -585,6 +586,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(100);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+        config.m_enableIV2 = m_useIv2;
         config.m_startAction = START_ACTION.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
@@ -595,7 +597,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
-        localServer.waitForInitialization();
+        localServer.waitForRejoin();
 
         Thread.sleep(1000);
         while (VoltDB.instance().rejoining()) {
@@ -670,6 +672,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         Thread.sleep(1000);
 
         VoltDB.Configuration config = new VoltDB.Configuration(cluster.portGenerator);
+        config.m_enableIV2 = m_useIv2;
         config.m_startAction = START_ACTION.REJOIN;
         config.m_pathToCatalog = Configuration.getPathToCatalogForTest("rejoin.jar");
         config.m_pathToDeployment = Configuration.getPathToCatalogForTest("rejoin.xml");
@@ -680,7 +683,7 @@ public class TestRejoinEndToEnd extends RejoinTestBase {
         ServerThread localServer = new ServerThread(config);
 
         localServer.start();
-        localServer.waitForInitialization();
+        localServer.waitForRejoin();
 
         Thread.sleep(2000);
 

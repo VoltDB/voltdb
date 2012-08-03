@@ -28,6 +28,7 @@ import java.util.concurrent.atomic.AtomicInteger;
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.EstTime;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
@@ -66,6 +67,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // HSId of this site's initiator.
     final long m_siteId;
+
+    final int m_snapshotPriority;
 
     // Partition count is important for some reason.
     final int m_numberOfPartitions;
@@ -133,6 +136,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Advanced in complete transaction.
     long m_lastCommittedTxnId = 0L;
     long m_currentTxnId = Long.MIN_VALUE;
+    long m_lastTxnTime = System.currentTimeMillis();
 
     SiteProcedureConnection getSiteProcedureConnection()
     {
@@ -258,7 +262,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             long txnId,
             int partitionId,
             int numPartitions,
-            boolean createForRejoin)
+            boolean createForRejoin,
+            int snapshotPriority)
     {
         m_siteId = siteId;
         m_context = context;
@@ -267,7 +272,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_scheduler = scheduler;
         m_backend = backend;
         m_isRejoining = createForRejoin;
-
+        m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, txnId);
     }
@@ -294,15 +299,21 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             m_hsql = null;
             m_ee = initializeEE(serializedCatalog, txnId);
         }
-        // IZZY- Get me from the deployment file in some sane way somehow some day
-        int snapshotPriority = 6;
+
         m_snapshotter = new SnapshotSiteProcessor(new Runnable() {
             @Override
             public void run() {
                 m_scheduler.offer(new SnapshotTask());
             }
         },
-        snapshotPriority);
+        m_snapshotPriority,
+        new SnapshotSiteProcessor.IdlePredicate() {
+
+            @Override
+            public boolean idle(long now) {
+                return (now - 5) > m_lastTxnTime;
+            }
+        });
     }
 
     /** Create a native VoltDB execution engine */
@@ -396,6 +407,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         if (task != null) {
             if (task instanceof TransactionTask) {
                 m_currentTxnId = ((TransactionTask)task).getMpTxnId();
+                m_lastTxnTime = EstTime.currentTimeMillis();
             }
             if (m_isRejoining) {
                 task.runForRejoin(getSiteProcedureConnection());
@@ -404,8 +416,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 task.run(getSiteProcedureConnection());
             }
         }
-
-        m_snapshotter.doSnapshotWork(m_ee, true);
     }
 
     public void startShutdown()

@@ -10,8 +10,5 @@
             <procedure class='voltkv.procedures.Put' />
             <procedure class='voltkv.procedures.Remove' />
         </procedures>
-        <partitions>
-            <partition table='store' column='key' />
-        </partitions>
     </database>
 </project>
