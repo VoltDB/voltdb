@@ -19,18 +19,14 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 import java.util.Collection;
-
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
-import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
-
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
@@ -40,12 +36,8 @@ import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-
-import org.voltdb.iv2.StartupAlgo;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
-import org.voltdb.iv2.Site;
-
 import org.voltdb.VoltDB;
 
 /**
@@ -120,6 +112,11 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                           boolean createForRejoin)
         throws KeeperException, ExecutionException, InterruptedException
     {
+            int snapshotPriority = 6;
+            if (catalogContext.cluster.getDeployment().get("deployment") != null) {
+                snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
+                    getSystemsettings().get("systemsettings").getSnapshotpriority();
+            }
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -127,7 +124,8 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                                        catalogContext.m_transactionId,
                                        m_partitionId,
                                        numberOfPartitions,
-                                       createForRejoin);
+                                       createForRejoin,
+                                       snapshotPriority);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
