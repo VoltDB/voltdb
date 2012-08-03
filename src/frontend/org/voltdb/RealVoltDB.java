@@ -580,7 +580,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 new CountDownLatch(clusterConfig.getPartitionCount()),
                                 m_deployment.getCluster().getKfactor(),
                                 topo, mpi);
-                        m_leaderAppointer.acceptPromotion();
+                        //m_leaderAppointer.acceptPromotion();
+                        m_globalServiceElector.registerService(m_leaderAppointer);
                     }
 
                     for (Initiator iv2init : m_iv2Initiators) {
