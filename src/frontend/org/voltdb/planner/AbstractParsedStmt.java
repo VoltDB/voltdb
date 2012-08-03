@@ -377,14 +377,12 @@ public abstract class AbstractParsedStmt {
         VoltType value_type = VoltType.typeFromString(value_type_name);
         String id = exprNode.attributes.get("id");
         assert(id != null);
-        int idArg = Integer.parseInt(id);
+        int idArg = 0;
+        try {
+            idArg = Integer.parseInt(id);
+        } catch (NumberFormatException nfe) {}
+        assert(idArg > 0);
         String parameter = exprNode.attributes.get("parameter");
-        int parameter_idx = -1;
-        if (parameter != null) {
-            try {
-                parameter_idx = Integer.parseInt(parameter);
-            } catch (NumberFormatException nfe) {}
-        }
         String volt_alias = exprNode.attributes.get("volt_alias");
         if (volt_alias == null) {
             volt_alias = name; // volt shares the function name with HSQL
@@ -399,46 +397,25 @@ public abstract class AbstractParsedStmt {
             args.add(argExpr);
         }
 
-        if (parameter_idx != -1) {
-            // Avoid a non-castable types runtime exception by negotiating the type(s) of the parameterized function's result
-            // and its parameter argument. Either of these types could be null or a specific supported value type, or a generic
-            // NUMERIC. Replace any "generic" type (null or NUMERIC) with the more specific type without over-specifying
-            // -- the BEST type might only become clear later when the context/caller of this function is parsed, so don't
-            // risk guessing wrong here just for the sake of specificity.
-            // There will be a "finalize" pass over the completed expression tree to finish specifying any remaining "generics".
-            AbstractExpression param_arg = args.get(parameter_idx);
-            // But DO use the type chosen by HSQL for the parameterized function as a specific type hint
-            // for numeric constant arguments that could either go decimal or float.
-            VoltType param_type = param_arg.getValueType();
-            // The heuristic for which types to change is that any type (parameter type or return type) specified so far,
-            // including "NUMERIC" is better than nothing. And that anything else is better than NUMERIC.
-            if (value_type != param_type) {
-                if (value_type == null) {
-                    value_type = param_type;
-                } else if (value_type == VoltType.NUMERIC) {
-                    if (param_type != null) {
-                        value_type = param_type;
-                    }
-                    // Pushing a type DOWN to the argument is a lot like work, and not worth it just to
-                    // propagate down a known NUMERIC return type,
-                    // since it will just have to be re-specialized when a more specific type is inferred from
-                    // the context or finalized when the expression is complete.
-                } else if ((param_type == null) || (param_type == VoltType.NUMERIC)) {
-                    // The only purpose of refining the parameter argument's type is to force a more specific
-                    // refinement than NUMERIC as implied by HSQL, in case that might be more specific than
-                    // what can be be inferred later from the function call context.
-                    param_arg.refineValueType(value_type);
-                }
-            }
-        }
-
         FunctionExpression expr = new FunctionExpression();
-        expr.setAttributes(name, volt_alias, idArg, parameter_idx);
+        expr.setAttributes(name, volt_alias, idArg);
+        expr.setArgs(args);
         if (value_type != null) {
             expr.setValueType(value_type);
             expr.setValueSize(value_type.getMaxLengthInBytes());
         }
-        expr.setArgs(args);
+
+        if (parameter != null) {
+            int parameter_idx = -1; // invalid argument index
+            try {
+                parameter_idx = Integer.parseInt(parameter);
+            } catch (NumberFormatException nfe) {}
+            assert(parameter_idx >= 0); // better be valid by now.
+            assert(parameter_idx < args.size()); // must refer to a provided argument
+
+            expr.setParameterArgAndNegotiateInitialValueTypes(parameter_idx);
+        }
+
         return expr;
     }
 

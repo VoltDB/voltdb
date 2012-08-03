@@ -32,10 +32,12 @@ public class FunctionExpression extends AbstractExpression {
         PARAMETER_ARG,
     }
 
+    private final static int NOT_PARAMETERIZED = -1;
+
     private String m_name;
     private String m_alias;
     private int m_functionId;
-    private int m_parameterArg;
+    private int m_parameterArg = NOT_PARAMETERIZED;
 
     public int getParameterArg() {
         return m_parameterArg;
@@ -49,12 +51,53 @@ public class FunctionExpression extends AbstractExpression {
         setExpressionType(ExpressionType.FUNCTION);
     }
 
-    public void setAttributes(String name, String volt_alias, int id, int parameterArg) {
+    public void setAttributes(String name, String volt_alias, int id) {
         m_name = name;
         m_alias = volt_alias;
         m_functionId = id;
-        m_parameterArg = parameterArg;
     }
+
+    public void setParameterArgAndNegotiateInitialValueTypes(int parameterArg) {
+        m_parameterArg = parameterArg;
+
+        // Avoid a non-castable types runtime exception by negotiating the type(s) of the parameterized function's result
+        // and its parameter argument. Either of these types could be null or a specific supported value type, or a generic
+        // NUMERIC. Replace any "generic" type (null or NUMERIC) with the more specific type without over-specifying
+        // -- the BEST type might only become clear later when the context/caller of this function is parsed, so don't
+        // risk guessing wrong here just for the sake of specificity.
+        // There will be a "finalize" pass over the completed expression tree to finish specifying any remaining "generics".
+
+        // DO use the type chosen by HSQL for the parameterized function as a specific type hint
+        // for numeric constant arguments that could either go decimal or float.
+        AbstractExpression param_arg = m_args.get(parameterArg);
+        VoltType param_type = param_arg.getValueType();
+        VoltType value_type = getValueType();
+        // The heuristic for which type to change is that any type (parameter type or return type) specified so far,
+        // including NUMERIC is better than nothing. And that anything else is better than NUMERIC.
+        if (value_type != param_type) {
+            if (value_type == null) {
+                value_type = param_type;
+            } else if (value_type == VoltType.NUMERIC) {
+                if (param_type != null) {
+                    value_type = param_type;
+                }
+                // Pushing a type DOWN to the argument is a lot like work, and not worth it just to
+                // propagate down a known NUMERIC return type,
+                // since it will just have to be re-specialized when a more specific type is inferred from
+                // the context or finalized when the expression is complete.
+            } else if ((param_type == null) || (param_type == VoltType.NUMERIC)) {
+                // The only purpose of refining the parameter argument's type is to force a more specific
+                // refinement than NUMERIC as implied by HSQL, in case that might be more specific than
+                // what can be be inferred later from the function call context.
+                param_arg.refineValueType(value_type);
+            }
+        }
+        if (value_type != null) {
+            setValueType(value_type);
+            setValueSize(value_type.getMaxLengthInBytes());
+        }
+    }
+
 
     @Override
     public void validate() throws Exception {
@@ -77,8 +120,10 @@ public class FunctionExpression extends AbstractExpression {
         if (m_name == null) {
             throw new Exception("ERROR: The function name for '" + this + "' is NULL");
         }
-        if (m_parameterArg < -1 || ((m_args != null) && m_parameterArg >= m_args.size())) {
-            throw new Exception("ERROR: The function parameter argument index '" + m_parameterArg + "' for '" + this + "' is out of bounds");
+        if (m_parameterArg != NOT_PARAMETERIZED) {
+            if (m_parameterArg < 0 || ((m_args != null) && m_parameterArg >= m_args.size())) {
+                throw new Exception("ERROR: The function parameter argument index '" + m_parameterArg + "' for '" + this + "' is out of bounds");
+            }
         }
 
     }
@@ -155,10 +200,14 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public void refineOperandType(VoltType columnType) {
-        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
+        if (m_parameterArg == NOT_PARAMETERIZED) {
+            // Non-parameterized functions should have a fixed SPECIFIC type.
+            // Further refinement should be useless/un-possible.
             return;
         }
-        if (m_parameterArg == -1) {
+        // A parameterized function may be able to usefully refine its parameter argument's type
+        // and have that change propagate up to its return type.
+        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
         AbstractExpression arg = m_args.get(m_parameterArg);
@@ -173,10 +222,14 @@ public class FunctionExpression extends AbstractExpression {
 
     @Override
     public void refineValueType(VoltType columnType) {
-        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
+        if (m_parameterArg == NOT_PARAMETERIZED) {
+            // Non-parameterized functions should have a fixed SPECIFIC type.
+            // Further refinement should be useless/un-possible.
             return;
         }
-        if (m_parameterArg == -1) {
+        // A parameterized function may be able to usefully refine its parameter argument's type
+        // and have that change propagate up to its return type.
+        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
             return;
         }
         AbstractExpression arg = m_args.get(m_parameterArg);
@@ -193,11 +246,15 @@ public class FunctionExpression extends AbstractExpression {
     public void finalizeValueTypes()
     {
         finalizeChildValueTypes();
-        if (m_parameterArg != -1) {
-            AbstractExpression arg = m_args.get(m_parameterArg);
-            m_valueType = arg.getValueType();
-            m_valueSize = m_valueType.getMaxLengthInBytes();
+        if (m_parameterArg == NOT_PARAMETERIZED) {
+            // Non-parameterized functions should have a fixed SPECIFIC type.
+            // Further refinement should be useless/un-possible.
+            return;
         }
+        // A parameterized function should reflect the final value of its parameter argument's type.
+        AbstractExpression arg = m_args.get(m_parameterArg);
+        m_valueType = arg.getValueType();
+        m_valueSize = m_valueType.getMaxLengthInBytes();
     }
 
 }
