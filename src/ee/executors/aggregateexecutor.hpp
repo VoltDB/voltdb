@@ -632,7 +632,8 @@ public:
         {
             VOLT_TRACE("no record. outputting a NULL row..");
             Agg** aggregates =
-                static_cast<Agg**>(m_memoryPool->allocate(sizeof(void*)));
+                static_cast<Agg**>(m_memoryPool->allocate(sizeof(void*) *
+                                                           m_colTypes->size()));
             for (int i = 0; i < m_colTypes->size(); i++)
             {
                 // It is necessary to look up the mapping between the
