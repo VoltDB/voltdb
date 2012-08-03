@@ -54,12 +54,7 @@
 #   VOLTDB_OPTS     Extra Java runtime options.
 #   LOG4J_CONFIG_PATH     Path to alternate log4j configuration
 
-
-bin=`dirname "$0"`
-bin=`cd "$bin"; pwd`
-
 # resolve links - $0 may be a softlink
-
 this="$0"
 while [ -h "$this" ]; do
   ls=`ls -ld "$this"`
@@ -72,13 +67,26 @@ while [ -h "$this" ]; do
 done
 
 # convert relative path to absolute path
+pushd `dirname "$0"` > /dev/null
 bin=`dirname "$this"`
 script=`basename "$this"`
 bin=`cd "$bin"; pwd`
 this="$bin/$script"
+popd > /dev/null
 
 # the root of the VoltDB installation
-export VOLTDB_HOME=`dirname "$this"`/..
+export VOLTDB_HOME=$(dirname $(dirname "$this"))
+
+# detect and adjust for Linux package installation vs. VoltDB distribution
+if [ -d $VOLTDB_HOME/../../lib/voltdb ]; then
+    # Linux package installation puts all libraries in /usr/lib/voltdb
+    VOLTDB_VOLTDB=$(dirname $(dirname "$VOLTDB_HOME"))/lib/voltdb
+    VOLTDB_LIB=$VOLTDB_VOLTDB
+else
+    # distribution puts third party jars in lib and voltdb libraries in voltdb
+    VOLTDB_VOLTDB=$VOLTDB_HOME/voltdb
+    VOLTDB_LIB=$VOLTDB_HOME/lib
+fi
 
 # get classpath and pass other args to voltcompiler
 EXTRA_CLASSPATH=$1
@@ -105,7 +113,7 @@ if [ -z "${LOG4J_CONFIG_PATH}" ]; then
   fi
 fi
 
-VOLTDBJAR=`ls $VOLTDB_HOME/voltdb/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
+VOLTDBJAR=`ls $VOLTDB_VOLTDB/voltdb-2.*.jar | grep -v "doc.jar" | head -1`
 if [ -n "${VOLTDBJAR}" ]; then
   CLASSPATH=$VOLTDBJAR
 else
@@ -114,7 +122,7 @@ else
 fi
 
 # add libs to CLASSPATH
-for f in $VOLTDB_HOME/lib/*.jar; do
+for f in $VOLTDB_LIB/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
