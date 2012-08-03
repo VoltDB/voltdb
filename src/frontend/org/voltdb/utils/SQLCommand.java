@@ -67,9 +67,8 @@ public class SQLCommand
     private static final Pattern AutoSplitParameters = Pattern.compile("[\\s,]+", Pattern.MULTILINE);
     public static List<String> parseQuery(String query)
     {
-        if (query == null) {
+        if (query == null)
             return null;
-        }
 
         String[] command = new String[] {"exec", "execute"};
         String[] keyword = new String[] {"select", "insert", "update", "delete"};
@@ -101,11 +100,9 @@ public class SQLCommand
             sqlFragments[j] = sqlFragments[j].trim();
             if (sqlFragments[j].length() != 0)
             {
-                if(sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
-                    for(int k = 0;k<stringFragments.size();k++) {
+                if(sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1)
+                    for(int k = 0;k<stringFragments.size();k++)
                         sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
-                    }
-                }
                 sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
                 sqlFragments[j] = sqlFragments[j].replace("#SQL_PARSER_STRING_KEYWORD#","");
                 queries.add(sqlFragments[j]);
@@ -115,9 +112,8 @@ public class SQLCommand
     }
     public static List<String> parseQueryProcedureCallParameters(String query)
     {
-        if (query == null) {
+        if (query == null)
             return null;
-        }
 
         query = SingleLineComments.matcher(query).replaceAll("");
         query = EscapedSingleQuote.matcher(query).replaceAll("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)");
@@ -139,11 +135,9 @@ public class SQLCommand
             sqlFragments[j] = sqlFragments[j].trim();
             if (sqlFragments[j].length() != 0)
             {
-                if(sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1) {
-                    for(int k = 0;k<stringFragments.size();k++) {
+                if(sqlFragments[j].indexOf("#(SQL_PARSER_STRING_FRAGMENT#") > -1)
+                    for(int k = 0;k<stringFragments.size();k++)
                         sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_STRING_FRAGMENT#" + k + ")", stringFragments.get(k));
-                    }
-                }
                 sqlFragments[j] = sqlFragments[j].replace("#(SQL_PARSER_ESCAPE_SINGLE_QUOTE)", "''");
                 sqlFragments[j] = sqlFragments[j].trim();
                 queries.add(sqlFragments[j]);
@@ -177,61 +171,57 @@ public class SQLCommand
                     isRecall = false;
                     line = Input.readLine("");
 
-                } else {
-                    line = Input.readLine((LineIndex++) + "> ");
                 }
-            } else {
-                line = Input.readLine();
+                else
+                    line = Input.readLine((LineIndex++) + "> ");
             }
+            else
+                line = Input.readLine();
 
             if (line == null)
             {
-                if (query == null) {
+                if (query == null)
                     return null;
-                } else {
+                else
                     return parseQuery(query.toString());
-                }
             }
 
             // Process recall commands - ONLY in interactive mode
             if (interactive && RecallToken.matcher(line).matches())
             {
-                Matcher m = RecallToken.matcher(line);
-                if (m.find())
-                {
-                    int recall = -1;
-                    try { recall = Integer.parseInt(m.group(1))-1; } catch(Exception x){}
-                    if (recall > -1 && recall < Lines.size())
+                    Matcher m = RecallToken.matcher(line);
+                    if (m.find())
                     {
-                        line = Lines.get(recall);
-                        Input.putString(line);
-                        out.flush();
-                        isRecall = true;
-                        continue;
-                    } else {
-                        System.out.printf("%s> Invalid RECALL reference: '" + m.group(1) + "'.\n", LineIndex-1);
+                        int recall = -1;
+                        try { recall = Integer.parseInt(m.group(1))-1; } catch(Exception x){}
+                        if (recall > -1 && recall < Lines.size())
+                        {
+                            line = Lines.get(recall);
+                            Input.putString(line);
+                            out.flush();
+                            isRecall = true;
+                            continue;
+                        }
+                        else
+                            System.out.printf("%s> Invalid RECALL reference: '" + m.group(1) + "'.\n", LineIndex-1);
                     }
-                } else {
-                    System.out.printf("%s> Invalid RECALL command: '" + line + "'.\n", LineIndex-1);
-                }
+                    else
+                        System.out.printf("%s> Invalid RECALL command: '" + line + "'.\n", LineIndex-1);
             }
 
             // Strip out invalid recall commands
-            if (RecallToken.matcher(line).matches()) {
+            if (RecallToken.matcher(line).matches())
                 line = "";
-            }
 
             // Queue up the line to the recall stack - ONLY in interactive mode
-            if (interactive) {
+            if (interactive)
                 Lines.add(line);
-            }
 
             // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
             if (ExitToken.matcher(line).matches())
             {
-                if (interactive) {
+                if (interactive)
                     return null;
-                }
             }
             // EXIT command - ONLY in interactive mode, exit immediately (without running any queued statements)
             else if (ListToken.matcher(line).matches())
@@ -241,11 +231,8 @@ public class SQLCommand
                     List<String> list = new LinkedList<String>(Procedures.keySet());
                     Collections.sort(list);
                     int padding = 0;
-                    for(String procedure : list) {
-                        if (padding < procedure.length()) {
-                            padding = procedure.length();
-                        }
-                    }
+                    for(String procedure : list)
+                        if (padding < procedure.length()) padding = procedure.length();
                     padding++;
                     String format = "%1$-" + padding + "s";
                     for(int i = 0;i<2;i++)
@@ -253,18 +240,16 @@ public class SQLCommand
                         int j = 0;
                         for(String procedure : list)
                         {
-                            if (i == 0 && procedure.startsWith("@")) {
+                            if (i == 0 && procedure.startsWith("@"))
                                 continue;
-                            } else if (i == 1 && !procedure.startsWith("@")) {
+                            else if (i == 1 && !procedure.startsWith("@"))
                                 continue;
-                            }
                             if (j == 0)
                             {
-                                if (i == 0) {
+                                if (i == 0)
                                     System.out.println("\n--- User Procedures ----------------------------------------");
-                                } else {
+                                else
                                     System.out.println("\n--- System Procedures --------------------------------------");
-                                }
                             }
                             for (List<String> parameterSet : Procedures.get(procedure).values()) {
                                 System.out.printf(format, procedure);
@@ -272,9 +257,8 @@ public class SQLCommand
                                 int pidx = 0;
                                 for(String paramType : parameterSet)
                                 {
-                                    if (pidx > 0) {
+                                    if (pidx > 0)
                                         System.out.print(", ");
-                                    }
                                     System.out.print(paramType);
                                     pidx++;
                                 }
@@ -294,18 +278,16 @@ public class SQLCommand
                     Object[] lists = GetTableList();
                     for(int i=0;i<3;i++)
                     {
-                        if (i == 0) {
+                        if (i == 0)
                             System.out.println("\n--- User Tables --------------------------------------------");
-                        } else if (i == 1) {
+                        else if (i == 1)
                             System.out.println("\n--- User Views ---------------------------------------------");
-                        } else {
+                        else
                             System.out.println("\n--- User Export Streams ------------------------------------");
-                        }
                         @SuppressWarnings("unchecked")
                         Iterator<String> list = ((TreeSet<String>)lists[i]).iterator();
-                        while(list.hasNext()) {
+                        while(list.hasNext())
                             System.out.println(list.next());
-                        }
                         System.out.print("\n");
                     }
                     System.out.print("\n");
@@ -314,35 +296,31 @@ public class SQLCommand
             // GO commands - ONLY in interactive mode, close batch and parse for execution
             else if (GoToken.matcher(line).matches())
             {
-                if (interactive) {
+                if (interactive)
                     return parseQuery(query.toString().trim());
-                }
             }
             // FILE command - include the content of the file into the query
             else if (FileToken.matcher(line).matches())
             {
                 boolean executeImmediate = false;
-                if (interactive && SemicolonToken.matcher(line).matches()) {
+                if (interactive && SemicolonToken.matcher(line).matches())
                     executeImmediate = true;
-                }
                 Matcher m = FileToken.matcher(line);
                 if (m.find())
                 {
                     line = readScriptFile(m.group(1));
                     if (line == null)
                     {
-                        if (!interactive) {
+                        if (!interactive)
                             return null;
-                        }
                     }
                     else
                     {
                         query.append(line);
                         query.append("\n");
 
-                        if (executeImmediate) {
+                        if (executeImmediate)
                             return parseQuery(query.toString().trim());
-                        }
                     }
                 }
                 else
@@ -350,18 +328,16 @@ public class SQLCommand
                     System.err.print("Invalid FILE command: '" + line + "'.");
                     // In non-interactive mode, a failure aborts the entire batch
                     // In interactive mode, we'll just ignore that specific failed command.
-                    if (!interactive) {
+                    if (!interactive)
                         return null;
-                    }
                 }
             }
             else
             {
                 query.append(line);
                 query.append("\n");
-                if (interactive && SemicolonToken.matcher(line).matches()) {
+                if (interactive && SemicolonToken.matcher(line).matches())
                     return parseQuery(query.toString().trim());
-                }
             }
             line = null;
         }
@@ -387,9 +363,8 @@ public class SQLCommand
                         if (m.find())
                         {
                             line = readScriptFile(m.group(1));
-                            if (line == null) {
+                            if (line == null)
                                 return null;
-                            }
                             query.append(line);
                             query.append("\n");
                         }
@@ -434,9 +409,8 @@ public class SQLCommand
             query = ExecuteCall.matcher(query).replaceFirst("");
             List<String> params = parseQueryProcedureCallParameters(query);
             String procedure = params.remove(0);
-            if (!Procedures.containsKey(procedure)) {
+            if (!Procedures.containsKey(procedure))
                 throw new Exception("Undefined procedure: " + procedure);
-            }
 
             List<String> paramTypes = Procedures.get(procedure).get(params.size());
             if (paramTypes == null || params.size() != paramTypes.size()) {
@@ -460,17 +434,16 @@ public class SQLCommand
                     String param = params.get(i);
                     if (paramType.equals("bit"))
                     {
-                        if(param.equals("yes") || param.equals("true") || param.equals("1")) {
+                        if(param.equals("yes") || param.equals("true") || param.equals("1"))
                             objectParams[i] = (byte)1;
-                        } else {
+                        else
                             objectParams[i] = (byte)0;
-                        }
                     }
                     else if (paramType.equals("tinyint"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_TINYINT;
-                        } else
+                        else
                         {
                             try
                             {
@@ -484,9 +457,9 @@ public class SQLCommand
                     }
                     else if (paramType.equals("smallint"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_SMALLINT;
-                        } else
+                        else
                         {
                             try
                             {
@@ -500,9 +473,9 @@ public class SQLCommand
                     }
                     else if (paramType.equals("int") || paramType.equals("integer"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_INTEGER;
-                        } else
+                        else
                         {
                             try
                             {
@@ -516,9 +489,9 @@ public class SQLCommand
                     }
                     else if (paramType.equals("bigint"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_BIGINT;
-                        } else
+                        else
                         {
                             try
                             {
@@ -532,9 +505,9 @@ public class SQLCommand
                     }
                     else if (paramType.equals("float"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_FLOAT;
-                        } else
+                        else
                         {
                             try
                             {
@@ -548,74 +521,67 @@ public class SQLCommand
                     }
                     else if (paramType.equals("varchar"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
-                        } else {
+                        else
                             objectParams[i] = Unquote.matcher(param).replaceAll("").replace("''","'");
-                        }
                     }
                     else if (paramType.equals("decimal"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_DECIMAL;
-                        } else {
+                        else
                             objectParams[i] = new BigDecimal(param);
-                        }
                     }
                     else if (paramType.equals("timestamp"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_TIMESTAMP;
-                        } else {
+                        else
                             objectParams[i] = DateParser.parse(param);
-                        }
                     }
                     else if (paramType.equals("statisticscomponent"))
                     {
                         String p = preprocessParam(param);
-                        if (!StatisticsComponents.contains(p)) {
+                        if (!StatisticsComponents.contains(p))
                             throw new Exception("Invalid Statistics Component: " + param);
-                        }
                         objectParams[i] = p;
                     }
                     else if (paramType.equals("sysinfoselector"))
                     {
                         String p = preprocessParam(param);
-                        if (!SysInfoSelectors.contains(p)) {
+                        if (!SysInfoSelectors.contains(p))
                             throw new Exception("Invalid SysInfo Selector: " + param);
-                        }
                         objectParams[i] = p;
                     }
                     else if (paramType.equals("metadataselector"))
                     {
                         String p = preprocessParam(param);
-                        if (!MetaDataSelectors.contains(p)) {
+                        if (!MetaDataSelectors.contains(p))
                             throw new Exception("Invalid Meta-Data Selector: " + param);
-                        }
                         objectParams[i] = p;
                     }
                     else if (paramType.equals("varbinary") || paramType.equals("tinyint_array"))
                     {
-                        if (IsNull.matcher(param).matches()) {
+                        if (IsNull.matcher(param).matches())
                             objectParams[i] = VoltType.NULL_STRING_OR_VARBINARY;
-                        } else
+                        else
                         {
                             // Make sure we have an even amount of characters, otherwise it is an invalid hex string
-                            if (param.length() % 2 == 1) {
+                            if (param.length() % 2 == 1)
                                 throw new Exception("Invalid varbinary value: input must have an even amount of characters to be a valid hex string.");
-                            }
                             String val = Unquote.matcher(param).replaceAll("").replace("''","'");
                             objectParams[i] = hexStringToByteArray(val);
                         }
-                    } else {
-                        throw new Exception("Unsupported Data Type: " + paramType);
                     }
+                    else
+                        throw new Exception("Unsupported Data Type: " + paramType);
                 }
             }
             if (procedure.equals("@UpdateApplicationCatalog"))
             {
                 printResponse(VoltDB.updateApplicationCatalog(new File((String) objectParams[0]),
-                        new File((String) objectParams[1])));
+                                                              new File((String) objectParams[1])));
             }
             else
             {
@@ -636,12 +602,10 @@ public class SQLCommand
     private static String preprocessParam(String param)
     {
         param = param.toUpperCase();
-        if (param.startsWith("'") && param.endsWith("'")) {
+        if (param.startsWith("'") && param.endsWith("'"))
             param = param.substring(1, param.length()-1);
-        }
-        if (param.charAt(0)=='"' && param.charAt(param.length()-1)=='"') {
+        if (param.charAt(0)=='"' && param.charAt(param.length()-1)=='"')
             param = param.substring(1, param.length()-1);
-        }
         param = param.trim();
         return param;
     }
@@ -652,9 +616,8 @@ public class SQLCommand
         for (int i=0;i<data.length;i++)
         {
             String hex = Integer.toHexString(0xFF & data[i]);
-            if (hex.length() == 1) {
+            if (hex.length() == 1)
                 hexString.append('0');
-            }
             hexString.append(hex);
         }
         return hexString.toString();
@@ -664,9 +627,8 @@ public class SQLCommand
     {
         int len = s.length();
         byte[] data = new byte[len / 2];
-        for (int i = 0; i < len; i += 2) {
+        for (int i = 0; i < len; i += 2)
             data[i/2] = (byte) ((Character.digit(s.charAt(i), 16) << 4) + Character.digit(s.charAt(i+1), 16));
-        }
         return data;
     }
 
@@ -675,27 +637,24 @@ public class SQLCommand
     private static boolean OutputShowMetadata = true;
     public static String paddingString(String s, int n, char c, boolean paddingLeft)
     {
-        if (s == null) {
+        if (s == null)
             return s;
-        }
 
         int add = n - s.length();
 
-        if(add <= 0) {
+        if(add <= 0)
             return s;
-        }
 
         StringBuffer str = new StringBuffer(s);
         char[] ch = new char[add];
         Arrays.fill(ch, c);
-        if(paddingLeft) {
+        if(paddingLeft)
             str.insert(0, ch);
-        } else {
+        else
             str.append(ch);
-        }
 
 
-        return str.toString();
+       return str.toString();
     }
     private static boolean isUpdateResult(VoltTable table)
     {
@@ -703,35 +662,31 @@ public class SQLCommand
     }
     private static void printResponse(ClientResponse response) throws Exception
     {
-        if (response.getStatus() != ClientResponse.SUCCESS) {
+        if (response.getStatus() != ClientResponse.SUCCESS)
             throw new Exception("Execution Error: " + response.getStatusString());
-        }
         if (OutputFormat.equals("fixed"))
         {
             for(VoltTable t : response.getResults())
             {
                 if (isUpdateResult(t))
                 {
-                    if(OutputShowMetadata) {
+                    if(OutputShowMetadata)
                         System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
-                    }
                     continue;
                 }
                 int columnCount = t.getColumnCount();
                 int[] padding = new int[columnCount];
                 String[] fmt = new String[columnCount];
-                for (int i = 0; i < columnCount; i++) {
+                for (int i = 0; i < columnCount; i++)
                     padding[i] = OutputShowMetadata ? t.getColumnName(i).length() : 0;
-                }
                 t.resetRowPosition();
                 while(t.advanceRow())
                 {
                     for (int i = 0; i < columnCount; i++)
                     {
                         Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull()) {
+                        if (t.wasNull())
                             v = "NULL";
-                        }
                         int l = 0;  // length
                         if (t.getColumnType(i) == VoltType.VARBINARY && !t.wasNull()) {
                             l = ((byte[])v).length*2;
@@ -740,36 +695,33 @@ public class SQLCommand
                             l= v.toString().length();
                         }
 
-                        if (padding[i] < l) {
+                        if (padding[i] < l)
                             padding[i] = l;
-                        }
                     }
                 }
                 for (int i = 0; i < columnCount; i++)
                 {
                     padding[i] += 1;
                     fmt[i] = "%1$" +
-                            ((t.getColumnType(i) == VoltType.STRING ||
-                            t.getColumnType(i) == VoltType.TIMESTAMP ||
-                            t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
-                            + padding[i] + "s";
+                        ((t.getColumnType(i) == VoltType.STRING ||
+                          t.getColumnType(i) == VoltType.TIMESTAMP ||
+                          t.getColumnType(i) == VoltType.VARBINARY) ? "-" : "")
+                        + padding[i] + "s";
                 }
                 if (OutputShowMetadata)
                 {
                     for (int i = 0; i < columnCount; i++)
                     {
                         System.out.printf("%1$-" + padding[i] + "s", t.getColumnName(i));
-                        if (i < columnCount - 1) {
+                        if (i < columnCount - 1)
                             System.out.print(" ");
-                        }
                     }
                     System.out.print("\n");
                     for (int i = 0; i < columnCount; i++)
                     {
                         System.out.print(paddingString("", padding[i], '-', false));
-                        if (i < columnCount - 1) {
+                        if (i < columnCount - 1)
                             System.out.print(" ");
-                        }
                     }
                     System.out.print("\n");
                 }
@@ -779,23 +731,20 @@ public class SQLCommand
                     for (int i = 0; i < columnCount; i++)
                     {
                         Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull()) {
+                        if (t.wasNull())
                             v = "NULL";
-                        } else if (t.getColumnType(i) == VoltType.VARBINARY) {
+                        else if (t.getColumnType(i) == VoltType.VARBINARY)
                             v = byteArrayToHexString((byte[])v);
-                        } else {
+                        else
                             v = v.toString();
-                        }
                         System.out.printf(fmt[i], v);
-                        if (i < columnCount - 1) {
+                        if (i < columnCount - 1)
                             System.out.print(" ");
-                        }
                     }
                     System.out.print("\n");
                 }
-                if (OutputShowMetadata) {
+                if (OutputShowMetadata)
                     System.out.printf("\n\n(%d row(s) affected)\n", t.getRowCount());
-                }
             }
         }
         else
@@ -805,9 +754,8 @@ public class SQLCommand
             {
                 if (isUpdateResult(t))
                 {
-                    if(OutputShowMetadata) {
+                    if(OutputShowMetadata)
                         System.out.printf("\n\n(%d row(s) affected)\n", t.fetchRow(0).getLong(0));
-                    }
                     continue;
                 }
                 int columnCount = t.getColumnCount();
@@ -815,9 +763,7 @@ public class SQLCommand
                 {
                     for (int i = 0; i < columnCount; i++)
                     {
-                        if (i > 0) {
-                            System.out.print(separator);
-                        }
+                        if (i > 0) System.out.print(separator);
                         System.out.print(t.getColumnName(i));
                     }
                     System.out.print("\n");
@@ -827,24 +773,20 @@ public class SQLCommand
                 {
                     for (int i = 0; i < columnCount; i++)
                     {
-                        if (i > 0) {
-                            System.out.print(separator);
-                        }
+                        if (i > 0) System.out.print(separator);
                         Object v = t.get(i, t.getColumnType(i));
-                        if (t.wasNull()) {
+                        if (t.wasNull())
                             v = "NULL";
-                        } else if (t.getColumnType(i) == VoltType.VARBINARY) {
+                        else if (t.getColumnType(i) == VoltType.VARBINARY)
                             v = byteArrayToHexString((byte[])v);
-                        } else {
+                        else
                             v = v.toString();
-                        }
                         System.out.print(v);
                     }
                     System.out.print("\n");
                 }
-                if (OutputShowMetadata) {
+                if (OutputShowMetadata)
                     System.out.printf("\n\n(%d row(s) affected)\n", t.getRowCount());
-                }
             }
         }
     }
@@ -854,8 +796,8 @@ public class SQLCommand
     private static final List<String> StatisticsComponents = Arrays.asList("INDEX","INITIATOR","IOSTATS","MANAGEMENT","MEMORY","PROCEDURE","TABLE","PARTITIONCOUNT","STARVATION","LIVECLIENTS", "DR", "TOPO");
     private static final List<String> SysInfoSelectors = Arrays.asList("OVERVIEW","DEPLOYMENT");
     private static final List<String> MetaDataSelectors =
-            Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
-                    "PROCEDURES", "PROCEDURECOLUMNS");
+        Arrays.asList("TABLES", "COLUMNS", "INDEXINFO", "PRIMARYKEYS",
+                      "PROCEDURES", "PROCEDURECOLUMNS");
     private static Map<String,Map<Integer, List<String>>> Procedures =
             Collections.synchronizedMap(new HashMap<String,Map<Integer, List<String>>>());
     private static void loadSystemProcedures()
@@ -880,7 +822,7 @@ public class SQLCommand
                 );
         Procedures.put("@SnapshotScan",
                 ImmutableMap.<Integer, List<String>>builder().put( 1,
-                        Arrays.asList("varchar")).build());
+                Arrays.asList("varchar")).build());
         Procedures.put("@Statistics",
                 ImmutableMap.<Integer, List<String>>builder().put( 2, Arrays.asList("statisticscomponent", "bit")).build());
         Procedures.put("@SystemCatalog",
@@ -913,9 +855,8 @@ public class SQLCommand
     {
         final Client client = ClientFactory.createClient(config);
 
-        for (String server : servers) {
+        for (String server : servers)
             client.createConnection(server.trim(), port);
-        }
         return client;
     }
 
@@ -929,41 +870,41 @@ public class SQLCommand
     private static void printUsage(int exitCode)
     {
         System.out.println(
-                "Usage: sqlcmd --help\n"
-                        + "   or  sqlcmd [--servers=comma_separated_server_list]\n"
-                        + "              [--port=port_number]\n"
-                        + "              [--user=user]\n"
-                        + "              [--password=password]\n"
-                        + "              [--output-format=(fixed|csv|tab)]\n"
-                        + "              [--output-skip-metadata]\n"
-                        + "\n"
-                        + "[--servers=comma_separated_server_list]\n"
-                        + "  List of servers to connect to.\n"
-                        + "  Default: localhost.\n"
-                        + "\n"
-                        + "[--port=port_number]\n"
-                        + "  Client port to connect to on cluster nodes.\n"
-                        + "  Default: 21212.\n"
-                        + "\n"
-                        + "[--user=user]\n"
-                        + "  Name of the user for database login.\n"
-                        + "  Default: (not defined - connection made without credentials).\n"
-                        + "\n"
-                        + "[--password=password]\n"
-                        + "  Password of the user for database login.\n"
-                        + "  Default: (not defined - connection made without credentials).\n"
-                        + "\n"
-                        + "[--output-format=(fixed|csv|tab)]\n"
-                        + "  Format of returned resultset data (Fixed-width, CSV or Tab-delimited).\n"
-                        + "  Default: fixed.\n"
-                        + "\n"
-                        + "[--output-skip-metadata]\n"
-                        + "  Removes metadata information such as column headers and row count from\n"
-                        + "  produced output.\n"
-                        + "\n"
-                        + "[--debug]\n"
-                        + "  Causes the utility to print out stack traces for all exceptions.\n"
-                );
+        "Usage: sqlcmd --help\n"
+        + "   or  sqlcmd [--servers=comma_separated_server_list]\n"
+        + "              [--port=port_number]\n"
+        + "              [--user=user]\n"
+        + "              [--password=password]\n"
+        + "              [--output-format=(fixed|csv|tab)]\n"
+        + "              [--output-skip-metadata]\n"
+        + "\n"
+        + "[--servers=comma_separated_server_list]\n"
+        + "  List of servers to connect to.\n"
+        + "  Default: localhost.\n"
+        + "\n"
+        + "[--port=port_number]\n"
+        + "  Client port to connect to on cluster nodes.\n"
+        + "  Default: 21212.\n"
+        + "\n"
+        + "[--user=user]\n"
+        + "  Name of the user for database login.\n"
+        + "  Default: (not defined - connection made without credentials).\n"
+        + "\n"
+        + "[--password=password]\n"
+        + "  Password of the user for database login.\n"
+        + "  Default: (not defined - connection made without credentials).\n"
+        + "\n"
+        + "[--output-format=(fixed|csv|tab)]\n"
+        + "  Format of returned resultset data (Fixed-width, CSV or Tab-delimited).\n"
+        + "  Default: fixed.\n"
+        + "\n"
+        + "[--output-skip-metadata]\n"
+        + "  Removes metadata information such as column headers and row count from\n"
+        + "  produced output.\n"
+        + "\n"
+        + "[--debug]\n"
+        + "  Causes the utility to print out stack traces for all exceptions.\n"
+        );
         System.exit(exitCode);
     }
     public static void printHelp()
@@ -1038,7 +979,7 @@ public class SQLCommand
             return;
         }
         Map<String, Integer> proc_param_counts =
-                Collections.synchronizedMap(new HashMap<String, Integer>());
+            Collections.synchronizedMap(new HashMap<String, Integer>());
         while (params.advanceRow())
         {
             String this_proc = params.getString("PROCEDURE_NAME");
@@ -1111,36 +1052,34 @@ public class SQLCommand
             for(int i = 0; i < args.length; i++)
             {
                 String arg = args[i];
-                if (arg.startsWith("--servers=")) {
+                if (arg.startsWith("--servers="))
                     serverList = arg.split("=")[1];
-                } else if (arg.startsWith("--port=")) {
+                else if (arg.startsWith("--port="))
                     port = Integer.valueOf(arg.split("=")[1]);
-                } else if (arg.startsWith("--user=")) {
+                else if (arg.startsWith("--user="))
                     user = arg.split("=")[1];
-                } else if (arg.startsWith("--password=")) {
+                else if (arg.startsWith("--password="))
                     password = arg.split("=")[1];
-                } else if (arg.startsWith("--output-format="))
+                else if (arg.startsWith("--output-format="))
                 {
-                    if (Pattern.compile("(fixed|csv|tab)", Pattern.CASE_INSENSITIVE).matcher(arg.split("=")[1].toLowerCase()).matches()) {
+                    if (Pattern.compile("(fixed|csv|tab)", Pattern.CASE_INSENSITIVE).matcher(arg.split("=")[1].toLowerCase()).matches())
                         OutputFormat = arg.split("=")[1].toLowerCase();
-                    } else {
+                    else
                         printUsage("Invalid value for --output-format");
-                    }
                 }
-                else if (arg.equals("--output-skip-metadata")) {
+                else if (arg.equals("--output-skip-metadata"))
                     OutputShowMetadata = false;
-                } else if (arg.equals("--debug")) {
+                else if (arg.equals("--debug"))
                     debug = true;
-                } else if (arg.equals("--help"))
+                else if (arg.equals("--help"))
                 {
                     printHelp();
                     printUsage(0);
                 }
-                else if ((arg.equals("--usage")) || (arg.equals("-?"))) {
+                else if ((arg.equals("--usage")) || (arg.equals("-?")))
                     printUsage(0);
-                } else {
+                else
                     printUsage("Invalid Parameter: " + arg);
-                }
             }
 
             // Split server list
@@ -1173,13 +1112,11 @@ public class SQLCommand
             if (System.in.available() > 0)
             {
                 queries = getQuery(false);
-                if (queries == null) {
+                if (queries == null)
                     System.exit(0);
-                } else {
-                    for(int i = 0;i<queries.size();i++) {
+                else
+                    for(int i = 0;i<queries.size();i++)
                         executeQuery(queries.get(i));
-                    }
-                }
             }
             else
             {
@@ -1190,27 +1127,22 @@ public class SQLCommand
                 {
                     try
                     {
-                        for(int i = 0;i<queries.size();i++) {
+                        for(int i = 0;i<queries.size();i++)
                             executeQuery(queries.get(i));
-                        }
                     }
                     catch(Exception x)
                     {
                         System.err.println(x.getMessage());
-                        if (debug) {
-                            x.printStackTrace(System.err);
-                        }
+                        if (debug) x.printStackTrace(System.err);
                     }
                 }
             }
 
-        }
+       }
         catch (Exception e)
         {
             System.err.println(e.getMessage());
-            if (debug) {
-                e.printStackTrace(System.err);
-            }
+            if (debug) e.printStackTrace(System.err);
             System.exit(-1);
         }
         finally
