@@ -115,20 +115,14 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
 
     @Override
     public int compareTo(PlanNodeList o) {
-        if (m_list.size() != o.m_list.size()) {
-            return -1;
-        }
+        if (m_list.size() != o.m_list.size()) return -1;
 
         int diff = getRootPlanNode().compareTo(o.getRootPlanNode());
-        if (diff != 0) {
-            return diff;
-        }
+        if (diff != 0) return diff;
 
         for (int i = 0; i < m_list.size(); i++) {
             diff = m_list.get(i).m_id - o.m_list.get(i).m_id;
-            if (diff != 0) {
-                return diff;
-            }
+            if (diff != 0) return diff;
         }
 
         return 0;
@@ -165,7 +159,7 @@ public class PlanNodeList extends PlanNodeTree implements Comparable<PlanNodeLis
         sb.append("digraph ").append(name).append(" {\n");
 
         for (AbstractPlanNode node : m_list) {
-            sb.append(node.toDOTString());
+                sb.append(node.toDOTString());
         }
 
         sb.append("\n}\n");

@@ -50,11 +50,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
     // List of the input TVEs into the aggregates.  Maybe should become
     // a list of SchemaColumns someday
     protected List<AbstractExpression> m_aggregateExpressions =
-            new ArrayList<AbstractExpression>();
+        new ArrayList<AbstractExpression>();
 
     // At the moment these are guaranteed to be TVES.  This might always be true
     protected List<AbstractExpression> m_groupByExpressions
-    = new ArrayList<AbstractExpression>();
+        = new ArrayList<AbstractExpression>();
 
     // True if this aggregate node is the coordinator summary aggregator
     // for an aggregator that was pushed down. Must know to correctly
@@ -78,8 +78,8 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // We're not checking that it's a valid ExpressionType because this plannode is a temporary hack
         //
         if (m_aggregateTypes.size() != m_aggregateDistinct.size() ||
-                m_aggregateDistinct.size() != m_aggregateExpressions.size() ||
-                m_aggregateExpressions.size() != m_aggregateOutputColumns.size())
+            m_aggregateDistinct.size() != m_aggregateExpressions.size() ||
+            m_aggregateExpressions.size() != m_aggregateOutputColumns.size())
         {
             throw new Exception("ERROR: Mismatched number of aggregate expression column attributes for PlanNode '" + this + "'");
         } else if (m_aggregateTypes.isEmpty()|| m_aggregateTypes.contains(ExpressionType.INVALID)) {
@@ -129,7 +129,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
                 if (!tve.getTableName().equals("VOLT_TEMP_TABLE"))
                 {
                     throw new RuntimeException("Unable to find index for column: " +
-                            tve.getColumnName());
+                                               tve.getColumnName());
                 }
             }
             else
@@ -142,7 +142,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // Find the proper index for the sort columns.  Not quite
         // sure these should be TVEs in the long term.
         List<TupleValueExpression> agg_tves =
-                new ArrayList<TupleValueExpression>();
+            new ArrayList<TupleValueExpression>();
         for (AbstractExpression agg_exp : m_aggregateExpressions)
         {
             agg_tves.addAll(ExpressionUtil.getTupleValueExpressions(agg_exp));
@@ -155,7 +155,7 @@ public class AggregatePlanNode extends AbstractPlanNode {
 
         // Aggregates also need to resolve indexes for group_by inputs
         List<TupleValueExpression> group_tves =
-                new ArrayList<TupleValueExpression>();
+            new ArrayList<TupleValueExpression>();
         for (AbstractExpression group_exp : m_groupByExpressions)
         {
             group_tves.addAll(ExpressionUtil.getTupleValueExpressions(group_exp));
@@ -176,9 +176,9 @@ public class AggregatePlanNode extends AbstractPlanNode {
      * @param aggInputExpr  The input expression which should get aggregated
      */
     public void addAggregate(ExpressionType aggType,
-            boolean isDistinct,
-            Integer aggOutputColumn,
-            AbstractExpression aggInputExpr)
+                             boolean isDistinct,
+                             Integer aggOutputColumn,
+                             AbstractExpression aggInputExpr)
     {
         assert(aggInputExpr != null);
         m_aggregateTypes.add(aggType);
@@ -251,12 +251,6 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
-    // TODO:Members not loaded
-    @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) {
-        super.loadFromJSONObject(jobj, db);
-    }
-
     @Override
     protected String explainPlanForNode(String indent) {
         StringBuilder sb = new StringBuilder();
@@ -275,5 +269,11 @@ public class AggregatePlanNode extends AbstractPlanNode {
         // trim the last ", " from the string
         sb.setLength(sb.length() - 2);
         return sb.toString();
+    }
+
+ // TODO:Members not loaded
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+        super.loadFromJSONObject(jobj, db);
     }
 }

@@ -18,9 +18,7 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 
@@ -62,17 +60,11 @@ public class SendPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) {
-        super.loadFromJSONObject(jobj, db);
-    }
-
-    @Override
     protected String explainPlanForNode(String indent) {
-        if (m_parents.size() == 0) {
+        if (m_parents.size() == 0)
             return "RETURN RESULTS TO STORED PROCEDURE";
-        } else {
+        else
             return "SEND PARTITION RESULTS TO COORDINATOR";
-        }
 
 
     }

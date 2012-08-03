@@ -104,7 +104,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
 
         // Now resolve the indexes in the distinct expression
         List<TupleValueExpression> distinct_tves =
-                ExpressionUtil.getTupleValueExpressions(m_distinctExpression);
+            ExpressionUtil.getTupleValueExpressions(m_distinctExpression);
         for (TupleValueExpression tve : distinct_tves)
         {
             int index = input_schema.getIndexOfTve(tve);

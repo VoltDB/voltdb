@@ -274,7 +274,7 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
 
         // Collect all the TVEs in the end expression and search key expressions
         List<TupleValueExpression> index_tves =
-                new ArrayList<TupleValueExpression>();
+            new ArrayList<TupleValueExpression>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(m_endExpression));
         for (AbstractExpression search_exp : m_searchkeyExpressions)
         {
@@ -314,28 +314,24 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         // need a double for math
         double keyWidthFl = keyWidth;
         // count a scan as a half cover
-        if (m_lookupType != IndexLookupType.EQ) {
+        if (m_lookupType != IndexLookupType.EQ)
             keyWidthFl -= 0.5;
-        }
         // when choosing between multiple matched indexes with 10 or more columns,
         // we won't always pick the optimal one.
         // if you hit this, you're probably in a silly use case
         final double MAX_INTERESTING_INDEX_WIDTH = 10.0;
-        if (keyWidthFl > MAX_INTERESTING_INDEX_WIDTH) {
+        if (keyWidthFl > MAX_INTERESTING_INDEX_WIDTH)
             keyWidthFl = MAX_INTERESTING_INDEX_WIDTH;
-        }
 
         // estimate cost of scan
         int tuplesToRead = 0;
 
         // minor priorities for index types (tiebreakers)
-        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue()) {
+        if (m_catalogIndex.getType() == IndexType.HASH_TABLE.getValue())
             tuplesToRead = 2;
-        }
         if ((m_catalogIndex.getType() == IndexType.BALANCED_TREE.getValue()) ||
-                (m_catalogIndex.getType() == IndexType.BTREE.getValue())) {
+            (m_catalogIndex.getType() == IndexType.BTREE.getValue()))
             tuplesToRead = 3;
-        }
         assert(tuplesToRead > 0);
 
         // if not a unique, covering index, pick the choice with the most columns
@@ -371,6 +367,31 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
+    protected String explainPlanForNode(String indent) {
+        assert(m_catalogIndex != null);
+
+        int indexSize = m_catalogIndex.getColumns().size();
+        int keySize = m_searchkeyExpressions.size();
+
+        String scanType = "unique-scan";
+        if (m_lookupType != IndexLookupType.EQ)
+            scanType = "range-scan";
+
+        String cover = "covering";
+        if (indexSize > keySize)
+            cover = String.format("%d/%d cols", keySize, indexSize);
+
+        String usageInfo = String.format("(%s %s)", scanType, cover);
+        if (keySize == 0)
+            usageInfo = "(for sort order only)";
+
+        String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
+        retval += " using \"" + m_targetIndexName + "\"";
+        retval += " " + usageInfo;
+        return retval;
+    }
+
+    @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) {
         super.loadFromJSONObject(jobj, db);
         try {
@@ -381,33 +402,5 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         } catch (JSONException e) {
             e.printStackTrace();
         }
-    }
-
-    @Override
-    protected String explainPlanForNode(String indent) {
-        assert(m_catalogIndex != null);
-
-        int indexSize = m_catalogIndex.getColumns().size();
-        int keySize = m_searchkeyExpressions.size();
-
-        String scanType = "unique-scan";
-        if (m_lookupType != IndexLookupType.EQ) {
-            scanType = "range-scan";
-        }
-
-        String cover = "covering";
-        if (indexSize > keySize) {
-            cover = String.format("%d/%d cols", keySize, indexSize);
-        }
-
-        String usageInfo = String.format("(%s %s)", scanType, cover);
-        if (keySize == 0) {
-            usageInfo = "(for sort order only)";
-        }
-
-        String retval = "INDEX SCAN of \"" + m_targetTableName + "\"";
-        retval += " using \"" + m_targetIndexName + "\"";
-        retval += " " + usageInfo;
-        return retval;
     }
 }
