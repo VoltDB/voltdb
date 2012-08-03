@@ -31,6 +31,7 @@ import junit.framework.TestCase;
 import org.voltdb.CatalogContext;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
@@ -62,7 +63,7 @@ public class TestPlannerTool extends TestCase {
 
         m_pt = new PlannerTool(context.cluster, context.database);
 
-        PlannerTool.Result result = null;
+        AdHocPlannedStatement result = null;
         result = m_pt.planSql("select * from warehouse;", false, true, false);
         System.out.println(result);
 

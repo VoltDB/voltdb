@@ -211,5 +211,6 @@ public class ClientConfig {
             throw new IllegalArgumentException(
                     "Max auto tune latency must be greater than 0, " + targetLatency + " was specified");
         }
+        m_autoTuneTargetInternalLatency = targetLatency;
     }
 }

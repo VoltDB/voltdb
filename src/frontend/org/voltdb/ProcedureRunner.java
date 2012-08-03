@@ -388,7 +388,8 @@ public class ProcedureRunner {
 
             QueuedSQL queuedSQL = new QueuedSQL();
             AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
-            queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan( plannedStatement.sql,
+            queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
+                    plannedStatement.sql,
                     plannedStatement.aggregatorFragment,
                     plannedStatement.collectorFragment,
                     plannedStatement.isReplicatedTableDML,
@@ -599,7 +600,7 @@ public class ProcedureRunner {
                 assert(f != null);
                 SQLStmt stmt = (SQLStmt) f.get(m_procedure);
                 Statement statement = m_catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
-                stmt.sqlText = statement.getSqltext();
+                stmt.sqlText = statement.getSqltext().getBytes(VoltDB.UTF8ENCODING);
                 m_cachedSingleStmt.stmt = stmt;
 
                 int numParams = m_catProc.getParameters().size();

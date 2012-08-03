@@ -84,6 +84,7 @@
 <property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
 <property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
+<property name='debian.package.dir'          value='obj/debian' />
 
 <!-- emma build instrumentation location -->
 <property name='build.instr.dir'             location='${build.dir}/instr' />
@@ -559,7 +560,7 @@ CLEANING
 
 <target name='clean'
 	description="Remove all compiled and generated files."
-	depends="cleantmp, clean_project_gen, clean_deployment_gen">
+	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -1015,33 +1016,6 @@ TEST CASES
     </exec>
 </target>
 
-<target name='with.emma' description="enable code coverage analysis" >
-    <!-- set up emma -->
-    <path id="emma.lib" >
-        <pathelement location="${vendor.lib.dir}/emma.jar" />
-        <pathelement location="${vendor.lib.dir}/emma_ant.jar" />
-    </path>
-    <taskdef resource="emma_ant.properties" classpathref="emma.lib" />
-    <!-- enable emma -->
-    <property name="emma.enabled" value="true" />
-    <!-- instrument the code -->
-    <property name="emma.dir" location="${build.dir}/emma" />
-    <mkdir dir="${emma.dir}" />
-    <emma>
-        <instr destdir="${build.instr.dir}/org/"
-               metadatafile="${emma.dir}/metadata.emma"
-               merge="true">
-          <instrpath path="${build.prod.dir}/org"/>
-
-          <filter includes="*voltdb.*"/>
-          <filter includes="*voltcore.*"/>
-          <!--pmsg is the protobuf-generated code for dragent-->
-          <filter excludes="*pmsg.*"/>
-          <filter excludes="*exampleutils.*"/>
-        </instr>
-    </emma>
-</target>
-
 <!-- script that runs junit_onesuite for each class in a fileset -->
 <!-- if there's a better way to do this than embedding javascript, please help... -->
 <scriptdef name="junit-files" language="javascript">
@@ -1206,8 +1180,10 @@ TEST CASES
                 <exclude name="**/TestAdminMode.class" />
                 <exclude name="**/TestCatalogUpdateSuite.class" />
 <!--                <exclude name="**/TestCRUDSuite.class" /> -->
-                <exclude name="**/TestExecutionSiteDeath.class" />
 <!--                <exclude name="**/TestFailureDetectSuite.class" /> -->
+                <!-- ExecutionSite not relevant to Iv2. -->
+                <exclude name="**/TestExecutionSite.class" />
+<!--                <exclude name="**/TestExecutionSiteDeath.class" /> -->
 <!--                <exclude name="**/TestFailuresSuite.class" /> -->
 <!--                <exclude name="**/TestFixedSQLSuite.class" /> -->
 <!--                <exclude name="**/TestFunctionsSuite.class" /> -->
@@ -1351,10 +1327,46 @@ TEST CASES
     </run_junit>
 </target>
 
+<target name='emma_junit'
+        description="run junit target and generate coverage report"
+        depends="with.emma, junit, emma-report"
+/>
+
+<target name='emma_junit_iv2'
+        description="run junit_iv2 target and generate coverage report"
+        depends="with.emma, junit_iv2, emma-report"
+/>
+
+<target name='with.emma' description="enable code coverage analysis" >
+    <!-- set up emma -->
+    <path id="emma.lib" >
+        <pathelement location="${vendor.lib.dir}/emma.jar" />
+        <pathelement location="${vendor.lib.dir}/emma_ant.jar" />
+    </path>
+    <taskdef resource="emma_ant.properties" classpathref="emma.lib" />
+    <!-- enable emma -->
+    <property name="emma.enabled" value="true" />
+    <!-- instrument the code -->
+    <property name="emma.dir" location="${build.dir}/emma" />
+    <mkdir dir="${emma.dir}" />
+    <emma>
+        <instr destdir="${build.instr.dir}/org/"
+               metadatafile="${emma.dir}/metadata.emma"
+               merge="true">
+          <instrpath path="${build.prod.dir}/org"/>
+
+          <filter includes="*voltdb.*"/>
+          <filter includes="*voltcore.*"/>
+          <!--pmsg is the protobuf-generated code for dragent-->
+          <filter excludes="*pmsg.*"/>
+          <filter excludes="*exampleutils.*"/>
+        </instr>
+    </emma>
+</target>
+
 <target
     name='emma-report'
-    depends='with.emma, junit'
-    description="Generate code coverage reports, if appropriate.">
+    description="Generate code coverage reports.  You need call the with.emma target before your test target">
     <emma>
         <report
             sourcepath="${src.gpl.dir}"
@@ -1371,6 +1383,7 @@ TEST CASES
         </report>
     </emma>
 </target>
+
 
 <!--
     this target is intended to be called only with antcall!
@@ -1407,8 +1420,10 @@ TEST CASES
   </antcall>
   <antcall target="sqlcoverage">
     <param name="build.dir.suffix" value="-coverage" />
+    <param name="sqlcoverage.failonerror" value="false" />
   </antcall>
   <!-- Get test coverage -->
+  <echo>Processing coverage</echo>
   <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
     <arg line="--directory ${build.dir}-coverage/objects"/>
     <arg line="--capture"/>
@@ -1586,6 +1601,7 @@ TEST CASES
 <target name='sqlcoverage' depends="ee,compile"
     description="Run the SQL coverage tests.">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
+    <property name="sqlcoverage.failonerror" value="true" />
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
     <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
@@ -1622,7 +1638,7 @@ TEST CASES
     <condition property="hosts" value="${sql_coverage_hosts}" else="1">
         <isset property="sql_coverage_hosts"/>
     </condition>
-    <condition property="sitesperhost" value="${sql_coverage_sites}" else="1">
+    <condition property="sitesperhost" value="${sql_coverage_sites}" else="3">
         <isset property="sql_coverage_sites"/>
     </condition>
     <condition property="replicas" value="${sql_coverage_replicas}" else="0">
@@ -1646,7 +1662,7 @@ TEST CASES
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/scripts' executable='python2.6' failonerror='true'>
+    <exec dir='tests/scripts' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
         <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
@@ -1878,6 +1894,38 @@ DEPLOYMENT FILE SCHEMA CODE GENERATION
         description="Remove all source files generated by JAXB for deployment file schema.">
     <exec dir='.' executable='/bin/sh' failonerror='false'>
         <arg line="-c 'rm -rfv ${deployment.parsergen.dir}'" />
+    </exec>
+</target>
+
+<!--
+***********************
+DEBIAN PACKAGE CREATION
+***********************
+-->
+
+<target name="debian_package"
+	    depends=""
+        description="Create Debian/Ubuntu package. Uses sudo, so it may prompt for a password.">
+    <exec dir="." executable="sudo" failonerror="true">
+        <arg line="python ${base.dir}/tools/voltdb-install.py -D" />
+    </exec>
+</target>
+
+<!-- This debian package cleaning target is safe. It doesn't run as root. -->
+<target name="clean_debian_package"
+	    depends=""
+        description="Remove all Debian/Ubuntu package build artifacts.">
+    <exec dir='.' executable='/bin/sh' failonerror='false'>
+        <arg line="-c 'rm -rfv ${debian.package.dir}'" />
+    </exec>
+</target>
+
+<!-- Use this if permissions are messed up by interrupted package building as root. -->
+<target name="force_clean_debian_package"
+	    depends=""
+        description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
+    <exec dir="." executable="sudo" failonerror="false">
+        <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
     </exec>
 </target>
 

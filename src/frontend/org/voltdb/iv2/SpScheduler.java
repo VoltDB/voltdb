@@ -60,6 +60,12 @@ public class SpScheduler extends Scheduler
         super(taskQueue);
     }
 
+    @Override
+    public void shutdown()
+    {
+        // nothing to do for SP shutdown.
+    }
+
     // This is going to run in the BabySitter's thread.  This and deliver are synchronized by
     // virtue of both being called on InitiatorMailbox and not directly called.
     // (That is, InitiatorMailbox's API, used by BabySitter, is synchronized on the same
