@@ -446,7 +446,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
-        assertEquals("oo", result.fetchRow(0).getString(0));*/
+        assertEquals("eoo", result.fetchRow(0).getString(0));*/
 
         cr = client.callProcedure("PARAM_ABS", -2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
