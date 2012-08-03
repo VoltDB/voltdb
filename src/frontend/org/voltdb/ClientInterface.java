@@ -865,7 +865,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void offBackpressure() {
-            System.out.println("Backpressure deactivated");
             m_connection.enableReadSelection();
         }
     }
