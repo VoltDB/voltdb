@@ -453,7 +453,7 @@ public class plannerTester {
                 //                              System.out.println("Path to the baseline file :"+pathNew+m_testName+".plan"+i );
                 m_reportWriter.write("Path to the config file :"+m_currentConfig+"\n"
                         +"Path to the baseline file :"+pathBaseline+m_testName+".plan"+i+"\n"
-                        +"Path to the baseline file :"+pathNew+m_testName+".plan"+i+"\n");
+                        +"Path to the current plan file :"+pathNew+m_testName+".plan"+i+"\n");
             }
             m_numTest++;
         }
