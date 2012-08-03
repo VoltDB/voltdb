@@ -78,7 +78,7 @@ def error(*msgs):
 
 def abort(*msgs):
     error(*msgs)
-    _message(sys.stdout, 'FATAL', 'Errors are fatal, aborting execution')
+    _message(sys.stderr, 'FATAL', 'Errors are fatal, aborting execution')
     sys.exit(1)
 
 def get_dst_path(*dirs):
@@ -462,7 +462,7 @@ def debian():
 
 def clean():
     info('Cleaning package building output in "%s"...' % Global.debian_output_root)
-    if Global.options.dryrun:
+    if not Global.options.dryrun:
         shutil.rmtree(Global.debian_output_root)
 
 #### Command line main
