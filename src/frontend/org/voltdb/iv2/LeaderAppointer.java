@@ -19,7 +19,6 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.atomic.AtomicBoolean;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import java.util.HashSet;
@@ -54,7 +53,6 @@ public class LeaderAppointer implements Promotable
 {
     private static final VoltLogger tmLog = new VoltLogger("TM");
     private final ZooKeeper m_zk;
-    private final CountDownLatch m_partitionCountLatch;
     private final int m_partitionCount;
     private final BabySitter[] m_partitionWatchers;
     private final MapCache m_iv2appointees;
@@ -82,7 +80,6 @@ public class LeaderAppointer implements Promotable
             if (m_inStartup.get()) {
                 if (children.size() == (m_kfactor + 1)) {
                     assignLeader(m_partitionId, VoltZK.childrenToReplicaHSIds(children));
-                    m_partitionCountLatch.countDown();
                 }
             }
         }
@@ -110,17 +107,16 @@ public class LeaderAppointer implements Promotable
         }
     };
 
-    public LeaderAppointer(ZooKeeper zk, CountDownLatch numberOfPartitions,
+    public LeaderAppointer(ZooKeeper zk, int numberOfPartitions,
             int kfactor, JSONObject topology, MpInitiator mpi)
     {
         m_zk = zk;
         m_kfactor = kfactor;
         m_topo = topology;
         m_MPI = mpi;
-        m_partitionCountLatch = numberOfPartitions;
-        m_partitionCount = (int)numberOfPartitions.getCount();
-        m_callbacks = new PartitionCallback[(int)numberOfPartitions.getCount()];
-        m_partitionWatchers = new BabySitter[(int)numberOfPartitions.getCount()];
+        m_partitionCount = numberOfPartitions;
+        m_callbacks = new PartitionCallback[m_partitionCount];
+        m_partitionWatchers = new BabySitter[m_partitionCount];
         m_iv2appointees = new MapCache(m_zk, VoltZK.iv2appointees);
         m_iv2masters = new MapCache(m_zk, VoltZK.iv2masters, m_masterCallback);
     }
