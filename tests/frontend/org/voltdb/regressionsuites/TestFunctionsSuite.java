@@ -441,7 +441,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-        // next one disabled until ENG-3485
+        // next one disabled until ENG-3486
         /*cr = client.callProcedure("PARAM_SUBSTRING", "eeoo");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -511,7 +511,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("AGG_OF_SUBSTRING", "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
 
         // Test parameterizing functions
-        // next one disabled until ENG-3485
+        // next one disabled until ENG-3486
         //project.addStmtProcedure("PARAM_SUBSTRING", "select SUBSTRING(? FROM 2) from P1");
         project.addStmtProcedure("PARAM_ABS", "select ABS(? + NUM) from P1");
 
