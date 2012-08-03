@@ -591,6 +591,18 @@ public class QueryExpression {
 
         return unionCorrespondingColumns.size();
     }
+    
+    public int getUnionType() {
+        return unionType;
+    }
+    
+    public QueryExpression getLeftQueryExpression() {
+        return leftQueryExpression;
+    }
+
+    public QueryExpression getRightQueryExpression() {
+        return rightQueryExpression;
+    }
 
     public void collectAllExpressions(HsqlList set, OrderedIntHashSet typeSet,
                                       OrderedIntHashSet stopAtTypeSet) {

@@ -181,15 +181,40 @@ public class StatementQuery extends StatementDMQL {
     VoltXMLElement voltGetXML(Session session)
     throws HSQLParseException
     {
+        return voltGetXMLExpression(queryExpression, session);
+    }
+    
+    VoltXMLElement voltGetXMLExpression(QueryExpression queryExpr, Session session)
+    throws HSQLParseException
+    {
         // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
         // The only other instances of QueryExpression are direct QueryExpression instances instantiated in XreadSetOperation
         // to represent UNION, etc.
         // The latter are not yet supported in VoltDB.
-        if ( ! (queryExpression instanceof QuerySpecification)) {
-            throw new HSQLParseException(queryExpression.operatorName() + " and similar tuple set operators are not supported.");
+        if (queryExpr.getUnionType() == QueryExpression.NOUNION) {
+            return voltGetXMLSpecification(queryExpr, session);
+        } else {
+            VoltXMLElement union = new VoltXMLElement("union");
+            union.attributes.put("uniontype", queryExpr.operatorName());
+            VoltXMLElement leftExpr = voltGetXMLExpression(
+                    queryExpr.getLeftQueryExpression(), session);
+            VoltXMLElement rightExpr = voltGetXMLExpression(
+                    queryExpr.getRightQueryExpression(), session);
+            union.children.add(leftExpr);
+            union.children.add(rightExpr);
+            return union;
         }
-
-        QuerySpecification select = (QuerySpecification) queryExpression;
+    }
+    
+    VoltXMLElement voltGetXMLSpecification(QueryExpression queryExpr, Session session)
+    throws HSQLParseException
+    {
+        // "select" statements/clauses are always represented by a QueryExpression of type QuerySpecification.
+        if (! (queryExpr instanceof QuerySpecification)) {
+            throw new HSQLParseException(queryExpr.operatorName() + " and similar tuple set operators are not supported.");
+        }
+        
+        QuerySpecification select = (QuerySpecification) queryExpr;
 
         try {
             getResult(session);

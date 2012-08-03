@@ -105,6 +105,7 @@ public abstract class AbstractParsedStmt {
         final String UPDATE_NODE_NAME = "update";
         final String DELETE_NODE_NAME = "delete";
         final String SELECT_NODE_NAME = "select";
+        final String UNION_NODE_NAME  = "union";
 
         AbstractParsedStmt retval = null;
 
@@ -125,6 +126,9 @@ public abstract class AbstractParsedStmt {
         }
         else if (xmlSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
             retval = new ParsedSelectStmt();
+        }
+        else if (xmlSQL.name.equalsIgnoreCase(UNION_NODE_NAME)) {
+            retval = new ParsedUnionStmt();
         }
         else {
             throw new RuntimeException("Unexpected Element: " + xmlSQL.name);
