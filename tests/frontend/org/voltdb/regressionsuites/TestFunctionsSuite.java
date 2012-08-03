@@ -30,6 +30,7 @@ import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -431,6 +432,29 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
+    public void testParams() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING testSubstring");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // next one disabled until ENG-3486
+        /*cr = client.callProcedure("PARAM_SUBSTRING", "eeoo");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertEquals("eoo", result.fetchRow(0).getString(0));*/
+
+        cr = client.callProcedure("PARAM_ABS", -2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertEquals(1, result.asScalarLong());
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -486,6 +510,10 @@ public class TestFunctionsSuite extends RegressionSuite {
         // Test GROUP BY by support
         project.addStmtProcedure("AGG_OF_SUBSTRING", "select MIN(SUBSTRING (DESC FROM 2)) from P1 where ID < -7");
 
+        // Test parameterizing functions
+        // next one disabled until ENG-3486
+        //project.addStmtProcedure("PARAM_SUBSTRING", "select SUBSTRING(? FROM 2) from P1");
+        project.addStmtProcedure("PARAM_ABS", "select ABS(? + NUM) from P1");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
