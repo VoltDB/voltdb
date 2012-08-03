@@ -64,7 +64,12 @@ class GlobalServiceElector implements LeaderNoticeHandler
     {
         hostLog.info("Host " + m_hostId + " promoted to be the global service provider");
         for (Promotable service : m_services) {
-            service.acceptPromotion();
+            try {
+                service.acceptPromotion();
+            }
+            catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to promote global service.", true, e);
+            }
         }
     }
 

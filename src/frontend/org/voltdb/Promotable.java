@@ -16,10 +16,14 @@
  */
 package org.voltdb;
 
+import java.util.concurrent.ExecutionException;
+
+import org.apache.zookeeper_voltpatches.KeeperException;
+
 public interface Promotable
 {
     /** Perform the tasks necessary when the implementor becomes the leader for
      * their service across the cluster.
      */
-    public void acceptPromotion();
+    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException;
 }
