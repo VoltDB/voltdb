@@ -99,7 +99,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                kfactor + 1, csp, numberOfPartitions,
+                csp, numberOfPartitions,
                 createForRejoin && isRejoinable());
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition

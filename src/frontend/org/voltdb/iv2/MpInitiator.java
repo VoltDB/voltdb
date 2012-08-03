@@ -70,7 +70,7 @@ public class MpInitiator extends BaseInitiator implements Promotable
         throws KeeperException, InterruptedException, ExecutionException
     {
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                numberOfPartitions, csp, numberOfPartitions,
+                csp, numberOfPartitions,
                 createForRejoin && isRejoinable());
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition

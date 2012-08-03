@@ -88,7 +88,7 @@ public abstract class BaseInitiator implements Initiator
 
     protected void configureCommon(BackendTarget backend, String serializedCatalog,
                           CatalogContext catalogContext,
-                          int startupCount, CatalogSpecificPlanner csp,
+                          CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin)
         throws KeeperException, ExecutionException, InterruptedException
