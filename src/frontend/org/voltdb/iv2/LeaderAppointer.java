@@ -17,6 +17,8 @@
 
 package org.voltdb.iv2;
 
+import java.util.concurrent.atomic.AtomicBoolean;
+
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
@@ -61,6 +63,7 @@ public class LeaderAppointer implements Promotable
     private final int m_kfactor;
     private final JSONObject m_topo;
     private final MpInitiator m_MPI;
+    private AtomicBoolean m_inStartup = new AtomicBoolean(false);
 
     private class PartitionCallback extends BabySitter.Callback
     {
@@ -76,9 +79,11 @@ public class LeaderAppointer implements Promotable
         {
             tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
                     CoreUtils.hsIdCollectionToString(VoltZK.childrenToReplicaHSIds(children)));
-            if (children.size() == (m_kfactor + 1)) {
-                assignLeader(m_partitionId, VoltZK.childrenToReplicaHSIds(children));
-                m_partitionCountLatch.countDown();
+            if (m_inStartup.get()) {
+                if (children.size() == (m_kfactor + 1)) {
+                    assignLeader(m_partitionId, VoltZK.childrenToReplicaHSIds(children));
+                    m_partitionCountLatch.countDown();
+                }
             }
         }
     }
@@ -96,8 +101,11 @@ public class LeaderAppointer implements Promotable
                 }
             }
             tmLog.info("Updated leaders: " + updatedLeaders);
-            if (updatedLeaders.size() == m_partitionCount) {
-                m_MPI.acceptPromotion();
+            if (m_inStartup.get()) {
+                if (updatedLeaders.size() == m_partitionCount) {
+                    m_inStartup.set(true);
+                    m_MPI.acceptPromotion();
+                }
             }
         }
     };
@@ -120,30 +128,35 @@ public class LeaderAppointer implements Promotable
     @Override
     public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
     {
-        for (int i = 0; i < m_partitionCount; i++) {
-            String dir = LeaderElector.electionDirForPartition(i);
-            try {
-                m_zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-            } catch (KeeperException.NodeExistsException e) {
-                // expected on all nodes that don't start() first.
-            }
-            m_callbacks[i] = new PartitionCallback(i);
-            Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, m_callbacks[i]);
-            m_partitionWatchers[i] = sitterstuff.getFirst();
-            if (sitterstuff.getSecond().size() == (m_kfactor + 1)) {
-                tmLog.debug("Partition complete on start(): " + i);
-                assignLeader(i, VoltZK.childrenToReplicaHSIds(sitterstuff.getSecond()));
-                m_partitionCountLatch.countDown();
-            }
-        }
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
+        if (m_iv2appointees.pointInTimeCache().size() == 0)
+        {
+            tmLog.info("LeaderAppointer in startup");
+            m_inStartup.set(true);
+        }
+        else if (m_iv2appointees.pointInTimeCache().size() != m_partitionCount) {
+            VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
+        }
+        if (m_inStartup.get()) {
+            for (int i = 0; i < m_partitionCount; i++) {
+                String dir = LeaderElector.electionDirForPartition(i);
+                try {
+                    m_zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+                } catch (KeeperException.NodeExistsException e) {
+                    // expected on all nodes that don't start() first.
+                }
+                m_callbacks[i] = new PartitionCallback(i);
+                Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, m_callbacks[i]);
+                m_partitionWatchers[i] = sitterstuff.getFirst();
+            }
+        }
     }
 
     private void assignLeader(int partitionId, List<Long> children)
     {
         int masterHostId = -1;
-        if (m_partitionCountLatch.getCount() > 0) {
+        if (m_inStartup.get()) {
             try {
                 // find master in topo
                 JSONArray parts = m_topo.getJSONArray("partitions");
