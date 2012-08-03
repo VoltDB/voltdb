@@ -434,7 +434,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
                     mpi = new MpInitiator(m_messenger, mpiBuddyHSId);
                     m_iv2Initiators.add(mpi);
-                    m_globalServiceElector.registerService(mpi);
                 }
 
                 /*

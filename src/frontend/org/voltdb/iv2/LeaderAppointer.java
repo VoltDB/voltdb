@@ -20,7 +20,9 @@ package org.voltdb.iv2;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
+import java.util.HashSet;
 import java.util.List;
+import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -51,6 +53,7 @@ public class LeaderAppointer implements Promotable
     private static final VoltLogger tmLog = new VoltLogger("TM");
     private final ZooKeeper m_zk;
     private final CountDownLatch m_partitionCountLatch;
+    private final int m_partitionCount;
     private final BabySitter[] m_partitionWatchers;
     private final MapCache m_iv2appointees;
     private final MapCache m_iv2masters;
@@ -84,6 +87,18 @@ public class LeaderAppointer implements Promotable
     {
         @Override
         public void run(ImmutableMap<String, JSONObject> cache) {
+            Set<Long> updatedLeaders = new HashSet<Long>();
+            for (JSONObject thing : cache.values()) {
+                try {
+                    updatedLeaders.add(Long.valueOf(thing.getLong("hsid")));
+                } catch (JSONException e) {
+                    VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
+                }
+            }
+            tmLog.info("Updated leaders: " + updatedLeaders);
+            if (updatedLeaders.size() == m_partitionCount) {
+                m_MPI.acceptPromotion();
+            }
         }
     };
 
@@ -95,6 +110,7 @@ public class LeaderAppointer implements Promotable
         m_topo = topology;
         m_MPI = mpi;
         m_partitionCountLatch = numberOfPartitions;
+        m_partitionCount = (int)numberOfPartitions.getCount();
         m_callbacks = new PartitionCallback[(int)numberOfPartitions.getCount()];
         m_partitionWatchers = new BabySitter[(int)numberOfPartitions.getCount()];
         m_iv2appointees = new MapCache(m_zk, VoltZK.iv2appointees);
@@ -104,8 +120,7 @@ public class LeaderAppointer implements Promotable
     @Override
     public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
     {
-        long partCount = m_partitionCountLatch.getCount();
-        for (int i = 0; i < partCount; i++) {
+        for (int i = 0; i < m_partitionCount; i++) {
             String dir = LeaderElector.electionDirForPartition(i);
             try {
                 m_zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
@@ -121,6 +136,8 @@ public class LeaderAppointer implements Promotable
                 m_partitionCountLatch.countDown();
             }
         }
+        m_iv2appointees.start(true);
+        m_iv2masters.start(true);
     }
 
     private void assignLeader(int partitionId, List<Long> children)
