@@ -39,17 +39,21 @@ import org.voltcore.utils.Pair;
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
 import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheWriter;
 
+import org.voltdb.Promotable;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
-public class LeaderAppointer
+import com.google.common.collect.ImmutableMap;
+
+public class LeaderAppointer implements Promotable
 {
     private static final VoltLogger tmLog = new VoltLogger("TM");
     private final ZooKeeper m_zk;
     private final CountDownLatch m_partitionCountLatch;
     private final BabySitter[] m_partitionWatchers;
+    private final MapCache m_iv2appointees;
+    private final MapCache m_iv2masters;
     private final PartitionCallback[] m_callbacks;
     private final int m_kfactor;
     private final JSONObject m_topo;
@@ -75,6 +79,13 @@ public class LeaderAppointer
         }
     }
 
+    MapCache.Callback m_masterCallback = new MapCache.Callback()
+    {
+        @Override
+        public void run(ImmutableMap<String, JSONObject> cache) {
+        }
+    };
+
     public LeaderAppointer(ZooKeeper zk, CountDownLatch numberOfPartitions,
             int kfactor, JSONObject topology)
     {
@@ -84,9 +95,12 @@ public class LeaderAppointer
         m_partitionCountLatch = numberOfPartitions;
         m_callbacks = new PartitionCallback[(int)numberOfPartitions.getCount()];
         m_partitionWatchers = new BabySitter[(int)numberOfPartitions.getCount()];
+        m_iv2appointees = new MapCache(m_zk, VoltZK.iv2appointees);
+        m_iv2masters = new MapCache(m_zk, VoltZK.iv2masters, m_masterCallback);
     }
 
-    public void start() throws InterruptedException, ExecutionException, KeeperException
+    @Override
+    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
     {
         long partCount = m_partitionCountLatch.getCount();
         for (int i = 0; i < partCount; i++) {
@@ -141,9 +155,8 @@ public class LeaderAppointer
         }
         tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
                 partitionId);
-        MapCacheWriter iv2appointees = new MapCache(m_zk, VoltZK.iv2appointees);
         try {
-            iv2appointees.put(Integer.toString(partitionId), new JSONObject("{appointee:" + masterHSId + "}"));
+            m_iv2appointees.put(Integer.toString(partitionId), new JSONObject("{appointee:" + masterHSId + "}"));
         }
         catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
