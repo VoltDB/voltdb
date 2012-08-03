@@ -55,9 +55,9 @@ public class SpScheduler extends Scheduler
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    SpScheduler(SiteTaskerQueue taskQueue)
+    SpScheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
-        super(taskQueue);
+        super(partitionId, taskQueue);
     }
 
     @Override

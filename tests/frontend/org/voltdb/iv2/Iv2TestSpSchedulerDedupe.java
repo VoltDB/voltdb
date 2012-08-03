@@ -87,7 +87,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         when(runner.isSystemProcedure()).thenReturn(false);
         when(procs.getProcByName(MockSPName)).thenReturn(runner);
 
-        dut = new SpScheduler(new SiteTaskerQueue());
+        dut = new SpScheduler(0, new SiteTaskerQueue());
         dut.setMailbox(mbox);
         dut.setProcedureSet(procs);
     }

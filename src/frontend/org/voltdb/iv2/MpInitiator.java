@@ -47,6 +47,7 @@ public class MpInitiator extends BaseInitiator
                 messenger,
                 MP_INIT_PID,
                 new MpScheduler(
+                    MP_INIT_PID,
                     buddyHSId,
                     new SiteTaskerQueue()),
                 "MP");

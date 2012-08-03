@@ -71,7 +71,22 @@ final public class TxnEgo {
     private final long m_txnId;
     private final long m_wallClock;
 
-    // use TransactionInfo.make()
+    /**
+     * Make the zero-valued (initial) TxnEgo for a partition
+     */
+    public static TxnEgo makeZero(final long partitionId)
+    {
+        return new TxnEgo(SEQUENCE_ZERO, partitionId);
+    }
+
+    /**
+     * Make the next sequence-valued TxnEgo
+     */
+    public static TxnEgo makeNext(final TxnEgo prev)
+    {
+        return new TxnEgo(prev.getSequence() + 1, prev.getPartitionId());
+    }
+
     public TxnEgo(long sequence, long partitionId)
     {
         if (sequence < SEQUENCE_ZERO) {

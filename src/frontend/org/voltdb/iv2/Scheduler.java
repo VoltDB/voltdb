@@ -55,11 +55,13 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
+    protected TxnEgo m_txnEgo;
 
-    Scheduler(SiteTaskerQueue taskQueue)
+    Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
+        m_txnEgo = TxnEgo.makeZero(partitionId);
     }
 
     @Override
