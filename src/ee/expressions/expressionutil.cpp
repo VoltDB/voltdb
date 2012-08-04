@@ -358,8 +358,7 @@ tupleValueFactory(json_spirit::Object &obj, ExpressionType et,
 
     return new TupleValueExpression(valueIdxValue.get_int(),
                                     tableName.get_str(),
-                                    columnName.get_str(),
-                                    lc, rc);
+                                    columnName.get_str());
 }
 
 AbstractExpression *

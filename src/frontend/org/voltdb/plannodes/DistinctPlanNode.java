@@ -17,6 +17,7 @@
 
 package org.voltdb.plannodes;
 
+import java.util.ArrayList;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -24,18 +25,20 @@ import org.json_voltpatches.JSONStringer;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
+import org.voltdb.expressions.TupleValueExpression.Members;
 import org.voltdb.types.PlanNodeType;
 
 public class DistinctPlanNode extends AbstractPlanNode {
 
     public enum Members {
-        DISTINCT_EXPRESSION;
+        DISTINCT_EXPRESSION,
+        DISTINCT_EXPRESSION_CNT
     }
 
     //
     // TODO: How will this work for multi-column Distincts?
     //
-    protected AbstractExpression m_distinctExpression;
+    protected List<AbstractExpression> m_distinctExpressions = new ArrayList<AbstractExpression>();
 
     public DistinctPlanNode() {
         super();
@@ -49,7 +52,7 @@ public class DistinctPlanNode extends AbstractPlanNode {
     public DistinctPlanNode produceCopyForTransformation() {
         DistinctPlanNode copy = new DistinctPlanNode();
         super.produceCopyForTransformation(copy);
-        copy.m_distinctExpression = m_distinctExpression;
+        copy.m_distinctExpressions = m_distinctExpressions;
         return copy;
     }
 
@@ -62,22 +65,22 @@ public class DistinctPlanNode extends AbstractPlanNode {
      * Set the expression to be distinct'd (verbing nouns weirds language)
      * @param expr
      */
-    public void setDistinctExpression(AbstractExpression expr)
+    public void setDistinctExpressions(List<AbstractExpression> exprList)
     {
-        if (expr != null)
+        if (exprList != null)
         {
+            m_distinctExpressions.clear();
             // PlanNodes all need private deep copies of expressions
             // so that the resolveColumnIndexes results
             // don't get bashed by other nodes or subsequent planner runs
-            try
-            {
-                m_distinctExpression = (AbstractExpression) expr.clone();
-            }
-            catch (CloneNotSupportedException e)
-            {
-                // This shouldn't ever happen
-                e.printStackTrace();
-                throw new RuntimeException(e.getMessage());
+            for (AbstractExpression expr : exprList) {
+                try {
+                    m_distinctExpressions.add((AbstractExpression) expr.clone());
+                } catch (CloneNotSupportedException e) {
+                    // This shouldn't ever happen
+                    e.printStackTrace();
+                    throw new RuntimeException(e.getMessage());
+                }
             }
         }
     }
@@ -101,8 +104,10 @@ public class DistinctPlanNode extends AbstractPlanNode {
         m_outputSchema.sortByTveIndex();
 
         // Now resolve the indexes in the distinct expression
-        List<TupleValueExpression> distinct_tves =
-            ExpressionUtil.getTupleValueExpressions(m_distinctExpression);
+        List<TupleValueExpression> distinct_tves = new ArrayList<TupleValueExpression>();
+        for (AbstractExpression expr : m_distinctExpressions) {
+            distinct_tves.addAll(ExpressionUtil.getTupleValueExpressions(expr));
+        }
         for (TupleValueExpression tve : distinct_tves)
         {
             int index = input_schema.getIndexOfTve(tve);
@@ -118,10 +123,14 @@ public class DistinctPlanNode extends AbstractPlanNode {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        stringer.key(Members.DISTINCT_EXPRESSION.name());
-        stringer.object();
-        m_distinctExpression.toJSONString(stringer);
-        stringer.endObject();
+        stringer.key(Members.DISTINCT_EXPRESSION_CNT.name()).value(m_distinctExpressions.size());
+        int count = 0;
+        for (AbstractExpression expr : m_distinctExpressions) {
+            stringer.key(Members.DISTINCT_EXPRESSION.name() + Integer.toString(count++));
+            stringer.object();
+            expr.toJSONString(stringer);
+            stringer.endObject();
+        }
     }
 
     @Override

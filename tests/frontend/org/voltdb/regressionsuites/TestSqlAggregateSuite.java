@@ -62,6 +62,11 @@ public class TestSqlAggregateSuite extends RegressionSuite {
             VoltTable[] results = client.callProcedure("@AdHoc", query).getResults();
             // lazy check that we get 5 rows back, put off checking contents
             assertEquals(5, results[0].getRowCount());
+            query = String.format("select distinct %s.DESC, %s.RATIO  from %s",
+                    table, table, table);
+            results = client.callProcedure("@AdHoc", query).getResults();
+            // lazy check that we get ` rows back, put off checking contents
+            assertEquals(1, results[0].getRowCount());
         }
     }
 

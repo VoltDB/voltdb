@@ -59,9 +59,8 @@ class SerializeOutput;
 
 class TupleValueExpression : public AbstractExpression {
   public:
-    TupleValueExpression(int value_idx, std::string tableName, std::string colName,
-        AbstractExpression* left = NULL, AbstractExpression* right = NULL)
-        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE, left, right)
+    TupleValueExpression(int value_idx, std::string tableName, std::string colName)
+        : AbstractExpression(EXPRESSION_TYPE_VALUE_TUPLE)
     {
         VOLT_TRACE("OptimizedTupleValueExpression %d %d", m_type, value_idx);
         this->tuple_idx = 0;

@@ -117,17 +117,16 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
 
-//    std::set<NValue, NValue::ltNValue> found_values;
     std::set<std::vector<NValue>, detail::ltTuples> found_values;
     while (iterator.next(tuple)) {
         //
         // Check whether this value already exists in our list
         //
         std::vector<NValue> tuples;
-        const AbstractExpression* nextExpr = node->getDistinctExpression();
-        while (nextExpr != NULL) {
-            tuples.push_back(nextExpr->eval(&tuple, NULL));
-            nextExpr = nextExpr->getRight();
+        const std::vector<AbstractExpression*>& expressions = node->getDistinctExpressions();
+        for (std::vector<AbstractExpression*>::const_iterator it = expressions.begin();
+            it != expressions.end(); ++it) {
+            tuples.push_back((*it)->eval(&tuple, NULL));
         }
 
         if (found_values.find(tuples) == found_values.end()) {
