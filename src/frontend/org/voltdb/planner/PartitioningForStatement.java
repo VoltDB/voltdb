@@ -202,6 +202,30 @@ public class PartitioningForStatement {
     }
 
     /**
+     * Returns the discovered single partition expression (if exists), unless the
+     * user gave a partitioning a-priori, and then it will return null.
+     */
+    public AbstractExpression effectivePartitioningExpression() {
+        if (m_lockIn) {
+            return singlePartitioningExpression();
+        }
+        return null;
+    }
+
+    /**
+     * Returns true if the statement will require two fragments.
+     */
+    public boolean requiresTwoFragments() {
+        if (getCountOfPartitionedTables() == 0) {
+            return false;
+        }
+        if ((effectivePartitioningValue() != null) || (effectivePartitioningExpression() != null)) {
+            return false;
+        }
+        return true;
+    }
+
+    /**
      * smart accessor - only returns a value if it was unique
      * @return
      */

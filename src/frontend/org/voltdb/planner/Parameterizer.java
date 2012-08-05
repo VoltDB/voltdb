@@ -24,7 +24,6 @@ import java.util.Map;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
-import org.voltdb.ParameterSet;
 import org.voltdb.VoltType;
 
 class Parameterizer {
@@ -51,7 +50,7 @@ class Parameterizer {
         return m_paramsNode.children.size();
     }
 
-    public ParameterSet parameterize() {
+    public Object[] parameterize() {
         // don't optimize plans with params yet
         if (m_paramsNode.children.size() > 0) {
             return null;
@@ -62,9 +61,7 @@ class Parameterizer {
 
         parameterizeRecursively(m_root);
 
-        ParameterSet pset = new ParameterSet();
-        pset.setParameters(m_paramValues.toArray());
-        return pset;
+        return m_paramValues.toArray();
     }
 
     void parameterizeRecursively(VoltXMLElement node) {

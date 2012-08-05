@@ -29,6 +29,8 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.ScalarValueHints;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.planner.microoptimizations.MicroOptimizationRunner;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
@@ -48,6 +50,7 @@ public class QueryPlanner {
     String m_recentErrorMsg;
     boolean m_quietPlanner;
     final boolean m_fullDebug;
+    PartitioningForStatement m_partitioning;
 
     /**
      * Initialize planner with physical schema info and a reference to HSQLDB parser.
@@ -71,6 +74,7 @@ public class QueryPlanner {
         m_cluster = catalogCluster;
         m_estimates = estimates;
         m_quietPlanner = suppressDebugOutput;
+        m_partitioning = partitioning;
         m_fullDebug = System.getProperties().contains("compilerdebug");
     }
 
@@ -121,36 +125,69 @@ public class QueryPlanner {
             outputCompiledStatement(stmtName, procName, xmlSQL);
         }
 
-        // transform as appropriate for CVE-based caching
-        Object[] extractedParams = null;
-        VoltXMLElement parameterizedXmlSQL = xmlSQL.duplicate();
-        Parameterizer pzer = new Parameterizer(parameterizedXmlSQL);
-        int preExistingParams = pzer.countParams();
-        if (parameterize && (preExistingParams == 0)) {
-            extractedParams = pzer.parameterize().toArray();
-            // if requested output the second version of the parsed plan
-            if (!m_quietPlanner && m_fullDebug) {
-                outputParameterizedCompiledStatement(stmtName, procName, xmlSQL);
-            }
+        // what's going to happen next:
+        //  Try to parameterize the constant value expressions (if asked to do so)
+        //  On success return the plan.
+        //  On failure, try the plan again without parameterization
+        //  note, this means copies might need to be made of anything mutated in
+        //   the planning process, specifically the VoltXML object and maybe the partitioning info
 
-            try {
-                CompiledPlan plan = compileFromXML(parameterizedXmlSQL,
-                        costModel, sql, joinOrder, stmtName, procName, maxTablesPerJoin,
-                        paramHints, preExistingParams);
-                for (int i = 0; i < plan.parameters.length; i++) {
-                    extractedParams[i] = Parameterizer.valueForStringWithType((String)extractedParams[i], plan.parameters[i]);
+        if (parameterize) {
+            // make a copy so it can be mutated
+            VoltXMLElement parameterizedXmlSQL = xmlSQL.duplicate();
+
+            Parameterizer pzer = new Parameterizer(parameterizedXmlSQL);
+            int preExistingParams = pzer.countParams();
+
+            // skip plans with pre-existing parameters
+            // assume a user knows how to cache/optimize these
+            if (preExistingParams == 0) {
+                Object[] extractedParams = null;
+
+                extractedParams = pzer.parameterize();
+
+                // if requested output the second version of the parsed plan
+                if (!m_quietPlanner && m_fullDebug) {
+                    outputParameterizedCompiledStatement(stmtName, procName, xmlSQL);
                 }
-                plan.extractedParamValues.setParameters(extractedParams);
-                return plan;
-            }
-            catch (Exception e) {
-                System.err.println("Failled to plan, but will continue without parameterization.");
-                e.printStackTrace();
+
+                try {
+                    // compile the plan with new parameters
+                    CompiledPlan plan = compileFromXML(parameterizedXmlSQL, costModel,
+                            sql, joinOrder, stmtName, procName, maxTablesPerJoin, paramHints);
+
+                    // the extracted params are all strings at first.
+                    // after the planner infers their types, fix them up
+                    // the only exception is that nulls are Java NULL, and not the string "null".
+                    for (int i = 0; i < plan.parameters.length; i++) {
+                        extractedParams[i] = Parameterizer.valueForStringWithType((String)extractedParams[i], plan.parameters[i]);
+                    }
+                    plan.extractedParamValues.setParameters(extractedParams);
+
+                    // handle the case where the statement is partitioned on a newly parameterized value
+                    if (m_partitioning.effectivePartitioningValue() == null) {
+                        AbstractExpression expr = m_partitioning.effectivePartitioningExpression();
+                        if (expr != null) {
+                            if (expr instanceof ParameterValueExpression) {
+                                ParameterValueExpression pve = (ParameterValueExpression) expr;
+                                Object partitionValue = plan.extractedParamValues.toArray()[pve.getParameterIndex()];
+                                plan.setPartitioningKey(partitionValue);
+                            }
+                        }
+                    }
+
+                    return plan;
+                }
+                catch (Exception e) {
+                    // ignore any errors planning with parameters
+                    // fall through to re-planning without them
+                }
             }
         }
 
+        // if parameterization isn't requested or if it failed, plan here
         return compileFromXML(xmlSQL, costModel, sql, joinOrder, stmtName,
-                procName, maxTablesPerJoin, paramHints, preExistingParams);
+                procName, maxTablesPerJoin, paramHints);
     }
 
     private CompiledPlan compileFromXML(
@@ -161,8 +198,7 @@ public class QueryPlanner {
             String stmtName,
             String procName,
             int maxTablesPerJoin,
-            ScalarValueHints[] paramHints,
-            int preExistingParams)
+            ScalarValueHints[] paramHints)
     {
         // Get a parsed statement from the xml
         // The callers of compilePlan are ready to catch any exceptions thrown here.
