@@ -62,6 +62,7 @@ public class LeaderAppointer implements Promotable
     private final JSONObject m_topo;
     private final MpInitiator m_MPI;
     private AtomicBoolean m_inStartup = new AtomicBoolean(false);
+    private Set<Long> m_currentLeaders = new HashSet<Long>();
 
     private class PartitionCallback extends BabySitter.Callback
     {
@@ -85,22 +86,28 @@ public class LeaderAppointer implements Promotable
         }
     }
 
+    private static Set<Long> getLeaderSetFromMapCache(ImmutableMap<String, JSONObject> cache)
+    {
+        Set<Long> updatedLeaders = new HashSet<Long>();
+        for (JSONObject thing : cache.values()) {
+            try {
+                updatedLeaders.add(Long.valueOf(thing.getLong("hsid")));
+            } catch (JSONException e) {
+                VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
+            }
+        }
+        return updatedLeaders;
+    }
+
     MapCache.Callback m_masterCallback = new MapCache.Callback()
     {
         @Override
         public void run(ImmutableMap<String, JSONObject> cache) {
-            Set<Long> updatedLeaders = new HashSet<Long>();
-            for (JSONObject thing : cache.values()) {
-                try {
-                    updatedLeaders.add(Long.valueOf(thing.getLong("hsid")));
-                } catch (JSONException e) {
-                    VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
-                }
-            }
-            tmLog.info("Updated leaders: " + updatedLeaders);
+            m_currentLeaders = getLeaderSetFromMapCache(cache);
+            tmLog.info("Updated leaders: " + m_currentLeaders);
             if (m_inStartup.get()) {
-                if (updatedLeaders.size() == m_partitionCount) {
-                    m_inStartup.set(true);
+                if (m_currentLeaders.size() == m_partitionCount) {
+                    m_inStartup.set(false);
                     m_MPI.acceptPromotion();
                 }
             }
@@ -146,6 +153,8 @@ public class LeaderAppointer implements Promotable
                 Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, m_callbacks[i]);
                 m_partitionWatchers[i] = sitterstuff.getFirst();
             }
+        }
+        else {
         }
     }
 
