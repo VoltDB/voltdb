@@ -1366,9 +1366,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private void processExplainPlannedStmtBatch(  ExplainPlannedStmtBatch planBatch ) {
         final Connection c = (Connection)planBatch.clientData;
         Database db = m_catalogContext.get().database;
-        List<byte[]> aggByteArray = planBatch.getAggregatorFragments();
-        List<byte[]> collByteArray = planBatch.getCollectorFragments();
         int size = planBatch.getPlannedStatementCount();
+
+        List<byte[]> aggByteArray = new ArrayList<byte[]>( size );
+        for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
+            aggByteArray.add(plannedStatement.aggregatorFragment);
+        }
+
+        List<byte[]> collByteArray = new ArrayList<byte[]>( size );
+        for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
+            collByteArray.add(plannedStatement.collectorFragment );
+        }
+
         VoltTable[] vt = new VoltTable[ size ];
 
         for( int i = 0; i<size; i++ ) {
