@@ -63,6 +63,12 @@ public class TestVoltType extends TestCase {
         assertEquals(VoltType.DECIMAL, VoltType.typeFromString("DECIMAL"));
         assertEquals(VoltType.VARBINARY, VoltType.typeFromString("VARBINARY"));
 
+        // test with classname prefix
+        assertEquals(VoltType.VARBINARY, VoltType.typeFromString("VoltType.VARBINARY"));
+        assertEquals(VoltType.STRING, VoltType.typeFromString("VoltType.STRING"));
+        assertEquals(VoltType.STRING, VoltType.typeFromString("VoltType.VARCHAR"));
+        assertEquals(VoltType.FLOAT, VoltType.typeFromString("VoltType.DOUBLE"));
+
         boolean caught = false;
         try {
             VoltType.typeFromString("Muhahaha");

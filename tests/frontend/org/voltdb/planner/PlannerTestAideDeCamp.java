@@ -163,7 +163,7 @@ public class PlannerTestAideDeCamp {
         CompiledPlan plan = null;
         plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
                                    catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
+                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null, false);
         //TODO: Some day, when compilePlan throws a proper PlanningErrorException for all error cases, this test can become an assert.
         if (plan == null)
         {
