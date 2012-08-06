@@ -35,7 +35,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected long m_txnId;
     // IV2: within a partition, the primary initiator and its replicas
     // use this for intra-partition ordering/lookup
-    protected long m_spHandle;
+    private long m_spHandle;
     // IV2: allow PI to signal RI repair log truncation with a new task.
     private long m_truncationHandle;
     protected boolean m_isReadOnly;

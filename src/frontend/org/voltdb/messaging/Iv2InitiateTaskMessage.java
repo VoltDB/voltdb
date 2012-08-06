@@ -180,7 +180,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         sb.append(m_txnId).append("\n");
         sb.append(") TRUNC HANDLE ");
         sb.append(getTruncationHandle()).append("\n");
-        sb.append("SP HANDLE: ").append(m_spHandle).append("\n");
+        sb.append("SP HANDLE: ").append(getSpHandle()).append("\n");
         sb.append("CLIENT INTERFACE HANDLE: ").append(m_clientInterfaceHandle);
         sb.append("\n");
         sb.append("CONNECTION ID: ").append(m_connectionId).append("\n");
