@@ -17,12 +17,20 @@
 
 package org.voltdb.plannodes;
 
-import java.util.*;
-import org.voltdb.VoltType;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.List;
+import java.util.Map;
+
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.utils.Pair;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Database;
+import org.voltdb.types.PlanNodeType;
 
 /**
  *
@@ -107,5 +115,111 @@ public class PlanNodeTree implements JSONString {
             stringer.array().value(parameter.getFirst()).value(parameter.getSecond().name()).endArray();
         }
         stringer.endArray();
+    }
+
+    public List<AbstractPlanNode> getNodeList() {
+        return m_planNodes;
+    }
+
+    public void loadFromJSONArray( JSONArray jArray, Database db ) {
+        int size = jArray.length();
+
+        try {
+            for( int i = 0; i < size; i++ ) {
+                JSONObject jobj;
+                jobj = jArray.getJSONObject(i);
+                String nodeType = jobj.getString("PLAN_NODE_TYPE");
+                int nodeTypeInt = PlanNodeType.get( nodeType ).getValue();
+                AbstractPlanNode apn = null;
+
+                if( nodeTypeInt == PlanNodeType.AGGREGATE.getValue() ) {
+                    apn = new AggregatePlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.DELETE.getValue() ) {
+                    apn = new DeletePlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.DISTINCT.getValue() ) {
+                    apn = new DistinctPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.HASHAGGREGATE.getValue() ) {
+                    apn = new HashAggregatePlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.INDEXSCAN.getValue() ) {
+                    apn = new IndexScanPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.SEQSCAN.getValue() ) {
+                    apn = new SeqScanPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.INSERT.getValue() ) {
+                    apn = new InsertPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.LIMIT.getValue() ) {
+                    apn = new LimitPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.MATERIALIZE.getValue() ) {
+                    apn = new MaterializePlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.NESTLOOP.getValue() ) {
+                    apn = new NestLoopPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.NESTLOOPINDEX.getValue() ) {
+                    apn = new NestLoopIndexPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.ORDERBY.getValue() ) {
+                    apn = new OrderByPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.PROJECTION.getValue() ) {
+                    apn = new ProjectionPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.RECEIVE.getValue() ) {
+                    apn = new ReceivePlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.SEND.getValue() ) {
+                    apn = new SendPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.UNION.getValue() ) {
+                    apn = new UnionPlanNode();
+                }
+                else if( nodeTypeInt == PlanNodeType.UPDATE.getValue() ) {
+                    apn = new UpdatePlanNode();
+                }
+                else {
+                    System.err.println("plan node type not support: "+nodeType);
+                }
+                apn.loadFromJSONObject(jobj, db);
+                m_planNodes.add(apn);
+            }
+            //link children and parents
+            for( int i = 0; i < size; i++ ) {
+                JSONObject jobj;
+                jobj = jArray.getJSONObject(i);
+                JSONArray children = jobj.getJSONArray("CHILDREN_IDS");
+                for( int j = 0; j < children.length(); j++ ) {
+                    m_planNodes.get(i).addAndLinkChild( getNodeofId( children.getInt(j) ) );
+                }
+            }
+        }
+        catch (JSONException e) {
+            // TODO Auto-generated catch block
+            e.printStackTrace();
+        }
+    }
+
+    public AbstractPlanNode getNodeofId ( int ID ) {
+        int size = m_planNodes.size();
+        for( int i = 0; i < size; i++ ) {
+            if( m_planNodes.get(i).getPlanNodeId() == ID ) {
+                return m_planNodes.get(i);
+            }
+        }
+        return null;
+    }
+
+    public AbstractPlanNode concatenate ( AbstractPlanNode pn ) {
+        PlanNodeTree pnt = new PlanNodeTree( pn );
+        int size = m_planNodes.size();
+        m_planNodes.addAll( pnt.getNodeList() );
+        m_planNodes.get(size-1).addAndLinkChild( m_planNodes.get(size) );
+        return getRootPlanNode();
     }
 }

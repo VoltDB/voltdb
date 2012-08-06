@@ -21,6 +21,7 @@ import java.util.ArrayList;
 import java.util.List;
 import java.util.TreeMap;
 
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
@@ -203,5 +204,10 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
     @Override
     protected String explainPlanForNode(String indent) {
         return "NESTLOOP INDEX JOIN";
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+        super.loadFromJSONObject(jobj, db);
     }
 }

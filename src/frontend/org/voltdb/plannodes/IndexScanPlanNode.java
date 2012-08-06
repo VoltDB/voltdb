@@ -22,6 +22,7 @@ import java.util.Collections;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
@@ -388,5 +389,18 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         retval += " using \"" + m_targetIndexName + "\"";
         retval += " " + usageInfo;
         return retval;
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+        super.loadFromJSONObject(jobj, db);
+        try {
+            m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
+            m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
+            //                  JSONObject obj = jobj.getJSONObject(Members.END_EXPRESSION.name());
+            //                  m_endExpression.fromJSONObject( obj, null);
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
     }
 }

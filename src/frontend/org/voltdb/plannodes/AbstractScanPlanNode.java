@@ -20,11 +20,16 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.VoltType;
-import org.voltdb.catalog.*;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.expressions.*;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -255,6 +260,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+    @Override
     public void resolveColumnIndexes()
     {
         // The following applies to both seq and index scan.  Index scan has
@@ -303,5 +309,19 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.key(Members.PREDICATE.name());
         stringer.value(m_predicate);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+        super.loadFromJSONObject(jobj, db);
+        try {
+            this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+            JSONObject jobj1 = jobj.getJSONObject( Members.PREDICATE.name() );
+            if( jobj1 != null ) {
+                this.m_predicate.fromJSONObject(jobj1, db);
+            }
+        } catch (JSONException e) {
+            //better to do nothing
+        }
     }
 }

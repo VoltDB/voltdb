@@ -27,7 +27,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
@@ -659,4 +661,90 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     protected abstract String explainPlanForNode(String indent);
+
+    public ArrayList<AbstractPlanNode> getScanNodeList () {
+        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        getScanNodeList_recurse( collected, visited);
+        return collected;
+    }
+
+    //postorder adding scan nodes
+    public void getScanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
+            HashSet<AbstractPlanNode> visited) {
+        if (visited.contains(this)) {
+            assert(false): "do not expect loops in plangraph.";
+            return;
+        }
+        visited.add(this);
+        for (AbstractPlanNode n : m_children) {
+            n.getScanNodeList_recurse(collected, visited);
+        }
+
+        if( this.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null ) {
+            collected.add(this.getInlinePlanNode(PlanNodeType.INDEXSCAN));
+        }
+        if( this.getInlinePlanNode(PlanNodeType.SEQSCAN) != null ) {
+            collected.add(this.getInlinePlanNode(PlanNodeType.SEQSCAN));
+        }
+        if ( getChildCount()==0 &&
+                ( getPlanNodeType().equals(PlanNodeType.SEQSCAN) || getPlanNodeType().equals(PlanNodeType.INDEXSCAN ) ) ) {
+            collected.add(this);
+        }
+
+        // NOTE: ignores inline nodes.
+    }
+
+    public ArrayList<AbstractPlanNode> getLists () {
+        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        getLists_recurse( collected, visited);
+        return collected;
+    }
+
+    //postorder add nodes
+    public void getLists_recurse(ArrayList<AbstractPlanNode> collected,
+            HashSet<AbstractPlanNode> visited) {
+        if (visited.contains(this)) {
+            assert(false): "do not expect loops in plangraph.";
+            return;
+        }
+        visited.add(this);
+
+        for (AbstractPlanNode n : m_children) {
+            n.getLists_recurse(collected, visited);
+        }
+        collected.add(this);
+
+        // NOTE: ignores inline nodes.
+    }
+
+  //TODO outputSchema not loaded
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+        if( jobj == null ) {
+            System.err.println("JSONObject is null");
+            return;
+        }
+        try {
+            String str = jobj.getString( Members.ID.name() );
+            m_id = Integer.parseInt( str );
+
+            //todo : need to set up output_schema, inline_nodes and members in various plannodes
+
+            m_outputSchema = new NodeSchema();
+
+            //load inline nodes
+            JSONArray jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
+            if( jarray.length() != 0 ) {
+                PlanNodeTree pnt = new PlanNodeTree();
+                pnt.loadFromJSONArray(jarray, db);
+                List<AbstractPlanNode> list = pnt.getNodeList();
+                for( AbstractPlanNode pn : list ) {
+                    m_inlineNodes.put( pn.getPlanNodeType(), pn);
+                }
+            }
+        } catch (JSONException e) {
+            e.printStackTrace();
+        }
+    }
 }
