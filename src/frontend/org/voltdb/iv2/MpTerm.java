@@ -21,7 +21,6 @@ import java.lang.InterruptedException;
 
 import java.util.ArrayList;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.HashSet;
 import java.util.List;
@@ -30,20 +29,14 @@ import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCache.Callback;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
 
 public class MpTerm implements Term
 {
@@ -55,7 +48,7 @@ public class MpTerm implements Term
     private final TreeSet<Long> m_knownLeaders = new TreeSet<Long>();
 
     // Initialized in start() -- when the term begins.
-    protected MapCache m_mapCache;
+    protected LeaderCache m_leaderCache;
 
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
@@ -63,18 +56,14 @@ public class MpTerm implements Term
     // NOTE: The contract with MapCache is that it always
     // returns a full cache (one entry for every partition).  Returning a
     // partially filled cache is NotSoGood(tm).
-    Callback m_leadersChangeHandler = new Callback()
+    LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<String, JSONObject> cache)
+        public void run(ImmutableMap<Integer, Long> cache)
         {
             Set<Long> updatedLeaders = new HashSet<Long>();
-            for (JSONObject thing : cache.values()) {
-                try {
-                    updatedLeaders.add(Long.valueOf(thing.getLong("hsid")));
-                } catch (JSONException e) {
-                    VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
-                }
+            for (Long HSId : cache.values()) {
+                updatedLeaders.add(HSId);
             }
             List<Long> leaders = new ArrayList<Long>(updatedLeaders);
             tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
@@ -106,8 +95,8 @@ public class MpTerm implements Term
     public void start()
     {
         try {
-            m_mapCache = new MapCache(m_zk, VoltZK.iv2masters, m_leadersChangeHandler);
-            m_mapCache.start(true);
+            m_leaderCache = new LeaderCache(m_zk, VoltZK.iv2masters, m_leadersChangeHandler);
+            m_leaderCache.start(true);
         }
         catch (ExecutionException ee) {
             VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);
@@ -119,9 +108,9 @@ public class MpTerm implements Term
     @Override
     public void shutdown()
     {
-        if (m_mapCache != null) {
+        if (m_leaderCache != null) {
             try {
-                m_mapCache.shutdown();
+                m_leaderCache.shutdown();
             } catch (InterruptedException e) {
                 // We're shutting down...this may jsut be faster.
             }

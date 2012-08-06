@@ -24,18 +24,11 @@ import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-
 import org.voltcore.messaging.HostMessenger;
 
 import org.voltcore.utils.Pair;
 
 import org.voltcore.zk.LeaderElector;
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCache.Callback;
-
-import org.voltcore.zk.MapCacheWriter;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -53,25 +46,21 @@ import com.google.common.collect.ImmutableMap;
  */
 public class SpInitiator extends BaseInitiator implements Promotable
 {
-    final private MapCache m_mapCache;
+    final private LeaderCache m_leaderCache;
     private boolean m_promoted = false;
 
-    Callback m_leadersChangeHandler = new Callback()
+    LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<String, JSONObject> cache)
+        public void run(ImmutableMap<Integer, Long> cache)
         {
-            for (JSONObject thing : cache.values()) {
-                try {
-                    if (Long.valueOf(thing.getLong("appointee")) == getInitiatorHSId()) {
-                        if (!m_promoted) {
-                            acceptPromotion();
-                            m_promoted = true;
-                        }
-                        break;
+            for (Long HSId : cache.values()) {
+                if (HSId == getInitiatorHSId()) {
+                    if (!m_promoted) {
+                        acceptPromotion();
+                        m_promoted = true;
                     }
-                } catch (JSONException e) {
-                    VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
+                    break;
                 }
             }
         }
@@ -82,7 +71,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         super(VoltZK.iv2masters, messenger, partition,
                 new SpScheduler(new SiteTaskerQueue()),
                 "SP");
-        m_mapCache = new MapCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
+        m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
     }
 
     @Override
@@ -94,7 +83,7 @@ public class SpInitiator extends BaseInitiator implements Promotable
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
-            m_mapCache.start(true);
+            m_leaderCache.start(true);
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
         }
@@ -135,10 +124,9 @@ public class SpInitiator extends BaseInitiator implements Promotable
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
-                    MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(),
+                    LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
-                    iv2masters.put(Integer.toString(m_partitionId),
-                            new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
+                    iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                 }
                 else {
                     // The only known reason to fail is a failed replica during
