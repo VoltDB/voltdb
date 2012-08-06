@@ -28,16 +28,12 @@ import java.io.IOException;
 
 import junit.framework.TestCase;
 
-import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
 import org.voltdb.CatalogContext;
-import org.voltdb.VoltDB;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.utils.CatalogUtil;
 
 public class TestPlannerTool extends TestCase {
@@ -67,7 +63,7 @@ public class TestPlannerTool extends TestCase {
 
         m_pt = new PlannerTool(context.cluster, context.database);
 
-        PlannerTool.Result result = null;
+        AdHocPlannedStatement result = null;
         result = m_pt.planSql("select * from warehouse;", false, true, false);
         System.out.println(result);
 
@@ -133,20 +129,19 @@ public class TestPlannerTool extends TestCase {
         System.out.println(result);
 
 
-        String plan = new String(result.getOnePlan(), VoltDB.UTF8ENCODING);
-        System.out.println( plan );
-        PlanNodeTree pnt = new PlanNodeTree();
-        try {
-            JSONObject jobj = new JSONObject( plan );
-            JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-            pnt.loadFromJSONArray(jarray, null);
-            String str = pnt.getRootPlanNode().toExplainPlanString();
-            System.out.println( str );
-        } catch (JSONException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-        }
-
+//        String plan = new String(result.getOnePlan(), VoltDB.UTF8ENCODING);
+//        System.out.println( plan );
+//        PlanNodeTree pnt = new PlanNodeTree();
+//        try {
+//            JSONObject jobj = new JSONObject( plan );
+//            JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
+//            pnt.loadFromJSONArray(jarray, null);
+//            String str = pnt.getRootPlanNode().toExplainPlanString();
+//            System.out.println( str );
+//        } catch (JSONException e) {
+//            // TODO Auto-generated catch block
+//            e.printStackTrace();
+//        }
     }
 
     public void testBadDDL() throws IOException

@@ -83,6 +83,8 @@ abstract public class Scheduler implements InitiatorMessageHandler
         return m_tasks;
     }
 
+    abstract public void shutdown();
+
     @Override
     abstract public void updateReplicas(List<Long> replicas);
 
@@ -90,4 +92,5 @@ abstract public class Scheduler implements InitiatorMessageHandler
     abstract public void deliver(VoltMessage message);
 
     abstract public void setMaxSeenTxnId(long maxSeenTxnId);
+
 }

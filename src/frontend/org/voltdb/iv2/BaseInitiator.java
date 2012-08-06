@@ -19,18 +19,14 @@ package org.voltdb.iv2;
 
 import java.util.ArrayList;
 import java.util.Collection;
-
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
-import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
-
 import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
@@ -40,12 +36,8 @@ import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-
-import org.voltdb.iv2.StartupAlgo;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
-import org.voltdb.iv2.Site;
-
 import org.voltdb.VoltDB;
 
 /**
@@ -120,6 +112,11 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                           boolean createForRejoin)
         throws KeeperException, ExecutionException, InterruptedException
     {
+            int snapshotPriority = 6;
+            if (catalogContext.cluster.getDeployment().get("deployment") != null) {
+                snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
+                    getSystemsettings().get("systemsettings").getSnapshotpriority();
+            }
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -127,7 +124,8 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                                        catalogContext.m_transactionId,
                                        m_partitionId,
                                        numberOfPartitions,
-                                       createForRejoin);
+                                       createForRejoin,
+                                       snapshotPriority);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -230,8 +228,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
     @Override
     public void shutdown()
     {
-        // rtb: better to schedule a shutdown SiteTasker?
-        // than to play java interrupt() games?
+        // set the shutdown flag on the site thread.
         if (m_executionSite != null) {
             m_executionSite.startShutdown();
         }
@@ -239,24 +236,32 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             if (m_leaderElector != null) {
                 m_leaderElector.shutdown();
             }
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.", e);
+        }
+
+        try {
             if (m_term != null) {
                 m_term.shutdown();
             }
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.", e );
+        }
+
+        try {
             if (m_initiatorMailbox != null) {
                 m_initiatorMailbox.shutdown();
             }
-        } catch (InterruptedException e) {
-            // what to do here?
-        } catch (KeeperException e) {
-            // What to do here?
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.", e);
         }
-        if (m_siteThread != null) {
-            try {
+
+        try {
+            if (m_siteThread != null) {
                 m_siteThread.interrupt();
-                m_siteThread.join();
             }
-            catch (InterruptedException giveup) {
-            }
+        } catch (Exception e) {
+            tmLog.info("Exception during shutdown.");
         }
     }
 

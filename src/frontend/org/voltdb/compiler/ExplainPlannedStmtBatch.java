@@ -27,10 +27,9 @@ public class ExplainPlannedStmtBatch extends AdHocPlannedStmtBatch {
             Object partitionParam,
             int catalogVersion,
             long clientHandle,
-            long connectionId,
             String hostname,
             boolean adminConnection,
             Object clientData) {
-        super(sqlBatchText, partitionParam, catalogVersion, clientHandle, connectionId, hostname, adminConnection, clientData);
+        super(sqlBatchText, partitionParam, catalogVersion, clientHandle, hostname, adminConnection, clientData);
     }
 }

@@ -8,8 +8,5 @@
            <procedure class='Insert' />
            <procedure class='Select' />
        </procedures>
-       <partitions>
-           <partition table='HELLOWORLD' column='DIALECT' />
-       </partitions>
     </database>
 </project>

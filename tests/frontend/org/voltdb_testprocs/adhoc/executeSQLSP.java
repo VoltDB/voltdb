@@ -42,6 +42,7 @@ import org.voltdb.VoltTable;
 public class executeSQLSP extends VoltProcedure {
     public static final SQLStmt testStmt = new SQLStmt("select * from PARTED1 order by partval");
 
+    @SuppressWarnings("deprecation")
     public VoltTable[] run(long partval, String sql) {
         voltQueueSQLExperimental(sql);
         voltQueueSQL(testStmt);

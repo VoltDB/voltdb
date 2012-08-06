@@ -135,6 +135,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         private SocketChannel m_socketChannel = null;
         Connection(BackendTarget target, int port) {
             if (target == BackendTarget.NATIVE_EE_IPC) {
+                System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
                 System.out
                         .println("Press enter after you have started the EE process to initiate the connection to the EE");
                 try {

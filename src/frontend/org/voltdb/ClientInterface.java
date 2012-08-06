@@ -47,7 +47,6 @@ import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.atomic.AtomicReference;
 import java.util.concurrent.locks.ReentrantLock;
 
-import org.apache.commons.lang3.ArrayUtils;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -170,9 +169,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      *
      * The ? extends ugliness is due to the SnapshotDaemon having an ACG that is a noop
      */
-    private final COWMap<Long, ClientInterfaceHandleManager>
-    m_cihm =
-    new COWMap<Long, ClientInterfaceHandleManager>();
+    private final COWMap<Long, ClientInterfaceHandleManager> m_cihm = new COWMap<Long, ClientInterfaceHandleManager>();
+
     private final Cartographer m_cartographer;
 
     /**
@@ -761,7 +759,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_cihm.put(c.connectionId(),
                         new ClientInterfaceHandleManager( m_isAdmin, c, m_acg.get()));
                 m_acg.get().addMember(this);
-                System.out.println("Initial read selection is " + !m_acg.get().hasBackPressure());
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
@@ -876,7 +873,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void offBackpressure() {
-            System.out.println("Backpressure deactivated");
             m_connection.enableReadSelection();
         }
     }
@@ -1277,7 +1273,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             vt[i] = new VoltTable(new VoltTable.ColumnInfo( "SQL Statement", VoltType.STRING),
-                    new VoltTable.ColumnInfo( "Explained Plan", VoltType.STRING));
+                                  new VoltTable.ColumnInfo( "Explained Plan", VoltType.STRING));
 
             for( Statement stmt : proc.getStatements() ) {
                 vt[i].addRow( stmt.getSqltext(), Encoder.hexDecodeToString( stmt.getExplainplan() ) );
@@ -1329,25 +1325,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         partitionParam,
                         m_catalogContext.get().catalogVersion,
                         task.clientHandle,
-                        handler.connectionId(),
                         handler.m_hostname,
                         handler.isAdmin(),
                         ccxn);
         for (String sqlStatement : sqlStatements) {
-            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sql, partitionParam != null);
+            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sqlStatement, partitionParam != null);
             // check the catalog version if there is a cached plan
             if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
                 break;
             }
-            planBatch.addStatement(sqlStatement,
-                    plannedStatement.aggregatorFragment,
-                    plannedStatement.collectorFragment,
-                    plannedStatement.isReplicatedTableDML,
-                    plannedStatement.isNonDeterministic,
-                    null);
+            planBatch.addStatement(plannedStatement);
         }
         // All statements retrieved from cache?
         if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
+            System.out.println("get plan from cache");
             processExplainPlannedStmtBatch( planBatch );
             return null;
         }
@@ -1431,6 +1422,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         null,
                         vt,
                         null);
+        System.out.println( vt[0] );
         response.setClientHandle( planBatch.clientHandle );
         ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf.putInt(buf.capacity() - 4);
@@ -1464,25 +1456,21 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
         AdHocPlannedStmtBatch planBatch =
                 new AdHocPlannedStmtBatch(sql,
-                        partitionParam,
-                        m_catalogContext.get().catalogVersion,
-                        task.clientHandle,
-                        handler.connectionId(),
-                        handler.m_hostname,
-                        handler.isAdmin(),
-                        ccxn);
+                                          partitionParam,
+                                          task.clientHandle,
+                                          handler.connectionId(),
+                                          handler.m_hostname,
+                                          handler.isAdmin(),
+                                          ccxn);
+
         for (String sqlStatement : sqlStatements) {
-            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sql, partitionParam != null);
+            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sqlStatement, partitionParam != null);
             // check the catalog version if there is a cached plan
             if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
                 break;
             }
-            planBatch.addStatement(sqlStatement,
-                    plannedStatement.aggregatorFragment,
-                    plannedStatement.collectorFragment,
-                    plannedStatement.isReplicatedTableDML,
-                    plannedStatement.isNonDeterministic,
-                    null);
+
+            planBatch.addStatement(plannedStatement);
         }
         // All statements retrieved from cache?
         if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
@@ -1691,10 +1679,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         else if ( sysProc == null && task.procName.equals("@Explain") ) {
+            System.out.println("dispatchExplainAdHoc");
             return dispatchExplainAdHoc(task, handler, ccxn);
         }
 
         else if ( sysProc == null && task.procName.equals("@ExplainProc") ) {
+            System.out.println("dispatchExplainProcedure");
             return dispatchExplainProcedure(task, handler, ccxn);
         }
 
@@ -1888,25 +1878,11 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // Set up the parameters.
-        // Need separate lists due to limitations on the kind of objects that can be dispatched.
-        // Convert to arrays, preferring primitive types.
-        List<byte[]> aggregatorFragmentList = plannedStmtBatch.getAggregatorFragments();
-        byte[][] aggregatorFragments = aggregatorFragmentList.toArray(
-                new byte[aggregatorFragmentList.size()][]);
-        List<byte[]> collectorFragmentList = plannedStmtBatch.getCollectorFragments();
-        byte[][] collectorFragments = collectorFragmentList.toArray(
-                new byte[collectorFragmentList.size()][]);
-        List<String> sqlStatementList = plannedStmtBatch.getSQLStatements();
-        String[] sqlStatements = sqlStatementList.toArray(
-                new String[sqlStatementList.size()]);
-        List<Integer> replicatedTableDMLFlagList = plannedStmtBatch.getReplicatedTableDMLFlags();
-        int[] replicatedTableDMLFlags = ArrayUtils.toPrimitive(
-                replicatedTableDMLFlagList.toArray(
-                        new Integer[replicatedTableDMLFlagList.size()]));
-        task.setParams(aggregatorFragments,
-                collectorFragments,
-                sqlStatements,
-                replicatedTableDMLFlags);
+
+        ByteBuffer buf = ByteBuffer.allocate(plannedStmtBatch.getPlanArraySerializedSize());
+        plannedStmtBatch.flattenPlanArrayToBuffer(buf);
+        assert(buf.hasArray());
+        task.setParams(buf.array());
         task.clientHandle = plannedStmtBatch.clientHandle;
 
         /*
@@ -1968,9 +1944,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void run() {
                 if (result.errorMsg == null) {
-                    if (result instanceof AdHocPlannedStmtBatch) {
+                    //TODO test if this lower @AdHoc speed
+                    if (result instanceof AdHocPlannedStmtBatch && ! ( result instanceof ExplainPlannedStmtBatch) ) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
-                        if (plannedStmtBatch.catalogVersion != m_catalogContext.get().catalogVersion) {
+                        // assume all stmts have the same catalog version
+                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
+                            (plannedStmtBatch.getPlannedStatement(0).catalogVersion != m_catalogContext.get().catalogVersion)) {
 
                             /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an
@@ -2036,7 +2015,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     }
                     else if (result instanceof ExplainPlannedStmtBatch ) {
                         final ExplainPlannedStmtBatch plannedStmtBatch = (ExplainPlannedStmtBatch) result;
-                        if (plannedStmtBatch.catalogVersion != m_catalogContext.get().catalogVersion) {
+                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
+                                (plannedStmtBatch.getPlannedStatement(0).catalogVersion != m_catalogContext.get().catalogVersion)) {
 
                             /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an
@@ -2061,6 +2041,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_mailbox.send(Long.MIN_VALUE, work);
                         }
                         else {
+                            System.out.println("get plan from query planner");
                             processExplainPlannedStmtBatch( plannedStmtBatch );
                         }
                     }
@@ -2397,50 +2378,53 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public Map<Long, Pair<String, long[]>> getLiveClientStats()
     {
-        Map<Long, Pair<String, long[]>> client_stats =
-                new HashMap<Long, Pair<String, long[]>>();
+        final Map<Long, Pair<String, long[]>> client_stats =
+            new HashMap<Long, Pair<String, long[]>>();
 
-        Map<Long, long[]> inflight_txn_stats;
         if (VoltDB.instance().isIV2Enabled()) {
-            inflight_txn_stats = new HashMap<Long, long[]>();
-            for (Map.Entry<Long, ClientInterfaceHandleManager> e :
-                m_cihm.entrySet()) {
-                long values[] = new long[2];
-                values[0] = e.getValue().isAdmin ? 1 : 0;
-                values[1] = e.getValue().getOutstandingTxns();
-                inflight_txn_stats.put(e.getKey(), values);
+            // m_cihm hashes connectionId to a ClientInterfaceHandleManager
+            // ClientInterfaceHandleManager has the connection object.
+            for (Map.Entry<Long, ClientInterfaceHandleManager> e : m_cihm.entrySet()) {
+                // The internal CI adapters report negative connection ids and
+                // aren't included in public stats.
+                if (e.getKey() > 0) {
+                    long adminMode = e.getValue().isAdmin ? 1 : 0;
+                    long readWait = e.getValue().connection.readStream().dataAvailable();
+                    long writeWait = e.getValue().connection.writeStream().getOutstandingMessageCount();
+                    long outstandingTxns = e.getValue().getOutstandingTxns();
+                    client_stats.put(
+                            e.getKey(), new Pair<String, long[]>(
+                                e.getValue().connection.getHostnameOrIP(),
+                                new long[] {adminMode, readWait, writeWait, outstandingTxns}));
+                }
             }
-        } else {
-            inflight_txn_stats = m_initiator.getOutstandingTxnStats();
         }
 
-        // put all the live connections in the stats map, then fill in admin and
-        // outstanding txn info from the inflight stats
+        else {
+            Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
 
-        for (Connection c : m_connections)
-        {
-            if (!client_stats.containsKey(c.connectionId()))
-            {
-                client_stats.put(
-                        c.connectionId(),
-                        new Pair<String, long[]>(c.getHostnameOrIP(),
+            // put all the live connections in the stats map, then fill in admin and
+            // outstanding txn info from the inflight stats
+            for (Connection c : m_connections) {
+                if (!client_stats.containsKey(c.connectionId())) {
+                    client_stats.put(
+                            c.connectionId(),
+                            new Pair<String, long[]>(c.getHostnameOrIP(),
                                 new long[]{0,
-                            c.readStream().dataAvailable(),
-                            c.writeStream().getOutstandingMessageCount(),
-                            0})
-                        );
+                                    c.readStream().dataAvailable(),
+                                    c.writeStream().getOutstandingMessageCount(),
+                                    0})
+                            );
+                }
+            }
+
+            for (Entry<Long, long[]> stat : inflight_txn_stats.entrySet()) {
+                if (client_stats.containsKey(stat.getKey())) {
+                    client_stats.get(stat.getKey()).getSecond()[0] = stat.getValue()[0];
+                    client_stats.get(stat.getKey()).getSecond()[3] = stat.getValue()[1];
+                }
             }
         }
-
-        for (Entry<Long, long[]> stat : inflight_txn_stats.entrySet())
-        {
-            if (client_stats.containsKey(stat.getKey()))
-            {
-                client_stats.get(stat.getKey()).getSecond()[0] = stat.getValue()[0];
-                client_stats.get(stat.getKey()).getSecond()[3] = stat.getValue()[1];
-            }
-        }
-
         return client_stats;
     }
 
