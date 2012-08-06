@@ -1,11 +1,11 @@
 Name:
-votekv
+voltkv
 
 Ref:
-./tests/frontend/org/voltdb/planner/baseline/voltkv/
+./baseline/voltkv
 
 DDL:
-./examples/voltkv/ddl.sql
+../../../examples/voltkv/ddl.sql
 
 Base Name:
 ddl
