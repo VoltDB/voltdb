@@ -106,7 +106,7 @@ public class Cartographer extends StatsSource
     @Override
     protected void populateColumnSchema(ArrayList<ColumnInfo> columns)
     {
-        columns.add(new ColumnInfo("Partition", VoltType.STRING));
+        columns.add(new ColumnInfo("Partition", VoltType.INTEGER));
         columns.add(new ColumnInfo("Sites", VoltType.STRING));
         columns.add(new ColumnInfo("Leader", VoltType.STRING));
 
