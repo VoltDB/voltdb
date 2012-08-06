@@ -23,8 +23,6 @@ import java.util.concurrent.ExecutionException;
 
 import java.util.List;
 
-import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.Mailbox;
@@ -32,9 +30,6 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.VoltMessage;
 
 import org.voltcore.utils.CoreUtils;
-
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheReader;
 
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
@@ -62,7 +57,7 @@ public class InitiatorMailbox implements Mailbox
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
     private final RejoinProducer m_rejoinProducer;
-    private final MapCacheReader m_masterMapCache;
+    private final LeaderCacheReader m_masterMapCache;
     private long m_hsId;
     private RepairAlgo m_algo;
 
@@ -92,7 +87,7 @@ public class InitiatorMailbox implements Mailbox
         m_repairLog = repairLog;
         m_rejoinProducer = rejoinProducer;
 
-        m_masterMapCache = new MapCache(m_messenger.getZK(), VoltZK.iv2masters);
+        m_masterMapCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
         try {
             m_masterMapCache.start(false);
         } catch (InterruptedException ignored) {
@@ -126,15 +121,8 @@ public class InitiatorMailbox implements Mailbox
 
     public long getMasterHsId(int partitionId)
     {
-        try {
-            JSONObject master = m_masterMapCache.get(Integer.toString(partitionId));
-            long masterHsId = Long.valueOf(master.getLong("hsid"));
-            return masterHsId;
-        } catch (Exception e) {
-            VoltDB.crashLocalVoltDB("Failed to deserialize map cache reader object.", false, e);
-        }
-        // unreachable.
-        return Long.MIN_VALUE;
+        long masterHSId = m_masterMapCache.get(partitionId);
+        return masterHSId;
     }
 
     @Override

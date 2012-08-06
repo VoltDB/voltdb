@@ -230,7 +230,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         }
     };
 
-    private static int getPartitionIdFromMapCachePath(String zkPath)
+    private static int getPartitionIdFromZKPath(String zkPath)
     {
         return Integer.valueOf(zkPath.split("/")[zkPath.split("/").length - 1]);
     }
@@ -267,7 +267,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
             try {
                 byte payload[] = callback.getData();
                 long HSId = Long.valueOf(new String(payload, "UTF-8"));
-                cache.put(getPartitionIdFromMapCachePath(callback.getPath()), HSId);
+                cache.put(getPartitionIdFromZKPath(callback.getPath()), HSId);
             } catch (KeeperException.NoNodeException e) {
                 // child may have been deleted between the parent trigger and getData.
             }
@@ -290,7 +290,7 @@ public class LeaderCache implements LeaderCacheReader, LeaderCacheWriter {
         try {
             byte payload[] = cb.getData();
             long HSId = Long.valueOf(new String(payload, "UTF-8"));
-            cacheCopy.put(getPartitionIdFromMapCachePath(cb.getPath()), HSId);
+            cacheCopy.put(getPartitionIdFromZKPath(cb.getPath()), HSId);
         } catch (KeeperException.NoNodeException e) {
             cacheCopy.remove(event.getPath());
         }

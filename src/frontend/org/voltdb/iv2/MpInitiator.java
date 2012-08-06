@@ -24,15 +24,11 @@ import java.util.List;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
-import org.json_voltpatches.JSONObject;
-
 import org.voltcore.messaging.HostMessenger;
 
 import org.voltcore.utils.Pair;
 
 import org.voltcore.zk.LeaderElector;
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheWriter;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
@@ -106,10 +102,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
 
                     // THIS IS where map cache should be updated, not
                     // in the promotion algorithm.
-                    MapCacheWriter iv2masters = new MapCache(m_messenger.getZK(),
+                    LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
                             m_zkMailboxNode);
-                    iv2masters.put(Integer.toString(m_partitionId),
-                            new JSONObject("{hsid:" + m_initiatorMailbox.getHSId() + "}"));
+                    iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
                 }
                 else {
                     // The only known reason to fail is a failed replica during

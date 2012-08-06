@@ -53,7 +53,7 @@ public class MpTerm implements Term
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
     // the Term processing.
-    // NOTE: The contract with MapCache is that it always
+    // NOTE: The contract with LeaderCache is that it always
     // returns a full cache (one entry for every partition).  Returning a
     // partially filled cache is NotSoGood(tm).
     LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
@@ -68,7 +68,7 @@ public class MpTerm implements Term
             List<Long> leaders = new ArrayList<Long>(updatedLeaders);
             tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
             tmLog.info(m_whoami
-                    + "MapCache change handler updating leader list to: "
+                    + "LeaderCache change handler updating leader list to: "
                     + CoreUtils.hsIdCollectionToString(leaders));
             m_knownLeaders.clear();
             m_knownLeaders.addAll(updatedLeaders);
