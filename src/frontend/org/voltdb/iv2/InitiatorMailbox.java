@@ -57,7 +57,7 @@ public class InitiatorMailbox implements Mailbox
     private final HostMessenger m_messenger;
     private final RepairLog m_repairLog;
     private final RejoinProducer m_rejoinProducer;
-    private final LeaderCacheReader m_masterMapCache;
+    private final LeaderCacheReader m_masterLeaderCache;
     private long m_hsId;
     private RepairAlgo m_algo;
 
@@ -87,9 +87,9 @@ public class InitiatorMailbox implements Mailbox
         m_repairLog = repairLog;
         m_rejoinProducer = rejoinProducer;
 
-        m_masterMapCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
+        m_masterLeaderCache = new LeaderCache(m_messenger.getZK(), VoltZK.iv2masters);
         try {
-            m_masterMapCache.start(false);
+            m_masterLeaderCache.start(false);
         } catch (InterruptedException ignored) {
             // not blocking. shouldn't interrupt.
         } catch (ExecutionException crashme) {
@@ -100,7 +100,7 @@ public class InitiatorMailbox implements Mailbox
 
     synchronized public void shutdown() throws InterruptedException
     {
-        m_masterMapCache.shutdown();
+        m_masterLeaderCache.shutdown();
         if (m_algo != null) {
             m_algo.cancel();
         }
@@ -121,7 +121,7 @@ public class InitiatorMailbox implements Mailbox
 
     public long getMasterHsId(int partitionId)
     {
-        long masterHSId = m_masterMapCache.get(partitionId);
+        long masterHSId = m_masterLeaderCache.get(partitionId);
         return masterHSId;
     }
 
