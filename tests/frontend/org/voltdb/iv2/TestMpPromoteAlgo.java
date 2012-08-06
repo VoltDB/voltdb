@@ -46,12 +46,19 @@ import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
 public class TestMpPromoteAlgo extends TestCase
 {
+    long txnEgo(long handle)
+    {
+        int partitionId = 100;
+        long sequence = TxnEgo.SEQUENCE_ZERO + handle;
+        return new TxnEgo(sequence, partitionId).getSequence();
+    }
+
     Iv2RepairLogResponseMessage makeFragResponse(long handle)
     {
         FragmentTaskMessage frag = mock(FragmentTaskMessage.class);
         Iv2RepairLogResponseMessage m = mock(Iv2RepairLogResponseMessage.class);
         when(m.getPayload()).thenReturn(frag);
-        when(m.getHandle()).thenReturn(handle);
+        when(m.getHandle()).thenReturn(txnEgo(handle));
         return m;
     }
 
@@ -61,7 +68,7 @@ public class TestMpPromoteAlgo extends TestCase
         CompleteTransactionMessage complete = mock(CompleteTransactionMessage.class);
         Iv2RepairLogResponseMessage m = mock(Iv2RepairLogResponseMessage.class);
         when(m.getPayload()).thenReturn(complete);
-        when(m.getHandle()).thenReturn(handle);
+        when(m.getHandle()).thenReturn(txnEgo(handle));
         return m;
     }
 
@@ -70,7 +77,7 @@ public class TestMpPromoteAlgo extends TestCase
     {
         CompleteTransactionMessage complete = mock(CompleteTransactionMessage.class);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId, sequence,
-            ofTotal, handle, complete);
+            ofTotal, txnEgo(handle), complete);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -81,7 +88,7 @@ public class TestMpPromoteAlgo extends TestCase
     {
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId, sequence,
-            ofTotal, handle, null);
+            ofTotal, txnEgo(handle), null);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -92,7 +99,7 @@ public class TestMpPromoteAlgo extends TestCase
     {
         FragmentTaskMessage frag = mock(FragmentTaskMessage.class);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId, sequence,
-            ofTotal, handle, frag);
+            ofTotal, txnEgo(handle), frag);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -115,10 +122,10 @@ public class TestMpPromoteAlgo extends TestCase
         // txns 1-5 are complete. 6 is not complete.
         // txn 5 returns frag(s) and complete(s).
         final Boolean t = true; final Boolean f = false;
-        long returnedHandles[]  = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
+        long returnedHandles[]  = new long[]{txnEgo(1L), txnEgo(5L), txnEgo(2L), txnEgo(5L), txnEgo(6L), txnEgo(3L), txnEgo(5L), txnEgo(1L)};
         boolean isComplete[] = new boolean[]{t,  f,  t,  t,  f,  t,  f,  t};
 
-        long expectedUnion[] = new long[]{1L, 2L, 3L, 5L, 6L};
+        long expectedUnion[] = new long[]{txnEgo(1L), txnEgo(2L), txnEgo(3L), txnEgo(5L), txnEgo(6L)};
         boolean expectComp[] = new boolean[]{t, t, t, t, f};
 
         for (int ii=0; ii < isComplete.length; ii++) {
@@ -178,7 +185,7 @@ public class TestMpPromoteAlgo extends TestCase
         needsRepair.add(1L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
         Pair<Boolean, Long> real_result = result.get();
-        assertEquals(1000L, (long)real_result.getSecond());
+        assertEquals(txnEgo(1000L), (long)real_result.getSecond());
     }
 
     @Test
