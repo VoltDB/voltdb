@@ -404,7 +404,12 @@ public class ProcedureRunner {
                     String msg = String.format("Parameter values passed to voltQueueSQL for unparameterized statement: %s", sql);
                     throw new VoltAbortException(msg);
                 }
-                queuedSQL.params = getCleanParams(queuedSQL.stmt, plannedStatement.extractedParamValues.toArray());
+                Object[] extractedParams = plannedStatement.extractedParamValues.toArray();
+                if (extractedParams.length != queuedSQL.stmt.numStatementParamJavaTypes) {
+                    String msg = String.format("Wrong number of extracted param for parameterized statement: %s", sql);
+                    throw new VoltAbortException(msg);
+                }
+                queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
             }
             m_batch.add(queuedSQL);
         } catch (Exception e) {

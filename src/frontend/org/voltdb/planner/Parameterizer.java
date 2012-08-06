@@ -26,6 +26,16 @@ import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.ParameterConverter;
 import org.voltdb.VoltType;
 
+/**
+ * Given a SQL statements plan from HSQLDB, as our fake XML tree,
+ * find all of the constant value expression and turn them into
+ * parameters, mutating the fake XML tree in place.
+ *
+ * Returns the extracted params as strings because we don't 100%
+ * HSQLDB's typing (ours is better). We do convert values typed as
+ * null to Java null though.
+ *
+ */
 class Parameterizer {
 
     final VoltXMLElement m_root;
@@ -107,26 +117,7 @@ class Parameterizer {
             return null;
         }
 
+        // leverage existing (rather heavyweight) code to convert param types
         return ParameterConverter.tryToMakeCompatible(false, false, type.classFromType(), null, value);
-
-
-        /*switch (type) {
-        case NULL:
-            return null;
-        case BIGINT:
-            return Long.parseLong(value);
-        case INTEGER:
-            return Integer.parseInt(value);
-        case SMALLINT:
-            return Short.parseShort(value);
-        case TINYINT:
-            return Byte.parseByte(value);
-        case FLOAT:
-            return Double.parseDouble(value);
-        case TIMESTAMP:
-            return value;
-        default:
-            return value;
-        }*/
     }
 }

@@ -219,7 +219,10 @@ public class PartitioningForStatement {
         if (getCountOfPartitionedTables() == 0) {
             return false;
         }
-        if ((effectivePartitioningValue() != null) || (effectivePartitioningExpression() != null)) {
+        if (effectivePartitioningValue() != null) {
+            return false;
+        }
+        if (effectivePartitioningExpression() != null) {
             return false;
         }
         return true;

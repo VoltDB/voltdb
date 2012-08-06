@@ -115,8 +115,6 @@ public class AdHocPlannedStatement implements Cloneable {
         assert(extractedParamValues != null);
         // any extracted params => extracted param size == param type array size
         assert((extractedParamValues.size() == 0) || (extractedParamValues.size() == parameterTypes.length));
-        // never fewer types than extracted params
-        assert(parameterTypes.length >= extractedParamValues.size());
     }
 
     @Override
