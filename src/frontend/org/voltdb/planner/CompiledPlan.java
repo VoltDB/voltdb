@@ -17,6 +17,7 @@
 
 package org.voltdb.planner;
 
+import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
 import org.voltdb.expressions.AbstractExpression;
@@ -59,6 +60,9 @@ public class CompiledPlan {
 
     /** A list of parameter names, indexes and types */
     public VoltType[] parameters = null;
+
+    /** Parameter values, if the planner pulled constants out of the plan */
+    public ParameterSet extractedParamValues = new ParameterSet();
 
     /** A list of output column ids, indexes and types */
     public NodeSchema columns = new NodeSchema();
