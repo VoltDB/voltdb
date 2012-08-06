@@ -401,8 +401,9 @@ public class ProcedureRunner {
             }
             else {
                 if (args.length > 0) {
-                    String msg = String.format("Parameter values passed to voltQueueSQL for unparameterized statement: %s", sql);
-                    throw new VoltAbortException(msg);
+                    throw new ExpectedProcedureException(
+                            "Number of arguments provided was " + args.length  +
+                            " where 0 were expected for statement " + sql);
                 }
                 Object[] extractedParams = plannedStatement.extractedParamValues.toArray();
                 if (extractedParams.length != queuedSQL.stmt.numStatementParamJavaTypes) {
