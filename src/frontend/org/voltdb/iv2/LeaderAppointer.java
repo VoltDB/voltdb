@@ -41,7 +41,6 @@ import org.voltcore.utils.Pair;
 
 import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.LeaderElector;
-import org.voltcore.zk.MapCache;
 
 import org.voltdb.Promotable;
 import org.voltdb.VoltDB;
@@ -55,8 +54,8 @@ public class LeaderAppointer implements Promotable
     private final ZooKeeper m_zk;
     private final int m_partitionCount;
     private final BabySitter[] m_partitionWatchers;
-    private final MapCache m_iv2appointees;
-    private final MapCache m_iv2masters;
+    private final LeaderCache m_iv2appointees;
+    private final LeaderCache m_iv2masters;
     private final PartitionCallback[] m_callbacks;
     private final int m_kfactor;
     private final JSONObject m_topo;
@@ -86,24 +85,11 @@ public class LeaderAppointer implements Promotable
         }
     }
 
-    private static Set<Long> getLeaderSetFromMapCache(ImmutableMap<String, JSONObject> cache)
-    {
-        Set<Long> updatedLeaders = new HashSet<Long>();
-        for (JSONObject thing : cache.values()) {
-            try {
-                updatedLeaders.add(Long.valueOf(thing.getLong("hsid")));
-            } catch (JSONException e) {
-                VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
-            }
-        }
-        return updatedLeaders;
-    }
-
-    MapCache.Callback m_masterCallback = new MapCache.Callback()
+    LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<String, JSONObject> cache) {
-            m_currentLeaders = getLeaderSetFromMapCache(cache);
+        public void run(ImmutableMap<Integer, Long> cache) {
+            m_currentLeaders = new HashSet<Long>(cache.values());
             tmLog.info("Updated leaders: " + m_currentLeaders);
             if (m_inStartup.get()) {
                 if (m_currentLeaders.size() == m_partitionCount) {
@@ -124,8 +110,8 @@ public class LeaderAppointer implements Promotable
         m_partitionCount = numberOfPartitions;
         m_callbacks = new PartitionCallback[m_partitionCount];
         m_partitionWatchers = new BabySitter[m_partitionCount];
-        m_iv2appointees = new MapCache(m_zk, VoltZK.iv2appointees);
-        m_iv2masters = new MapCache(m_zk, VoltZK.iv2masters, m_masterCallback);
+        m_iv2appointees = new LeaderCache(m_zk, VoltZK.iv2appointees);
+        m_iv2masters = new LeaderCache(m_zk, VoltZK.iv2masters, m_masterCallback);
     }
 
     @Override
@@ -193,7 +179,7 @@ public class LeaderAppointer implements Promotable
         tmLog.info("Appointing HSId " + CoreUtils.hsIdToString(masterHSId) + " as leader for partition " +
                 partitionId);
         try {
-            m_iv2appointees.put(Integer.toString(partitionId), new JSONObject("{appointee:" + masterHSId + "}"));
+            m_iv2appointees.put(partitionId, masterHSId);
         }
         catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
