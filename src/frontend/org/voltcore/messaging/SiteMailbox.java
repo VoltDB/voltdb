@@ -26,6 +26,7 @@ import java.util.concurrent.Semaphore;
 import org.voltdb.CatalogContext;
 import org.voltdb.CommandLog;
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class SiteMailbox implements Mailbox {
 
@@ -52,6 +53,8 @@ public class SiteMailbox implements Mailbox {
         public long getFaultSequenceNumber() {
             return 0;
         }
+        @Override
+        public void log(Iv2InitiateTaskMessage message) {}
         };
     final HostMessenger m_hostMessenger;
     final ArrayList<Deque<VoltMessage>> m_messages = new ArrayList<Deque<VoltMessage>>();

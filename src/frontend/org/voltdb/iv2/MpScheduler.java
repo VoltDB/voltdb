@@ -18,30 +18,25 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-
-import java.util.concurrent.atomic.AtomicLong;
-
 import java.util.HashMap;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-
-import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.CommandLog;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
-import org.voltdb.iv2.EveryPartitionTask;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class MpScheduler extends Scheduler
@@ -59,6 +54,7 @@ public class MpScheduler extends Scheduler
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
+    private CommandLog m_cl;
 
     MpScheduler(long buddyHSId, SiteTaskerQueue taskQueue)
     {
@@ -304,5 +300,10 @@ public class MpScheduler extends Scheduler
         }
         assert(maxSeenTxnId >= (1l << 40));
         m_txnId.set(maxSeenTxnId);
+    }
+
+    @Override
+    public void setCommandLog(CommandLog cl) {
+        m_cl = cl;
     }
 }

@@ -17,29 +17,25 @@
 
 package org.voltdb.iv2;
 
-import java.lang.Long;
-
 import java.util.ArrayList;
 import java.util.Collections;
-
-import java.util.concurrent.atomic.AtomicLong;
-
 import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
-
-import org.voltdb.messaging.BorrowTaskMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
+import org.voltdb.CommandLog;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class SpScheduler extends Scheduler
@@ -51,6 +47,7 @@ public class SpScheduler extends Scheduler
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
     private final AtomicLong m_txnId = new AtomicLong(0);
+    private CommandLog m_cl;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
@@ -190,6 +187,7 @@ public class SpScheduler extends Scheduler
                 newSpHandle = msg.getSpHandle();
                 m_txnId.set(newSpHandle);
             }
+            m_cl.log(msg);
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, runner,
@@ -428,5 +426,11 @@ public class SpScheduler extends Scheduler
     @Override
     public void setMaxSeenTxnId(long maxSeenTxnId) {
         assert(maxSeenTxnId < (1l << 40));
+    }
+
+    @Override
+    public void setCommandLog(CommandLog cl) {
+        new Throwable("Setting command log " + cl).printStackTrace();
+        m_cl = cl;
     }
 }

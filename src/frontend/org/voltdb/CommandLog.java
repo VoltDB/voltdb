@@ -20,6 +20,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public interface CommandLog {
     /**
@@ -42,6 +43,8 @@ public interface CommandLog {
     public abstract boolean needsInitialization();
 
     public abstract void log(InitiateTaskMessage message);
+
+    public abstract void log(Iv2InitiateTaskMessage message);
 
     public abstract void shutdown() throws InterruptedException;
 

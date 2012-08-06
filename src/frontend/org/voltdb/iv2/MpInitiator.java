@@ -17,19 +17,17 @@
 
 package org.voltdb.iv2;
 
+import java.util.List;
 import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
-import java.util.List;
-
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
-
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CommandLog;
 import org.voltdb.VoltZK;
 
 /**
@@ -57,12 +55,13 @@ public class MpInitiator extends BaseInitiator
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          CommandLog cl)
         throws KeeperException, InterruptedException, ExecutionException
     {
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 numberOfPartitions, csp, numberOfPartitions,
-                createForRejoin && isRejoinable());
+                createForRejoin && isRejoinable(), cl);
     }
 
     /**

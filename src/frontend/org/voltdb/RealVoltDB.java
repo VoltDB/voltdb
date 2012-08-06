@@ -63,7 +63,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -73,10 +72,7 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.iv2.Cartographer;
-import org.voltdb.iv2.SpInitiator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -100,8 +96,10 @@ import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.SpInitiator;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.RejoinCoordinator;
@@ -577,7 +575,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                                 m_deployment.getCluster().getKfactor(),
                                 csp,
                                 clusterConfig.getPartitionCount(),
-                                m_rejoining);
+                                m_rejoining,
+                                m_commandLog);
                     }
                 } catch (Exception e) {
                     Throwable toLog = e;

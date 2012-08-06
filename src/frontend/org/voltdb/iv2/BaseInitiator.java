@@ -36,6 +36,7 @@ import org.voltcore.zk.MapCacheWriter;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.VoltDB;
@@ -109,7 +110,8 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
                           CatalogContext catalogContext,
                           int startupCount, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          CommandLog cl)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -138,6 +140,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setProcedureSet(procSet);
+            m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();

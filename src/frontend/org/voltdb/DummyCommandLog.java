@@ -21,6 +21,7 @@ import java.util.Set;
 import java.util.concurrent.Semaphore;
 
 import org.voltdb.messaging.InitiateTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 public class DummyCommandLog implements CommandLog {
     @Override
@@ -53,4 +54,7 @@ public class DummyCommandLog implements CommandLog {
 
     @Override
     public void initForRejoin(CatalogContext context, long txnId, boolean isRejoin) {}
+
+    @Override
+    public void log(Iv2InitiateTaskMessage message) {}
 }
