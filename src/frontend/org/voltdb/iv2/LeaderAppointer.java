@@ -17,12 +17,13 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.atomic.AtomicBoolean;
+import java.util.concurrent.atomic.AtomicReference;
 
 import java.util.concurrent.ExecutionException;
 
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -51,6 +52,11 @@ import com.google.common.collect.ImmutableMap;
 public class LeaderAppointer implements Promotable
 {
     private static final VoltLogger tmLog = new VoltLogger("TM");
+
+    private enum AppointerState {
+        INIT, CLUSTER_START, CLUSTER_REPAIR, DONE
+    }
+
     private final ZooKeeper m_zk;
     private final int m_partitionCount;
     private final BabySitter[] m_partitionWatchers;
@@ -60,7 +66,8 @@ public class LeaderAppointer implements Promotable
     private final int m_kfactor;
     private final JSONObject m_topo;
     private final MpInitiator m_MPI;
-    private AtomicBoolean m_inStartup = new AtomicBoolean(false);
+    private AtomicReference<AppointerState> m_state =
+        new AtomicReference<AppointerState>(AppointerState.INIT);
     private Set<Long> m_currentLeaders = new HashSet<Long>();
 
     private class PartitionCallback extends BabySitter.Callback
@@ -90,7 +97,7 @@ public class LeaderAppointer implements Promotable
 
             tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
                     CoreUtils.hsIdCollectionToString(updatedHSIds));
-            if (m_inStartup.get()) {
+            if (m_state.get() == AppointerState.CLUSTER_START) {
                 // We can't yet tolerate a host failure during startup.  Crash it all
                 if (missingHSIds.size() > 0) {
                     VoltDB.crashGlobalVoltDB("Node failure detected during startup.", false, null);
@@ -124,9 +131,9 @@ public class LeaderAppointer implements Promotable
         public void run(ImmutableMap<Integer, Long> cache) {
             m_currentLeaders = new HashSet<Long>(cache.values());
             tmLog.info("Updated leaders: " + m_currentLeaders);
-            if (m_inStartup.get()) {
+            if (m_state.get() == AppointerState.CLUSTER_START) {
                 if (m_currentLeaders.size() == m_partitionCount) {
-                    m_inStartup.set(false);
+                    m_state.set(AppointerState.DONE);
                     m_MPI.acceptPromotion();
                 }
             }
@@ -152,15 +159,20 @@ public class LeaderAppointer implements Promotable
     {
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
+        // Figure out what conditions we assumed leadership under.
         if (m_iv2appointees.pointInTimeCache().size() == 0)
         {
             tmLog.info("LeaderAppointer in startup");
-            m_inStartup.set(true);
+            m_state.set(AppointerState.CLUSTER_START);
         }
-        else if (m_iv2appointees.pointInTimeCache().size() != m_partitionCount) {
+        else if ((m_iv2appointees.pointInTimeCache().size() != m_partitionCount) ||
+                 (m_iv2masters.pointInTimeCache().size() != m_partitionCount)) {
+            // If we are promoted and the appointees or masters set is partial, the previous appointer failed
+            // during startup (at least for now, until we add add/remove a partition on the fly).
             VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
         }
-        if (m_inStartup.get()) {
+
+        if (m_state.get() == AppointerState.CLUSTER_START) {
             for (int i = 0; i < m_partitionCount; i++) {
                 String dir = LeaderElector.electionDirForPartition(i);
                 try {
@@ -173,14 +185,20 @@ public class LeaderAppointer implements Promotable
                 m_partitionWatchers[i] = sitterstuff.getFirst();
             }
         }
+        else if (m_state.get() == AppointerState.CLUSTER_REPAIR) {
+            // figure out the current state of the world.
+            Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
+        }
         else {
+            VoltDB.crashLocalVoltDB("Leader appointer promoted but in neither startup nor repair.  Odd.", false,
+                    null);
         }
     }
 
     private long assignLeader(int partitionId, List<Long> children)
     {
         int masterHostId = -1;
-        if (m_inStartup.get()) {
+        if (m_state.get() == AppointerState.CLUSTER_START) {
             try {
                 // find master in topo
                 JSONArray parts = m_topo.getJSONArray("partitions");
