@@ -40,6 +40,17 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected String m_columnName = null;
     protected String m_columnAlias = null;
 
+    private boolean m_hasAggregate = false;
+
+
+    public boolean hasAggregate() {
+        return m_hasAggregate;
+    }
+
+    public void setHasAggregate(boolean m_hasAggregate) {
+        this.m_hasAggregate = m_hasAggregate;
+    }
+
     public TupleValueExpression() {
         super(ExpressionType.VALUE_TUPLE);
     }
