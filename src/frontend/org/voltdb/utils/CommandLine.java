@@ -68,6 +68,7 @@ public class CommandLine extends VoltDB.Configuration
         // final in baseclass: cl.m_commitLogDir = new File("/tmp");
         cl.m_timestampTestingSalt = m_timestampTestingSalt;
         cl.m_isRejoinTest = m_isRejoinTest;
+        cl.m_enableIV2 = m_enableIV2;
         cl.m_tag = m_tag;
         cl.m_vemTag = m_vemTag;
 
@@ -335,6 +336,12 @@ public class CommandLine extends VoltDB.Configuration
         return this;
     }
 
+    public CommandLine enableIV2(boolean enable)
+    {
+        m_enableIV2 = enable;
+        return this;
+    }
+
     // user-customizable string appeneded to commandline.
     // useful to allow customization of VEM/REST cmdlns.
     // Please don't abuse this by shoving lots of long-term
@@ -479,9 +486,19 @@ public class CommandLine extends VoltDB.Configuration
             cmdline.add("externalinterface"); cmdline.add(m_externalInterface);
         }
 
+        if (m_enableIV2)
+        {
+            cmdline.add("enableiv2");
+        }
+
         if (customCmdLn != null && !customCmdLn.isEmpty())
         {
             cmdline.add(customCmdLn);
+        }
+
+        if ((m_ipcPorts != null) && (m_ipcPorts.size() > 0)) {
+            cmdline.add("ipcports");
+            cmdline.add(org.apache.commons.lang3.StringUtils.join(m_ipcPorts, ","));
         }
 
         if (m_tag != null) {

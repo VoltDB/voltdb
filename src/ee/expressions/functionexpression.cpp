@@ -65,6 +65,20 @@ public:
         delete m_child;
     }
 
+    virtual bool hasParameter() const {
+        return m_child->hasParameter();
+    }
+
+    virtual void substitute(const NValueArray &params) {
+        assert (m_child);
+
+        if (!m_hasParameter)
+            return;
+
+        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
+        m_child->substitute(params);
+    }
+
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {
         assert (m_child);
         return (m_child->eval(tuple1, tuple2)).callUnary<E>();
@@ -90,6 +104,28 @@ public:
             delete m_args[i];
         }
         delete &m_args;
+    }
+
+    virtual bool hasParameter() const {
+        for (size_t i = 0; i < m_args.size(); i++) {
+            assert(m_args[i]);
+            if (m_args[i]->hasParameter()) {
+                return true;
+            }
+        }
+        return false;
+    }
+
+    virtual void substitute(const NValueArray &params) {
+        if (!m_hasParameter)
+            return;
+
+        VOLT_TRACE("Substituting parameters for expression \n%s ...", debug(true).c_str());
+        for (size_t i = 0; i < m_args.size(); i++) {
+            assert(m_args[i]);
+            VOLT_TRACE("Substituting parameters for arg at index %d...", static_cast<int>(i));
+            m_args[i]->substitute(params);
+        }
     }
 
     NValue eval(const TableTuple *tuple1, const TableTuple *tuple2) const {

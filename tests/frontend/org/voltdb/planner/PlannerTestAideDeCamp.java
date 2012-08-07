@@ -42,6 +42,7 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.StatementCompiler;
+import org.voltdb.compiler.TablePartitionMap;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
@@ -80,7 +81,8 @@ public class PlannerTestAideDeCamp {
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
         //hsql.runDDLFile(schemaPath);
-        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql);
+        TablePartitionMap partitionMap = new TablePartitionMap(compiler);
+        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap);
         ddl_compiler.loadSchema(schemaPath);
         ddl_compiler.compileToCatalog(catalog, db);
     }
@@ -161,7 +163,7 @@ public class PlannerTestAideDeCamp {
         CompiledPlan plan = null;
         plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
                                    catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
+                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null, false);
 
         if (plan == null)
         {
@@ -177,10 +179,10 @@ public class PlannerTestAideDeCamp {
         // Input Parameters
         // We will need to update the system catalogs with this new information
         // If this is an adhoc query then there won't be any parameters
-        for (ParameterInfo param : plan.parameters) {
-            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(param.index));
-            catalogParam.setJavatype(param.type.getValue());
-            catalogParam.setIndex(param.index);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
+            catalogParam.setJavatype(plan.parameters[i].getValue());
+            catalogParam.setIndex(i);
         }
 
         // Output Columns
@@ -197,15 +199,15 @@ public class PlannerTestAideDeCamp {
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
-        for (CompiledPlan.Fragment fragment : plan.fragments) {
-            PlanNodeList nodeList = new PlanNodeList(fragment.planGraph);
-            nodeLists.add(nodeList);
+        nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
+        if (plan.subPlanGraph != null) {
+            nodeLists.add(new PlanNodeList(plan.subPlanGraph));
         }
 
         //Store the list of parameters types and indexes in the plan node list.
         List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
-        for (ParameterInfo param : plan.parameters) {
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(param.index, param.type);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, plan.parameters[i]);
             parameters.add(parameter);
         }
 

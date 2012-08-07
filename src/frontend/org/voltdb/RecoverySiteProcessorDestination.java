@@ -552,7 +552,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             Thread.yield();
         }
         if (m_sc == null) {
-            VoltDB.crashLocalVoltDB("Timed out waiting for connection from source partition", false, null);
+            VoltDB.crashLocalVoltDB("Timed out waiting for connection from source partition", true, null);
         }
         ssc.close();
         m_sc.configureBlocking(true);

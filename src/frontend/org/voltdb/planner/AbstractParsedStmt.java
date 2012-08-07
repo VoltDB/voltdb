@@ -66,9 +66,9 @@ public abstract class AbstractParsedStmt {
 
     public String sql;
 
-    public ArrayList<ParameterInfo> paramList = new ArrayList<ParameterInfo>();
+    public VoltType[] paramList = new VoltType[0];
 
-    public HashMap<Long, ParameterInfo> paramsById = new HashMap<Long, ParameterInfo>();
+    public HashMap<Long, Integer> paramsById = new HashMap<Long, Integer>();
 
     public ArrayList<Table> tableList = new ArrayList<Table>();
 
@@ -100,7 +100,7 @@ public abstract class AbstractParsedStmt {
      * @param xmlSQL
      * @param db
      */
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement xmlSQL, Database db, String joinOrder) {
+    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, Database db, String joinOrder) {
         final String INSERT_NODE_NAME = "insert";
         final String UPDATE_NODE_NAME = "update";
         final String DELETE_NODE_NAME = "delete";
@@ -108,14 +108,10 @@ public abstract class AbstractParsedStmt {
 
         AbstractParsedStmt retval = null;
 
-        if (xmlSQL == null) {
+        if (stmtTypeElement == null) {
             System.err.println("Unexpected error parsing hsql parsed stmt xml");
             throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
         }
-
-        assert(xmlSQL.name.equals("statement"));
-
-        VoltXMLElement stmtTypeElement = xmlSQL.children.get(0);
 
         // create non-abstract instances
         if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
@@ -491,16 +487,16 @@ public abstract class AbstractParsedStmt {
     }
 
     private void parseParameters(VoltXMLElement paramsNode, Database db) {
+        paramList = new VoltType[paramsNode.children.size()];
+
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
-                ParameterInfo param = new ParameterInfo();
-
                 long id = Long.parseLong(node.attributes.get("id"));
-                param.index = Integer.parseInt(node.attributes.get("index"));
+                int index = Integer.parseInt(node.attributes.get("index"));
                 String typeName = node.attributes.get("type");
-                param.type = VoltType.typeFromString(typeName);
-                paramsById.put(id, param);
-                paramList.add(param);
+                VoltType type = VoltType.typeFromString(typeName);
+                paramsById.put(id, index);
+                paramList[index] = type;
             }
         }
     }
@@ -601,7 +597,7 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (ParameterInfo param : paramList) {
+        for (VoltType param : paramList) {
             retval += param.toString() + " ";
         }
 
@@ -665,9 +661,8 @@ public abstract class AbstractParsedStmt {
         if (paramId == -1) {
             return -1;
         }
-        ParameterInfo param = paramsById.get(paramId);
-        assert(param != null);
-        return param.index;
+        assert(paramsById.containsKey(paramId));
+        return paramsById.get(paramId);
     }
 
     private void addExprToEquivalenceSets(AbstractExpression expr) {

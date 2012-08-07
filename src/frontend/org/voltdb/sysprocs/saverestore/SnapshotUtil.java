@@ -981,7 +981,7 @@ public class SnapshotUtil {
 
             @Override
             public long connectionId() {
-                throw new UnsupportedOperationException();
+                return Long.MIN_VALUE + 2;
             }
 
             @Override

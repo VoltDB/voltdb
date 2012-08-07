@@ -15,34 +15,28 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.planner;
+package org.voltdb.iv2;
 
-import java.io.IOException;
-import org.voltdb.VoltType;
-import org.voltdb.messaging.*;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 
 /**
- *
- *
+ * BorrowTransactionState represents the execution of a borrowed
+ * read fragment that must be executed before the leader SP has
+ * created the multi-partition transaction. This fragment must not
+ * block the head of the pendingQueue -- only work arriving from
+ * the SP leader can block the queue or the SP leader's ordering
+ * is violated at the borrowed site.
  */
-public class ParameterInfo implements FastSerializable {
-    public int index;
-    public VoltType type;
-
-    @Override
-    public String toString() {
-        return "P" + String.valueOf(index) + ":" + type.name();
+public class BorrowTransactionState extends ParticipantTransactionState
+{
+    BorrowTransactionState(long txnId, TransactionInfoBaseMessage notice)
+    {
+        super(txnId, notice);
     }
 
     @Override
-    public void readExternal(FastDeserializer in) throws IOException {
-        index = in.readInt();
-        type = VoltType.get(in.readByte());
-    }
-
-    @Override
-    public void writeExternal(FastSerializer out) throws IOException {
-        out.writeInt(index);
-        out.writeByte(type.getValue());
+    public boolean isSinglePartition()
+    {
+        return true;
     }
 }

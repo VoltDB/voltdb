@@ -145,10 +145,17 @@ public class ProcedureRunner {
         reflect();
     }
 
-    boolean isSystemProcedure() {
+    public boolean isSystemProcedure() {
         return m_isSysProc;
     }
 
+    public boolean isEverySite() {
+        boolean retval = false;
+        if (isSystemProcedure()) {
+            retval = m_catProc.getEverysite();
+        }
+        return retval;
+    }
     /**
      * Note this fails for Sysprocs that use it in non-coordinating fragment work. Don't.
      * @return The transaction id for determinism, not for ordering.
@@ -166,7 +173,7 @@ public class ProcedureRunner {
         return m_cachedRNG;
     }
 
-    ClientResponseImpl call(long txnId, Object... paramListIn) {
+    public ClientResponseImpl call(long txnId, Object... paramListIn) {
         // verify per-txn state has been reset
         assert(m_txnId == -1);
         assert(m_statusCode == Byte.MIN_VALUE);
@@ -177,7 +184,7 @@ public class ProcedureRunner {
         Object[] paramList = paramListIn;
 
         m_txnId = txnId;
-        assert(m_txnId > 0);
+        assert(m_txnId >= 0);
 
         ClientResponseImpl retval = null;
         // assert no sql is queued
@@ -381,16 +388,37 @@ public class ProcedureRunner {
 
             QueuedSQL queuedSQL = new QueuedSQL();
             AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
-            queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan( plannedStatement.sql,
+            queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
+                    plannedStatement.sql,
                     plannedStatement.aggregatorFragment,
                     plannedStatement.collectorFragment,
                     plannedStatement.isReplicatedTableDML,
-                    plannedStatement.params);
-            queuedSQL.params = getCleanParams( queuedSQL.stmt, args);
+                    plannedStatement.parameterTypes);
+            if (plannedStatement.extractedParamValues.size() == 0) {
+                // case handles if there were parameters OR
+                // if there were no constants to pull out
+                queuedSQL.params = getCleanParams(queuedSQL.stmt, args);
+            }
+            else {
+                if (args.length > 0) {
+                    throw new ExpectedProcedureException(
+                            "Number of arguments provided was " + args.length  +
+                            " where 0 were expected for statement " + sql);
+                }
+                Object[] extractedParams = plannedStatement.extractedParamValues.toArray();
+                if (extractedParams.length != queuedSQL.stmt.numStatementParamJavaTypes) {
+                    String msg = String.format("Wrong number of extracted param for parameterized statement: %s", sql);
+                    throw new VoltAbortException(msg);
+                }
+                queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
+            }
             m_batch.add(queuedSQL);
         } catch (Exception e) {
             if (e instanceof ExecutionException) {
                 throw new VoltAbortException(e.getCause());
+            }
+            if (e instanceof VoltAbortException) {
+                throw (VoltAbortException) e;
             }
             throw new VoltAbortException(e);
         }
@@ -450,18 +478,8 @@ public class ProcedureRunner {
 
         VoltTable[] results = null;
 
-        if (batchSize == 0)
+        if (batchSize == 0) {
             return new VoltTable[] {};
-
-        boolean slowPath = false;
-        for (int i = 0; i < batchSize; ++i) {
-            final SQLStmt stmt = batch.get(i).stmt;
-            // if any stmt is not single sited in this batch, the
-            // full batch must take the slow path through the dtxn
-            if (!stmt.isSinglePartition()) {
-                slowPath = true;
-                break;
-            }
         }
 
         // IF THIS IS HSQL, RUN THE QUERIES DIRECTLY IN HSQL
@@ -476,23 +494,19 @@ public class ProcedureRunner {
                 }
                 else {
                     assert(qs.stmt.plan != null);
-                    //TODO: For now ad hoc SQL parameters aren't supported.
-                    assert(qs.params.toArray().length == 0);
+                    //TODO: For now extracted ad hoc SQL parameters are discarded
+                    qs.params = new ParameterSet();
                     sparams = new ArrayList<StmtParameter>();
                 }
                 results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(
                                                                 qs.stmt, qs.params, sparams);
             }
         }
-
-        // FOR MP-TXNS
-        else if (slowPath) {
-            results = slowPath(batch, isFinalSQL);
-        }
-
-        // FOR SP-TXNS (or all replicated read MPs)
-        else {
+        else if (m_catProc.getSinglepartition()) {
             results = fastPath(batch);
+        }
+        else {
+            results = slowPath(batch, isFinalSQL);
         }
 
         // check expectations
@@ -525,7 +539,7 @@ public class ProcedureRunner {
         }
     }
 
-    DependencyPair executePlanFragment(
+    public DependencyPair executePlanFragment(
             TransactionState txnState,
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params) {
@@ -606,7 +620,7 @@ public class ProcedureRunner {
                 assert(f != null);
                 SQLStmt stmt = (SQLStmt) f.get(m_procedure);
                 Statement statement = m_catProc.getStatements().get(VoltDB.ANON_STMT_NAME);
-                stmt.sqlText = statement.getSqltext();
+                stmt.sqlText = statement.getSqltext().getBytes(VoltDB.UTF8ENCODING);
                 m_cachedSingleStmt.stmt = stmt;
 
                 int numParams = m_catProc.getParameters().size();

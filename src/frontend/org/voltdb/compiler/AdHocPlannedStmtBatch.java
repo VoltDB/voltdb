@@ -17,10 +17,12 @@
 
 package org.voltdb.compiler;
 
+import java.io.IOException;
+import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
 
-import org.voltdb.planner.ParameterInfo;
+import org.voltdb.VoltDB;
 
 /**
  * Holds a batch of planned SQL statements.
@@ -31,10 +33,12 @@ import org.voltdb.planner.ParameterInfo;
 public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Cloneable {
     private static final long serialVersionUID = -8627490621430290801L;
 
+    // not persisted across serializations
     public final String sqlBatchText;
+
     // May be reassigned if the planner infers single partition work.
+    // Also not persisted across serializations
     public Object partitionParam;
-    public final int catalogVersion;
 
     // The planned statements.
     // Do not add statements directly. Use addStatement so that the readOnly flag
@@ -64,7 +68,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     public AdHocPlannedStmtBatch(
             String sqlBatchText,
             Object partitionParam,
-            int catalogVersion,
             long clientHandle,
             long connectionId,
             String hostname,
@@ -72,7 +75,6 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
             Object clientData) {
         this.sqlBatchText = sqlBatchText;
         this.partitionParam = partitionParam;
-        this.catalogVersion = catalogVersion;
         this.clientHandle = clientHandle;
         this.connectionId = connectionId;
         this.hostname = hostname;
@@ -105,88 +107,19 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
     public List<String> getSQLStatements() {
         List<String> sqlStatements = new ArrayList<String>(plannedStatements.size());
         for (AdHocPlannedStatement plannedStatement : plannedStatements) {
-            sqlStatements.add(plannedStatement.sql);
+            sqlStatements.add(new String(plannedStatement.sql, VoltDB.UTF8ENCODING));
         }
         return sqlStatements;
     }
 
     /**
-     * Retrieve all the aggregator fragments as a list of strings.
-     *
-     * @return list of SQL aggregator fragment strings
+     * Add an AdHocPlannedStatement to this batch.
      */
-    public List<byte[]> getAggregatorFragments() {
-        List<byte[]> fragments = new ArrayList<byte[]>(plannedStatements.size());
-        for (AdHocPlannedStatement plannedStatement : plannedStatements) {
-            fragments.add(plannedStatement.aggregatorFragment);
-        }
-        return fragments;
-    }
-
-    /**
-     * Retrieve all the collector fragments as a list of strings.
-     *
-     * @return list of SQL collector fragment strings
-     */
-    public List<byte[]> getCollectorFragments() {
-        List<byte[]> fragments = new ArrayList<byte[]>(plannedStatements.size());
-        for (AdHocPlannedStatement plannedStatement : plannedStatements) {
-            fragments.add(plannedStatement.collectorFragment);
-        }
-        return fragments;
-    }
-
-    /**
-     * Retrieve all the replicated table DML flags as a list of integers.
-     *
-     * @return list of table replication DML flags (1=true, 0=false)
-     */
-    public List<Integer> getReplicatedTableDMLFlags() {
-        List<Integer> flags = new ArrayList<Integer>(plannedStatements.size());
-        for (AdHocPlannedStatement plannedStatement : plannedStatements) {
-            flags.add(plannedStatement.isReplicatedTableDML ? 1 : 0);
-        }
-        return flags;
-    }
-
-    /**
-     * Convenience method to create a new AdHocPlannedStatement. Copies redundant
-     * data from AsyncCompilerResult base class to new object because it is also
-     * derived from that class.
-     *
-     * IMPORTANT: This does not update sqlBatchText. The caller is responsible for
-     * splitting the batch text and assuring that the individual SQL statements
-     * correspond to the original.
-     *
-     * @param sqlStatement          SQL statement text (must be single statement)
-     * @param aggregatorFragment    aggregator fragment
-     * @param collectorFragment     collector fragment
-     * @param isReplicatedTableDML  replicated table DML flag
-     * @param isNonDeterministic    non-deterministic SQL flag
-     * @return                      statement object
-     */
-    public void addStatement(String sqlStatement, byte[] aggregatorFragment,
-                             byte[] collectorFragment, boolean isReplicatedTableDML,
-                             boolean isNonDeterministic, List<ParameterInfo> params) {
-        AdHocPlannedStatement plannedStmt = new AdHocPlannedStatement(
-                                                        sqlStatement,
-                                                        aggregatorFragment,
-                                                        collectorFragment,
-                                                        isReplicatedTableDML,
-                                                        isNonDeterministic,
-                                                        partitionParam,
-                                                        catalogVersion);
+    public void addStatement(AdHocPlannedStatement plannedStmt) {
         // The first non-select statement makes it not read-only.
-        if (readOnly && !sqlStatement.trim().toLowerCase().startsWith("select")) {
+        if (!plannedStmt.readOnly) {
             readOnly = false;
         }
-        plannedStmt.clientHandle = clientHandle;
-        plannedStmt.connectionId = connectionId;
-
-        plannedStmt.hostname = hostname;
-        plannedStmt.adminConnection = adminConnection;
-        plannedStmt.clientData = clientData;
-        plannedStmt.params = params;
         plannedStatements.add(plannedStmt);
     }
 
@@ -232,4 +165,28 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
         return readOnly;
     }
 
+    public int getPlanArraySerializedSize() {
+        int size = 2; // sizeof batch
+        for (AdHocPlannedStatement cs : plannedStatements) {
+            size += cs.getSerializedSize();
+        }
+        return size;
+    }
+
+    public void flattenPlanArrayToBuffer(ByteBuffer buf) throws IOException {
+        buf.putShort((short) plannedStatements.size());
+        for (AdHocPlannedStatement cs : plannedStatements) {
+            cs.flattenToBuffer(buf);
+        }
+    }
+
+    public static AdHocPlannedStatement[] planArrayFromBuffer(ByteBuffer buf) throws IOException {
+        short csCount = buf.getShort();
+        AdHocPlannedStatement[] statements = new AdHocPlannedStatement[csCount];
+        for (int i = 0; i < csCount; ++i) {
+            AdHocPlannedStatement cs = AdHocPlannedStatement.fromBuffer(buf);
+            statements[i] = cs;
+        }
+        return statements;
+    }
 }
