@@ -367,15 +367,15 @@ public class testPlannerTester extends TestCase {
     //          }
     //    }
 
-    //    public void testWholeProcess() {
-    //          try {
-    //                  plannerTester.setUp(m_homeDir+"/test1");
-    //                  plannerTester.batchCompileSave();
-    //                  plannerTester.batchDiff();
-    //          } catch (Exception e) {
-    //                  e.printStackTrace();
-    //          }
-    //    }
+//        public void testWholeProcess() {
+//              try {
+//                      plannerTester.setUp(m_homeDir+"/test1");
+//                      plannerTester.batchCompileSave();
+//                      plannerTester.batchDiff();
+//              } catch (Exception e) {
+//                      e.printStackTrace();
+//              }
+//        }
 
     //make sure plan files are already in baseline directories
     //    public void testDiffVoltExamples() {
@@ -399,10 +399,11 @@ public class testPlannerTester extends TestCase {
 
     public void testMain() {
         String[] args = {"-cs","-d","-s","-e",
-                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voter",
-                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/test1",
-                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltcache",
-                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltkv",
+//                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voter",
+//                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/test1",
+//                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltcache",
+//                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltkv",
+                "-C="+m_homeDir+"/"+"test1",
                 "-r="+m_homeDir+"/"};
         plannerTester.main(args);
     }
