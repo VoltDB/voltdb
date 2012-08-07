@@ -681,18 +681,20 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             n.getScanNodeList_recurse(collected, visited);
         }
 
-        if( this.getInlinePlanNode(PlanNodeType.INDEXSCAN) != null ) {
-            collected.add(this.getInlinePlanNode(PlanNodeType.INDEXSCAN));
-        }
-        if( this.getInlinePlanNode(PlanNodeType.SEQSCAN) != null ) {
-            collected.add(this.getInlinePlanNode(PlanNodeType.SEQSCAN));
+        Iterator it = m_inlineNodes.entrySet().iterator();
+        if( it.hasNext() ) {
+            Map.Entry<PlanNodeType, AbstractPlanNode> pair = (Map.Entry<PlanNodeType, AbstractPlanNode>) it.next();
+            if( pair.getKey().equals( PlanNodeType.INDEXSCAN ) ) {
+                collected.add( pair.getValue() );
+            }
+            else if(  pair.getKey().equals( PlanNodeType.SEQSCAN ) ) {
+                collected.add( pair.getValue() );
+            }
         }
         if ( getChildCount()==0 &&
                 ( getPlanNodeType().equals(PlanNodeType.SEQSCAN) || getPlanNodeType().equals(PlanNodeType.INDEXSCAN ) ) ) {
             collected.add(this);
         }
-
-        // NOTE: ignores inline nodes.
     }
 
     public ArrayList<AbstractPlanNode> getLists () {
@@ -720,31 +722,27 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
   //TODO outputSchema not loaded
-    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         if( jobj == null ) {
             System.err.println("JSONObject is null");
             return;
         }
-        try {
-            String str = jobj.getString( Members.ID.name() );
-            m_id = Integer.parseInt( str );
+        String str = jobj.getString( Members.ID.name() );
+        m_id = Integer.parseInt( str );
 
-            //todo : need to set up output_schema, inline_nodes and members in various plannodes
+        //todo : need to set up output_schema, inline_nodes and members in various plannodes
 
-            m_outputSchema = new NodeSchema();
+        m_outputSchema = new NodeSchema();
 
-            //load inline nodes
-            JSONArray jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
-            if( jarray.length() != 0 ) {
-                PlanNodeTree pnt = new PlanNodeTree();
-                pnt.loadFromJSONArray(jarray, db);
-                List<AbstractPlanNode> list = pnt.getNodeList();
-                for( AbstractPlanNode pn : list ) {
-                    m_inlineNodes.put( pn.getPlanNodeType(), pn);
-                }
+        //load inline nodes
+        JSONArray jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
+        if( jarray.length() != 0 ) {
+            PlanNodeTree pnt = new PlanNodeTree();
+            pnt.loadFromJSONArray(jarray, db);
+            List<AbstractPlanNode> list = pnt.getNodeList();
+            for( AbstractPlanNode pn : list ) {
+                m_inlineNodes.put( pn.getPlanNodeType(), pn);
             }
-        } catch (JSONException e) {
-            e.printStackTrace();
         }
     }
 }

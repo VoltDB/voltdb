@@ -196,7 +196,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
 
  // TODO:Members not loaded
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
     }
 
