@@ -24,6 +24,8 @@ import java.util.concurrent.ExecutionException;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+
+import java.util.Map.Entry;
 import java.util.Set;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -54,7 +56,10 @@ public class LeaderAppointer implements Promotable
     private static final VoltLogger tmLog = new VoltLogger("TM");
 
     private enum AppointerState {
-        INIT, CLUSTER_START, CLUSTER_REPAIR, DONE
+        INIT,           // Initial start state, used to inhibit ZK callback actions
+        CLUSTER_START,  // indicates that we're doing the initial cluster startup
+        CLUSTER_REPAIR, // indicates that we're been promoted within a running cluster and handling repair
+        DONE            // indicates normal running conditions
     }
 
     private final ZooKeeper m_zk;
@@ -73,13 +78,25 @@ public class LeaderAppointer implements Promotable
     private class PartitionCallback extends BabySitter.Callback
     {
         final int m_partitionId;
-        final Set<Long> m_replicas = new HashSet<Long>();
+        final Set<Long> m_replicas;
         // bit of a hack, but no real HSId should ever be this value
-        long m_currentLeader = Long.MAX_VALUE;
+        long m_currentLeader;
+
+        PartitionCallback(int partitionId, long currentLeader)
+        {
+            this(partitionId);
+            // Try to be clever for repair.  Create ourselves with the current leader set to
+            // whatever is in the LeaderCache, and claim that replica exists, then let the
+            // first run() call fix the world.
+            m_currentLeader = currentLeader;
+            m_replicas.add(currentLeader);
+        }
 
         PartitionCallback(int partitionId)
         {
             m_partitionId = partitionId;
+            m_currentLeader = Long.MAX_VALUE;
+            m_replicas = new HashSet<Long>();
         }
 
         @Override
@@ -125,6 +142,9 @@ public class LeaderAppointer implements Promotable
         }
     }
 
+    // In CLUSTER_START, no LeaderCache watches should fire that aren't under our control
+    // In CLUSTER_REPAIR, it's possible that some appointee is still completing its promotion
+    // and could cause a LeaderCache watch to fire.
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
@@ -171,6 +191,10 @@ public class LeaderAppointer implements Promotable
             // during startup (at least for now, until we add add/remove a partition on the fly).
             VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
         }
+        else {
+            tmLog.info("LeaderAppointer in repair");
+            m_state.set(AppointerState.DONE);
+        }
 
         if (m_state.get() == AppointerState.CLUSTER_START) {
             for (int i = 0; i < m_partitionCount; i++) {
@@ -185,13 +209,19 @@ public class LeaderAppointer implements Promotable
                 m_partitionWatchers[i] = sitterstuff.getFirst();
             }
         }
-        else if (m_state.get() == AppointerState.CLUSTER_REPAIR) {
+        else {
             // figure out the current state of the world.
             Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
-        }
-        else {
-            VoltDB.crashLocalVoltDB("Leader appointer promoted but in neither startup nor repair.  Odd.", false,
-                    null);
+            for (Entry<Integer, Long> master : masters.entrySet()) {
+                int partId = master.getKey();
+                String dir = LeaderElector.electionDirForPartition(partId);
+                m_callbacks[partId] = new PartitionCallback(partId, master.getValue());
+                Pair<BabySitter, List<String>> sitterstuff =
+                    BabySitter.blockingFactory(m_zk, dir, m_callbacks[partId]);
+                m_partitionWatchers[partId] = sitterstuff.getFirst();
+            }
+            // just go ahead and promote our MPI
+            m_MPI.acceptPromotion();
         }
     }
 
