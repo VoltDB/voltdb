@@ -79,4 +79,12 @@ public class TestTxnEgo extends TestCase
         assertEquals(16000, te.getPartitionId());
     }
 
+    public void testSequenceCorrectness() throws Exception
+    {
+        long sequence = TxnEgo.SEQUENCE_ZERO + 1L;
+        TxnEgo te = new TxnEgo(sequence, 1);
+        assertEquals(sequence, te.getSequence());
+    }
+
+
 }
