@@ -212,6 +212,7 @@ public class LeaderAppointer implements Promotable
         else {
             // figure out the current state of the world.
             Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
+            tmLog.info("LeaderAppointer repairing with master set: " + masters);
             for (Entry<Integer, Long> master : masters.entrySet()) {
                 int partId = master.getKey();
                 String dir = LeaderElector.electionDirForPartition(partId);
