@@ -312,7 +312,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
         try {
             this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );

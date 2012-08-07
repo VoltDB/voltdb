@@ -125,7 +125,7 @@ public class testPlannerTester extends TestCase {
             //List<AbstractPlanNode> pnList = plannerTester.compile("INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);", 4, false);
             //assertTrue( pnList.size() == 2 );
 
-            plannerTester.setUp(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+            plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                     "testplans-plannerTester-ddl", "L", "a");
             List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
             System.out.println( pnList.size() );
@@ -145,7 +145,7 @@ public class testPlannerTester extends TestCase {
         //pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
         //      pn = compile("select * from t where a = ? order by a limit ?;",3, true);
         String path = m_homeDir+"/";
-        plannerTester.setUp(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+        plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                 "testplans-plannerTester-ddl", "L", "a");
         List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
 
@@ -404,7 +404,9 @@ public class testPlannerTester extends TestCase {
 //                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltcache",
 //                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltkv",
                 "-C="+m_homeDir+"/"+"test1",
-                "-r="+m_homeDir+"/"};
+                "-r="+m_homeDir,
+//                "-help"
+                };
         plannerTester.main(args);
     }
 
