@@ -238,7 +238,7 @@ public class TestPushDownAggregates extends TestCase {
 
     public void testMultiPartNoLimitPushdown() {
         List<AbstractPlanNode> pn =
-                compile("select I, count(*) as tag from T2 group by I order by tag, I", 0, false);
+                compile("select I, count(*) as tag from T2 group by I order by I limit 1", 0, false);
 
         for ( AbstractPlanNode nd : pn) {
             System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
