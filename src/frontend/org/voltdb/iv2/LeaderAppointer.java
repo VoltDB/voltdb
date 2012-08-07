@@ -66,6 +66,9 @@ public class LeaderAppointer implements Promotable
     private class PartitionCallback extends BabySitter.Callback
     {
         final int m_partitionId;
+        final Set<Long> m_replicas = new HashSet<Long>();
+        // bit of a hack, but no real HSId should ever be this value
+        long m_currentLeader = Long.MAX_VALUE;
 
         PartitionCallback(int partitionId)
         {
@@ -75,13 +78,43 @@ public class LeaderAppointer implements Promotable
         @Override
         public void run(List<String> children)
         {
+            List<Long> updatedHSIds = VoltZK.childrenToReplicaHSIds(children);
+            // compute previously unseen HSId set in the callback list
+            Set<Long> newHSIds = new HashSet<Long>(updatedHSIds);
+            newHSIds.removeAll(m_replicas);
+            tmLog.info("Newly seen replicas: " + CoreUtils.hsIdCollectionToString(newHSIds));
+            // compute previously seen but now vanished from the callback list HSId set
+            Set<Long> missingHSIds = new HashSet<Long>(m_replicas);
+            missingHSIds.removeAll(updatedHSIds);
+            tmLog.info("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
+
             tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
-                    CoreUtils.hsIdCollectionToString(VoltZK.childrenToReplicaHSIds(children)));
+                    CoreUtils.hsIdCollectionToString(updatedHSIds));
             if (m_inStartup.get()) {
+                // We can't yet tolerate a host failure during startup.  Crash it all
+                if (missingHSIds.size() > 0) {
+                    VoltDB.crashGlobalVoltDB("Node failure detected during startup.", false, null);
+                }
                 if (children.size() == (m_kfactor + 1)) {
-                    assignLeader(m_partitionId, VoltZK.childrenToReplicaHSIds(children));
+                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                }
+                else {
+                    tmLog.info("Waiting on " + ((m_kfactor + 1) - children.size()) + " more nodes " +
+                            "for k-safety before startup");
                 }
             }
+            else {
+                // Check for k-safety
+                if (children.size() == 0) {
+                    VoltDB.crashGlobalVoltDB("Cluster has become unviable: No remaining replicas for partition "
+                            + m_partitionId + ", shutting down.", false, null);
+                }
+                else if (missingHSIds.contains(m_currentLeader)) {
+                    m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
+                }
+            }
+            m_replicas.clear();
+            m_replicas.addAll(updatedHSIds);
         }
     }
 
@@ -144,7 +177,7 @@ public class LeaderAppointer implements Promotable
         }
     }
 
-    private void assignLeader(int partitionId, List<Long> children)
+    private long assignLeader(int partitionId, List<Long> children)
     {
         int masterHostId = -1;
         if (m_inStartup.get()) {
@@ -184,5 +217,6 @@ public class LeaderAppointer implements Promotable
         catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unable to appoint new master for partition " + partitionId, true, e);
         }
+        return masterHSId;
     }
 }
