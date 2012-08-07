@@ -1,5 +1,4 @@
 /* This file is part of VoltDB.
-/* This file is part of VoltDB.
  * Copyright (C) 2008-2012 VoltDB Inc.
  *
  * VoltDB is free software: you can redistribute it and/or modify

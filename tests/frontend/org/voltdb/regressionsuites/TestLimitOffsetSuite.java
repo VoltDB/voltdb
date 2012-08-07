@@ -28,14 +28,17 @@ import java.io.IOException;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
+import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestLimitOffsetSuite extends RegressionSuite {
     public TestLimitOffsetSuite(String name) {
         super(name);
     }
-    /*
+
     private void load(Client client)
     throws NoConnectionsException, IOException, InterruptedException {
         for (int i = 0; i < 10; i++) {
@@ -113,7 +116,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "SELECT * FROM A, B WHERE A.PKEY < B.PKEY LIMIT 1 OFFSET 1;")
                                  .getResults()[0];
         assertEquals(1, result.getRowCount());
-    }*/
+    }
 
     public void testENG3487() throws IOException, ProcCallException {
         Client client = this.getClient();
@@ -145,18 +148,18 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
         project.addSchema(TestLimitOffsetSuite.class.getResource("testlimitoffset-ddl.sql"));
         project.addPartitionInfo("A", "PKEY");
-        /*
+
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("LimitAPKEY", "SELECT * FROM A ORDER BY PKEY LIMIT ? OFFSET ?;");
         project.addStmtProcedure("LimitBPKEY", "SELECT * FROM B ORDER BY PKEY LIMIT ? OFFSET ?;");
         project.addStmtProcedure("LimitAI", "SELECT * FROM A ORDER BY I LIMIT ? OFFSET ?;");
         project.addStmtProcedure("LimitBI", "SELECT * FROM B ORDER BY I LIMIT ? OFFSET ?;");
-*/
+
         // local
-//        config = new LocalCluster("testlimitoffset-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
-//        if (!config.compile(project)) fail();
-//        builder.addServerConfig(config);
+        config = new LocalCluster("testlimitoffset-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
 
         // Cluster
         config = new LocalCluster("testlimitoffset-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
