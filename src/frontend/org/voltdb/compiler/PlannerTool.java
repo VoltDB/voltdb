@@ -58,9 +58,8 @@ public class PlannerTool {
         for (String command : commands) {
             String decoded_cmd = Encoder.hexDecodeToString(command);
             decoded_cmd = decoded_cmd.trim();
-            if (decoded_cmd.length() == 0) {
+            if (decoded_cmd.length() == 0)
                 continue;
-            }
             try {
                 m_hsql.runDDLCommand(decoded_cmd);
             }
@@ -115,8 +114,8 @@ public class PlannerTool {
 
         if (plan.isContentDeterministic() == false) {
             String potentialErrMsg =
-                    "Statement has a non-deterministic result - statement: \"" +
-                            sql + "\" , reason: " + plan.nondeterminismDetail();
+                "Statement has a non-deterministic result - statement: \"" +
+                sql + "\" , reason: " + plan.nondeterminismDetail();
             // throw new RuntimeException(potentialErrMsg);
             hostLog.warn(potentialErrMsg);
         }

@@ -70,15 +70,15 @@ public class TestPlannerTool extends TestCase {
         // try too many tables
         try {
             result = m_pt.planSql("select * from WAREHOUSE, DISTRICT, CUSTOMER, CUSTOMER_NAME, HISTORY, STOCK, ORDERS, NEW_ORDER, ORDER_LINE where " +
-                    "WAREHOUSE.W_ID = DISTRICT.D_W_ID and " +
-                    "WAREHOUSE.W_ID = CUSTOMER.C_W_ID and " +
-                    "WAREHOUSE.W_ID = CUSTOMER_NAME.C_W_ID and " +
-                    "WAREHOUSE.W_ID = HISTORY.H_W_ID and " +
-                    "WAREHOUSE.W_ID = STOCK.S_W_ID and " +
-                    "WAREHOUSE.W_ID = ORDERS.O_W_ID and " +
-                    "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
-                    "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
-                    "WAREHOUSE.W_ID = 0", false, true, false);
+                "WAREHOUSE.W_ID = DISTRICT.D_W_ID and " +
+                "WAREHOUSE.W_ID = CUSTOMER.C_W_ID and " +
+                "WAREHOUSE.W_ID = CUSTOMER_NAME.C_W_ID and " +
+                "WAREHOUSE.W_ID = HISTORY.H_W_ID and " +
+                "WAREHOUSE.W_ID = STOCK.S_W_ID and " +
+                "WAREHOUSE.W_ID = ORDERS.O_W_ID and " +
+                "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
+                "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
+                "WAREHOUSE.W_ID = 0", false, true, false);
             fail();
         }
         catch (Exception e) {}
@@ -90,12 +90,12 @@ public class TestPlannerTool extends TestCase {
         // try just the right amount of tables
         try {
             result = m_pt.planSql("select * from CUSTOMER, STOCK, ORDERS, ORDER_LINE, NEW_ORDER where " +
-                    "CUSTOMER.C_W_ID = CUSTOMER.C_W_ID and " +
-                    "CUSTOMER.C_W_ID = STOCK.S_W_ID and " +
-                    "CUSTOMER.C_W_ID = ORDERS.O_W_ID and " +
-                    "CUSTOMER.C_W_ID = ORDER_LINE.OL_W_ID and " +
-                    "CUSTOMER.C_W_ID = NEW_ORDER.NO_W_ID and " +
-                    "CUSTOMER.C_W_ID = 0", true, true, false);
+                "CUSTOMER.C_W_ID = CUSTOMER.C_W_ID and " +
+                "CUSTOMER.C_W_ID = STOCK.S_W_ID and " +
+                "CUSTOMER.C_W_ID = ORDERS.O_W_ID and " +
+                "CUSTOMER.C_W_ID = ORDER_LINE.OL_W_ID and " +
+                "CUSTOMER.C_W_ID = NEW_ORDER.NO_W_ID and " +
+                "CUSTOMER.C_W_ID = 0", true, true, false);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -127,21 +127,6 @@ public class TestPlannerTool extends TestCase {
 
         result = m_pt.planSql("select * from warehouse;", false, true, false);
         System.out.println(result);
-
-
-//        String plan = new String(result.getOnePlan(), VoltDB.UTF8ENCODING);
-//        System.out.println( plan );
-//        PlanNodeTree pnt = new PlanNodeTree();
-//        try {
-//            JSONObject jobj = new JSONObject( plan );
-//            JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-//            pnt.loadFromJSONArray(jarray, null);
-//            String str = pnt.getRootPlanNode().toExplainPlanString();
-//            System.out.println( str );
-//        } catch (JSONException e) {
-//            // TODO Auto-generated catch block
-//            e.printStackTrace();
-//        }
     }
 
     public void testBadDDL() throws IOException
@@ -156,8 +141,8 @@ public class TestPlannerTool extends TestCase {
         // Add a newline string literal case just for fun
         builder.addLiteralSchema("create table s(id bigint not null, name varchar(5) default 'a\nb', primary key(id));");
         builder.addStmtProcedure("MakeCompileHappy",
-                "SELECT * FROM A WHERE C1 = ?;",
-                "A.C1: 0");
+                                 "SELECT * FROM A WHERE C1 = ?;",
+                                 "A.C1: 0");
 
         final File jar = new File("testbadddl-oop.jar");
         jar.deleteOnExit();

@@ -106,7 +106,7 @@ public class SystemProcedureCatalog {
     }
 
     public static final HashMap<String, Config> listing =
-            new HashMap<String, Config>();
+        new HashMap<String, Config>();
 
     static {                                                                                            // SP     RO     Every  Pro  (DR: kill, skip, replica-ok)
         listing.put("@AdHoc_RW_MP",             new Config("org.voltdb.sysprocs.AdHoc_RW_MP",              false, false, false, false, false, false, true));

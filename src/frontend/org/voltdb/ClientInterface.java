@@ -169,8 +169,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      *
      * The ? extends ugliness is due to the SnapshotDaemon having an ACG that is a noop
      */
-    private final COWMap<Long, ClientInterfaceHandleManager> m_cihm = new COWMap<Long, ClientInterfaceHandleManager>();
-
+    private final COWMap<Long, ClientInterfaceHandleManager>
+            m_cihm = new COWMap<Long, ClientInterfaceHandleManager>();
     private final Cartographer m_cartographer;
 
     /**
@@ -189,7 +189,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             processFinishedCompilerWork(result);
         }
     };
-
 
     /*
      * A thread local is a convenient way to keep the ACG out of volt core. The lookup is paired
@@ -308,7 +307,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final ExecutorService m_executor = Executors.newCachedThreadPool(new ThreadFactory() {
             private final AtomicLong m_createdThreadCount = new AtomicLong(0);
             private final ThreadGroup m_group =
-                    new ThreadGroup(Thread.currentThread().getThreadGroup(), "Client authentication threads");
+                new ThreadGroup(Thread.currentThread().getThreadGroup(), "Client authentication threads");
 
             @Override
             public Thread newThread(Runnable r) {
@@ -381,7 +380,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     catch (IOException ioe)
                     {
                         if (ioe.getMessage() != null &&
-                                ioe.getMessage().contains("Too many open files"))
+                            ioe.getMessage().contains("Too many open files"))
                         {
                             networkLog.warn("Rejected accepting new connection due to too many open files");
                             continue;
@@ -535,7 +534,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             //Didn't get the value. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
                 authLog.debug("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): wire protocol violation (timeout reading message length).");
+                              "): wire protocol violation (timeout reading message length).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
                 socket.write(responseBuffer);
@@ -547,7 +546,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final int messageLength = lengthBuffer.getInt();
             if (messageLength < 0) {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): wire protocol violation (message length " + messageLength + " is negative).");
+                             "): wire protocol violation (message length " + messageLength + " is negative).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
                 socket.write(responseBuffer);
@@ -555,14 +554,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 return null;
             }
             if (messageLength > ((1024 * 1024) * 2)) {
-                authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): wire protocol violation (message length " + messageLength + " is too large).");
-                //Send negative response
-                responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
-                socket.write(responseBuffer);
-                socket.close();
-                return null;
-            }
+                  authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
+                               "): wire protocol violation (message length " + messageLength + " is too large).");
+                  //Send negative response
+                  responseBuffer.put(WIRE_PROTOCOL_FORMAT_ERROR).flip();
+                  socket.write(responseBuffer);
+                  socket.close();
+                  return null;
+              }
 
             final ByteBuffer message = ByteBuffer.allocate(messageLength);
             //Do non-blocking I/O to retrieve the login message
@@ -581,7 +580,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             //Didn't get the whole message. Client isn't going to get anymore time.
             if (lengthBuffer.hasRemaining()) {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): wire protocol violation (timeout reading authentication strings).");
+                             "): wire protocol violation (timeout reading authentication strings).");
                 //Send negative response
                 responseBuffer.put(WIRE_PROTOCOL_TIMEOUT_ERROR).flip();
                 socket.write(responseBuffer);
@@ -609,7 +608,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                 if (!authenticated) {
                     authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                            "): user " + username + " failed authentication.");
+                                 "): user " + username + " failed authentication.");
                     //Send negative response
                     responseBuffer.put(AUTHENTICATION_FAILURE).flip();
                     socket.write(responseBuffer);
@@ -634,16 +633,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             InputHandler handler = null;
             if (service.equalsIgnoreCase("database")) {
                 handler =
-                        new ClientInputHandler(
-                                username,
-                                socket.socket().getInetAddress().getHostName(),
-                                m_isAdmin);
+                    new ClientInputHandler(
+                            username,
+                            socket.socket().getInetAddress().getHostName(),
+                            m_isAdmin);
             }
             else {
                 String strUser = "ANONYMOUS";
-                if ((username != null) && (username.length() > 0)) {
-                    strUser = username;
-                }
+                if ((username != null) && (username.length() > 0)) strUser = username;
 
                 // If no processor can handle this service, null is returned.
                 String connectorClassName = ExportManager.instance().getConnectorForService(service);
@@ -653,8 +650,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     socket.write(responseBuffer);
                     socket.close();
                     authLog.warn("Rejected user " + strUser +
-                            " attempting to use disabled or unconfigured service " +
-                            service + ".");
+                                 " attempting to use disabled or unconfigured service " +
+                                 service + ".");
                     return null;
                 }
                 if (!user.authorizeConnector(connectorClassName)) {
@@ -688,7 +685,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             else {
                 authLog.warn("Failure to authenticate connection(" + socket.socket().getRemoteSocketAddress() +
-                        "): user " + username + " failed authentication.");
+                             "): user " + username + " failed authentication.");
                 // Send negative response
                 responseBuffer.put(AUTHENTICATION_FAILURE).flip();
                 socket.write(responseBuffer);
@@ -716,7 +713,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         private final String m_username;
 
         public ClientInputHandler(String username, String hostname,
-                boolean isAdmin)
+                                  boolean isAdmin)
         {
             m_username = username.intern();
             m_hostname = hostname;
@@ -757,7 +754,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             m_connection = c;
             if (VoltDB.instance().isIV2Enabled()) {
                 m_cihm.put(c.connectionId(),
-                        new ClientInterfaceHandleManager( m_isAdmin, c, m_acg.get()));
+                           new ClientInterfaceHandleManager( m_isAdmin, c, m_acg.get()));
                 m_acg.get().addMember(this);
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
@@ -965,15 +962,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
                 }
                 Iv2InitiateTaskMessage workRequest =
-                        new Iv2InitiateTaskMessage(m_siteId,
-                                initiatorHSId,
-                                Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-                                Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
-                                isReadOnly,
-                                isSinglePartition,
-                                invocation,
-                                handle,
-                                connectionId);
+                    new Iv2InitiateTaskMessage(m_siteId,
+                            initiatorHSId,
+                            Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
+                            Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                            isReadOnly,
+                            isSinglePartition,
+                            invocation,
+                            handle,
+                            connectionId);
 
                 Iv2Trace.logCreateTransaction(workRequest);
                 m_mailbox.send(initiatorHSId, workRequest);
@@ -984,18 +981,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return true;
         } else {
             return m_initiator.createTransaction(connectionId,
-                    connectionHostname,
-                    adminConnection,
-                    invocation,
-                    isReadOnly,
-                    isSinglePartition,
-                    isEveryPartition,
-                    partitions,
-                    numPartitions,
-                    clientData,
-                    messageSize,
-                    now,
-                    allowMismatchedResults);
+                                                 connectionHostname,
+                                                 adminConnection,
+                                                 invocation,
+                                                 isReadOnly,
+                                                 isSinglePartition,
+                                                 isEveryPartition,
+                                                 partitions,
+                                                 numPartitions,
+                                                 clientData,
+                                                 messageSize,
+                                                 now,
+                                                 allowMismatchedResults);
         }
     }
 
@@ -1028,16 +1025,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
          * Construct the runnables so they have access to the list of connections
          */
         final ClientInterface ci = new ClientInterface(
-                port, adminPort, context, messenger, replicationRole, initiator, cartographer, allPartitions);
+           port, adminPort, context, messenger, replicationRole, initiator, cartographer, allPartitions);
 
         initiator.setClientInterface(ci);
         return ci;
     }
 
     ClientInterface(int port, int adminPort, CatalogContext context, HostMessenger messenger,
-            ReplicationRole replicationRole, TransactionInitiator initiator,
-            Cartographer cartographer, int[] allPartitions) throws Exception
-            {
+                    ReplicationRole replicationRole, TransactionInitiator initiator,
+                    Cartographer cartographer, int[] allPartitions) throws Exception
+    {
         m_catalogContext.set(context);
         m_initiator = initiator;
         m_cartographer = cartographer;
@@ -1088,7 +1085,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                         public void cancel() {
                                         }
 
-                                    });
+                            });
                         }
                     } else {
                         m_d.offer(message);
@@ -1109,7 +1106,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_iv2Masters = new MapCache(messenger.getZK(), VoltZK.iv2masters);
         m_iv2Masters.start(true);
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
-            }
+    }
 
     /**
      * Publishes the HSId of this execution site to ZK
@@ -1158,8 +1155,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      * @return ClientResponseImpl on error or null if okay.
      */
     private ClientResponseImpl checkPolicies(String name, AuthSystem.AuthUser user,
-            final StoredProcedureInvocation task,
-            final Procedure catProc, Config sysProc) {
+                                  final StoredProcedureInvocation task,
+                                  final Procedure catProc, Config sysProc) {
         List<InvocationAcceptancePolicy> policies = m_policies.get(name);
         ClientResponseImpl error = null;
         if (policies != null) {
@@ -1216,7 +1213,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     public void mayActivateSnapshotDaemon() {
         SnapshotSchedule schedule = m_catalogContext.get().database.getSnapshotschedule().get("default");
         if (VoltDB.instance().getSiteTracker().isFirstHost() &&
-                schedule != null && schedule.getEnabled())
+            schedule != null && schedule.getEnabled())
         {
             Future<Void> future = m_snapshotDaemon.makeActive(schedule);
             try {
@@ -1472,7 +1469,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
                 break;
             }
-
             planBatch.addStatement(plannedStatement);
         }
         // All statements retrieved from cache?
@@ -1483,10 +1479,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         LocalObjectMessage work = new LocalObjectMessage(
                 new AdHocPlannerWork(
-                        m_siteId,
-                        false, task.clientHandle, handler.connectionId(),
-                        handler.m_hostname, handler.isAdmin(), ccxn,
-                        sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler));
+                    m_siteId,
+                    false, task.clientHandle, handler.connectionId(),
+                    handler.m_hostname, handler.isAdmin(), ccxn,
+                    sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler));
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1506,18 +1502,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             // policy check is pretty far away from here.
             // assert and satisfy findbugs, and the casual reader.
             assert false : "Expected to catch invalid parameters in UpdateCatalogAcceptancePolicy.";
-        return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
-                new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
-                        " Catalog content must be passed as string or byte[].",
-                        task.clientHandle);
+            return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
+                    new VoltTable[0], "Failed to process UpdateApplicationCatalog request." +
+                    " Catalog content must be passed as string or byte[].",
+                    task.clientHandle);
         }
         String deploymentString = (String) params.toArray()[1];
         LocalObjectMessage work = new LocalObjectMessage(
                 new CatalogChangeWork(
-                        m_siteId,
-                        task.clientHandle, handler.connectionId(), handler.m_hostname,
-                        handler.isAdmin(), ccxn, catalogBytes, deploymentString,
-                        m_adhocCompletionHandler));
+                    m_siteId,
+                    task.clientHandle, handler.connectionId(), handler.m_hostname,
+                    handler.isAdmin(), ccxn, catalogBytes, deploymentString,
+                    m_adhocCompletionHandler));
 
         // XXX: need to know the async compiler mailbox id.
         m_mailbox.send(m_plannerSiteId, work);
@@ -1532,10 +1528,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         try {
             CatalogMap<Table> tables = m_catalogContext.get().database.getTables();
             Object valueToHash =
-                    LoadSinglepartitionTable.
+                LoadSinglepartitionTable.
                     partitionValueFromInvocation(tables, task);
             involvedPartitions =
-                    new int[] { TheHashinator.hashToPartition(valueToHash) };
+                new int[] { TheHashinator.hashToPartition(valueToHash) };
         }
         catch (Exception e) {
             authLog.warn(e.getMessage());
@@ -1565,13 +1561,13 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if ((params.toArray().length != 0)) {
             String selector = (String)params.toArray()[0];
             if (selector.equals("DR") || selector.equals("TOPO")) {
-                try {
-                    VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector);
-                    return null;
-                } catch (Exception e) {
-                    return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
-                }
-            }
+               try {
+                   VoltDB.instance().getStatsAgent().collectStats(ccxn, task.clientHandle, selector);
+                   return null;
+               } catch (Exception e) {
+                   return errorResponse( ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
+               }
+           }
         }
         int[] involvedPartitions = m_allPartitions;
         createTransaction(handler.connectionId(), handler.m_hostname,
@@ -1590,20 +1586,20 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     ClientResponseImpl dispatchTopology(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
             ClientInputHandler handler, Connection ccxn) {
         try {
-            ColumnInfo[] masterCols = new ColumnInfo[] {
-                    new ColumnInfo("Partition", VoltType.STRING),
-                    new ColumnInfo("Sites", VoltType.STRING),
-                    new ColumnInfo("Leader", VoltType.STRING)};
-            VoltTable masterTable = new VoltTable(masterCols);
-            Map<String, JSONObject> masters = m_iv2Masters.pointInTimeCache();
-            for (Entry<String, JSONObject> entry : masters.entrySet()) {
-                long partitionId = Long.valueOf(entry.getValue().getLong("hsid"));
-                masterTable.addRow(entry.getKey(),
-                        CoreUtils.hsIdCollectionToString(m_cartographer.getReplicasForIv2Master(entry.getKey())),
-                        CoreUtils.hsIdToString(partitionId));
-            }
-            return new ClientResponseImpl(ClientResponseImpl.SUCCESS,
-                    new VoltTable[]{masterTable}, null, task.clientHandle);
+           ColumnInfo[] masterCols = new ColumnInfo[] {
+              new ColumnInfo("Partition", VoltType.STRING),
+              new ColumnInfo("Sites", VoltType.STRING),
+              new ColumnInfo("Leader", VoltType.STRING)};
+           VoltTable masterTable = new VoltTable(masterCols);
+           Map<String, JSONObject> masters = m_iv2Masters.pointInTimeCache();
+           for (Entry<String, JSONObject> entry : masters.entrySet()) {
+               long partitionId = Long.valueOf(entry.getValue().getLong("hsid"));
+               masterTable.addRow(entry.getKey(),
+                       CoreUtils.hsIdCollectionToString(m_cartographer.getReplicasForIv2Master(entry.getKey())),
+                       CoreUtils.hsIdToString(partitionId));
+           }
+           return new ClientResponseImpl(ClientResponseImpl.SUCCESS,
+                   new VoltTable[]{masterTable}, null, task.clientHandle);
 
         } catch(Exception e) {
             hostLog.error("Failed to create topology summary for @Statistics TOPO", e);
@@ -1612,31 +1608,31 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     ClientResponseImpl dispatchPromote(Config sysProc,
-            ByteBuffer buf,
-            StoredProcedureInvocation task,
-            ClientInputHandler handler,
-            Connection ccxn)
+                                       ByteBuffer buf,
+                                       StoredProcedureInvocation task,
+                                       ClientInputHandler handler,
+                                       Connection ccxn)
     {
         if (VoltDB.instance().getReplicationRole() == ReplicationRole.NONE)
         {
             return new ClientResponseImpl(ClientResponseImpl.GRACEFUL_FAILURE,
                     new VoltTable[0], "@Promote issued on master cluster." +
-                            " No action taken.",
-                            task.clientHandle);
+                    " No action taken.",
+                    task.clientHandle);
         }
 
         // the shared dispatch for sysprocs
         int[] involvedPartitions = m_allPartitions;
         createTransaction(handler.connectionId(), handler.m_hostname,
-                handler.isAdmin(),
-                task,
-                sysProc.getReadonly(),
-                sysProc.getSinglepartition(),
-                sysProc.getEverysite(),
-                involvedPartitions, involvedPartitions.length,
-                ccxn, buf.capacity(),
-                System.currentTimeMillis(),
-                false);
+                          handler.isAdmin(),
+                          task,
+                          sysProc.getReadonly(),
+                          sysProc.getSinglepartition(),
+                          sysProc.getEverysite(),
+                          involvedPartitions, involvedPartitions.length,
+                          ccxn, buf.capacity(),
+                          System.currentTimeMillis(),
+                          false);
         return null;
     }
 
@@ -1689,6 +1685,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return dispatchExplainProcedure(task, handler, ccxn);
         }
 
+
         if (user == null) {
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
@@ -1732,7 +1729,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             } else if (task.procName.equals("@Promote")) {
                 return dispatchPromote(sysProc, buf, task, handler, ccxn);
             }
-
 
             // If you're going to copy and paste something, CnP the pattern
             // up above.  -rtb.
@@ -1781,16 +1777,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 // break out the Hashinator and calculate the appropriate partition
                 try {
                     involvedPartitions = new int[] {
-                            getPartitionForProcedure(
-                                    catProc.getPartitionparameter(),
-                                    catProc.getPartitioncolumn().getType(),
-                                    task)
-                    };
+                                getPartitionForProcedure(
+                                        catProc.getPartitionparameter(),
+                                        catProc.getPartitioncolumn().getType(),
+                                        task)
+                            };
                 }
                 catch (RuntimeException e) {
                     // unable to hash to a site, return an error
                     String errorMessage = "Error sending procedure "
-                            + task.procName + " to the correct partition. Make sure parameter values are correct.";
+                        + task.procName + " to the correct partition. Make sure parameter values are correct.";
                     authLog.l7dlog( Level.WARN,
                             LogKeys.host_ClientInterface_unableToRouteSinglePartitionInvocation.name(),
                             new Object[] { task.procName }, null);
@@ -1807,16 +1803,16 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
             boolean allowMismatchedResults = catProc.getReadonly() && isProcedureNonDeterministic(catProc);
             boolean success =
-                    createTransaction(handler.connectionId(), handler.m_hostname,
-                            handler.isAdmin(),
-                            task,
-                            catProc.getReadonly(),
-                            catProc.getSinglepartition(),
-                            catProc.getEverysite(),
-                            involvedPartitions, involvedPartitions.length,
-                            ccxn, buf.capacity(),
-                            now,
-                            allowMismatchedResults);
+                createTransaction(handler.connectionId(), handler.m_hostname,
+                        handler.isAdmin(),
+                        task,
+                        catProc.getReadonly(),
+                        catProc.getSinglepartition(),
+                        catProc.getEverysite(),
+                        involvedPartitions, involvedPartitions.length,
+                        ccxn, buf.capacity(),
+                        now,
+                        allowMismatchedResults);
             if (!success) {
                 // HACK: this return is for the DR agent so that it
                 // will move along on duplicate replicated transactions
@@ -1879,7 +1875,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         // Set up the parameters.
-
         ByteBuffer buf = ByteBuffer.allocate(plannedStmtBatch.getPlanArraySerializedSize());
         plannedStmtBatch.flattenPlanArrayToBuffer(buf);
         assert(buf.hasArray());
@@ -1945,7 +1940,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void run() {
                 if (result.errorMsg == null) {
-                    //TODO test if this lower @AdHoc speed
                     if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
                         // assume all stmts have the same catalog version
@@ -1957,19 +1951,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                obsolete catalog, re-plan. */
                             LocalObjectMessage work = new LocalObjectMessage(
                                     new AdHocPlannerWork(m_siteId,
-                                            false,
-                                            plannedStmtBatch.clientHandle,
-                                            plannedStmtBatch.connectionId,
-                                            plannedStmtBatch.hostname,
-                                            plannedStmtBatch.adminConnection,
-                                            plannedStmtBatch.clientData,
-                                            plannedStmtBatch.sqlBatchText,
-                                            plannedStmtBatch.getSQLStatements(),
-                                            plannedStmtBatch.partitionParam,
-                                            null,
-                                            false,
-                                            true,
-                                            m_adhocCompletionHandler));
+                                                         false,
+                                                         plannedStmtBatch.clientHandle,
+                                                         plannedStmtBatch.connectionId,
+                                                         plannedStmtBatch.hostname,
+                                                         plannedStmtBatch.adminConnection,
+                                                         plannedStmtBatch.clientData,
+                                                         plannedStmtBatch.sqlBatchText,
+                                                         plannedStmtBatch.getSQLStatements(),
+                                                         plannedStmtBatch.partitionParam,
+                                                         null,
+                                                         false,
+                                                         true,
+                                                         m_adhocCompletionHandler));
 
                             // XXX: Need to know the async mailbox id.
                             m_mailbox.send(Long.MIN_VALUE, work);
@@ -1984,8 +1978,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         StoredProcedureInvocation task = new StoredProcedureInvocation();
                         task.procName = "@UpdateApplicationCatalog";
                         task.setParams(changeResult.encodedDiffCommands, changeResult.catalogBytes,
-                                changeResult.expectedCatalogVersion, changeResult.deploymentString,
-                                changeResult.deploymentCRC);
+                                       changeResult.expectedCatalogVersion, changeResult.deploymentString,
+                                       changeResult.deploymentCRC);
                         task.clientHandle = changeResult.clientHandle;
 
                         /*
@@ -2052,10 +2046,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
                 else {
                     ClientResponseImpl errorResponse =
-                            new ClientResponseImpl(
-                                    ClientResponseImpl.UNEXPECTED_FAILURE,
-                                    new VoltTable[0], result.errorMsg,
-                                    result.clientHandle);
+                        new ClientResponseImpl(
+                                ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0], result.errorMsg,
+                                result.clientHandle);
                     ByteBuffer buf = ByteBuffer.allocate(errorResponse.getSerializedSize() + 4);
                     buf.putInt(buf.capacity() - 4);
                     errorResponse.flattenToBuffer(buf);
@@ -2075,7 +2069,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             @Override
             public void run() {
                 try {
-                    ft.get();
+                     ft.get();
                 } catch (Exception e) {
                     StringWriter sw = new StringWriter();
                     PrintWriter pw = new PrintWriter(sw);
@@ -2208,8 +2202,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     int getPartitionForProcedure(int partitionIndex, int partitionType,
             StoredProcedureInvocation task)
-                    throws Exception
-                    {
+    throws Exception
+    {
         Object invocationParameter = task.getParameterAtIndex(partitionIndex);
         final VoltType partitionParamType = VoltType.get((byte)partitionType);
 
@@ -2218,8 +2212,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // load CSV data or other untyped inputs that match DDL without
         // requiring the loader to know precise the schema.
         if ((invocationParameter != null) &&
-                (invocationParameter.getClass() == String.class) &&
-                (partitionParamType.isNumber()))
+            (invocationParameter.getClass() == String.class) &&
+            (partitionParamType.isNumber()))
         {
             invocationParameter = ParameterConverter.stringToLong(
                     invocationParameter,
@@ -2227,14 +2221,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         return TheHashinator.hashToPartition(invocationParameter);
-                    }
+    }
 
     @Override
     public void initiateSnapshotDaemonWork(final String procedureName, long clientData, final Object params[]) {
         final Config sysProc = SystemProcedureCatalog.listing.get(procedureName);
         if (sysProc == null) {
             throw new RuntimeException("SnapshotDaemon attempted to invoke " + procedureName +
-                    " which is not a known procedure");
+            " which is not a known procedure");
         }
         Procedure catProc = sysProc.asCatalogProcedure();
         StoredProcedureInvocation spi = new StoredProcedureInvocation();
@@ -2399,7 +2393,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 }
             }
         }
-
         else {
             Map<Long, long[]> inflight_txn_stats = m_initiator.getOutstandingTxnStats();
 
