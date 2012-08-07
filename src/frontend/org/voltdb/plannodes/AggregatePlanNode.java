@@ -55,6 +55,10 @@ public class AggregatePlanNode extends AbstractPlanNode {
     protected List<AbstractExpression> m_groupByExpressions
         = new ArrayList<AbstractExpression>();
 
+    public List<AbstractExpression> getGroupByExpressions() {
+        return m_groupByExpressions;
+    }
+
     // True if this aggregate node is the coordinator summary aggregator
     // for an aggregator that was pushed down. Must know to correctly
     // decide if other nodes can be pushed down / past this node.

@@ -1318,6 +1318,12 @@ public class PlanAssembler {
                 break;
             }
 
+            if (receiveNode instanceof AggregatePlanNode &&
+                    ((AggregatePlanNode)receiveNode).getGroupByExpressions().size() != 0) {
+                    receiveNode = null;
+                    break;
+            }
+
             // Traverse...
             if (receiveNode.getChildCount() == 0) {
                 receiveNode = null;
