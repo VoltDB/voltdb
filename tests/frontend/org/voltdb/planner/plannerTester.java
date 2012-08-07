@@ -114,6 +114,7 @@ public class plannerTester {
         }
     }
 
+    //TODO maybe a more robust parser? Need to figure out how to handle config file array if using the CLIConfig below
 //    private static class PlannerTesterConfig extends CLIConfig {
 //        @Option(shortOpt = "d", desc = "Do the diff")
 //        boolean isDiff = false;
