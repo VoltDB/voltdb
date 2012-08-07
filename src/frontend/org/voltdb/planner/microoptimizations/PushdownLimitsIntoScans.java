@@ -70,6 +70,7 @@ public class PushdownLimitsIntoScans implements MicroOptimization {
         if ((child instanceof AbstractScanPlanNode) == false)
             return plan;
 
+
         plan.clearChildren();
         child.clearParents();
         child.addInlinePlanNode(plan);
