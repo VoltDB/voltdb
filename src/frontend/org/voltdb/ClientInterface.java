@@ -1323,8 +1323,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         ExplainPlannedStmtBatch planBatch =
                 new ExplainPlannedStmtBatch(sql,
                         partitionParam,
-                        m_catalogContext.get().catalogVersion,
                         task.clientHandle,
+                        handler.connectionId(),
                         handler.m_hostname,
                         handler.isAdmin(),
                         ccxn);
@@ -1338,7 +1338,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
         // All statements retrieved from cache?
         if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
-            System.out.println("get plan from cache");
             processExplainPlannedStmtBatch( planBatch );
             return null;
         }
@@ -1422,13 +1421,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         null,
                         vt,
                         null);
-        System.out.println( vt[0] );
         response.setClientHandle( planBatch.clientHandle );
         ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf.putInt(buf.capacity() - 4);
         response.flattenToBuffer(buf);
         buf.flip();
         c.writeStream().enqueue(buf);
+
+     //TODO do not cache the plans for explainAdhoc
+//        planBatch.clientData = null;
+//        for (int index = 0; index < planBatch.getPlannedStatementCount(); index++) {
+//            m_adhocCache.put(planBatch.getPlannedStatement(index));
+//        }
     }
 
     ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
@@ -1462,7 +1466,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                           handler.m_hostname,
                                           handler.isAdmin(),
                                           ccxn);
-
         for (String sqlStatement : sqlStatements) {
             AdHocPlannedStatement plannedStatement = m_adhocCache.get(sqlStatement, partitionParam != null);
             // check the catalog version if there is a cached plan
@@ -1679,12 +1682,10 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         }
 
         else if ( sysProc == null && task.procName.equals("@Explain") ) {
-            System.out.println("dispatchExplainAdHoc");
             return dispatchExplainAdHoc(task, handler, ccxn);
         }
 
         else if ( sysProc == null && task.procName.equals("@ExplainProc") ) {
-            System.out.println("dispatchExplainProcedure");
             return dispatchExplainProcedure(task, handler, ccxn);
         }
 
@@ -1945,7 +1946,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             public void run() {
                 if (result.errorMsg == null) {
                     //TODO test if this lower @AdHoc speed
-                    if (result instanceof AdHocPlannedStmtBatch && ! ( result instanceof ExplainPlannedStmtBatch) ) {
+                    if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
                         // assume all stmts have the same catalog version
                         if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
@@ -2041,7 +2042,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             m_mailbox.send(Long.MIN_VALUE, work);
                         }
                         else {
-                            System.out.println("get plan from query planner");
                             processExplainPlannedStmtBatch( plannedStmtBatch );
                         }
                     }
