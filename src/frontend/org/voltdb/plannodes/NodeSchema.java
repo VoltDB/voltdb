@@ -111,7 +111,7 @@ public class NodeSchema
     int getIndexOfTve(TupleValueExpression tve)
     {
         return getIndexOf(tve.getTableName(), tve.getColumnName(),
-                tve.getColumnAlias());
+                          tve.getColumnAlias());
     }
 
     /** Convenience method to sort the SchemaColumns.  Only applies if they
@@ -125,14 +125,14 @@ public class NodeSchema
             public int compare(SchemaColumn col1, SchemaColumn col2)
             {
                 if (!(col1.getExpression() instanceof TupleValueExpression) ||
-                        !(col2.getExpression() instanceof TupleValueExpression))
+                    !(col2.getExpression() instanceof TupleValueExpression))
                 {
                     throw new ClassCastException();
                 }
                 TupleValueExpression tve1 =
-                        (TupleValueExpression) col1.getExpression();
+                    (TupleValueExpression) col1.getExpression();
                 TupleValueExpression tve2 =
-                        (TupleValueExpression) col2.getExpression();
+                    (TupleValueExpression) col2.getExpression();
                 if (tve1.getColumnIndex() < tve2.getColumnIndex())
                 {
                     return -1;
@@ -203,5 +203,5 @@ public class NodeSchema
         return sb.toString();
     }
 
-    private final ArrayList<SchemaColumn> m_columns;
+    private ArrayList<SchemaColumn> m_columns;
 }

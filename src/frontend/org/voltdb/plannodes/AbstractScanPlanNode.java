@@ -77,8 +77,8 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             if (!m_targetTableName.equals(col.getTableName()))
             {
                 throw new Exception("ERROR: The scan column: " + col.getColumnName() +
-                        " in table: " + m_targetTableName + " refers to " +
-                        " table: " + col.getTableName());
+                                    " in table: " + m_targetTableName + " refers to " +
+                                    " table: " + col.getTableName());
             }
         }
     }
@@ -181,7 +181,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         {
             m_tableSchema = new NodeSchema();
             CatalogMap<Column> cols =
-                    db.getTables().getIgnoreCase(m_targetTableName).getColumns();
+                db.getTables().getIgnoreCase(m_targetTableName).getColumns();
             // you don't strictly need to sort this, but it makes diff-ing easier
             for (Column col : CatalogUtil.getSortedCatalogItems(cols, "index"))
             {
@@ -194,9 +194,9 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 tve.setColumnAlias(col.getTypeName());
                 tve.setColumnName(col.getTypeName());
                 m_tableSchema.addColumn(new SchemaColumn(m_targetTableName,
-                        col.getTypeName(),
-                        col.getTypeName(),
-                        tve));
+                                                         col.getTypeName(),
+                                                         col.getTypeName(),
+                                                         tve));
             }
         }
 
@@ -217,7 +217,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         // to overwrite the inline projection and still have the right thing
         // happen
         ProjectionPlanNode proj =
-                (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
         if (proj != null)
         {
             // Does this operation needs to change complex expressions
@@ -232,7 +232,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
                 // Order the scan columns according to the table schema
                 // before we stick them in the projection output
                 List<TupleValueExpression> scan_tves =
-                        new ArrayList<TupleValueExpression>();
+                    new ArrayList<TupleValueExpression>();
                 for (SchemaColumn col : m_tableScanSchema.getColumns())
                 {
                     assert(col.getExpression() instanceof TupleValueExpression);
@@ -268,7 +268,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         // predicate expression
         List<TupleValueExpression> predicate_tves =
-                ExpressionUtil.getTupleValueExpressions(m_predicate);
+            ExpressionUtil.getTupleValueExpressions(m_predicate);
         for (TupleValueExpression tve : predicate_tves)
         {
             int index = m_tableSchema.getIndexOfTve(tve);
@@ -277,7 +277,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
         // inline projection
         ProjectionPlanNode proj =
-                (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
+            (ProjectionPlanNode)getInlinePlanNode(PlanNodeType.PROJECTION);
         if (proj != null)
         {
             proj.resolveColumnIndexesUsingSchema(m_tableSchema);
@@ -324,5 +324,4 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             //better to do nothing
         }
     }
-
 }

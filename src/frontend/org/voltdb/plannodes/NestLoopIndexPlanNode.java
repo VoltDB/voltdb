@@ -50,7 +50,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // rest of the plan.  the expressions that are
         // given to the projection are currently not ever used
         IndexScanPlanNode inlineScan =
-                (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
+            (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
         assert(inlineScan != null);
         inlineScan.generateOutputSchema(db);
         assert(m_children.size() == 1);
@@ -59,15 +59,15 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // The child subplan's output is the outer table
         // The inlined node's output is the inner table
         m_outputSchema =
-                m_children.get(0).getOutputSchema().
-                join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
+            m_children.get(0).getOutputSchema().
+            join(inlineScan.getOutputSchema()).copyAndReplaceWithTVE();
     }
 
     @Override
     public void resolveColumnIndexes()
     {
         IndexScanPlanNode inline_scan =
-                (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
+            (IndexScanPlanNode) m_inlineNodes.get(PlanNodeType.INDEXSCAN);
         assert (m_children.size() == 1 && inline_scan != null);
         for (AbstractPlanNode child : m_children)
         {
@@ -92,7 +92,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         //  the planner currently blithely ignores that abstractjoinnode also
         //  has a predicate field, and so do we.
         List<TupleValueExpression> predicate_tves =
-                ExpressionUtil.getTupleValueExpressions(inline_scan.getPredicate());
+            ExpressionUtil.getTupleValueExpressions(inline_scan.getPredicate());
         for (TupleValueExpression tve : predicate_tves)
         {
             // this double-schema search is somewhat common, maybe it
@@ -104,7 +104,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
-                            tve.toString());
+                                               tve.toString());
                 }
             }
             tve.setColumnIndex(index);
@@ -112,7 +112,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
 
         //  get the end expression and search key expressions
         List<TupleValueExpression> index_tves =
-                new ArrayList<TupleValueExpression>();
+            new ArrayList<TupleValueExpression>();
         index_tves.addAll(ExpressionUtil.getTupleValueExpressions(inline_scan.getEndExpression()));
         for (AbstractExpression search_exp : inline_scan.getSearchKeyExpressions())
         {
@@ -127,7 +127,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for nestloopindexscan TVE: " +
-                            tve.toString());
+                                               tve.toString());
                 }
             }
             tve.setColumnIndex(index);
@@ -136,7 +136,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         // need to resolve the indexes of the output schema and
         // order the combined output schema coherently
         TreeMap<Integer, SchemaColumn> sort_cols =
-                new TreeMap<Integer, SchemaColumn>();
+            new TreeMap<Integer, SchemaColumn>();
         for (SchemaColumn col : m_outputSchema.getColumns())
         {
             // Right now these all need to be TVEs
@@ -149,7 +149,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
                 if (index == -1)
                 {
                     throw new RuntimeException("Unable to find index for column: " +
-                            col.toString());
+                                               col.toString());
                 }
                 sort_cols.put(index + outer_schema.size(), col);
             }
@@ -191,7 +191,7 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
             return false;
         }
         IndexScanPlanNode index_scan =
-                (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
+            (IndexScanPlanNode) getInlinePlanNode(PlanNodeType.INDEXSCAN);
         assert(index_scan != null);
         if ( ! index_scan.isOrderDeterministic()) {
             m_nondeterminismDetail = index_scan.m_nondeterminismDetail;
@@ -200,14 +200,14 @@ public class NestLoopIndexPlanNode extends AbstractJoinPlanNode {
         return true;
     }
 
-    @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) {
-        super.loadFromJSONObject(jobj, db);
-    }
-
 
     @Override
     protected String explainPlanForNode(String indent) {
         return "NESTLOOP INDEX JOIN";
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+        super.loadFromJSONObject(jobj, db);
     }
 }
