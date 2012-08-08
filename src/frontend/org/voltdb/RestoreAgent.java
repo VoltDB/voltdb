@@ -75,7 +75,8 @@ import org.voltdb.utils.MiscUtils;
  * to resume normal operation.
  */
 public class RestoreAgent implements CommandLogReinitiator.Callback,
-SnapshotCompletionInterest {
+SnapshotCompletionInterest
+{
     // Implement this callback to get notified when restore finishes.
     public interface Callback {
         /**
@@ -141,54 +142,7 @@ SnapshotCompletionInterest {
     // Whether or not we have a snapshot to restore
     private boolean m_hasRestored = false;
 
-    private CommandLogReinitiator m_replayAgent = new CommandLogReinitiator() {
-        private Callback m_callback;
-        @Override
-        public void setCallback(Callback callback) {
-            m_callback = callback;
-        }
-        @Override
-        public void replay() {
-            new Thread(new Runnable() {
-                @Override
-                public void run() {
-                    if (m_callback != null) {
-                        m_callback.onReplayCompletion();
-                    }
-                }
-            }).start();
-        }
-        @Override
-        public void join() throws InterruptedException {}
-        @Override
-        public boolean hasReplayedSegments() {
-            return false;
-        }
-        @Override
-        public Long getMaxLastSeenTxn() {
-            return null;
-        }
-        @Override
-        public boolean started() {
-            return true;
-        }
-        @Override
-        public void setSnapshotTxnId(long txnId) {}
-        @Override
-        public void returnAllSegments() {}
-        @Override
-        public boolean hasReplayedTxns() {
-            return false;
-        }
-        @Override
-        public void generateReplayPlan() {}
-        @Override
-        public void setCatalogContext(CatalogContext context) {}
-        @Override
-        public void setInitiator(TransactionInitiator initiator) {}
-        @Override
-        public void setSiteTracker(SiteTracker siteTracker) {}
-    };
+    private CommandLogReinitiator m_replayAgent = new DefaultCommandLogReinitiator();
 
     /*
      * A thread to keep on sending fake heartbeats until the restore is
