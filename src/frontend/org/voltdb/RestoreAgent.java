@@ -93,7 +93,6 @@ SnapshotCompletionInterest
 
     // ZK stuff (while converting bare strings to VoltZK, map these
     // to the previously used symbols.)
-    private final static String RESTORE_BARRIER = VoltZK.restore_barrier;
     private final static String RESTORE_BARRIER2 = VoltZK.restore_barrier + "2";
     private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
 
@@ -473,7 +472,7 @@ SnapshotCompletionInterest
      */
     public Pair<Integer, String> findRestoreCatalog() {
         createZKDirectory(VoltZK.restore);
-        createZKDirectory(RESTORE_BARRIER);
+        createZKDirectory(VoltZK.restore_barrier);
         createZKDirectory(RESTORE_BARRIER2);
 
         enterRestore();
