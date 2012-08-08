@@ -23,6 +23,8 @@ import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
+import java.util.TreeSet;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
@@ -133,18 +135,56 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
                                                   null, false, m_allowMismatchedResults));
 
                 /*
-                 * ENG-3374: Use the same set of non-coordinator sites the
-                 * initiator sent out the participant notices to, so that when
-                 * the coordinator send out the fragment works all participants
-                 * will get them.
+                 * ENG-3374: Get the set of non-coordinator sites for this
+                 * transaction from the initiator and from the local site.
                  *
-                 * During rejoin, the initiator's site tracker and the
-                 * coordinator's site tracker may not be consistent for a brief
-                 * period of time. So can't rely on the site tracker to tell the
-                 * coordinator which sites to send work to.
+                 * Compare them and find any sites the initiator knows about that
+                 * the local site doesn't know about. These are either new
+                 * rejoining sites that need to be included, or they are
+                 * failed sites that don't need to be included. Determine, for
+                 * each extra site, which case it's in and either add it to
+                 * the transaction or not.
+                 *
+                 * Note that if the local site has extra sites in the transaction,
+                 * that can be ignored because the local site can count on a
+                 * failure notice coming.
+                 *
+                 * Also note that having these two lists differ should be rare,
+                 * and only when cluster membership changes.
                  */
                 m_nonCoordinatingSites = m_task.getNonCoordinatorSites();
-            } else {
+
+                // note, tracker should be non-null outside of tests
+                if (tracker != null) {
+                    long[] myArraySites = tracker.getAllSitesExcluding(m_hsId);
+
+                    Set<Long> mySites = new TreeSet<Long>();
+                    for (long hsid : myArraySites) {
+                        mySites.add(hsid);
+                    }
+
+                    // match is true if all initiator-reported sites are locally known
+                    boolean match = true;
+                    for (long hsid : m_nonCoordinatingSites) {
+                        if (!mySites.contains(hsid)) {
+                            match = false;
+                            if (!m_site.isActiveOrPreviouslyKnownSiteId(hsid)) {
+                                mySites.add(hsid);
+                            }
+                        }
+                    }
+
+                    // if no match, rebuild the list according to the block above
+                    if (!match) {
+                        m_nonCoordinatingSites = new long[mySites.size()];
+                        int i = 0;
+                        for (long siteId : mySites) {
+                            m_nonCoordinatingSites[i++] = siteId;
+                        }
+                    }
+                }
+            }
+            else {
                 m_durabilityFlag = ((InitiateTaskMessage)notice).getDurabilityFlagIfItExists();
                 m_task = null;
             }
@@ -677,11 +717,16 @@ public class MultiPartitionParticipantTxnState extends TransactionState {
         // and decrement expected dependency response count
         if (m_nonCoordinatingSites != null) {
             ArrayDeque<Long> newlist = new ArrayDeque<Long>(m_nonCoordinatingSites.length);
+            int removed = 0;
             for (int i=0; i < m_nonCoordinatingSites.length; ++i) {
                 if (!failedSites.contains(m_nonCoordinatingSites[i])) {
-                newlist.addLast(m_nonCoordinatingSites[i]);
+                    newlist.addLast(m_nonCoordinatingSites[i]);
+                }
+                else {
+                    removed++;
                 }
             }
+            //assert(removed == failedSites.size());
 
             m_nonCoordinatingSites = new long[newlist.size()];
             for (int i=0; i < m_nonCoordinatingSites.length; ++i) {

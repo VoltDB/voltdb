@@ -94,7 +94,7 @@ public class PlannerTool {
                 m_cluster, m_database, partitioning, m_hsql, new DatabaseEstimates(), true);
         CompiledPlan plan = null;
         try {
-            plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
+            plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null, true);
         } catch (Exception e) {
             throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
         }
@@ -108,7 +108,10 @@ public class PlannerTool {
             }
         }
 
-        if (!allowParameterization && plan.parameters.length > 0) {
+        if (!allowParameterization &&
+            (plan.extractedParamValues.size() == 0) &&
+            (plan.parameters.length > 0))
+        {
             throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
         }
 

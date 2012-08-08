@@ -119,7 +119,7 @@ public abstract class StatementCompiler {
         CompiledPlan plan = null;
         try {
             plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder,
-                    catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(), DEFAULT_MAX_JOIN_TABLES, null);
+                    catalogStmt.getTypeName(), catalogStmt.getParent().getTypeName(), DEFAULT_MAX_JOIN_TABLES, null, false);
         } catch (PlanningErrorException e) {
             // These are normal expectable errors -- don't normally need a stack-trace.
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());

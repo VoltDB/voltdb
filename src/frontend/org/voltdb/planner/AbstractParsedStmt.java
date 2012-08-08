@@ -100,7 +100,7 @@ public abstract class AbstractParsedStmt {
      * @param xmlSQL
      * @param db
      */
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement xmlSQL, Database db, String joinOrder) {
+    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, Database db, String joinOrder) {
         final String INSERT_NODE_NAME = "insert";
         final String UPDATE_NODE_NAME = "update";
         final String DELETE_NODE_NAME = "delete";
@@ -108,30 +108,30 @@ public abstract class AbstractParsedStmt {
 
         AbstractParsedStmt retval = null;
 
-        if (xmlSQL == null) {
+        if (stmtTypeElement == null) {
             System.err.println("Unexpected error parsing hsql parsed stmt xml");
             throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
         }
 
         // create non-abstract instances
-        if (xmlSQL.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
+        if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
             retval = new ParsedInsertStmt();
         }
-        else if (xmlSQL.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equalsIgnoreCase(UPDATE_NODE_NAME)) {
             retval = new ParsedUpdateStmt();
         }
-        else if (xmlSQL.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
+        else if (stmtTypeElement.name.equalsIgnoreCase(DELETE_NODE_NAME)) {
             retval = new ParsedDeleteStmt();
         }
-        else if (xmlSQL.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
+        else if (stmtTypeElement.name.equalsIgnoreCase(SELECT_NODE_NAME)) {
             retval = new ParsedSelectStmt();
         }
         else {
-            throw new RuntimeException("Unexpected Element: " + xmlSQL.name);
+            throw new RuntimeException("Unexpected Element: " + stmtTypeElement.name);
         }
 
         // parse tables and parameters
-        for (VoltXMLElement node : xmlSQL.children) {
+        for (VoltXMLElement node : stmtTypeElement.children) {
             if (node.name.equalsIgnoreCase("parameters")) {
                 retval.parseParameters(node, db);
             }
@@ -145,7 +145,7 @@ public abstract class AbstractParsedStmt {
         }
 
         // parse specifics
-        retval.parse(xmlSQL, db);
+        retval.parse(stmtTypeElement, db);
 
         // split up the where expression into categories
         retval.analyzeWhereExpression(db);
