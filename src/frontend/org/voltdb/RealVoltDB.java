@@ -1566,6 +1566,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 heartbeatThread.interrupt();
                 heartbeatThread.join();
 
+                if (m_leaderAppointer != null) {
+                    m_leaderAppointer.shutdown();
+                }
                 m_globalServiceElector.shutdown();
 
                 if (m_hasStartedSampler.get()) {

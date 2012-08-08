@@ -319,4 +319,18 @@ public class LeaderAppointer implements Promotable
         }
         return masterHSId;
     }
+
+    public void shutdown()
+    {
+        try {
+            m_iv2appointees.shutdown();
+            m_iv2masters.shutdown();
+            for (BabySitter watcher : m_partitionWatchers) {
+                watcher.shutdown();
+            }
+        }
+        catch (Exception e) {
+            // don't care, we're going down
+        }
+    }
 }
