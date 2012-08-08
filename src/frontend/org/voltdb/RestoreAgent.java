@@ -555,10 +555,8 @@ SnapshotCompletionInterest
      */
     SnapshotInfo generatePlans() throws Exception {
         TreeMap<Long, Snapshot> snapshots = new TreeMap<Long, SnapshotUtil.Snapshot>();
-        /*
-         * If the user wants to create a new database, don't scan the
-         * snapshots.
-         */
+
+        // Only scan if startup might require a snapshot restore.
         if (m_action == START_ACTION.RECOVER || m_action == START_ACTION.START) {
             snapshots = getSnapshots();
         }
@@ -577,78 +575,12 @@ SnapshotCompletionInterest
                 continue;
             }
 
-            Snapshot s = e.getValue();
-            File digest = s.m_digests.get(0);
-            int partitionCount = -1;
-            boolean skip = false;
-            for (TableFiles tf : s.m_tableFiles.values()) {
-                if (tf.m_isReplicated) {
-                    continue;
-                }
-
-                if (skip) {
-                    break;
-                }
-
-                for (boolean completed : tf.m_completed) {
-                    if (!completed) {
-                        skip = true;
-                        break;
-                    }
-                }
-
-                // Everyone has to agree on the total partition count
-                for (int count : tf.m_totalPartitionCounts) {
-                    if (partitionCount == -1) {
-                        partitionCount = count;
-                    } else if (count != partitionCount) {
-                        skip = true;
-                        break;
-                    }
-                }
+            SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
+            if (info != null) {
+                snapshotInfos.add(info);
             }
-
-            Long catalog_crc = null;
-            try
-            {
-                JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
-                catalog_crc = digest_detail.getLong("catalogCRC");
-            }
-            catch (IOException ioe)
-            {
-                LOG.info("Unable to read digest file: " +
-                         digest.getAbsolutePath() + " due to: " + ioe.getMessage());
-                skip = true;
-            }
-            catch (JSONException je)
-            {
-                LOG.info("Unable to extract catalog CRC from digest: " +
-                         digest.getAbsolutePath() + " due to: " + je.getMessage());
-                skip = true;
-            }
-
-            if (skip) {
-                continue;
-            }
-
-            SnapshotInfo info =
-                new SnapshotInfo(e.getKey(), digest.getParent(),
-                                 parseDigestFilename(digest.getName()),
-                                 partitionCount, catalog_crc);
-            for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
-                TableFiles tableFile = te.getValue();
-                HashSet<Integer> ids = new HashSet<Integer>();
-                for (Set<Integer> idSet : tableFile.m_validPartitionIds) {
-                    ids.addAll(idSet);
-                }
-                if (!tableFile.m_isReplicated) {
-                    info.partitions.put(te.getKey(), ids);
-                }
-            }
-            snapshotInfos.add(info);
         }
         LOG.debug("Gathered " + snapshotInfos.size() + " snapshot information");
-
         sendLocalRestoreInformation(maxLastSeenTxn, snapshotInfos);
 
         // Negotiate with other hosts about which snapshot to restore
@@ -665,6 +597,67 @@ SnapshotCompletionInterest
 
         m_planned = true;
         return infoWithMinHostId;
+    }
+
+    private SnapshotInfo checkSnapshotIsComplete(Long key, Snapshot s)
+    {
+        int partitionCount = -1;
+        for (TableFiles tf : s.m_tableFiles.values()) {
+            if (tf.m_isReplicated) {
+                continue;
+            }
+
+            for (boolean completed : tf.m_completed) {
+                if (!completed) {
+                    return null;
+                }
+            }
+
+            // Everyone has to agree on the total partition count
+            for (int count : tf.m_totalPartitionCounts) {
+                if (partitionCount == -1) {
+                    partitionCount = count;
+                } else if (count != partitionCount) {
+                    return null;
+                }
+            }
+        }
+
+        File digest = s.m_digests.get(0);
+        Long catalog_crc = null;
+        try
+        {
+            JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
+            catalog_crc = digest_detail.getLong("catalogCRC");
+        }
+        catch (IOException ioe)
+        {
+            LOG.info("Unable to read digest file: " +
+                    digest.getAbsolutePath() + " due to: " + ioe.getMessage());
+            return null;
+        }
+        catch (JSONException je)
+        {
+            LOG.info("Unable to extract catalog CRC from digest: " +
+                    digest.getAbsolutePath() + " due to: " + je.getMessage());
+            return null;
+        }
+
+        SnapshotInfo info =
+            new SnapshotInfo(key, digest.getParent(),
+                    parseDigestFilename(digest.getName()),
+                    partitionCount, catalog_crc);
+        for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
+            TableFiles tableFile = te.getValue();
+            HashSet<Integer> ids = new HashSet<Integer>();
+            for (Set<Integer> idSet : tableFile.m_validPartitionIds) {
+                ids.addAll(idSet);
+            }
+            if (!tableFile.m_isReplicated) {
+                info.partitions.put(te.getKey(), ids);
+            }
+        }
+        return info;
     }
 
     /**
