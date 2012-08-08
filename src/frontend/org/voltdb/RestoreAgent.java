@@ -92,18 +92,28 @@ SnapshotCompletionInterest
     private final static VoltLogger LOG = new VoltLogger("HOST");
     private String m_generatedRestoreBarrier2;
 
+    // Different states the restore process can be in
+    private enum State { RESTORE, REPLAY, TRUNCATE };
+
+    // Current state of the restore agent
+    private volatile State m_state = State.RESTORE;
+
     // Transaction ID of the restore sysproc
     private final static long RESTORE_TXNID = 1l;
+    private final RestoreAdapter m_restoreAdapter = new RestoreAdapter();
 
-    private final Integer m_hostId;
+    private final ZooKeeper m_zk;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
+    private final Integer m_hostId;
     private final START_ACTION m_action;
-    private final Set<Integer> m_liveHosts;
     private final boolean m_clEnabled;
     private final String m_clPath;
     private final String m_clSnapshotPath;
     private final String m_snapshotPath;
+    private final int[] m_allPartitions;
+    private final Set<Integer> m_liveHosts;
+
     private boolean m_planned = false;
 
     /*
@@ -112,25 +122,16 @@ SnapshotCompletionInterest
      * Use the memoized field m_isLeader.
      */
     private LeaderElector m_leaderElector = null;
+    private boolean m_isLeader = false;
 
     private TransactionInitiator m_initiator;
 
     // The snapshot to restore
     private SnapshotInfo m_snapshotToRestore = null;
+
     // The txnId of the truncation snapshot generated at the end.
     private long m_truncationSnapshot = Long.MIN_VALUE;
 
-    private final ZooKeeper m_zk;
-    private boolean m_isLeader = false;
-
-    private final int[] m_allPartitions;
-
-    // Different states the restore process can be in
-    private enum State { RESTORE, REPLAY, TRUNCATE };
-
-    // State of the restore agent
-    private volatile State m_state = State.RESTORE;
-    private final RestoreAdapter m_restoreAdapter = new RestoreAdapter();
     // Whether or not we have a snapshot to restore
     private boolean m_hasRestored = false;
 
@@ -157,9 +158,6 @@ SnapshotCompletionInterest
         public void run() {
             if (!m_planned) {
                 findRestoreCatalog();
-//                VoltDB.crashLocalVoltDB("Restore planner should not be started " +
-//                        " without findRestoreCatalog already invoked",
-//                        false, null);
             }
 
             boolean leader = false;
