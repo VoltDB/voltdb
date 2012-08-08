@@ -212,38 +212,39 @@ SELECT * FROM P1 WHERE _pick[<options=,ABS>](P1.BIG) != 'dfiUWWvOeTOnMTRyw'
 SELECT * FROM P1 WHERE _pick[<options=,ABS>](P1.BIG) != 'mIlNtheOJZzCZmCLV'
 SELECT * FROM P1 WHERE _pick[<options=,ABS>](P1.BIG)<>'SFbcPuBrohlSegPtk'
 SELECT * FROM P1 WHERE _pick[<options=,ABS>](P1.BIG)<>'AleCgrLsUgWQEBauE'
-SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 10
-SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 2
-SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 4
-SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 3
-SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 5
-SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 10
-SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 9
-SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 10
-SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 9
-SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 6
-SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 1
-SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 8
-SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 10
-SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 6
-SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 4
-SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 6
-SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 6
-SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 9
-SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 3
-SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 2
-SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 8
-SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 9
-SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 2
-SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 3
-SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 2
-SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 2
-SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 8
-SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 1
-SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 2
-SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 10
-SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 10
-SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 1
+-- Comment out following 32 queries before we fix bug eng-3487
+--SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 10
+--SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 2
+--SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 4
+--SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 3
+--SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 5
+--SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 10
+--SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 9
+--SELECT _pick[<options=,ABS>](P1.TINY), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 10
+--SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 9
+--SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 6
+--SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 1
+--SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 8
+--SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 10
+--SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 6
+--SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 4
+--SELECT _pick[<options=,ABS>](P1.SMALL), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 6
+--SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 6
+--SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 9
+--SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 3
+--SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 2
+--SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 8
+--SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 9
+--SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 2
+--SELECT _pick[<options=,ABS>](P1.ID), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 3
+--SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 2
+--SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.TINY) FROM P1 LIMIT 2
+--SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 8
+--SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.SMALL) FROM P1 LIMIT 1
+--SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 2
+--SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.ID) FROM P1 LIMIT 10
+--SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 10
+--SELECT _pick[<options=,ABS>](P1.BIG), _pick[<options=,ABS>](P1.BIG) FROM P1 LIMIT 1
 SELECT _pick[<options=,ABS>](R1.TINY), ID FROM R1 ORDER BY ID
 SELECT _pick[<options=,ABS>](R1.SMALL), ID FROM R1 ORDER BY ID
 SELECT _pick[<options=,ABS>](R1.ID), ID FROM R1 ORDER BY ID

@@ -125,7 +125,7 @@ public class testPlannerTester extends TestCase {
             //List<AbstractPlanNode> pnList = plannerTester.compile("INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);", 4, false);
             //assertTrue( pnList.size() == 2 );
 
-            plannerTester.setUp(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+            plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                     "testplans-plannerTester-ddl", "L", "a");
             List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
             System.out.println( pnList.size() );
@@ -145,7 +145,7 @@ public class testPlannerTester extends TestCase {
         //pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
         //      pn = compile("select * from t where a = ? order by a limit ?;",3, true);
         String path = m_homeDir+"/";
-        plannerTester.setUp(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+        plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                 "testplans-plannerTester-ddl", "L", "a");
         List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
 
@@ -355,6 +355,19 @@ public class testPlannerTester extends TestCase {
         }
     }
 
+//  public void testMain() {
+//  String[] args = {"-d","-s","-e","-cs",
+////          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voter",
+////          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/test1",
+////          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltcache",
+////          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltkv",
+//          "-C="+m_homeDir+"/"+"test1",
+//          "-r="+m_homeDir,
+////          "-help"
+//          };
+//  plannerTester.main(args);
+//}
+
     //    public void testBatchDiff() {
     //          int size = 7;
     //          String pathBaseline = "/tmp/volttest/test1Baseline/";
@@ -367,15 +380,15 @@ public class testPlannerTester extends TestCase {
     //          }
     //    }
 
-    //    public void testWholeProcess() {
-    //          try {
-    //                  plannerTester.setUp(m_homeDir+"/test1");
-    //                  plannerTester.batchCompileSave();
-    //                  plannerTester.batchDiff();
-    //          } catch (Exception e) {
-    //                  e.printStackTrace();
-    //          }
-    //    }
+//        public void testWholeProcess() {
+//              try {
+//                      plannerTester.setUp(m_homeDir+"/test1");
+//                      plannerTester.batchCompileSave();
+//                      plannerTester.batchDiff();
+//              } catch (Exception e) {
+//                      e.printStackTrace();
+//              }
+//        }
 
     //make sure plan files are already in baseline directories
     //    public void testDiffVoltExamples() {
@@ -396,16 +409,6 @@ public class testPlannerTester extends TestCase {
     //                  e.printStackTrace();
     //          }
     //    }
-
-    public void testMain() {
-        String[] args = {"-cs","-d","-s","-e",
-                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voter",
-                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/test1",
-                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltcache",
-                "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltkv",
-                "-r="+m_homeDir+"/"};
-        plannerTester.main(args);
-    }
 
     //    public void testwrite() {
     //          try {
@@ -434,4 +437,3 @@ public class testPlannerTester extends TestCase {
     //          }
     //    }
 }
-

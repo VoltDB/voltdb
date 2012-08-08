@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
@@ -311,17 +312,26 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
     }
 
+    //TODO some members not loaded
     @Override
-    public void loadFromJSONObject( JSONObject jobj, Database db ) {
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        try {
-            this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
-            JSONObject jobj1 = jobj.getJSONObject( Members.PREDICATE.name() );
-            if( jobj1 != null ) {
-                this.m_predicate.fromJSONObject(jobj1, db);
-            }
-        } catch (JSONException e) {
-            //better to do nothing
+
+        this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+//        JSONObject jobj1 = jobj.getJSONObject( Members.PREDICATE.name() );
+//        if( jobj1 != null ) {
+//            this.m_predicate.fromJSONObject(jobj1, db);
+//        }
+    }
+
+    @Override
+    public void getScanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
+            HashSet<AbstractPlanNode> visited) {
+        if (visited.contains(this)) {
+            assert(false): "do not expect loops in plangraph.";
+            return;
         }
+        visited.add(this);
+        collected.add(this);
     }
 }
