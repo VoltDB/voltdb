@@ -93,7 +93,6 @@ SnapshotCompletionInterest
 
     // ZK stuff (while converting bare strings to VoltZK, map these
     // to the previously used symbols.)
-    private final static String RESTORE_BARRIER2 = VoltZK.restore_barrier + "2";
     private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
 
     private String m_generatedRestoreBarrier2;
@@ -473,7 +472,7 @@ SnapshotCompletionInterest
     public Pair<Integer, String> findRestoreCatalog() {
         createZKDirectory(VoltZK.restore);
         createZKDirectory(VoltZK.restore_barrier);
-        createZKDirectory(RESTORE_BARRIER2);
+        createZKDirectory(VoltZK.restore_barrier2);
 
         enterRestore();
 
@@ -509,7 +508,7 @@ SnapshotCompletionInterest
                                      false, e);
         }
         try {
-            m_generatedRestoreBarrier2 = m_zk.create(RESTORE_BARRIER2 + "/counter", null,
+            m_generatedRestoreBarrier2 = m_zk.create(VoltZK.restore_barrier2 + "/counter", null,
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -532,7 +531,7 @@ SnapshotCompletionInterest
         List<String> children = null;
         while (true) {
             try {
-                children = m_zk.getChildren(RESTORE_BARRIER2, false);
+                children = m_zk.getChildren(VoltZK.restore_barrier2, false);
             } catch (KeeperException e2) {
                 VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
             } catch (InterruptedException e2) {
