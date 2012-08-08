@@ -52,6 +52,14 @@ import org.voltdb.VoltZK;
 
 import com.google.common.collect.ImmutableMap;
 
+/**
+ * LeaderAppointer handles centralized appointment of partition leaders across
+ * the partition.  This is primarily so that the leaders can be evenly
+ * distributed throughout the cluster, reducing bottlenecks (at least at
+ * startup).  As a side-effect, this service also controls the initial startup
+ * of the cluster, blocking operation until each partition has a k-safe set of
+ * replicas, each partition has a leader, and the MPI has started.
+ */
 public class LeaderAppointer implements Promotable
 {
     private static final VoltLogger tmLog = new VoltLogger("TM");
@@ -59,7 +67,7 @@ public class LeaderAppointer implements Promotable
     private enum AppointerState {
         INIT,           // Initial start state, used to inhibit ZK callback actions
         CLUSTER_START,  // indicates that we're doing the initial cluster startup
-        DONE            // indicates normal running conditions
+        DONE            // indicates normal running conditions, including repair
     }
 
     private final ZooKeeper m_zk;
@@ -73,16 +81,15 @@ public class LeaderAppointer implements Promotable
     private final MpInitiator m_MPI;
     private AtomicReference<AppointerState> m_state =
         new AtomicReference<AppointerState>(AppointerState.INIT);
-    private Set<Long> m_currentLeaders = new HashSet<Long>();
     private CountDownLatch m_startupLatch = null;
 
     private class PartitionCallback extends BabySitter.Callback
     {
         final int m_partitionId;
         final Set<Long> m_replicas;
-        // bit of a hack, but no real HSId should ever be this value
         long m_currentLeader;
 
+        /** Constructor used when we know (or think we know) who the leader for this partition is */
         PartitionCallback(int partitionId, long currentLeader)
         {
             this(partitionId);
@@ -93,9 +100,11 @@ public class LeaderAppointer implements Promotable
             m_replicas.add(currentLeader);
         }
 
+        /** Constructor used at startup when there is no leader */
         PartitionCallback(int partitionId)
         {
             m_partitionId = partitionId;
+            // A bit of a hack, but we should never end up with an HSID as Long.MAX_VALUE
             m_currentLeader = Long.MAX_VALUE;
             m_replicas = new HashSet<Long>();
         }
@@ -107,11 +116,11 @@ public class LeaderAppointer implements Promotable
             // compute previously unseen HSId set in the callback list
             Set<Long> newHSIds = new HashSet<Long>(updatedHSIds);
             newHSIds.removeAll(m_replicas);
-            tmLog.info("Newly seen replicas: " + CoreUtils.hsIdCollectionToString(newHSIds));
+            tmLog.debug("Newly seen replicas: " + CoreUtils.hsIdCollectionToString(newHSIds));
             // compute previously seen but now vanished from the callback list HSId set
             Set<Long> missingHSIds = new HashSet<Long>(m_replicas);
             missingHSIds.removeAll(updatedHSIds);
-            tmLog.info("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
+            tmLog.debug("Newly dead replicas: " + CoreUtils.hsIdCollectionToString(missingHSIds));
 
             tmLog.debug("Handling babysitter callback for partition " + m_partitionId + ": children: " +
                     CoreUtils.hsIdCollectionToString(updatedHSIds));
@@ -160,14 +169,18 @@ public class LeaderAppointer implements Promotable
         }
     }
 
+    /* We'll use this callback purely for startup so we can discover when all
+     * the leaders we have appointed have completed their promotions and
+     * published themselves to Zookeeper */
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
         public void run(ImmutableMap<Integer, Long> cache) {
-            m_currentLeaders = new HashSet<Long>(cache.values());
-            tmLog.info("Updated leaders: " + m_currentLeaders);
+            Set<Long> currentLeaders = new HashSet<Long>(cache.values());
+            tmLog.debug("Updated leaders: " + currentLeaders);
             if (m_state.get() == AppointerState.CLUSTER_START) {
-                if (m_currentLeaders.size() == m_partitionCount) {
+                if (currentLeaders.size() == m_partitionCount) {
+                    tmLog.info("Leader appointment complete, promoting MPI and unblocking.");
                     m_state.set(AppointerState.DONE);
                     m_MPI.acceptPromotion();
                     m_startupLatch.countDown();
@@ -193,12 +206,13 @@ public class LeaderAppointer implements Promotable
     @Override
     public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException
     {
+        // Crank up the leader caches.  Use blocking startup so that we'll have valid point-in-time caches later.
         m_iv2appointees.start(true);
         m_iv2masters.start(true);
         // Figure out what conditions we assumed leadership under.
         if (m_iv2appointees.pointInTimeCache().size() == 0)
         {
-            tmLog.info("LeaderAppointer in startup");
+            tmLog.debug("LeaderAppointer in startup");
             m_state.set(AppointerState.CLUSTER_START);
         }
         else if ((m_iv2appointees.pointInTimeCache().size() != m_partitionCount) ||
@@ -208,14 +222,19 @@ public class LeaderAppointer implements Promotable
             VoltDB.crashGlobalVoltDB("Detected failure during startup, unable to start", false, null);
         }
         else {
-            tmLog.info("LeaderAppointer in repair");
+            tmLog.debug("LeaderAppointer in repair");
             m_state.set(AppointerState.DONE);
         }
 
         if (m_state.get() == AppointerState.CLUSTER_START) {
+            // Need to block the return of acceptPromotion until after the MPI is promoted.  Wait for this latch
+            // to countdown after appointing all the partition leaders.  The
+            // LeaderCache callback will count it down once it has seen all the
+            // appointed leaders publish themselves as the actual leaders.
             m_startupLatch = new CountDownLatch(1);
             for (int i = 0; i < m_partitionCount; i++) {
                 String dir = LeaderElector.electionDirForPartition(i);
+                // Race along with all of the replicas for this partition to create the ZK parent node
                 try {
                     m_zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
                 } catch (KeeperException.NodeExistsException e) {
@@ -228,7 +247,13 @@ public class LeaderAppointer implements Promotable
             m_startupLatch.await();
         }
         else {
-            // figure out the current state of the world.
+            // If we're taking over for a failed LeaderAppointer, we know when
+            // we get here that every partition had a leader at some point in
+            // time.  We'll seed each of the PartitionCallbacks for each
+            // partition with the HSID of the last published leader.  The
+            // blocking startup of the BabySitter watching that partition will
+            // call our callback, get the current full set of replicas, and
+            // appoint a new leader if the seeded one has actually failed
             Map<Integer, Long> masters = m_iv2masters.pointInTimeCache();
             tmLog.info("LeaderAppointer repairing with master set: " + masters);
             for (Entry<Integer, Long> master : masters.entrySet()) {
@@ -246,6 +271,9 @@ public class LeaderAppointer implements Promotable
 
     private long assignLeader(int partitionId, List<Long> children)
     {
+        // We used masterHostId = -1 as a way to force the leader choice to be
+        // the first replica in the list, if we don't have some other mechanism
+        // which has successfully overridden it.
         int masterHostId = -1;
         if (m_state.get() == AppointerState.CLUSTER_START) {
             try {
@@ -266,6 +294,11 @@ public class LeaderAppointer implements Promotable
             }
         }
         else {
+            // For now, if we're appointing a new leader as a result of a
+            // failure, just pick the first replica in the children list.
+            // Could eventually do something more complex here to try to keep a
+            // semi-balance, but it's unclear that this has much utility until
+            // we add rebalancing on rejoin as well.
             masterHostId = -1;
         }
 

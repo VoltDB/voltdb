@@ -53,7 +53,9 @@ class GlobalServiceElector implements LeaderNoticeHandler
         m_services.add(service);
     }
 
-    /** Kick off the leader election */
+    /** Kick off the leader election.
+     * Will block until all of the acceptPromotion() calls to all of the services return at the initial leader.
+     */
     void start() throws KeeperException, InterruptedException, ExecutionException
     {
         m_leaderElector.start(true);
