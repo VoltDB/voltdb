@@ -280,6 +280,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 tve.setTableName("VOLT_TEMP_TABLE");
                 tve.setValueSize(orig_col.expression.getValueSize());
                 tve.setValueType(orig_col.expression.getValueType());
+                if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    tve.setHasAggregate(true);
+                }
             }
         }
         else if (child.name.equals("function") == false)

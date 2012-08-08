@@ -25,12 +25,18 @@ package org.voltdb.planner;
 
 import java.util.List;
 
-import org.voltdb.catalog.*;
-import org.voltdb.plannodes.*;
+import junit.framework.TestCase;
+
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Table;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
+import org.voltdb.plannodes.DistinctPlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
-
-import junit.framework.TestCase;
 
 public class TestPushDownAggregates extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -65,6 +71,11 @@ public class TestPushDownAggregates extends TestCase {
         for (Table t : tmap) {
             if (!t.getTypeName().equalsIgnoreCase("d1")) {
                 t.setIsreplicated(false);
+            }
+            // partition column PKEY for Table t2
+            if (!t.getTypeName().equalsIgnoreCase("t2")) {
+                t.setIsreplicated(false);
+                t.setPartitioncolumn(t.getColumns().get("PKEY"));
             }
         }
     }
@@ -223,6 +234,24 @@ public class TestPushDownAggregates extends TestCase {
         System.out.println(pnl.toDOTString("FRAG0"));
         pnl = new PlanNodeList(pn.get(1));
         System.out.println(pnl.toDOTString("FRAG1"));
+    }
+
+    public void testMultiPartNoLimitPushdown() {
+        List<AbstractPlanNode> pn =
+                compile("select I, count(*) as tag from T2 group by I order by I limit 1", 0, false);
+
+        for ( AbstractPlanNode nd : pn) {
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+        }
+    }
+
+    public void testMultiPartLimitPushdown() {
+        List<AbstractPlanNode> pn =
+                compile("select I, count(*) as tag from T2 group by I order by tag, I limit 1", 0, false);
+
+        for ( AbstractPlanNode nd : pn) {
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+        }
     }
 
     /**
