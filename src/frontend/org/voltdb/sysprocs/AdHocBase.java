@@ -17,6 +17,7 @@
 
 package org.voltdb.sysprocs;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 import java.util.Map;
@@ -73,7 +74,13 @@ public abstract class AdHocBase extends VoltSystemProcedure {
         assert(serializedBatchData != null);
 
         ByteBuffer buf = ByteBuffer.wrap(serializedBatchData);
-        AdHocPlannedStatement[] statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
+        AdHocPlannedStatement[] statements = null;
+        try {
+            statements = AdHocPlannedStmtBatch.planArrayFromBuffer(buf);
+        }
+        catch (IOException e) {
+            throw new VoltAbortException(e);
+        }
 
         if (statements.length == 0) {
             return new VoltTable[]{};
@@ -95,8 +102,9 @@ public abstract class AdHocBase extends VoltSystemProcedure {
                     statement.aggregatorFragment,
                     statement.collectorFragment,
                     statement.isReplicatedTableDML,
-                    statement.params);
-            voltQueueSQL(stmt);
+                    statement.parameterTypes);
+
+            voltQueueSQL(stmt, statement.extractedParamValues.toArray());
         }
 
         return voltExecuteSQL(true);
