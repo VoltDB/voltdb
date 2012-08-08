@@ -395,13 +395,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        try {
-            m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
-            m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-            //                  JSONObject obj = jobj.getJSONObject(Members.END_EXPRESSION.name());
-            //                  m_endExpression.fromJSONObject( obj, db);
-        } catch (JSONException e) {
-            e.printStackTrace();
-        }
+        m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
+        m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
+        //                  JSONObject obj = jobj.getJSONObject(Members.END_EXPRESSION.name());
+        //                  m_endExpression.fromJSONObject( obj, db);
     }
 }

@@ -681,19 +681,8 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             n.getScanNodeList_recurse(collected, visited);
         }
 
-        Iterator it = m_inlineNodes.entrySet().iterator();
-        if( it.hasNext() ) {
-            Map.Entry<PlanNodeType, AbstractPlanNode> pair = (Map.Entry<PlanNodeType, AbstractPlanNode>) it.next();
-            if( pair.getKey().equals( PlanNodeType.INDEXSCAN ) ) {
-                collected.add( pair.getValue() );
-            }
-            else if(  pair.getKey().equals( PlanNodeType.SEQSCAN ) ) {
-                collected.add( pair.getValue() );
-            }
-        }
-        if ( getChildCount()==0 &&
-                ( getPlanNodeType().equals(PlanNodeType.SEQSCAN) || getPlanNodeType().equals(PlanNodeType.INDEXSCAN ) ) ) {
-            collected.add(this);
+        for (AbstractPlanNode node : m_inlineNodes.values()) {
+            node.getScanNodeList_recurse(collected, visited);
         }
     }
 
