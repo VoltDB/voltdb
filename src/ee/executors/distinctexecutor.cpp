@@ -94,12 +94,16 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
 
+    // substitute params for distinct expression
+    AbstractExpression *distinctExpression = node->getDistinctExpression();
+    distinctExpression->substitute(params);
+
     std::set<NValue, NValue::ltNValue> found_values;
     while (iterator.next(tuple)) {
         //
         // Check whether this value already exists in our list
         //
-        NValue tuple_value = node->getDistinctExpression()->eval(&tuple, NULL);
+        NValue tuple_value = distinctExpression->eval(&tuple, NULL);
         if (found_values.find(tuple_value) == found_values.end()) {
             found_values.insert(tuple_value);
             if (!output_table->insertTuple(tuple)) {
