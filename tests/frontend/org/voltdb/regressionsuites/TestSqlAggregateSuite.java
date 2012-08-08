@@ -409,6 +409,14 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         }
     }
 
+    // ENG-3645 crashed on an aggregates memory management issue.
+    public void testEng3645() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable[] results = client.callProcedure("@AdHoc",
+                "SELECT SUM(HOURS),AVG(HOURS),MIN(HOURS),MAX(HOURS) FROM ENG3465 WHERE EMPNUM='E1';").getResults();
+        assertTrue(results[0].advanceRow());
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //

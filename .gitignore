@@ -28,5 +28,9 @@ voltipc.xcodeproj/
 *runapp*.py
 *.log
 tests/test_apps/*/*.jar
+doc/tutorials/*/*.jar
+doc/tutorials/auction/csvloader_*.csv
 src/frontend/org/voltdb/compiler/projectfile/
 src/frontend/org/voltdb/compiler/deploymentfile/
+doc/tutorials/*/*.jar
+doc/tutorials/auction/csvloader_*.csv

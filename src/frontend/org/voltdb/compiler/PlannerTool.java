@@ -17,22 +17,16 @@
 
 package org.voltdb.compiler;
 
-import java.util.List;
-
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.hsqldb_voltpatches.HSQLInterface.HSQLParseException;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltDB;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
 import org.voltdb.planner.CompiledPlan;
-import org.voltdb.planner.CompiledPlan.Fragment;
-import org.voltdb.planner.ParameterInfo;
 import org.voltdb.planner.PartitioningForStatement;
 import org.voltdb.planner.QueryPlanner;
 import org.voltdb.planner.TrivialCostModel;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.utils.Encoder;
 
 /**
@@ -48,27 +42,6 @@ public class PlannerTool {
     final HSQLInterface m_hsql;
 
     public static final int AD_HOC_JOINED_TABLE_LIMIT = 5;
-
-    public static class Result {
-        byte[] onePlan = null;
-        byte[] allPlan = null;
-        boolean replicatedDML = false;
-        boolean nonDeterministic = false;
-        Object partitionParam;
-        List<ParameterInfo> params;
-
-        @Override
-        public String toString() {
-            StringBuilder sb = new StringBuilder();
-            sb.append("RESULT {\n");
-            sb.append("  ONE: ").append(onePlan == null ? "null" : new String(onePlan, VoltDB.UTF8ENCODING)).append("\n");
-            sb.append("  ALL: ").append(allPlan == null ? "null" : new String(allPlan, VoltDB.UTF8ENCODING)).append("\n");
-            sb.append("  RTD: ").append(replicatedDML ? "true" : "false").append("\n");
-            sb.append("  PARAM: ").append(partitionParam == null ? "null" : partitionParam.toString()).append("\n");
-            sb.append("}");
-            return sb.toString();
-        }
-    }
 
     public PlannerTool(final Cluster cluster, final Database database) {
         assert(cluster != null);
@@ -99,7 +72,7 @@ public class PlannerTool {
         hostLog.info("hsql loaded");
     }
 
-    public Result planSql(String sqlIn, Object partitionParam, boolean inferSP, boolean allowParameterization) {
+    public AdHocPlannedStatement planSql(String sqlIn, Object partitionParam, boolean inferSP, boolean allowParameterization) {
         if ((sqlIn == null) || (sqlIn.length() == 0)) {
             throw new RuntimeException("Can't plan empty or null SQL.");
         }
@@ -121,7 +94,7 @@ public class PlannerTool {
                 m_cluster, m_database, partitioning, m_hsql, new DatabaseEstimates(), true);
         CompiledPlan plan = null;
         try {
-            plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
+            plan = planner.compilePlan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null, true);
         } catch (Exception e) {
             throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
         }
@@ -135,7 +108,10 @@ public class PlannerTool {
             }
         }
 
-        if (!allowParameterization && plan.parameters.size() > 0) {
+        if (!allowParameterization &&
+            (plan.extractedParamValues.size() == 0) &&
+            (plan.parameters.length > 0))
+        {
             throw new RuntimeException("ERROR: PARAMETERIZATION IN AD HOC QUERY");
         }
 
@@ -147,40 +123,10 @@ public class PlannerTool {
             hostLog.warn(potentialErrMsg);
         }
 
-        //log("finished planning stmt:");
-        //log("SQL: " + plan.sql);
-        //log("COST: " + Double.toString(plan.cost));
-        //log("PLAN:\n");
-        //log(plan.explainedPlan);
-
-        assert(plan.fragments.size() <= 2);
-
         //////////////////////
         // OUTPUT THE RESULT
         //////////////////////
-        Result retval = new Result();
 
-        /*
-         * Copy the parameter information
-         */
-        retval.params = plan.parameters;
-        for (Fragment frag : plan.fragments) {
-            PlanNodeList planList = new PlanNodeList(frag.planGraph);
-            byte[] serializedPlan = planList.toJSONString().getBytes(VoltDB.UTF8ENCODING);
-            byte[] encodedPlan = serializedPlan; //Encoder.compressAndBase64Encode(serializedPlan);
-            if (frag.multiPartition) {
-                assert(retval.allPlan == null);
-                retval.allPlan = encodedPlan;
-            }
-            else {
-                assert(retval.onePlan == null);
-                retval.onePlan = encodedPlan;
-            }
-        }
-
-        retval.replicatedDML = plan.replicatedTableDML;
-        retval.nonDeterministic = !plan.isContentDeterministic() || !plan.isOrderDeterministic();
-        retval.partitionParam = partitioning.effectivePartitioningValue();
-        return retval;
+        return new AdHocPlannedStatement(plan);
     }
 }

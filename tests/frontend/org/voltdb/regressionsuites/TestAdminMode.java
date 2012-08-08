@@ -204,7 +204,7 @@ public class TestAdminMode extends RegressionSuite
             results = adminclient.callProcedure("@Resume").getResults();
             System.out.println(results[0].toString());
             // queue up a bunch of invocations but don't read the responses
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 10000; i++)
             {
                 ConnectionUtil.sendInvocation(channel, "InsertA", i, 1000 + i);
                 ConnectionUtil.sendInvocation(channel, "SelectA");

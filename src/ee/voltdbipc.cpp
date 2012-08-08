@@ -90,7 +90,6 @@ typedef struct {
     int32_t tableId;
     int64_t txnId;
     int64_t lastCommittedTxnId;
-    int64_t undoToken;
     char data[0];
 }__attribute__((packed)) load_table_cmd;
 
@@ -665,14 +664,12 @@ int8_t VoltDBIPC::loadTable(struct ipc_command *cmd) {
     const int32_t tableId = ntohl(loadTableCommand->tableId);
     const int64_t txnId = ntohll(loadTableCommand->txnId);
     const int64_t lastCommittedTxnId = ntohll(loadTableCommand->lastCommittedTxnId);
-    const int64_t undoToken = ntohll(loadTableCommand->undoToken);
     // ...and fast serialized table last.
     void* offset = loadTableCommand->data;
     int sz = static_cast<int> (ntohl(cmd->msgsize) - sizeof(load_table_cmd));
     try {
         ReferenceSerializeInput serialize_in(offset, sz);
 
-        m_engine->setUndoToken(undoToken);
         bool success = m_engine->loadTable(tableId, serialize_in, txnId, lastCommittedTxnId);
         if (success) {
             return kErrorCode_Success;
@@ -1122,9 +1119,11 @@ int main(int argc, char **argv) {
 
     int port = 0;
 
+    // allow called to override port with the first argument
     if (argc == 2) {
-        printf("Binding to a specific socket is no longer supported\n");
-        exit(-1);
+        char *portStr = argv[1];
+        assert(portStr);
+        port = atoi(portStr);
     }
 
     struct sockaddr_in address;
