@@ -748,7 +748,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 m_cihm.put(c.connectionId(),
                            new ClientInterfaceHandleManager( m_isAdmin, c, m_acg.get()));
                 m_acg.get().addMember(this);
-                System.out.println("Initial read selection is " + !m_acg.get().hasBackPressure());
                 if (!m_acg.get().hasBackPressure()) {
                     c.enableReadSelection();
                 }
@@ -863,7 +862,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void offBackpressure() {
-            System.out.println("Backpressure deactivated");
             m_connection.enableReadSelection();
         }
     }
@@ -1651,7 +1649,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // Set up the parameters.
         ByteBuffer buf = ByteBuffer.allocate(plannedStmtBatch.getPlanArraySerializedSize());
-        plannedStmtBatch.flattenPlanArrayToBuffer(buf);
+        try {
+            plannedStmtBatch.flattenPlanArrayToBuffer(buf);
+        }
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
         assert(buf.hasArray());
         task.setParams(buf.array());
         task.clientHandle = plannedStmtBatch.clientHandle;

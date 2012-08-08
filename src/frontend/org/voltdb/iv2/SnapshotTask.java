@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.SiteProcedureConnection;
 
 public class SnapshotTask extends SiteTasker
@@ -32,7 +31,7 @@ public class SnapshotTask extends SiteTasker
     @Override
     public void run(SiteProcedureConnection siteConnection)
     {
-        siteConnection.doSnapshotWork(false);
+        siteConnection.doSnapshotWork(true);
     }
 
     @Override

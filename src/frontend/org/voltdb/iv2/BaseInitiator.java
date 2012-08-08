@@ -17,22 +17,21 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
-
 import org.voltcore.utils.CoreUtils;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 
-import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
+import org.voltdb.LoadedProcedureSet;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
@@ -93,6 +92,11 @@ public abstract class BaseInitiator implements Initiator
                           boolean createForRejoin)
         throws KeeperException, ExecutionException, InterruptedException
     {
+            int snapshotPriority = 6;
+            if (catalogContext.cluster.getDeployment().get("deployment") != null) {
+                snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
+                    getSystemsettings().get("systemsettings").getSnapshotpriority();
+            }
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -100,7 +104,8 @@ public abstract class BaseInitiator implements Initiator
                                        catalogContext.m_transactionId,
                                        m_partitionId,
                                        numberOfPartitions,
-                                       createForRejoin);
+                                       createForRejoin,
+                                       snapshotPriority);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
