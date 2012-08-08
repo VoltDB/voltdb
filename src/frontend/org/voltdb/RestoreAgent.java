@@ -93,7 +93,6 @@ SnapshotCompletionInterest
 
     // ZK stuff (while converting bare strings to VoltZK, map these
     // to the previously used symbols.)
-    private final static String RESTORE = VoltZK.restore;
     private final static String RESTORE_BARRIER = VoltZK.restore_barrier;
     private final static String RESTORE_BARRIER2 = VoltZK.restore_barrier + "2";
     private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
@@ -473,7 +472,7 @@ SnapshotCompletionInterest
      *         to restore.
      */
     public Pair<Integer, String> findRestoreCatalog() {
-        createZKDirectory(RESTORE);
+        createZKDirectory(VoltZK.restore);
         createZKDirectory(RESTORE_BARRIER);
         createZKDirectory(RESTORE_BARRIER2);
 
@@ -776,7 +775,7 @@ SnapshotCompletionInterest
     private void sendLocalRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
         ByteBuffer buf = serializeRestoreInformation(max, snapshots);
 
-        String zkNode = RESTORE + "/" + m_hostId;
+        String zkNode = VoltZK.restore + "/" + m_hostId;
         try {
             m_zk.create(zkNode, buf.array(),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
@@ -798,7 +797,7 @@ SnapshotCompletionInterest
         List<String> children = null;
         while (true) {
             try {
-                children = m_zk.getChildren(RESTORE, false);
+                children = m_zk.getChildren(VoltZK.restore, false);
             } catch (KeeperException e2) {
                 throw e2;
             } catch (InterruptedException e2) {
@@ -929,7 +928,7 @@ SnapshotCompletionInterest
 
             byte[] data = null;
             try {
-                data = m_zk.getData(RESTORE + "/" + node, false, null);
+                data = m_zk.getData(VoltZK.restore + "/" + node, false, null);
             } catch (Exception e) {
                 throw e;
             }
