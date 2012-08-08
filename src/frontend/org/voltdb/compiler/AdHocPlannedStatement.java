@@ -17,10 +17,13 @@
 
 package org.voltdb.compiler;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltdb.ParameterSet;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltType;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.planner.CompiledPlan;
 
 /**
@@ -37,7 +40,8 @@ public class AdHocPlannedStatement implements Cloneable {
     public boolean isNonDeterministic;
     public boolean readOnly;
     public int catalogVersion;
-    public VoltType[] params;
+    public VoltType[] parameterTypes;
+    public ParameterSet extractedParamValues;
     public Object partitionParam; // not serialized
 
     AdHocPlannedStatement(CompiledPlan plan) {
@@ -47,7 +51,8 @@ public class AdHocPlannedStatement implements Cloneable {
         isReplicatedTableDML = plan.replicatedTableDML;
         isNonDeterministic = (!plan.isContentDeterministic()) || (!plan.isOrderDeterministic());
         catalogVersion = -1;
-        params = plan.parameters;
+        parameterTypes = plan.parameters;
+        extractedParamValues = plan.extractedParamValues;
         readOnly = plan.readOnly;
         partitionParam = plan.getPartitioningKey();
 
@@ -63,7 +68,8 @@ public class AdHocPlannedStatement implements Cloneable {
      * @param isReplicatedTableDML      replication flag
      * @param isNonDeterministic        non-deterministic SQL flag
      * @param isReadOnly                does it write
-     * @param params                    parameter type array
+     * @param paramTypes                parameter type array
+     * @param extractedParamValues      params extracted from constant values
      * @param catalogVersion            catalog version
      */
     public AdHocPlannedStatement(byte[] sql,
@@ -72,7 +78,8 @@ public class AdHocPlannedStatement implements Cloneable {
                                  boolean isReplicatedTableDML,
                                  boolean isNonDeterministic,
                                  boolean isReadOnly,
-                                 VoltType[] params,
+                                 VoltType[] paramTypes,
+                                 ParameterSet extractedParamValues,
                                  int catalogVersion) {
         this.sql = sql;
         this.aggregatorFragment = aggregatorFragment;
@@ -80,7 +87,8 @@ public class AdHocPlannedStatement implements Cloneable {
         this.isReplicatedTableDML = isReplicatedTableDML;
         this.isNonDeterministic = isNonDeterministic;
         this.readOnly = isReadOnly;
-        this.params = params;
+        this.parameterTypes = paramTypes;
+        this.extractedParamValues = extractedParamValues;
         this.catalogVersion = catalogVersion;
 
         // as this constructor is used for deserializaton on the proc-running side,
@@ -91,9 +99,22 @@ public class AdHocPlannedStatement implements Cloneable {
 
     private void validate() {
         assert(aggregatorFragment != null);
-        assert((isNonDeterministic == false) || (readOnly == true)); // nondet => readonly
-        assert((isReplicatedTableDML == false) || (readOnly == false)); // dml => !readonly
-        assert((isReplicatedTableDML == false) || (collectorFragment != null)); // repdml => 2partplan
+
+        // nondet => readonly
+        assert((isNonDeterministic == false) || (readOnly == true));
+
+        // dml => !readonly
+        assert((isReplicatedTableDML == false) || (readOnly == false));
+
+        // repdml => 2partplan
+        assert((isReplicatedTableDML == false) || (collectorFragment != null));
+
+        // zero param types => null extracted params
+        // nonzero param types => param types and extracted params have same size
+        assert(parameterTypes != null);
+        assert(extractedParamValues != null);
+        // any extracted params => extracted param size == param type array size
+        assert((extractedParamValues.size() == 0) || (extractedParamValues.size() == parameterTypes.length));
     }
 
     @Override
@@ -130,14 +151,14 @@ public class AdHocPlannedStatement implements Cloneable {
         size += 4; // catalog version
 
         size += 2; // params count
-        if (params != null) {
-            size += params.length;
-        }
+        size += parameterTypes.length;
+
+        size += extractedParamValues.getSerializedSize();
 
         return size;
     }
 
-    void flattenToBuffer(ByteBuffer buf) {
+    void flattenToBuffer(ByteBuffer buf) throws IOException {
         validate(); // assertions for extra safety
 
         buf.putShort((short) sql.length);
@@ -160,18 +181,15 @@ public class AdHocPlannedStatement implements Cloneable {
 
         buf.putInt(catalogVersion);
 
-        if (params != null) {
-            buf.putShort((short) params.length);
-            for (VoltType type : params) {
-                buf.put(type.getValue());
-            }
+        buf.putShort((short) parameterTypes.length);
+        for (VoltType type : parameterTypes) {
+            buf.put(type.getValue());
         }
-        else {
-            buf.putShort((short) 0);
-        }
+
+        extractedParamValues.flattenToBuffer(buf);
     }
 
-    public static AdHocPlannedStatement fromBuffer(ByteBuffer buf) {
+    public static AdHocPlannedStatement fromBuffer(ByteBuffer buf) throws IOException {
         byte[] sql = new byte[buf.getShort()];
         buf.get(sql);
 
@@ -192,10 +210,14 @@ public class AdHocPlannedStatement implements Cloneable {
         int catalogVersion = buf.getInt();
 
         short paramCount = buf.getShort();
-        VoltType[] params = new VoltType[paramCount];
+        VoltType[] paramTypes = new VoltType[paramCount];
         for (int i = 0; i < paramCount; ++i) {
-            params[i] = VoltType.get(buf.get());
+            paramTypes[i] = VoltType.get(buf.get());
         }
+
+        ParameterSet parameterSet = new ParameterSet();
+        FastDeserializer fds = new FastDeserializer(buf);
+        parameterSet.readExternal(fds);
 
         return new AdHocPlannedStatement(
                 sql,
@@ -204,7 +226,8 @@ public class AdHocPlannedStatement implements Cloneable {
                 isReplicatedTableDML,
                 isNonDeterministic,
                 isReadOnly,
-                params,
+                paramTypes,
+                parameterSet,
                 catalogVersion);
     }
 }
