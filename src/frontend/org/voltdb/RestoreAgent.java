@@ -90,11 +90,6 @@ SnapshotCompletionInterest
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
-
-    // ZK stuff (while converting bare strings to VoltZK, map these
-    // to the previously used symbols.)
-    private final static String SNAPSHOT_ID = VoltZK.restore_snapshot_id;
-
     private String m_generatedRestoreBarrier2;
 
     // Transaction ID of the restore sysproc
@@ -173,7 +168,7 @@ SnapshotCompletionInterest
                 // Wait until either we're the leader or the snapshot TXNID node
                 // exists, then do the right thing.
                 while (!m_isLeader &&
-                        (m_zk.exists(SNAPSHOT_ID, null) == null))
+                        (m_zk.exists(VoltZK.restore_snapshot_id, null) == null))
                 {
                     Thread.sleep(200);
                 }
@@ -181,7 +176,7 @@ SnapshotCompletionInterest
                 /*
                  * If this is the leader, initiate the snapshot restore
                  */
-                if (m_zk.exists(SNAPSHOT_ID, null) == null)
+                if (m_zk.exists(VoltZK.restore_snapshot_id, null) == null)
                 {
                     if (m_isLeader)
                     {
@@ -554,7 +549,7 @@ SnapshotCompletionInterest
         // Clean up the ZK snapshot ID node so that we're good for next time.
         try
         {
-            m_zk.delete(SNAPSHOT_ID, -1);
+            m_zk.delete(VoltZK.restore_snapshot_id, -1);
         }
         catch (Exception ignore) {}
     }
@@ -728,7 +723,7 @@ SnapshotCompletionInterest
 
         LOG.debug("Sending snapshot ID " + txnId + " for restore to other nodes");
         try {
-            m_zk.create(SNAPSHOT_ID, buf.array(),
+            m_zk.create(VoltZK.restore_snapshot_id, buf.array(),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -740,13 +735,13 @@ SnapshotCompletionInterest
      * Get the txnId of the snapshot the cluster is restoring from from ZK.
      * NOTE that the barrier for this is now completely contained
      * in run() in the restorePlanner thread; nobody gets out of there until
-     * someone wins the leader election and successfully writes the SNAPSHOT_ID
+     * someone wins the leader election and successfully writes the VoltZK.restore_snapshot_id
      * node, so we just need to read it here.
      */
     private void fetchSnapshotTxnId() {
         long txnId = 0;
         try {
-            byte[] data = m_zk.getData(SNAPSHOT_ID, false, null);
+            byte[] data = m_zk.getData(VoltZK.restore_snapshot_id, false, null);
             txnId = ByteBuffer.wrap(data).getLong();
         } catch (KeeperException e2) {
             VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
