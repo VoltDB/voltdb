@@ -34,7 +34,6 @@ import java.util.Set;
 import java.util.TreeMap;
 import java.util.concurrent.Callable;
 import java.util.concurrent.CountDownLatch;
-import java.util.concurrent.Future;
 import java.util.concurrent.FutureTask;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -45,17 +44,12 @@ import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.logging.VoltLogger;
-import org.voltcore.network.Connection;
-import org.voltcore.network.NIOReadStream;
-import org.voltcore.network.WriteStream;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.LeaderElector;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.client.ClientResponse;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
@@ -100,7 +94,17 @@ SnapshotCompletionInterest
 
     // Transaction ID of the restore sysproc
     private final static long RESTORE_TXNID = 1l;
-    private final RestoreAdapter m_restoreAdapter = new RestoreAdapter();
+
+    // Restore adapter needs a completion functor.
+    // Runnable here preferable to exposing all of RestoreAgent to RestoreAdapater.
+    private final Runnable m_changeStateFunctor = new Runnable() {
+        @Override
+        public void run() {
+            changeState();
+        }
+    };
+
+    private final RestoreAdapter m_restoreAdapter = new RestoreAdapter(m_changeStateFunctor);
 
     private final ZooKeeper m_zk;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
@@ -203,106 +207,6 @@ SnapshotCompletionInterest
             }
         }
     };
-
-    /**
-     * A dummy connection to provide to the DTXN. It routes ClientResponses back
-     * to the restore agent.
-     */
-    private class RestoreAdapter implements Connection, WriteStream {
-        @Override
-        public boolean hadBackPressure() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void enqueue(DeferredSerialization ds) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void enqueue(ByteBuffer b) {
-            ClientResponseImpl resp = new ClientResponseImpl();
-            try
-            {
-                b.position(4);
-                resp.initFromBuffer(b);
-            }
-            catch (IOException ioe)
-            {
-                LOG.error("Unable to deserialize ClientResponse from snapshot",
-                          ioe);
-                return;
-            }
-            handleResponse(resp);
-        }
-
-        @Override
-        public void enqueue(ByteBuffer[] b) {
-            if (b.length == 1)
-            {
-                enqueue(b[0]);
-            }
-            else
-            {
-                throw new UnsupportedOperationException();
-            }
-        }
-
-        @Override
-        public int calculatePendingWriteDelta(long now) {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public boolean isEmpty() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public int getOutstandingMessageCount() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public WriteStream writeStream() {
-            return this;
-        }
-
-        @Override
-        public NIOReadStream readStream() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void disableReadSelection() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public void enableReadSelection() {
-            throw new UnsupportedOperationException();
-        }
-
-        @Override
-        public String getHostnameOrIP() {
-            return "";
-        }
-
-        @Override
-        public long connectionId() {
-            return Long.MIN_VALUE + 1;
-        }
-
-        @Override
-        public Future<?> unregister() {
-            return null;
-        }
-
-        @Override
-        public void queueTask(Runnable r) {
-            throw new UnsupportedOperationException();
-        }
-    }
 
     /**
      * Information about the local files of a specific snapshot that will be
@@ -1052,31 +956,6 @@ SnapshotCompletionInterest
                                           m_restoreAdapter, 0,
                                           EstTime.currentTimeMillis(),
                                           false);
-        }
-    }
-
-    private void handleResponse(ClientResponse res) {
-        boolean failure = false;
-        if (res.getStatus() != ClientResponse.SUCCESS) {
-            failure = true;
-        }
-
-        VoltTable[] results = res.getResults();
-        if (results == null || results.length != 1) {
-            failure = true;
-        }
-        while (!failure && results[0].advanceRow()) {
-            String resultStatus = results[0].getString("RESULT");
-            if (!resultStatus.equalsIgnoreCase("success")) {
-                failure = true;
-            }
-        }
-
-        if (failure) {
-            VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
-                                     res.getStatusString(), false, null);
-        } else {
-            changeState();
         }
     }
 
