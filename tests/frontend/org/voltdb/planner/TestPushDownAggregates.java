@@ -27,9 +27,6 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.DistinctPlanNode;
@@ -236,22 +233,46 @@ public class TestPushDownAggregates extends TestCase {
         System.out.println(pnl.toDOTString("FRAG1"));
     }
 
-    public void testMultiPartNoLimitPushdown() {
+    public void testMultiPartLimitPushdown() {
         List<AbstractPlanNode> pn =
                 compile("select I, count(*) as tag from T2 group by I order by I limit 1", 0, false);
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
         }
     }
 
-    public void testMultiPartLimitPushdown() {
+    public void testMultiPartLimitPushdownByOne() {
+        List<AbstractPlanNode> pn =
+                compile("select I, count(*) as tag from T2 group by I order by 1 limit 1", 0, false);
+
+        for ( AbstractPlanNode nd : pn) {
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+            assertTrue(nd.toExplainPlanString().contains("LIMIT"));
+        }
+    }
+
+    public void testMultiPartNoLimitPushdown() {
         List<AbstractPlanNode> pn =
                 compile("select I, count(*) as tag from T2 group by I order by tag, I limit 1", 0, false);
 
         for ( AbstractPlanNode nd : pn) {
-            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
         }
+        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
+    }
+
+    public void testMultiPartNoLimitPushdownByTwo() {
+        List<AbstractPlanNode> pn =
+                compile("select I, count(*) as tag from T2 group by I order by 2 limit 1", 0, false);
+
+        for ( AbstractPlanNode nd : pn) {
+            System.out.println("PlanNode Explain string:\n" + nd.toExplainPlanString());
+        }
+        assertTrue(pn.get(0).toExplainPlanString().contains("LIMIT"));
+        assertFalse(pn.get(1).toExplainPlanString().contains("LIMIT"));
     }
 
     /**

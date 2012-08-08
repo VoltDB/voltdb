@@ -42,7 +42,8 @@ public class TupleValueExpression extends AbstractValueExpression {
 
     private boolean m_hasAggregate = false;
 
-
+    /// Only set for the special case of an aggregate function result used in an "ORDER BY" clause.
+    /// This TupleValueExpression represents the corresponding "column" in the aggregate's generated output TEMP table.
     public boolean hasAggregate() {
         return m_hasAggregate;
     }
