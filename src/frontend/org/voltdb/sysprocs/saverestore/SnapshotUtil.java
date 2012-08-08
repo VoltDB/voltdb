@@ -129,8 +129,10 @@ public class SnapshotUtil {
             }
             stringer.endArray();
             stringer.key("partitionTransactionIds").object();
+            int ii = 0;
             for (Long txnid : partitionTransactionIds) {
-                stringer.key("0").value(txnid);
+                stringer.key(Integer.toString(ii)).value(txnid);
+                ii++;
             }
             stringer.endObject();
             stringer.key("catalogCRC").value(catalogCRC);
