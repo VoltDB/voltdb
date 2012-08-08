@@ -401,11 +401,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     @Override
     public boolean isActiveOrPreviouslyKnownSiteId(long hsid) {
-        // if the site id is less than this one, then it existed when this site
+        // if the host id is less than this one, then it existed when this site
         // was created (or it failed before this site existed)
         // This relies on the non-resuse and monotonically increasingness of host ids
         // this also assumes no garbage input
-        if (hsid <= m_siteId) {
+        if (CoreUtils.getHostIdFromHSId(hsid) <= CoreUtils.getHostIdFromHSId(m_siteId)) {
             return true;
         }
 
