@@ -70,8 +70,6 @@ public class CSVLoader {
     private static String insertProcedure = "";
     private static Map<Long, String[]> errorInfo = new TreeMap<Long, String[]>();
 
-    private static CSVReader csvReader;
-    private static Client csvClient;
     protected static final VoltLogger m_log = new VoltLogger("CONSOLE");
 
     private static final class MyCallback implements ProcedureCallback {
@@ -199,6 +197,7 @@ public class CSVLoader {
 
         config = cfg;
         configuration();
+        CSVReader csvReader = null;
         try {
             if (CSVLoader.standin)
                 csvReader = new CSVReader(new BufferedReader(
@@ -214,6 +213,7 @@ public class CSVLoader {
             m_log.error("CSV file '" + config.file + "' could not be found.");
             System.exit(-1);
         }
+        assert(csvReader != null);
         // Split server list
         String[] serverlist = config.servers.split(",");
 
@@ -221,6 +221,7 @@ public class CSVLoader {
         ClientConfig c_config = new ClientConfig(config.user, config.password);
         c_config.setProcedureCallTimeout(0); // Set procedure all to infinite
                                              // timeout, see ENG-2670
+        Client csvClient = null;
         try {
             csvClient = CSVLoader.getClient(c_config, serverlist, config.port);
         } catch (Exception e) {
@@ -229,6 +230,7 @@ public class CSVLoader {
             close_cleanup();
             System.exit(-1);
         }
+        assert(csvClient != null);
 
         try {
             ProcedureCallback cb = null;
@@ -326,6 +328,7 @@ public class CSVLoader {
 
         produceFiles();
         close_cleanup();
+        csvReader.close();
         csvClient.close();
     }
 
@@ -401,7 +404,7 @@ public class CSVLoader {
 
     private static void produceFiles() {
         latency = System.currentTimeMillis() - start;
-        m_log.info("CSVLoader elaspsed: " + latency / 1000F
+        m_log.info("CSVLoader elapsed: " + latency / 1000F
                 + " seconds");
 
         int bulkflush = 300; // by default right now
@@ -411,7 +414,7 @@ public class CSVLoader {
                 String info[] = errorInfo.get(irow);
                 if (info.length != 2)
                     System.out
-                            .println("internal error, infomation is not enough");
+                            .println("internal error, information is not enough");
                 linect++;
                 out_invaliderowfile.write(info[0] + "\n");
                 String message = "Invalid input on line " + irow + ".\n  Contents:" + info[0];
@@ -458,7 +461,6 @@ public class CSVLoader {
         outCount.set(0);
         errorInfo.clear();
 
-        csvReader.close();
         out_invaliderowfile.close();
         out_logfile.close();
         out_reportfile.close();
