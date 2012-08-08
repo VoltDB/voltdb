@@ -965,7 +965,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                             isSinglePartition,
                             invocation,
                             handle,
-                            connectionId);
+                            connectionId,
+                            false);
 
                 Iv2Trace.logCreateTransaction(workRequest);
                 m_mailbox.send(initiatorHSId, workRequest);

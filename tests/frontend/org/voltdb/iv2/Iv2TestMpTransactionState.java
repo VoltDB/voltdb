@@ -23,7 +23,13 @@
 
 package org.voltdb.iv2;
 
-import static org.mockito.Mockito.*;
+import static org.mockito.Matchers.any;
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.never;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
@@ -197,7 +203,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, -1, (txnId-1), txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, -1, (txnId-1), txnId, true, false, null, 0, 0, false);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -242,7 +248,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, -1, (txnId -1), txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, -1, (txnId -1), txnId, true, false, null, 0, 0, false);
         int hsids = 6;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -284,7 +290,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(3, 4, (txnId - 1), txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(3, 4, (txnId - 1), txnId, true, false, null, 0, 0, false);
         int hsids = 6;
         buddyHSId = 3;
         long[] non_local = configureHSIds(hsids);
@@ -328,7 +334,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, 0, (txnId - 1), txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, 0, (txnId - 1), txnId, true, false, null, 0, 0, false);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -377,7 +383,7 @@ public class Iv2TestMpTransactionState extends TestCase
         long txnId = 1234l;
         int batch_size = 3;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, 0, (txnId - 1), txnId, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, 0, (txnId - 1), txnId, true, false, null, 0, 0, false);
         int hsids = 1;
         buddyHSId = 0;
         long[] non_local = configureHSIds(hsids);
@@ -429,7 +435,7 @@ public class Iv2TestMpTransactionState extends TestCase
     {
         long truncPt = 100L;
         Iv2InitiateTaskMessage taskmsg =
-            new Iv2InitiateTaskMessage(0, 0, truncPt, 101L, true, false, null, 0, 0);
+            new Iv2InitiateTaskMessage(0, 0, truncPt, 101L, true, false, null, 0, 0, false);
         assertEquals(truncPt, taskmsg.getTruncationHandle());
 
         FragmentTaskMessage localFrag = mock(FragmentTaskMessage.class);

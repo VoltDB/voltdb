@@ -154,8 +154,20 @@ public class SpScheduler extends Scheduler
                         message.isSinglePartition(),
                         message.getStoredProcedureInvocation(),
                         message.getClientInterfaceHandle(),
-                        message.getConnectionId());
-                newSpHandle = m_txnId.incrementAndGet();
+                        message.getConnectionId(),
+                        message.isForReplay());
+
+                /*
+                 * If this is CL replay use the txnid from the CL and also
+                 * update the txnid to match the one from the CL
+                 */
+                if (message.isForReplay()) {
+                    newSpHandle = message.getTxnId();
+                    m_txnId.set(newSpHandle);
+                } else {
+                    newSpHandle = m_txnId.incrementAndGet();
+                }
+
                 msg.setSpHandle(newSpHandle);
                 // Also, if this is a vanilla single-part procedure, make the TXNID
                 // be the SpHandle (for now)
@@ -172,7 +184,8 @@ public class SpScheduler extends Scheduler
                                 msg.isSinglePartition(),
                                 msg.getStoredProcedureInvocation(),
                                 msg.getClientInterfaceHandle(),
-                                msg.getConnectionId());
+                                msg.getConnectionId(),
+                                msg.isForReplay());
                     // Update the handle in the copy
                     replmsg.setSpHandle(newSpHandle);
                     m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),

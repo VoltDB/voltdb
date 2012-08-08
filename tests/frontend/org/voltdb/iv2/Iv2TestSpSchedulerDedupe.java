@@ -23,39 +23,39 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Matchers.anyLong;
+import static org.mockito.Matchers.anyObject;
+import static org.mockito.Matchers.eq;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
+
 import java.util.ArrayList;
+import java.util.HashMap;
 import java.util.List;
-
-import org.json_voltpatches.JSONException;
-
-import org.mockito.ArgumentCaptor;
-import static org.mockito.Mockito.*;
-
-import org.voltcore.messaging.VoltMessage;
-
-import org.voltcore.zk.MapCache;
-
-import org.voltdb.ClientResponseImpl;
-
-import org.voltdb.messaging.FragmentResponseMessage;
-import org.voltdb.messaging.InitiateResponseMessage;
-
-import org.voltdb.ParameterSet;
-import org.voltdb.ProcedureRunner;
 
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.junit.Test;
+import org.mockito.ArgumentCaptor;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.zk.MapCache;
+import org.voltdb.ClientResponseImpl;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.ParameterSet;
+import org.voltdb.ProcedureRunner;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDBInterface;
+import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 
 import com.google.common.collect.ImmutableMap;
-import java.util.HashMap;
-import org.json_voltpatches.JSONObject;
 
 public class Iv2TestSpSchedulerDedupe extends TestCase
 {
@@ -109,7 +109,8 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
                                        singlePart, // single-part
                                        spi, // invocation
                                        Long.MAX_VALUE, // client interface handle
-                                       Long.MAX_VALUE); // client connection id
+                                       Long.MAX_VALUE,
+                                       false); // client connection id
         return task;
     }
 

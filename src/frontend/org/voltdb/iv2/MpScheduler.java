@@ -177,7 +177,17 @@ public class MpScheduler extends Scheduler
         final String procedureName = message.getStoredProcedureName();
         final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
 
-        final long mpTxnId = m_txnId.incrementAndGet();
+        /*
+         * If this is CL replay, use the txnid from the CL and use it to update the current txnid
+         */
+        long mpTxnId;
+        if (message.isForReplay()) {
+            mpTxnId = message.getTxnId();
+            m_txnId.incrementAndGet();
+        } else {
+            mpTxnId = m_txnId.incrementAndGet();
+        }
+
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
         // Handle every-site system procedures (at the MPI)
@@ -193,7 +203,8 @@ public class MpScheduler extends Scheduler
                     true, // isSinglePartition
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
-                    message.getConnectionId());
+                    message.getConnectionId(),
+                    message.isForReplay());
             DuplicateCounter counter = new DuplicateCounter(
                     message.getInitiatorHSId(),
                     mpTxnId,
@@ -217,7 +228,8 @@ public class MpScheduler extends Scheduler
                     message.isSinglePartition(),
                     message.getStoredProcedureInvocation(),
                     message.getClientInterfaceHandle(),
-                    message.getConnectionId());
+                    message.getConnectionId(),
+                    message.isForReplay());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
