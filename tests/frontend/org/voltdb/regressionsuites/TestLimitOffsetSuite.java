@@ -132,9 +132,9 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         VoltTable result = client.callProcedure("@AdHoc", "select I, count(*) as tag from A group by I order by tag, I limit 1")
                 .getResults()[0];
 
-        //assertEquals(1, result.getRowCount());
+        assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        System.err.println("Result:\n" + result);
+        //System.err.println("Result:\n" + result);
         assertEquals(9, result.getLong(0));
         assertEquals(1, result.getLong(1));
 
