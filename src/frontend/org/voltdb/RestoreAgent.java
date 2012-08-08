@@ -157,46 +157,42 @@ SnapshotCompletionInterest
         @Override
         public void run() {
             if (!m_planned) {
+                // TestRestoreAgent doesn't follow the same plan-making code as
+                // Inits and may require the runnable to initialize its own restore
+                // catalog plan.
                 findRestoreCatalog();
             }
 
-            boolean leader = false;
-
             try {
-                // Wait until either we're the leader or the snapshot TXNID node
-                // exists, then do the right thing.
-                while (!m_isLeader &&
-                        (m_zk.exists(VoltZK.restore_snapshot_id, null) == null))
-                {
-                    Thread.sleep(200);
-                }
-
-                /*
-                 * If this is the leader, initiate the snapshot restore
-                 */
-                if (m_zk.exists(VoltZK.restore_snapshot_id, null) == null)
-                {
-                    if (m_isLeader)
-                    {
-                        leader = true;
-                        long txnId = 0;
-                        if (m_snapshotToRestore != null) {
-                            txnId = m_snapshotToRestore.txnId;
-                        }
-                        sendSnapshotTxnId(txnId);
-
-                        if (m_snapshotToRestore != null) {
-                            LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
-                                      " in " + m_snapshotToRestore.path);
-                            Object[] params = new Object[] {m_snapshotToRestore.path,
-                                                            m_snapshotToRestore.nonce};
-                            initSnapshotWork(RESTORE_TXNID,
-                                             Pair.of("@SnapshotRestore", params));
-                        }
+                if (!m_isLeader) {
+                    // wait on the leader's barrier.
+                    while (m_zk.exists(VoltZK.restore_snapshot_id, null) == null) {
+                        Thread.sleep(200);
                     }
-                    else
-                    {
-                        throw new RuntimeException("The unpossible has happened");
+                    m_restoreHeartbeatThread.start();
+                    changeState();
+                }
+                else {
+                    long txnId = 0;
+                    if (m_snapshotToRestore != null) {
+                        txnId = m_snapshotToRestore.txnId;
+                    }
+                    // will release the non-leaders waiting on VoltZK.restore_snapshot_id.
+                    sendSnapshotTxnId(txnId);
+
+                    if (m_snapshotToRestore != null) {
+                        LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
+                                " in " + m_snapshotToRestore.path);
+                        Object[] params = new Object[] {m_snapshotToRestore.path,
+                            m_snapshotToRestore.nonce};
+                        initSnapshotWork(RESTORE_TXNID,
+                                Pair.of("@SnapshotRestore", params));
+                    }
+                    m_restoreHeartbeatThread.start();
+
+                    // if no snapshot to restore, transition immediately.
+                    if (m_snapshotToRestore == null) {
+                        changeState();
                     }
                 }
             }
@@ -204,18 +200,6 @@ SnapshotCompletionInterest
             {
                 VoltDB.crashGlobalVoltDB("Failed to safely enter recovery: " + e.getMessage(),
                                          false, e);
-            }
-
-            m_restoreHeartbeatThread.start();
-
-            // Use our remembered leader state since the actual leader could have
-            // finished and abdicated before we get here.
-            if (!leader || m_snapshotToRestore == null) {
-                /*
-                 * Hosts that are not initiating the restore should change
-                 * state immediately
-                 */
-                changeState();
             }
         }
     };
