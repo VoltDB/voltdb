@@ -367,6 +367,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler
     {
+        /** Remember the complete set of all faulted sites */
+        protected Set<Long> m_failedHsids = new HashSet<Long>();
+
         @Override
         public void faultOccured(Set<VoltFault> faults)
         {
@@ -379,12 +382,46 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                 {
                     SiteFailureFault site_fault = (SiteFailureFault)fault;
                     failedSites.add(site_fault);
+                    // record the failed site ids for future queries on this object
+                    m_failedHsids.addAll(site_fault.getSiteIds());
                 }
             }
             if (!failedSites.isEmpty()) {
                 m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedSites));
             }
         }
+
+        /**
+         * Was the given site id in the log of all witnessed faults?
+         */
+        public boolean isWitnessedFailedSite(long hsid) {
+            return m_failedHsids.contains(hsid);
+        }
+    }
+
+    @Override
+    public boolean isActiveOrPreviouslyKnownSiteId(long hsid) {
+        // if the host id is less than this one, then it existed when this site
+        // was created (or it failed before this site existed)
+        // This relies on the non-resuse and monotonically increasingness of host ids
+        // this also assumes no garbage input
+        if (CoreUtils.getHostIdFromHSId(hsid) <= CoreUtils.getHostIdFromHSId(m_siteId)) {
+            return true;
+        }
+
+        // check whether this site has witnessed a failure
+        if (m_faultHandler.isWitnessedFailedSite(hsid)) {
+            return true;
+        }
+
+        // check if it's a live site
+        if (m_tracker.getAllSites().contains(hsid)) {
+            return true;
+        }
+
+        // this case should point to this id belonging to a currently joining node,
+        // whose status has just not been reflected in the local tracker yet.
+        return false;
     }
 
     /**
