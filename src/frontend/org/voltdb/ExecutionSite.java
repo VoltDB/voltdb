@@ -1733,6 +1733,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                                       SnapshotFormat.NATIVE,
                                       (byte) 0x1,
                                       snapshotMsg.m_roadblockTransactionId,
+                                      Long.MIN_VALUE,
                                       null,
                                       m_systemProcedureContext,
                                       CoreUtils.getHostnameOrAddress());

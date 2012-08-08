@@ -430,7 +430,6 @@ public class SpScheduler extends Scheduler
 
     @Override
     public void setCommandLog(CommandLog cl) {
-        new Throwable("Setting command log " + cl).printStackTrace();
         m_cl = cl;
     }
 }
