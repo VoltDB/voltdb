@@ -19,6 +19,7 @@ package org.voltdb.iv2;
 
 import java.util.concurrent.atomic.AtomicReference;
 
+import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import java.util.HashSet;
@@ -58,7 +59,6 @@ public class LeaderAppointer implements Promotable
     private enum AppointerState {
         INIT,           // Initial start state, used to inhibit ZK callback actions
         CLUSTER_START,  // indicates that we're doing the initial cluster startup
-        CLUSTER_REPAIR, // indicates that we're been promoted within a running cluster and handling repair
         DONE            // indicates normal running conditions
     }
 
@@ -74,6 +74,7 @@ public class LeaderAppointer implements Promotable
     private AtomicReference<AppointerState> m_state =
         new AtomicReference<AppointerState>(AppointerState.INIT);
     private Set<Long> m_currentLeaders = new HashSet<Long>();
+    private CountDownLatch m_startupLatch = null;
 
     private class PartitionCallback extends BabySitter.Callback
     {
@@ -119,7 +120,24 @@ public class LeaderAppointer implements Promotable
                 if (missingHSIds.size() > 0) {
                     VoltDB.crashGlobalVoltDB("Node failure detected during startup.", false, null);
                 }
-                if (children.size() == (m_kfactor + 1)) {
+                // ENG-3166: Eventually we would like to get rid of the extra replicas beyond k_factor,
+                // but for now we just look to see how many replicas of this partition we actually expect
+                // and gate leader assignment on that many copies showing up.
+                int replicaCount = m_kfactor + 1;
+                JSONArray parts;
+                try {
+                    parts = m_topo.getJSONArray("partitions");
+                    for (int p = 0; p < parts.length(); p++) {
+                        JSONObject aPartition = parts.getJSONObject(p);
+                        int pid = aPartition.getInt("partition_id");
+                        if (pid == m_partitionId) {
+                            replicaCount = aPartition.getJSONArray("replicas").length();
+                        }
+                    }
+                } catch (JSONException e) {
+                    // Ignore and just assume the normal number of replicas
+                }
+                if (children.size() == replicaCount) {
                     m_currentLeader = assignLeader(m_partitionId, updatedHSIds);
                 }
                 else {
@@ -142,9 +160,6 @@ public class LeaderAppointer implements Promotable
         }
     }
 
-    // In CLUSTER_START, no LeaderCache watches should fire that aren't under our control
-    // In CLUSTER_REPAIR, it's possible that some appointee is still completing its promotion
-    // and could cause a LeaderCache watch to fire.
     LeaderCache.Callback m_masterCallback = new LeaderCache.Callback()
     {
         @Override
@@ -155,6 +170,7 @@ public class LeaderAppointer implements Promotable
                 if (m_currentLeaders.size() == m_partitionCount) {
                     m_state.set(AppointerState.DONE);
                     m_MPI.acceptPromotion();
+                    m_startupLatch.countDown();
                 }
             }
         }
@@ -197,6 +213,7 @@ public class LeaderAppointer implements Promotable
         }
 
         if (m_state.get() == AppointerState.CLUSTER_START) {
+            m_startupLatch = new CountDownLatch(1);
             for (int i = 0; i < m_partitionCount; i++) {
                 String dir = LeaderElector.electionDirForPartition(i);
                 try {
@@ -208,6 +225,7 @@ public class LeaderAppointer implements Promotable
                 Pair<BabySitter, List<String>> sitterstuff = BabySitter.blockingFactory(m_zk, dir, m_callbacks[i]);
                 m_partitionWatchers[i] = sitterstuff.getFirst();
             }
+            m_startupLatch.await();
         }
         else {
             // figure out the current state of the world.

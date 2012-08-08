@@ -189,8 +189,7 @@ public class ClusterConfig
             int master = partToHosts.get(part).get(index);
             stringer.key("master").value(master);
             stringer.key("replicas").array();
-            for (int host_pos : partToHosts.get(part))
-            {
+            for (int host_pos : partToHosts.get(part)) {
                 stringer.value(host_pos);
             }
             stringer.endArray();
