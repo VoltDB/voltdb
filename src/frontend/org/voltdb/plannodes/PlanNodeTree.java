@@ -214,12 +214,4 @@ public class PlanNodeTree implements JSONString {
         }
         return null;
     }
-
-    public AbstractPlanNode concatenate ( AbstractPlanNode pn ) {
-        PlanNodeTree pnt = new PlanNodeTree( pn );
-        int size = m_planNodes.size();
-        m_planNodes.addAll( pnt.getNodeList() );
-        m_planNodes.get(size-1).addAndLinkChild( m_planNodes.get(size) );
-        return getRootPlanNode();
-    }
 }

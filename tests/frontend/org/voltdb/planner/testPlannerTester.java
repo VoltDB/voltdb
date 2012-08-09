@@ -38,6 +38,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
+import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
 public class testPlannerTester extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -120,19 +121,16 @@ public class testPlannerTester extends TestCase {
 
     public void testCompile() {
         try {
-            //                                  plannerTester.setUp(m_currentDir+"/examples/voter/ddl.sql",
-            //                                                  "ddl", "l", "phone_number");
-            //List<AbstractPlanNode> pnList = plannerTester.compile("INSERT INTO votes (phone_number, state, contestant_number) VALUES (?, ?, ?);", 4, false);
-            //assertTrue( pnList.size() == 2 );
-
             plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                     "testplans-plannerTester-ddl", "L", "a");
             List<AbstractPlanNode> pnList = plannerTester.compile("select * from l, t where t.a=l.a limit ?;", 3, false);
             System.out.println( pnList.size() );
             System.out.println( pnList.get(0).toExplainPlanString() );
 
-            AbstractPlanNode pn = plannerTester.combinePlanNodes( pnList );
-            System.out.println( pn.toExplainPlanString() );
+            assert( pnList.size() == 2 );
+            assert( pnList.get(1) instanceof SendPlanNode );
+            if ( pnList.get(0).reattachFragment( ( SendPlanNode )pnList.get(1) ) )
+                System.out.println( pnList.get(0).toExplainPlanString() );
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -140,10 +138,6 @@ public class testPlannerTester extends TestCase {
 
     public void testWriteAndLoad() throws Exception {
         AbstractPlanNode pn = null;
-        //pn = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-        //pn = compile("select * from l where b = ? limit ?;", 3, true);
-        //pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 0, true);
-        //      pn = compile("select * from t where a = ? order by a limit ?;",3, true);
         String path = m_homeDir+"/";
         plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                 "testplans-plannerTester-ddl", "L", "a");
@@ -151,7 +145,9 @@ public class testPlannerTester extends TestCase {
 
         System.out.println( pnList.size() );
 
-        pn = plannerTester.combinePlanNodes(pnList);
+        assert( pnList.get(1) instanceof SendPlanNode );
+        pnList.get(0).reattachFragment( (SendPlanNode) pnList.get(1) );
+        pn = pnList.get(0);
         System.out.println( pn.toJSONString() );
         System.out.println( pn.toExplainPlanString() );
         plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
@@ -160,8 +156,8 @@ public class testPlannerTester extends TestCase {
         PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt", getsql);
         System.out.println( pnt.toJSONString() );
         System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
-        ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeLists();
-        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeLists();
+        ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeList();
+        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeList();
         assertTrue( list1.size() == list2.size() );
         for( int i = 0; i < list1.size(); i++ ) {
             Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
@@ -186,8 +182,8 @@ public class testPlannerTester extends TestCase {
         System.out.println( pnt.toJSONString() );
         System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
         //System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
-        ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeLists();
-        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeLists();
+        ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeList();
+        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeList();
         assertTrue( list1.size() == list2.size() );
         for( int i = 0; i < list1.size(); i++ ) {
             Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
@@ -266,11 +262,11 @@ public class testPlannerTester extends TestCase {
     //          }
     //    }
 
-    public void testGetLists() {
+    public void testGetList() {
         AbstractPlanNode pn1 = null;
         pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
 
-        ArrayList<AbstractPlanNode> pnlist = pn1.getPlanNodeLists();
+        ArrayList<AbstractPlanNode> pnlist = pn1.getPlanNodeList();
 
         System.out.println( pn1.toExplainPlanString() );
         System.out.println( pnlist.size() );

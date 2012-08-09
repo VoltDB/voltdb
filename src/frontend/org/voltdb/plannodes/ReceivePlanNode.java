@@ -17,6 +17,9 @@
 
 package org.voltdb.plannodes;
 
+import java.util.ArrayList;
+import java.util.HashSet;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -112,5 +115,12 @@ public class ReceivePlanNode extends AbstractPlanNode {
             m_nondeterminismDetail = childNode.nondeterminismDetail();
             m_isContentDeterministic = childNode.isContentDeterministic();
         }
+    }
+
+    @Override
+    public void reattachFragment_recurse( HashSet<AbstractPlanNode> visited, ArrayList<AbstractPlanNode> collected, SendPlanNode child  ) {
+        visited.add(this);
+        collected.add(this);
+        this.addAndLinkChild(child);
     }
 }

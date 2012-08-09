@@ -48,6 +48,7 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
+import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
 
 public class plannerTester {
@@ -57,7 +58,6 @@ public class plannerTester {
     private static String m_pathRefPlan;
     private static String m_baseName;
     private static String m_pathDDL;
-    private static int m_numSQL = 0;
     private static String m_savePlanPath;
     private static ArrayList<Pair<String,String>> m_partitionColumns = new ArrayList<Pair<String,String>>();
     private static ArrayList<String> m_stmts = new ArrayList<String>();
@@ -71,30 +71,28 @@ public class plannerTester {
     private static boolean m_showSQLStatement = false;
     private static ArrayList<String> m_config = new ArrayList<String>();
 
-    private static int m_numTest = 0;
     private static int m_numPass = 0;
     private static int m_numFail = 0;
     private static ArrayList<String> m_diffMessages = new ArrayList<String>();
     private static String m_reportDir = "/tmp/";
     private static BufferedWriter m_reportWriter;
 
-    public static class diffPair extends Pair<Object,Object>{
+    public static class diffPair {
         private Object m_first;
         private Object m_second;
 
         public diffPair( Object first, Object second ) {
-           super(first, second);
+            m_first = first;
+            m_second = second;
         }
 
         @Override
         public String toString() {
-            if( m_first == null ) {
-                m_first = "[]";
-            }
-            if( m_second == null ) {
-                m_second = "[]";
-            }
-            return "("+m_first.toString()+" => "+m_second.toString()+")";
+            String first = ( m_first == null ) ?
+                            "[]" : m_first.toString();
+            String second = ( m_second == null ) ?
+                            "[]" : m_second.toString();
+            return "("+first+" => "+second+")";
         }
 
         public boolean equals() {
@@ -193,21 +191,23 @@ public class plannerTester {
             try {
                 m_reportWriter = new BufferedWriter(new FileWriter( m_reportDir+"plannerTester.report" ));
             } catch (IOException e1) {
-                e1.printStackTrace();
+                System.out.println(e1.getMessage());
+                System.exit(-1);
             }
             for( String config : m_config ) {
                 try {
                     setUp( config );
-                    batchDiff( );
+                    startDiff();
                 } catch (Exception e) {
                     e.printStackTrace();
                 }
             }
-            System.out.println("Test: "+m_numTest);
+            int numTest = m_numPass + m_numFail;
+            System.out.println("Test: "+numTest);
             System.out.println("Pass: "+m_numPass);
             System.out.println("Fail: "+m_numFail);
             try {
-                m_reportWriter.write( "\nTest: "+m_numTest+"\n"
+                m_reportWriter.write( "\nTest: "+numTest+"\n"
                         +"Pass: "+m_numPass+"\n"
                         +"Fail: "+m_numFail+"\n");
                 m_reportWriter.flush();
@@ -251,14 +251,12 @@ public class plannerTester {
             }
             else if( line.equalsIgnoreCase("SQL:")) {
                 m_stmts.clear();
-                m_numSQL = 0;
                 while( (line = reader.readLine()).length() > 6 ) {
                     if( line.startsWith("#") ) {
                         continue;
                     }
                     m_stmts.add( line );
                 }
-                m_numSQL = m_stmts.size();
             }
             else if( line.equalsIgnoreCase("Save Path:") ) {
                 line = reader.readLine();
@@ -327,20 +325,6 @@ public class plannerTester {
         List<AbstractPlanNode> pnList = null;
         pnList =  aide.compile(sql, paramCount, singlePartition);
         return pnList;
-    }
-
-    public static AbstractPlanNode combinePlanNodes( List<AbstractPlanNode> pnList ) {
-        int size = pnList.size();
-        AbstractPlanNode pn = pnList.get(0);
-        if( size == 1 ) {
-            return pn;
-        } else {
-            PlanNodeTree pnt = new PlanNodeTree( pn );
-            for( int i = 1; i < size; i++ ) {
-                pnt.concatenate( pnList.get(i) );
-            }
-            return pnt.getRootPlanNode();
-        }
     }
 
     public static void writePlanToFile( AbstractPlanNode pn, String pathToDir, String fileName, String sql) {
@@ -426,35 +410,39 @@ public class plannerTester {
     public static void batchCompileSave( ) throws Exception {
         int size = m_stmts.size();
         for( int i = 0; i < size; i++ ) {
-            //assume multi partition
             List<AbstractPlanNode> pnList = compile( m_stmts.get(i), 0, false);
-            AbstractPlanNode pn = combinePlanNodes(pnList);
+            AbstractPlanNode pn = pnList.get(0);
+            if( pnList.size() == 2 ){//multi partition query plan
+                assert( pnList.get(1) instanceof SendPlanNode );
+                if( ! pn.reattachFragment( ( SendPlanNode) pnList.get(1) ) ) {
+                    System.err.println( "Receive plan node not found while reattachFragment." );
+                }
+            }
             writePlanToFile(pn, m_savePlanPath, m_testName+".plan"+i, m_stmts.get(i) );
         }
     }
 
     //parameters : path to baseline and the new plans
     //size : number of total files in the baseline directory
-    public static void batchDiff( String pathBaseline, String pathNew, int size ) throws IOException {
+    public static void batchDiff( ) throws IOException {
         PlanNodeTree pnt1 = null;
         PlanNodeTree pnt2 = null;
-        m_stmts.clear();
         m_stmtsBase.clear();
+        int size = m_stmts.size();
         for( int i = 0; i < size; i++ ){
             ArrayList<String> getsql = new ArrayList<String>();
             try {
-                pnt1 = loadPlanFromFile( pathBaseline+m_testName+".plan"+i, getsql );
+                pnt1 = loadPlanFromFile( m_pathRefPlan+m_testName+".plan"+i, getsql );
                 m_stmtsBase.add( getsql.get(0) );
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+pathBaseline+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
+                System.err.println("Plan files in"+m_pathRefPlan+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
                 System.exit(1);
             }
             try{
                 getsql.clear();
-                pnt2  = loadPlanFromFile( pathNew+m_testName+".plan"+i, getsql );
-                m_stmts.add( getsql.get(0) );
+                pnt2  = loadPlanFromFile( m_savePlanPath+m_testName+".plan"+i, getsql );
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+pathNew+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
+                System.err.println("Plan files in"+m_savePlanPath+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
                 System.exit(1);
             }
             AbstractPlanNode pn1 = pnt1.getRootPlanNode();
@@ -478,18 +466,17 @@ public class plannerTester {
                 }
 
                 m_reportWriter.write("Path to the config file :"+m_currentConfig+"\n"
-                        +"Path to the baseline file :"+pathBaseline+m_testName+".plan"+i+"\n"
-                        +"Path to the current plan file :"+pathNew+m_testName+".plan"+i+
+                        +"Path to the baseline file :"+m_pathRefPlan+m_testName+".plan"+i+"\n"
+                        +"Path to the current plan file :"+m_savePlanPath+m_testName+".plan"+i+
                         "\n\n----------------------------------------------------------------------\n");
             }
-            m_numTest++;
         }
         m_reportWriter.flush();
     }
 
-    public static void batchDiff( ) throws IOException {
+    public static void startDiff( ) throws IOException {
         m_reportWriter.write( "===================================================================Begin test "+m_testName+"\n" );
-        batchDiff( m_pathRefPlan, m_savePlanPath, m_numSQL );
+        batchDiff( );
         m_reportWriter.write( "==================================================================="+
                 "End of "+m_testName+"\n");
         m_reportWriter.flush();
@@ -499,8 +486,8 @@ public class plannerTester {
         m_treeSizeDiff = 0;
         boolean noDiff = true;
         ArrayList<String> messages = new ArrayList<String>();
-        ArrayList<AbstractPlanNode> list1 = oldpn1.getPlanNodeLists();
-        ArrayList<AbstractPlanNode> list2 = newpn2.getPlanNodeLists();
+        ArrayList<AbstractPlanNode> list1 = oldpn1.getPlanNodeList();
+        ArrayList<AbstractPlanNode> list2 = newpn2.getPlanNodeList();
         int size1 = list1.size();
         int size2 = list2.size();
         m_treeSizeDiff = size1 - size2;

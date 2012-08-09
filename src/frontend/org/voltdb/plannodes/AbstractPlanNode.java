@@ -686,15 +686,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    public ArrayList<AbstractPlanNode> getPlanNodeLists () {
+    public ArrayList<AbstractPlanNode> getPlanNodeList () {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
         ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
-        getPlanNodeLists_recurse( collected, visited);
+        getPlanNodeList_recurse( collected, visited);
         return collected;
     }
 
     //postorder add nodes
-    public void getPlanNodeLists_recurse(ArrayList<AbstractPlanNode> collected,
+    public void getPlanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";
@@ -703,7 +703,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         visited.add(this);
 
         for (AbstractPlanNode n : m_children) {
-            n.getPlanNodeLists_recurse(collected, visited);
+            n.getPlanNodeList_recurse(collected, visited);
         }
         collected.add(this);
     }
@@ -727,6 +727,26 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
             for( AbstractPlanNode pn : list ) {
                 m_inlineNodes.put( pn.getPlanNodeType(), pn);
             }
+        }
+    }
+
+    public boolean reattachFragment( SendPlanNode child ) {
+        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        reattachFragment_recurse( visited, collected, child );
+        if( collected.size() == 0 )
+            return false;
+        else
+            return true;
+    }
+
+    public void reattachFragment_recurse( HashSet<AbstractPlanNode> visited, ArrayList<AbstractPlanNode> collected, SendPlanNode child ) {
+        visited.add(this);
+        for( AbstractPlanNode pn : m_inlineNodes.values() ) {
+            pn.reattachFragment_recurse(visited, collected, child);
+        }
+        for( AbstractPlanNode pn : m_children ) {
+            pn.reattachFragment_recurse(visited, collected, child);
         }
     }
 }
