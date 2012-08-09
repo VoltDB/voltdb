@@ -30,6 +30,7 @@ import java.io.FileReader;
 import java.io.FileWriter;
 import java.io.IOException;
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -58,7 +59,7 @@ public class plannerTester {
     private static String m_pathDDL;
     private static int m_numSQL = 0;
     private static String m_savePlanPath;
-    private static ArrayList<diffPair> m_partitionColumns = new ArrayList<plannerTester.diffPair>();
+    private static ArrayList<Pair<String,String>> m_partitionColumns = new ArrayList<Pair<String,String>>();
     private static ArrayList<String> m_stmts = new ArrayList<String>();
     private static ArrayList<String> m_stmtsBase = new ArrayList<String>();
     private static int m_treeSizeDiff;
@@ -77,7 +78,7 @@ public class plannerTester {
     private static String m_reportDir = "/tmp/";
     private static BufferedWriter m_reportWriter;
 
-    public static class diffPair extends Pair{
+    public static class diffPair extends Pair<Object,Object>{
         private Object m_first;
         private Object m_second;
 
@@ -270,7 +271,7 @@ public class plannerTester {
                 if( index == -1 ) {
                     System.err.println("Config file syntax error : Partition Columns should be table.column");
                 }
-                diffPair p = new diffPair( line.substring(0, index), line.substring(index+1) );
+                Pair<String,String> p = new Pair<String,String>( line.substring(0, index), line.substring(index+1) );
                 m_partitionColumns.add( p );
             }
         }
@@ -282,7 +283,7 @@ public class plannerTester {
     }
 
     public static void setUpForTest( String pathDDL, String baseName, String table, String column ) {
-        diffPair p = new diffPair( table, column );
+        Pair<String,String> p = new Pair<String,String>( table, column );
         m_partitionColumns.add(p);
         m_pathDDL = pathDDL;
         m_baseName = baseName;
@@ -302,10 +303,10 @@ public class plannerTester {
         CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
         for (Table t : tmap) {
             String tableName = t.getTypeName();
-            for( diffPair p : m_partitionColumns ) {
-                if( ((String)p.getFirst()).equalsIgnoreCase(tableName) ){
+            for( Pair<String,String> p : m_partitionColumns ) {
+                if( p.getFirst().equalsIgnoreCase(tableName) ){
                     t.setIsreplicated(false);
-                    Column column = t.getColumns().getIgnoreCase( (String)p.getSecond() );
+                    Column column = t.getColumns().getIgnoreCase( p.getSecond() );
                     t.setPartitioncolumn(column);
                     break;
                 }
@@ -390,10 +391,10 @@ public class plannerTester {
         return pnt;
     }
 
-    public static String getKeyInfo( ArrayList<AbstractPlanNode> pnList ) {
+    public static String getKeyInfo( Collection<AbstractPlanNode> pnList ) {
         String str="";
+        str += "[";
         for( AbstractPlanNode pn : pnList ) {
-            str += "[";
             str += pn.getPlanNodeId();
             str += "-";
             str += pn.getPlanNodeType().toString();
@@ -405,7 +406,7 @@ public class plannerTester {
             str += "]";
         }
         else{
-            str += "[]";
+            str = "[]";
         }
         return str;
     }
@@ -440,15 +441,21 @@ public class plannerTester {
         m_stmts.clear();
         m_stmtsBase.clear();
         for( int i = 0; i < size; i++ ){
+            ArrayList<String> getsql = new ArrayList<String>();
             try {
-                ArrayList<String> getsql = new ArrayList<String>();
                 pnt1 = loadPlanFromFile( pathBaseline+m_testName+".plan"+i, getsql );
                 m_stmtsBase.add( getsql.get(0) );
+            } catch (FileNotFoundException e) {
+                System.err.println("Plan files in"+pathBaseline+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
+                System.exit(1);
+            }
+            try{
                 getsql.clear();
                 pnt2  = loadPlanFromFile( pathNew+m_testName+".plan"+i, getsql );
                 m_stmts.add( getsql.get(0) );
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+pathBaseline+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
+                System.err.println("Plan files in"+pathNew+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
+                System.exit(1);
             }
             AbstractPlanNode pn1 = pnt1.getRootPlanNode();
             AbstractPlanNode pn2 = pnt2.getRootPlanNode();
@@ -457,37 +464,23 @@ public class plannerTester {
                 m_numPass++;
             } else {
                 m_numFail++;
-                //                              System.out.println("Statement "+i+" of "+m_testName+": ");
                 m_reportWriter.write( "Statement "+i+" of "+m_testName+": \n" );
 
                 for( String msg : m_diffMessages ) {
-                    //                                  System.out.println(msg);
                     m_reportWriter.write( msg+"\n\n" );
                 }
-                //                              System.out.println();
                 if( m_showSQLStatement ) {
-                    //                                  System.out.println(m_stmtsBase.get(i));
-                    //                                  System.out.println("==>");
-                    //                                  System.out.println(m_stmts.get(i));
-                    //                                  System.out.println();
                     m_reportWriter.write( "SQL statement:\n"+m_stmtsBase.get(i)+"\n==>\n"+m_stmts.get(i)+"\n");
                 }
 
                 if( m_showExpainedPlan ) {
-                    //                                  System.out.print( pn1.toExplainPlanString() );
-                    //                                  System.out.println( "==>");
-                    //                                  System.out.println("");
-                    //                                  System.out.println( pn2.toExplainPlanString() );
-                    //                                  System.out.println();
                     m_reportWriter.write("\nExplained plan:\n"+pn1.toExplainPlanString()+"\n==>\n"+pn2.toExplainPlanString()+"\n");
                 }
 
-                //                              System.out.println("Path to the config file :"+m_currentConfig );
-                //                              System.out.println("Path to the baseline file :"+pathBaseline+m_testName+".plan"+i );
-                //                              System.out.println("Path to the baseline file :"+pathNew+m_testName+".plan"+i );
                 m_reportWriter.write("Path to the config file :"+m_currentConfig+"\n"
                         +"Path to the baseline file :"+pathBaseline+m_testName+".plan"+i+"\n"
-                        +"Path to the current plan file :"+pathNew+m_testName+".plan"+i+"\n");
+                        +"Path to the current plan file :"+pathNew+m_testName+".plan"+i+
+                        "\n\n----------------------------------------------------------------------\n");
             }
             m_numTest++;
         }
@@ -495,11 +488,8 @@ public class plannerTester {
     }
 
     public static void batchDiff( ) throws IOException {
-        //              System.out.println( "====================================================Begin test: "+m_testName );
         m_reportWriter.write( "===================================================================Begin test "+m_testName+"\n" );
         batchDiff( m_pathRefPlan, m_savePlanPath, m_numSQL );
-        //              System.out.println("==================================================================="+
-        //                              "End of "+m_testName);
         m_reportWriter.write( "==================================================================="+
                 "End of "+m_testName+"\n");
         m_reportWriter.flush();
@@ -518,18 +508,14 @@ public class plannerTester {
         diffPair stringdiffPair = new diffPair(null,null);
         if( size1 != size2 ) {
             intdiffPair.set(size1, size2);
-            //                  System.out.println( "Plan tree size diff: " );
-            //                  System.out.println( intdiffPair.toString() );
             messages.add( "Plan tree size diff: "+intdiffPair.toString() );
 
         }
         if( !m_changedSQL ){
             if( m_treeSizeDiff < 0 ){
-                //                              System.out.println( "Old plan might be better" );
                 messages.add( "Old plan might be better" );
             }
             else if( m_treeSizeDiff > 0 ) {
-                //                              System.out.println( "New plan might be better");
                 messages.add( "New plan might be better" );
             }
         }
@@ -605,128 +591,41 @@ public class plannerTester {
             }
         }
         //do the diff
-        ArrayList<Integer> indexList = new ArrayList<Integer>();
-        ArrayList<AbstractPlanNode> parentNodeList = new ArrayList<AbstractPlanNode>();
-        for( AbstractPlanNode index: projInlineNodes1.keySet() ) {
-            parentNodeList.add(index);
-        }
-        String info = getKeyInfo( parentNodeList );
-        stringdiffPair.setFirst( info );
-        parentNodeList.clear();
-        for( AbstractPlanNode index: projInlineNodes2.keySet() ) {
-            parentNodeList.add(index);
-        }
-        info = getKeyInfo( parentNodeList );
-        stringdiffPair.setSecond(info);
+        stringdiffPair.set(getKeyInfo( projInlineNodes1.keySet() ), getKeyInfo( projInlineNodes2.keySet() ));
         if( !stringdiffPair.equals() ){
-            //                  System.out.println( "Inline Projection Nodes diff: ");
-            //                  System.out.println( stringdiffPair.toString() );
             messages.add( "Inline Projection Nodes diff: \n"+stringdiffPair.toString() );
         }
-        parentNodeList.clear();
 
-        for( AbstractPlanNode index: limitInlineNodes1.keySet() ) {
-            parentNodeList.add(index);
-        }
-        info = getKeyInfo( parentNodeList );
-        stringdiffPair.setFirst(info);
-        parentNodeList.clear();
-        for( AbstractPlanNode index: limitInlineNodes2.keySet() ) {
-            parentNodeList.add(index);
-        }
-        info = getKeyInfo( parentNodeList );
-        stringdiffPair.setSecond(info);
+        stringdiffPair.set(getKeyInfo( limitInlineNodes1.keySet() ), getKeyInfo( limitInlineNodes2.keySet() ));
         if( !stringdiffPair.equals() ) {
-            //                  System.out.println( "Inline Limit Nodes diff: ");
-            //                  System.out.println( stringdiffPair.toString() );
             messages.add( "Inline Limit Nodes diff: \n"+stringdiffPair.toString() );
         }
-        parentNodeList.clear();
 
-        for( AbstractPlanNode index: limitInlineNodes1.keySet() ) {
-            parentNodeList.add(index);
-        }
-        info = getKeyInfo( parentNodeList );
-        stringdiffPair.setFirst(info);
-        parentNodeList.clear();
-        for( AbstractPlanNode index: limitInlineNodes2.keySet() ) {
-            parentNodeList.add(index);
-        }
-        info = getKeyInfo( parentNodeList );
-        stringdiffPair.setSecond(info);
+        stringdiffPair.set(getKeyInfo( orderByInlineNodes1.keySet() ), getKeyInfo( orderByInlineNodes2.keySet() ));
         if( !stringdiffPair.equals() ) {
-            //                  System.out.println( "Inline OrderBy Nodes diff: ");
-            //                  System.out.println( stringdiffPair.toString() );
             messages.add( "Inline OrderBy Nodes diff: \n"+stringdiffPair.toString() );
         }
-        parentNodeList.clear();
 
-        for( AbstractPlanNode index: limitInlineNodes1.keySet() ) {
-            parentNodeList.add(index);
-        }
-        info = getKeyInfo( parentNodeList );
-        stringdiffPair.setFirst(info);
-        parentNodeList.clear();
-        for( AbstractPlanNode index: limitInlineNodes2.keySet() ) {
-            parentNodeList.add(index);
-        }
-        info = getKeyInfo( parentNodeList );
-        stringdiffPair.setSecond(info);
+        stringdiffPair.set( getKeyInfo( indexScanInlineNodes1.keySet() ), getKeyInfo( indexScanInlineNodes2.keySet() ));
         if( !stringdiffPair.equals() ) {
-            //                  System.out.println( "Inline IndexScan Nodes diff: ");
-            //                  System.out.println( stringdiffPair.toString() );
             messages.add( "Inline IndexScan Nodes diff: \n"+stringdiffPair.toString() );
         }
-        parentNodeList.clear();
 
-        //non-inline proj limit order by nodes
-        for( int index: projNodes1.keySet() ) {
-            indexList.add(index);
-        }
-        stringdiffPair.setFirst(indexList.clone());
-        indexList.clear();
-        for( int index: projNodes2.keySet() ) {
-            indexList.add(index);
-        }
-        stringdiffPair.setSecond(indexList.clone());
+        //non-inline proj, limit, order by nodes
+        stringdiffPair.set( projNodes1.keySet(), projNodes2.keySet() );
         if( !stringdiffPair.equals() ){
-            //                  System.out.println( "Projection Node diff: " );
-            //                  System.out.println( stringdiffPair.toString() );
             messages.add( "Projection Nodes diff: \n"+stringdiffPair.toString() );
         }
-        indexList.clear();
 
-        for( int index: limitNodes1.keySet() ) {
-            indexList.add(index);
-        }
-        stringdiffPair.setFirst(indexList.clone());
-        indexList.clear();
-        for( int index: limitNodes2.keySet() ) {
-            indexList.add(index);
-        }
-        stringdiffPair.setSecond(indexList.clone());
+        stringdiffPair.set( limitNodes1.keySet(), limitNodes2.keySet() );
         if( !stringdiffPair.equals() ){
-            //                  System.out.println( "Limit Node diff: " );
-            //                  System.out.println( stringdiffPair.toString() );
             messages.add( "Limit Nodes diff: \n"+stringdiffPair.toString() );
         }
-        indexList.clear();
 
-        for( int index: orderByNodes1.keySet() ) {
-            indexList.add(index);
-        }
-        stringdiffPair.setFirst(indexList.clone());
-        indexList.clear();
-        for( int index: orderByNodes2.keySet() ) {
-            indexList.add(index);
-        }
-        stringdiffPair.setSecond(indexList.clone());
+        stringdiffPair.set( orderByNodes1.keySet(), orderByNodes2.keySet()  );
         if( !stringdiffPair.equals() ){
-            //                  System.out.println( "Order By Node diff:" );
-            //                  System.out.println( stringdiffPair.toString() );
             messages.add( "Order By Nodes diff: \n"+stringdiffPair.toString() );
         }
-        indexList.clear();
 
         //join nodes diff
         ArrayList<AbstractPlanNode> joinNodes1 = getJoinNodes( list1 );
@@ -735,9 +634,6 @@ public class plannerTester {
         size2 = joinNodes2.size();
         if( size1 != size2 ) {
             intdiffPair.set( size1 , size2);
-            //                  System.out.println("Join Nodes Number diff:");
-            //                  System.out.println( intdiffPair.toString() );
-            //                  System.out.println("SQL statement might be changed.");
             messages.add( "Join Nodes Number diff:\n"+intdiffPair.toString()+"\nSQL statement might be changed.");
             m_changedSQL = true;
             String str1 = "";
@@ -763,8 +659,6 @@ public class plannerTester {
                     PlanNodeType pnt2 = pn2.getPlanNodeType();
                     if( !pnt1.equals(pnt2) ) {
                         stringdiffPair.set( pnt1+" at "+pn1.getPlanNodeId(), pnt2+" at "+pn2.getPlanNodeId());
-                        //                                              System.out.println( "Join Node Type diff:");
-                        //                                              System.out.println( stringdiffPair );
                         messages.add( "Join Node Type diff:\n"+stringdiffPair.toString());
                     }
                 }
@@ -793,16 +687,12 @@ public class plannerTester {
         diffPair stringdiffPair = new diffPair("", "");
         ArrayList<String> messages = new ArrayList<String>();
         if( max == 0 ) {
-            //                  System.out.println("0 scan statement");
             messages.add("0 scan statement");
         }
         else {
             if( size1 != size2 ){
                 intdiffPair.set(size1, size2);
                 messages.add("Scan time diff : "+"\n"+intdiffPair.toString()+"\n"+"SQL statement might be changed");
-                //                      System.out.println( "Scan time diff : " );
-                //                      System.out.println( intdiffPair );
-                //                      System.out.println( "SQL statement might be changed" );
                 m_changedSQL = true;
                 try {
                     for( int i = 0; i < min; i++ ) {
@@ -814,14 +704,10 @@ public class plannerTester {
                         String nodeType2 = j2.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
                         if( !table1.equalsIgnoreCase(table2) ) {
                             stringdiffPair.set( nodeType1+" on "+table1, nodeType2+" on "+table2 );
-                            //                                          System.out.println("Table diff at leaf "+i+":");
-                            //                                          System.out.println( stringdiffPair.toString() );
                             messages.add( "Table diff at leaf "+i+":"+"\n"+stringdiffPair.toString());
                         }
                         else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
                             stringdiffPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2);
-                            //                                          System.out.println("Scan diff at leaf "+i+" :");
-                            //                                          System.out.println( stringdiffPair.toString() );
                             messages.add("Scan diff at leaf "+i+" :"+"\n"+stringdiffPair.toString());
                         }
                         else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
@@ -829,17 +715,13 @@ public class plannerTester {
                             String index2 = j2.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
                             stringdiffPair.set( index1, index2);
                             if( !index1.equalsIgnoreCase(index2) ) {
-                                //                                                      System.out.println("Index diff at leaf "+i+" :");
-                                //                                                      System.out.println(stringdiffPair.toString());
                                 messages.add("Index diff at leaf "+i+" :"+"\n"+stringdiffPair.toString());
                             } else {
-                                //                                                      System.out.println("Same at leaf "+i);
                                 messages.add("Same at leaf "+i);
                             }
                         }
                         //either index scan using same index or seqscan on same table
                         else{
-                            //System.out.println("Same at leaf "+i);
                             messages.add("Same at leaf "+i);
                         }
                     }
@@ -855,15 +737,11 @@ public class plannerTester {
                             }
                             if( index != null ) {
                                 stringdiffPair.set(nodeType+" on "+table+" using "+index, "Empty" );
-                                //                                                      System.out.println("Diff at leaf "+i+" :");
-                                //                                                      System.out.println(stringdiffPair.toString());
                                 messages.add( "Diff at leaf "+i+" :"+"\n"+stringdiffPair.toString());
                             }
                             else
                             {
                                 stringdiffPair.set(nodeType+" on "+table, "Empty" );
-                                //                                                      System.out.println("Diff at leaf "+i+": ");
-                                //                                                      System.out.println(stringdiffPair.toString());
                                 messages.add("Diff at leaf "+i+": "+"\n"+stringdiffPair.toString());
                             }
                         }
@@ -879,15 +757,11 @@ public class plannerTester {
                             }
                             if( index != null ) {
                                 stringdiffPair.set("Empty", nodeType+" on "+table+" using "+index );
-                                //                                                              System.out.println("Diff at leaf "+i+" :");
-                                //                                                              System.out.println(stringdiffPair.toString());
                                 messages.add( "Diff at leaf "+i+" :"+"\n"+stringdiffPair.toString());
                             }
                             else
                             {
                                 stringdiffPair.set("Empty", nodeType+" on "+table );
-                                //                                                              System.out.println("Diff at leaf "+i+": ");
-                                //                                                              System.out.println(stringdiffPair.toString());
                                 messages.add( "Diff at leaf "+i+": "+"\n"+stringdiffPair.toString() );
                             }
                         }
@@ -898,11 +772,9 @@ public class plannerTester {
                 }
             }
             else {
-                //                      System.out.println("same leaf size");
                 messages.add( "same leaf size" );
                 try{
                     if( max == 1 ) {
-                        //                                      System.out.println("Single scan plan");
                         messages.add("Single scan plan");
                         JSONObject j1 = new JSONObject( list1.get(0).toJSONString() );
                         JSONObject j2 = new JSONObject( list2.get(0).toJSONString() );
@@ -912,14 +784,10 @@ public class plannerTester {
                         String nodeType2 = j2.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
                         if( !table1.equalsIgnoreCase(table2) ){
                             stringdiffPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
-                            //                                          System.out.println("Diff table at leaf"+0+" :");
-                            //                                          System.out.println(stringdiffPair.toString());
                             messages.add( "Diff table at leaf "+0+" :"+"\n"+stringdiffPair.toString());
                         }
                         else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
                             stringdiffPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
-                            //                                          System.out.println("Diff scan at leaf "+0+" :");
-                            //                                          System.out.println(stringdiffPair);
                             messages.add("Diff scan at leaf "+0+" :"+"\n"+stringdiffPair.toString());
                         }
                         else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
@@ -927,22 +795,17 @@ public class plannerTester {
                             String index2 = j2.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
                             if( !index1.equalsIgnoreCase(index2) ){
                                 stringdiffPair.set(nodeType1+" on "+table1+" using "+index1, nodeType2+" on "+table2+" using "+index2 );
-                                //                                                      System.out.println("Diff index at leaf"+0+": ");
-                                //                                                      System.out.println(stringdiffPair.toString());
                                 messages.add("Diff index at leaf "+0+": "+"\n"+stringdiffPair.toString());
                             }
                             else{
-                                //                                                      System.out.println("Same at "+0);
                                 messages.add( "Same at "+0 );
                             }
                         }
                         else {
-                            //                                          System.out.println("Same at "+0);
                             messages.add("Same at "+0);
                         }
                     }
                     else {
-                        //                                      System.out.println("Join query");
                         messages.add("Join query");
                         for( int i = 0; i < max; i++ ) {
                             JSONObject j1 = new JSONObject( list1.get(i).toJSONString() );
@@ -953,14 +816,10 @@ public class plannerTester {
                             String nodeType2 = j2.getString(AbstractPlanNode.Members.PLAN_NODE_TYPE.name());
                             if( !table1.equalsIgnoreCase(table2) ){
                                 stringdiffPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
-                                //                                                      System.out.println("Diff table at leaf "+i+" :");
-                                //                                                      System.out.println(stringdiffPair);
                                 messages.add("Diff table at leaf "+i+" :"+"\n"+stringdiffPair.toString());
                             }
                             else if( !nodeType1.equalsIgnoreCase(nodeType2) ) {
                                 stringdiffPair.set(nodeType1+" on "+table1, nodeType2+" on "+table2 );
-                                //                                                      System.out.println("Diff scan at leaf "+i+" :");
-                                //                                                      System.out.println(stringdiffPair);
                                 messages.add( "Diff scan at leaf "+i+" :"+"\n"+stringdiffPair.toString());
                             }
                             else if ( nodeType1.equalsIgnoreCase(PlanNodeType.INDEXSCAN.name()) ) {
@@ -968,17 +827,13 @@ public class plannerTester {
                                 String index2 = j2.getString(IndexScanPlanNode.Members.TARGET_INDEX_NAME.name());
                                 if( !index1.equalsIgnoreCase(index2) ){
                                     stringdiffPair.set(nodeType1+" on "+table1+" using "+index1, nodeType2+" on "+table2+" using "+index2 );
-                                    //                                                                  System.out.println("Diff index at leaf "+i+": ");
-                                    //                                                                  System.out.println(stringdiffPair.toString());
                                     messages.add( "Diff index at leaf "+i+" :"+"\n"+stringdiffPair.toString());
                                 }
                                 else {
-                                    //                                                                  System.out.println("Same at leaf "+i);
                                     messages.add("Same at leaf "+i);
                                 }
                             }
                             else{
-                                //                                              System.out.println("Same at leaf "+i);
                                 messages.add( "Same at leaf "+i );
                             }
                         }
@@ -992,12 +847,10 @@ public class plannerTester {
         for( String msg : messages ) {
             if( msg.contains("diff") || msg.contains("Diff") ) {
                 noDiff = false;
-                m_diffMessages.add( msg );
+                break;
             }
         }
-        //              for ( String message : messages ) {
-        //                      System.out.println( message );
-        //              }
+        m_diffMessages.addAll(messages);
         return noDiff;
     }
 
