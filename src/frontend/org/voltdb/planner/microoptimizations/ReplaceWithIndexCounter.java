@@ -40,9 +40,9 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
     public List<CompiledPlan> apply(CompiledPlan plan) {
         ArrayList<CompiledPlan> retval = new ArrayList<CompiledPlan>();
 
-        AbstractPlanNode planGraph = plan.fragments.get(0).planGraph;
+        AbstractPlanNode planGraph = plan.rootPlanGraph;
         planGraph = recursivelyApply(planGraph);
-        plan.fragments.get(0).planGraph = planGraph;
+        plan.rootPlanGraph = planGraph;
 
         retval.add(plan);
         return retval;
