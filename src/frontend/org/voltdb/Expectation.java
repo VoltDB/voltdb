@@ -45,17 +45,17 @@ public class Expectation {
         m_scalar = scalar;
     }
 
-    static void fail(String procedureName, String stmtName, int batchIndex,
+    static void fail(String procedureName, byte[] stmtName, int batchIndex,
             String errMsg) throws VoltAbortException {
 
         String fullMsg = "Expectation failing in procedure: " + procedureName + "\n";
-        fullMsg += "  Running SQL: " + stmtName + "\n";
+        fullMsg += "  Running SQL: " + new String(stmtName, VoltDB.UTF8ENCODING) + "\n";
         fullMsg += "  Error message: " + errMsg;
 
         throw new VoltAbortException(fullMsg);
     }
 
-    static void check(String procedureName, String stmtName, int batchIndex,
+    static void check(String procedureName, byte[] stmtName, int batchIndex,
             Expectation expectation, VoltTable table) throws VoltAbortException {
         if (expectation == null)
             return;
