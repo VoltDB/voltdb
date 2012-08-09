@@ -44,6 +44,7 @@ var QueryUI = (function(queryTab){
 								sql = sql.replace('$(SQL_PARSER_STRING_FRAGMENT#' + j + ')', frag[j]);
 						sql = sql.replace(/\$\(SQL_PARSER_ESCAPE_SINGLE_QUOTE\)/g,"''");
                         sql = sql.replace("#SQL_PARSER_STRING_KEYWORD#","");
+                        sql = sql.replace(/\"/g, '\\"');
 						statements.push(sql);
 					}
 				}
@@ -201,7 +202,7 @@ function isUpdateResult(table)
 
 function printGrid(target, id, table)
 {
-    var src = '<table id="resultset-' + id + '" class="sortable tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
+	var src = '<table id="resultset-' + id + '" class="sortable tablesorter resultset-' + id + '" border="0" cellpadding="0" cellspacing="1"><thead class="ui-widget-header noborder"><tr>';
     if (isUpdateResult(table))
 		src += '<th>modified_tuples</th>';
     else
@@ -214,7 +215,7 @@ function printGrid(target, id, table)
 	{
 		src += '<tr>';
 		for(var k = 0; k < table.data[j].length; k++)
-            src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + table.data[j][k] + '</td>';
+			src += '<td align="' + (table.schema[k].type == 9 ? 'left' : 'right') + '">' + table.data[j][k] + '</td>';
 		src += '</tr>';
 	}
 	src += '</tbody></table>';
