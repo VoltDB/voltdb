@@ -18,7 +18,7 @@
 package org.voltdb;
 
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.dtxn.TransactionCreator;
 
 /**
  * The default command log reinitiator for community edition VoltDB.
@@ -85,7 +85,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public void setInitiator(TransactionInitiator initiator) {
+    public void setInitiator(TransactionCreator initiator) {
     }
 
     @Override

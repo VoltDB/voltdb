@@ -32,7 +32,7 @@ import java.util.Map;
  * systems with provide their own subclasses.</p>
  *
  */
-public abstract class TransactionInitiator {
+public abstract class TransactionInitiator implements TransactionCreator {
 
     /**
      * <p>Create a new transaction, which will result in one or more

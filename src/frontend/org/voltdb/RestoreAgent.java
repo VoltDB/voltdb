@@ -51,7 +51,7 @@ import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.dtxn.TransactionCreator;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.Snapshot;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil.TableFiles;
@@ -128,7 +128,7 @@ SnapshotCompletionInterest
     private LeaderElector m_leaderElector = null;
     private boolean m_isLeader = false;
 
-    private TransactionInitiator m_initiator;
+    private TransactionCreator m_initiator;
 
     // The snapshot to restore
     private SnapshotInfo m_snapshotToRestore = null;
@@ -337,7 +337,7 @@ SnapshotCompletionInterest
         m_replayAgent.setSiteTracker(siteTracker);
     }
 
-    public void setInitiator(TransactionInitiator initiator) {
+    public void setInitiator(TransactionCreator initiator) {
         m_initiator = initiator;
         if (m_replayAgent != null)
             m_replayAgent.setInitiator(initiator);

@@ -18,7 +18,7 @@
 package org.voltdb;
 
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.dtxn.TransactionInitiator;
+import org.voltdb.dtxn.TransactionCreator;
 
 public interface CommandLogReinitiator {
     public interface Callback {
@@ -37,7 +37,7 @@ public interface CommandLogReinitiator {
 
     public void setSiteTracker(SiteTracker siteTracker);
 
-    public void setInitiator(TransactionInitiator initiator);
+    public void setInitiator(TransactionCreator initiator);
 
     /**
      * Generate the local replay plan. Call this before starting replay.

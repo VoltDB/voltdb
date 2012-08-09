@@ -686,7 +686,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             // Create the client interface
             int portOffset = 0;
-            // TODO: fix
             //for (long site : m_siteTracker.getMailboxTracker().getAllInitiators()) {
             for (int i = 0; i < 1; i++) {
                 // create DTXN and CI for each local non-EE site
@@ -799,11 +798,18 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ci.initializeSnapshotDaemon(m_messenger.getZK());
 
             // set additional restore agent stuff
-            TransactionInitiator initiator = m_dtxns.get(0);
             if (m_restoreAgent != null) {
-                m_restoreAgent.setCatalogContext(m_catalogContext);
-                m_restoreAgent.setSiteTracker(m_siteTracker);
-                m_restoreAgent.setInitiator(initiator);
+                if (isIV2Enabled()) {
+                    m_restoreAgent.setCatalogContext(m_catalogContext);
+                    m_restoreAgent.setSiteTracker(getSiteTrackerForSnapshot());
+                    m_restoreAgent.setInitiator(null);
+                }
+                else {
+                    TransactionInitiator initiator = m_dtxns.get(0);
+                    m_restoreAgent.setCatalogContext(m_catalogContext);
+                    m_restoreAgent.setSiteTracker(m_siteTracker);
+                    m_restoreAgent.setInitiator(initiator);
+                }
             }
         }
     }
