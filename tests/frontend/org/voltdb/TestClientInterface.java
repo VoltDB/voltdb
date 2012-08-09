@@ -283,7 +283,7 @@ public class TestClientInterface {
                 "select * from a", null, 0, 0, "localhost", false, null);
         AdHocPlannedStatement s = new AdHocPlannedStatement(
                 "select * from a".getBytes(VoltDB.UTF8ENCODING),
-                new byte[0], new byte[0], false, false, true, null, 0);
+                new byte[0], new byte[0], false, false, true, new VoltType[0], new ParameterSet(), 0);
         plannedStmtBatch.addStatement(s);
         m_ci.processFinishedCompilerWork(plannedStmtBatch).run();
 
