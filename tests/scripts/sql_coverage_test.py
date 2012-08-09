@@ -129,9 +129,15 @@ def run_once(name, command, statements_path, results_path):
     return server.returncode
 
 def run_config(config, basedir, output_dir, random_seed, report_all, generate_only, args):
+    fuzzylevel = 0
     for key in config.iterkeys():
-        if not os.path.isabs(config[key]):
-            config[key] = os.path.abspath(os.path.join(basedir, config[key]))
+        if(key != "fuzzylevel"):
+            if not os.path.isabs(config[key]):
+                config[key] = os.path.abspath(os.path.join(basedir, config[key]))
+        else:
+            if(config[key].isdigit()):
+                fuzzylevel = int(config[key])
+
     if not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -193,7 +199,7 @@ def run_config(config, basedir, output_dir, random_seed, report_all, generate_on
         exit(1)
 
     success = generate_html_reports(random_seed, statements_path, hsql_path,
-                                    jni_path, output_dir, report_all)
+                                    jni_path, output_dir, report_all, fuzzylevel)
     return success
 
 def usage():

@@ -160,7 +160,7 @@ def print_section(name, mismatches, output_dir):
 
     return result
 
-def is_different(x):
+def is_different(x, fuzzylevel):
     """Marks the attributes that are different. Since the whole table will be
     printed out as a single string.
     the first line is column count,
@@ -176,6 +176,10 @@ def is_different(x):
         if int(x["jni"]["Status"]) > 0 or int(x["hsqldb"]["Status"]) > 0:
             x["highlight"] = ["Status"]
             return True
+
+    if(fuzzylevel == 1):
+        str = x['SQL'].lower()
+        str = " ".join(str.split())
 
     if "Result" in x["jni"] and "Result" in x["hsqldb"]:
         x["highlight"] = []
@@ -193,9 +197,18 @@ def is_different(x):
                 x["highlight"][i].append(1) # Tuple count
                 return True
             for j in xrange(len(x["jni"]["Result"][i].tuples)):
-                if x["jni"]["Result"][i].tuples[j] != \
-                        x["hsqldb"]["Result"][i].tuples[j]:
-                    x["highlight"][i].append(j + 4) # Offset to the correct row
+                if(fuzzylevel == 1          and \
+                  (str.find("select") > -1) and \
+                  (str.find("limit") > -1)  and \
+                  (str.find("order by") == -1)):
+                    # We do NOT care the actual contents returned by this querie, e.g.
+                    # SELECT p1.ID, P1.TINY FROM P1 P1.id LIMIT 8
+                    continue
+                else: 
+                    # We do care the actual contents returned by all these queries, including this one:
+                    # SELECT p1.ID, P1.TINY FROM P1 orDer     BY P1.id LIMIT 8
+                    if x["jni"]["Result"][i].tuples[j] !=  x["hsqldb"]["Result"][i].tuples[j]:
+                        x["highlight"][i].append(j + 4) # Offset to the correct row
         for i in x["highlight"]:
             if i:
                 return True
@@ -212,7 +225,7 @@ contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
 def generate_html_reports(seed, statements_path, hsql_path, jni_path,
-                          output_dir, report_all, is_matching = False):
+                          output_dir, report_all, fuzzylevel, is_matching = False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -244,10 +257,10 @@ def generate_html_reports(seed, statements_path, hsql_path, jni_path,
         statement["hsqldb"] = hsql
         statement["jni"] = jni
         if is_matching:
-            if not is_different(statement):
+            if not is_different(statement, fuzzylevel):
                 mismatches.append(statement)
         else:
-            if is_different(statement):
+            if is_different(statement, fuzzylevel):
                 mismatches.append(statement)
         if report_all:
             all_results.append(statement)
