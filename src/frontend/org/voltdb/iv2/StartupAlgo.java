@@ -82,7 +82,7 @@ public class StartupAlgo implements RepairAlgo
         // block here until the babysitter thread provides all replicas.
         // then initialize the mailbox's replica set and proceed as leader.
         m_missingStartupSites.await();
-        m_promotionResult.done(0);
+        m_promotionResult.done(TxnEgo.SEQUENCE_ZERO);
     }
 
     /** Process a new repair log response */

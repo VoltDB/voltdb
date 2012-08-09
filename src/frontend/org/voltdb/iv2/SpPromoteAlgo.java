@@ -44,7 +44,7 @@ public class SpPromoteAlgo implements RepairAlgo
     private final InitiatorMailbox m_mailbox;
     private final long m_requestId = System.nanoTime();
     private final List<Long> m_survivors;
-    private long m_maxSeenTxnId = 0; // UPDATE ME TO REAL VALUE WHEN EXTRACTING BASE CLASS
+    private long m_maxSeenTxnId = TxnEgo.SEQUENCE_ZERO;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -122,7 +122,7 @@ public class SpPromoteAlgo implements RepairAlgo
         } catch (Exception e) {
             tmLog.error(m_whoami + "failed leader promotion:", e);
             m_promotionResult.setException(e);
-            m_promotionResult.done(Long.MIN_VALUE);
+            m_promotionResult.done(m_maxSeenTxnId);
         }
         return m_promotionResult;
     }
@@ -166,6 +166,10 @@ public class SpPromoteAlgo implements RepairAlgo
                         + " repair log entries from "
                         + CoreUtils.hsIdToString(response.m_sourceHSId));
             }
+            // Long.MAX_VALUE has rejoin semantics
+            if (response.getHandle() != Long.MAX_VALUE) {
+                m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
+            }
             m_repairLogUnion.add(response);
             if (rrs.update(response)) {
                 tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
@@ -189,7 +193,7 @@ public class SpPromoteAlgo implements RepairAlgo
         return true;
     }
 
-    /** Send missed-messages to survivors. Exciting! */
+    /** Send missed-messages to survivors. */
     public void repairSurvivors()
     {
         // cancel() and repair() must be synchronized by the caller (the deliver lock,

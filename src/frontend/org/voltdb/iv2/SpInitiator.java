@@ -40,8 +40,7 @@ public class SpInitiator extends BaseInitiator
     public SpInitiator(HostMessenger messenger, Integer partition)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(new SiteTaskerQueue()),
-                "SP");
+                new SpScheduler(partition, new SiteTaskerQueue()), "SP");
     }
 
     @Override

@@ -23,22 +23,24 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.ExecutionException;
-import java.util.concurrent.Future;
-
-import org.mockito.InOrder;
 import static org.mockito.Matchers.any;
 import static org.mockito.Matchers.eq;
-import static org.mockito.Mockito.*;
+import static org.mockito.Mockito.inOrder;
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.times;
+import static org.mockito.Mockito.verify;
+import static org.mockito.Mockito.when;
 
 import java.util.ArrayList;
 import java.util.List;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.Future;
 
-import org.voltcore.utils.Pair;
-
-import junit.framework.*;
+import junit.framework.TestCase;
 
 import org.junit.Test;
+import org.mockito.InOrder;
+import org.voltcore.utils.Pair;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogRequestMessage;
@@ -46,6 +48,20 @@ import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
 public class TestMpPromoteAlgo extends TestCase
 {
+    long txnEgo(long handle)
+    {
+        // repair log uses long.max_value in the header response
+        // to signify an empty repair log. this is fragile and
+        // should be improved.
+        if (handle == Long.MAX_VALUE) {
+            return handle;
+        } else {
+            int partitionId = 100;
+            long sequence = TxnEgo.SEQUENCE_ZERO + handle;
+            return new TxnEgo(sequence, partitionId).getSequence();
+        }
+    }
+
     Iv2RepairLogResponseMessage makeFragResponse(long handle)
     {
         FragmentTaskMessage frag = mock(FragmentTaskMessage.class);
@@ -115,11 +131,14 @@ public class TestMpPromoteAlgo extends TestCase
         // txns 1-5 are complete. 6 is not complete.
         // txn 5 returns frag(s) and complete(s).
         final Boolean t = true; final Boolean f = false;
-        long returnedHandles[]  = new long[]{1L, 5L, 2L, 5L, 6L, 3L, 5L, 1L};
+        long returnedHandles[]  = new long[]{txnEgo(1L), txnEgo(5L), txnEgo(2L), txnEgo(5L), txnEgo(6L), txnEgo(3L), txnEgo(5L), txnEgo(1L)};
         boolean isComplete[] = new boolean[]{t,  f,  t,  t,  f,  t,  f,  t};
 
-        long expectedUnion[] = new long[]{1L, 2L, 3L, 5L, 6L};
+        long expectedUnion[] = new long[]{txnEgo(1L), txnEgo(2L), txnEgo(3L), txnEgo(5L), txnEgo(6L)};
         boolean expectComp[] = new boolean[]{t, t, t, t, f};
+
+        Iv2RepairLogResponseMessage makeCompleteResponse = makeCompleteResponse(returnedHandles[0]);
+        System.out.println("txnEgo: " + returnedHandles[0] + " m.handle(): " + makeCompleteResponse.getHandle());
 
         for (int ii=0; ii < isComplete.length; ii++) {
             if (isComplete[ii]) {
@@ -134,6 +153,7 @@ public class TestMpPromoteAlgo extends TestCase
         assertEquals(expectedUnion.length, algo.m_repairLogUnion.size());
         int i = 0;
         for (Iv2RepairLogResponseMessage li : algo.m_repairLogUnion) {
+            System.out.println("Comparing " + li.getHandle() + " to expected " + expectedUnion[i] + "SEQ 0 is: " + TxnEgo.SEQUENCE_ZERO + " shifted zero: " + (TxnEgo.SEQUENCE_ZERO << 14));
             assertEquals(li.getHandle(), expectedUnion[i]);
             if (expectComp[i]) {
                 assertTrue(li.getPayload() instanceof CompleteTransactionMessage);
@@ -162,23 +182,23 @@ public class TestMpPromoteAlgo extends TestCase
         verify(mailbox, times(1)).send(any(long[].class), any(Iv2RepairLogRequestMessage.class));
 
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, 1000L));
-        algo.deliver(makeRealFragResponse(requestId, 1L, 1, 2, 1000L));
+        algo.deliver(makeRealAckResponse(requestId, 1L, 0, 2, txnEgo(1000L)));
+        algo.deliver(makeRealFragResponse(requestId, 1L, 1, 2, txnEgo(1000L)));
 
         // has only the normal ack. Never saw an MP transaction.
         algo.deliver(makeRealAckResponse(requestId, 2L, 0, 1, Long.MAX_VALUE));
 
         // also has a complete. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 3, 1000L));
-        algo.deliver(makeRealFragResponse(requestId, 3L, 1, 3, 1000L));
-        algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 3, 1000L));
+        algo.deliver(makeRealAckResponse(requestId, 3L, 0, 3, txnEgo(1000L)));
+        algo.deliver(makeRealFragResponse(requestId, 3L, 1, 3, txnEgo(1000L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 3, txnEgo(1000L)));
 
         // verify exactly 1 repair happened.
         List<Long> needsRepair = new ArrayList<Long>();
         needsRepair.add(1L);
         verify(mailbox, times(1)).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
         Pair<Boolean, Long> real_result = result.get();
-        assertEquals(1000L, (long)real_result.getSecond());
+        assertEquals(txnEgo(1000L), (long)real_result.getSecond());
     }
 
     @Test
@@ -198,36 +218,36 @@ public class TestMpPromoteAlgo extends TestCase
         // Master 1
         // First, everyone completed
         // has a frag for txn 1000. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId,      1L, 0, 8, 1000L));
-        algo.deliver(makeRealFragResponse(requestId,     1L, 1, 8, 1000L));
-        algo.deliver(makeRealCompleteResponse(requestId, 1L, 2, 8, 1000L));
+        algo.deliver(makeRealAckResponse(requestId,      1L, 0, 8, txnEgo(1000L)));
+        algo.deliver(makeRealFragResponse(requestId,     1L, 1, 8, txnEgo(1000L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 1L, 2, 8, txnEgo(1000L)));
         // Second, 3 will lose complete
-        algo.deliver(makeRealFragResponse(requestId,     1L, 3, 8, 1001L));
-        algo.deliver(makeRealCompleteResponse(requestId, 1L, 4, 8, 1001L));
+        algo.deliver(makeRealFragResponse(requestId,     1L, 3, 8, txnEgo(1001L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 1L, 4, 8, txnEgo(1001L)));
         // Third, 2 will lose complete and 3 has nothing
-        algo.deliver(makeRealFragResponse(requestId,     1L, 5, 8, 1002L));
-        algo.deliver(makeRealCompleteResponse(requestId, 1L, 6, 8, 1002L));
+        algo.deliver(makeRealFragResponse(requestId,     1L, 5, 8, txnEgo(1002L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 1L, 6, 8, txnEgo(1002L)));
         // Fourth, 1 just has a fragment, the other two are gone.
-        algo.deliver(makeRealFragResponse(requestId,     1L, 7, 8, 1003L));
+        algo.deliver(makeRealFragResponse(requestId,     1L, 7, 8, txnEgo(1003L)));
 
         // Master 2
         // has only the normal ack. Never saw an MP transaction.
-        algo.deliver(makeRealAckResponse(requestId,      2L, 0, 6, 1000L));
-        algo.deliver(makeRealFragResponse(requestId,     2L, 1, 6, 1000L));
-        algo.deliver(makeRealCompleteResponse(requestId, 2L, 2, 6, 1000L));
+        algo.deliver(makeRealAckResponse(requestId,      2L, 0, 6, txnEgo(1000L)));
+        algo.deliver(makeRealFragResponse(requestId,     2L, 1, 6, txnEgo(1000L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 2L, 2, 6, txnEgo(1000L)));
         // second, 3 loses complete
-        algo.deliver(makeRealFragResponse(requestId,     2L, 3, 6, 1001L));
-        algo.deliver(makeRealCompleteResponse(requestId, 2L, 4, 6, 1001L));
+        algo.deliver(makeRealFragResponse(requestId,     2L, 3, 6, txnEgo(1001L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 2L, 4, 6, txnEgo(1001L)));
         // third, 2 (us) loses complete
-        algo.deliver(makeRealFragResponse(requestId,     2L, 5, 6, 1002L));
+        algo.deliver(makeRealFragResponse(requestId,     2L, 5, 6, txnEgo(1002L)));
 
         // Master 3
         // also has a complete. MP handle is 1000L
-        algo.deliver(makeRealAckResponse(requestId,      3L, 0, 4, 1000L));
-        algo.deliver(makeRealFragResponse(requestId,     3L, 1, 4, 1000L));
-        algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 4, 1000L));
+        algo.deliver(makeRealAckResponse(requestId,      3L, 0, 4, txnEgo(1000L)));
+        algo.deliver(makeRealFragResponse(requestId,     3L, 1, 4, txnEgo(1000L)));
+        algo.deliver(makeRealCompleteResponse(requestId, 3L, 2, 4, txnEgo(1000L)));
         // 3 loses complete
-        algo.deliver(makeRealFragResponse(requestId,     3L, 3, 4, 1001L));
+        algo.deliver(makeRealFragResponse(requestId,     3L, 3, 4, txnEgo(1001L)));
 
         // First, repair 3
         List<Long> needsRepair = new ArrayList<Long>();
@@ -244,7 +264,7 @@ public class TestMpPromoteAlgo extends TestCase
         inOrder.verify(mailbox).repairReplicasWith(eq(needsRepair), any(Iv2RepairLogResponseMessage.class));
 
         Pair<Boolean, Long> real_result = result.get();
-        assertEquals(1003L, (long)real_result.getSecond());
+        assertEquals(txnEgo(1003L), (long)real_result.getSecond());
     }
 
     // verify correct txnID when no MP has ever been done
@@ -273,7 +293,7 @@ public class TestMpPromoteAlgo extends TestCase
 
         // verify that the discovered txn id is 0 (the correct starting txnid).
         Pair<Boolean, Long> real_result = result.get();
-        assertEquals(0L, (long)real_result.getSecond());
+        assertEquals(txnEgo(0L), (long)real_result.getSecond());
     }
 
 

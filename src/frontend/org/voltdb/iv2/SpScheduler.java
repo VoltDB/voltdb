@@ -23,7 +23,6 @@ import java.util.HashMap;
 import java.util.LinkedList;
 import java.util.List;
 import java.util.Map;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
@@ -46,15 +45,14 @@ public class SpScheduler extends Scheduler
         new HashMap<Long, TransactionState>();
     private final Map<Long, DuplicateCounter> m_duplicateCounters =
         new HashMap<Long, DuplicateCounter>();
-    private final AtomicLong m_txnId = new AtomicLong(0);
     private CommandLog m_cl;
 
     // the current not-needed-any-more point of the repair log.
     long m_repairLogTruncationHandle = Long.MIN_VALUE;
 
-    SpScheduler(SiteTaskerQueue taskQueue)
+    SpScheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
-        super(taskQueue);
+        super(partitionId, taskQueue);
     }
 
     @Override
@@ -163,10 +161,14 @@ public class SpScheduler extends Scheduler
                  */
                 if (message.isForReplay()) {
                     newSpHandle = message.getTxnId();
-                    m_txnId.set(newSpHandle);
+                    setMaxSeenTxnId(newSpHandle);
                 } else {
-                    newSpHandle = m_txnId.incrementAndGet();
+                    advanceTxnEgo();
+                    newSpHandle = currentTxnEgoSequence();
                 }
+
+                // advanceTxnEgo();
+                // newSpHandle = currentTxnEgoSequence();
 
                 msg.setSpHandle(newSpHandle);
                 // Also, if this is a vanilla single-part procedure, make the TXNID
@@ -197,8 +199,8 @@ public class SpScheduler extends Scheduler
                 }
             }
             else {
-                newSpHandle = msg.getSpHandle();
-                m_txnId.set(newSpHandle);
+                setMaxSeenTxnId(msg.getSpHandle());
+                newSpHandle = currentTxnEgoSequence();
             }
             m_cl.log(msg);
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
@@ -289,7 +291,7 @@ public class SpScheduler extends Scheduler
         // borrows do not advance the sp handle. The handle would
         // move backwards anyway once the next message is received
         // from the SP leader.
-        long newSpHandle = m_txnId.get();
+        long newSpHandle = currentTxnEgoSequence();
         Iv2Trace.logFragmentTaskMessage(message.getFragmentTaskMessage(),
                 m_mailbox.getHSId(), newSpHandle, true);
         TransactionState txn = m_outstandingTxns.get(message.getTxnId());
@@ -338,7 +340,8 @@ public class SpScheduler extends Scheduler
             // all the messaging mess at some point.
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
-            newSpHandle = m_txnId.incrementAndGet();
+            advanceTxnEgo();
+            newSpHandle = currentTxnEgoSequence();
             msg.setSpHandle(newSpHandle);
             // If we have input dependencies, it's borrow work, there's no way we
             // can actually distribute it
@@ -364,7 +367,7 @@ public class SpScheduler extends Scheduler
         }
         else {
             newSpHandle = msg.getSpHandle();
-            m_txnId.set(newSpHandle);
+            setMaxSeenTxnId(newSpHandle);
         }
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);
@@ -434,11 +437,6 @@ public class SpScheduler extends Scheduler
                 new CompleteTransactionTask(txn, m_pendingTasks, message);
             m_pendingTasks.offer(task);
         }
-    }
-
-    @Override
-    public void setMaxSeenTxnId(long maxSeenTxnId) {
-        assert(maxSeenTxnId < (1l << 40));
     }
 
     @Override

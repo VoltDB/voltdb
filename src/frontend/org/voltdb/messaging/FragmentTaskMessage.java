@@ -134,7 +134,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     {
         super(initiatorHSId, coordinatorHSId, ftask);
 
-        m_spHandle = ftask.m_spHandle;
+        setSpHandle(ftask.getSpHandle());
         m_taskType = ftask.m_taskType;
         m_isFinal = ftask.m_isFinal;
         m_subject = ftask.m_subject;
@@ -588,7 +588,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
-        sb.append(", SP HANDLE: ").append(m_spHandle);
+        sb.append(", SP HANDLE: ").append(getSpHandle());
         sb.append("\n");
         if (m_isReadOnly)
             sb.append("  READ, COORD ");

@@ -37,7 +37,7 @@ import org.voltdb.VoltZK;
  */
 public class MpInitiator extends BaseInitiator
 {
-    private static final int MP_INIT_PID = -1;
+    public static final int MP_INIT_PID = TxnEgo.PARTITIONID_MAX_VALUE;
 
     public MpInitiator(HostMessenger messenger, long buddyHSId)
     {
@@ -45,6 +45,7 @@ public class MpInitiator extends BaseInitiator
                 messenger,
                 MP_INIT_PID,
                 new MpScheduler(
+                    MP_INIT_PID,
                     buddyHSId,
                     new SiteTaskerQueue()),
                 "MP");
