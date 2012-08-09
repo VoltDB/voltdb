@@ -17,6 +17,7 @@
 
 package org.voltdb.compiler;
 
+import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.List;
@@ -176,14 +177,14 @@ public class ExplainPlannedStmtBatch extends AsyncCompilerResult implements Clon
         return size;
     }
 
-    public void flattenPlanArrayToBuffer(ByteBuffer buf) {
+    public void flattenPlanArrayToBuffer(ByteBuffer buf) throws IOException {
         buf.putShort((short) plannedStatements.size());
         for (AdHocPlannedStatement cs : plannedStatements) {
             cs.flattenToBuffer(buf);
         }
     }
 
-    public static AdHocPlannedStatement[] planArrayFromBuffer(ByteBuffer buf) {
+    public static AdHocPlannedStatement[] planArrayFromBuffer(ByteBuffer buf) throws IOException {
         short csCount = buf.getShort();
         AdHocPlannedStatement[] statements = new AdHocPlannedStatement[csCount];
         for (int i = 0; i < csCount; ++i) {
