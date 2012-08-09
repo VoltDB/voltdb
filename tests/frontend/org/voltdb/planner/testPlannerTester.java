@@ -160,8 +160,8 @@ public class testPlannerTester extends TestCase {
         PlanNodeTree pnt = plannerTester.loadPlanFromFile(path+"prettyJson.txt", getsql);
         System.out.println( pnt.toJSONString() );
         System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
-        ArrayList<AbstractPlanNode> list1 = pn.getLists();
-        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getLists();
+        ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeLists();
+        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeLists();
         assertTrue( list1.size() == list2.size() );
         for( int i = 0; i < list1.size(); i++ ) {
             Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
@@ -186,8 +186,8 @@ public class testPlannerTester extends TestCase {
         System.out.println( pnt.toJSONString() );
         System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
         //System.out.println( pnt.getRootPlanNode().toExplainPlanString() );
-        ArrayList<AbstractPlanNode> list1 = pn.getLists();
-        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getLists();
+        ArrayList<AbstractPlanNode> list1 = pn.getPlanNodeLists();
+        ArrayList<AbstractPlanNode> list2 = pnt.getRootPlanNode().getPlanNodeLists();
         assertTrue( list1.size() == list2.size() );
         for( int i = 0; i < list1.size(); i++ ) {
             Map<PlanNodeType, AbstractPlanNode> inlineNodes1 = list1.get(i).getInlinePlanNodes();
@@ -270,7 +270,7 @@ public class testPlannerTester extends TestCase {
         AbstractPlanNode pn1 = null;
         pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
 
-        ArrayList<AbstractPlanNode> pnlist = pn1.getLists();
+        ArrayList<AbstractPlanNode> pnlist = pn1.getPlanNodeLists();
 
         System.out.println( pn1.toExplainPlanString() );
         System.out.println( pnlist.size() );

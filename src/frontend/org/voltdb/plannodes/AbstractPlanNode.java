@@ -686,15 +686,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    public ArrayList<AbstractPlanNode> getLists () {
+    public ArrayList<AbstractPlanNode> getPlanNodeLists () {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
         ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
-        getLists_recurse( collected, visited);
+        getPlanNodeLists_recurse( collected, visited);
         return collected;
     }
 
     //postorder add nodes
-    public void getLists_recurse(ArrayList<AbstractPlanNode> collected,
+    public void getPlanNodeLists_recurse(ArrayList<AbstractPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";
@@ -703,23 +703,18 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         visited.add(this);
 
         for (AbstractPlanNode n : m_children) {
-            n.getLists_recurse(collected, visited);
+            n.getPlanNodeLists_recurse(collected, visited);
         }
         collected.add(this);
-
-        // NOTE: ignores inline nodes.
     }
 
   //TODO outputSchema not loaded
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        if( jobj == null ) {
-            System.err.println("JSONObject is null");
-            return;
-        }
+        assert( jobj != null );
         String str = jobj.getString( Members.ID.name() );
         m_id = Integer.parseInt( str );
 
-        //todo : need to set up output_schema, inline_nodes and members in various plannodes
+        //TODO : need to set up output_schema and members in various plannodes. Inline nodes are handled below
 
         m_outputSchema = new NodeSchema();
 

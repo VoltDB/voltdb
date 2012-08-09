@@ -499,8 +499,8 @@ public class plannerTester {
         m_treeSizeDiff = 0;
         boolean noDiff = true;
         ArrayList<String> messages = new ArrayList<String>();
-        ArrayList<AbstractPlanNode> list1 = oldpn1.getLists();
-        ArrayList<AbstractPlanNode> list2 = newpn2.getLists();
+        ArrayList<AbstractPlanNode> list1 = oldpn1.getPlanNodeLists();
+        ArrayList<AbstractPlanNode> list2 = newpn2.getPlanNodeLists();
         int size1 = list1.size();
         int size2 = list2.size();
         m_treeSizeDiff = size1 - size2;
