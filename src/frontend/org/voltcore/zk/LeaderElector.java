@@ -22,7 +22,6 @@ import java.util.concurrent.ExecutionException;
 import java.util.concurrent.ExecutorService;
 import java.util.concurrent.Executors;
 import java.util.concurrent.Future;
-import java.util.concurrent.TimeUnit;
 import java.util.concurrent.atomic.AtomicBoolean;
 
 import org.apache.zookeeper_voltpatches.CreateMode;
@@ -95,6 +94,26 @@ public class LeaderElector {
     }
 
     /**
+     * Provide a way for clients to create nodes which comply with the leader election
+     * format without participating in a leader election
+     * @throws InterruptedException
+     * @throws KeeperException
+     */
+    public static String createParticipantNode(ZooKeeper zk, String dir, String prefix, byte[] data)
+        throws KeeperException, InterruptedException
+    {
+        // create the election root node if it doesn't exist.
+        try {
+            zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
+        } catch (KeeperException.NodeExistsException e) {
+            // expected on all nodes that don't start() first.
+        }
+        String node = zk.create(ZKUtil.joinZKPath(dir, prefix + "_"), data,
+                Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        return node;
+    }
+
+    /**
      * Start leader election.
      *
      * Creates an ephemeral sequential node under the given directory and check
@@ -109,15 +128,7 @@ public class LeaderElector {
      */
     public void start(boolean block) throws KeeperException, InterruptedException, ExecutionException
     {
-        // create the election root node if it doesn't exist.
-        try {
-            zk.create(dir, null, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT);
-        } catch (KeeperException.NodeExistsException e) {
-            // expected on all nodes that don't start() first.
-        }
-
-        node = zk.create(ZKUtil.joinZKPath(dir, prefix + "_"), data,
-                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL_SEQUENTIAL);
+        node = createParticipantNode(zk, dir, prefix, data);
         Future<?> task = es.submit(eventHandler);
         if (block) {
             task.get();

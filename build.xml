@@ -1200,7 +1200,7 @@ TEST CASES
 <!--                <exclude name="**/TestPlansGroupBySuite.class" /> -->
                 <exclude name="**/TestReplicationSuite.class" />
 <!--                <exclude name="**/TestRollbackSuite.class" /> -->
-                <exclude name="**/TestSQLFeaturesSuite.class" />
+<!--                <exclude name="**/TestSQLFeaturesSuite.class" /> -->
 <!--                <exclude name="**/TestSQLTypesSuite.class" /> -->
 <!--                <exclude name="**/TestSecuritySuite.class" /> -->
                 <exclude name="**/TestSneakyExecutionOrderSuite.class" />
@@ -1308,8 +1308,6 @@ TEST CASES
                 <include name='org/voltdb/messaging/**/*Test.class'/>
                 <include name='org/voltdb/network/**/*Test.class'/>
                 <include name='org/voltdb/utils/**/*Test.class'/>
-                <!--Remove exclusion of TestExecutionSite when ENG-3374 is fixed -->
-                <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>

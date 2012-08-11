@@ -433,12 +433,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
         {
             dim.deliver(createInitiateResponse(0, 1, true, true, false, createResultSet("sweet")));
         }
-        catch (RuntimeException e)
+        catch (AssertionError e)
         {
-            if (e.getMessage().contains("Mismatched"))
-            {
-                caught = true;
-            }
+            caught = true;
         }
         assertTrue(caught);
         m_testStream.reset();
@@ -452,12 +449,9 @@ public class TestDtxnInitiatorMailbox extends TestCase
         {
             dim.deliver(createInitiateResponse(2, 1, true, true, false, createResultSet("sweet")));
         }
-        catch (RuntimeException e)
+        catch (AssertionError e)
         {
-            if (e.getMessage().contains("Mismatched"))
-            {
-                caught = true;
-            }
+            caught = true;
         }
         assertTrue(caught);
     }
