@@ -211,12 +211,22 @@ public enum VoltType {
 
     /**
      * Converts string representations to an enum value.
-     * @param str A string in the form "VoltType.TYPENAME"
+     * @param str A string in the form "TYPENAME" or "VoltType.TYPENAME",
+     * e.g. "BIGINT" or "VoltType.VARCHAR"
      * @return One of the valid enum values for VoltType
      */
     public static VoltType typeFromString(String str) {
-        if (str.compareToIgnoreCase("null") == 0)
+        if (str == null) {
             return NULL;
+        }
+
+        if (str.startsWith("VoltType.")) {
+            str = str.substring("VoltType.".length());
+        }
+
+        if (str.compareToIgnoreCase("null") == 0) {
+            return NULL;
+        }
 
         for (VoltType type: values()) {
             if (type.matchesString(str)) {

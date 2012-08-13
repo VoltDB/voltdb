@@ -1308,6 +1308,8 @@ TEST CASES
                 <include name='org/voltdb/messaging/**/*Test.class'/>
                 <include name='org/voltdb/network/**/*Test.class'/>
                 <include name='org/voltdb/utils/**/*Test.class'/>
+                <!--Remove exclusion of TestExecutionSite when ENG-3374 is fixed -->
+                <exclude name="**/TestExecutionSite.class" />
                 <exclude name="**/*$*.class"/>
                 <exclude name="**/TestMaliciousClientSuite.class" />
                 <exclude name="org/voltdb/quarantine/**/*.class"/>
@@ -1420,8 +1422,10 @@ TEST CASES
   </antcall>
   <antcall target="sqlcoverage">
     <param name="build.dir.suffix" value="-coverage" />
+    <param name="sqlcoverage.failonerror" value="false" />
   </antcall>
   <!-- Get test coverage -->
+  <echo>Processing coverage</echo>
   <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
     <arg line="--directory ${build.dir}-coverage/objects"/>
     <arg line="--capture"/>
@@ -1599,6 +1603,7 @@ TEST CASES
 <target name='sqlcoverage' depends="ee,compile"
     description="Run the SQL coverage tests.">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
+    <property name="sqlcoverage.failonerror" value="true" />
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
     <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
@@ -1659,7 +1664,7 @@ TEST CASES
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/scripts' executable='python2.6' failonerror='true'>
+    <exec dir='tests/scripts' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
         <env key="VOLT_ENABLEIV2" value="${enableiv2}" />

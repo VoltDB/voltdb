@@ -54,7 +54,8 @@ import org.voltdb.types.VoltDecimalHelper;
      */
     private final LinkedList<byte[]> m_encodedStrings = new LinkedList<byte[]>();
     private final LinkedList<byte[][]> m_encodedStringArrays = new LinkedList<byte[][]>();
-    private int m_serializedSize = -1; // memoized serialized size
+    // memoized serialized size (start assuming valid size for empty ParameterSet)
+    private int m_serializedSize = 2;
 
     public ParameterSet() {
     }
@@ -82,6 +83,10 @@ import org.voltdb.types.VoltDecimalHelper;
      */
     public Object[] toArray() {
         return m_params;
+    }
+
+    public int size() {
+        return m_params.length;
     }
 
     public int getSerializedSize() {
@@ -471,7 +476,7 @@ import org.voltdb.types.VoltDecimalHelper;
      * @return
      */
     private int calculateSerializedSize() {
-        if (m_serializedSize != -1) {
+        if (m_serializedSize != 2) {
             throw new RuntimeException("Trying to calculate the serialized size " +
                                        "of the parameter set twice");
         }
@@ -618,12 +623,6 @@ import org.voltdb.types.VoltDecimalHelper;
     }
 
     public void flattenToBuffer(ByteBuffer buf) throws IOException {
-        if (m_serializedSize == -1) {
-            throw new RuntimeException("Invalid use of parameter set. If the " +
-                                       "parameter set was constructed by readExternal(), " +
-                                       "writeExternal() should be used for serialization.");
-        }
-
         Iterator<byte[][]> strArrayIter = m_encodedStringArrays.iterator();
         Iterator<byte[]> strIter = m_encodedStrings.iterator();
         buf.putShort((short)m_params.length);

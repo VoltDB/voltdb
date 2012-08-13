@@ -3,7 +3,7 @@
 APPNAME="helloworld"
 
 # find voltdb binaries in either installation or distribution directory.
-if [ -n "$(which voltdb)" ]; then
+if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
     VOLTDB_BIN="$(pwd)/../../../bin"
@@ -33,7 +33,7 @@ function clean() {
 # compile the source code for procedures and the client
 function srccompile() {
     mkdir -p obj
-    javac -target 1.6 -classpath $CLASSPATH -d obj *.java
+    javac -target 1.6 -source 1.6 -classpath $CLASSPATH -d obj *.java
     # stop if compilation fails
     if [ $? != 0 ]; then exit; fi
 }

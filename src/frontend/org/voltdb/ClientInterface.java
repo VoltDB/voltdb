@@ -865,7 +865,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         @Override
         public void offBackpressure() {
-            System.out.println("Backpressure deactivated");
             m_connection.enableReadSelection();
         }
     }
@@ -1683,7 +1682,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
         // Set up the parameters.
         ByteBuffer buf = ByteBuffer.allocate(plannedStmtBatch.getPlanArraySerializedSize());
-        plannedStmtBatch.flattenPlanArrayToBuffer(buf);
+        try {
+            plannedStmtBatch.flattenPlanArrayToBuffer(buf);
+        }
+        catch (Exception e) {
+            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
+        }
         assert(buf.hasArray());
         task.setParams(buf.array());
         task.clientHandle = plannedStmtBatch.clientHandle;

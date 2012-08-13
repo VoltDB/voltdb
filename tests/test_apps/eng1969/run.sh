@@ -3,7 +3,7 @@
 APPNAME="eng1969"
 
 # find voltdb binaries in either installation or distribution directory.
-if [ -n "$(which voltdb)" ]; then
+if [ -n "$(which voltdb 2> /dev/null)" ]; then
     VOLTDB_BIN=$(dirname "$(which voltdb)")
 else
     VOLTDB_BIN="$(pwd)/../../../bin"
