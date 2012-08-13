@@ -1823,7 +1823,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         createTransaction(changeResult.connectionId, changeResult.hostname,
                                 changeResult.adminConnection,
                                 task, false, true, true, m_allPartitions,
-                                m_allPartitions.length, changeResult.clientData, 0,
+                                m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
                                 EstTime.currentTimeMillis(), false);
                     }
                     else {

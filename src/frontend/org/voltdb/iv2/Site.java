@@ -249,7 +249,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp) {
-            throw new RuntimeException("Not implemented in iv2");
+            return Site.this.updateCatalog(diffCmds, context, csp);
         }
     };
 
@@ -645,4 +645,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
+    private boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_context = context;
+        m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
+
+        //Necessary to quiesce before updating the catalog
+        //so export data for the old generation is pushed to Java.
+        m_ee.quiesce(m_lastCommittedTxnId);
+        m_ee.updateCatalog(m_context.m_transactionId, diffCmds);
+
+        return true;
+    }
 }
