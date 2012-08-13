@@ -61,7 +61,6 @@ public class plannerTester {
     private static String m_savePlanPath;
     private static ArrayList<Pair<String,String>> m_partitionColumns = new ArrayList<Pair<String,String>>();
     private static ArrayList<String> m_stmts = new ArrayList<String>();
-    private static ArrayList<String> m_stmtsBase = new ArrayList<String>();
     private static int m_treeSizeDiff;
     private static boolean m_changedSQL;
 
@@ -427,26 +426,36 @@ public class plannerTester {
     public static void batchDiff( ) throws IOException {
         PlanNodeTree pnt1 = null;
         PlanNodeTree pnt2 = null;
-        m_stmtsBase.clear();
         int size = m_stmts.size();
+        String baseStmt = null;
         for( int i = 0; i < size; i++ ){
             ArrayList<String> getsql = new ArrayList<String>();
             try {
                 pnt1 = loadPlanFromFile( m_pathRefPlan+m_testName+".plan"+i, getsql );
-                m_stmtsBase.add( getsql.get(0) );
+                baseStmt = getsql.get(0);
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+m_pathRefPlan+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
+                System.err.println("Plan files in"+m_pathRefPlan+i+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
                 System.exit(1);
             }
+
+            //if sql stmts not consistent
+            if( !baseStmt.equalsIgnoreCase( m_stmts.get(i)) ) {
+                diffPair strPair = new diffPair( m_stmts.get(i), baseStmt );
+                m_reportWriter.write("Statement "+i+" of "+m_testName+":\n SQL statement is not consistent with the one in baseline :"+"\n"+
+                        strPair.toString()+"\n");
+                m_numFail++;
+                continue;
+            }
+
             try{
-                getsql.clear();
                 pnt2  = loadPlanFromFile( m_savePlanPath+m_testName+".plan"+i, getsql );
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+m_savePlanPath+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
+                System.err.println("Plan files in"+m_savePlanPath+i+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
                 System.exit(1);
             }
             AbstractPlanNode pn1 = pnt1.getRootPlanNode();
             AbstractPlanNode pn2 = pnt2.getRootPlanNode();
+
 
             if( diff( pn1, pn2, false ) ) {
                 m_numPass++;
@@ -458,7 +467,7 @@ public class plannerTester {
                     m_reportWriter.write( msg+"\n\n" );
                 }
                 if( m_showSQLStatement ) {
-                    m_reportWriter.write( "SQL statement:\n"+m_stmtsBase.get(i)+"\n==>\n"+m_stmts.get(i)+"\n");
+                    m_reportWriter.write( "SQL statement:\n"+baseStmt+"\n==>\n"+m_stmts.get(i)+"\n");
                 }
 
                 if( m_showExpainedPlan ) {

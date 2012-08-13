@@ -128,64 +128,49 @@ public class PlanNodeTree implements JSONString {
             for( int i = 0; i < size; i++ ) {
                 JSONObject jobj;
                 jobj = jArray.getJSONObject(i);
-                String nodeType = jobj.getString("PLAN_NODE_TYPE");
-                int nodeTypeInt = PlanNodeType.get( nodeType ).getValue();
+                String nodeTypeStr = jobj.getString("PLAN_NODE_TYPE");
+                //int nodeTypeInt = PlanNodeType.get( nodeType ).getValue();
+                PlanNodeType nodeType = PlanNodeType.get( nodeTypeStr );
                 AbstractPlanNode apn = null;
 
-                if( nodeTypeInt == PlanNodeType.AGGREGATE.getValue() ) {
-                    apn = new AggregatePlanNode();
+                switch( nodeType ) {
+                case AGGREGATE : apn = new AggregatePlanNode();
+                    break;
+                case DELETE : apn = new DeletePlanNode();
+                    break;
+                case DISTINCT : apn = new DistinctPlanNode();
+                    break;
+                case HASHAGGREGATE : apn = new HashAggregatePlanNode();
+                    break;
+                case INDEXSCAN : apn = new IndexScanPlanNode();
+                    break;
+                case SEQSCAN : apn = new SeqScanPlanNode();
+                    break;
+                case INSERT : apn = new InsertPlanNode();
+                    break;
+                case LIMIT : apn = new LimitPlanNode();
+                    break;
+                case MATERIALIZE : apn = new MaterializePlanNode();
+                    break;
+                case NESTLOOP : apn = new NestLoopPlanNode();
+                    break;
+                case NESTLOOPINDEX : apn = new NestLoopIndexPlanNode();
+                    break;
+                case ORDERBY : apn = new OrderByPlanNode();
+                    break;
+                case PROJECTION : apn = new ProjectionPlanNode();
+                    break;
+                case RECEIVE: apn = new ReceivePlanNode();
+                    break;
+                case SEND: apn = new SendPlanNode();
+                    break;
+                case UNION: apn = new UnionPlanNode();
+                    break;
+                case UPDATE: apn = new UpdatePlanNode();
+                    break;
+                default : System.err.println("plan node type not support: "+nodeType);
                 }
-                else if( nodeTypeInt == PlanNodeType.DELETE.getValue() ) {
-                    apn = new DeletePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.DISTINCT.getValue() ) {
-                    apn = new DistinctPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.HASHAGGREGATE.getValue() ) {
-                    apn = new HashAggregatePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.INDEXSCAN.getValue() ) {
-                    apn = new IndexScanPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.SEQSCAN.getValue() ) {
-                    apn = new SeqScanPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.INSERT.getValue() ) {
-                    apn = new InsertPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.LIMIT.getValue() ) {
-                    apn = new LimitPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.MATERIALIZE.getValue() ) {
-                    apn = new MaterializePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.NESTLOOP.getValue() ) {
-                    apn = new NestLoopPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.NESTLOOPINDEX.getValue() ) {
-                    apn = new NestLoopIndexPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.ORDERBY.getValue() ) {
-                    apn = new OrderByPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.PROJECTION.getValue() ) {
-                    apn = new ProjectionPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.RECEIVE.getValue() ) {
-                    apn = new ReceivePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.SEND.getValue() ) {
-                    apn = new SendPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.UNION.getValue() ) {
-                    apn = new UnionPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.UPDATE.getValue() ) {
-                    apn = new UpdatePlanNode();
-                }
-                else {
-                    System.err.println("plan node type not support: "+nodeType);
-                }
+
                 apn.loadFromJSONObject(jobj, db);
                 m_planNodes.add(apn);
             }

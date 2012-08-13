@@ -351,18 +351,18 @@ public class testPlannerTester extends TestCase {
         }
     }
 
-//  public void testMain() {
-//  String[] args = {"-d","-s","-e","-cs",
-////          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voter",
-////          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/test1",
-////          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltcache",
-////          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltkv",
-//          "-C="+m_homeDir+"/"+"test1",
-//          "-r="+m_homeDir,
-////          "-help"
-//          };
-//  plannerTester.main(args);
-//}
+  public void testMain() {
+  String[] args = {"-d","-s","-e","-cs",
+//          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voter",
+//          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/test1",
+//          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltcache",
+//          "-C="+m_currentDir+"/tests/frontend/org/voltdb/planner/config/voltkv",
+          "-C="+m_homeDir+"/"+"test1",
+          "-r="+m_homeDir,
+//          "-help"
+          };
+  plannerTester.main(args);
+}
 
     //    public void testBatchDiff() {
     //          int size = 7;
