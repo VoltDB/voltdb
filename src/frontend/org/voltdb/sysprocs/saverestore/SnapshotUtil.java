@@ -66,6 +66,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -128,13 +129,13 @@ public class SnapshotUtil {
                 stringer.endObject();
             }
             stringer.endArray();
-            stringer.key("partitionTransactionIds").object();
-            int ii = 0;
-            for (Long txnid : partitionTransactionIds) {
-                stringer.key(Integer.toString(ii)).value(txnid);
-                ii++;
+            if (VoltDB.instance().isIV2Enabled()) {
+                stringer.key("partitionTransactionIds").object();
+                for (Long txnid : partitionTransactionIds) {
+                    stringer.key(Long.toString(TxnEgo.getPartitionId(txnid))).value(txnid);
+                }
+                stringer.endObject();
             }
-            stringer.endObject();
             stringer.key("catalogCRC").value(catalogCRC);
             stringer.endObject();
         } catch (JSONException e) {

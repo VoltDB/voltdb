@@ -20,9 +20,9 @@ package org.voltdb.iv2;
 import java.util.HashSet;
 
 import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
-import org.voltdb.StoredProcedureInvocation;
 
 public class SpTransactionState extends TransactionState
 {

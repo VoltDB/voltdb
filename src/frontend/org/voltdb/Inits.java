@@ -47,6 +47,7 @@ import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.compiler.deploymentfile.DeploymentType;
 import org.voltdb.export.ExportManager;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.HTTPAdminListener;
 import org.voltdb.utils.LogKeys;
@@ -342,7 +343,13 @@ public class Inits {
             }
 
             try {
-                long catalogTxnId = org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                long catalogTxnId;
+                if (m_rvdb.isIV2Enabled()) {
+                    catalogTxnId = TxnEgo.makeZero(0).getTxnId();
+                } else {
+                    catalogTxnId =
+                            org.voltdb.TransactionIdManager.makeIdFromComponents(System.currentTimeMillis(), 0, 0);
+                }
                 ZooKeeper zk = m_rvdb.getHostMessenger().getZK();
                 zk.create(
                         VoltZK.initial_catalog_txnid,

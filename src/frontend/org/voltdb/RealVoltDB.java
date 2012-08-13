@@ -100,6 +100,7 @@ import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.MpInitiator;
 import org.voltdb.iv2.SpInitiator;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
 import org.voltdb.rejoin.RejoinCoordinator;
@@ -1143,7 +1144,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             long depCRC = CatalogUtil.compileDeploymentAndGetCRC(catalog, m_deployment,
                     true, true);
             assert(depCRC != -1);
-            m_catalogContext = new CatalogContext(0, catalog, null, depCRC, 0, -1);
+
+            m_catalogContext = new CatalogContext(
+                    isIV2Enabled() ? TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId() : 0,
+                            catalog, null, depCRC, 0, -1);
 
             int numberOfNodes = m_deployment.getCluster().getHostcount();
             if (numberOfNodes <= 0) {

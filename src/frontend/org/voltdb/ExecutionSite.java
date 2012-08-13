@@ -220,6 +220,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         @Override
         public CountDownLatch snapshotCompleted(String nonce,
                                                 long txnId,
+                                                long partitionTxnIds[],
                                                 boolean truncationSnapshot) {
             if (m_rejoinSnapshotTxnId != -1) {
                 if (m_rejoinSnapshotTxnId == txnId) {

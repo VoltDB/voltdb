@@ -120,7 +120,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                     LinkedList<SnapshotCompletionInterest> interests =
                                             new LinkedList<SnapshotCompletionInterest>(m_interests);
                                     for (SnapshotCompletionInterest i : interests) {
-                                        i.snapshotCompleted( "", 0, true);
+                                        i.snapshotCompleted( "", 0, new long[0], true);
                                     }
                                     break;
                                 }

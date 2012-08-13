@@ -56,7 +56,7 @@ final public class TxnEgo {
     // 40-bits of the 49 bit sequence number (where it existed bit-wise
     // in the legacy id).
     static final long SEQUENCE_ZERO = (getSequenceZero() - getEpoch());
-    final public static long getSequenceZero() {
+    private final static long getSequenceZero() {
         Calendar c = Calendar.getInstance();
         c.setTimeInMillis(0);
         c.set(2015, 0, 1, 0, 0, 0);
@@ -87,7 +87,11 @@ final public class TxnEgo {
         return new TxnEgo(getSequence() + 1, getPartitionId());
     }
 
-    public TxnEgo(long sequence, long partitionId)
+    public TxnEgo(long txnId) {
+        this(getSequence(txnId), getPartitionId(txnId));
+    }
+
+    TxnEgo(long sequence, long partitionId)
     {
         if (sequence < SEQUENCE_ZERO) {
             throw new IllegalArgumentException("Invalid sequence value "
@@ -123,6 +127,14 @@ final public class TxnEgo {
         return m_wallClock;
     }
 
+    private static long getSequence(long txnId) {
+        return txnId >> PARTITIONID_BITS;
+    }
+
+    public static long getPartitionId(long txnId) {
+        return txnId & PARTITIONID_MAX_VALUE;
+    }
+
     final public long getPartitionId()
     {
         return m_txnId & PARTITIONID_MAX_VALUE;
@@ -136,6 +148,7 @@ final public class TxnEgo {
     /**
      * Get a string representation of the TxnId
      */
+    @Override
     public String toString() {
         final StringBuilder sb = new StringBuilder(128);
         sb.append("TxnId: ").append(getTxnId());

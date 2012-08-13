@@ -58,7 +58,7 @@ public class TestMpPromoteAlgo extends TestCase
         } else {
             int partitionId = 100;
             long sequence = TxnEgo.SEQUENCE_ZERO + handle;
-            return new TxnEgo(sequence, partitionId).getSequence();
+            return new TxnEgo(sequence, partitionId).getTxnId();
         }
     }
 
@@ -153,7 +153,7 @@ public class TestMpPromoteAlgo extends TestCase
         assertEquals(expectedUnion.length, algo.m_repairLogUnion.size());
         int i = 0;
         for (Iv2RepairLogResponseMessage li : algo.m_repairLogUnion) {
-            System.out.println("Comparing " + li.getHandle() + " to expected " + expectedUnion[i] + "SEQ 0 is: " + TxnEgo.SEQUENCE_ZERO + " shifted zero: " + (TxnEgo.SEQUENCE_ZERO << 14));
+            System.out.println("Comparing " + li.getHandle() + " to expected " + expectedUnion[i] + "SEQ 0 is: " + TxnEgo.makeZero(0).getTxnId() + " shifted zero: " + (TxnEgo.makeZero(0).getTxnId() << 14));
             assertEquals(li.getHandle(), expectedUnion[i]);
             if (expectComp[i]) {
                 assertTrue(li.getPayload() instanceof CompleteTransactionMessage);
@@ -293,7 +293,7 @@ public class TestMpPromoteAlgo extends TestCase
 
         // verify that the discovered txn id is 0 (the correct starting txnid).
         Pair<Boolean, Long> real_result = result.get();
-        assertEquals(txnEgo(0L), (long)real_result.getSecond());
+        assertEquals(TxnEgo.makeZero(MpInitiator.MP_INIT_PID).getTxnId(), (long)real_result.getSecond());
     }
 
 

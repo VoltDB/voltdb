@@ -1690,7 +1690,8 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
     }
 
     @Override
-    public CountDownLatch snapshotCompleted(final String nonce, final long txnId, final boolean truncation) {
+    public CountDownLatch snapshotCompleted(
+            final String nonce, final long txnId, final long partitionTxnIds[], final boolean truncation) {
         if (!truncation) {
             return new CountDownLatch(0);
         }

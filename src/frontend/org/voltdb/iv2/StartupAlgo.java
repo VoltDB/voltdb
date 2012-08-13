@@ -22,7 +22,6 @@ import java.util.concurrent.Future;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltcore.utils.Pair;
 
 public class StartupAlgo implements RepairAlgo
@@ -31,6 +30,7 @@ public class StartupAlgo implements RepairAlgo
     private final String m_whoami;
 
     private final CountDownLatch m_missingStartupSites;
+    private final int m_partitionId;
 
     // Each Term can process at most one promotion; if promotion fails, make
     // a new Term and try again (if that's your big plan...)
@@ -39,7 +39,7 @@ public class StartupAlgo implements RepairAlgo
     /**
      * Setup a new StartupAlgo but don't take any action to take responsibility.
      */
-    public StartupAlgo(CountDownLatch missingStartupSites, String whoami)
+    public StartupAlgo(CountDownLatch missingStartupSites, String whoami, int partitionId)
     {
         if (missingStartupSites != null) {
             m_missingStartupSites = missingStartupSites;
@@ -47,7 +47,7 @@ public class StartupAlgo implements RepairAlgo
         else {
             m_missingStartupSites = new CountDownLatch(0);
         }
-
+        m_partitionId = partitionId;
         m_whoami = whoami;
     }
 
@@ -82,7 +82,7 @@ public class StartupAlgo implements RepairAlgo
         // block here until the babysitter thread provides all replicas.
         // then initialize the mailbox's replica set and proceed as leader.
         m_missingStartupSites.await();
-        m_promotionResult.done(TxnEgo.SEQUENCE_ZERO);
+        m_promotionResult.done(TxnEgo.makeZero(m_partitionId).getTxnId());
     }
 
     /** Process a new repair log response */

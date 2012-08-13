@@ -692,6 +692,12 @@ public class SnapshotSaveAPI
                         }
                     }
                     if (!aborted) {
+                        /*
+                         * Inform the SnapshotCompletionMonitor of what the partition specific txnids for
+                         * this snapshot were so it can forward that to completion interests.
+                         */
+                        VoltDB.instance().getSnapshotCompletionMonitor().registerPartitionTxnIdsForSnapshot(
+                                txnId, partitionTransactionIds);
                         logSnapshotStartToZK( txnId, context, file_nonce);
                     }
                 }

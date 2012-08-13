@@ -134,7 +134,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     // Advanced in complete transaction.
-    long m_lastCommittedTxnId = 0L;
+    long m_lastCommittedTxnId = 0;
     long m_currentTxnId = Long.MIN_VALUE;
     long m_lastTxnTime = System.currentTimeMillis();
 
@@ -275,6 +275,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_snapshotPriority = snapshotPriority;
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, txnId);
+        m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
+        m_currentTxnId = Long.MIN_VALUE;
     }
 
     /** Update the loaded procedures. */

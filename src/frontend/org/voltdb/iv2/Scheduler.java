@@ -66,17 +66,20 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     final public void setMaxSeenTxnId(long maxSeenTxnId)
     {
-        m_txnEgo = new TxnEgo(maxSeenTxnId, m_txnEgo.getPartitionId());
+        final TxnEgo ego = new TxnEgo(maxSeenTxnId);
+        assert(m_txnEgo.getPartitionId() == ego.getPartitionId());
+        m_txnEgo = ego;
     }
 
-    final protected void advanceTxnEgo()
+    final protected long advanceTxnEgo()
     {
         m_txnEgo = m_txnEgo.makeNext();
+        return m_txnEgo.getTxnId();
     }
 
-    final protected long currentTxnEgoSequence()
+    final protected long getCurrentTxnId()
     {
-        return m_txnEgo.getSequence();
+        return m_txnEgo.getTxnId();
     }
 
     @Override

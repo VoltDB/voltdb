@@ -188,7 +188,7 @@ public abstract class BaseInitiator implements Initiator, LeaderNoticeHandler
             while (!success) {
                 RepairAlgo repair = null;
                 if (m_missingStartupSites != null) {
-                    repair = new StartupAlgo(m_missingStartupSites, m_whoami);
+                    repair = new StartupAlgo(m_missingStartupSites, m_whoami, m_partitionId);
                 }
                 else {
                     repair = createPromoteAlgo(m_term.getInterestingHSIds(),

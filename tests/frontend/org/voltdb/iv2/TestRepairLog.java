@@ -23,20 +23,21 @@
 
 package org.voltdb.iv2;
 
+import static org.mockito.Mockito.mock;
+import static org.mockito.Mockito.when;
+
 import java.io.IOException;
 import java.nio.ByteBuffer;
 import java.util.List;
 
-import static org.mockito.Mockito.*;
+import junit.framework.TestCase;
 
+import org.junit.Test;
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
-import junit.framework.TestCase;
-import org.junit.Test;
 
 public class TestRepairLog extends TestCase
 {
