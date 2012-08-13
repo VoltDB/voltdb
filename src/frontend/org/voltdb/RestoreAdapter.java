@@ -52,7 +52,15 @@ public class RestoreAdapter implements Connection, WriteStream {
 
     @Override
     public void enqueue(DeferredSerialization ds) {
-        throw new UnsupportedOperationException();
+        try {
+            ByteBuffer[] bbArray = ds.serialize();
+            if (bbArray.length != 1) {
+                throw new UnsupportedOperationException();
+            }
+            enqueue(bbArray[0]);
+        } catch (IOException error) {
+            throw new UnsupportedOperationException(error.getMessage());
+        }
     }
 
     @Override

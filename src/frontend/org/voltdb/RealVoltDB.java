@@ -800,9 +800,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             // set additional restore agent stuff
             if (m_restoreAgent != null) {
                 if (isIV2Enabled()) {
+                    ci.bindRestoreAdapter(m_restoreAgent.getAdapter());
                     m_restoreAgent.setCatalogContext(m_catalogContext);
                     m_restoreAgent.setSiteTracker(getSiteTrackerForSnapshot());
-                    m_restoreAgent.setInitiator(null);
+                    m_restoreAgent.setInitiator(new Iv2TransactionCreator(m_clientInterfaces.get(0)));
                 }
                 else {
                     TransactionInitiator initiator = m_dtxns.get(0);

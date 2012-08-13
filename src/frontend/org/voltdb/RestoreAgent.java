@@ -106,6 +106,11 @@ SnapshotCompletionInterest
 
     private final RestoreAdapter m_restoreAdapter = new RestoreAdapter(m_changeStateFunctor);
 
+    // RealVoltDB needs this to connect the ClientInterface and the Adapter.
+    RestoreAdapter getAdapter() {
+        return m_restoreAdapter;
+    }
+
     private final ZooKeeper m_zk;
     private final SnapshotCompletionMonitor m_snapshotMonitor;
     private final Callback m_callback;
@@ -203,7 +208,7 @@ SnapshotCompletionInterest
             catch (Exception e)
             {
                 VoltDB.crashGlobalVoltDB("Failed to safely enter recovery: " + e.getMessage(),
-                                         false, e);
+                                         true, e);
             }
         }
     };
@@ -339,8 +344,9 @@ SnapshotCompletionInterest
 
     public void setInitiator(TransactionCreator initiator) {
         m_initiator = initiator;
-        if (m_replayAgent != null)
+        if (m_replayAgent != null) {
             m_replayAgent.setInitiator(initiator);
+        }
     }
 
     /**

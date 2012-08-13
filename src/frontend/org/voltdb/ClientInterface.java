@@ -921,10 +921,44 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
+    public boolean createTransaction(
+            final long connectionId,
+            final String connectionHostname,
+            final boolean adminConnection,
+            final StoredProcedureInvocation invocation,
+            final boolean isReadOnly,
+            final boolean isSinglePartition,
+            final boolean isEveryPartition,
+            final int partitions[],
+            final int numPartitions,
+            final Object clientData,
+            final int messageSize,
+            final long now,
+            final boolean allowMismatchedResults)
+    {
+        return createTransaction(
+                connectionId,
+                connectionHostname,
+                adminConnection,
+                Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                invocation,
+                isReadOnly,
+                isSinglePartition,
+                isEveryPartition,
+                partitions,
+                numPartitions,
+                clientData,
+                messageSize,
+                now,
+                allowMismatchedResults);
+    }
+
+    // Wrap API to SimpleDtxnInitiator - mostly for the future
     public  boolean createTransaction(
             final long connectionId,
             final String connectionHostname,
             final boolean adminConnection,
+            final long txnId,
             final StoredProcedureInvocation invocation,
             final boolean isReadOnly,
             final boolean isSinglePartition,
@@ -960,7 +994,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     new Iv2InitiateTaskMessage(m_siteId,
                             initiatorHSId,
                             Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-                            Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                            txnId,
                             isReadOnly,
                             isSinglePartition,
                             invocation,
@@ -1202,6 +1236,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 AdmissionControlGroup.getDummy()));
             }
         });
+    }
+
+    /**
+     * Tell the clientInterface about the restore adapater.
+     */
+    public void bindRestoreAdapter(final RestoreAdapter restoreAdapter) {
+        m_cihm.put(restoreAdapter.connectionId(),
+                new ClientInterfaceHandleManager(true, restoreAdapter,
+                    AdmissionControlGroup.getDummy()));
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID
