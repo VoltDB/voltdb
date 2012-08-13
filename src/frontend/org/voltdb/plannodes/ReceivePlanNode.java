@@ -17,7 +17,6 @@
 
 package org.voltdb.plannodes;
 
-import java.util.ArrayList;
 import java.util.HashSet;
 
 import org.json_voltpatches.JSONException;
@@ -118,9 +117,8 @@ public class ReceivePlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void reattachFragment_recurse( HashSet<AbstractPlanNode> visited, ArrayList<AbstractPlanNode> collected, SendPlanNode child  ) {
-        visited.add(this);
-        collected.add(this);
+    public boolean reattachFragment_recurse( HashSet<AbstractPlanNode> visited, SendPlanNode child  ) {
         this.addAndLinkChild(child);
+        return true;
     }
 }

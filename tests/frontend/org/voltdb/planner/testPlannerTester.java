@@ -293,62 +293,92 @@ public class testPlannerTester extends TestCase {
     public void testDiff() {
         AbstractPlanNode pn1 = null;
         AbstractPlanNode pn2 = null;
-        ArrayList<AbstractPlanNode> list1 = new ArrayList<AbstractPlanNode>();
-        ArrayList<AbstractPlanNode> list2 = new ArrayList<AbstractPlanNode>();
-        pn1 = compile("select * from l order by b limit ?;", 3, true);
-        pn2 = compile("select * from l order by a limit ?;", 3, true);
-        assertTrue(pn1 != null);
-        assertTrue(pn2 != null);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l, t where t.a=l.b order by b limit ?;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l, t where t.a=l.b order by b;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l, t where t.a=l.b limit ?;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l, t where t.a=l.b;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l order by a limit ?;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l limit ?;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l where a=? order by b limit ?;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l where a=? limit ?;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l where a=?;", 3, true);
-        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        pn1 = compile("select * from l, t where t.a=l.a;", 3, true);
-        pn2 = compile("select * from l, t where t.b=l.b order by a limit ?;", 3, true);
-        list1.add(pn1);
-        list2.add(pn2);
-        int size = list1.size();
-        for( int i = 0; i < size; i++ ) {
-            System.out.println(i);
-            plannerTester.diff(list1.get(i), list2.get(i), true);
-            System.out.println(list1.get(i).toExplainPlanString());
-            System.out.println(list2.get(i).toExplainPlanString());
+        assertTrue( compileDiffDigPattern( "select * from l order by b limit ?;", 3, true,
+                                           "select * from l order by a limit ?;", 3, true,
+                                            "same leaf size") );
+        assertTrue( compileDiffDigPattern( "select * from l, t where t.a=l.b order by b limit ?;", 3, true,
+                                           "select * from l, t where t.a=l.b order by a limit ?;", 3, true,
+                                           "Join query") );
 
+        assertTrue( compileDiffDigPattern( "select * from l, t where t.a=l.b order by b;", 3, true,
+                "select * from l, t where t.a=l.b order by a limit ?;", 3, true,
+                "Plan tree size diff: (5 => 6)","Inline Projection Nodes diff:","([5-SEQSCAN] => [6-SEQSCAN])"
+                ,"Inline IndexScan Nodes diff:","([4-NESTLOOPINDEX] => [5-NESTLOOPINDEX])","Limit Nodes diff:","([] => [2])"));
+
+        assertTrue( compileDiffDigPattern( "select * from l, t where t.a=l.b order by b limit ?;", 3, true,
+                "select * from l, t where t.a=l.b order by a limit ?;", 3, true,
+                "Join query") );
+
+//        assertTrue( compileDiffDigPattern( "select * from l, t where t.a=l.b limit ?;", 3, true,
+//                "select * from l, t where t.a=l.b order by a limit ?;", 3, true,
+//                "Limit Nodes diff: ","([] => [2])","Order By Nodes diff:","([] => [4])") );
+//
+//        assertTrue( compileDiffDigPattern( "select * from l, t where t.a=l.b;", 3, true,
+//                "select * from l, t where t.a=l.b order by a limit ?;", 3, true,
+//                "Scan time diff : ","(1 => 2)","Diff at leaf 1 :","(Empty => INDEXSCAN on T using COVER2_TREE)"));
+//
+//        assertTrue( compileDiffDigPattern( "select * from l, t where t.a=l.a;", 3, true,
+//                "select * from l, t where t.a=l.b order by a limit ?;", 3, true,
+//                "Diff scan at leaf 1 :","(INDEXSCAN on T => SEQSCAN on T)",
+//                "Limit Nodes diff: ","([] => [2])",
+//                "Order By Nodes diff: ","([] => [4])",
+//                "Join Node Type diff:","(NESTLOOPINDEX at 3 => NESTLOOP at 5)"));
+//
+//        assertTrue( compileDiffDigPattern( "select * from l where a=?;", 3, true,
+//                "select * from l, t where t.b=l.b order by a limit ?;", 3, true,
+//                "Diff at leaf 1 :", "(Empty => INDEXSCAN on T using COVER2_TREE)",
+//                "Projection Nodes diff:","([] => [3])"));
+
+//        pn1 = compile("select * from l order by a limit ?;", 3, true);
+//        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+//        list1.add(pn1);
+//        list2.add(pn2);
+//        pn1 = compile("select * from l limit ?;", 3, true);
+//        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+//        list1.add(pn1);
+//        list2.add(pn2);
+//        pn1 = compile("select * from l where a=? order by b limit ?;", 3, true);
+//        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+//        list1.add(pn1);
+//        list2.add(pn2);
+//        pn1 = compile("select * from l where a=? limit ?;", 3, true);
+//        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+//        list1.add(pn1);
+//        list2.add(pn2);
+//        pn1 = compile("select * from l where a=?;", 3, true);
+//        pn2 = compile("select * from l, t where t.a=l.b order by a limit ?;", 3, true);
+//        list1.add(pn1);
+//        list2.add(pn2);
+//        pn1 = compile("select * from l, t where t.a=l.a;", 3, true);
+//        pn2 = compile("select * from l, t where t.b=l.b order by a limit ?;", 3, true);
+//        list1.add(pn1);
+//        list2.add(pn2);
+//        int size = list1.size();
+//        for( int i = 0; i < size; i++ ) {
+//            System.out.println(i);
+//            plannerTester.diff(list1.get(i), list2.get(i), true);
+//            System.out.println(list1.get(i).toExplainPlanString());
+//            System.out.println(list2.get(i).toExplainPlanString());
+//
+//        }
+    }
+
+    public boolean compileDiffDigPattern( String sql1, int paraCount1, boolean sp1,
+                                          String sql2, int paraCount2,  boolean sp2,
+                                          String... patterns) {
+        AbstractPlanNode pn1 = compile( sql1, paraCount1, sp1 );
+        AbstractPlanNode pn2 = compile( sql2, paraCount2, sp2 );
+        plannerTester.diff( pn1, pn2, true );
+        int numMatched = 0;
+        for( String str : plannerTester.m_diffMessages ) {
+            for( String pattern : patterns )
+                if( str.contains( pattern ) )
+                    numMatched++;
         }
+        if( numMatched == patterns.length )
+            return true;
+        else
+            return false;
     }
 
   public void testMain() {

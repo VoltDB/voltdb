@@ -72,7 +72,7 @@ public class plannerTester {
 
     private static int m_numPass = 0;
     private static int m_numFail = 0;
-    private static ArrayList<String> m_diffMessages = new ArrayList<String>();
+    public static ArrayList<String> m_diffMessages = new ArrayList<String>();
     private static String m_reportDir = "/tmp/";
     private static BufferedWriter m_reportWriter;
 

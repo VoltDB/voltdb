@@ -732,21 +732,19 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     public boolean reattachFragment( SendPlanNode child ) {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
-        reattachFragment_recurse( visited, collected, child );
-        if( collected.size() == 0 )
-            return false;
-        else
-            return true;
+        return reattachFragment_recurse( visited, child );
     }
 
-    public void reattachFragment_recurse( HashSet<AbstractPlanNode> visited, ArrayList<AbstractPlanNode> collected, SendPlanNode child ) {
+    public boolean reattachFragment_recurse( HashSet<AbstractPlanNode> visited, SendPlanNode child ) {
         visited.add(this);
         for( AbstractPlanNode pn : m_inlineNodes.values() ) {
-            pn.reattachFragment_recurse(visited, collected, child);
+            if( pn.reattachFragment_recurse(visited, child) )
+                return true;
         }
         for( AbstractPlanNode pn : m_children ) {
-            pn.reattachFragment_recurse(visited, collected, child);
+            if( pn.reattachFragment_recurse(visited, child) )
+                return true;
         }
+        return false;
     }
 }
