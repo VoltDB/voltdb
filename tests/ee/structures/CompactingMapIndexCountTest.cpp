@@ -164,7 +164,7 @@ TEST_F(CompactingMapTest, SimpleUniqueRank) {
     sucess = volt.insert(std::pair<int,int>(3, 3)); ASSERT_TRUE(!sucess);
     rankasc = volt.rankAsc(3);
     if (rankasc != 3)
-        printf("false: <SimpleUniqueRank> expected %d, but got %lld\n", 3, rankasc);
+        printf("false: <SimpleUniqueRank> expected %d, but got %ld\n", 3, (long)rankasc);
     ASSERT_TRUE(rankasc == 3);
 
     ASSERT_TRUE(volt.verify());
@@ -213,7 +213,7 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 }
                 int64_t rankasc = volt.rankAsc(val);
                 if (rankasc != ct)
-                    printf("false: unique_rankAsc expected %lld, but got %lld\n", ct, rankasc);
+                    printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)ct, (long)rankasc);
                 ASSERT_TRUE(rankasc == ct);
                 volti = volt.findRank(rankasc);
                 ASSERT_TRUE(volti.key() == val);
@@ -234,7 +234,7 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 }
                 int64_t rankasc= volt.rankAsc(val);
                 if (rankasc != ct)
-                    printf("false: DEPULICATE... unique_rankAsc expected %lld, but got %lld\n", ct, rankasc);
+                    printf("false: DEPULICATE... unique_rankAsc expected %ld, but got %ld\n", (long)ct, (long)rankasc);
                 ASSERT_TRUE(rankasc == ct);
                 volti = volt.findRank(rankasc);
                 ASSERT_TRUE(volti.key() == val);
@@ -270,7 +270,7 @@ TEST_F(CompactingMapTest, SimpleMultiRank) {
     ASSERT_TRUE(volt.verify());
     voltdb::CompactingMap<int, int, IntComparator, true>::iterator volti;
     bool sucess;
-    int rankasc, rankupper;
+    int64_t rankasc, rankupper;
 
     sucess = volt.insert(std::pair<int,int>(1, 1)); ASSERT_TRUE(sucess);
     sucess = volt.insert(std::pair<int,int>(2, 2)); ASSERT_TRUE(sucess);
