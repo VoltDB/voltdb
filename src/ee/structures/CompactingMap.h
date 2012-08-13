@@ -825,13 +825,13 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
         for (int64_t i = 1; i <= m_count; i++) {
                 it = findRank(i);
                 if ((n = lookup(it.key())) == &NIL) {
-                        printf("Can not find rank %lld node with key\n", i);
+                        printf("Can not find rank %ld node with key\n", (long)i);
                         return false;
                 }
 
                 if (m_unique) {
                         if ((rkasc = rankAsc(it.key())) != i) {
-                                printf("false: unique_rankAsc expected %lld, but got %lld\n", i, rkasc);
+                                printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
                                 return false;
                         }
                 } else {
@@ -844,7 +844,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
                             if (it.equals(up)) {
                                 rkUpper = rankUpper(k);
                                 if (rkUpper != i) {
-                                    printf("false: multi_rankUpper expected %lld, but got %lld\n", i, rkUpper);
+                                    printf("false: multi_rankUpper expected %ld, but got %ld\n", (long)i, (long)rkUpper);
                                     return false;
                                 }
                             }
@@ -852,7 +852,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
                             if (m_count == i) {
                                 rkUpper = rankUpper(k);
                                 if (rkUpper != m_count) {
-                                    printf("false: multi_rankUpper expected %lld, but got %lld\n", i, rkUpper);
+                                    printf("false: multi_rankUpper expected %ld, but got %ld\n", (long)i, (long)rkUpper);
                                     return false;
                                 }
                             }
@@ -866,8 +866,8 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
                                 it.movePrev();
                         }
                         if (rkasc + nc != i) {
-                                printf("false: multi_rankAsc %lld keys are the same", nc);
-                                printf("false: multi_rankAsc expected %lld, but got %lld\n", i, rkasc);
+                                printf("false: multi_rankAsc %ld keys are the same", (long)nc);
+                                printf("false: multi_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
                                 return false;
                         }
                 }
@@ -916,7 +916,7 @@ int CompactingMap<Key, Data, Compare, hasRank>::inOrderCounterChecking(const Tre
                 if (n->left != &NIL) ct += getSubct(n->left);
                 if (n->right != &NIL) ct += getSubct(n->right);
                 if (ct != getSubct(n)) {
-                        printf("node counter is not correct, expected %lld but get %lld\n", ct, getSubct(n));
+                        printf("node counter is not correct, expected %ld but get %ld\n", (long)ct, (long)getSubct(n));
                         return -1;
                 }
 
