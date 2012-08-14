@@ -265,37 +265,15 @@ protected:
 
         iter = m_entries.find(key);
 
-        if (iter.isEnd()) {
-            name_.append("\nDEBUG -- failed index delete shot past end skipping:");
-            iter = m_entries.begin();
-            while (!iter.isEnd()) {
-                static char appendix[256];
-                snprintf(appendix,256, "+%ld", (long)iter.value());
-                name_.append(appendix);
-                iter.moveNext();
-            }
-            return false;
-        }
+        if (iter.isEnd()) return false;
 
         do {
             if (iter.value() == tuple->address()) {
-                name_.append("\nDEBUG -- did index delete out of:");
-            MMIter iter2 = m_entries.begin();
-            while (!iter2.isEnd()) {
-                static char appendix[256];
-                snprintf(appendix,256, "+%ld", (long)iter2.value());
-                name_.append(appendix);
-                iter2.moveNext();
-            }
                 return m_entries.erase(iter);
             }
             iter.moveNext();
         } while ((!iter.isEnd()) && (m_eq(iter.key(), key)));
-        if (iter.isEnd()) {
-            name_.append("\nDEBUG -- failed index delete walked off end");
-        } else {
-            name_.append("\nDEBUG -- failed index delete walked to next key");
-        }
+
         return false;
     }
 
