@@ -216,7 +216,7 @@ public class SpPromoteAlgo implements RepairAlgo
                 }
             }
             if (!needsRepair.isEmpty()) {
-                m_mailbox.repairReplicasWith(needsRepair, li);
+                m_mailbox.repairReplicasWith(needsRepair, li.getPayload());
             }
         }
         tmLog.info(m_whoami + "finished queuing " + queued + " replica repair messages.");
