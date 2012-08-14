@@ -692,10 +692,11 @@ public class DDLCompiler {
             index.setCountable(true);
         }
 
-        if (indexNameNoCase.contains("NoCounter")) {
-            index.setType(IndexType.BALANCED_TREE.getValue());
-            index.setCountable(false);
-        }
+        // Countable is always on right now. Fix it when VoltDB can pack memory for TreeNode.
+//        if (indexNameNoCase.contains("NoCounter")) {
+//            index.setType(IndexType.BALANCED_TREE.getValue());
+//            index.setCountable(false);
+//        }
 
         // need to set other index data here (column, etc)
         for (int i = 0; i < columns.length; i++) {
