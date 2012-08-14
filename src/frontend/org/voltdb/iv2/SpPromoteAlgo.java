@@ -168,7 +168,9 @@ public class SpPromoteAlgo implements RepairAlgo
             if (response.getHandle() != Long.MAX_VALUE) {
                 m_maxSeenTxnId = Math.max(m_maxSeenTxnId, response.getHandle());
             }
-            m_repairLogUnion.add(response);
+            if (response.getPayload() != null) {
+                m_repairLogUnion.add(response);
+            }
             if (rrs.update(response)) {
                 tmLog.info(m_whoami + "collected " + rrs.m_receivedResponses
                         + " responses for " + rrs.m_expectedResponses +

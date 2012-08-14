@@ -23,6 +23,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.VoltDB;
 
 /**
  * Scheduler's rough current responsibility is to take appropriate local action
@@ -67,7 +68,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
     final public void setMaxSeenTxnId(long maxSeenTxnId)
     {
         final TxnEgo ego = new TxnEgo(maxSeenTxnId);
-        assert(m_txnEgo.getPartitionId() == ego.getPartitionId());
+        if (m_txnEgo.getPartitionId() != ego.getPartitionId()) {
+            VoltDB.crashLocalVoltDB(
+                    "Received a transaction id at partition " + m_txnEgo.getPartitionId() +
+                    " for partition " + ego.getPartitionId() + ". The partition ids should match.", true, null);
+        }
         m_txnEgo = ego;
     }
 

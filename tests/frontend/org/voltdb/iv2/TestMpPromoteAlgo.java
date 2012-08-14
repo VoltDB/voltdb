@@ -67,7 +67,8 @@ public class TestMpPromoteAlgo extends TestCase
         FragmentTaskMessage frag = mock(FragmentTaskMessage.class);
         Iv2RepairLogResponseMessage m = mock(Iv2RepairLogResponseMessage.class);
         when(m.getPayload()).thenReturn(frag);
-        when(m.getHandle()).thenReturn(handle);
+        when(m.getHandle()).thenReturn(-1L);
+        when(m.getTxnId()).thenReturn(handle);
         return m;
     }
 
@@ -77,7 +78,8 @@ public class TestMpPromoteAlgo extends TestCase
         CompleteTransactionMessage complete = mock(CompleteTransactionMessage.class);
         Iv2RepairLogResponseMessage m = mock(Iv2RepairLogResponseMessage.class);
         when(m.getPayload()).thenReturn(complete);
-        when(m.getHandle()).thenReturn(handle);
+        when(m.getHandle()).thenReturn(-1L);
+        when(m.getTxnId()).thenReturn(handle);
         return m;
     }
 
@@ -86,7 +88,7 @@ public class TestMpPromoteAlgo extends TestCase
     {
         CompleteTransactionMessage complete = mock(CompleteTransactionMessage.class);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId, sequence,
-            ofTotal, handle, complete);
+            ofTotal, handle, handle, complete);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -97,7 +99,7 @@ public class TestMpPromoteAlgo extends TestCase
     {
         assertEquals(0, sequence);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId, sequence,
-            ofTotal, handle, null);
+            ofTotal, handle, handle, null);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -108,7 +110,7 @@ public class TestMpPromoteAlgo extends TestCase
     {
         FragmentTaskMessage frag = mock(FragmentTaskMessage.class);
         Iv2RepairLogResponseMessage m = new Iv2RepairLogResponseMessage(requestId, sequence,
-            ofTotal, handle, frag);
+            ofTotal, handle, handle, frag);
         m.m_sourceHSId = sourceHSId;
         return m;
     }
@@ -154,7 +156,7 @@ public class TestMpPromoteAlgo extends TestCase
         int i = 0;
         for (Iv2RepairLogResponseMessage li : algo.m_repairLogUnion) {
             System.out.println("Comparing " + li.getHandle() + " to expected " + expectedUnion[i] + "SEQ 0 is: " + TxnEgo.makeZero(0).getTxnId() + " shifted zero: " + (TxnEgo.makeZero(0).getTxnId() << 14));
-            assertEquals(li.getHandle(), expectedUnion[i]);
+            assertEquals(li.getTxnId(), expectedUnion[i]);
             if (expectComp[i]) {
                 assertTrue(li.getPayload() instanceof CompleteTransactionMessage);
             }

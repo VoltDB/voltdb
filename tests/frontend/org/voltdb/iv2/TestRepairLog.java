@@ -165,9 +165,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(3, rl.contents(1L, false).size());
         assertEquals(m2, rl.contents(1L, false).get(1).getPayload());
-        assertEquals(2L, rl.contents(1L, false).get(1).getHandle());
+        assertEquals(2L, rl.contents(1L, false).get(1).getTxnId());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
-        assertEquals(3L, rl.contents(1L, false).get(2).getHandle());
+        assertEquals(3L, rl.contents(1L, false).get(2).getTxnId());
     }
 
     @Test
@@ -189,9 +189,9 @@ public class TestRepairLog extends TestCase
         rl.deliver(m3);
         assertEquals(3, rl.contents(1L, false).size());
         assertEquals(m2, rl.contents(1L, false).get(1).getPayload());
-        assertEquals(2L, rl.contents(1L, false).get(1).getHandle());
+        assertEquals(2L, rl.contents(1L, false).get(1).getTxnId());
         assertEquals(m3, rl.contents(1L, false).get(2).getPayload());
-        assertEquals(3L, rl.contents(1L, false).get(2).getHandle());
+        assertEquals(3L, rl.contents(1L, false).get(2).getTxnId());
     }
 
 
