@@ -63,7 +63,6 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 import org.apache.zookeeper_voltpatches.data.Stat;
 import org.json_voltpatches.JSONArray;
-import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.Level;
@@ -73,9 +72,9 @@ import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.BabySitter;
 import org.voltcore.zk.ZKUtil;
 import org.voltdb.iv2.Cartographer;
+import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.SpInitiator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
@@ -155,7 +154,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     MailboxPublisher m_mailboxPublisher;
     MailboxTracker m_mailboxTracker;
     private String m_buildString;
-    private static final String m_defaultVersionString = "2.8";
+    private static final String m_defaultVersionString = "2.8.1";
     private String m_versionString = m_defaultVersionString;
     HostMessenger m_messenger = null;
     final ArrayList<ClientInterface> m_clientInterfaces = new ArrayList<ClientInterface>();
@@ -184,6 +183,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     // IV2 things
     List<Initiator> m_iv2Initiators = new ArrayList<Initiator>();
     Cartographer m_cartographer = null;
+    LeaderAppointer m_leaderAppointer = null;
+    GlobalServiceElector m_globalServiceElector = null;
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -393,6 +394,10 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                         "See previous log message for details.", false, null);
             }
 
+            // Create the GlobalServiceElector.  Do this here so we can register the MPI with it
+            // when we construct it below
+            m_globalServiceElector = new GlobalServiceElector(m_messenger.getZK(), m_messenger.getHostId());
+
             /*
              * Construct all the mailboxes for things that need to be globally addressable so they can be published
              * in one atomic shot.
@@ -409,9 +414,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             ClusterConfig clusterConfig = null;
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
+            JSONObject topo = getTopology(isRejoin);
+            MpInitiator mpi = null;
             try {
-                JSONObject topo = getTopology(isRejoin);
-
                 // IV2 mailbox stuff
                 if (isIV2Enabled()) {
                     ClusterConfig iv2config = new ClusterConfig(topo);
@@ -427,8 +432,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                    Initiator initiator = new MpInitiator(m_messenger, mpiBuddyHSId);
-                    m_iv2Initiators.add(initiator);
+                    mpi = new MpInitiator(m_messenger, mpiBuddyHSId);
+                    m_iv2Initiators.add(mpi);
                 }
 
                 /*
@@ -569,6 +574,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              */
             if (isIV2Enabled()) {
                 try {
+                    m_leaderAppointer = new LeaderAppointer(
+                            m_messenger.getZK(),
+                            clusterConfig.getPartitionCount(),
+                            m_deployment.getCluster().getKfactor(),
+                            topo, mpi);
+                    m_globalServiceElector.registerService(m_leaderAppointer);
+
                     for (Initiator iv2init : m_iv2Initiators) {
                         iv2init.configure(
                                 getBackendTargetType(),
@@ -658,6 +670,13 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 }
             }
 
+            // Start the GlobalServiceElector.  Not sure where this will actually belong.
+            try {
+                m_globalServiceElector.start();
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("Unable to start GlobalServiceElector", true, e);
+            }
+
             /*
              * At this point all of the execution sites have been published to m_localSites
              * It is possible that while they were being created the mailbox tracker found additional
@@ -686,8 +705,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
 
             // Create the client interface
             int portOffset = 0;
-            // TODO: fix
-            //for (long site : m_siteTracker.getMailboxTracker().getAllInitiators()) {
             for (int i = 0; i < 1; i++) {
                 // create DTXN and CI for each local non-EE site
                 SimpleDtxnInitiator initiator =
@@ -1548,6 +1565,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_periodicWorkThread.shutdown();
                 heartbeatThread.interrupt();
                 heartbeatThread.join();
+
+                if (m_leaderAppointer != null) {
+                    m_leaderAppointer.shutdown();
+                }
+                m_globalServiceElector.shutdown();
 
                 if (m_hasStartedSampler.get()) {
                     m_sampler.setShouldStop();

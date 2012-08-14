@@ -179,7 +179,8 @@
         <p>You can launch VoltDB's Web Studio from:</p>
         <pre><script>document.write(root.replace('/demo/','/studio.web/index.htm'));</script></pre>
         <p>You can launch a simple Command-Line Interface from:</p>
-        <pre><script>document.write(root.replace('/demo/','/sqlcmd/sqlcmd'));</script></pre>
+        <pre><script>var sqlcmdpath = root.replace('/tools/demo/', '/bin/sqlcmd');document.write(sqlcmdpath)
+        </script></pre>
 
         <table cellspacing="0" cellpadding="0" border="0"><tr><td class="nbr">2</td><td class="nbrtitle">Windows Tools</td></tr></table>
         <p>If you work on Window, get VoltDB's Windows Studio from:</p>
