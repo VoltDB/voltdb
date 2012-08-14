@@ -18,6 +18,7 @@
 package org.voltdb;
 
 import java.util.ArrayList;
+import java.util.Collection;
 import java.util.HashSet;
 import java.util.LinkedList;
 import java.util.List;
@@ -31,6 +32,7 @@ import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltcore.utils.Pair;
+import org.voltcore.zk.CoreZK;
 import org.voltcore.zk.ZKUtil;
 
 /**
@@ -83,9 +85,11 @@ public class VoltZK {
 
     // leader election
     public static final String iv2masters = "/db/iv2masters";
+    public static final String iv2appointees = "/db/iv2appointees";
     public static final String iv2mpi = "/db/iv2mpi";
     public static final String leaders = "/db/leaders";
     public static final String leaders_initiators = "/db/leaders/initiators";
+    public static final String leaders_globalservice = "/db/leaders/globalservice";
 
     // Persistent nodes (mostly directories) to create on startup
     public static final String[] ZK_HIERARCHY = {
@@ -94,9 +98,11 @@ public class VoltZK {
             cluster_metadata,
             operationMode,
             iv2masters,
+            iv2appointees,
             iv2mpi,
             leaders,
-            leaders_initiators
+            leaders_initiators,
+            leaders_globalservice
     };
 
     /**
@@ -179,5 +185,19 @@ public class VoltZK {
                clusterMetadata.put( hostId, new String(cb.getData(), "UTF-8"));
             } catch (KeeperException.NoNodeException e){}
         }
+    }
+
+    /**
+     * Convert a list of ZK nodes named HSID_SUFFIX (such as that used by LeaderElector)
+     * into a list of HSIDs.
+     */
+    public static List<Long> childrenToReplicaHSIds(Collection<String> children)
+    {
+        List<Long> replicas = new ArrayList<Long>(children.size());
+        for (String child : children) {
+            long HSId = Long.parseLong(CoreZK.getPrefixFromChildName(child));
+            replicas.add(HSId);
+        }
+        return replicas;
     }
 }

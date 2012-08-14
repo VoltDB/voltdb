@@ -28,19 +28,53 @@ import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.CommandLog;
+
+import org.voltcore.utils.Pair;
+
+import org.voltcore.zk.LeaderElector;
+
+import org.voltdb.BackendTarget;
+import org.voltdb.CatalogContext;
+import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.Promotable;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
+
+import com.google.common.collect.ImmutableMap;
 
 /**
  * Subclass of Initiator to manage single-partition operations.
  * This class is primarily used for object construction and configuration plumbing;
  * Try to avoid filling it with lots of other functionality.
  */
-public class SpInitiator extends BaseInitiator
+public class SpInitiator extends BaseInitiator implements Promotable
 {
+    final private LeaderCache m_leaderCache;
+    private boolean m_promoted = false;
+
+    LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
+    {
+        @Override
+        public void run(ImmutableMap<Integer, Long> cache)
+        {
+            for (Long HSId : cache.values()) {
+                if (HSId == getInitiatorHSId()) {
+                    if (!m_promoted) {
+                        acceptPromotion();
+                        m_promoted = true;
+                    }
+                    break;
+                }
+            }
+        }
+    };
+
     public SpInitiator(HostMessenger messenger, Integer partition)
     {
         super(VoltZK.iv2masters, messenger, partition,
-                new SpScheduler(partition, new SiteTaskerQueue()), "SP");
+                new SpScheduler(partition, new SiteTaskerQueue()),
+                "SP");
+        m_leaderCache = new LeaderCache(messenger.getZK(), VoltZK.iv2appointees, m_leadersChangeHandler);
     }
 
     @Override
@@ -52,10 +86,67 @@ public class SpInitiator extends BaseInitiator
                           CommandLog cl)
         throws KeeperException, InterruptedException, ExecutionException
     {
+        try {
+            m_leaderCache.start(true);
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to configure SpInitiator.", true, e);
+        }
         super.configureCommon(backend, serializedCatalog, catalogContext,
-                kfactor + 1, csp, numberOfPartitions,
+                csp, numberOfPartitions,
                 createForRejoin && isRejoinable(),
                 cl);
+        // add ourselves to the ephemeral node list which BabySitters will watch for this
+        // partition
+        LeaderElector.createParticipantNode(m_messenger.getZK(),
+                LeaderElector.electionDirForPartition(m_partitionId),
+                Long.toString(getInitiatorHSId()), null);
+    }
+
+    @Override
+    public void acceptPromotion()
+    {
+        try {
+            long startTime = System.currentTimeMillis();
+            Boolean success = false;
+            m_term = createTerm(m_messenger.getZK(),
+                    m_partitionId, getInitiatorHSId(), m_initiatorMailbox,
+                    m_whoami);
+            m_term.start();
+            while (!success) {
+                RepairAlgo repair = null;
+                repair = createPromoteAlgo(m_term.getInterestingHSIds(),
+                        m_initiatorMailbox, m_whoami);
+
+                m_initiatorMailbox.setRepairAlgo(repair);
+                // term syslogs the start of leader promotion.
+                Pair<Boolean, Long> result = repair.start().get();
+                success = result.getFirst();
+                if (success) {
+                    m_initiatorMailbox.setLeaderState(result.getSecond());
+                    tmLog.info(m_whoami
+                            + "finished leader promotion. Took "
+                            + (System.currentTimeMillis() - startTime) + " ms.");
+
+                    // THIS IS where map cache should be updated, not
+                    // in the promotion algorithm.
+                    LeaderCacheWriter iv2masters = new LeaderCache(m_messenger.getZK(),
+                            m_zkMailboxNode);
+                    iv2masters.put(m_partitionId, m_initiatorMailbox.getHSId());
+                }
+                else {
+                    // The only known reason to fail is a failed replica during
+                    // recovery; that's a bounded event (by k-safety).
+                    // CrashVoltDB here means one node failure causing another.
+                    // Don't create a cascading failure - just try again.
+                    tmLog.info(m_whoami
+                            + "interrupted during leader promotion after "
+                            + (System.currentTimeMillis() - startTime) + " ms. of "
+                            + "trying. Retrying.");
+                }
+            }
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Terminally failed leader promotion.", true, e);
+        }
     }
 
     /**
@@ -68,11 +159,10 @@ public class SpInitiator extends BaseInitiator
     }
 
     @Override
-    public Term createTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
-            String zkMapCacheNode, String whoami)
+    public Term createTerm(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+            String whoami)
     {
-        return new SpTerm(missingStartupSites, zk, partitionId, initiatorHSId, mailbox, whoami);
+        return new SpTerm(zk, partitionId, initiatorHSId, mailbox, whoami);
     }
 
     @Override

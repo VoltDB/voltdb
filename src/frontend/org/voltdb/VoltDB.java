@@ -539,7 +539,7 @@ public class VoltDB {
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
-            return;
+            throw new AssertionError("Faux crash of VoltDB successful.");
         }
 
         List<String> throwerStacktrace = null;
@@ -663,7 +663,7 @@ public class VoltDB {
         wasCrashCalled = true;
         crashMessage = errMsg;
         if (ignoreCrash) {
-            return;
+            throw new AssertionError("Faux crash of VoltDB successful.");
         }
         try {
             instance().getHostMessenger().sendPoisonPill(errMsg);

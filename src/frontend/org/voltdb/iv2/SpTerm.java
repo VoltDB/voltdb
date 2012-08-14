@@ -17,10 +17,8 @@
 
 package org.voltdb.iv2;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.List;
-import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
@@ -33,8 +31,7 @@ import org.voltcore.zk.BabySitter.Callback;
 import org.voltcore.zk.LeaderElector;
 
 import org.voltdb.VoltDB;
-
-import com.google.common.collect.Sets;
+import org.voltdb.VoltZK;
 
 public class SpTerm implements Term
 {
@@ -44,8 +41,6 @@ public class SpTerm implements Term
     private final InitiatorMailbox m_mailbox;
     private final int m_partitionId;
     private final ZooKeeper m_zk;
-    private final CountDownLatch m_missingStartupSites;
-    private final TreeSet<String> m_knownReplicas = new TreeSet<String>();
 
     // Initialized in start() -- when the term begins.
     protected BabySitter m_babySitter;
@@ -58,57 +53,24 @@ public class SpTerm implements Term
         @Override
         public void run(List<String> children)
         {
-            // Need to handle startup separately from runtime updates.
-            if (SpTerm.this.m_missingStartupSites.getCount() > 0) {
-                TreeSet<String> updatedReplicas = com.google.common.collect.Sets.newTreeSet(children);
-                // Cancel setup if a previously seen replica disappeared.
-                // I think voltcore might actually terminate before getting here...
-                Sets.SetView<String> removed = Sets.difference(SpTerm.this.m_knownReplicas, updatedReplicas);
-                if (!removed.isEmpty()) {
-                    tmLog.error(m_whoami
-                            + "replica(s) failed during startup. Initialization can not complete."
-                            + " Failed replicas: " + removed);
-                    VoltDB.crashLocalVoltDB("Replicas failed during startup.", true, null);
-                    return;
-                }
-                Sets.SetView<String> added = Sets.difference(updatedReplicas, SpTerm.this.m_knownReplicas);
-                int newReplicas = added.size();
-                m_knownReplicas.addAll(updatedReplicas);
-                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(updatedReplicas);
-                m_mailbox.updateReplicas(replicas);
-                for (int i=0; i < newReplicas; i++) {
-                    SpTerm.this.m_missingStartupSites.countDown();
-                }
-            }
-            else {
-                // remove the leader; convert to hsids; deal with the replica change.
-                List<Long> replicas = BaseInitiator.childrenToReplicaHSIds(children);
-                tmLog.info(m_whoami
-                        + "replica change handler updating replica list to: "
-                        + CoreUtils.hsIdCollectionToString(replicas));
-                m_mailbox.updateReplicas(replicas);
-            }
+            // remove the leader; convert to hsids; deal with the replica change.
+            List<Long> replicas = VoltZK.childrenToReplicaHSIds(children);
+            tmLog.info(m_whoami
+                    + "replica change handler updating replica list to: "
+                    + CoreUtils.hsIdCollectionToString(replicas));
+            m_mailbox.updateReplicas(replicas);
         }
     };
 
     /**
      * Setup a new Term but don't take any action to take responsibility.
      */
-    public SpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
+    public SpTerm(ZooKeeper zk, int partitionId, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami)
     {
         m_zk = zk;
         m_partitionId = partitionId;
         m_mailbox = mailbox;
-
-        if (missingStartupSites != null) {
-            m_missingStartupSites = missingStartupSites;
-        }
-        else {
-            m_missingStartupSites = new CountDownLatch(0);
-        }
-
         m_whoami = whoami;
     }
 
@@ -144,7 +106,7 @@ public class SpTerm implements Term
     public List<Long> getInterestingHSIds()
     {
         List<String> survivorsNames = m_babySitter.lastSeenChildren();
-        List<Long> survivors =  BaseInitiator.childrenToReplicaHSIds(survivorsNames);
+        List<Long> survivors =  VoltZK.childrenToReplicaHSIds(survivorsNames);
         return survivors;
     }
 }

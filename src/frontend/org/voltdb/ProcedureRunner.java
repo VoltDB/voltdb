@@ -393,12 +393,32 @@ public class ProcedureRunner {
                     plannedStatement.aggregatorFragment,
                     plannedStatement.collectorFragment,
                     plannedStatement.isReplicatedTableDML,
-                    plannedStatement.params);
-            queuedSQL.params = getCleanParams( queuedSQL.stmt, args);
+                    plannedStatement.parameterTypes);
+            if (plannedStatement.extractedParamValues.size() == 0) {
+                // case handles if there were parameters OR
+                // if there were no constants to pull out
+                queuedSQL.params = getCleanParams(queuedSQL.stmt, args);
+            }
+            else {
+                if (args.length > 0) {
+                    throw new ExpectedProcedureException(
+                            "Number of arguments provided was " + args.length  +
+                            " where 0 were expected for statement " + sql);
+                }
+                Object[] extractedParams = plannedStatement.extractedParamValues.toArray();
+                if (extractedParams.length != queuedSQL.stmt.numStatementParamJavaTypes) {
+                    String msg = String.format("Wrong number of extracted param for parameterized statement: %s", sql);
+                    throw new VoltAbortException(msg);
+                }
+                queuedSQL.params = getCleanParams(queuedSQL.stmt, extractedParams);
+            }
             m_batch.add(queuedSQL);
         } catch (Exception e) {
             if (e instanceof ExecutionException) {
                 throw new VoltAbortException(e.getCause());
+            }
+            if (e instanceof VoltAbortException) {
+                throw (VoltAbortException) e;
             }
             throw new VoltAbortException(e);
         }
@@ -474,8 +494,8 @@ public class ProcedureRunner {
                 }
                 else {
                     assert(qs.stmt.plan != null);
-                    //TODO: For now ad hoc SQL parameters aren't supported.
-                    assert(qs.params.toArray().length == 0);
+                    //TODO: For now extracted ad hoc SQL parameters are discarded
+                    qs.params = new ParameterSet();
                     sparams = new ArrayList<StmtParameter>();
                 }
                 results[i++] = getHsqlBackendIfExists().runSQLWithSubstitutions(
@@ -491,7 +511,7 @@ public class ProcedureRunner {
 
         // check expectations
         int i = 0; for (QueuedSQL qs : batch) {
-            Expectation.check(m_procedureName, qs.stmt.getText(),
+            Expectation.check(m_procedureName, qs.stmt.sqlText,
                     i, qs.expectation, results[i]);
             i++;
         }

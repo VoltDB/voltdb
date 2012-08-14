@@ -126,6 +126,9 @@ public abstract class VoltProcedure {
          */
         public VoltAbortException(Throwable t) {
             super(t);
+            if (t.getMessage() != null) {
+                message = t.getMessage();
+            }
         }
 
         /**
