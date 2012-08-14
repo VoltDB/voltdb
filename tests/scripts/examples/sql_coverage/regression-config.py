@@ -77,6 +77,12 @@
     "basic-ints": {"schema": "int-schema.py",
                    "ddl": "int-DDL.sql",
                    "template": "regression-basic-ints.sql",
+                   # ENG-3483
+                   # If fuzzylevel is declared and set to 1, then we only care the
+                   # number of records returned by certain queries, e.g.
+                   # SELECT P1.TINY, P1.TINY FROM P1 LIMIT 10
+                   # This is introduced to enable sqlcoverage running on multiple sites per node
+                   "fuzzylevel": "1",
                    "normalizer": "normalizer.py"},
 # HSQL HAS BAD DEFAULT PRECISION
 # AND VoltDB gives VOLTDB ERROR: Type DECIMAL can't be cast as FLOAT
@@ -126,6 +132,12 @@
     "advanced-ints": {"schema": "int-schema.py",
                       "ddl": "int-DDL.sql",
                       "template": "regression-advanced-ints.sql",
+                      # ENG-3483
+                      # If fuzzylevel is declared and set to 1, then we only care the
+                      # number of records returned by certain queries, e.g.
+                      # SELECT P1.TINY, P1.TINY FROM P1 LIMIT 10
+                      # This is introduced to enable sqlcoverage running on multiple sites per node
+                      "fuzzylevel": "1",
                       "normalizer": "normalizer.py"},
 # This suite written to test push-down of aggregates and limits in combination
 # with indexes, projections and order-by.
