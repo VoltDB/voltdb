@@ -126,8 +126,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
                                     txnId,
                                     readOnly,
                                     false);
-        // set sphandle to something arbitrarily not partition 0.
-        frag.setSpHandle(TxnEgo.makeZero(10).getTxnId());
+        frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
         return frag;
     }
 
