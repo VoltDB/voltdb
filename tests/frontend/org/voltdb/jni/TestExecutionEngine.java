@@ -239,6 +239,54 @@ public class TestExecutionEngine extends TestCase {
             }
         };
 
+        final Runnable onDestinationCompletion = new Runnable() {
+            @Override
+            public void run() {
+                destinationCompleted.set(true);
+            }
+        };
+
+        final AtomicReference<ExecutionEngine> destinationReference= new AtomicReference<ExecutionEngine>();
+
+
+        final HashMap<Pair<String, Integer>, Long> tablesAndSources =
+            new HashMap<Pair<String, Integer>, Long>();
+        tablesAndSources.put(Pair.of( "STOCK", STOCK_TABLEID), sourceId);
+        tablesAndSources.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), sourceId);
+
+        final MockMailbox destinationMailbox = new MockMailbox();
+        MockMailbox.registerMailbox(destinationId, destinationMailbox);
+
+        Thread destinationThread = new Thread("Destination thread") {
+            @Override
+            public void run() {
+                final ExecutionEngine destinationEngine =
+                    new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, (int)destinationId,
+                                           (int)destinationId, "", 100, 1);
+                destinationReference.set(destinationEngine);
+                destinationEngine.loadCatalog( 0, serializedCatalog);
+                RecoverySiteProcessorDestination destinationProcess =
+                    new RecoverySiteProcessorDestination(
+                            tablesAndSources,
+                            destinationEngine,
+                            destinationMailbox,
+                            destinationId,
+                            0,
+                            onDestinationCompletion,
+                            mh);
+                /*
+                 * Do a lot of craziness so we can intercept the mailbox calls
+                 * and discard the buffer so it is returned to the source
+                 */
+                destinationProcess.doRecoveryWork(-1);
+                destinationProcess.doRecoveryWork(0);
+                assert(destinationCompleted.get());
+            }
+        };
+        destinationThread.start();
+
+        Thread.sleep(1000);
+
         final AtomicReference<ExecutionEngine> sourceReference = new AtomicReference<ExecutionEngine>();
 
         Thread sourceThread = new Thread("Source thread") {
@@ -284,51 +332,6 @@ public class TestExecutionEngine extends TestCase {
             }
         };
         sourceThread.start();
-
-        final HashMap<Pair<String, Integer>, Long> tablesAndSources =
-            new HashMap<Pair<String, Integer>, Long>();
-        tablesAndSources.put(Pair.of( "STOCK", STOCK_TABLEID), sourceId);
-        tablesAndSources.put(Pair.of( "WAREHOUSE", WAREHOUSE_TABLEID), sourceId);
-
-        final MockMailbox destinationMailbox = new MockMailbox();
-        MockMailbox.registerMailbox(destinationId, destinationMailbox);
-
-        final Runnable onDestinationCompletion = new Runnable() {
-            @Override
-            public void run() {
-                destinationCompleted.set(true);
-            }
-        };
-
-        final AtomicReference<ExecutionEngine> destinationReference= new AtomicReference<ExecutionEngine>();
-
-        Thread destinationThread = new Thread("Destination thread") {
-            @Override
-            public void run() {
-                final ExecutionEngine destinationEngine =
-                    new ExecutionEngineJNI(CLUSTER_ID, NODE_ID, (int)destinationId,
-                                           (int)destinationId, "", 100, 1);
-                destinationReference.set(destinationEngine);
-                destinationEngine.loadCatalog( 0, serializedCatalog);
-                RecoverySiteProcessorDestination destinationProcess =
-                    new RecoverySiteProcessorDestination(
-                            tablesAndSources,
-                            destinationEngine,
-                            destinationMailbox,
-                            destinationId,
-                            0,
-                            onDestinationCompletion,
-                            mh);
-                /*
-                 * Do a lot of craziness so we can intercept the mailbox calls
-                 * and discard the buffer so it is returned to the source
-                 */
-                destinationProcess.doRecoveryWork(-1);
-                destinationProcess.doRecoveryWork(0);
-                assert(destinationCompleted.get());
-            }
-        };
-        destinationThread.start();
 
         destinationThread.join();
         sourceThread.join();
