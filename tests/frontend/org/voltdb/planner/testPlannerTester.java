@@ -364,17 +364,17 @@ public class testPlannerTester extends TestCase {
             return false;
     }
 
-//  public void testMain() {
-//  String[] args = {"-d","-s","-e","-cs",
-//          "-C="+m_currentDir+"/tests/scripts/plannertester/config/test1",
+  public void testMain() {
+  String[] args = {"-d","-s","-e","-cs",
+          "-C="+m_currentDir+"/tests/scripts/plannertester/config/test1",
 //          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voltcache",
 //          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voltkv",
 //          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voter",
-//          "-r="+m_homeDir,
-////          "-help"
-//          };
-//  plannerTester.main(args);
-//}
+          "-r="+m_homeDir,
+//          "-help"
+          };
+  plannerTester.main(args);
+}
 
   //    public void testBatchDiff() {
   //          int size = 7;

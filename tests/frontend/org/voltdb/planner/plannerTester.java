@@ -171,7 +171,7 @@ public class plannerTester {
                 System.out.println("-e  : Output explained plan along with diff");
                 System.out.println("-s  : Output sql statement along with diff");
                 System.out.println("-C=configFile  : Specify the path to a config file");
-                System.out.println("-r=reportFileDir  : Specify report file path, default will be ~/, report file name is plannerTester.report");
+                System.out.println("-r=reportFileDir  : Specify report file path, default will be tmp/, report file name is plannerTester.report");
                 System.exit(0);
             }
         }

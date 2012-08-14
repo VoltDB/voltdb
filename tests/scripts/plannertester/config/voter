@@ -2,10 +2,10 @@ Name:
 voter
 
 Ref:
-./tests/scripts/plannertester/baseline/voter/
+./baseline/voter/
 
 DDL:
-./examples/voter/ddl.sql
+../../../examples/voter/ddl.sql
 
 Base Name:
 ddl

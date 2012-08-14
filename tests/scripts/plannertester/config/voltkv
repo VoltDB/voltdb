@@ -2,10 +2,10 @@ Name:
 voltkv
 
 Ref:
-./tests/scripts/plannertester/baseline/voltkv
+./baseline/voltkv
 
 DDL:
-./examples/voltkv/ddl.sql
+../../../examples/voltkv/ddl.sql
 
 Base Name:
 ddl
