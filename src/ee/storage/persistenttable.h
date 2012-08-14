@@ -294,7 +294,7 @@ protected:
     void updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
 
     bool tryInsertOnAllIndexes(TableTuple *tuple);
-    bool tryUpdateOnAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
+    bool checkUpdateOnUniqueIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
 
     bool checkNulls(TableTuple &tuple) const;
 

@@ -89,17 +89,29 @@ public:
         // this can probably be optimized
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-        if (m_eq(m_tmp1, m_tmp2))
-        {
-            // no update is needed for this index
-            return true;
-        }
 
-        // It looks like we're deleting the new value and inserting the new value
-        // The lookup is on the index keys, but the address of the current tuple
-        //  (which has the new key value) is needed for this non-unique index
-        //  to determine which of the tuples with a given key need to be deleted.
+        // This optimization was implicated in a crash -- it is suspected of violating the non-inline (string) memory
+        // management assumption that the index has been updated to reference NEW COPIES of the old values.
+        // The old copies get reclaimed at transaction commit.
+        // TODO: We COULD try to re-enable this in the special case of indexes using inlined key storage.
+        // This could be accomplished by using an alternative to the "operator()" shown here that only returns
+        // true when there are no memory management implications (non-inline values use the same addresses.
+        // It would probably be even better to pre-empt index updates on columns that are not explicitly assigned
+        // in the update statement.
+        //if (m_eq(m_tmp1, m_tmp2))
+        //{
+        //    // no update is needed for this index
+        //    return true;
+        //}
+
+
+        // newTupleValue actually points to the existing tuple referenced by the index
+        // -- though its column values have already been updated not to match the key stored in the index.
+        // newTupleValue must be passed into deleteEntryPrivate to delete only the correct entry
+        // that matches the old key m_tmp1 (possibly one of many, each with a different tuple address value).
+        // deleteEntry can not be used for this because it constructs its key from the tuple's current column values.
         bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
+        // addEntry COULD have been be used here instead of setting and using m_tmp2.
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;
@@ -253,15 +265,37 @@ protected:
 
         iter = m_entries.find(key);
 
-        if (iter.isEnd()) return false;
+        if (iter.isEnd()) {
+            name_.append("\nDEBUG -- failed index delete shot past end skipping:");
+            iter = m_entries.begin();
+            while (!iter.isEnd()) {
+                static char appendix[256];
+                snprintf(appendix,256, "+%ld", (long)iter.value());
+                name_.append(appendix);
+                iter.moveNext();
+            }
+            return false;
+        }
 
         do {
             if (iter.value() == tuple->address()) {
+                name_.append("\nDEBUG -- did index delete out of:");
+            MMIter iter2 = m_entries.begin();
+            while (!iter2.isEnd()) {
+                static char appendix[256];
+                snprintf(appendix,256, "+%ld", (long)iter2.value());
+                name_.append(appendix);
+                iter2.moveNext();
+            }
                 return m_entries.erase(iter);
             }
             iter.moveNext();
         } while ((!iter.isEnd()) && (m_eq(iter.key(), key)));
-
+        if (iter.isEnd()) {
+            name_.append("\nDEBUG -- failed index delete walked off end");
+        } else {
+            name_.append("\nDEBUG -- failed index delete walked to next key");
+        }
         return false;
     }
 
