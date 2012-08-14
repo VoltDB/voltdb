@@ -72,15 +72,18 @@ struct TableIndexScheme {
                          bool intsOnly, TupleSchema *tupleSchema) {
         this->name = name; this->type = type; this->columnIndices = columnIndices;
         this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = false;
+        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = true;
     }
-
+/* This constructor does not set countable field according what you value you pass in.
+ * FIX it when VoltDB CompactingMap can pack memory together for TreeNode without allocating
+ * memory for the 4 bytes countable field.
+ * */
     TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
                      std::vector<ValueType> columnTypes, bool unique,  bool countable,
                      bool intsOnly, TupleSchema *tupleSchema) {
         this->name = name; this->type = type; this->columnIndices = columnIndices;
         this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = countable;
+        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = true;
     }
 
     std::string name;
