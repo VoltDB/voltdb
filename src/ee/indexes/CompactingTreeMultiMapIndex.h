@@ -241,6 +241,7 @@ public:
             }
         }
     }
+
     int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
