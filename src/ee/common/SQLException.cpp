@@ -71,7 +71,16 @@ SQLException::SQLException(const char* sqlState, std::string message, int intern
 }
 
 void SQLException::p_serialize(ReferenceSerializeOutput *output) {
-    for (int ii = 0; m_sqlState != NULL && ii < 5; ii++) {
+    // Asserting these conditions again here "at the last second", just in case the buffer was initialized to something
+    // dynamic that might have gone out of scope in the process of throwing and catching this exception.
+    // Usually, the state is initialized to one of the const char* statics above,
+    // so there's no need to "copy in" in the constructor or to worry about it having changed here,
+    // but user-defined functions throwing user-defined SQL errors present a special challenge,
+    // especially for some values of "user".
+    assert(m_sqlState);
+    assert(m_sqlState[5] == '\0');
+    assert(strlen(m_sqlState) == 5);
+    for (int ii = 0; ii < 5; ii++) {
         output->writeByte(m_sqlState[ii]);
     }
 }

@@ -20,66 +20,65 @@
 
 namespace voltdb {
 
+// static buffers to reference in SQLExceptions that reference user-provided detail.
+// As statics, their content would be overwritten if two dynamic SQLExceptions were ever both in play,
+// but this should not be an issue for the single-threaded EE.
+// The important thing is that these buffers survive the throw and catch of the referencing SQLException.
+static char msg_format_buffer[1024]; 
+static char state_format_buffer[6]; 
+
 /** implement a forced SQL ERROR function (for test and example purposes) for either integer or string types **/
 template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
-    int64_t intValue = -1;
-    char buffer[1024];
-    const char* msgcode;
+    const char* sqlstatecode;
     const char* msgtext;
     const ValueType type = getValueType();
     if (type == VALUE_TYPE_VARCHAR) {
         const int32_t valueLength = getObjectLength();
         const char *valueChars = reinterpret_cast<char*>(getObjectValue());
-        snprintf(buffer, std::min((int32_t)sizeof(buffer), valueLength+1), "%s", valueChars);
-        msgcode = SQLException::nonspecific_error_code_for_error_forced_by_user;
-        msgtext = buffer;
+        snprintf(msg_format_buffer, std::min((int32_t)sizeof(msg_format_buffer), valueLength+1), "%s", valueChars);
+        sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
+        msgtext = msg_format_buffer;
     } else {
-        intValue = castAsBigIntAndGetValue(); // let cast throw if invalid
-        snprintf(buffer, sizeof(buffer), "%05ld", (long) intValue);
-        msgcode = buffer;
+        int64_t intValue = castAsBigIntAndGetValue(); // let cast throw if invalid
+        if (intValue == 0) {
+            return *this;
+        }
+        snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld", (long) intValue);
+        sqlstatecode = state_format_buffer;
         msgtext = SQLException::specific_error_specified_by_user;
     }
-    if (intValue != 0) {
-        throw SQLException(msgcode, msgtext);
-    }
-    return *this;
+    throw SQLException(sqlstatecode, msgtext);
 }
 
 /** implement the 2-argument forced SQL ERROR function (for test and example purposes) */
 template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
-    int64_t intValue = -1;
-    char buffer[1024];
-    char buffer2[1024];
-    const char* msgcode;
-    const char* msgtext;
+    const char* sqlstatecode;
 
     const NValue& codeArg = arguments[0];
     if (codeArg.isNull()) {
-        msgcode = SQLException::nonspecific_error_code_for_error_forced_by_user;
+        sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
     } else {
-        intValue = codeArg.castAsBigIntAndGetValue(); // let cast throw if invalid
-        snprintf(buffer, sizeof(buffer), "%05ld", (long) intValue);
-        msgcode = buffer;
+        int64_t intValue = codeArg.castAsBigIntAndGetValue(); // let cast throw if invalid
+        if (intValue == 0) {
+            return codeArg;
+        }
+        snprintf(state_format_buffer, sizeof(state_format_buffer), "%05ld", (long) intValue);
+        sqlstatecode = state_format_buffer;
     }
 
     const NValue& strValue = arguments[1];
     if (strValue.isNull()) {
-        msgtext = "";
+        msg_format_buffer[0] = '\0';
     } else {
         if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
             throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
         }
-
         const int32_t valueLength = strValue.getObjectLength();
         char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
-        snprintf(buffer2, std::min((int32_t)sizeof(buffer2), valueLength+1), "%s", valueChars);
-        msgtext = buffer2;
+        snprintf(msg_format_buffer, std::min((int32_t)sizeof(msg_format_buffer), valueLength+1), "%s", valueChars);
     }
-    if (intValue != 0) {
-        throw SQLException(msgcode, msgtext);
-    }
-    return codeArg;
+    throw SQLException(sqlstatecode, msg_format_buffer);
 }
 
 namespace functionexpression {

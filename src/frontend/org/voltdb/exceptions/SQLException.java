@@ -37,7 +37,7 @@ public class SQLException extends SerializableException {
         super(buffer);
         m_sqlState = new byte[5];
         buffer.get(m_sqlState);
-        String state = new String(m_sqlState);
+        String state = getSQLState();
         assert(state.length() == 5);
     }
 
@@ -65,9 +65,7 @@ public class SQLException extends SerializableException {
         try {
             state = new String(m_sqlState, "UTF-8");
         } catch (UnsupportedEncodingException e) {
-            // TODO Auto-generated catch block
-            e.printStackTrace();
-            assert(false);
+            throw new RuntimeException(e);
         }
         return state;
     }
