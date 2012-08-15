@@ -54,11 +54,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     /**
      * Attributes
-     * NOTE: The IndexCountPlanNode will use AbstractScanPlanNode's m_predicate
-     * as the "Post-Scan Predicate Expression". When this is defined, the EE will
-     * run a tuple through an additional predicate to see whether it qualifies.
-     * This is necessary when we have a predicate that includes columns that are not
-     * all in the index that was selected.
      */
 
     // The index to use in the scan operation
@@ -133,27 +128,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true for unique index scans
+     * Should just return true -- there's only one order for a single row
+     * @return true
      */
     @Override
     public boolean isOrderDeterministic() {
-        if (m_catalogIndex.getUnique()) {
-            // Any unique index scan capable of returning multiple rows will return them in a fixed order.
-            // XXX: This may not be strictly true if/when we support order-determinism based on a mix of columns
-            // from different joined tables -- an equality filter based on a non-ordered column from the other table
-            // would not produce predictably ordered results even when the other table is ordered by all of its display columns
-            // but NOT the column used in the equality filter.
-            return true;
-        }
-        // Assuming (?!) that the relative order of the "multiple entries" in a non-unique index can not be guaranteed,
-        // the only case in which a non-unique index can guarantee determinism is for an indexed-column-only scan,
-        // because it would ignore any differences in the entries.
-        // TODO: return true for an index-only scan --
-        // That would require testing of an inline projection node consisting solely of (functions of?) the indexed columns.
-        m_nondeterminismDetail = "index scan may provide insufficient ordering";
-        return false;
+        return true;
     }
 
     public void setCatalogIndex(Index index)

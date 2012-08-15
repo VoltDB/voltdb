@@ -241,6 +241,7 @@ public:
             }
         }
     }
+
     int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
@@ -252,10 +253,6 @@ public:
         }
 
         int cmp = m_eq(m_tmp1, m_seqIter.key());
-        if (m_seqIter.isEnd()) {
-            return m_entries.size();
-        }
-
         KeyType tmpKey = m_seqIter.key();
         if (cmp == 0) {
             m_seqIter.movePrev();
