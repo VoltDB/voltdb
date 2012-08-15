@@ -733,8 +733,16 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         public Database getDatabase()                           { return m_context.database; }
         @Override
         public Cluster getCluster()                             { return m_context.cluster; }
+
+        /*
+         * Pre-iv2 the transaction id and sp handle are absolutely always the same.
+         * This is because there is a global order. In IV2 there is no global order
+         * so there is a per partition order/txn-id called SpHandle which may/may not
+         * be the same as the txn-id for a given transaction. If the transaction
+         * is multi-part then the txnid and SpHandle will not be the same.
+         */
         @Override
-        public long getLastCommittedTxnId()                     { return lastCommittedTxnId; }
+        public long getLastCommittedSpHandle()                     { return lastCommittedTxnId; }
         @Override
         public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
@@ -2834,7 +2842,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
     // do-nothing implementation of IV2 SiteProcedeConnection API
     @Override
-    public void truncateUndoLog(boolean rollback, long token, long txnId) {
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle) {
         throw new RuntimeException("Unsupported IV2-only API.");
     }
 

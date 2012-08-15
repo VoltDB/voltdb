@@ -954,7 +954,7 @@ SnapshotCompletionInterest
                                           false);
         } else {
             m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true,
-                                          txnId, spi,
+                                          txnId, System.currentTimeMillis(), spi,
                                           restoreProc.getReadonly(),
                                           restoreProc.getSinglepartition(),
                                           restoreProc.getEverysite(),

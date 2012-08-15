@@ -188,7 +188,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       long now,
                                       boolean allowMismatchedResults) {
             createTransaction(connectionId, connectionHostname, adminConnection,
-                              0, invocation, isReadOnly, isSinglePartition,
+                              0, 0, invocation, isReadOnly, isSinglePartition,
                               isEverySite, partitions, numPartitions,
                               clientData, messageSize, now, allowMismatchedResults);
             return true;
@@ -199,6 +199,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
                                       String connectionHostname,
                                       boolean adminConnection,
                                       long txnId,
+                                      long timestamp,
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
                                       boolean isSinglePartition,

@@ -33,6 +33,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected long m_initiatorHSId;
     protected long m_coordinatorHSId;
     protected long m_txnId;
+    protected long m_timestamp;
     // IV2: within a partition, the primary initiator and its replicas
     // use this for intra-partition ordering/lookup
     private long m_spHandle;
@@ -48,13 +49,15 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     protected TransactionInfoBaseMessage(long initiatorHSId,
                                       long coordinatorHSId,
                                       long txnId,
+                                      long timestamp,
                                       boolean isReadOnly) {
         m_initiatorHSId = initiatorHSId;
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = txnId;
+        m_spHandle = Long.MIN_VALUE;
+        m_timestamp = timestamp;
         m_isReadOnly = isReadOnly;
         m_subject = Subject.DEFAULT.getId();
-        m_spHandle = Long.MIN_VALUE;
     }
 
     protected TransactionInfoBaseMessage(long initiatorHSId,
@@ -64,6 +67,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_initiatorHSId = initiatorHSId;
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = rhs.m_txnId;
+        m_timestamp = rhs.m_timestamp;
         m_isReadOnly = rhs.m_isReadOnly;
         m_subject = rhs.m_subject;
         m_spHandle = rhs.m_spHandle;
@@ -84,6 +88,14 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
 
     public long getTxnId() {
         return m_txnId;
+    }
+
+    public long getTimestamp() {
+        return m_timestamp;
+    }
+
+    public void setTimestamp(long timestamp) {
+        m_timestamp = timestamp;
     }
 
     public void setSpHandle(long spHandle) {
@@ -116,6 +128,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         msgsize += 8   // m_initiatorHSId
             + 8        // m_coordinatorHSId
             + 8        // m_txnId
+            + 8        // m_timestamp
             + 8        // m_spHandle
             + 8        // m_truncationHandle
             + 1;       // m_isReadOnly
@@ -127,6 +140,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_initiatorHSId);
         buf.putLong(m_coordinatorHSId);
         buf.putLong(m_txnId);
+        buf.putLong(m_timestamp);
         buf.putLong(m_spHandle);
         buf.putLong(m_truncationHandle);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
@@ -137,6 +151,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_initiatorHSId = buf.getLong();
         m_coordinatorHSId = buf.getLong();
         m_txnId = buf.getLong();
+        m_timestamp = buf.getLong();
         m_spHandle = buf.getLong();
         m_truncationHandle = buf.getLong();
         m_isReadOnly = buf.get() == 1;

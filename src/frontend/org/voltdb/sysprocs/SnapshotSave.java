@@ -141,7 +141,7 @@ public class SnapshotSave extends VoltSystemProcedure
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
-                                                         context.getLastCommittedTxnId(),
+                                                         context.getLastCommittedSpHandle(),
                                                          data, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }

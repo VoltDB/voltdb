@@ -350,8 +350,7 @@ public class ProcedureRunner {
     }
 
     public Date getTransactionTime() {
-        long ts = TransactionIdManager.getTimestampFromTransactionId(getTransactionId());
-        return new Date(ts);
+        return new Date(m_txnState.timestamp);
     }
 
     public void voltQueueSQL(final SQLStmt stmt, Expectation expectation, Object... args) {
@@ -955,6 +954,7 @@ public class ProcedureRunner {
            m_localTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                  siteId,
                                                  m_txnState.txnId,
+                                                 m_txnState.timestamp,
                                                  m_txnState.isReadOnly(),
                                                  false);
 
@@ -962,6 +962,7 @@ public class ProcedureRunner {
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
                                                        siteId,
                                                        m_txnState.txnId,
+                                                       m_txnState.timestamp,
                                                        m_txnState.isReadOnly(),
                                                        finalTask);
        }

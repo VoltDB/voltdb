@@ -22,9 +22,7 @@ import java.util.Deque;
 import java.util.Iterator;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltdb.exceptions.SerializableException;
-
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
@@ -59,7 +57,7 @@ public class TransactionTaskQueue
         // the queue was empty
         // the queue wasn't empty but the txn IDs matched
         if (!m_backlog.isEmpty()) {
-            if (task.getMpTxnId() != m_backlog.getFirst().getMpTxnId())
+            if (task.getTxnId() != m_backlog.getFirst().getTxnId())
             {
                 m_backlog.addLast(task);
                 retval = true;
@@ -89,7 +87,7 @@ public class TransactionTaskQueue
             // get head
             MpTransactionState txn = (MpTransactionState)m_backlog.getFirst().getTransactionState();
             // inject poison pill
-            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, false, false);
+            FragmentTaskMessage dummy = new FragmentTaskMessage(0L, 0L, 0L, 0L, false, false);
             FragmentResponseMessage poison =
                 new FragmentResponseMessage(dummy, 0L); // Don't care about source HSID here
             // Provide a serializable exception so that the procedure runner sees
@@ -141,7 +139,7 @@ public class TransactionTaskQueue
                         iter.next();
                         while (iter.hasNext()) {
                             TransactionTask task = iter.next();
-                            if (task.getMpTxnId() == next.getMpTxnId())
+                            if (task.getTxnId() == next.getTxnId())
                             {
                                 iter.remove();
                                 taskQueueOffer(task);

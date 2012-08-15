@@ -65,9 +65,6 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-
-import org.voltdb.iv2.LeaderCache;
-import org.voltdb.iv2.LeaderCacheReader;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
@@ -89,6 +86,8 @@ import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.LeaderCache;
+import org.voltdb.iv2.LeaderCacheReader;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
@@ -938,6 +937,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 connectionHostname,
                 adminConnection,
                 Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                0, //unused timestammp
                 invocation,
                 isReadOnly,
                 isSinglePartition,
@@ -956,6 +956,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final String connectionHostname,
             final boolean adminConnection,
             final long txnId,
+            final long timestamp,
             final StoredProcedureInvocation invocation,
             final boolean isReadOnly,
             final boolean isSinglePartition,
@@ -990,6 +991,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         initiatorHSId,
                         Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
                         txnId,
+                        timestamp,
                         isReadOnly,
                         isSinglePartition,
                         invocation,

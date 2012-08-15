@@ -136,8 +136,24 @@ public class SpScheduler extends Scheduler
         final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
         if (message.isSinglePartition()) {
             long newSpHandle;
+            long timestamp;
             Iv2InitiateTaskMessage msg = message;
             if (m_isLeader) {
+
+                /*
+                 * If this is CL replay use the txnid from the CL and also
+                 * update the txnid to match the one from the CL
+                 */
+                if (message.isForReplay()) {
+                    newSpHandle = message.getTxnId();
+                    timestamp = message.getTimestamp();
+                    setMaxSeenTxnId(newSpHandle);
+                } else {
+                    TxnEgo ego = advanceTxnEgo();
+                    newSpHandle = ego.getTxnId();
+                    timestamp = ego.getWallClock();
+                }
+
                 // Need to set the SP handle on the received message
                 // Need to copy this or the other local sites handling
                 // the same initiate task message will overwrite each
@@ -148,23 +164,13 @@ public class SpScheduler extends Scheduler
                         message.getCoordinatorHSId(),
                         m_repairLogTruncationHandle,
                         message.getTxnId(),
+                        message.getTimestamp(),
                         message.isReadOnly(),
                         message.isSinglePartition(),
                         message.getStoredProcedureInvocation(),
                         message.getClientInterfaceHandle(),
                         message.getConnectionId(),
                         message.isForReplay());
-
-                /*
-                 * If this is CL replay use the txnid from the CL and also
-                 * update the txnid to match the one from the CL
-                 */
-                if (message.isForReplay()) {
-                    newSpHandle = message.getTxnId();
-                    setMaxSeenTxnId(newSpHandle);
-                } else {
-                    newSpHandle = advanceTxnEgo();
-                }
 
                 // advanceTxnEgo();
                 // newSpHandle = currentTxnEgoSequence();
@@ -174,6 +180,7 @@ public class SpScheduler extends Scheduler
                 // be the SpHandle (for now)
                 if (!runner.isEverySite()) {
                     msg.setTxnId(newSpHandle);
+                    msg.setTimestamp(timestamp);
                 }
                 if (m_sendToHSIds.size() > 0) {
                     Iv2InitiateTaskMessage replmsg =
@@ -181,6 +188,7 @@ public class SpScheduler extends Scheduler
                                 m_mailbox.getHSId(),
                                 m_repairLogTruncationHandle,
                                 msg.getTxnId(),
+                                msg.getTimestamp(),
                                 msg.isReadOnly(),
                                 msg.isSinglePartition(),
                                 msg.getStoredProcedureInvocation(),
@@ -200,12 +208,14 @@ public class SpScheduler extends Scheduler
             else {
                 setMaxSeenTxnId(msg.getSpHandle());
                 newSpHandle = msg.getSpHandle();
+                timestamp = msg.getTimestamp();
             }
-            m_cl.log(msg);
+            if (!msg.isReadOnly()) {
+                m_cl.log(msg);
+            }
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
-                new SpProcedureTask(m_mailbox, runner,
-                        newSpHandle, m_pendingTasks, msg);
+                new SpProcedureTask(m_mailbox, runner, m_pendingTasks, msg);
             m_pendingTasks.offer(task);
             return;
         }
@@ -245,8 +255,7 @@ public class SpScheduler extends Scheduler
                 new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
 
-            final SpProcedureTask task = new SpProcedureTask(m_mailbox, runner,
-                    localWork.getSpHandle(), m_pendingTasks, localWork);
+            final SpProcedureTask task = new SpProcedureTask(m_mailbox, runner, m_pendingTasks, localWork);
             m_pendingTasks.offer(task);
         }
 
@@ -340,7 +349,9 @@ public class SpScheduler extends Scheduler
             // all the messaging mess at some point.
             msg = new FragmentTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
-            newSpHandle = advanceTxnEgo();
+            //Not going to use the timestamp from the new Ego because the multi-part timestamp is what should be used
+            TxnEgo ego = advanceTxnEgo();
+            newSpHandle = ego.getTxnId();
             msg.setSpHandle(newSpHandle);
             // If we have input dependencies, it's borrow work, there's no way we
             // can actually distribute it

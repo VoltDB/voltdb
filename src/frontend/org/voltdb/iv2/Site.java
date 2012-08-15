@@ -135,6 +135,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
     // Advanced in complete transaction.
     long m_lastCommittedTxnId = 0;
+    long m_lastCommittedSpHandle = 0;
     long m_currentTxnId = Long.MIN_VALUE;
     long m_lastTxnTime = System.currentTimeMillis();
 
@@ -160,8 +161,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         @Override
-        public long getLastCommittedTxnId() {
-            return m_lastCommittedTxnId;
+        public long getLastCommittedSpHandle() {
+            return m_lastCommittedSpHandle;
         }
 
         @Override
@@ -276,6 +277,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         // need this later when running in the final thread.
         m_startupConfig = new StartupConfig(serializedCatalog, txnId);
         m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
+        m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
     }
 
@@ -408,7 +410,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         SiteTasker task = m_scheduler.poll();
         if (task != null) {
             if (task instanceof TransactionTask) {
-                m_currentTxnId = ((TransactionTask)task).getMpTxnId();
+                m_currentTxnId = ((TransactionTask)task).getTxnId();
                 m_lastTxnTime = EstTime.currentTimeMillis();
             }
             if (m_isRejoining) {
@@ -534,7 +536,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     }
 
     @Override
-    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId)
+    public void truncateUndoLog(boolean rollback, long beginUndoToken, long txnId, long spHandle)
     {
         if (rollback) {
             m_ee.undoUndoToken(beginUndoToken);
@@ -546,6 +548,12 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 m_ee.releaseUndoToken(latestUndoToken);
             }
             m_lastCommittedTxnId = txnId;
+            if (TxnEgo.getPartitionId(m_lastCommittedSpHandle) != TxnEgo.getPartitionId(spHandle)) {
+                VoltDB.crashLocalVoltDB("Mismatch SpHandle partitiond id " +
+                        TxnEgo.getPartitionId(m_lastCommittedSpHandle) + ", " +
+                        TxnEgo.getPartitionId(spHandle), true, null);
+            }
+            m_lastCommittedSpHandle = spHandle;
         }
     }
 

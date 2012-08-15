@@ -27,9 +27,9 @@ import org.voltdb.messaging.Iv2InitiateTaskMessage;
 public class SpTransactionState extends TransactionState
 {
     final Iv2InitiateTaskMessage m_task;
-    protected SpTransactionState(long realTxnId, TransactionInfoBaseMessage notice)
+    protected SpTransactionState(TransactionInfoBaseMessage notice)
     {
-        super(realTxnId, null, notice);
+        super(null, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
     }
 

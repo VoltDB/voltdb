@@ -64,11 +64,11 @@ public class MpTransactionState extends TransactionState
     FragmentTaskMessage m_remoteWork = null;
     FragmentTaskMessage m_localWork = null;
 
-    MpTransactionState(Mailbox mailbox, long txnId,
+    MpTransactionState(Mailbox mailbox,
                        TransactionInfoBaseMessage notice,
                        List<Long> useHSIds, long buddyHSId)
     {
-        super(txnId, mailbox, notice);
+        super(mailbox, notice);
         m_task = (Iv2InitiateTaskMessage)notice;
         m_useHSIds = useHSIds;
         m_buddyHSId = buddyHSId;

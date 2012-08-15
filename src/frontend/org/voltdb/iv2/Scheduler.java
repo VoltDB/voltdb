@@ -76,10 +76,10 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_txnEgo = ego;
     }
 
-    final protected long advanceTxnEgo()
+    final protected TxnEgo advanceTxnEgo()
     {
         m_txnEgo = m_txnEgo.makeNext();
-        return m_txnEgo.getTxnId();
+        return m_txnEgo;
     }
 
     final protected long getCurrentTxnId()

@@ -106,7 +106,8 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
             new Iv2InitiateTaskMessage(destHSId, // initHSID
                                        Long.MIN_VALUE, // coordHSID
                                        txnId - 1, // truncationHandle
-                                       txnId,
+                                       txnId,     // txnId
+                                       System.currentTimeMillis(), // timestamp
                                        readOnly, // readonly
                                        singlePart, // single-part
                                        spi, // invocation
@@ -124,6 +125,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
             new FragmentTaskMessage(destHSId, // don't care
                                     destHSId, // don't care
                                     txnId,
+                                    System.currentTimeMillis(),
                                     readOnly,
                                     false);
         frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
@@ -168,7 +170,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testPrimaryInitiateTaskResponseNoReplicas() throws Exception
     {
-        long txnid = TxnEgo.makeZero(0).getSequence();
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();
@@ -187,7 +189,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testPrimaryFragmentTaskResponseNoReplicas() throws Exception
     {
-        long txnid = TxnEgo.makeZero(0).getSequence();
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();
@@ -206,7 +208,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testPrimaryInitiateTaskResponseReplicas() throws Exception
     {
-        long txnid = TxnEgo.makeZero(0).getSequence();
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();
@@ -235,7 +237,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
     @Test
     public void testPrimaryFragmentTaskResponseReplicas() throws Exception
     {
-        long txnid = TxnEgo.makeZero(0).getSequence();
+        long txnid = TxnEgo.makeZero(0).getTxnId();
         long primary_hsid = 1111l;
 
         createObjs();

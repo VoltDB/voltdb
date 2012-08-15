@@ -179,11 +179,15 @@ public class MpScheduler extends Scheduler
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
          */
         long mpTxnId;
+        long timestamp;
         if (message.isForReplay()) {
             mpTxnId = message.getTxnId();
+            timestamp = message.getTimestamp();
             setMaxSeenTxnId(mpTxnId);
         } else {
-            mpTxnId = advanceTxnEgo();;
+            TxnEgo ego = advanceTxnEgo();
+            mpTxnId = ego.getTxnId();
+            timestamp = ego.getWallClock();
         }
 
         // advanceTxnEgo();
@@ -200,6 +204,7 @@ public class MpScheduler extends Scheduler
                     message.getCoordinatorHSId(),
                     m_repairLogTruncationHandle,
                     mpTxnId,
+                    timestamp,
                     message.isReadOnly(),
                     true, // isSinglePartition
                     message.getStoredProcedureInvocation(),
@@ -212,7 +217,7 @@ public class MpScheduler extends Scheduler
                     m_iv2Masters);
             m_duplicateCounters.put(mpTxnId, counter);
             EveryPartitionTask eptask =
-                new EveryPartitionTask(m_mailbox, mpTxnId, m_pendingTasks, sp,
+                new EveryPartitionTask(m_mailbox, m_pendingTasks, sp,
                         m_iv2Masters);
             m_pendingTasks.offer(eptask);
             return;
@@ -225,6 +230,7 @@ public class MpScheduler extends Scheduler
                     message.getCoordinatorHSId(),
                     m_repairLogTruncationHandle,
                     mpTxnId,
+                    timestamp,
                     message.isReadOnly(),
                     message.isSinglePartition(),
                     message.getStoredProcedureInvocation(),
@@ -234,7 +240,7 @@ public class MpScheduler extends Scheduler
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
             new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
-                    mpTxnId, m_pendingTasks, mp, m_iv2Masters, m_buddyHSId);
+                    m_pendingTasks, mp, m_iv2Masters, m_buddyHSId);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);
     }

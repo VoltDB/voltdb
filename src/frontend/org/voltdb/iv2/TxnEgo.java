@@ -140,7 +140,7 @@ final public class TxnEgo {
         return m_txnId & PARTITIONID_MAX_VALUE;
     }
 
-    public long getSequence() {
+    long getSequence() {
         long seq = m_txnId >> PARTITIONID_BITS;
         return seq;
     }

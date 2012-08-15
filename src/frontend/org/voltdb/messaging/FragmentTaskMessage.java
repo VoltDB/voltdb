@@ -28,8 +28,8 @@ import org.voltcore.messaging.Subject;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ParameterSet;
-import org.voltdb.utils.LogKeys;
 import org.voltdb.VoltDB;
+import org.voltdb.utils.LogKeys;
 
 /**
  * Message from a stored procedure coordinator to an execution site
@@ -116,9 +116,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public FragmentTaskMessage(long initiatorHSId,
                                long coordinatorHSId,
                                long txnId,
+                               long timestamp,
                                boolean isReadOnly,
                                boolean isFinal) {
-        super(initiatorHSId, coordinatorHSId, txnId, isReadOnly);
+        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly);
 
         m_isFinal = isFinal;
         m_subject = Subject.DEFAULT.getId();
@@ -192,13 +193,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     public static FragmentTaskMessage createWithOneFragment(long initiatorHSId,
                                                             long coordinatorHSId,
                                                             long txnId,
+                                                            long timestamp,
                                                             boolean isReadOnly,
                                                             long fragmentId,
                                                             int outputDepId,
                                                             ByteBuffer parameterSet,
                                                             boolean isFinal) {
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
-                                                          txnId, isReadOnly, isFinal);
+                                                          txnId, timestamp, isReadOnly, isFinal);
         ret.addFragment(fragmentId, outputDepId, parameterSet);
         return ret;
     }

@@ -17,10 +17,9 @@
 
 package org.voltdb;
 
-import java.util.concurrent.Future;
-
 import java.util.List;
 import java.util.Map;
+import java.util.concurrent.Future;
 
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.dtxn.TransactionState;
@@ -116,7 +115,7 @@ public interface SiteProcedureConnection {
     /**
      * IV2 commit / rollback interface to the EE
      */
-    public void truncateUndoLog(boolean rollback, long token, long txnId);
+    public void truncateUndoLog(boolean rollback, long token, long txnId, long spHandle);
 
     /**
      * IV2: send dependencies to the EE

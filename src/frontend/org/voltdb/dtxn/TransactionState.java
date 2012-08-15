@@ -21,14 +21,15 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.TransactionIdManager;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
 import org.voltdb.SiteProcedureConnection;
-import org.voltdb.iv2.Site;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
+import org.voltdb.iv2.Site;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -64,10 +65,10 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected RejoinState m_rejoinState = RejoinState.NORMAL;
 
     /** Iv2 constructor */
-    protected TransactionState(long txnId, Mailbox mbox,
+    protected TransactionState(Mailbox mbox,
                                TransactionInfoBaseMessage notice)
     {
-        super(txnId, notice.getInitiatorHSId());
+        super(notice.getTxnId(), notice.getSpHandle(), notice.getTimestamp(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = null;
         m_notice = notice;
@@ -87,7 +88,9 @@ public abstract class TransactionState extends OrderableTransaction  {
                                ExecutionSite site,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getInitiatorHSId());
+        super(notice.getTxnId(), notice.getSpHandle(),
+                TransactionIdManager.getTimestampFromTransactionId(notice.getTxnId()),
+                notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = site;
         m_notice = notice;

@@ -46,6 +46,7 @@ public interface TransactionCreator
             final String connectionHostname,
             boolean adminConnection,
             long txnId,
+            long timestamp,
             StoredProcedureInvocation invocation,
             boolean isReadOnly,
             boolean isSinglePartition,

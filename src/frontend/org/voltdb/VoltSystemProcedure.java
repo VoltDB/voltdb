@@ -32,7 +32,6 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -230,6 +229,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                             0,
                             m.getHSId(),
                             0,
+                            0,
                             false,
                             pf.fragmentId,
                             pf.outputDepId,
@@ -334,6 +334,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     txnState.initiatorHSId,
                     m_site.getCorrespondingSiteId(),
                     txnState.txnId,
+                    txnState.timestamp,
                     txnState.isReadOnly(),
                     pf.fragmentId,
                     pf.outputDepId,

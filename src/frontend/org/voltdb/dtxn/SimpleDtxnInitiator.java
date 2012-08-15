@@ -143,7 +143,8 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
         long txnId;
         txnId = m_idManager.getNextUniqueTransactionId();
         boolean retval =
-            createTransaction(connectionId, connectionHostname, adminConnection, txnId, invocation,
+            createTransaction(connectionId, connectionHostname, adminConnection, txnId,
+                              TransactionIdManager.getTimestampFromTransactionId(txnId), invocation,
                               isReadOnly, isSinglePartition, isEveryPartition, partitions,
                               numPartitions, clientData, messageSize, now, allowMismatchedResults);
         return retval;
@@ -155,6 +156,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
                                   final String connectionHostname,
                                   final boolean adminConnection,
                                   final long txnId,
+                                  final long timestamp,
                                   final StoredProcedureInvocation invocation,
                                   final boolean isReadOnly,
                                   final boolean isSinglePartition,

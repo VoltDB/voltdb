@@ -32,8 +32,8 @@ import junit.framework.TestCase;
 
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.network.WriteStream;
-import org.voltcore.utils.EstTime;
 import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.EstTime;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.MockVoltDB;
 import org.voltdb.StoredProcedureInvocation;
@@ -136,6 +136,7 @@ public class TestDtxnInitiatorMailbox extends TestCase
                                       String connectionHostname,
                                       boolean adminConnection,
                                       long txnId,
+                                      long timestamp,
                                       StoredProcedureInvocation invocation,
                                       boolean isReadOnly,
                                       boolean isSinglePartition,
