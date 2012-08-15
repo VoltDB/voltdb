@@ -799,31 +799,35 @@ public class SnapshotDaemon implements SnapshotCompletionInterest {
                                         false);
                             } else if (haveFailure) {
                                 hostLog.info("Queued user snapshot was attempted, but there was a failure.");
-                                ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                m_zk.create(
-                                        VoltZK.user_snapshot_response + requestId,
-                                        rimpl.flattenToBuffer(buf).array(),
-                                        Ids.OPEN_ACL_UNSAFE,
-                                        CreateMode.PERSISTENT);
+                                if (requestId != null) {
+                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                    m_zk.create(
+                                            VoltZK.user_snapshot_response + requestId,
+                                            rimpl.flattenToBuffer(buf).array(),
+                                            Ids.OPEN_ACL_UNSAFE,
+                                            CreateMode.PERSISTENT);
+                                }
                                 //Reset the watch, in case this is recoverable
                                 userSnapshotRequestExistenceCheck();
                                 //Log the details of the failure, after resetting the watch in case of some odd NPE
                                 result.resetRowPosition();
                                 hostLog.info(result);
                             } else {
-                                hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
-                                        VoltZK.user_snapshot_response + requestId);
-                                /*
-                                 * Snapshot was started no problem, reset the watch for new requests
-                                 */
-                                ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
-                                ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
-                                m_zk.create(
-                                        VoltZK.user_snapshot_response + requestId,
-                                        rimpl.flattenToBuffer(buf).array(),
-                                        Ids.OPEN_ACL_UNSAFE,
-                                        CreateMode.PERSISTENT);
+                                if (requestId != null) {
+                                    hostLog.debug("Queued user snapshot was successfully requested, saving to path " +
+                                            VoltZK.user_snapshot_response + requestId);
+                                    /*
+                                     * Snapshot was started no problem, reset the watch for new requests
+                                     */
+                                    ClientResponseImpl rimpl = (ClientResponseImpl)clientResponse;
+                                    ByteBuffer buf = ByteBuffer.allocate(rimpl.getSerializedSize());
+                                    m_zk.create(
+                                            VoltZK.user_snapshot_response + requestId,
+                                            rimpl.flattenToBuffer(buf).array(),
+                                            Ids.OPEN_ACL_UNSAFE,
+                                            CreateMode.PERSISTENT);
+                                }
                                 userSnapshotRequestExistenceCheck();
                                 return;
                             }
