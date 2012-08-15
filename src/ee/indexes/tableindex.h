@@ -83,7 +83,7 @@ struct TableIndexScheme {
                      bool intsOnly, TupleSchema *tupleSchema) {
         this->name = name; this->type = type; this->columnIndices = columnIndices;
         this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = true;
+        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = countable;
     }
 
     std::string name;
