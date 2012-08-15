@@ -105,7 +105,8 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
             m_endKeyBeforeSubstituteArrayPtr[ctr] =
                     m_node->getEndKeyExpressions()[ctr];
         }
-
+    } else {
+        m_numOfEndkeys = 0;
     }
 
     //
@@ -403,7 +404,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
     }
     rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
-    VOLT_DEBUG("ANSWER %ld = %ld - %ld - 1 + %d + %d\n", (long)rkRes, (long)rkEnd, (long)rkStart, leftIncluded, rightIncluded);
+    VOLT_DEBUG("Index Count ANSWER %ld = %ld - %ld - 1 + %d + %d\n", (long)rkRes, (long)rkEnd, (long)rkStart, leftIncluded, rightIncluded);
     tmptup.setNValue(0, ValueFactory::getBigIntValue( rkRes ));
     m_outputTable->insertTuple(tmptup);
 
