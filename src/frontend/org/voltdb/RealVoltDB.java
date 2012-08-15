@@ -99,10 +99,8 @@ import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
-import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
 import org.voltdb.iv2.MpInitiator;
-import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
@@ -188,6 +186,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     Cartographer m_cartographer = null;
     LeaderAppointer m_leaderAppointer = null;
     GlobalServiceElector m_globalServiceElector = null;
+    MpInitiator m_MPI = null;
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -418,7 +417,6 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             DtxnInitiatorMailbox initiatorMailbox = null;
             long initiatorHSId = 0;
             JSONObject topo = getTopology(isRejoin);
-            MpInitiator mpi = null;
             try {
                 // IV2 mailbox stuff
                 if (isIV2Enabled()) {
@@ -435,8 +433,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     }
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
                     long mpiBuddyHSId = m_iv2Initiators.get(0).getInitiatorHSId();
-                    mpi = new MpInitiator(m_messenger, mpiBuddyHSId);
-                    m_iv2Initiators.add(mpi);
+                    m_MPI = new MpInitiator(m_messenger, mpiBuddyHSId);
+                    m_iv2Initiators.add(m_MPI);
                 }
 
                 /*
@@ -581,7 +579,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                             m_messenger.getZK(),
                             clusterConfig.getPartitionCount(),
                             m_deployment.getCluster().getKfactor(),
-                            topo, mpi);
+                            topo, m_MPI);
                     m_globalServiceElector.registerService(m_leaderAppointer);
 
                     for (Initiator iv2init : m_iv2Initiators) {
@@ -1784,6 +1782,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             {
                 m_adminListener.notifyOfCatalogUpdate();
             }
+
+            m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
 
             return Pair.of(m_catalogContext, csp);
         }

@@ -249,7 +249,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
 
         @Override
         public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp) {
-            return Site.this.updateCatalog(diffCmds, context, csp);
+            return Site.this.updateCatalog(diffCmds, context, csp, false);
         }
     };
 
@@ -650,15 +650,22 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         return m_loadedProcedures.getProcByName(procedureName);
     }
 
-    private boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    /**
+     * Update the catalog.  If we're the MPI, don't bother with the EE.
+     */
+    public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
+            boolean isMPI)
     {
+        hostLog.fatal("Updating catalog for hsid: " + CoreUtils.hsIdToString(m_siteId));
         m_context = context;
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
-        //Necessary to quiesce before updating the catalog
-        //so export data for the old generation is pushed to Java.
-        m_ee.quiesce(m_lastCommittedTxnId);
-        m_ee.updateCatalog(m_context.m_transactionId, diffCmds);
+        if (!isMPI) {
+            //Necessary to quiesce before updating the catalog
+            //so export data for the old generation is pushed to Java.
+            m_ee.quiesce(m_lastCommittedTxnId);
+            m_ee.updateCatalog(m_context.m_transactionId, diffCmds);
+        }
 
         return true;
     }

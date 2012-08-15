@@ -142,4 +142,9 @@ public class MpInitiator extends BaseInitiator implements Promotable
     {
         return new MpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
     }
+
+    public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+    {
+        m_executionSite.updateCatalog(diffCmds, context, csp, true);
+    }
 }
