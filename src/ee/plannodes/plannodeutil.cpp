@@ -75,6 +75,12 @@ voltdb::AbstractPlanNode* getEmptyPlanNode(voltdb::PlanNodeType type) {
             ret = new voltdb::IndexCountPlanNode();
             break;
         // ------------------------------------------------------------------
+        // TableCount
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_TABLECOUNT):
+            ret = new voltdb::TableCountPlanNode();
+            break;
+        // ------------------------------------------------------------------
         // NestLoop
         // ------------------------------------------------------------------
         case (voltdb::PLAN_NODE_TYPE_NESTLOOP):
@@ -192,6 +198,12 @@ std::string getTypeName(voltdb::PlanNodeType type) {
         case (voltdb::PLAN_NODE_TYPE_INDEXCOUNT):
             ret = "INDEXCOUNT";
             break;
+        // ------------------------------------------------------------------
+        // TableScan
+        // ------------------------------------------------------------------
+        case (voltdb::PLAN_NODE_TYPE_TABLECOUNT):
+            ret = "TABLECOUNT";
+        break;
         // ------------------------------------------------------------------
         // NestLoop
         // ------------------------------------------------------------------
