@@ -364,7 +364,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
     // the planner should determine if this update can affect indexes.
     // if so, update the indexes here
     if (updatesIndexes) {
-        if (!tryUpdateOnAllIndexes(ptuua->getOldTuple(), target)) {
+        if (!checkUpdateOnUniqueIndexes(ptuua->getOldTuple(), target)) {
             throw ConstraintFailureException(this, ptuua->getOldTuple(),
                                              target,
                                              CONSTRAINT_TYPE_UNIQUE);
@@ -440,7 +440,7 @@ void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
-        if (!tryUpdateOnAllIndexes(targetBackup, target)) {
+        if (!checkUpdateOnUniqueIndexes(targetBackup, target)) {
             // TODO: this might be too strict. see insertTuple()
             throwFatalException("Failed to update tuple in table %s for undo:"
                                 " unique constraint violation\n%s\n%s\n", m_name.c_str(),
@@ -600,7 +600,7 @@ bool PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
     return true;
 }
 
-bool PersistentTable::tryUpdateOnAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
+bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
     for (int i = m_uniqueIndexCount - 1; i >= 0;--i) {
         if (m_uniqueIndexes[i]->checkForIndexChange(&targetTuple, &sourceTuple) == false)
             continue; // no update is needed for this index
