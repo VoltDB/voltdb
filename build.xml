@@ -1168,7 +1168,7 @@ TEST CASES
                 <exclude name="**/TestRejoinWithCatalogUpdates.class" />
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
-                <exclude name="**/TestReplicatedInvocation.class" />
+<!--                <exclude name="**/TestReplicatedInvocation.class" /> -->
 <!--                <exclude name="**/TestRestoreAgent.class" -->
 <!--                <exclude name="**/TestSimpleCJK.class" /> -->
 <!--                <exclude name="**/TestClientTimeouts.class" /> -->
