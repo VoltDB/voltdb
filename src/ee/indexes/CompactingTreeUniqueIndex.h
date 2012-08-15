@@ -90,22 +90,8 @@ public:
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
 
-        // This optimization was implicated in a crash -- it is suspected of violating the non-inline (string) memory
-        // management assumption that the index has been updated to reference NEW COPIES of the old values.
-        // The old copies get reclaimed at transaction commit.
-        // TODO: We COULD try to re-enable this in the special case of indexes using inlined key storage.
-        // This could be accomplished by using an alternative to the "operator()" shown here that only returns
-        // true when there are no memory management implications (non-inline values use the same addresses.
-        // It would probably be even better to pre-empt index updates on columns that are not explicitly assigned
-        // in the update statement.
-        //        if (m_eq(m_tmp1, m_tmp2))
-        //{
-        //    // no update is needed for this index
-        //    return true;
-        //}
-
         bool deleted = deleteEntryPrivate(m_tmp1);
-        // addEntry COULD have been be used here instead of setting and using m_tmp2.
+        //TODO: addEntry COULD be used here instead of setting and using m_tmp2.
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;
