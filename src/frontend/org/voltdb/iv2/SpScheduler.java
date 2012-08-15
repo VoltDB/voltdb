@@ -28,6 +28,7 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CommandLog;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.BorrowTaskMessage;
@@ -178,7 +179,9 @@ public class SpScheduler extends Scheduler
                 msg.setSpHandle(newSpHandle);
                 // Also, if this is a vanilla single-part procedure, make the TXNID
                 // be the SpHandle (for now)
-                if (!runner.isEverySite()) {
+                // Only system procedures are every-site, so we'll check through the SystemProcedureCatalog
+                if (SystemProcedureCatalog.listing.get(procedureName) == null ||
+                    !SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
                     msg.setTxnId(newSpHandle);
                     msg.setTimestamp(timestamp);
                 }

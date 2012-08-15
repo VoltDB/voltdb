@@ -27,8 +27,8 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltdb.CommandLog;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
+import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.dtxn.TransactionState;
@@ -173,7 +173,6 @@ public class MpScheduler extends Scheduler
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
-        final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
 
         /*
          * If this is CL replay, use the txnid from the CL and use it to update the current txnid
@@ -196,7 +195,8 @@ public class MpScheduler extends Scheduler
         // Don't have an SP HANDLE at the MPI, so fill in the unused value
         Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), mpTxnId, Long.MIN_VALUE);
         // Handle every-site system procedures (at the MPI)
-        if (runner.isEverySite()) {
+        if (SystemProcedureCatalog.listing.get(procedureName) != null &&
+                SystemProcedureCatalog.listing.get(procedureName).getEverysite()) {
             // Send an SP initiate task to all remote sites
             final Long localId = m_mailbox.getHSId();
             Iv2InitiateTaskMessage sp = new Iv2InitiateTaskMessage(

@@ -73,19 +73,19 @@ public class SystemProcedureCatalog {
             this.allowedInReplica = allowedInReplica;
         }
 
-        boolean getEverysite() {
+        public boolean getEverysite() {
             return everySite;
         }
 
-        boolean getReadonly() {
+        public boolean getReadonly() {
             return readOnly;
         }
 
-        boolean getSinglepartition() {
+        public boolean getSinglepartition() {
             return singlePartition;
         }
 
-        String getClassname() {
+        public String getClassname() {
             return className;
         }
 
