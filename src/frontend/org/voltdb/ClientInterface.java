@@ -1263,7 +1263,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
 
             vt[i] = new VoltTable(new VoltTable.ColumnInfo( "SQL Statement", VoltType.STRING),
-                                  new VoltTable.ColumnInfo( "Explained Plan", VoltType.STRING));
+                                  new VoltTable.ColumnInfo( "Execution plan", VoltType.STRING));
 
             for( Statement stmt : proc.getStatements() ) {
                 vt[i].addRow( stmt.getSqltext(), Encoder.hexDecodeToString( stmt.getExplainplan() ) );
@@ -1372,7 +1372,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
                     pnt.loadFromJSONArray(jarray, db);
                     String str = pnt.getRootPlanNode().toExplainPlanString();
-                    vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Explained Plan-SP", VoltType.STRING));
+                    vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Execution plan-SP", VoltType.STRING));
                     vt[i].addRow(str);
                 } catch (JSONException e) {
                     System.out.println(e.getMessage());
@@ -1397,7 +1397,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
 
                     String str = pnt.getRootPlanNode().toExplainPlanString();
-                    vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Explained Plan-MP", VoltType.STRING));
+                    vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Execution plan-MP", VoltType.STRING));
                     vt[i].addRow(str);
                 } catch (JSONException e) {
                     System.out.println(e.getMessage());
