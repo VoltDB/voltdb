@@ -21,7 +21,6 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.VoltTable;
 import org.voltdb.client.ClientResponse;
@@ -35,10 +34,10 @@ import org.voltdb.utils.LogKeys;
  */
 public class SpProcedureTask extends ProcedureTask
 {
-    SpProcedureTask(Mailbox initiator, ProcedureRunner runner, TransactionTaskQueue queue,
+    SpProcedureTask(Mailbox initiator, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg)
     {
-       super(initiator, runner, new SpTransactionState(msg), queue);
+       super(initiator, procName, new SpTransactionState(msg), queue);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -52,7 +51,7 @@ public class SpProcedureTask extends ProcedureTask
 
         // cast up here .. ugly.
         SpTransactionState txn = (SpTransactionState)m_txn;
-        final InitiateResponseMessage response = processInitiateTask(txn.m_task);
+        final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         if (!response.shouldCommit()) {
             m_txn.setNeedsRollback();
         }

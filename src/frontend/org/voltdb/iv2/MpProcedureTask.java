@@ -39,11 +39,11 @@ public class MpProcedureTask extends ProcedureTask
     final long[] m_initiatorHSIds;
     final Iv2InitiateTaskMessage m_msg;
 
-    MpProcedureTask(Mailbox mailbox, ProcedureRunner runner, TransactionTaskQueue queue,
+    MpProcedureTask(Mailbox mailbox, String procName, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators,
                   long buddyHSId)
     {
-        super(mailbox, runner,
+        super(mailbox, procName,
               new MpTransactionState(mailbox, msg, pInitiators,
                                      buddyHSId),
               queue);
@@ -61,7 +61,7 @@ public class MpProcedureTask extends ProcedureTask
         m_txn.setBeginUndoToken(siteConnection.getLatestUndoToken());
         // Exception path out of here for rollback is going to need to
         // call m_txn.setDone() somehow
-        final InitiateResponseMessage response = processInitiateTask(txn.m_task);
+        final InitiateResponseMessage response = processInitiateTask(txn.m_task, siteConnection);
         if (!response.shouldCommit()) {
             txn.setNeedsRollback();
         }

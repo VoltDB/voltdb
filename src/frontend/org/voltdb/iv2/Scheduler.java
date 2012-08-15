@@ -22,7 +22,6 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.LoadedProcedureSet;
 import org.voltdb.VoltDB;
 
 /**
@@ -52,7 +51,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     // offered work.
     // IZZY: We should refactor this to be inviolable in the future.
     final protected SiteTaskerQueue m_tasks;
-    protected LoadedProcedureSet m_loadedProcs;
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
@@ -96,11 +94,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
-    }
-
-    void setProcedureSet(LoadedProcedureSet loadedProcs)
-    {
-        m_loadedProcs = loadedProcs;
     }
 
     public SiteTaskerQueue getQueue()

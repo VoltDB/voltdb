@@ -27,7 +27,6 @@ import java.util.Map;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.CommandLog;
-import org.voltdb.ProcedureRunner;
 import org.voltdb.SystemProcedureCatalog;
 import org.voltdb.VoltDB;
 import org.voltdb.dtxn.TransactionState;
@@ -134,7 +133,6 @@ public class SpScheduler extends Scheduler
     public void handleIv2InitiateTaskMessage(Iv2InitiateTaskMessage message)
     {
         final String procedureName = message.getStoredProcedureName();
-        final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
         if (message.isSinglePartition()) {
             long newSpHandle;
             long timestamp;
@@ -218,7 +216,7 @@ public class SpScheduler extends Scheduler
             }
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
-                new SpProcedureTask(m_mailbox, runner, m_pendingTasks, msg);
+                new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, msg);
             m_pendingTasks.offer(task);
             return;
         }
@@ -231,7 +229,6 @@ public class SpScheduler extends Scheduler
     @Override
     public void handleIv2InitiateTaskMessageRepair(List<Long> needsRepair, Iv2InitiateTaskMessage message) {
         final String procedureName = message.getStoredProcedureName();
-        final ProcedureRunner runner = m_loadedProcs.getProcByName(procedureName);
         if (!message.isSinglePartition()) {
             throw new RuntimeException("SpScheduler.handleIv2InitiateTaskMessageRepair " +
                     "should never receive multi-partition initiations.");
@@ -258,7 +255,7 @@ public class SpScheduler extends Scheduler
                 new Iv2InitiateTaskMessage(message.getInitiatorHSId(),
                     message.getCoordinatorHSId(), message);
 
-            final SpProcedureTask task = new SpProcedureTask(m_mailbox, runner, m_pendingTasks, localWork);
+            final SpProcedureTask task = new SpProcedureTask(m_mailbox, procedureName, m_pendingTasks, localWork);
             m_pendingTasks.offer(task);
         }
 

@@ -239,7 +239,7 @@ public class MpScheduler extends Scheduler
                     message.isForReplay());
         // Multi-partition initiation (at the MPI)
         final MpProcedureTask task =
-            new MpProcedureTask(m_mailbox, m_loadedProcs.getProcByName(procedureName),
+            new MpProcedureTask(m_mailbox, procedureName,
                     m_pendingTasks, mp, m_iv2Masters, m_buddyHSId);
         m_outstandingTxns.put(task.m_txn.txnId, task.m_txn);
         m_pendingTasks.offer(task);

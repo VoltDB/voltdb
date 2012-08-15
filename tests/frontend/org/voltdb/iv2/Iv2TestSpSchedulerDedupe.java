@@ -46,7 +46,6 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltcore.zk.MapCache;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.CommandLog;
-import org.voltdb.LoadedProcedureSet;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.StoredProcedureInvocation;
@@ -62,7 +61,6 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
 {
     Mailbox mbox;
     MapCache iv2masters;
-    LoadedProcedureSet procs;
     VoltDBInterface vdbi;
     ProcedureRunner runner;
     Scheduler dut;
@@ -81,16 +79,8 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
         fakecache.put("0", new JSONObject("{hsid:0}"));
         when(iv2masters.pointInTimeCache()).thenReturn(ImmutableMap.copyOf(fakecache));
 
-        // Mock a procedure set that always returns a proc with name MockSPName
-        // that is never a system procedure.
-        procs = mock(LoadedProcedureSet.class);
-        runner = mock(ProcedureRunner.class);
-        when(runner.isSystemProcedure()).thenReturn(false);
-        when(procs.getProcByName(MockSPName)).thenReturn(runner);
-
         dut = new SpScheduler(0, new SiteTaskerQueue());
         dut.setMailbox(mbox);
-        dut.setProcedureSet(procs);
         dut.setCommandLog(mock(CommandLog.class));
     }
 
