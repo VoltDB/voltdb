@@ -2913,4 +2913,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     public void setRejoinComplete() {
         throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
+
+    @Override
+    public ProcedureRunner getProcedureRunner(String procedureName) {
+        throw new RuntimeException("getProcedureRunner is an IV2-only interface.");
+    }
 }

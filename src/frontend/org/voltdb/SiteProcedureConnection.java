@@ -130,6 +130,11 @@ public interface SiteProcedureConnection {
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params);
 
+    /**
+     * IV2: get the procedure runner for the named procedure
+     */
+    public ProcedureRunner getProcedureRunner(String procedureName);
+
     public void setRejoinComplete();
 
     public long[] getUSOForExportTable(String signature);

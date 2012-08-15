@@ -645,6 +645,11 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
                 readOnly ? Long.MAX_VALUE : getNextUndoToken());
     }
 
+    @Override
+    public ProcedureRunner getProcedureRunner(String procedureName) {
+        return m_loadedProcedures.getProcByName(procedureName);
+    }
+
     private boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
         m_context = context;
