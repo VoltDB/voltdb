@@ -976,7 +976,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
                     messageSize, now);
             Long initiatorHSId;
-            if (isSinglePartition) {
+            if (isSinglePartition && !isEveryPartition) {
                 initiatorHSId = m_iv2Masters.get(partitions[0]);
                 if (initiatorHSId == null) {
                     hostLog.error("Failed to find master initiator for partition: "
