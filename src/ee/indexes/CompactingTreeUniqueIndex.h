@@ -242,6 +242,7 @@ public:
         m_tmp1.setFromKey(searchKey);
         return (m_entries.find(m_tmp1).isEnd() == false);
     }
+
     int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
@@ -253,6 +254,7 @@ public:
             return m_entries.rankAsc(m_keyIter.key());
         }
     }
+
     int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 

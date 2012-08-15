@@ -25,7 +25,6 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Index;
 import org.voltdb.catalog.Table;
@@ -39,7 +38,6 @@ import org.voltdb.planner.StatsField;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.IndexLookupType;
 import org.voltdb.types.PlanNodeType;
-import org.voltdb.utils.CatalogUtil;
 
 public class IndexCountPlanNode extends AbstractScanPlanNode {
 
@@ -54,11 +52,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     /**
      * Attributes
-     * NOTE: The IndexCountPlanNode will use AbstractScanPlanNode's m_predicate
-     * as the "Post-Scan Predicate Expression". When this is defined, the EE will
-     * run a tuple through an additional predicate to see whether it qualifies.
-     * This is necessary when we have a predicate that includes columns that are not
-     * all in the index that was selected.
      */
 
     // The index to use in the scan operation
@@ -133,27 +126,12 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     /**
-     * Accessor for flag marking the plan as guaranteeing an identical result/effect
-     * when "replayed" against the same database state, such as during replication or CL recovery.
-     * @return true for unique index scans
+     * Should just return true -- there's only one order for a single row
+     * @return true
      */
     @Override
     public boolean isOrderDeterministic() {
-        if (m_catalogIndex.getUnique()) {
-            // Any unique index scan capable of returning multiple rows will return them in a fixed order.
-            // XXX: This may not be strictly true if/when we support order-determinism based on a mix of columns
-            // from different joined tables -- an equality filter based on a non-ordered column from the other table
-            // would not produce predictably ordered results even when the other table is ordered by all of its display columns
-            // but NOT the column used in the equality filter.
-            return true;
-        }
-        // Assuming (?!) that the relative order of the "multiple entries" in a non-unique index can not be guaranteed,
-        // the only case in which a non-unique index can guarantee determinism is for an indexed-column-only scan,
-        // because it would ignore any differences in the entries.
-        // TODO: return true for an index-only scan --
-        // That would require testing of an inline projection node consisting solely of (functions of?) the indexed columns.
-        m_nondeterminismDetail = "index scan may provide insufficient ordering";
-        return false;
+        return true;
     }
 
     public void setCatalogIndex(Index index)
@@ -278,20 +256,23 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public boolean isEndExpreValid() {
         return m_endExprValid;
     }
-
+    /**
+     * When call this function, we can assume there is not post expression
+     * when I want to set endKey. And the endKey can not be null.
+     * @param endExpr
+     */
     public void setEndKeyExpression(AbstractExpression endExpr) {
-        // assume there is not post expression when I want to set endKey
         assert(endExpr != null);
         m_endkeyExpressions = new ArrayList<AbstractExpression>();
 
         ArrayList <AbstractExpression> subEndExpr = endExpr.findAllSubexpressionsOfClass(ComparisonExpression.class);
-        int cmpSize = subEndExpr.size();
-        int ctEqual = 0, ctOther = 0;
+        int ctOther = 0;
         for (AbstractExpression ae: subEndExpr) {
             ExpressionType et = ae.getExpressionType();
             // comparision type checking
             if (et == ExpressionType.COMPARE_EQUAL) {
-                ctEqual++;
+                // There is no order guarantee of subEndExpr to put equal cmp before other cmp
+                // So this should be fine
             } else if (et == ExpressionType.COMPARE_LESSTHAN) {
                 ctOther++;
                 m_endType = IndexLookupType.LT;
@@ -300,33 +281,23 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 m_endType = IndexLookupType.LTE;
             } else {
                 // something wrong, we can not handle other cases
+                // Excluded case like :
+                // "SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?"
                 m_endExprValid = false;
                 return;
             }
 
-            if (ae.getLeft() instanceof TupleValueExpression) {
-                this.addEndKeyExpression(ae.getRight());
-            } else {
-                this.addEndKeyExpression(ae.getLeft());
-            }
+            assert (ae.getLeft() instanceof TupleValueExpression);
+            this.addEndKeyExpression(ae.getRight());
         }
-        // Post expression cases are excluded
         // Only one non-equal comparision allowed
-        if (ctOther > 1 || ctOther + ctEqual != cmpSize) {
-            m_endExprValid = false;
-            return;
-        }
-        // Two cases excluded:
+        // Excluded case:
         // (1) "SELECT count(*) from T1 WHERE POINTS = ?"
-        // (2) "SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?"
-        if (ctEqual == 1 && ctOther == 0) {
+        // (2) "SELECT count(*) from T1 WHERE NAME = 'xin' AND POINTS = ?"
+        if (ctOther != 1) {
             m_endExprValid = false;
             return;
         }
-
-        // the order of the endKeyExpr is important
-        List<ColumnRef> sortedColumns = CatalogUtil.getSortedCatalogItems(this.getCatalogIndex().getColumns(), "index");
-
 
         m_endExprValid = true;
     }

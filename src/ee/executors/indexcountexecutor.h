@@ -66,8 +66,6 @@ protected:
     bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
     AbstractExpression** m_endKeyBeforeSubstituteArray;
     bool* m_needsSubstituteEndKey;
-    bool m_hasEndKey;
-
     bool m_needsSubstitutePostExpression;
 
     IndexLookupType m_lookupType;
