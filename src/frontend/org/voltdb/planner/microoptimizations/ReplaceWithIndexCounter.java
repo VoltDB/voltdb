@@ -25,6 +25,7 @@ import java.util.Set;
 import org.voltdb.catalog.ColumnRef;
 import org.voltdb.catalog.Index;
 import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ComparisonExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.planner.CompiledPlan;
 import org.voltdb.plannodes.AbstractPlanNode;
@@ -61,13 +62,14 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
 
         for (int i = 0; i < plan.getChildCount(); i++)
             children.add(plan.getChild(i));
-        plan.clearChildren();
 
         for (AbstractPlanNode child : children) {
             // TODO this will break when children feed multiple parents
-            child = recursivelyApply(child);
-            child.clearParents();
-            plan.addAndLinkChild(child);
+            AbstractPlanNode newChild = recursivelyApply(child);
+            if (!newChild.equals(child)) {
+                child.removeFromGraph();
+                plan.addAndLinkChild(newChild);
+            }
         }
 
         if ((plan instanceof AggregatePlanNode) == false)
@@ -90,7 +92,8 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
                 isp.getSearchKeyExpressions().size() == 0)
             return plan;
         // check index type
-        Index idx = ((IndexScanPlanNode)child).getCatalogIndex();
+        IndexScanPlanNode ispnChild = (IndexScanPlanNode)child;
+        Index idx = ispnChild.getCatalogIndex();
         if (idx.getCountable() == false)
             return plan;
 
@@ -107,18 +110,11 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         // jump to instead of doing index scan
         // End expression should indicate the END key or the whole size of the index
 
-        IndexCountPlanNode icpn = null;
-        if (hasNoPostExpression((IndexScanPlanNode)child)) {
-            icpn = new IndexCountPlanNode((IndexScanPlanNode)child);
-            if (icpn.isEndExpreValid() == false)
+        if (hasNoPostExpression(ispnChild)) {
+            if (hasValidEndExpr(ispnChild.getEndExpression()) == false)
                 return plan;
 
-            icpn.setOutputSchema(plan.getOutputSchema());
-
-            plan.removeFromGraph();
-            child.removeFromGraph();
-
-            return icpn;
+            return new IndexCountPlanNode(ispnChild, (AggregatePlanNode)plan);
         }
         return plan;
     }
@@ -170,6 +166,40 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         }
 
         if (columnsLeft.size() != 0)
+            return false;
+        return true;
+    }
+
+    /**
+     * When call this function, we can assume there is not post expression
+     * when I want to set endKey.
+     * @param endExpr
+     */
+    boolean hasValidEndExpr(AbstractExpression endExpr) {
+        if (endExpr == null)
+            return true;
+        ArrayList <AbstractExpression> subEndExpr = endExpr.findAllSubexpressionsOfClass(ComparisonExpression.class);
+        int ctOther = 0;
+        for (AbstractExpression ae: subEndExpr) {
+            ExpressionType et = ae.getExpressionType();
+            // comparision type checking
+            if (et == ExpressionType.COMPARE_LESSTHAN ||
+                    et == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
+                ctOther++;
+            } else if ( et == ExpressionType.COMPARE_EQUAL ) {
+                // Do nothing here
+            } else {
+                // something wrong, we can not handle other cases
+                // Excluded case like :
+                // "SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?"
+                return false;
+            }
+            // TVE on right case that Paul suggests to be ruled out
+            if ((ae.getLeft() instanceof TupleValueExpression) == false)
+                return false;
+        }
+        // There should be a lessThan or lessEqualThan for endKey expr
+        if (ctOther != 1)
             return false;
         return true;
     }

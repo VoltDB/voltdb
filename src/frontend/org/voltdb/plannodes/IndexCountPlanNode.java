@@ -77,13 +77,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     // this index scan is going to use
     protected Index m_catalogIndex = null;
 
-    protected Boolean m_endExprValid = false;
-
     public IndexCountPlanNode() {
         super();
     }
 
-    public IndexCountPlanNode(IndexScanPlanNode isp) {
+    public IndexCountPlanNode(IndexScanPlanNode isp, AggregatePlanNode apn) {
         super();
 
         m_catalogIndex = isp.m_catalogIndex;
@@ -100,10 +98,8 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
         m_predicate = null;
 
-        if (isp.getEndExpression() != null)
-            this.setEndKeyExpression(isp.getEndExpression());
-        else
-            this.m_endExprValid = true;
+        m_outputSchema = apn.getOutputSchema().clone();
+        this.setEndKeyExpression(isp.getEndExpression());
     }
 
     @Override
@@ -239,67 +235,24 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         }
     }
 
-    public List<AbstractExpression> getEndKeyExpressions() {
-        return Collections.unmodifiableList(m_endkeyExpressions);
-    }
-
-    public void setOutputSchema(NodeSchema schema)
-    {
-        // set output schema according to aggregate plan node's output schema
-        m_outputSchema = schema.clone();
-    }
-
-    public void setParents(AbstractPlanNode parents) {
-        // TODO(xin): set parents node
-    }
-
-    public boolean isEndExpreValid() {
-        return m_endExprValid;
-    }
     /**
      * When call this function, we can assume there is not post expression
      * when I want to set endKey. And the endKey can not be null.
      * @param endExpr
      */
     public void setEndKeyExpression(AbstractExpression endExpr) {
-        assert(endExpr != null);
-        m_endkeyExpressions = new ArrayList<AbstractExpression>();
-
-        ArrayList <AbstractExpression> subEndExpr = endExpr.findAllSubexpressionsOfClass(ComparisonExpression.class);
-        int ctOther = 0;
-        for (AbstractExpression ae: subEndExpr) {
-            ExpressionType et = ae.getExpressionType();
-            // comparision type checking
-            if (et == ExpressionType.COMPARE_EQUAL) {
-                // There is no order guarantee of subEndExpr to put equal cmp before other cmp
-                // So this should be fine
-            } else if (et == ExpressionType.COMPARE_LESSTHAN) {
-                ctOther++;
-                m_endType = IndexLookupType.LT;
-            } else if (et == ExpressionType.COMPARE_LESSTHANOREQUALTO) {
-                ctOther++;
-                m_endType = IndexLookupType.LTE;
-            } else {
-                // something wrong, we can not handle other cases
-                // Excluded case like :
-                // "SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?"
-                m_endExprValid = false;
-                return;
+        if (endExpr != null) {
+            m_endkeyExpressions = new ArrayList<AbstractExpression>();
+            ArrayList <AbstractExpression> subEndExpr = endExpr.findAllSubexpressionsOfClass(ComparisonExpression.class);
+            for (AbstractExpression ae: subEndExpr) {
+                assert (ae.getLeft() instanceof TupleValueExpression);
+                if (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHAN)
+                    m_endType = IndexLookupType.LT;
+                else if (ae.getExpressionType() == ExpressionType.COMPARE_LESSTHANOREQUALTO)
+                    m_endType = IndexLookupType.LTE;
+                this.addEndKeyExpression(ae.getRight());
             }
-
-            assert (ae.getLeft() instanceof TupleValueExpression);
-            this.addEndKeyExpression(ae.getRight());
         }
-        // Only one non-equal comparision allowed
-        // Excluded case:
-        // (1) "SELECT count(*) from T1 WHERE POINTS = ?"
-        // (2) "SELECT count(*) from T1 WHERE NAME = 'xin' AND POINTS = ?"
-        if (ctOther != 1) {
-            m_endExprValid = false;
-            return;
-        }
-
-        m_endExprValid = true;
     }
 
     @Override

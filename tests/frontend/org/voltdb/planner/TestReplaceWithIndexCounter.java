@@ -126,14 +126,12 @@ public class TestReplaceWithIndexCounter extends TestCase {
         checkIndexCounter(pn, false, false);
     }
 
-    // Down below are cases that we can replace
-
     public void testCountStar10() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?", 1, false);
         checkIndexCounter(pn, false, false);
     }
 
-
+    // Down below are cases that we can replace
     public void testCountStar11() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS", 0, false);
         checkIndexCounter(pn, true, true);
