@@ -94,10 +94,10 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     private SnapshotSiteProcessor m_snapshotter;
 
     // Current catalog
-    CatalogContext m_context;
+    volatile CatalogContext m_context;
 
     // Currently available procedure
-    LoadedProcedureSet m_loadedProcedures;
+    volatile LoadedProcedureSet m_loadedProcedures;
 
     // Current topology
     int m_partitionId;
