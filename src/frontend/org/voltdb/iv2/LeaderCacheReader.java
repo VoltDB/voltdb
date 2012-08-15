@@ -15,22 +15,19 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.plannodes;
+package org.voltdb.iv2;
 
-import org.voltdb.types.PlanNodeType;
+import java.util.concurrent.ExecutionException;
+import com.google.common.collect.ImmutableMap;
 
 /**
- * Plan node representing an Aggregate with a Hash based implementation of grouping.
- *
+ * A read-only interface to LeaderCache for consumers that do not
+ * perform writes.
  */
-public class HashAggregatePlanNode extends AggregatePlanNode {
-    public HashAggregatePlanNode() {
-        super();
-    }
-
-    @Override
-    public PlanNodeType getPlanNodeType() {
-        return PlanNodeType.HASHAGGREGATE;
-    }
-
+public interface LeaderCacheReader {
+    public void start(boolean block) throws InterruptedException, ExecutionException;
+    public void shutdown() throws InterruptedException;
+    public ImmutableMap<Integer, Long> pointInTimeCache();
+    public Long get(int partitionId);
 }
+

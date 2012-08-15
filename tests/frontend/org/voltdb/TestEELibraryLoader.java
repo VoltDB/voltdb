@@ -23,7 +23,6 @@
 
 package org.voltdb;
 
-import static org.junit.Assert.assertEquals;
 import static org.junit.Assert.assertFalse;
 import static org.junit.Assert.assertTrue;
 
@@ -41,7 +40,14 @@ public class TestEELibraryLoader
         mockvolt.m_noLoadLib = true;
         assertFalse(EELibraryLoader.loadExecutionEngineLibrary(false));
         assertFalse(VoltDB.wasCrashCalled);
-        assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));
+        boolean threw = false;
+        try {
+            assertFalse(EELibraryLoader.loadExecutionEngineLibrary(true));
+        }
+        catch (AssertionError ae) {
+            threw = true;
+        }
+        assertTrue(threw);
         assertTrue(VoltDB.wasCrashCalled);
         VoltDB.wasCrashCalled = false;
         VoltDB.initialize(configuration);

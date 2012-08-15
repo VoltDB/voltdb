@@ -21,7 +21,6 @@ import java.lang.InterruptedException;
 
 import java.util.ArrayList;
 
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 import java.util.HashSet;
 import java.util.List;
@@ -30,20 +29,14 @@ import java.util.TreeSet;
 
 import org.apache.zookeeper_voltpatches.ZooKeeper;
 
-import org.json_voltpatches.JSONException;
-import org.json_voltpatches.JSONObject;
-
 import org.voltcore.logging.VoltLogger;
 
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCache.Callback;
 
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
 
 import com.google.common.collect.ImmutableMap;
-import com.google.common.collect.Sets;
 
 public class MpTerm implements Term
 {
@@ -52,81 +45,45 @@ public class MpTerm implements Term
 
     private final InitiatorMailbox m_mailbox;
     private final ZooKeeper m_zk;
-    private final CountDownLatch m_missingStartupSites;
     private final TreeSet<Long> m_knownLeaders = new TreeSet<Long>();
 
     // Initialized in start() -- when the term begins.
-    protected MapCache m_mapCache;
+    protected LeaderCache m_leaderCache;
 
     // runs on the babysitter thread when a replica changes.
     // simply forward the notice to the initiator mailbox; it controls
     // the Term processing.
-    // NOTE: The contract with MapCache is that it always
+    // NOTE: The contract with LeaderCache is that it always
     // returns a full cache (one entry for every partition).  Returning a
     // partially filled cache is NotSoGood(tm).
-    Callback m_leadersChangeHandler = new Callback()
+    LeaderCache.Callback m_leadersChangeHandler = new LeaderCache.Callback()
     {
         @Override
-        public void run(ImmutableMap<String, JSONObject> cache)
+        public void run(ImmutableMap<Integer, Long> cache)
         {
             Set<Long> updatedLeaders = new HashSet<Long>();
-            for (JSONObject thing : cache.values()) {
-                try {
-                    updatedLeaders.add(Long.valueOf(thing.getLong("hsid")));
-                } catch (JSONException e) {
-                    VoltDB.crashLocalVoltDB("Corrupt ZK MapCache data.", true, e);
-                }
+            for (Long HSId : cache.values()) {
+                updatedLeaders.add(HSId);
             }
             List<Long> leaders = new ArrayList<Long>(updatedLeaders);
-            // Need to handle startup separately from runtime updates.
-            if (MpTerm.this.m_missingStartupSites.getCount() > 0) {
-
-                Sets.SetView<Long> removed = Sets.difference(MpTerm.this.m_knownLeaders, updatedLeaders);
-                if (!removed.isEmpty()) {
-                    tmLog.error(m_whoami
-                            + "leader(s) failed during startup. Initialization can not complete."
-                            + " Failed leaders: " + removed);
-                    VoltDB.crashLocalVoltDB("Leaders failed during startup.", true, null);
-                    return;
-                }
-                Sets.SetView<Long> added = Sets.difference(updatedLeaders, MpTerm.this.m_knownLeaders);
-                int newLeaders = added.size();
-                m_knownLeaders.clear();
-                m_knownLeaders.addAll(updatedLeaders);
-                m_mailbox.updateReplicas(leaders);
-                for (int i=0; i < newLeaders; i++) {
-                    MpTerm.this.m_missingStartupSites.countDown();
-                }
-            }
-            else {
-                // remove the leader; convert to hsids; deal with the replica change.
-                tmLog.info(m_whoami
-                        + "MapCache change handler updating leader list to: "
-                        + CoreUtils.hsIdCollectionToString(leaders));
-                m_knownLeaders.clear();
-                m_knownLeaders.addAll(updatedLeaders);
-                m_mailbox.updateReplicas(leaders);
-            }
+            tmLog.debug(m_whoami + "updating leaders: " + CoreUtils.hsIdCollectionToString(leaders));
+            tmLog.info(m_whoami
+                    + "LeaderCache change handler updating leader list to: "
+                    + CoreUtils.hsIdCollectionToString(leaders));
+            m_knownLeaders.clear();
+            m_knownLeaders.addAll(updatedLeaders);
+            m_mailbox.updateReplicas(leaders);
         }
     };
 
     /**
      * Setup a new Term but don't take any action to take responsibility.
      */
-    public MpTerm(CountDownLatch missingStartupSites, ZooKeeper zk,
-            long initiatorHSId, InitiatorMailbox mailbox,
+    public MpTerm(ZooKeeper zk, long initiatorHSId, InitiatorMailbox mailbox,
             String whoami)
     {
         m_zk = zk;
         m_mailbox = mailbox;
-
-        if (missingStartupSites != null) {
-            m_missingStartupSites = missingStartupSites;
-        }
-        else {
-            m_missingStartupSites = new CountDownLatch(0);
-        }
-
         m_whoami = whoami;
     }
 
@@ -138,8 +95,8 @@ public class MpTerm implements Term
     public void start()
     {
         try {
-            m_mapCache = new MapCache(m_zk, VoltZK.iv2masters, m_leadersChangeHandler);
-            m_mapCache.start(true);
+            m_leaderCache = new LeaderCache(m_zk, VoltZK.iv2masters, m_leadersChangeHandler);
+            m_leaderCache.start(true);
         }
         catch (ExecutionException ee) {
             VoltDB.crashLocalVoltDB("Unable to create babysitter starting term.", true, ee);
@@ -151,9 +108,9 @@ public class MpTerm implements Term
     @Override
     public void shutdown()
     {
-        if (m_mapCache != null) {
+        if (m_leaderCache != null) {
             try {
-                m_mapCache.shutdown();
+                m_leaderCache.shutdown();
             } catch (InterruptedException e) {
                 // We're shutting down...this may jsut be faster.
             }

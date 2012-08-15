@@ -65,14 +65,10 @@ import org.voltcore.network.VoltNetworkPool;
 import org.voltcore.network.VoltProtocolHandler;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.COWMap;
-import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-import org.voltcore.zk.MapCache;
-import org.voltcore.zk.MapCacheReader;
 import org.voltdb.SystemProcedureCatalog.Config;
-import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
@@ -96,12 +92,15 @@ import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.LeaderCache;
+import org.voltdb.iv2.LeaderCacheReader;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.plannodes.PlanNodeTree;
+import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
@@ -160,7 +159,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     /**
      * IV2 stuff
      */
-    private final MapCacheReader m_iv2Masters;
+    private final LeaderCacheReader m_iv2Masters;
 
     /**
      * The CIHM is unique to the connection and the ACG is shared by all connections
@@ -946,38 +945,32 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
                     messageSize, now);
-            try {
-                long initiatorHSId;
-                if (isSinglePartition) {
-                    JSONObject master = m_iv2Masters.get(Integer.toString(partitions[0]));
-                    if (master == null) {
-                        hostLog.error("Failed to find master initiator for partition: "
-                                + Integer.toString(partitions[0]) + ". Transaction not initiated.");
-                        cihm.removeHandle(handle);
-                        return false;
-                    }
-                    initiatorHSId = master.getLong("hsid");
+            Long initiatorHSId;
+            if (isSinglePartition) {
+                initiatorHSId = m_iv2Masters.get(partitions[0]);
+                if (initiatorHSId == null) {
+                    hostLog.error("Failed to find master initiator for partition: "
+                            + Integer.toString(partitions[0]) + ". Transaction not initiated.");
+                    cihm.removeHandle(handle);
+                    return false;
                 }
-                else {
-                    initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
-                }
-                Iv2InitiateTaskMessage workRequest =
-                    new Iv2InitiateTaskMessage(m_siteId,
-                            initiatorHSId,
-                            Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-                            Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
-                            isReadOnly,
-                            isSinglePartition,
-                            invocation,
-                            handle,
-                            connectionId);
-
-                Iv2Trace.logCreateTransaction(workRequest);
-                m_mailbox.send(initiatorHSId, workRequest);
-            } catch (JSONException e) {
-                cihm.removeHandle(handle);
-                throw new RuntimeException(e);
             }
+            else {
+                initiatorHSId = m_cartographer.getHSIdForMultiPartitionInitiator();
+            }
+            Iv2InitiateTaskMessage workRequest =
+                new Iv2InitiateTaskMessage(m_siteId,
+                        initiatorHSId,
+                        Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
+                        Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                        isReadOnly,
+                        isSinglePartition,
+                        invocation,
+                        handle,
+                        connectionId);
+
+            Iv2Trace.logCreateTransaction(workRequest);
+            m_mailbox.send(initiatorHSId, workRequest);
             return true;
         } else {
             return m_initiator.createTransaction(connectionId,
@@ -1103,7 +1096,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_plannerSiteId = messenger.getHSIdForLocalSite(HostMessenger.ASYNC_COMPILER_SITE_ID);
         registerMailbox(messenger.getZK());
         m_siteId = m_mailbox.getHSId();
-        m_iv2Masters = new MapCache(messenger.getZK(), VoltZK.iv2masters);
+        m_iv2Masters = new LeaderCache(messenger.getZK(), VoltZK.iv2masters);
         m_iv2Masters.start(true);
         m_isConfiguredForHSQL = (VoltDB.instance().getBackendTargetType() == BackendTarget.HSQLDB_BACKEND);
     }
@@ -1396,11 +1389,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
                     //TODO  db is null, may need to be set up in some cases.
                     pnt.loadFromJSONArray(jarray, db);
-                    //combine plan fragments
+                    //reattach plan fragments
                     jobj = new JSONObject( collplan );
                     jarray =  jobj.getJSONArray("PLAN_NODES");
                     collpnt.loadFromJSONArray(jarray, db);
-                    pnt.concatenate( collpnt.getRootPlanNode() );
+                    assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
+                    pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
 
                     String str = pnt.getRootPlanNode().toExplainPlanString();
                     vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Explained Plan-MP", VoltType.STRING));
@@ -1515,7 +1509,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     m_adhocCompletionHandler));
 
-        // XXX: need to know the async compiler mailbox id.
         m_mailbox.send(m_plannerSiteId, work);
         return null;
     }
@@ -1581,30 +1574,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 System.currentTimeMillis(),
                 false);
         return null;
-    }
-
-    ClientResponseImpl dispatchTopology(Config sysProc, ByteBuffer buf, StoredProcedureInvocation task,
-            ClientInputHandler handler, Connection ccxn) {
-        try {
-           ColumnInfo[] masterCols = new ColumnInfo[] {
-              new ColumnInfo("Partition", VoltType.STRING),
-              new ColumnInfo("Sites", VoltType.STRING),
-              new ColumnInfo("Leader", VoltType.STRING)};
-           VoltTable masterTable = new VoltTable(masterCols);
-           Map<String, JSONObject> masters = m_iv2Masters.pointInTimeCache();
-           for (Entry<String, JSONObject> entry : masters.entrySet()) {
-               long partitionId = Long.valueOf(entry.getValue().getLong("hsid"));
-               masterTable.addRow(entry.getKey(),
-                       CoreUtils.hsIdCollectionToString(m_cartographer.getReplicasForIv2Master(entry.getKey())),
-                       CoreUtils.hsIdToString(partitionId));
-           }
-           return new ClientResponseImpl(ClientResponseImpl.SUCCESS,
-                   new VoltTable[]{masterTable}, null, task.clientHandle);
-
-        } catch(Exception e) {
-            hostLog.error("Failed to create topology summary for @Statistics TOPO", e);
-            return errorResponse(ccxn, task.clientHandle, ClientResponse.UNEXPECTED_FAILURE, null, e, true);
-        }
     }
 
     ClientResponseImpl dispatchPromote(Config sysProc,
@@ -1970,8 +1939,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                          true,
                                                          m_adhocCompletionHandler));
 
-                            // XXX: Need to know the async mailbox id.
-                            m_mailbox.send(Long.MIN_VALUE, work);
+                            m_mailbox.send(m_plannerSiteId, work);
                         }
                         else {
                             createAdHocTransaction(plannedStmtBatch);

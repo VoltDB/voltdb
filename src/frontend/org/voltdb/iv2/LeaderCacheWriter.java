@@ -15,22 +15,15 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.plannodes;
+package org.voltdb.iv2;
 
-import org.voltdb.types.PlanNodeType;
+import org.apache.zookeeper_voltpatches.KeeperException;
 
 /**
- * Plan node representing an Aggregate with a Hash based implementation of grouping.
- *
+ * A write-only interface to LeaderCache for consumers that do not
+ * perform reads.
  */
-public class HashAggregatePlanNode extends AggregatePlanNode {
-    public HashAggregatePlanNode() {
-        super();
-    }
-
-    @Override
-    public PlanNodeType getPlanNodeType() {
-        return PlanNodeType.HASHAGGREGATE;
-    }
-
+public interface LeaderCacheWriter {
+    public void put(int partitionId, long HSId) throws KeeperException, InterruptedException;
 }
+

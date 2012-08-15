@@ -14,23 +14,16 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
+package org.voltdb;
 
-package org.voltdb.plannodes;
+import java.util.concurrent.ExecutionException;
 
-import org.voltdb.types.PlanNodeType;
+import org.apache.zookeeper_voltpatches.KeeperException;
 
-/**
- * Plan node representing an Aggregate with a Hash based implementation of grouping.
- *
- */
-public class HashAggregatePlanNode extends AggregatePlanNode {
-    public HashAggregatePlanNode() {
-        super();
-    }
-
-    @Override
-    public PlanNodeType getPlanNodeType() {
-        return PlanNodeType.HASHAGGREGATE;
-    }
-
+public interface Promotable
+{
+    /** Perform the tasks necessary when the implementor becomes the leader for
+     * their service across the cluster.
+     */
+    public void acceptPromotion() throws InterruptedException, ExecutionException, KeeperException;
 }

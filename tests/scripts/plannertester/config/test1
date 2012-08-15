@@ -2,7 +2,7 @@ Name:
 test1
 
 Ref:
-./tests/frontend/org/voltdb/planner/baseline/test1/
+./tests/scripts/plannertester/baseline/test1
 
 DDL:
 ./tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql
