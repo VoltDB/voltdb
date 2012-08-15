@@ -25,9 +25,7 @@
 #include <cassert>
 #include "ContiguousAllocator.h"
 
-#ifndef NodeCount
-#define NodeCount u_int32_t
-#endif
+typedef u_int32_t NodeCount;
 
 #ifndef SUBCTMAX
 #define SUBCTMAX INT32_MAX

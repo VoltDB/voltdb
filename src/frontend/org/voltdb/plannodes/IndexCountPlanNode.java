@@ -54,11 +54,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
     /**
      * Attributes
-     * NOTE: The IndexCountPlanNode will use AbstractScanPlanNode's m_predicate
-     * as the "Post-Scan Predicate Expression". When this is defined, the EE will
-     * run a tuple through an additional predicate to see whether it qualifies.
-     * This is necessary when we have a predicate that includes columns that are not
-     * all in the index that was selected.
      */
 
     // The index to use in the scan operation
