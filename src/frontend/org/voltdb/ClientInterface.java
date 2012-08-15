@@ -947,7 +947,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 clientData,
                 messageSize,
                 now,
-                allowMismatchedResults);
+                allowMismatchedResults,
+                false);  // is for replay.
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
@@ -966,7 +967,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final Object clientData,
             final int messageSize,
             final long now,
-            final boolean allowMismatchedResults)
+            final boolean allowMismatchedResults,
+            final boolean isForReplay)
     {
         if (VoltDB.instance().isIV2Enabled()) {
             final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
@@ -997,7 +999,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         invocation,
                         handle,
                         connectionId,
-                        false);
+                        isForReplay);
 
             Iv2Trace.logCreateTransaction(workRequest);
             m_mailbox.send(initiatorHSId, workRequest);
@@ -1220,23 +1222,17 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_snapshotDaemon.init(this, zk, new Runnable() {
             @Override
             public void run() {
-                /*
-                 * For the snapshot daemon create a noop ACG because it is privileged
-                 */
-                m_cihm.put(
-                        m_snapshotDaemonAdapter.connectionId(),
-                        new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter,
-                                AdmissionControlGroup.getDummy()));
+                bindAdapter(m_snapshotDaemonAdapter);
             }
         });
     }
 
     /**
-     * Tell the clientInterface about the restore adapater.
+     * Tell the clientInterface about a connection adapter.
      */
-    public void bindRestoreAdapter(final RestoreAdapter restoreAdapter) {
-        m_cihm.put(restoreAdapter.connectionId(),
-                new ClientInterfaceHandleManager(true, restoreAdapter,
+    public void bindAdapter(final Connection adapter) {
+        m_cihm.put(adapter.connectionId(),
+                new ClientInterfaceHandleManager(true, adapter,
                     AdmissionControlGroup.getDummy()));
     }
 

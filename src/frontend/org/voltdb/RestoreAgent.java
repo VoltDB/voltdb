@@ -921,13 +921,8 @@ SnapshotCompletionInterest
     }
 
     /**
-     * Initiate a snapshot action to truncate the logs. This should only be
-     * called by one initiator.
-     *
-     * @param txnId
-     *            The transaction ID of the SPI to generate
-     * @param invocation
-     *            The invocation used to create the SPI
+     * Restore a snapshot. An arbitrarily early transaction is provided if command
+     * log replay follows to maintain txnid sequence constraints (with simple dtxn).
      */
     private void initSnapshotWork(Long txnId, final Pair<String, Object[]> invocation) {
         Config restore = SystemProcedureCatalog.listing.get(invocation.getFirst());
@@ -942,6 +937,16 @@ SnapshotCompletionInterest
                 return params;
             }
         });
+
+        // txnId is hacked here for the SimpleDTXN case to maintain the constraint
+        // that it always precedes any txnid that might appear in the log. Basically,
+        // an invalid Id is used for the snapshot restore.
+        //
+        // Iv2 asserts/throws on invalid ids. And it doesn't have the same constraint,
+        // so only take the txnId hack path in the non-iv2 case.
+        if (VoltDB.instance().isIV2Enabled()) {
+            txnId = null;
+        }
 
         if (txnId == null) {
             m_initiator.createTransaction(m_restoreAdapter.connectionId(), "CommandLog", true, spi,
