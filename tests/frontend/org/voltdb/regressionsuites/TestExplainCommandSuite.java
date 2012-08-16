@@ -12,6 +12,7 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 
 public class TestExplainCommandSuite extends RegressionSuite {
+
     /**
      * Constructor needed for JUnit. Should just pass on parameters to superclass.
      * @param name The name of the method to test. This is just passed to the superclass.
@@ -24,17 +25,18 @@ public class TestExplainCommandSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = null;
 
-        vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM T1" ).getResults()[0];
+        vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM T1 order by A_INT" ).getResults()[0];
         while( vt.advanceRow() ) {
-            String resultStr = (String) vt.get(0, VoltType.STRING );
-            assertTrue( resultStr.contains( "RETURN RESULTS TO STORED PROCEDURE" ));
-            assertTrue( resultStr.contains( "AGGREGATION ops" ));
-            assertTrue( resultStr.contains( "RECEIVE FROM ALL PARTITIONS" ));
-            assertTrue( resultStr.contains( "SEND PARTITION RESULTS TO COORDINATOR" ));
-            assertTrue( resultStr.contains( "AGGREGATION ops" ));
-            assertTrue( resultStr.contains( "SEQUENTIAL SCAN of \"T1\"" ));
+            System.out.println(vt);
+            String plan = (String) vt.get(0, VoltType.STRING );
+            assertTrue( plan.contains( "RETURN RESULTS TO STORED PROCEDURE" ));
+            assertTrue( plan.contains( "ORDER BY (SORT)"));
+            assertTrue( plan.contains( "AGGREGATION ops: sum" ));
+            assertTrue( plan.contains( "RECEIVE FROM ALL PARTITIONS" ));
+            assertTrue( plan.contains( "SEND PARTITION RESULTS TO COORDINATOR" ));
+            assertTrue( plan.contains( "AGGREGATION ops: count(*)" ));
+            assertTrue( plan.contains( "SEQUENTIAL SCAN of \"T1\"" ));
         }
-
     }
 
     public void testExplainProc() throws IOException, ProcCallException {
