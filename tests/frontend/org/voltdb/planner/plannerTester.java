@@ -418,7 +418,7 @@ public class plannerTester {
 
             //if sql stmts not consistent
             if( !baseStmt.equalsIgnoreCase( m_stmts.get(i)) ) {
-                diffPair strPair = new diffPair( m_stmts.get(i), baseStmt );
+                diffPair strPair = new diffPair( baseStmt, m_stmts.get(i) );
                 m_reportWriter.write("Statement "+i+" of "+m_testName+":\n SQL statement is not consistent with the one in baseline :"+"\n"+
                         strPair.toString()+"\n");
                 m_numFail++;
