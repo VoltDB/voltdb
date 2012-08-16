@@ -115,6 +115,35 @@ public class ClientInterfaceHandleManager
     }
 
     /**
+     * Factory to make a threadsafe version of CIHM. This is used
+     * exclusively by some internal CI adapters that don't have
+     * the natural thread-safety protocol/design of VoltNetwork.
+     */
+    public static ClientInterfaceHandleManager makeThreadSafeCIHM(
+            boolean isAdmin, Connection connection, AdmissionControlGroup acg)
+    {
+        return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
+            synchronized long getHandle(boolean isSinglePartition, int partitionId,
+                    long clientHandle, int messageSize, long creationTime) {
+                return super.getHandle(isSinglePartition, partitionId,
+                        clientHandle, messageSize, creationTime);
+            }
+            synchronized boolean removeHandle(long ciHandle) {
+                return super.removeHandle(ciHandle);
+            }
+            synchronized Iv2InFlight findHandle(long ciHandle) {
+                return super.findHandle(ciHandle);
+            }
+            synchronized long getOutstandingTxns() {
+                return super.getOutstandingTxns();
+            }
+            synchronized void freeOutstandingTxns() {
+                super.freeOutstandingTxns();
+            }
+        };
+    }
+
+    /**
      * Create a new handle for a transaction and store the client information
      * for that transaction in the internal structures.
      * ClientInterface handles have the partition ID encoded in them as the 10

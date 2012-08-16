@@ -1232,7 +1232,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
      */
     public void bindAdapter(final Connection adapter) {
         m_cihm.put(adapter.connectionId(),
-                new ClientInterfaceHandleManager(true, adapter,
+                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter,
                     AdmissionControlGroup.getDummy()));
     }
 
