@@ -124,13 +124,6 @@ template <std::size_t keySize>
 class IntsKey {
 public:
 
-    /**
-     * Does this key need to update when the tuple changes somehow, but still
-     * has the equivalent key value.
-     */
-    static bool needsValueUpdateOnEquivalentKeyUpdate() {
-        return false;
-    }
 
     /*
      * Take a value that is part of the key (already converted to a uint64_t) and inserts it into the
@@ -409,15 +402,6 @@ struct IntsHasher : std::unary_function<IntsKey<keySize>, std::size_t>
 template <std::size_t keySize>
 class GenericKey {
 public:
-
-    /**
-     * Does this key need to update when the tuple changes somehow, but still
-     * has the equivalent key value.
-     */
-    static bool needsValueUpdateOnEquivalentKeyUpdate() {
-        return false;
-    }
-
     inline void setFromKey(const TableTuple *tuple) {
         assert(tuple);
         ::memcpy(data, tuple->m_data + TUPLE_HEADER_SIZE, tuple->getSchema()->tupleLength());
@@ -544,15 +528,6 @@ struct GenericHasher : std::unary_function<GenericKey<keySize>, std::size_t>
  */
 class TupleKey {
   public:
-
-    /**
-     * Does this key need to update when the tuple changes somehow, but still
-     * has the equivalent key value.
-     */
-    static bool needsValueUpdateOnEquivalentKeyUpdate() {
-        return true;
-    }
-
     inline TupleKey() {
         m_columnIndices = NULL;
         m_keyTuple = NULL;

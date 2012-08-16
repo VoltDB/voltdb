@@ -83,8 +83,8 @@ public:
         return deleteEntryPrivate(m_tmp1);
     }
 
-    bool replaceEntry(const TableTuple *newTupleValue,
-                      const TableTuple *oldTupleValue)
+    bool replaceEntry(const TableTuple* oldTupleValue,
+                      const TableTuple* newTupleValue)
     {
         // this can probably be optimized
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
@@ -102,16 +102,9 @@ public:
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple *newTupleValue,
-                                 const TableTuple *oldTupleValue)
-    {
+    bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
+                              const TableTuple *newTupleValue) {
         assert(oldTupleValue->address() != newTupleValue->address());
-
-        // if the key references some part of the tuple, it'll need to be updated
-        if (KeyType::needsValueUpdateOnEquivalentKeyUpdate()) {
-            return replaceEntry(newTupleValue, oldTupleValue);
-        }
-
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
         typename MapType::iterator mapiter = m_entries.find(m_tmp1);
         assert(!mapiter.isEnd());
