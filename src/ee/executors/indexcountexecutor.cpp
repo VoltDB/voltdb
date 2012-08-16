@@ -295,100 +295,53 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     int64_t rkStart = 0, rkEnd = 0, rkRes = 0;
     int leftIncluded = 0, rightIncluded = 0;
 
-    if (m_index->isUniqueIndex()) {
-        // Deal with unique map
-        VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-        if (searchKeyUnderflow == false) {
-            if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+    // Deal with multi-map
+    VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
+            localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+    if (searchKeyUnderflow == false) {
+        if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
+            rkStart = m_index->getCounterLET(&m_searchKey, true);
+        } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
+            if (m_index->hasKey(&m_searchKey)) {
+                leftIncluded = 1;
                 rkStart = m_index->getCounterLET(&m_searchKey, false);
-            } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-                rkStart = m_index->getCounterLET(&m_searchKey, false);
-                if (m_index->hasKey(&m_searchKey))
-                    leftIncluded = 1;
-                if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
-                    // search key is not complete:
-                    // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
-                    // like: SELECT count(*) from T2 WHERE POINTS < ?
-                    // but it actually finds the previous rank. (If m_searchKey is null, find 0 rank)
-                    // Add 1 back.
-                    rkStart++;
-                    leftIncluded = 1;
-                }
+            } else {
+                rkStart = m_index->getCounterLET(&m_searchKey, true);
+            }
+            if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
+                // search key is not complete:
+                // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
+                // like: SELECT count(*) from T2 WHERE POINTS < ?
+                // but it actually finds the previous rank. (If m_searchKey is null, find 0 rank)
+                // Add 1 back.
+                rkStart++;
+                leftIncluded = 1;
+            }
+        } else {
+            return false;
+        }
+    }
+    if (m_numOfEndkeys != 0) {
+        if (endKeyOverflow == false) {
+            IndexLookupType localEndType = m_endType;
+            if (localEndType == INDEX_LOOKUP_TYPE_LT) {
+                rkEnd = m_index->getCounterGET(&m_endKey, false);
+            } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
+                if (m_index->hasKey(&m_endKey)) {
+                    rkEnd = m_index->getCounterGET(&m_endKey, true);
+                    rightIncluded = 1;
+                } else
+                    rkEnd = m_index->getCounterGET(&m_endKey, false);
             } else {
                 return false;
-            }
-        }
-
-        if (m_numOfEndkeys != 0) {
-            if (endKeyOverflow == false) {
-                IndexLookupType localEndType = m_endType;
-                if (localEndType == INDEX_LOOKUP_TYPE_LT) {
-                    rkEnd = m_index->getCounterGET(&m_endKey, false);
-                } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
-                    rkEnd = m_index->getCounterGET(&m_endKey, false);
-                    if (m_index->hasKey(&m_endKey))
-                        rightIncluded = 1;
-                } else {
-                    return false;
-                }
-            } else {
-                rkEnd = m_index->getSize();
-                rightIncluded = 1;
             }
         } else {
             rkEnd = m_index->getSize();
             rightIncluded = 1;
         }
     } else {
-        // Deal with multi-map
-        VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-                localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
-        if (searchKeyUnderflow == false) {
-            if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
-                rkStart = m_index->getCounterLET(&m_searchKey, true);
-            } else if (localLookupType == INDEX_LOOKUP_TYPE_GTE) {
-                if (m_index->hasKey(&m_searchKey)) {
-                    leftIncluded = 1;
-                    rkStart = m_index->getCounterLET(&m_searchKey, false);
-                } else {
-                    rkStart = m_index->getCounterLET(&m_searchKey, true);
-                }
-                if (m_searchKey.getSchema()->columnCount() > activeNumOfSearchKeys) {
-                    // search key is not complete:
-                    // like: SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?
-                    // like: SELECT count(*) from T2 WHERE POINTS < ?
-                    // but it actually finds the previous rank. (If m_searchKey is null, find 0 rank)
-                    // Add 1 back.
-                    rkStart++;
-                    leftIncluded = 1;
-                }
-            } else {
-                return false;
-            }
-        }
-        if (m_numOfEndkeys != 0) {
-            if (endKeyOverflow == false) {
-                IndexLookupType localEndType = m_endType;
-                if (localEndType == INDEX_LOOKUP_TYPE_LT) {
-                    rkEnd = m_index->getCounterGET(&m_endKey, false);
-                } else if (localEndType == INDEX_LOOKUP_TYPE_LTE) {
-                    if (m_index->hasKey(&m_endKey)) {
-                        rkEnd = m_index->getCounterGET(&m_endKey, true);
-                        rightIncluded = 1;
-                    } else
-                        rkEnd = m_index->getCounterGET(&m_endKey, false);
-                } else {
-                    return false;
-                }
-            } else {
-                rkEnd = m_index->getSize();
-                rightIncluded = 1;
-            }
-        } else {
-            rkEnd = m_index->getSize();
-            rightIncluded = 1;
-        }
+        rkEnd = m_index->getSize();
+        rightIncluded = 1;
     }
     rkRes = rkEnd - rkStart - 1 + leftIncluded + rightIncluded;
     VOLT_DEBUG("Index Count ANSWER %ld = %ld - %ld - 1 + %d + %d\n", (long)rkRes, (long)rkEnd, (long)rkStart, leftIncluded, rightIncluded);
