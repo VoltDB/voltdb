@@ -121,7 +121,7 @@ public class PlanNodeTree implements JSONString {
         return m_planNodes;
     }
 
-    public void loadFromJSONArray( JSONArray jArray, Database db ) {
+    public void loadFromJSONArray( JSONArray jArray, Database db ) throws InstantiationException, IllegalAccessException {
         int size = jArray.length();
 
         try {
@@ -132,45 +132,7 @@ public class PlanNodeTree implements JSONString {
                 //int nodeTypeInt = PlanNodeType.get( nodeType ).getValue();
                 PlanNodeType nodeType = PlanNodeType.get( nodeTypeStr );
                 AbstractPlanNode apn = null;
-
-                switch( nodeType ) {
-                case AGGREGATE : apn = new AggregatePlanNode();
-                    break;
-                case DELETE : apn = new DeletePlanNode();
-                    break;
-                case DISTINCT : apn = new DistinctPlanNode();
-                    break;
-                case HASHAGGREGATE : apn = new HashAggregatePlanNode();
-                    break;
-                case INDEXSCAN : apn = new IndexScanPlanNode();
-                    break;
-                case SEQSCAN : apn = new SeqScanPlanNode();
-                    break;
-                case INSERT : apn = new InsertPlanNode();
-                    break;
-                case LIMIT : apn = new LimitPlanNode();
-                    break;
-                case MATERIALIZE : apn = new MaterializePlanNode();
-                    break;
-                case NESTLOOP : apn = new NestLoopPlanNode();
-                    break;
-                case NESTLOOPINDEX : apn = new NestLoopIndexPlanNode();
-                    break;
-                case ORDERBY : apn = new OrderByPlanNode();
-                    break;
-                case PROJECTION : apn = new ProjectionPlanNode();
-                    break;
-                case RECEIVE: apn = new ReceivePlanNode();
-                    break;
-                case SEND: apn = new SendPlanNode();
-                    break;
-                case UNION: apn = new UnionPlanNode();
-                    break;
-                case UPDATE: apn = new UpdatePlanNode();
-                    break;
-                default : System.err.println("plan node type not support: "+nodeType);
-                }
-
+                apn = nodeType.getPlanNodeClass().newInstance();
                 apn.loadFromJSONObject(jobj, db);
                 m_planNodes.add(apn);
             }

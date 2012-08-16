@@ -722,7 +722,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         JSONArray jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
         if( jarray.length() != 0 ) {
             PlanNodeTree pnt = new PlanNodeTree();
-            pnt.loadFromJSONArray(jarray, db);
+            try {
+                pnt.loadFromJSONArray(jarray, db);
+            } catch (InstantiationException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
             List<AbstractPlanNode> list = pnt.getNodeList();
             for( AbstractPlanNode pn : list ) {
                 m_inlineNodes.put( pn.getPlanNodeType(), pn);

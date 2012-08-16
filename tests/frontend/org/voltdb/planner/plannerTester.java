@@ -365,7 +365,15 @@ public class plannerTester {
             jobj = new JSONObject( prettyJson );
             JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
             Database db = aide.getDatabase();
-            pnt.loadFromJSONArray(jarray, db);
+            try {
+                pnt.loadFromJSONArray(jarray, db);
+            } catch (InstantiationException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            } catch (IllegalAccessException e) {
+                // TODO Auto-generated catch block
+                e.printStackTrace();
+            }
         } catch (JSONException e) {
             e.printStackTrace();
         }

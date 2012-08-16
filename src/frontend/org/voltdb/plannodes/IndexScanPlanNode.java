@@ -397,7 +397,21 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         super.loadFromJSONObject(jobj, db);
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
-        //                  JSONObject obj = jobj.getJSONObject(Members.END_EXPRESSION.name());
-        //                  m_endExpression.fromJSONObject( obj, db);
+
+        JSONObject tempjobj = jobj.getJSONObject(Members.END_EXPRESSION.name());
+        System.out.println( tempjobj );
+        if( tempjobj != null)
+            m_endExpression.fromJSONObject( tempjobj, db);
+
+//        JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
+//        if( jarray.length() != 0 ) {
+//            int size = jarray.length();
+//            for( int i = 0 ; i < size; i++ ) {
+//                tempjobj = jarray.getJSONObject( i );
+//                AbstractExpression expr = new AbstractExpression();
+//                expr.fromJSONObject( tempjobj, db);
+//                m_searchkeyExpressions.
+//            }
+//        }
     }
 }
