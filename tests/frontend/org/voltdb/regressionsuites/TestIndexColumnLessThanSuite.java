@@ -96,7 +96,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
     }
 
     /**
-     * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
+     * Build a list of the tests that will be run when TestIndexColumnLess gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
      * This particular class runs all tests on the the local JNI backend with both
      * one and two partition configurations, as well as on the hsql backend.
