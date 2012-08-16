@@ -172,6 +172,12 @@ public class TestReplaceWithIndexCounter extends TestCase {
         checkIndexCounter(pn, false);
     }
 
+    // Planner bug: Fix it with true replaceable flag
+    public void testCountStar19() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000", 2, false);
+        checkIndexCounter(pn, false);
+    }
+
     /**
      * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *

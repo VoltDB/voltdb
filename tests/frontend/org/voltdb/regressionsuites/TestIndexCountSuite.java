@@ -23,11 +23,16 @@
 
 package org.voltdb.regressionsuites;
 
+import java.io.IOException;
+
 import junit.framework.Test;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
+import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb_testprocs.regressionsuites.sqlfeatureprocs.BatchedMultiPartitionTest;
 public class TestIndexCountSuite extends RegressionSuite {
@@ -44,6 +49,16 @@ public class TestIndexCountSuite extends RegressionSuite {
         super(name);
     }
 
+    void callWithExpectedCount(Client client,int count, String procName, Object... params) throws NoConnectionsException, IOException, ProcCallException {
+        ClientResponse cr = client.callProcedure(procName, params);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        assertEquals(1, cr.getResults().length);
+        VoltTable result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(count, result.getLong(0));
+    }
+
     public void testOneColumnUniqueIndex() throws Exception {
         Client client = getClient();
 
@@ -52,6 +67,11 @@ public class TestIndexCountSuite extends RegressionSuite {
         client.callProcedure("TU1.insert", 3, 3);
         client.callProcedure("TU1.insert", 6, 6);
         client.callProcedure("TU1.insert", 8, 8);
+
+        callWithExpectedCount(client, 5, "TU1_LT", 6000000000L);
+        callWithExpectedCount(client, 0, "TU1_GT", 6000000000L);
+        callWithExpectedCount(client, 0, "TU1_LT", -6000000000L);
+        callWithExpectedCount(client, 5, "TU1_GT", -6000000000L);
 
         VoltTable table;
 
@@ -474,7 +494,7 @@ public class TestIndexCountSuite extends RegressionSuite {
 
     }
 
-    public void testTwoColumnsUniqueIntegerIndex() throws Exception {
+    public void testTwoColumnsUniqueOverflowIndex() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TU3.insert", 1, 1, 123);
@@ -488,18 +508,12 @@ public class TestIndexCountSuite extends RegressionSuite {
         client.callProcedure("TU3.insert", 9, 6, 456);
         client.callProcedure("TU3.insert", 10, 8, 456);
 
-        VoltTable table;
-        // test with 2,6
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU3 WHERE TEL = 456 AND POINTS < 6").getResults()[0];
-        assertTrue(table.getRowCount() == 1);
-        assertTrue(table.advanceRow());
-        assertEquals(3, table.getLong(0));
+        callWithExpectedCount(client, 5, "TU3_LT", 123, 6000000000L);
 
-        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU3 WHERE TEL = 456 AND POINTS >= 2 AND POINTS < 6").getResults()[0];
-        assertTrue(table.getRowCount() == 1);
-        assertTrue(table.advanceRow());
-        assertEquals(2, table.getLong(0));
-
+        callWithExpectedCount(client, 3, "TU3_GET_LT", 123, 3, 6000000000L);
+        callWithExpectedCount(client, 3, "TU3_GET_LET", 123, 3, 6000000000L);
+        callWithExpectedCount(client, 2, "TU3_GT_LET", 123, 3, 6000000000L);
+        callWithExpectedCount(client, 2, "TU3_GT_LT", 123, 3, 6000000000L);
     }
 
     public void testThreeColumnsUniqueIndex() throws Exception {
@@ -705,6 +719,11 @@ public class TestIndexCountSuite extends RegressionSuite {
         client.callProcedure("TM2.insert", 19, 8, "jia");
         client.callProcedure("TM2.insert", 20, 8, "jia");
 
+        callWithExpectedCount(client, 5, "TM2_GT_LT", "xin", 3, 6000000000L);
+        callWithExpectedCount(client, 8, "TM2_GET_LT", "xin", 3, 6000000000L);
+        callWithExpectedCount(client, 5, "TM2_GT_LET", "xin", 3, 6000000000L);
+        callWithExpectedCount(client, 8, "TM2_GET_LET", "xin", 3, 6000000000L);
+
         VoltTable table;
 
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM2 WHERE UNAME = 'xxx' AND POINTS > 1 AND POINTS <= 6").getResults()[0];
@@ -824,6 +843,29 @@ public class TestIndexCountSuite extends RegressionSuite {
         project.addPartitionInfo("TM1", "ID");
         project.addPartitionInfo("TM2", "UNAME");
 
+        project.addStmtProcedure("TU1_LT",       "SELECT COUNT(*) FROM TU1 WHERE POINTS < ?");
+        project.addStmtProcedure("TU1_LET",       "SELECT COUNT(*) FROM TU1 WHERE POINTS <= ?");
+        project.addStmtProcedure("TU1_GT",       "SELECT COUNT(*) FROM TU1 WHERE POINTS > ?");
+        project.addStmtProcedure("TU1_GET",       "SELECT COUNT(*) FROM TU1 WHERE POINTS >= ?");
+
+        project.addStmtProcedure("TU3_LT",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS < ?");
+        project.addStmtProcedure("TU3_LET",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS <= ?");
+        project.addStmtProcedure("TU3_GT_LT",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS < ?");
+        project.addStmtProcedure("TU3_GT_LET",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS > ? AND POINTS <= ?");
+        project.addStmtProcedure("TU3_GET_LT",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS < ?");
+        project.addStmtProcedure("TU3_GET_LET",       "SELECT COUNT(*) FROM TU3 WHERE TEL = ? AND POINTS >= ? AND POINTS <= ?");
+
+        project.addStmtProcedure("TM1_LT",       "SELECT COUNT(*) FROM TM1 WHERE POINTS < ?");
+        project.addStmtProcedure("TM1_LET",       "SELECT COUNT(*) FROM TM1 WHERE POINTS <= ?");
+        project.addStmtProcedure("TM1_GT",       "SELECT COUNT(*) FROM TM1 WHERE POINTS > ?");
+        project.addStmtProcedure("TM1_GET",       "SELECT COUNT(*) FROM TM1 WHERE POINTS >= ?");
+
+        project.addStmtProcedure("TM2_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS < ?");
+        project.addStmtProcedure("TM2_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS <= ?");
+        project.addStmtProcedure("TM2_GT_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?");
+        project.addStmtProcedure("TM2_GT_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
+        project.addStmtProcedure("TM2_GET_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?");
+        project.addStmtProcedure("TM2_GET_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
         boolean success;
 
         /////////////////////////////////////////////////////////////
@@ -839,7 +881,7 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
-        
+
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
