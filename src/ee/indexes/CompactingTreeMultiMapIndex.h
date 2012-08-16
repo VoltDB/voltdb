@@ -89,17 +89,14 @@ public:
         // this can probably be optimized
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-        if (m_eq(m_tmp1, m_tmp2))
-        {
-            // no update is needed for this index
-            return true;
-        }
 
-        // It looks like we're deleting the new value and inserting the new value
-        // The lookup is on the index keys, but the address of the current tuple
-        //  (which has the new key value) is needed for this non-unique index
-        //  to determine which of the tuples with a given key need to be deleted.
+        // newTupleValue actually points to the existing tuple referenced by the index
+        // -- though its column values have already been updated not to match the key stored in the index.
+        // newTupleValue must be passed into deleteEntryPrivate to delete only the correct entry
+        // that matches the old key m_tmp1 (possibly one of many, each with a different tuple address value).
+        // deleteEntry can not be used for this because it constructs its key from the tuple's current column values.
         bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
+        //TODO: addEntry COULD be used here instead of setting and using m_tmp2.
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;
