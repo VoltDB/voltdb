@@ -735,21 +735,19 @@ int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
     if (m == 0) {
         if (x->right != &NIL)
             ctr = getSubct(x->right);
-        ct += getSubct(x) - ctr;
-        if (!m_unique) {
-            while(p->parent != &NIL) {
-                if (m_comper(key, p->key) == 0) {
-                    if (p->right != &NIL && m_comper(key, p->right->key) == 0)
-                        ct-= getSubct(p->right);
-                    ct--;
-                }
-                p = p->parent;
+        ct = getSubct(x) - ctr;
+        while(p->parent != &NIL) {
+            if (m_comper(key, p->key) == 0) {
+                if (p->right != &NIL && m_comper(key, p->right->key) == 0)
+                    ct-= getSubct(p->right);
+                ct--;
             }
+            p = p->parent;
         }
     } else if (m > 0) {
         if (p->right != &NIL)
             ctr = getSubct(p->right);
-        ct += getSubct(p) - ctr;
+        ct = getSubct(p) - ctr;
         while (p->parent != &NIL) {
             if (p->parent->right == p) {
                 ct += getSubct(p->parent) - getSubct(p);
@@ -759,7 +757,7 @@ int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
     } else {
         if (p->left != &NIL)
             ctl = getSubct(p->left);
-        ct += getSubct(p) - ctl - 1;
+        ct = getSubct(p) - ctl - 1;
         while (p->parent != &NIL) {
             if (p->parent->left == p) {
                 ct += getSubct(p->parent) - getSubct(p);
@@ -807,7 +805,7 @@ typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key
             x = x->left;
         } else {
             x = x->right;
-            rk = rk - xl - 1;
+            rk -= (xl + 1);
         }
         xl = 0;
     }
