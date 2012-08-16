@@ -44,32 +44,32 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         super(name);
     }
 
-//    public void testFailedSqlcoverageCase() throws Exception {
-//        Client client = getClient();
-//
-//        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(0, 'JOUmtGnsKFCGOaWvg', -27392, 7.30754864900605705103e-01);");
-//        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(1, 'aXwwPrkDwabomDdAZ', 30036, 1.09425040281800223241e-01);");
-//        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(4, 'xJAmmYpKGJJyflOMw', -7060, 14977);");
-//        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(5, 'xybOXumtYDvBNhbUs', 13529, -2025);");
-//
-//        VoltTable table;
-//
-//        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
-//        assertTrue(table.advanceRow() == false);
-//
-//        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID <= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
-//        assertTrue(table.advanceRow() == false);
-//
-//        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID <= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
-//        assertTrue(table.getRowCount() == 4);
-//        assertTrue(table.advanceRow());
-//        //System.err.println("RESULT01:\n" + table);
-//
-//        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID >= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
-//        assertTrue(table.getRowCount() == 4);
-//        assertTrue(table.advanceRow());
-//        //System.err.println("RESULT02:\n" + table);
-//    }
+    public void testFailedSqlcoverageCase() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(0, 'JOUmtGnsKFCGOaWvg', -27392, 7.30754864900605705103e-01);");
+        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(1, 'aXwwPrkDwabomDdAZ', 30036, 1.09425040281800223241e-01);");
+        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(4, 'xJAmmYpKGJJyflOMw', -7060, 14977);");
+        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(5, 'xybOXumtYDvBNhbUs', 13529, -2025);");
+
+        VoltTable table;
+
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        assertTrue(table.advanceRow() == false);
+
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID <= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        assertTrue(table.advanceRow() == false);
+
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID <= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        assertTrue(table.getRowCount() == 4);
+        assertTrue(table.advanceRow());
+        //System.err.println("RESULT01:\n" + table);
+
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID >= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        assertTrue(table.getRowCount() == 4);
+        assertTrue(table.advanceRow());
+        //System.err.println("RESULT02:\n" + table);
+    }
 
     public void testTwoTableJoinBug() throws Exception {
         Client client = getClient();
