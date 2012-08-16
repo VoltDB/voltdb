@@ -21,6 +21,7 @@ import java.io.File;
 import java.io.FileFilter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
@@ -328,7 +329,7 @@ SnapshotCompletionInterest
             }
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Unable to instantiate command log reinitiator",
-                                     false, e);
+                                     false, e instanceof InvocationTargetException ? e.getCause() : e);
         }
         m_replayAgent.setCallback(this);
     }
