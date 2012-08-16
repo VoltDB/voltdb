@@ -32,11 +32,11 @@ import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
 
-public class TestCompatictingViewsSuite extends RegressionSuite {
+public class TestCompactingViewsSuite extends RegressionSuite {
 
     static final Class<?>[] PROCEDURES = {};
 
-    public TestCompatictingViewsSuite(String name) {
+    public TestCompactingViewsSuite(String name) {
         super(name);
     }
 
@@ -128,7 +128,7 @@ public class TestCompatictingViewsSuite extends RegressionSuite {
 
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
-        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCompatictingViewsSuite.class);
+        final MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestCompactingViewsSuite.class);
 
         final VoltProjectBuilder project = new VoltProjectBuilder();
 
