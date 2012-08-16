@@ -82,116 +82,111 @@ public class TestReplaceWithIndexCounter extends TestCase {
     // DOES NOT support the cases down below right now
     public void testCountStar00() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-        checkIndexCounter(pn, true, false);
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar01() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 ORDER BY POINTS ASC", 0, false);
-        checkIndexCounter(pn, true, false);
+        checkIndexCounter(pn, false);
     }
 
 
     public void testCountStar02() {
         List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, false);
-        checkIndexCounter(pn, true, false);
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar03() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS DESC", 0, false);
-        checkIndexCounter(pn, true, false);
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar04() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS = ?", 0, false);
-        checkIndexCounter(pn, false, false);
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar05() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ? ORDER BY ID DESC", 0, false);
-        checkIndexCounter(pn, false, false);
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar06() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS >= 3 AND AGE = ?", 1, false);
-        checkIndexCounter(pn, false, false);
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar07() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?", 2, false);
-        checkIndexCounter(pn, false, false);
+        checkIndexCounter(pn, false);
     }
 
     public void testCountStar08() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME >'XIN' AND POINTS = ?", 1, false);
-        checkIndexCounter(pn, false, false);
+        checkIndexCounter(pn, false);
     }
-
-    // Down below are cases that we can replace
 
     public void testCountStar10() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS > ?", 1, false);
-        checkIndexCounter(pn, false, false);
+        checkIndexCounter(pn, false);
     }
 
-
+    // Down below are cases that we can replace
     public void testCountStar11() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < 4 ORDER BY POINTS", 0, false);
-        checkIndexCounter(pn, true, true);
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar12() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, false);
-        checkIndexCounter(pn, false, true);
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar13() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS >= 3", 0, false);
-        checkIndexCounter(pn, false, true);
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar14() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > 3 AND POINTS <= 6", 0, false);
-        checkIndexCounter(pn, false, true);
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar15() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS > ? AND POINTS < ?", 2, false);
-        checkIndexCounter(pn, false, true);
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar16() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= ? AND POINTS <= ?", 2, false);
-        checkIndexCounter(pn, false, true);
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar17() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < ?", 1, false);
-        checkIndexCounter(pn, false, true);
+        checkIndexCounter(pn, true);
     }
 
     public void testCountStar18() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN'", 1, false);
-        checkIndexCounter(pn, false, false);
+        checkIndexCounter(pn, false);
     }
 
-//    public void testCountStarOnPartitionedTable() {
-//        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-//        checkPushedDown(pn, true,
-//                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-//                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
-//    }
+    // Planner bug: Fix it with true replaceable flag
+    public void testCountStar19() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000", 2, false);
+        checkIndexCounter(pn, false);
+    }
 
     /**
-     * Check if the aggregate node is pushed-down in the given plan. If the
-     * pushDownTypes is null, it assumes that the aggregate node should NOT be
-     * pushed-down.
+     * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *
-     * @param np
+     * @param pn
      *            The generated plan
-     * @param isMultiPart
-     *            Whether or not the plan is distributed
+     * @param isReplaceable
+     *            Whether or not the original plan is replaced with CountingIndexPlanNode
      */
-    private void checkIndexCounter(List<AbstractPlanNode> pn, boolean isMultiPart, boolean isReplaceable) {
+    private void checkIndexCounter(List<AbstractPlanNode> pn, boolean isReplaceable) {
         assertTrue(pn.size() > 0);
 
         for ( AbstractPlanNode nd : pn) {

@@ -19,6 +19,7 @@
 #ifndef HSTOREINDEXCOUNTEXECUTOR_H
 #define HSTOREINDEXSCANEXECUTOR_H
 
+#include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
@@ -66,9 +67,6 @@ protected:
     bool* m_needsSubstituteSearchKey; // needs_substitute_search_key_ptr[]
     AbstractExpression** m_endKeyBeforeSubstituteArray;
     bool* m_needsSubstituteEndKey;
-    bool m_hasEndKey;
-
-    bool m_needsSubstitutePostExpression;
 
     IndexLookupType m_lookupType;
     IndexLookupType m_endType;
@@ -76,10 +74,7 @@ protected:
     // IndexCount Information
     TempTable* m_outputTable;
     PersistentTable* m_targetTable;
-
     TableIndex *m_index;
-    TableTuple m_dummy;
-    TableTuple m_tuple;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)

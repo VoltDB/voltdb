@@ -410,15 +410,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     //printf ("<INDEX SCAN> localSortDirection: %d\n", localSortDirection);
     if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
-        bool order_by_asc = true;
-        if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
-            // nothing now
-        }
-        else {
-            order_by_asc = false;
-        }
-
         if (activeNumOfSearchKeys == 0) {
+            bool order_by_asc = true;
+            if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
+                // nothing now
+            }
+            else {
+                order_by_asc = false;
+            }
             m_index->moveToEnd(order_by_asc);
         }
     }
