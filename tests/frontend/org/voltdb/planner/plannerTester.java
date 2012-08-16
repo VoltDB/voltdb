@@ -73,8 +73,8 @@ public class plannerTester {
     private static boolean m_showSQLStatement = false;
     private static ArrayList<String> m_config = new ArrayList<String>();
 
-    private static int m_numPass = 0;
-    private static int m_numFail = 0;
+    private static int m_numPass;
+    private static int m_numFail;
     public static ArrayList<String> m_diffMessages = new ArrayList<String>();
     private static String m_reportDir = "/tmp/";
     private static BufferedWriter m_reportWriter;
