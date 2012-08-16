@@ -73,10 +73,7 @@ protected:
     // IndexCount Information
     TempTable* m_outputTable;
     PersistentTable* m_targetTable;
-
     TableIndex *m_index;
-    TableTuple m_dummy;
-    TableTuple m_tuple;
 
     // arrange the memory mgmt aids at the bottom to try to maximize
     // cache hits (by keeping them out of the way of useful runtime data)

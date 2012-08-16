@@ -140,11 +140,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         m_endKey.moveNoHeader(m_endKeyBackingStore);
     }
 
-    m_tuple = TableTuple(m_targetTable->schema());
-
-    //
     // Miscellanous Information
-    //
     m_lookupType = m_node->getLookupType();
     if (m_numOfEndkeys != 0) {
         m_endType = m_node->getEndType();
@@ -177,6 +173,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
     bool searchKeyUnderflow = false, endKeyOverflow = false;
+    TableTuple& tmptup = m_outputTable->tempTuple();
+    TableTuple m_dummy;
 
     //
     // SEARCH KEY
@@ -203,7 +201,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             // handle the case where this is a comparison, rather than equality match
             // comparison is the only place where the executor might return matching tuples
             // e.g. TINYINT < 1000 should return all values
-            TableTuple& tmptup = m_outputTable->tempTuple();
+
             tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
 
             if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
@@ -255,9 +253,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                     throw e;
                 }
 
-                // handle the case where this is a comparison, rather than equality match
-                // comparison is the only place where the executor might return matching tuples
-                // e.g. TINYINT < 1000 should return all values
+                // Overflow cases that can return early without accessing the index need this
+                // default 0 count as their result.
                 TableTuple& tmptup = m_outputTable->tempTuple();
                 tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
 
@@ -294,11 +291,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
     assert (m_index->is_countable_index_);
 
-    // An index count has two parts: unique and multi
-
+    // An index count has two cases: unique and non-unique
     int64_t rkStart = 0, rkEnd = 0, rkRes = 0;
-
-    TableTuple& tmptup = m_outputTable->tempTuple();
     int leftIncluded = 0, rightIncluded = 0;
 
     if (m_index->isUniqueIndex()) {
