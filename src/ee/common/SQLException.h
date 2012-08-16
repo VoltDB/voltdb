@@ -47,12 +47,12 @@ public:
     static const char* volt_temp_table_memory_overflow;
     static const char* volt_decimal_serialization_error;
 
-    SQLException(const char* sqlState, std::string message);
-    SQLException(const char* sqlState, std::string message, VoltEEExceptionType type);
-    SQLException(const char* sqlState, std::string message, int internalFlags);
+    SQLException(std::string sqlState, std::string message);
+    SQLException(std::string sqlState, std::string message, VoltEEExceptionType type);
+    SQLException(std::string sqlState, std::string message, int internalFlags);
     virtual ~SQLException() {}
 
-    const char* getSqlState() const { return m_sqlState; }
+    const std::string& getSqlState() const { return m_sqlState; }
 
     // internal flags that are not serialized to java
     static const int TYPE_UNDERFLOW = 1;
@@ -62,7 +62,7 @@ public:
 protected:
     void p_serialize(ReferenceSerializeOutput *output);
 private:
-    const char* m_sqlState;
+    std::string m_sqlState;
 
     // internal and not sent to java
     const int m_internalFlags;

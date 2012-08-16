@@ -20,18 +20,13 @@
 
 namespace voltdb {
 
-// static buffers to reference in SQLExceptions that reference user-provided detail.
-// As statics, their content would be overwritten if two dynamic SQLExceptions were ever both in play,
-// but this should not be an issue for the single-threaded EE.
-// The important thing is that these buffers survive the throw and catch of the referencing SQLException.
-static char msg_format_buffer[1024];
-static char state_format_buffer[6];
-
 /** implement a forced SQL ERROR function (for test and example purposes) for either integer or string types **/
 template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     const char* sqlstatecode;
     const char* msgtext;
     const ValueType type = getValueType();
+    char msg_format_buffer[1024];
+    char state_format_buffer[6];
     if (type == VALUE_TYPE_VARCHAR) {
         const int32_t valueLength = getObjectLength();
         const char *valueChars = reinterpret_cast<char*>(getObjectValue());
@@ -54,6 +49,8 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
 template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const char* sqlstatecode;
+    char msg_format_buffer[1024];
+    char state_format_buffer[6];
 
     const NValue& codeArg = arguments[0];
     if (codeArg.isNull()) {
