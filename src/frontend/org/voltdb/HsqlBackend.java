@@ -32,12 +32,10 @@ import java.util.List;
 
 import org.voltcore.logging.Level;
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.StmtParameter;
 import org.voltdb.exceptions.ConstraintFailureException;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.types.TimestampType;
-import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
 
@@ -168,6 +166,8 @@ public class HsqlBackend {
                         columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.TIMESTAMP);
                     else if (type.equals("VARBINARY"))
                         columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.VARBINARY);
+                    else if (type.equals("CHARACTER"))
+                        columns[i-1] = new VoltTable.ColumnInfo(colname, VoltType.STRING);
                     else
                         throw new ExpectedProcedureException("Trying to create a column in Backend with a (currently) unsupported type: " + type);
                 }
@@ -287,7 +287,7 @@ public class HsqlBackend {
                     throw new RuntimeException("Inserting date into mismatched column type in HSQL.");
                 TimestampType d = (TimestampType) paramObjs[i];
                 // convert VoltDB's microsecond granularity to millis.
-                Timestamp t = new Timestamp(d.getTime() * 1000);
+                Timestamp t = new Timestamp(d.getTime() / 1000);
                 sqlOut.append('\'').append(t.toString()).append('\'');
             }
             else if (paramObjs[i] instanceof byte[]) {
