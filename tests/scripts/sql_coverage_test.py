@@ -36,7 +36,7 @@ import imp
 from voltdbclient import *
 from optparse import OptionParser
 from Query import VoltQueryClient
-from SQLCoverageReport import generate_html_reports, generate_summary
+from SQLCoverageReport import generate_summary
 from SQLGenerator import SQLGenerator
 
 class Config:
@@ -192,8 +192,10 @@ def run_config(config, basedir, output_dir, random_seed, report_all, generate_on
         print >> sys.stderr, "Test with the HSQLDB backend had errors."
         exit(1)
 
-    success = generate_html_reports(random_seed, statements_path, hsql_path,
-                                    jni_path, output_dir, report_all)
+    global compare_results
+    compare_results = imp.load_source("normalizer", config["normalizer"]).compare_results
+    success = compare_results(random_seed, statements_path, hsql_path,
+                              jni_path, output_dir, report_all)
     return success
 
 def usage():
