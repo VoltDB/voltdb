@@ -27,14 +27,14 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
-import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.types.PlanNodeType;
+import org.voltdb.plannodes.PlanNodeTree;
 
 public class testLoadPlanNodeFromJSON extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -80,14 +80,21 @@ public class testLoadPlanNodeFromJSON extends TestCase {
         aide.tearDown();
     }
 
-    public void testLoadIndexScanPlanNode () throws JSONException {
-        AbstractPlanNode pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-        String JSONStr = pn.findAllNodesOfType( PlanNodeType.INDEXSCAN ).get(0).toJSONString();
-        JSONObject jobj = new JSONObject( JSONStr );
-        IndexScanPlanNode ispn = new IndexScanPlanNode();
-        ispn.loadFromJSONObject(jobj, aide.getDatabase());
-        String JSONStr1 = ispn.toJSONString();
-        System.out.println( JSONStr );
-        System.out.println( JSONStr1 );
+    public void testLoadQueryPlans () throws JSONException {
+        testLoadQueryPlanTree( "select count(*) from l,t where lname=? and l.a=t.a order by l.b limit ?;", 3, true );
+        testLoadQueryPlanTree( "select * from l,t where lname=? and l.a=t.a order by l.b limit ?;", 3, true );
+        testLoadQueryPlanTree( "select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;", 3, true );
+    }
+
+    public void testLoadQueryPlanTree( String sql, int paraCount, boolean singlePartition ) throws JSONException {
+        AbstractPlanNode pn = compile(sql, paraCount, singlePartition );
+        PlanNodeTree pnt = new PlanNodeTree( pn );
+        String str = pnt.toJSONString();
+        System.out.println( str );
+        JSONArray jarray = new JSONObject( str ).getJSONArray( PlanNodeTree.Members.PLAN_NODES.name() );
+        PlanNodeTree pnt1 = new PlanNodeTree();
+        pnt1.loadFromJSONArray(jarray, aide.getDatabase() );
+        String str1 = pnt1.toJSONString();
+        assertTrue( str.equals(str1) );
     }
 }

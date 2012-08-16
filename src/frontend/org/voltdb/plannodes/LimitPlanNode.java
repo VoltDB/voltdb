@@ -154,10 +154,16 @@ public class LimitPlanNode extends AbstractPlanNode {
         m_outputSchema.sortByTveIndex();
     }
 
- // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
+        m_offset = jobj.getInt( Members.OFFSET.name() );
+        m_limit = jobj.getInt( Members.LIMIT.name() );
+        m_limitParameterId = jobj.getLong( Members.LIMIT_PARAM_IDX.name() );
+        m_offsetParameterId = jobj.getLong( Members.OFFSET_PARAM_IDX.name() );
+        if( !jobj.isNull(Members.LIMIT_EXPRESSION.name()) ) {
+            m_limitExpression = AbstractExpression.fromJSONObject( jobj.getJSONObject(Members.LIMIT_EXPRESSION.name()), db);
+        }
     }
 
     @Override

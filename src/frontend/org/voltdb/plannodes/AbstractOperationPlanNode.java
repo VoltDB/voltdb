@@ -144,9 +144,9 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
     }
 
-    // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
+        m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
     }
 }

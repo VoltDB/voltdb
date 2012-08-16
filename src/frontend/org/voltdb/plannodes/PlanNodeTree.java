@@ -121,7 +121,7 @@ public class PlanNodeTree implements JSONString {
         return m_planNodes;
     }
 
-    public void loadFromJSONArray( JSONArray jArray, Database db ) throws InstantiationException, IllegalAccessException {
+    public void loadFromJSONArray( JSONArray jArray, Database db )  {
         int size = jArray.length();
 
         try {
@@ -129,10 +129,17 @@ public class PlanNodeTree implements JSONString {
                 JSONObject jobj;
                 jobj = jArray.getJSONObject(i);
                 String nodeTypeStr = jobj.getString("PLAN_NODE_TYPE");
-                //int nodeTypeInt = PlanNodeType.get( nodeType ).getValue();
                 PlanNodeType nodeType = PlanNodeType.get( nodeTypeStr );
                 AbstractPlanNode apn = null;
-                apn = nodeType.getPlanNodeClass().newInstance();
+                try {
+                    apn = nodeType.getPlanNodeClass().newInstance();
+                } catch (InstantiationException e) {
+                    e.printStackTrace();
+                    return;
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                    return;
+                }
                 apn.loadFromJSONObject(jobj, db);
                 m_planNodes.add(apn);
             }
