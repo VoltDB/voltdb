@@ -656,7 +656,6 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp,
             boolean isMPI)
     {
-        hostLog.fatal("Updating catalog for hsid: " + CoreUtils.hsIdToString(m_siteId));
         m_context = context;
         m_loadedProcedures.loadProcedures(m_context, m_backend, csp);
 
