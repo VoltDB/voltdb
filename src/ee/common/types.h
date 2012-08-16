@@ -380,6 +380,8 @@ ExpressionType stringToExpression(std::string str );
 std::string indexLookupToString(IndexLookupType type);
 IndexLookupType stringToIndexLookup(std::string str );
 
+int64_t getMaxTypeValue (ValueType type);
+
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString);
 
 }
