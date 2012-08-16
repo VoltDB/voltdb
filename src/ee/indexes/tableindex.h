@@ -306,20 +306,30 @@ public:
     virtual bool hasKey(const TableTuple *searchKey) = 0;
 
     /**
-     * This function only supports countable tree index. It returns the counter value equal or greater than the serarchKey.
-     * It will return the rank with the searchKey in ascending order including itself.
-     * isUpper means nothing to Unique index. For non-unique index, it will return the high or low rank according to this
-     * boolean flag as true or false,respectively.
+     * This function only supports countable tree index. It returns the counter value
+     * equal or greater than the serarchKey. It will return the rank with the searchKey
+     * in ascending order including itself.
+     *
+     * @parameter: isUpper means nothing to Unique index. For non-unique index, it will
+     * return the high or low rank according to this boolean flag as true or false,respectively.
+     *
+     * @Return great than rank value as "m_entries.size() + 1"  for given
+     * searchKey that is larger than all keys.
      */
     virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper)
     {
         throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
     }
     /**
-     * This function only supports countable tree index. It returns the counter value less than or equal to the serarchKey.
-     * It will return the rank with the searchKey in ascending order including itself.
-     * isUpper means nothing to Unique index. For non-unique index, it will return the high or low rank according to this
-     * boolean flag as true or false,respectively.
+     * This function only supports countable tree index. It returns the counter value
+     * equal or less than the serarchKey. It will return the rank with the searchKey
+     * in ascending order including itself.
+     *
+     * @parameter: isUpper means nothing to Unique index. For non-unique index, it will
+     * return the high or low rank according to this boolean flag as true or false,respectively.
+     *
+     * @Return less than rank value as "m_entries.size()"  for given
+     * searchKey that is larger than all keys.
      */
     virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper)
     {

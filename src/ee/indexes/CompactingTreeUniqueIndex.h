@@ -243,6 +243,9 @@ public:
         return (m_entries.find(m_tmp1).isEnd() == false);
     }
 
+    /**
+     * See comments in parent class TableIndex
+     */
     int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
@@ -255,6 +258,9 @@ public:
         }
     }
 
+    /**
+     * See comments in parent class TableIndex
+     */
     int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
