@@ -364,7 +364,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
     // the planner should determine if this update can affect indexes.
     // if so, update the indexes here
     if (updatesIndexes) {
-        if (!checkUpdateOnUniqueIndexes(ptuua->getOldTuple(), target)) {
+        if (!checkUpdateOnUniqueIndexes(target, ptuua->getOldTuple())) {
             throw ConstraintFailureException(this, ptuua->getOldTuple(),
                                              target,
                                              CONSTRAINT_TYPE_UNIQUE);
@@ -373,12 +373,12 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
         //If the CFE is thrown the Undo action should not attempt to revert the
         //indexes.
         ptuua->needToRevertIndexes();
-        updateFromAllIndexes(ptuua->getOldTuple(), target);
+        updateFromAllIndexes(target, ptuua->getOldTuple());
     }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleUpdate(ptuua->getOldTuple(), target);
+        m_views[i]->processTupleUpdate(target, ptuua->getOldTuple());
     }
 
     /**
@@ -440,14 +440,14 @@ void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
-        if (!checkUpdateOnUniqueIndexes(targetBackup, target)) {
+        if (!checkUpdateOnUniqueIndexes(target, targetBackup)) {
             // TODO: this might be too strict. see insertTuple()
             throwFatalException("Failed to update tuple in table %s for undo:"
                                 " unique constraint violation\n%s\n%s\n", m_name.c_str(),
                                 targetBackup.debugNoHeader().c_str(),
                                 target.debugNoHeader().c_str());
         }
-        updateFromAllIndexes(targetBackup, target);
+        updateFromAllIndexes(target, targetBackup);
     }
 }
 
@@ -606,7 +606,7 @@ bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTuple, const 
             continue; // no update is needed for this index
 
         // if there is a change, the new_key has to be checked
-        FAIL_IF (m_uniqueIndexes[i]->exists(&sourceTuple)) {
+        FAIL_IF (m_uniqueIndexes[i]->exists(&targetTuple)) {
             VOLT_WARN("Unique Index '%s' complained to the update",
                       m_uniqueIndexes[i]->debug().c_str());
             return false; // cannot insert the new value
@@ -888,7 +888,7 @@ void PersistentTable::swapTuples(TableTuple sourceTuple, TableTuple destinationT
      * not move the tuple.
      */
     if (!sourceTuple.isPendingDelete()) {
-        updateWithSameKeyFromAllIndexes(sourceTuple, destinationTuple);
+        updateWithSameKeyFromAllIndexes(destinationTuple, sourceTuple);
     }
 }
 
