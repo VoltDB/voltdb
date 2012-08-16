@@ -705,14 +705,8 @@ SnapshotCompletionInterest
         }
     }
 
-    /**
-     * Pick the snapshot to restore from based on the global snapshot
-     * information.
-     *
-     * @return The snapshot to restore from, null if none.
-     * @throws Exception
-     */
-    private Set<SnapshotInfo> getRestorePlan() throws Exception {
+    private List<String> waitOnVoltZK_restore() throws KeeperException
+    {
         LOG.debug("Waiting for all hosts to send their snapshot information");
         List<String> children = null;
         while (true) {
@@ -732,7 +726,18 @@ SnapshotCompletionInterest
                 break;
             }
         }
+        return children;
+    }
 
+    /**
+     * Pick the snapshot to restore from based on the global snapshot
+     * information.
+     *
+     * @return The snapshot to restore from, null if none.
+     * @throws Exception
+     */
+    private Set<SnapshotInfo> getRestorePlan() throws Exception {
+        List<String> children = waitOnVoltZK_restore();
         if (children == null) {
             throw new RuntimeException("Unable to read agreement messages from" +
                                        " other hosts for restore plan");
