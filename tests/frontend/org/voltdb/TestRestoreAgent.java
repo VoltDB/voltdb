@@ -774,6 +774,6 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             si = new HashSet<SnapshotInfo>();
             frags.put(txnid, si);
         }
-        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc));
+        si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc, -1));
     }
 }

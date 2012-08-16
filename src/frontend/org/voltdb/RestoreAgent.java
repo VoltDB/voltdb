@@ -42,8 +42,10 @@ import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.Code;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
@@ -230,12 +232,6 @@ SnapshotCompletionInterest
         public final int hostId;
 
         public SnapshotInfo(long txnId, String path, String nonce, int partitions,
-                            long catalogCrc)
-        {
-            this(txnId, path, nonce, partitions, catalogCrc, -1);
-        }
-
-        public SnapshotInfo(long txnId, String path, String nonce, int partitions,
                             long catalogCrc, int hostId)
         {
             this.txnId = txnId;
@@ -246,14 +242,60 @@ SnapshotCompletionInterest
             this.hostId = hostId;
         }
 
-        public int size() {
-            // I can't make this add up --izzy
-            // txnId + pathLen + nonceLen + partCount + catalogCrc + path + nonce
-            int size = 8 + 4 + 4 + 8 + 8 + 4 + path.length() + nonce.length();
-            for (Entry<String, Set<Integer>> e : partitions.entrySet()) {
-                size += 4 + 4 + e.getKey().length() + 4 * e.getValue().size();
+        public SnapshotInfo(JSONObject jo) throws JSONException
+        {
+            txnId = jo.getLong("txnId");
+            path = jo.getString("path");
+            nonce = jo.getString("nonce");
+            partitionCount = jo.getInt("partitionCount");
+            catalogCrc = jo.getLong("catalogCrc");
+            hostId = jo.getInt("hostId");
+
+            JSONArray tables = jo.getJSONArray("tables");
+            int cnt = tables.length();
+            for (int i=0; i < cnt; i++) {
+                JSONObject tableEntry = tables.getJSONObject(i);
+                String name = tableEntry.getString("name");
+                JSONArray jsonPartitions = tableEntry.getJSONArray("partitions");
+                Set<Integer> partSet = new HashSet<Integer>();
+                int partCnt = jsonPartitions.length();
+                for (int j=0; j < partCnt; j++) {
+                    int p = jsonPartitions.getInt(j);
+                    partSet.add(p);
+                }
+                partitions.put(name, partSet);
             }
-            return size;
+        }
+
+        public JSONObject toJSONObject()
+        {
+            JSONStringer stringer = new JSONStringer();
+            try {
+                stringer.object();
+                stringer.key("txnId").value(txnId);
+                stringer.key("path").value(path);
+                stringer.key("nonce").value(nonce);
+                stringer.key("partitionCount").value(partitionCount);
+                stringer.key("catalogCrc").value(catalogCrc);
+                stringer.key("hostId").value(hostId);
+                stringer.key("tables").array();
+                for (Entry<String, Set<Integer>> p : partitions.entrySet()) {
+                    stringer.object();
+                    stringer.key("name").value(p.getKey());
+                    stringer.key("partitions").array();
+                    for (int pid : p.getValue()) {
+                        stringer.value(pid);
+                    }
+                    stringer.endArray();
+                    stringer.endObject();
+                }
+                stringer.endArray(); // tables
+                stringer.endObject();
+                return new JSONObject(stringer.toString());
+            } catch (JSONException e) {
+                VoltDB.crashLocalVoltDB("Invalid JSON communicate snapshot info.", true, e);
+            }
+            throw new RuntimeException("impossible.");
         }
     }
 
@@ -557,7 +599,7 @@ SnapshotCompletionInterest
         SnapshotInfo info =
             new SnapshotInfo(key, digest.getParent(),
                     parseDigestFilename(digest.getName()),
-                    partitionCount, catalog_crc);
+                    partitionCount, catalog_crc, m_hostId);
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();
             HashSet<Integer> ids = new HashSet<Integer>();
@@ -652,11 +694,10 @@ SnapshotCompletionInterest
      *            The information of the local snapshot files.
      */
     private void sendLocalRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
-        ByteBuffer buf = serializeRestoreInformation(max, snapshots);
-
+        String jsonData = serializeRestoreInformation(max, snapshots);
         String zkNode = VoltZK.restore + "/" + m_hostId;
         try {
-            m_zk.create(zkNode, buf.array(),
+            m_zk.create(zkNode, jsonData.getBytes(VoltDB.UTF8ENCODING),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             throw new RuntimeException("Failed to create Zookeeper node: " +
@@ -784,93 +825,54 @@ SnapshotCompletionInterest
     }
 
     /**
-     * @param children
-     * @param snapshotFragments
-     * @return null if there is no log to replay in the whole cluster
-     * @throws Exception
+     * This function, like all good functions, does three things.
+     * It produces the command log start transaction Id.
+     * It produces a map of SnapshotInfo objects.
+     * And, it errors if the remote start action does not match the local action.
      */
-    private Long
-    deserializeRestoreInformation(List<String> children,
-                                  Map<Long, Set<SnapshotInfo>> snapshotFragments)
-    throws Exception {
-        byte recover = (byte) m_action.ordinal();
-        Long clStartTxnId = null;
-        ByteBuffer buf;
-        for (String node : children) {
-            int hostId;
-            try {
-                hostId = Integer.parseInt(node);
-            } catch (NumberFormatException e) {
-                // If the node is not named using hostID, skip it
-                continue;
-            }
-
-            byte[] data = null;
-            try {
+    private Long deserializeRestoreInformation(List<String> children,
+            Map<Long, Set<SnapshotInfo>> snapshotFragments) throws Exception
+    {
+        try {
+            int recover = m_action.ordinal();
+            Long clStartTxnId = null;
+            for (String node : children) {
+                byte[] data = null;
                 data = m_zk.getData(VoltZK.restore + "/" + node, false, null);
-            } catch (Exception e) {
-                throw e;
-            }
+                String jsonData = new String(data, "UTF8");
+                JSONObject json = new JSONObject(jsonData);
 
-            buf = ByteBuffer.wrap(data);
-            // Check if there is log to replay
-            boolean hasLog = buf.get() == 1;
-            if (hasLog) {
-                long maxTxnId = buf.getLong();
-                if (clStartTxnId == null || maxTxnId > clStartTxnId) {
-                    clStartTxnId = maxTxnId;
-                }
-            }
-
-            byte recoverByte = buf.get();
-            if (recoverByte != recover) {
-                String msg = "Database actions are not consistent, please enter " +
-                    "the same database action on the command-line.";
-                throw new RuntimeException(msg);
-            }
-
-            int count = buf.getInt();
-            for (int i = 0; i < count; i++) {
-                long txnId = buf.getLong();
-                Set<SnapshotInfo> fragments = snapshotFragments.get(txnId);
-                if (fragments == null) {
-                    fragments = new HashSet<SnapshotInfo>();
-                    snapshotFragments.put(txnId, fragments);
-                }
-                long catalogCrc = buf.getLong();
-
-                int len = buf.getInt();
-                byte[] nonceBytes = new byte[len];
-                buf.get(nonceBytes);
-
-                len = buf.getInt();
-                byte[] pathBytes = new byte[len];
-                buf.get(pathBytes);
-
-                int totalPartitionCount = buf.getInt();
-
-                SnapshotInfo info = new SnapshotInfo(txnId, new String(pathBytes),
-                                                     new String(nonceBytes),
-                                                     totalPartitionCount,
-                                                     catalogCrc, hostId);
-                fragments.add(info);
-
-                int tableCount = buf.getInt();
-                for (int j = 0; j < tableCount; j++) {
-                    len = buf.getInt();
-                    byte[] tableNameBytes = new byte[len];
-                    buf.get(tableNameBytes);
-
-                    int partitionCount = buf.getInt();
-                    HashSet<Integer> partitions = new HashSet<Integer>(partitionCount);
-                    info.partitions.put(new String(tableNameBytes), partitions);
-                    for (int k = 0; k < partitionCount; k++) {
-                        partitions.add(buf.getInt());
+                long maxTxnId = json.optLong("max", Long.MIN_VALUE);
+                if (maxTxnId != Long.MIN_VALUE) {
+                    if (clStartTxnId == null || maxTxnId > clStartTxnId) {
+                        clStartTxnId = maxTxnId;
                     }
                 }
+                int remoteRecover = json.getInt("action");
+                if (remoteRecover != recover) {
+                    String msg = "Database actions are not consistent, please enter " +
+                        "the same database action on the command-line.";
+                    throw new RuntimeException(msg);
+                }
+
+                JSONArray snapInfos = json.getJSONArray("snapInfos");
+                int snapInfoCnt = snapInfos.length();
+                for (int i=0; i < snapInfoCnt; i++) {
+                    JSONObject jsonInfo = snapInfos.getJSONObject(i);
+                    SnapshotInfo info = new SnapshotInfo(jsonInfo);
+                    Set<SnapshotInfo> fragments = snapshotFragments.get(info.txnId);
+                    if (fragments == null) {
+                        fragments = new HashSet<SnapshotInfo>();
+                        snapshotFragments.put(info.txnId, fragments);
+                    }
+                    fragments.add(info);
+                }
             }
+            return clStartTxnId;
+        } catch (JSONException je) {
+            VoltDB.crashLocalVoltDB("Error exchanging snapshot information", true, je);
         }
-        return clStartTxnId;
+        throw new RuntimeException("impossible");
     }
 
     /**
@@ -878,47 +880,28 @@ SnapshotCompletionInterest
      * @param snapshots
      * @return
      */
-    private ByteBuffer serializeRestoreInformation(Long max, Set<SnapshotInfo> snapshots) {
-        // hasLog + recover + snapshotCount
-        int size = 1 + 1 + 4;
-        if (max != null) {
-            // we need to add the size of the max number to the total size
-            size += 8;
-        }
-        for (SnapshotInfo i : snapshots) {
-            size += i.size();
-        }
-
-        ByteBuffer buf = ByteBuffer.allocate(size);
-        if (max == null) {
-            buf.put((byte) 0);
-        } else {
-            buf.put((byte) 1);
-            buf.putLong(max);
-        }
-        // 1 means recover, 0 means to create new DB
-        buf.put((byte) m_action.ordinal());
-
-        buf.putInt(snapshots.size());
-        for (SnapshotInfo snapshot : snapshots) {
-            buf.putLong(snapshot.txnId);
-            buf.putLong(snapshot.catalogCrc);
-            buf.putInt(snapshot.nonce.length());
-            buf.put(snapshot.nonce.getBytes());
-            buf.putInt(snapshot.path.length());
-            buf.put(snapshot.path.getBytes());
-            buf.putInt(snapshot.partitionCount);
-            buf.putInt(snapshot.partitions.size());
-            for (Entry<String, Set<Integer>> p : snapshot.partitions.entrySet()) {
-                buf.putInt(p.getKey().length());
-                buf.put(p.getKey().getBytes());
-                buf.putInt(p.getValue().size());
-                for (int id : p.getValue()) {
-                    buf.putInt(id);
-                }
+    private String serializeRestoreInformation(Long max, Set<SnapshotInfo> snapshots)
+    {
+        try {
+            JSONStringer stringer = new JSONStringer();
+            stringer.object();
+            // optional max value.
+            if (max != null) {
+                stringer.key("max").value(max);
             }
+            // 1 means recover, 0 means to create new DB
+            stringer.key("action").value(m_action.ordinal());
+            stringer.key("snapInfos").array();
+            for (SnapshotInfo snapshot : snapshots) {
+                stringer.value(snapshot.toJSONObject());
+            }
+            stringer.endArray();
+            stringer.endObject();
+            return stringer.toString();
+        } catch (JSONException je) {
+            VoltDB.crashLocalVoltDB("Error exchanging snapshot info", true, je);
         }
-        return buf;
+        throw new RuntimeException("impossible codepath.");
     }
 
     /**
