@@ -41,13 +41,6 @@ IndexCountPlanNode::~IndexCountPlanNode() {
     setOutputTable(NULL);
 }
 
-void IndexCountPlanNode::setKeyIterate(bool val) {
-    this->key_iterate = val;
-}
-bool IndexCountPlanNode::getKeyIterate() const {
-    return (this->key_iterate);
-}
-
 void IndexCountPlanNode::setLookupType(IndexLookupType lookup_type) {
     this->lookup_type = lookup_type;
 }

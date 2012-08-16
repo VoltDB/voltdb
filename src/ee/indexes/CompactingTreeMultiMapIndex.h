@@ -59,7 +59,7 @@ namespace voltdb {
  * Index implemented as a Binary Tree Multimap.
  * @see TableIndex
  */
-template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=false>
+template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=true>
 class CompactingTreeMultiMapIndex : public TableIndex
 {
     friend class TableIndexFactory;
@@ -225,6 +225,9 @@ public:
         return (m_entries.find(m_tmp1).isEnd() == false);
     }
 
+    /**
+     * @See comments in parent class TableIndex
+     */
     int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
@@ -241,21 +244,20 @@ public:
             }
         }
     }
+
+    /**
+     * @See comments in parent class TableIndex
+     */
     int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
         m_tmp1.setFromKey(searchKey);
         m_seqIter = m_entries.lowerBound(m_tmp1);
 
-        if (m_seqIter.isEnd()) {
+        if (m_seqIter.isEnd())
             return m_entries.size();
-        }
 
         int cmp = m_eq(m_tmp1, m_seqIter.key());
-        if (m_seqIter.isEnd()) {
-            return m_entries.size();
-        }
-
         KeyType tmpKey = m_seqIter.key();
         if (cmp == 0) {
             m_seqIter.movePrev();
@@ -263,7 +265,7 @@ public:
                 if (isUpper) return m_entries.rankUpper(m_seqIter.key());
                 else return m_entries.rankAsc(m_seqIter.key());
             } else
-                //we can not find a previous key
+                // we can not find a previous key return rank as 0.
                 return 0;
         }
         // return rank with the current key if equal

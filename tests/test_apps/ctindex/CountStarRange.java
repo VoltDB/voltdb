@@ -38,3 +38,4 @@ public class CountStarRange extends VoltProcedure {
           return voltExecuteSQL();
       }
 }
+

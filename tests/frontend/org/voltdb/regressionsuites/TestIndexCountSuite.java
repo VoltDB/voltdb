@@ -839,6 +839,23 @@ public class TestIndexCountSuite extends RegressionSuite {
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
+        
+        /////////////////////////////////////////////////////////////
+        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
+        /////////////////////////////////////////////////////////////
+
+        config = new LocalCluster("sqlCountingIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #3: 2 Local Site/Partitions running on JNI backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
 
         return builder;
     }
