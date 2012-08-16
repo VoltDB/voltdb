@@ -231,15 +231,13 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert(activeNumOfSearchKeys > 0);
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
-    int activeNumOfEndKeys = -1;
     if (m_numOfEndkeys != 0) {
-        activeNumOfEndKeys = m_numOfEndkeys;
         //
         // END KEY
         //
         m_endKey.setAllNulls();
         VOLT_TRACE("Initial (all null) end key: '%s'", m_endKey.debugNoHeader().c_str());
-        for (int ctr = 0; ctr < activeNumOfEndKeys; ctr++) {
+        for (int ctr = 0; ctr < m_numOfEndkeys; ctr++) {
             if (m_needsSubstituteEndKey[ctr]) {
                 m_endKeyBeforeSubstituteArray[ctr]->substitute(params);
             }
@@ -263,7 +261,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 TableTuple& tmptup = m_outputTable->tempTuple();
                 tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
 
-                if (ctr == (activeNumOfEndKeys - 1)) {
+                if (ctr == (m_numOfEndkeys - 1)) {
                     assert (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
                         m_outputTable->insertTuple(tmptup);
