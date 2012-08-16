@@ -145,7 +145,7 @@ public:
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
-    // TODO(xin): later rename it to ranklower
+    // TODO(xin): later rename it to rankLower
     int64_t rankAsc(const Key& key);
     int64_t rankUpper(const Key& key);
 

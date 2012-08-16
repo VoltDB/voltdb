@@ -60,7 +60,7 @@ namespace voltdb {
  * Index implemented as a Binary Unique Map.
  * @see TableIndex
  */
-template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=false>
+template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=true>
 class CompactingTreeUniqueIndex : public TableIndex
 {
     friend class TableIndexFactory;
