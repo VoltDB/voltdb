@@ -756,6 +756,10 @@ SnapshotCompletionInterest
                 break;
             }
         }
+        if (children == null) {
+            throw new RuntimeException("Unable to read agreement messages from" +
+                                       " other hosts for restore plan");
+        }
         return children;
     }
 
@@ -767,34 +771,31 @@ SnapshotCompletionInterest
      * @throws Exception
      */
     private Set<SnapshotInfo> getRestorePlan() throws Exception {
+        // Wait for ZK to publish the snapshot fragment/info structures.
         List<String> children = waitOnVoltZK_restore();
-        if (children == null) {
-            throw new RuntimeException("Unable to read agreement messages from" +
-                                       " other hosts for restore plan");
+
+        // If not recovering, nothing to do.
+        if (m_action == START_ACTION.CREATE) {
+            return null;
         }
 
         TreeMap<Long, Set<SnapshotInfo>> snapshotFragments = new TreeMap<Long, Set<SnapshotInfo>>();
         Long clStartTxnId = deserializeRestoreInformation(children, snapshotFragments);
 
-        // If we're not recovering, skip the rest
-        if (m_action == START_ACTION.CREATE) {
-            return null;
-        }
-
+        // If command log has no snapshot requirement clear the fragment set directly
         if (clStartTxnId != null && clStartTxnId == Long.MIN_VALUE) {
-            // command log has no snapshot requirement.  Just clear out the
-            // fragment set directly
             snapshotFragments.clear();
         }
-        // If we have a command log and it requires a snapshot, then bail if
-        // there's no good snapshot
+
+        // If we have a command log and it requires a snapshot but no snapshot
+        // fragments were found, simply bail.
         if ((clStartTxnId != null && clStartTxnId != Long.MIN_VALUE) &&
             snapshotFragments.size() == 0)
         {
             throw new RuntimeException("No viable snapshots to restore");
         }
-        LOG.debug("There are " + snapshotFragments.size() +
-                  " snapshots available in the cluster");
+
+        LOG.debug("There are " + snapshotFragments.size() + " snapshots available in the cluster");
 
         // Find the last complete snapshot and use it
         HashMap<Long, Map<String, Set<Integer>>> snapshotTablePartitions =
