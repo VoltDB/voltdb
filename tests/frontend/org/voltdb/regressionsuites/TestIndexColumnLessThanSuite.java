@@ -136,7 +136,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
-/*
+        
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
@@ -147,14 +147,14 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #3: Local Cluster (of processes) with failed node
+        // CONFIG #3: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlCountingIndex-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
+        config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
-        */
+        
+        
         return builder;
     }
 
