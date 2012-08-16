@@ -78,6 +78,13 @@
 <property name='src.ee.dir'                  location='src/ee' />
 <property name='src.catalog.dir'             location='src/catgen' />
 <property name='depcache'                    value='.depcache' />
+<property name='project.parsergen.dir'       location='${src.gpl.dir}/org/voltdb/compiler/projectfile' />
+<property name='project.parsergen.pkg'       value='org.voltdb.compiler.projectfile' />
+<property name='project.parsergen.xsd'       value='org/voltdb/compiler/ProjectFileSchema.xsd' />
+<property name='deployment.parsergen.dir'    location='${src.gpl.dir}/org/voltdb/compiler/deploymentfile' />
+<property name='deployment.parsergen.pkg'    value='org.voltdb.compiler.deploymentfile' />
+<property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
+<property name='debian.package.dir'          value='obj/debian' />
 
 <!-- emma build instrumentation location -->
 <property name='build.instr.dir'             location='${build.dir}/instr' />
@@ -147,6 +154,7 @@ PRIMARY ENTRY POINTS
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 <target name="check_noclustering"
@@ -164,6 +172,7 @@ PRIMARY ENTRY POINTS
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=localhsql" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 <target name="check_quick"
@@ -180,6 +189,7 @@ PRIMARY ENTRY POINTS
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 
@@ -195,6 +205,7 @@ PRIMARY ENTRY POINTS
         <arg value="-Dbuild=${build}" />
         <arg value="-DtimeoutLength=${timeoutLength}" />
         <arg value="-DVOLT_REGRESSIONS=${VOLT_REGRESSIONS}" />
+        <arg value="-DVOLT_ENABLEIV2=${VOLT_ENABLEIV2}" />
     </exec>
 </target>
 
@@ -315,7 +326,6 @@ DISTRIBUTION
             <include name="examples/**"/>
             <include name="lib/**"/>
             <include name="tools/demo/**"/>
-            <include name="tools/sqlcmd/**"/>
             <include name="voltdb/**"/>
             <exclude name=".gitignore"/>
         </fileset>
@@ -387,7 +397,6 @@ DISTRIBUTION
             <include name="doc/tutorials/**/run.sh"/>
             <include name="examples/**/run.sh"/>
             <include name="tools/generate"/>
-            <include name="tools/sqlcmd/sqlcmd"/>
         </fileset>
     </chmod>
 
@@ -431,7 +440,7 @@ DISTRIBUTION
         <fileset dir="${dist.dir}/" defaultexcludes="yes">
             <include name="**/*"/>
             <exclude name=".gitignore"/>
-            <exclude name="bin/"/>
+            <include name="bin/sqlcmd"/>
             <exclude name="voltdb/libvoltdb*"/>
             <exclude name="voltdb/voltdb-*.jar"/>
             <exclude name="voltdb/libjzmq*"/>
@@ -448,7 +457,7 @@ DISTRIBUTION
             <include name="examples/voltkv/run.sh"/>
             <include name="examples/voter/run.sh"/>
             <include name="tools/generate"/>
-            <include name="tools/sqlcmd/sqlcmd"/>
+            <include name="bin/sqlcmd"/> 
         </fileset>
     </chmod>
 
@@ -547,7 +556,9 @@ CLEANING
 ***************************************
 -->
 
-<target name='clean' description="Remove all compiled files." depends="cleantmp">
+<target name='clean'
+	description="Remove all compiled and generated files."
+	depends="cleantmp, clean_project_gen, clean_deployment_gen, clean_debian_package">
   <exec dir='examples/voter' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltcache' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
   <exec dir='examples/voltkv' executable='/usr/bin/env'><arg line="bash run.sh clean"/></exec>
@@ -609,6 +620,7 @@ JAR BUILDING
             <include name="au/com/bytecode/opencsv_voltpatches/**" />
             <include name="org/hsqldb_voltpatches/**" />
             <include name="org/json_voltpatches/**" />
+            <include name="org/mindrot/**" />
         </fileset>
         <fileset dir="${build.test.dir}" defaultexcludes="yes" >
             <include name="org/voltdb/ServerThread.class" />
@@ -745,7 +757,7 @@ JAVA COMPILATION
 ***************************************
 -->
 
-<target name="compile" depends="catalog, compile_core, compile_pro"
+<target name="compile" depends="catalog, project_gen, deployment_gen, compile_core, compile_pro"
         description="Compile all Java source and test classes"/>
 
 <target name="compile_core">
@@ -867,8 +879,7 @@ NATIVE EE STUFF
 ***************************************
 -->
 
-<target name='catalog'
-        description="Generate catalog source code.">
+<target name='catalog' description="Generate catalog source code.">
   <exec dir="${src.catalog.dir}" executable='python' failonerror='true'>
     <arg line="catalog.py"/>
   </exec>
@@ -1003,33 +1014,6 @@ TEST CASES
     </exec>
 </target>
 
-<target name='with.emma' description="enable code coverage analysis" >
-    <!-- set up emma -->
-    <path id="emma.lib" >
-        <pathelement location="${vendor.lib.dir}/emma.jar" />
-        <pathelement location="${vendor.lib.dir}/emma_ant.jar" />
-    </path>
-    <taskdef resource="emma_ant.properties" classpathref="emma.lib" />
-    <!-- enable emma -->
-    <property name="emma.enabled" value="true" />
-    <!-- instrument the code -->
-    <property name="emma.dir" location="${build.dir}/emma" />
-    <mkdir dir="${emma.dir}" />
-    <emma>
-        <instr destdir="${build.instr.dir}/org/"
-               metadatafile="${emma.dir}/metadata.emma"
-               merge="true">
-          <instrpath path="${build.prod.dir}/org"/>
-
-          <filter includes="*voltdb.*"/>
-          <filter includes="*voltcore.*"/>
-          <!--pmsg is the protobuf-generated code for dragent-->
-          <filter excludes="*pmsg.*"/>
-          <filter excludes="*exampleutils.*"/>
-        </instr>
-    </emma>
-</target>
-
 <!-- script that runs junit_onesuite for each class in a fileset -->
 <!-- if there's a better way to do this than embedding javascript, please help... -->
 <scriptdef name="junit-files" language="javascript">
@@ -1099,6 +1083,7 @@ TEST CASES
             <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
             <env key="TEST_DIR" value="${build.testobjects.dir}" />
             <env key="VOLT_REGRESSIONS" value="${regressions}" />
+            <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
             <!-- Following two env vars are used by Java code
                  when running ant check -Dbuild=memcheck
                  The voltdbipc client is used in concert with valgrind
@@ -1147,6 +1132,88 @@ TEST CASES
             <arg value="--testresult=${junit.failures}" />
         </exec>
     </sequential>
+</target>
+
+<target
+    name="junit_iv2"
+    description="Tests exclusive to IV2 functionality.">
+
+    <condition property="enableiv2" value="${enableiv2}" else="true">
+        <isset property="enableiv2"/>
+    </condition>
+
+    <run_junit>
+        <tests>
+            <fileset dir='${build.test.dir}'>
+                <include name='org/hsqldb_voltpatches/**/Test*.class'/>
+                <include name='org/voltdb/**/Test*.class'/>
+                <include name='org/voltdb/**/Iv2Test*.class'/>
+                <exclude name="**/*$*.class"/>
+                <!-- pro tests -->
+                <exclude name="**/TestCommandLogServer.class" />
+                <exclude name="**/TestResponseSampler.class" />
+                <exclude name="**/TestRestoreWithReplay.class" />
+                <exclude name="**/TestVoltLicense.class" />
+                <exclude name="**/TestPrimary.class" />
+                <exclude name="**/TestSecondaryRejoin.class" />
+                <exclude name="**/TestInvocationBufferServer.class" />
+                <exclude name="**/TestSyncSnapshotGeneratorAndConverter.class" />
+                <exclude name="**/TestSnapshotSaveTruncation.class" />
+                <!-- community tests -->
+<!--                <exclude name="**/TestHSQLBackend.class" /> -->
+<!--                <exclude name="**/TestAdHocQueries.class" /> -->
+                <exclude name="**/TestJSONInterface.class" />
+<!--                <exclude name="**/TestRejoinEndToEnd.class" /> -->
+                <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
+                <exclude name="**/TestRejoinWithCatalogUpdates.class" />
+                <exclude name="**/TestRejoinFuzz.class" />
+                <exclude name="**/TestRejoinFuzz2.class" />
+                <exclude name="**/TestReplicatedInvocation.class" />
+<!--                <exclude name="**/TestRestoreAgent.class" -->
+<!--                <exclude name="**/TestSimpleCJK.class" /> -->
+<!--                <exclude name="**/TestClientTimeouts.class" /> -->
+                <exclude name="**/TestExportToFileClient.class" />
+                <exclude name="**/TestNonDetermisticSeppuku.class" />
+<!--                <exclude name="**/TestJDBCDriver.class" />-->
+                <exclude name="**/TestAdminMode.class" />
+                <exclude name="**/TestCatalogUpdateSuite.class" />
+<!--                <exclude name="**/TestCRUDSuite.class" /> -->
+<!--                <exclude name="**/TestFailureDetectSuite.class" /> -->
+                <!-- ExecutionSite not relevant to Iv2. -->
+                <exclude name="**/TestExecutionSite.class" />
+<!--                <exclude name="**/TestExecutionSiteDeath.class" /> -->
+<!--                <exclude name="**/TestFailuresSuite.class" /> -->
+<!--                <exclude name="**/TestFixedSQLSuite.class" /> -->
+<!--                <exclude name="**/TestFunctionsSuite.class" /> -->
+<!--                <exclude name="**/TestGiantDeleteSuite.class" /> -->
+<!--                <exclude name="**/TestIndexMemoryOwnershipSuite.class"  /> -->
+<!--                <exclude name="**/TestIndexesSuite.class" /> -->
+<!--                <exclude name="**/TestLimitOffsetSuite.class" /> -->
+<!--                <exclude name="**/TestLoadingSuite.class" /> -->
+                <exclude name="**/TestMaliciousClientSuite.class" />
+<!--                <exclude name="**/TestMaterializedViewSuite.class" /> -->
+<!--                <exclude name="**/TestMultiPartitionSuite.class" /> -->
+<!--                <exclude name="**/TestOrderBySuite.class" /> -->
+                <exclude name="**/TestPartitionDetection.class" />
+<!--                <exclude name="**/TestPlansGroupBySuite.class" /> -->
+                <exclude name="**/TestReplicationSuite.class" />
+<!--                <exclude name="**/TestRollbackSuite.class" /> -->
+<!--                <exclude name="**/TestSQLFeaturesSuite.class" /> -->
+<!--                <exclude name="**/TestSQLTypesSuite.class" /> -->
+<!--                <exclude name="**/TestSecuritySuite.class" /> -->
+                <exclude name="**/TestSneakyExecutionOrderSuite.class" />
+<!--                <exclude name="**/TestSqlAggregateSuite.class" /> -->
+<!--                <exclude name="**/TestSqlLogicOperatorsSuite.class" /> -->
+<!--                <exclude name="**/TestSqlUpdateSuite.class" /> -->
+<!--                <exclude name="**/TestSystemCatalogSuite.class" /> -->
+<!--                <exclude name="**/TestSystemInformationSuite.class" /> -->
+                <exclude name="**/TestSystemProcedureSuite.class" />
+<!--                <exclude name="**/TestTPCCSuite.class" /> -->
+<!--                <exclude name="**/TestBlobType.class" /> -->
+                <exclude name="org/voltdb/quarantine/**/*.class"/>
+            </fileset>
+        </tests>
+    </run_junit>
 </target>
 
 <!-- common macro to run a bynch of junit -->
@@ -1258,10 +1325,46 @@ TEST CASES
     </run_junit>
 </target>
 
+<target name='emma_junit'
+        description="run junit target and generate coverage report"
+        depends="with.emma, junit, emma-report"
+/>
+
+<target name='emma_junit_iv2'
+        description="run junit_iv2 target and generate coverage report"
+        depends="with.emma, junit_iv2, emma-report"
+/>
+
+<target name='with.emma' description="enable code coverage analysis" >
+    <!-- set up emma -->
+    <path id="emma.lib" >
+        <pathelement location="${vendor.lib.dir}/emma.jar" />
+        <pathelement location="${vendor.lib.dir}/emma_ant.jar" />
+    </path>
+    <taskdef resource="emma_ant.properties" classpathref="emma.lib" />
+    <!-- enable emma -->
+    <property name="emma.enabled" value="true" />
+    <!-- instrument the code -->
+    <property name="emma.dir" location="${build.dir}/emma" />
+    <mkdir dir="${emma.dir}" />
+    <emma>
+        <instr destdir="${build.instr.dir}/org/"
+               metadatafile="${emma.dir}/metadata.emma"
+               merge="true">
+          <instrpath path="${build.prod.dir}/org"/>
+
+          <filter includes="*voltdb.*"/>
+          <filter includes="*voltcore.*"/>
+          <!--pmsg is the protobuf-generated code for dragent-->
+          <filter excludes="*pmsg.*"/>
+          <filter excludes="*exampleutils.*"/>
+        </instr>
+    </emma>
+</target>
+
 <target
     name='emma-report'
-    depends='with.emma, junit'
-    description="Generate code coverage reports, if appropriate.">
+    description="Generate code coverage reports.  You need call the with.emma target before your test target">
     <emma>
         <report
             sourcepath="${src.gpl.dir}"
@@ -1278,6 +1381,7 @@ TEST CASES
         </report>
     </emma>
 </target>
+
 
 <!--
     this target is intended to be called only with antcall!
@@ -1314,8 +1418,10 @@ TEST CASES
   </antcall>
   <antcall target="sqlcoverage">
     <param name="build.dir.suffix" value="-coverage" />
+    <param name="sqlcoverage.failonerror" value="false" />
   </antcall>
   <!-- Get test coverage -->
+  <echo>Processing coverage</echo>
   <exec dir="${lcov.dir}" executable='lcov' failonerror="true">
     <arg line="--directory ${build.dir}-coverage/objects"/>
     <arg line="--capture"/>
@@ -1441,6 +1547,9 @@ TEST CASES
     <condition property="verbosereport" value="${verbosereport}" else="true">
         <isset property="verbosereport"/>
     </condition>
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
+    </condition>
 
     <run_junit>
         <tests>
@@ -1490,6 +1599,7 @@ TEST CASES
 <target name='sqlcoverage' depends="ee,compile"
     description="Run the SQL coverage tests.">
     <property name="build.dir.suffix" value="" /> <!-- Default -->
+    <property name="sqlcoverage.failonerror" value="true" />
     <property name="test.example.dir"
     location="tests/scripts/examples/sql_coverage" />
     <property name="log4j.configuration" location="tests/log4j-allconsole.xml" />
@@ -1501,6 +1611,9 @@ TEST CASES
         <arg line="-c 'rm -rf ${sqlcov.dir}'"/>
     </exec>
     <mkdir dir="${sqlcov.dir}" />
+    <condition property="enableiv2" value="${enableiv2}" else="false">
+        <isset property="enableiv2"/>
+    </condition>
     <condition property="" value="${env.VOLTBUILD}" else='release'>
         <isset property="env.VOLTBUILD"/>
     </condition>
@@ -1523,7 +1636,7 @@ TEST CASES
     <condition property="hosts" value="${sql_coverage_hosts}" else="1">
         <isset property="sql_coverage_hosts"/>
     </condition>
-    <condition property="sitesperhost" value="${sql_coverage_sites}" else="1">
+    <condition property="sitesperhost" value="${sql_coverage_sites}" else="3">
         <isset property="sql_coverage_sites"/>
     </condition>
     <condition property="replicas" value="${sql_coverage_replicas}" else="0">
@@ -1547,9 +1660,10 @@ TEST CASES
         <include name="version.txt"/>
       </fileset>
     </copy>
-    <exec dir='tests/scripts' executable='python2.6' failonerror='true'>
+    <exec dir='tests/scripts' executable='python2.6' failonerror="${sqlcoverage.failonerror}">
         <env key="TEST_DIR" value="${build.testobjects.dir}" />
         <env key="VOLTDB_BUILD_DIR" value="${build.dir}"/>
+        <env key="VOLT_ENABLEIV2" value="${enableiv2}" />
         <arg line='sql_coverage_test.py' />
         <arg line="${seed_arg}" />
         <arg line="${config_arg}" />
@@ -1717,6 +1831,100 @@ UTILITIES
         <classpath refid='project.classpath' />
         <assertions><enable/></assertions>
     </java>
+</target>
+
+<!--
+***************************************
+PROJECT FILE SCHEMA CODE GENERATION
+***************************************
+-->
+
+<target name="project_gen"
+        depends="project_gen_check"
+        unless="project.parsergen.uptodate"
+        description="Use JAXB to generate source from the project file schema">
+    <delete file="${project.parsergen.dir}/.flagfile" />
+    <exec dir="${src.gpl.dir}" executable="xjc" failonerror="true">
+        <arg line="-p ${project.parsergen.pkg} ${project.parsergen.xsd}" />
+    </exec>
+    <touch file="${project.parsergen.dir}/.flagfile" />
+</target>
+
+<target name="project_gen_check" depends="">
+    <uptodate property="project.parsergen.uptodate"
+              targetfile="${project.parsergen.dir}/.flagfile">
+        <srcfiles file="${src.gpl.dir}/${project.parsergen.xsd}" />
+    </uptodate>
+</target>
+
+<target name="clean_project_gen"
+        description="Remove all source files generated by JAXB for project file schema.">
+    <exec dir='.' executable='/bin/sh' failonerror='false'>
+        <arg line="-c 'rm -rfv ${project.parsergen.dir}'" />
+    </exec>
+</target>
+
+<!--
+***************************************
+DEPLOYMENT FILE SCHEMA CODE GENERATION
+***************************************
+-->
+
+<target name="deployment_gen"
+        depends="deployment_gen_check"
+        unless="deployment.parsergen.uptodate"
+        description="Use JAXB to generate source from the deployment file schema">
+    <delete file="${deployment.parsergen.dir}/.flagfile" />
+    <exec dir="${src.gpl.dir}" executable="xjc" failonerror="true">
+        <arg line="-p ${deployment.parsergen.pkg} ${deployment.parsergen.xsd}" />
+    </exec>
+    <touch file="${deployment.parsergen.dir}/.flagfile" />
+</target>
+
+<target name="deployment_gen_check" depends="">
+    <uptodate property="deployment.parsergen.uptodate"
+              targetfile="${deployment.parsergen.dir}/.flagfile">
+        <srcfiles file="${src.gpl.dir}/${deployment.parsergen.xsd}" />
+    </uptodate>
+</target>
+
+<target name="clean_deployment_gen"
+        description="Remove all source files generated by JAXB for deployment file schema.">
+    <exec dir='.' executable='/bin/sh' failonerror='false'>
+        <arg line="-c 'rm -rfv ${deployment.parsergen.dir}'" />
+    </exec>
+</target>
+
+<!--
+***********************
+DEBIAN PACKAGE CREATION
+***********************
+-->
+
+<target name="debian_package"
+	    depends=""
+        description="Create Debian/Ubuntu package. Uses sudo, so it may prompt for a password.">
+    <exec dir="." executable="sudo" failonerror="true">
+        <arg line="python ${base.dir}/tools/voltdb-install.py -D" />
+    </exec>
+</target>
+
+<!-- This debian package cleaning target is safe. It doesn't run as root. -->
+<target name="clean_debian_package"
+	    depends=""
+        description="Remove all Debian/Ubuntu package build artifacts.">
+    <exec dir='.' executable='/bin/sh' failonerror='false'>
+        <arg line="-c 'rm -rfv ${debian.package.dir}'" />
+    </exec>
+</target>
+
+<!-- Use this if permissions are messed up by interrupted package building as root. -->
+<target name="force_clean_debian_package"
+	    depends=""
+        description="Forceably remove all Debian/Ubuntu package build artifacts as root.">
+    <exec dir="." executable="sudo" failonerror="false">
+        <arg line="/bin/sh -c 'rm -rfv ${debian.package.dir}'" />
+    </exec>
 </target>
 
 <!-- END PROJECT -->

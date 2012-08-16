@@ -981,11 +981,16 @@ public class SnapshotUtil {
 
             @Override
             public long connectionId() {
-                throw new UnsupportedOperationException();
+                return Long.MIN_VALUE + 2;
             }
 
             @Override
             public Future<?> unregister() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void queueTask(Runnable r) {
                 throw new UnsupportedOperationException();
             }
 

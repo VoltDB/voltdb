@@ -66,7 +66,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
     final int messageTypeOffset = blockIndexOffset + 4;
     final int tableIdOffset = messageTypeOffset + 1;
 
-    private static final VoltLogger recoveryLog = new VoltLogger("RECOVERY");
+    private static final VoltLogger recoveryLog = new VoltLogger("JOIN");
 
     /**
      * List of tables that need to be streamed
@@ -552,7 +552,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             Thread.yield();
         }
         if (m_sc == null) {
-            VoltDB.crashLocalVoltDB("Timed out waiting for connection from source partition", false, null);
+            VoltDB.crashLocalVoltDB("Timed out waiting for connection from source partition", true, null);
         }
         ssc.close();
         m_sc.configureBlocking(true);

@@ -16,12 +16,6 @@
             <procedure class='com.auctionexample.debug.SelectItem' />
             <procedure class='com.auctionexample.debug.SelectUser' />
         </procedures>
-        <partitions>
-            <partition table='ITEM' column='ITEMID' />
-            <partition table='BID' column='ITEMID' />
-            <partition table='ITEM_EXPORT' column='ITEMID' />
-            <partition table='BID_EXPORT' column='ITEMID' />
-        </partitions>
         <export>
             <tables>
                 <table name="ITEM_EXPORT"/>

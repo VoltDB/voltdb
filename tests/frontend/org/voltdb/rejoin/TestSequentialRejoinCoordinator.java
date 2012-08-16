@@ -143,8 +143,14 @@ public class TestSequentialRejoinCoordinator {
 
         // fake a replay finished response for site 2 before snapshot stream finishes
         RejoinMessage msg3 = new RejoinMessage(2l, RejoinMessage.Type.REPLAY_FINISHED);
-        m_coordinator.deliver(msg3);
-
+        boolean threw = false;
+        try {
+            m_coordinator.deliver(msg3);
+        }
+        catch (AssertionError ae) {
+            threw = true;
+        }
+        assertTrue(threw);
         // crash should be called
         assertTrue(VoltDB.wasCrashCalled);
     }

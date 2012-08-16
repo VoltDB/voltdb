@@ -44,6 +44,7 @@ var QueryUI = (function(queryTab){
 								sql = sql.replace('$(SQL_PARSER_STRING_FRAGMENT#' + j + ')', frag[j]);
 						sql = sql.replace(/\$\(SQL_PARSER_ESCAPE_SINGLE_QUOTE\)/g,"''");
                         sql = sql.replace("#SQL_PARSER_STRING_KEYWORD#","");
+                        sql = sql.replace(/\"/g, '\\"');
 						statements.push(sql);
 					}
 				}

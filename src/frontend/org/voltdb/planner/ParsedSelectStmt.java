@@ -280,6 +280,9 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
                 tve.setTableName("VOLT_TEMP_TABLE");
                 tve.setValueSize(orig_col.expression.getValueSize());
                 tve.setValueType(orig_col.expression.getValueType());
+                if (orig_col.expression.hasAnySubexpressionOfClass(AggregateExpression.class)) {
+                    tve.setHasAggregate(true);
+                }
             }
         }
         else if (child.name.equals("function") == false)
@@ -361,10 +364,11 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     private AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
         if (id != -1) {
             ParameterValueExpression parameter = new ParameterValueExpression();
-            ParameterInfo paramInfo = paramsById.get(id);
-            parameter.setParameterIndex(paramInfo.index);
-            parameter.setValueType(paramInfo.type);
-            parameter.setValueSize(paramInfo.type.getLengthInBytesForFixedTypes());
+            assert(paramsById.containsKey(id));
+            int index = paramsById.get(id);
+            parameter.setParameterIndex(index);
+            parameter.setValueType(paramList[index]);
+            parameter.setValueSize(paramList[index].getLengthInBytesForFixedTypes());
             return parameter;
         }
         else {

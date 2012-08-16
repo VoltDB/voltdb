@@ -117,13 +117,7 @@ AbstractExpression::hasParameter() const
 bool
 AbstractExpression::initParamShortCircuits()
 {
-    if (m_left && m_left->hasParameter())
-        return true;
-    if (m_right && m_right->hasParameter())
-        return true;
-
-    m_hasParameter = false;
-    return false;
+    return (m_hasParameter = hasParameter());
 }
 
 std::string

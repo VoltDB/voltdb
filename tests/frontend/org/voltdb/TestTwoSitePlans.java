@@ -25,7 +25,6 @@ package org.voltdb;
 
 import java.io.File;
 import java.io.IOException;
-
 import java.util.concurrent.atomic.AtomicReference;
 
 import junit.framework.TestCase;
@@ -154,9 +153,11 @@ public class TestTwoSitePlans extends TestCase {
         ParameterSet params = new ParameterSet();
         params.setParameters(1L, 1L, 1L);
 
-        VoltTable[] results = ee2.executeQueryPlanFragmentsAndGetResults(
-                new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) }, 1,
-                new ParameterSet[] { params }, 1,
+        VoltTable[] results = ee2.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
+                null,
+                new ParameterSet[] { params },
                 1,
                 0,
                 Long.MAX_VALUE);
@@ -166,9 +167,11 @@ public class TestTwoSitePlans extends TestCase {
         params = new ParameterSet();
         params.setParameters(2L, 2L, 2L);
 
-        results = ee1.executeQueryPlanFragmentsAndGetResults(
-                new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) }, 1,
-                new ParameterSet[] { params }, 1,
+        results = ee1.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(insertFrag) },
+                null,
+                new ParameterSet[] { params },
                 2,
                 1,
                 Long.MAX_VALUE);
@@ -181,9 +184,12 @@ public class TestTwoSitePlans extends TestCase {
         params.setParameters();
 
         int outDepId = 1 | DtxnConstants.MULTIPARTITION_DEPENDENCY;
-        VoltTable dependency1 = ee1.executePlanFragment(
-                CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                -1, params, 3, 2, Long.MAX_VALUE);
+        VoltTable dependency1 = ee1.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                null,
+                new ParameterSet[] { params },
+                3, 2, Long.MAX_VALUE)[0];
         try {
             System.out.println(dependency1.toString());
         } catch (Exception e) {
@@ -192,9 +198,12 @@ public class TestTwoSitePlans extends TestCase {
         }
         assertTrue(dependency1 != null);
 
-        VoltTable dependency2 = ee2.executePlanFragment(
-                CatalogUtil.getUniqueIdForFragment(selectBottomFrag),
-                -1, params, 3, 2, Long.MAX_VALUE);
+        VoltTable dependency2 = ee2.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(selectBottomFrag) },
+                null,
+                new ParameterSet[] { params },
+                3, 2, Long.MAX_VALUE)[0];
         try {
             System.out.println(dependency2.toString());
         } catch (Exception e) {
@@ -206,9 +215,12 @@ public class TestTwoSitePlans extends TestCase {
         ee1.stashDependency(outDepId, dependency1);
         ee1.stashDependency(outDepId, dependency2);
 
-        dependency1 = ee1.executePlanFragment(
-                CatalogUtil.getUniqueIdForFragment(selectTopFrag),
-                outDepId, params, 3, 2, Long.MAX_VALUE);
+        dependency1 = ee1.executePlanFragments(
+                1,
+                new long[] { CatalogUtil.getUniqueIdForFragment(selectTopFrag) },
+                new long[] { outDepId },
+                new ParameterSet[] { params },
+                3, 2, Long.MAX_VALUE)[0];
         try {
             System.out.println("Final Result");
             System.out.println(dependency1.toString());

@@ -17,8 +17,11 @@
 package org.voltdb.compiler;
 
 import java.util.ArrayList;
+import java.util.Collections;
 import java.util.HashMap;
 import java.util.List;
+
+import java.util.Map.Entry;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -59,6 +62,17 @@ public class ClusterConfig
         m_hostCount = hostCount;
         m_sitesPerHost = sitesPerHost;
         m_replicationFactor = replicationFactor;
+        m_errorMsg = "Config is unvalidated";
+    }
+
+    // Construct a ClusterConfig object from the JSON topology.  The computations
+    // for this object are currently deterministic given the three values below, so
+    // this all magically works.  If you change that fact, good luck Chuck.
+    public ClusterConfig(JSONObject topo) throws JSONException
+    {
+        m_hostCount = topo.getInt("hostcount");
+        m_sitesPerHost = topo.getInt("sites_per_host");
+        m_replicationFactor = topo.getInt("kfactor");
         m_errorMsg = "Config is unvalidated";
     }
 
@@ -141,12 +155,20 @@ public class ClusterConfig
             partToHosts.get(partition).add(hostForSite);
         }
 
+        // We need to sort the hostID lists for each partition so that
+        // the leader assignment magic in the loop below will work.
+        for (Entry<Integer, ArrayList<Integer>> e : partToHosts.entrySet()) {
+            Collections.sort(e.getValue());
+        }
+
         // {"kfactor" : 2,
         //  "sites_per_host" : 3,
         //  "partitions" :
         //    [{"partition_id" : 0,
+        //      "master" : <hostid1>,
         //      "replicas" : [hostid1, hostid2, hostid3]},
         //     {"partition_id" : 1,
+        //      "master" : <hostid2>,
         //      "replicas" : [hostid1, hostid2, hostid3]}
         //    ]
         // }
@@ -161,9 +183,13 @@ public class ClusterConfig
         {
             stringer.object();
             stringer.key("partition_id").value(part);
+            // This two-line magic deterministically spreads the partition leaders
+            // evenly across the cluster at startup.
+            int index = part % (getReplicationFactor() + 1);
+            int master = partToHosts.get(part).get(index);
+            stringer.key("master").value(master);
             stringer.key("replicas").array();
-            for (int host_pos : partToHosts.get(part))
-            {
+            for (int host_pos : partToHosts.get(part)) {
                 stringer.value(host_pos);
             }
             stringer.endArray();
@@ -173,8 +199,7 @@ public class ClusterConfig
         stringer.endObject();
 
         JSONObject topo = new JSONObject(stringer.toString());
-        hostLog.debug("TOPO: " + topo.toString(2));
-
+        hostLog.info("TOPO: " + topo.toString(2));
         return topo;
     }
 

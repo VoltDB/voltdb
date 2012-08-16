@@ -107,11 +107,9 @@ private:
 
     int8_t setLogLevels(struct ipc_command *cmd);
 
-    void executeQueryPlanFragmentsAndGetResults(struct ipc_command *cmd);
+    void executePlanFragments(struct ipc_command *cmd);
 
-    void executePlanFragmentAndGetResults(struct ipc_command *cmd);
-
-    void executeCustomPlanFragmentAndGetResults(struct ipc_command *cmd);
+    void loadFragment(struct ipc_command *cmd);
 
     void getStats(struct ipc_command *cmd);
 

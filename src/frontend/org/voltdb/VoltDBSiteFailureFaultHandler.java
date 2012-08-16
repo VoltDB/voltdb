@@ -21,6 +21,7 @@ import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
+import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.export.ExportManager;
 import org.voltdb.fault.FaultHandler;
 import org.voltdb.fault.SiteFailureFault;
@@ -54,7 +55,8 @@ class VoltDBSiteFailureFaultHandler implements FaultHandler {
         // kill the cluster if this all happened too soon
         if (m_rvdb.getHostMessenger().isLocalHostReady() == false) {
             // check that this isn't a rejoining node
-            if (m_rvdb.getConfig().m_rejoinToHostAndPort == null) {
+            if (m_rvdb.getConfig().m_startAction != START_ACTION.REJOIN &&
+                    m_rvdb.getConfig().m_startAction != START_ACTION.LIVE_REJOIN) {
                 String message = "Node fault detected before all nodes finished " +
                                  "initializing. Cluster will not start.";
                 VoltDB.crashGlobalVoltDB(message, false, null);

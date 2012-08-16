@@ -117,20 +117,26 @@ bool DistinctExecutor::p_execute(const NValueArray &params) {
     TableIterator iterator = input_table->iterator();
     TableTuple tuple(input_table->schema());
 
+    // substitute params for distinct expression
+    const std::vector<AbstractExpression*>& expressions = node->getDistinctExpressions();
+    for (std::vector<AbstractExpression*>::const_iterator it = expressions.begin(); it != expressions.end(); ++it) {
+        (*it)->substitute(params);
+    }
+
     std::set<std::vector<NValue>, detail::ltTuples> found_values;
     while (iterator.next(tuple)) {
         //
         // Check whether this value already exists in our list
         //
-        std::vector<NValue> tuples;
-        const std::vector<AbstractExpression*>& expressions = node->getDistinctExpressions();
+        std::vector<NValue> tupleValues;
         for (std::vector<AbstractExpression*>::const_iterator it = expressions.begin();
             it != expressions.end(); ++it) {
-            tuples.push_back((*it)->eval(&tuple, NULL));
+            tupleValues.push_back((*it)->eval(&tuple, NULL));
         }
 
-        if (found_values.find(tuples) == found_values.end()) {
-            found_values.insert(tuples);
+        if (found_values.find(tupleValues) == found_values.end()) {
+            found_values.insert(tupleValues);
+
             if (!output_table->insertTuple(tuple)) {
                 VOLT_ERROR("Failed to insert tuple from input table '%s' into"
                            " output table '%s'",

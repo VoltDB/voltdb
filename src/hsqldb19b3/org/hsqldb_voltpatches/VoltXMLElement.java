@@ -56,4 +56,15 @@ public class VoltXMLElement {
             e.append(sb, indent + "   ");
         }
     }
+
+    public VoltXMLElement duplicate() {
+        VoltXMLElement retval = new VoltXMLElement(name);
+        for (Entry<String, String> e : attributes.entrySet()) {
+            retval.attributes.put(e.getKey(), e.getValue());
+        }
+        for (VoltXMLElement child : children) {
+            retval.children.add(child.duplicate());
+        }
+        return retval;
+    }
 }
