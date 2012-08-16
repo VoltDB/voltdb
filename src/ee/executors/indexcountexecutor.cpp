@@ -180,7 +180,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     // SEARCH KEY
     //
     m_searchKey.setAllNulls();
-    VOLT_TRACE("Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
+    VOLT_DEBUG("<Index Count>Initial (all null) search key: '%s'", m_searchKey.debugNoHeader().c_str());
     for (int ctr = 0; ctr < activeNumOfSearchKeys; ctr++) {
         if (m_needsSubstituteSearchKey[ctr]) {
             m_searchKeyBeforeSubstituteArray[ctr]->substitute(params);
@@ -234,7 +234,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         // END KEY
         //
         m_endKey.setAllNulls();
-        VOLT_TRACE("Initial (all null) end key: '%s'", m_endKey.debugNoHeader().c_str());
+        VOLT_DEBUG("Initial (all null) end key: '%s'", m_endKey.debugNoHeader().c_str());
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++) {
             if (m_needsSubstituteEndKey[ctr]) {
                 m_endKeyBeforeSubstituteArray[ctr]->substitute(params);
@@ -265,6 +265,11 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                         return true;
                     } else if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
                         endKeyOverflow = true;
+                        const ValueType type = m_endKey.getSchema()->columnType(ctr);
+                        NValue tmpEndKeyValue = ValueFactory::getBigIntValue(getMaxTypeValue(type));
+                        m_endKey.setNValue(ctr, tmpEndKeyValue);
+
+                        VOLT_DEBUG("<Index count> end key out of range, MAX value: %ld...\n", (long)getMaxTypeValue(type));
                         break;
                     } else {
                         throw e;
@@ -336,8 +341,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 return false;
             }
         } else {
-            rkEnd = m_index->getSize();
-            rightIncluded = 1;
+            rkEnd = m_index->getCounterGET(&m_endKey, true);
         }
     } else {
         rkEnd = m_index->getSize();

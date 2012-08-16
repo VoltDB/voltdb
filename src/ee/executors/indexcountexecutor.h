@@ -19,6 +19,7 @@
 #ifndef HSTOREINDEXCOUNTEXECUTOR_H
 #define HSTOREINDEXSCANEXECUTOR_H
 
+#include "common/common.h"
 #include "common/valuevector.h"
 #include "common/tabletuple.h"
 #include "executors/abstractexecutor.h"
