@@ -863,7 +863,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         project.addStmtProcedure("TM2_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS < ?");
         project.addStmtProcedure("TM2_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS <= ?");
         project.addStmtProcedure("TM2_GT_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS < ?");
-        project.addStmtProcedure("TM2_GT_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
+        project.addStmtProcedure("TM2_GT_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS > ? AND POINTS <= ?");
         project.addStmtProcedure("TM2_GET_LT",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS < ?");
         project.addStmtProcedure("TM2_GET_LET",       "SELECT COUNT(*) FROM TM2 WHERE UNAME = ? AND POINTS >= ? AND POINTS <= ?");
         boolean success;
