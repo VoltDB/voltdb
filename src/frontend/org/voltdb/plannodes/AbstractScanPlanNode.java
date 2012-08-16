@@ -303,6 +303,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+    //TODO some members not in here
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
@@ -312,16 +313,15 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
     }
 
-    //TODO some members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
 
+        if(!jobj.isNull(Members.PREDICATE.name())) {
+            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
+        }
         this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
-//        JSONObject jobj1 = jobj.getJSONObject( Members.PREDICATE.name() );
-//        if( jobj1 != null ) {
-//            this.m_predicate.fromJSONObject(jobj1, db);
-//        }
+
     }
 
     @Override

@@ -711,22 +711,29 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
   //TODO outputSchema not loaded
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         assert( jobj != null );
-        String str = jobj.getString( Members.ID.name() );
-        m_id = Integer.parseInt( str );
+        m_id = jobj.getInt( Members.ID.name() );
 
-        //TODO : need to set up output_schema and members in various plannodes. Inline nodes are handled below
-
-        m_outputSchema = new NodeSchema();
-
+        JSONArray jarray = null;
         //load inline nodes
-        JSONArray jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
-        if( jarray.length() != 0 ) {
+        if( !jobj.isNull( Members.INLINE_NODES.name() ) ){
+            jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
             PlanNodeTree pnt = new PlanNodeTree();
             pnt.loadFromJSONArray(jarray, db);
             List<AbstractPlanNode> list = pnt.getNodeList();
             for( AbstractPlanNode pn : list ) {
                 m_inlineNodes.put( pn.getPlanNodeType(), pn);
             }
+        }
+        //children and parents list loading implemented in planNodeTree.loadFromJsonArray
+
+        //load output shchema
+        m_outputSchema = new NodeSchema();
+        if( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ){
+            jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
+        }
+        int size = jarray.length();
+        for( int i = 0; i < size; i++ ) {
+            m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i), db) );
         }
     }
 

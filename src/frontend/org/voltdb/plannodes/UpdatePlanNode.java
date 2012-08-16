@@ -58,6 +58,7 @@ public class UpdatePlanNode extends AbstractOperationPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
+        m_updatesIndexes = jobj.getBoolean( Members.UPDATES_INDEXES .name() );
     }
 
     @Override

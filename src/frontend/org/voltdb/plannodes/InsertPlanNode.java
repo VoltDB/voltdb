@@ -58,6 +58,7 @@ public class InsertPlanNode extends AbstractOperationPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
+        m_multiPartition = jobj.getBoolean( Members.MULTI_PARTITION.name() );
     }
 
     @Override
