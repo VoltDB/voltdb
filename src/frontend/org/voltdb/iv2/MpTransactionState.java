@@ -108,7 +108,7 @@ public class MpTransactionState extends TransactionState
     @Override
     public StoredProcedureInvocation getInvocation()
     {
-        return null;
+        return m_task.getStoredProcedureInvocation();
     }
 
     @Override
