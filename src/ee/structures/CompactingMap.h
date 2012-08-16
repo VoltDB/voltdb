@@ -146,6 +146,7 @@ public:
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
     // TODO(xin): later rename it to rankLower
+    // Must pass a key that already in map, or else return -1
     int64_t rankAsc(const Key& key);
     int64_t rankUpper(const Key& key);
 
@@ -726,7 +727,7 @@ template<typename Key, typename Data, typename Compare, bool hasRank>
 int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
     if (!hasRank) return -1;
     TreeNode *n = lookup(key);
-    // must pass a key that already in map
+    // return -1 if the key passed in is not in the map
     if (n == &NIL) return -1;
     TreeNode *x = m_root, *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
@@ -774,6 +775,9 @@ template<typename Key, typename Data, typename Compare, bool hasRank>
 int64_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
     if (!hasRank) return -1;
     if (m_unique) return rankAsc(key);
+    TreeNode *n = lookup(key);
+    // return -1 if the key passed in is not in the map
+    if (n == &NIL) return -1;
 
     iterator it;
     it = upperBound(key);

@@ -254,8 +254,8 @@ TEST_F(CompactingMapTest, RandomUniqueRank) {
                 ASSERT_TRUE(!volti.isEnd());
                 ASSERT_TRUE(stli->first == volti.key());
 
-                stl.erase(val);
-                volt.erase(val);
+                ASSERT_TRUE(stl.erase(val));
+                ASSERT_TRUE(volt.erase(val));
             }
         }
     }
@@ -289,7 +289,10 @@ TEST_F(CompactingMapTest, SimpleMultiRank) {
     rankasc = volt.rankAsc(5); ASSERT_TRUE(rankasc == 6);
     rankasc = volt.rankAsc(6); ASSERT_TRUE(rankasc == 7);
     rankasc = volt.rankAsc(8); ASSERT_TRUE(rankasc == 9);
+    // key is not in Map, return -1 always
+    rankasc = volt.rankAsc(0); ASSERT_TRUE(rankasc == -1);
     rankasc = volt.rankAsc(7); ASSERT_TRUE(rankasc == -1);
+    rankasc = volt.rankAsc(12); ASSERT_TRUE(rankasc == -1);
 
     rankupper = volt.rankUpper(1); ASSERT_TRUE(rankupper == 1);
     rankupper = volt.rankUpper(2); ASSERT_TRUE(rankupper == 2);
@@ -297,6 +300,10 @@ TEST_F(CompactingMapTest, SimpleMultiRank) {
     rankupper = volt.rankUpper(5); ASSERT_TRUE(rankupper == 6);
     rankupper = volt.rankUpper(6); ASSERT_TRUE(rankupper == 8);
     rankupper = volt.rankUpper(8); ASSERT_TRUE(rankupper == 10);
+    // key is not in Map, return -1 always
+    rankupper = volt.rankUpper(0); ASSERT_TRUE(rankupper == -1);
+    rankupper = volt.rankUpper(7); ASSERT_TRUE(rankupper == -1);
+    rankupper = volt.rankUpper(12); ASSERT_TRUE(rankupper == -1);
 }
 
 TEST_F(CompactingMapTest, RandomMultiRank) {
