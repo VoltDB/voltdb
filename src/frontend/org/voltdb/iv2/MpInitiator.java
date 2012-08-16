@@ -143,6 +143,13 @@ public class MpInitiator extends BaseInitiator implements Promotable
         return new MpPromoteAlgo(m_term.getInterestingHSIds(), m_initiatorMailbox, m_whoami);
     }
 
+    /**
+     * Update the MPI's Site's catalog.  Unlike the SPI, this is not going to
+     * run from the same Site's thread; this is actually going to run from some
+     * other local SPI's Site thread.  Since the MPI's site thread is going to
+     * be blocked running the EveryPartitionTask for the catalog update, this
+     * is currently safe with no locking.  And yes, I'm a horrible person.
+     */
     public void updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
     {
         m_executionSite.updateCatalog(diffCmds, context, csp, true);

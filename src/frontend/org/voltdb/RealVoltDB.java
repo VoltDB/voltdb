@@ -1783,7 +1783,12 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 m_adminListener.notifyOfCatalogUpdate();
             }
 
-            m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
+            // 4. If running IV2, we need to update the MPI's catalog.  The MPI doesn't
+            // run an every-site copy of the UpdateApplicationCatalog sysproc, so for now
+            // we do the update along with the rest of the global state here.
+            if (m_MPI != null) {
+                m_MPI.updateCatalog(diffCommands, m_catalogContext, csp);
+            }
 
             return Pair.of(m_catalogContext, csp);
         }
