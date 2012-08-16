@@ -42,6 +42,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     m_node = dynamic_cast<IndexCountPlanNode*>(abstractNode);
     assert(m_node);
     assert(m_node->getTargetTable());
+    assert(m_node->getPredicate() == NULL);
 
     // Create output table based on output schema from the plan
     TupleSchema* schema = m_node->generateTupleSchema(false);
@@ -140,12 +141,6 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     }
 
     m_tuple = TableTuple(m_targetTable->schema());
-
-    if (m_node->getPredicate() != NULL)
-    {
-        m_needsSubstitutePostExpression =
-                m_node->getPredicate()->hasParameter();
-    }
 
     //
     // Miscellanous Information
