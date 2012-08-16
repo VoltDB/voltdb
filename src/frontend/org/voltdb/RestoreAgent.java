@@ -228,8 +228,13 @@ SnapshotCompletionInterest
         public final long catalogCrc;
         // All the partitions for partitioned tables in the local snapshot file
         public final Map<String, Set<Integer>> partitions = new TreeMap<String, Set<Integer>>();
+        public final Map<Integer, Long> partitionToTxnId = new TreeMap<Integer, Long>();
         // This is not serialized, the name of the ZK node already has the host ID embedded.
         public final int hostId;
+
+        public void setPidToTxnIdMap(Map<Integer,Long> map) {
+            partitionToTxnId.putAll(map);
+        }
 
         public SnapshotInfo(long txnId, String path, String nonce, int partitions,
                             long catalogCrc, int hostId)
@@ -265,6 +270,14 @@ SnapshotCompletionInterest
                 }
                 partitions.put(name, partSet);
             }
+            JSONObject jsonPtoTxnId = jo.getJSONObject("partitionToTxnId");
+            @SuppressWarnings("unchecked")
+            Iterator<String> it = jsonPtoTxnId.keys();
+            while (it.hasNext()) {
+                 String key = it.next();
+                 Long val = jsonPtoTxnId.getLong(key);
+                 partitionToTxnId.put(Integer.valueOf(key), val);
+            }
         }
 
         public JSONObject toJSONObject()
@@ -290,6 +303,11 @@ SnapshotCompletionInterest
                     stringer.endObject();
                 }
                 stringer.endArray(); // tables
+                stringer.key("partitionToTxnId").object();
+                for (Entry<Integer,Long> e : partitionToTxnId.entrySet()) {
+                    stringer.key(e.getKey().toString()).value(e.getValue());
+                }
+                stringer.endObject(); // partitionToTxnId
                 stringer.endObject();
                 return new JSONObject(stringer.toString());
             } catch (JSONException e) {
@@ -578,10 +596,20 @@ SnapshotCompletionInterest
 
         File digest = s.m_digests.get(0);
         Long catalog_crc = null;
+        Map<Integer,Long> pidToTxnMap = new TreeMap<Integer,Long>();
         try
         {
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
             catalog_crc = digest_detail.getLong("catalogCRC");
+
+            JSONObject pidToTxnId = digest_detail.getJSONObject("partitionTransactionIds");
+            @SuppressWarnings("unchecked")
+            Iterator<String> it = pidToTxnId.keys();
+            while (it.hasNext()) {
+                String pidkey = it.next();
+                Long txnidval = pidToTxnId.getLong(pidkey);
+                pidToTxnMap.put(Integer.valueOf(pidkey), txnidval);
+            }
         }
         catch (IOException ioe)
         {
@@ -600,6 +628,7 @@ SnapshotCompletionInterest
             new SnapshotInfo(key, digest.getParent(),
                     parseDigestFilename(digest.getName()),
                     partitionCount, catalog_crc, m_hostId);
+        // populate table to partition map.
         for (Entry<String, TableFiles> te : s.m_tableFiles.entrySet()) {
             TableFiles tableFile = te.getValue();
             HashSet<Integer> ids = new HashSet<Integer>();
@@ -610,6 +639,7 @@ SnapshotCompletionInterest
                 info.partitions.put(te.getKey(), ids);
             }
         }
+        info.setPidToTxnIdMap(pidToTxnMap);
         return info;
     }
 
