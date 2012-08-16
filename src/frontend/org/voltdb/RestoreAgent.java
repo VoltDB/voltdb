@@ -787,15 +787,7 @@ SnapshotCompletionInterest
             snapshotFragments.clear();
         }
 
-        // If we have a command log and it requires a snapshot but no snapshot
-        // fragments were found, simply bail.
-        if ((clStartTxnId != null && clStartTxnId != Long.MIN_VALUE) &&
-            snapshotFragments.size() == 0)
-        {
-            throw new RuntimeException("No viable snapshots to restore");
-        }
-
-        LOG.debug("There are " + snapshotFragments.size() + " snapshots available in the cluster");
+        LOG.debug("There are " + snapshotFragments.size() + " restore candidate snapshots available in the cluster");
 
         // Find the last complete snapshot and use it
         HashMap<Long, Map<String, Set<Integer>>> snapshotTablePartitions =
@@ -848,6 +840,8 @@ SnapshotCompletionInterest
             }
         }
 
+        // If we have a command log and it requires a snapshot but no snapshot
+        // fragments were found, simply bail.
         if (clStartTxnId != null && clStartTxnId != Long.MIN_VALUE &&
             snapshotFragments.size() == 0) {
             throw new RuntimeException("No viable snapshots to restore");
