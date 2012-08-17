@@ -85,18 +85,11 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
             return plan;
 
         AbstractPlanNode child = plan.getChild(0);
+        // What else should I check if it is a query like:
+        // "Select Count(*) from Table"
         if (child instanceof SeqScanPlanNode) {
-            // What else should I check if it is a query like:
-            // "Select Count(*) from Table"
-            SeqScanPlanNode ssp = (SeqScanPlanNode)child;
-            if (ssp.getPredicate() == null) {
-                assert(plan.getParent(0) != null);
-                TableCountPlanNode tcp = new TableCountPlanNode(
-                        ssp, (AggregatePlanNode) plan);
-
-                plan.removeFromGraph();
-                child.removeFromGraph();
-                return tcp ;
+            if (((SeqScanPlanNode)child).getPredicate() == null) {
+                return new TableCountPlanNode((SeqScanPlanNode)child, (AggregatePlanNode) plan) ;
             }
         }
         if ((child instanceof IndexScanPlanNode) == false)
