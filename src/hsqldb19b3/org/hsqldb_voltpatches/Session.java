@@ -1793,6 +1793,11 @@ public class Session implements SessionInterface {
         currentSchema = database.schemaManager.getSchemaHsqlName(schema);
     }
 
+    // schema object methods
+    public void setSchemaNoThrow(String schema) {
+        currentSchema = database.schemaManager.getSchemaHsqlNameNoThrow(schema, currentSchema);
+    }
+
     public void setCatalog(String catalog) {
 
         if (database.getCatalogName().name.equals(catalog)) {

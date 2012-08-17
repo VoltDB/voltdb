@@ -48,7 +48,7 @@ public class TestPushDownAggregates extends TestCase {
         try {
             pn = aide.compile(sql, paramCount, singlePartition);
         }
-        catch (NullPointerException ex) {
+        catch (PlanningErrorException ex) {
             throw ex;
         }
         catch (Exception ex) {
@@ -186,7 +186,7 @@ public class TestPushDownAggregates extends TestCase {
     public void testGroupByNotInDisplayColumn() {
         try {
             compile("SELECT count(A1) FROM T1 GROUP BY A1", 0, false);
-        } catch (NullPointerException e) {
+        } catch (PlanningErrorException e) {
             // There shouldn't be any plan
             return;
         }
