@@ -81,6 +81,14 @@ public class TestIndexMemoryOwnershipSuite extends RegressionSuite {
         response = client.callProcedure("LookupT1b", "b");
         table = getSingleRowTable(response);
         System.out.println(table.toJSONString());
+
+        // Try to repro a string memory management related crash when a no-op update corrupts an index.
+        response = client.callProcedure("UpdateT1b", "b", "a2");
+        assertEquals(1, getLongFromResponse(response));
+
+        // This will cause a server fatal error if the corruption happened.
+        response = client.callProcedure("UpdateT1b", "b2", "a2");
+        assertEquals(1, getLongFromResponse(response));
     }
 
     public void testMatViewUpdates() throws Exception {
@@ -140,6 +148,7 @@ public class TestIndexMemoryOwnershipSuite extends RegressionSuite {
         project.addPartitionInfo("t1", "a");
         project.addStmtProcedure("InsertT1", "insert into t1 values (?, ?, ?);", "t1.a:0");
         project.addStmtProcedure("UpdateT1c", "update t1 set c = ? where a = ?;", "t1.a:1");
+        project.addStmtProcedure("UpdateT1b", "update t1 set b = ? where a = ?;", "t1.a:1");
         project.addStmtProcedure("DeleteT1", "delete from t1 where c = ?;");
         project.addStmtProcedure("LookupT1b", "select * from t1 where b = ?;");
         project.addStmtProcedure("MVLookup", "select * from mv where b = ? and a = ?;", "t1.a:1");

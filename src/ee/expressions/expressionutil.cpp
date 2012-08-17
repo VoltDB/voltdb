@@ -422,11 +422,44 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
     break;
 
     // Functions and pseudo-functions
-    case (EXPRESSION_TYPE_FUNCTION_ABS):
-    case (EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM):
-    case (EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR):
-        ret = functionFactory(et, args);
-        break;
+    case (EXPRESSION_TYPE_FUNCTION): {
+        // add the function id
+        json_spirit::Value functionIdValue = json_spirit::find_value(obj, "FUNCTION_ID");
+        if (functionIdValue == json_spirit::Value::null) {
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                          "ExpressionUtil::"
+                                          "expressionFactory:"
+                                          " Couldn't find FUNCTION_ID value");
+        }
+        int functionId = functionIdValue.get_int();
+
+        ret = functionFactory(functionId, args);
+        if ( ! ret) {
+            json_spirit::Value functionNameValue = json_spirit::find_value(obj, "NAME");
+            std::string nameString;
+            if (functionNameValue == json_spirit::Value::null) {
+                nameString = "?";
+            } else {
+                nameString = functionNameValue.get_str();
+            }
+
+            char aliasBuffer[256];
+            json_spirit::Value functionAliasValue = json_spirit::find_value(obj, "ALIAS");
+            if (functionAliasValue == json_spirit::Value::null) {
+                aliasBuffer[0] = '\0';
+            } else {
+                std::string aliasString = functionAliasValue.get_str();
+                snprintf(aliasBuffer, sizeof(aliasBuffer), " aliased to '%s'", aliasString.c_str());
+            }
+
+            char fn_message[1024];
+            snprintf(fn_message, sizeof(fn_message),
+                     "SQL function '%s'%s with ID (%d) is not implemented in VoltDB (or may have been incorrectly parsed)",
+                     nameString.c_str(), aliasBuffer, functionId);
+            throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION, fn_message);
+        }
+    }
+    break;
 
     // Constant Values, parameters, tuples
     case (EXPRESSION_TYPE_VALUE_CONSTANT):
@@ -447,6 +480,7 @@ ExpressionUtil::expressionFactory(json_spirit::Object &obj,
 
         // must handle all known expressions in this factory
     default:
+
         char message[256];
         snprintf(message,256, "Invalid ExpressionType '%s' (%d) requested from factory",
                 expressionToString(et).c_str(), (int)et);

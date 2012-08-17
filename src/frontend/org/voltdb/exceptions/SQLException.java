@@ -17,7 +17,7 @@
 
 package org.voltdb.exceptions;
 
-import java.nio.BufferUnderflowException;
+import java.io.UnsupportedEncodingException;
 import java.nio.ByteBuffer;
 
 /**
@@ -35,37 +35,52 @@ public class SQLException extends SerializableException {
      */
     public SQLException(ByteBuffer buffer) {
         super(buffer);
-        final byte sqlStateBytes[] = new byte[5];
-        try {
-            buffer.get(sqlStateBytes);
-        } catch (BufferUnderflowException e) {
-            m_sqlState = "";
-            return;
-        }
-        m_sqlState = new String(sqlStateBytes);
+        m_sqlState = new byte[5];
+        buffer.get(m_sqlState);
+        String state = getSQLState();
+        assert(state.length() == 5);
     }
 
     public SQLException(String sqlState) {
-        m_sqlState = sqlState;
+        assert(sqlState.length() == 5);
+        byte[] sqlStateBytes = null;
+        try {
+            sqlStateBytes = sqlState.getBytes("UTF-8");
+        } catch (UnsupportedEncodingException e1) {
+            sqlStateBytes = new byte[5];
+            e1.printStackTrace();
+            assert(false);
+        }
+        assert(sqlStateBytes.length == 5);
+        m_sqlState = sqlStateBytes;
     }
 
     /**
      * Retrieve the SQLState code for the error that generated this exception.
      * @return Five character SQLState code.
      */
-    public String getSQLState() { return m_sqlState; }
+    public String getSQLState()
+    {
+        String state = null;
+        try {
+            state = new String(m_sqlState, "UTF-8");
+        } catch (UnsupportedEncodingException e) {
+            throw new RuntimeException(e);
+        }
+        return state;
+    }
 
     /**
      * Storage for the five character SQLState code
      */
-    private final String m_sqlState;
+    private final byte[] m_sqlState;
 
     /**
-     * Return the amount of storage necesary to store the 5 character SQL state, 2 byte string length, and message.
+     * Return the amount of storage necessary to store the 5 character SQL state, SerializableException accounts for the rest
      */
     @Override
     protected int p_getSerializedSize() {
-        return 5;// sqlState + messageBytesLength + messageBytes
+        return 5;// messageBytes
     }
 
     /**
@@ -73,8 +88,8 @@ public class SQLException extends SerializableException {
      */
     @Override
     protected void p_serializeToBuffer(ByteBuffer b) {
-        assert (m_sqlState.getBytes().length == 5);
-        b.put(m_sqlState.getBytes());
+        assert (m_sqlState.length == 5);
+        b.put(m_sqlState);
     }
 
     @Override

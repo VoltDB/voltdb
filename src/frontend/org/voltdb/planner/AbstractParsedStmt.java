@@ -34,6 +34,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
@@ -368,13 +369,26 @@ public abstract class AbstractParsedStmt {
      */
     AbstractExpression parseFunctionExpression(VoltXMLElement exprNode, Database db) {
         String name = exprNode.attributes.get("name").toLowerCase();
-        // Parameterized argument type of function. One parameter type is apparently all that SQL ever needs.
+        String disabled = exprNode.attributes.get("disabled");
+        if (disabled != null) {
+            throw new PlanningErrorException("Function '" + name + "' is not supported in VoltDB: " + disabled);
+        }
         String value_type_name = exprNode.attributes.get("type");
         VoltType value_type = VoltType.typeFromString(value_type_name);
-        AbstractExpression expr = null;
+        String id = exprNode.attributes.get("id");
+        assert(id != null);
+        int idArg = 0;
+        try {
+            idArg = Integer.parseInt(id);
+        } catch (NumberFormatException nfe) {}
+        assert(idArg > 0);
+        String parameter = exprNode.attributes.get("parameter");
+        String volt_alias = exprNode.attributes.get("volt_alias");
+        if (volt_alias == null) {
+            volt_alias = name; // volt shares the function name with HSQL
+        }
 
         ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
-        // This needs to be conditional on an expected/allowed number/type of arguments.
         for (VoltXMLElement argNode : exprNode.children) {
             assert(argNode != null);
             // recursively parse each argument subtree (could be any kind of expression).
@@ -383,55 +397,25 @@ public abstract class AbstractParsedStmt {
             args.add(argExpr);
         }
 
-        List<SQLFunction> overloads = SQLFunction.functionsByNameAndArgumentCount(name, args.size());
-        if (overloads == null) {
-            throw new PlanningErrorException("Function '" + name + "' with " + args.size() + " arguments is not supported");
-        }
-
-        // Validate/select specific named function overload against supported argument type(s?).
-        // This amounts to a not-yet-implemented performance feature that allows the planner to direct the
-        // executor to argument-type-specific functions instead of relying on its current tendency to
-        // type-check every row/value at runtime.
-        // Until that day, overloads can be a singleton list.
-        SQLFunction resolved = null;
-        for (SQLFunction supportedFunction : overloads) {
-            resolved = supportedFunction;
-            if ( ! supportedFunction.hasParameter()) {
-                break;
-            }
-            VoltType paramType = supportedFunction.paramType();
-            if (paramType.equals(value_type)) {
-                break;
-            }
-            if (paramType.equals(VoltType.NUMERIC) && (value_type.isExactNumeric() ||  value_type.equals(VoltType.FLOAT))) {
-                break;
-            }
-            // type was not acceptable or not supported
-            resolved = null;
-        }
-
-        if (resolved == null) {
-            throw new PlanningErrorException("Function '" + name + "' does not support argument type '" + value_type_name + "'");
-        }
-
-        ExpressionType exprType = resolved.getExpressionType();
-
-        try {
-            expr = exprType.getExpressionClass().newInstance();
-        } catch (Exception e) {
-            e.printStackTrace();
-            throw new RuntimeException(e.getMessage(), e);
-        }
-        expr.setExpressionType(exprType);
-
-        VoltType vt = resolved.getValueType();
-        // Null return type is a place-holder for the parser-provided parameter type.
-        if (vt != null) {
-            expr.setValueType(vt);
-            expr.setValueSize(vt.getMaxLengthInBytes());
-        }
-
+        FunctionExpression expr = new FunctionExpression();
+        expr.setAttributes(name, volt_alias, idArg);
         expr.setArgs(args);
+        if (value_type != null) {
+            expr.setValueType(value_type);
+            expr.setValueSize(value_type.getMaxLengthInBytes());
+        }
+
+        if (parameter != null) {
+            int parameter_idx = -1; // invalid argument index
+            try {
+                parameter_idx = Integer.parseInt(parameter);
+            } catch (NumberFormatException nfe) {}
+            assert(parameter_idx >= 0); // better be valid by now.
+            assert(parameter_idx < args.size()); // must refer to a provided argument
+
+            expr.setParameterArgAndNegotiateInitialValueTypes(parameter_idx);
+        }
+
         return expr;
     }
 
@@ -450,8 +434,8 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement child : columnsNode.children) {
             assert(child.name.equals("columnref"));
             AbstractExpression col_exp = parseExpressionTree(child, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(col_exp);
-            ExpressionUtil.assignOutputValueTypesRecursively(col_exp);
+            // TupleValueExpressions are always specifically typed,
+            // so there is no need for expression type specialization, here.
             assert(col_exp != null);
             assert(col_exp instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col_exp;
@@ -711,6 +695,24 @@ public abstract class AbstractParsedStmt {
             valueEquivalence.put(rightExpr, eqSet1);
             eqSet1.add(rightExpr);
         }
+    }
+
+    /** Parse a where clause. This behavior is common to all kinds of statements.
+     *  TODO: It's not clear why ParsedDeleteStmt has its own VERY SIMILAR code to do this in method parseCondition.
+     *  There's a minor difference in how "ANDs" are modeled -- are they multiple condition nodes or
+     *  single condition nodes with multiple children? That distinction may be due to an arbitrary difference
+     *  in the parser's handling of different statements, but even if it's justified, this method could easily
+     *  be extended to handle multiple multi-child conditionNodes.
+     */
+    protected void parseConditions(VoltXMLElement conditionNode, Database db) {
+        if (conditionNode.children.size() == 0)
+            return;
+
+        VoltXMLElement exprNode = conditionNode.children.get(0);
+        assert(where == null); // Should be non-reentrant -- not overwriting any previous value!
+        where = parseExpressionTree(exprNode, db);
+        assert(where != null);
+        ExpressionUtil.finalizeValueTypes(where);
     }
 
 }

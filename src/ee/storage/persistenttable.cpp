@@ -364,7 +364,7 @@ bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool u
     // the planner should determine if this update can affect indexes.
     // if so, update the indexes here
     if (updatesIndexes) {
-        if (!tryUpdateOnAllIndexes(ptuua->getOldTuple(), target)) {
+        if (!checkUpdateOnUniqueIndexes(ptuua->getOldTuple(), target)) {
             throw ConstraintFailureException(this, ptuua->getOldTuple(),
                                              target,
                                              CONSTRAINT_TYPE_UNIQUE);
@@ -440,7 +440,7 @@ void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
-        if (!tryUpdateOnAllIndexes(targetBackup, target)) {
+        if (!checkUpdateOnUniqueIndexes(targetBackup, target)) {
             // TODO: this might be too strict. see insertTuple()
             throwFatalException("Failed to update tuple in table %s for undo:"
                                 " unique constraint violation\n%s\n%s\n", m_name.c_str(),
@@ -600,7 +600,7 @@ bool PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
     return true;
 }
 
-bool PersistentTable::tryUpdateOnAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
+bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
     for (int i = m_uniqueIndexCount - 1; i >= 0;--i) {
         if (m_uniqueIndexes[i]->checkForIndexChange(&targetTuple, &sourceTuple) == false)
             continue; // no update is needed for this index
@@ -870,6 +870,23 @@ void PersistentTable::swapTuples(TableTuple sourceTuple, TableTuple destinationT
     ::memcpy(destinationTuple.address(), sourceTuple.address(), m_tupleLength);
     sourceTuple.setActiveFalse();
     assert(!sourceTuple.isPendingDeleteOnUndoRelease());
+
+    /*
+     * If the tuple is pending deletion then it isn't in any of the indexes.
+     * However that contradicts the assertion above that the tuple is not
+     * pending deletion. In current Volt there is only on transaction executing
+     * at any given time and the commit always releases the undo quantum
+     * because there is no speculation. This situation should be impossible
+     * as the assertion above implies. It looks like this is forward thinking
+     * code for something that shouldn't happen right now.
+     *
+     * However this still isn't sufficient to actually work if speculation
+     * is implemented because moving the tuple will invalidate the pointer
+     * in the undo action for deleting the tuple. If the transaction ends
+     * up being rolled back it won't find the tuple! You would have to go
+     * back and update the undo action (how would you find it?) or
+     * not move the tuple.
+     */
     if (!sourceTuple.isPendingDelete()) {
         updateWithSameKeyFromAllIndexes(sourceTuple, destinationTuple);
     }

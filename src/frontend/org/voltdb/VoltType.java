@@ -234,7 +234,7 @@ public enum VoltType {
             }
         }
         if (str.equals("DOUBLE")) return FLOAT;
-        if (str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
+        if (str.equals("CHARACTER") || str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
 
         throw new RuntimeException("Can't find type: " + str);
     }
