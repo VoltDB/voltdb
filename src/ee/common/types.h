@@ -46,6 +46,7 @@
 #define HSTORETYPES_H
 
 #include <string>
+#include <stdint.h>
 namespace voltdb {
 
 // forward declare
