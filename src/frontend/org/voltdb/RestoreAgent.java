@@ -552,7 +552,7 @@ SnapshotCompletionInterest
 
         // Negotiate with other hosts about which snapshot to restore
         Set<SnapshotInfo> lastSnapshot = getRestorePlan();
-        SnapshotInfo infoWithMinHostId = pickSnapshotInfo(lastSnapshot);
+        SnapshotInfo infoWithMinHostId = consolidateSnapshotInfos(lastSnapshot);
 
         /*
          * Generate the replay plan here so that we don't have to wait until the
@@ -642,27 +642,26 @@ SnapshotCompletionInterest
     /**
      * Picks a snapshot info for restore. A single snapshot might have different
      * files scattered across multiple machines. All nodes must pick the same
-     * SnapshotInfo or different nodes will generate different plans.
-     *
-     * @param lastSnapshot The snapshot to restore from
-     * @return A single snapshot info
+     * SnapshotInfo or different nodes will pick different catalogs to restore.
+     * Pick one SnapshotInfo and consolidate the per-node state into it.
      */
-    static SnapshotInfo pickSnapshotInfo(Collection<SnapshotInfo> lastSnapshot) {
-        SnapshotInfo infoWithMinHostId = null;
+    static SnapshotInfo consolidateSnapshotInfos(Collection<SnapshotInfo> lastSnapshot)
+    {
+        SnapshotInfo chosen = null;
         if (lastSnapshot != null) {
             Iterator<SnapshotInfo> i = lastSnapshot.iterator();
             while (i.hasNext()) {
                 SnapshotInfo next = i.next();
-                if (infoWithMinHostId == null ||
-                    next.hostId < infoWithMinHostId.hostId) {
-                    infoWithMinHostId = next;
+                if (chosen == null) {
+                    chosen = next;
+                }
+                else {
+                    // create a full mapping of txn ids to partition ids.
+                    chosen.partitionToTxnId.putAll(next.partitionToTxnId);
                 }
             }
-            assert(infoWithMinHostId != null);
-            assert(infoWithMinHostId.hostId != -1);
-            LOG.debug("Snapshot to restore: " + infoWithMinHostId.txnId);
         }
-        return infoWithMinHostId;
+        return chosen;
     }
 
     /**
