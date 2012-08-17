@@ -528,8 +528,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         }
 
         if (m_initiateTaskBuffer != null) {
-            buf.putInt(m_initiateTaskBuffer.remaining());
-            buf.put(m_initiateTaskBuffer);
+            ByteBuffer dup = m_initiateTaskBuffer.duplicate();
+            buf.putInt(dup.remaining());
+            buf.put(dup);
         } else {
             buf.putInt(0);
         }
@@ -617,9 +618,18 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
 
         int initiateTaskMessageLength = buf.getInt();
         if (initiateTaskMessageLength > 0) {
+            int startPosition = buf.position();
             Iv2InitiateTaskMessage message = new Iv2InitiateTaskMessage();
             message.initFromBuffer(buf);
             m_initiateTask = message;
+
+            /*
+             * There is an assertion that all bytes of the message are consumed.
+             * Initiate task lazily deserializes the parameter buffer and doesn't consume
+             * all the bytes so do it here so the assertion doesn't trip
+             */
+            buf.position(startPosition + initiateTaskMessageLength);
+
         }
     }
 
