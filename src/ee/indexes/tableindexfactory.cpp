@@ -168,10 +168,9 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     }
 
     /**
-     * This file just got twice as long. Really, turning off counting seems of little value for larger keys.
-     * I'd say at least don't bother supporting both choices for the generic keys.
+     * Turning off counting seems of little value for larger keys.
+     * Otherwise this file would be twice as long.
      */
-
     if (/*(type == BALANCED_TREE_INDEX) &&*/ (unique)) {
         if (type == HASH_TABLE_INDEX) {
             VOLT_INFO("Producing a tree index for %s: "
@@ -207,8 +206,8 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
     }
 
     /**
-     * This file just got twice as long. Really, turning off counting seems of little value for larger keys.
-     * I'd say at least don't bother supporting both choices for the generic keys.
+     * Turning off counting seems of little value for larger keys.
+     * Otherwise this file would be twice as long.
      */
     if (/*(type == BALANCED_TREE_INDEX) &&*/ (!unique)) {
         if (type == HASH_TABLE_INDEX) {

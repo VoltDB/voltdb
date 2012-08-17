@@ -136,7 +136,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
-        
+
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
@@ -153,8 +153,8 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
-        
-        
+
+
         return builder;
     }
 

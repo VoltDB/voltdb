@@ -23,9 +23,7 @@
 #include "common/FatalException.hpp"
 #include "expressions/abstractexpression.h"
 #include "expressions/expressionutil.h"
-
 #include "plannodes/indexcountnode.h"
-
 #include "storage/table.h"
 #include "storage/tableiterator.h"
 #include "storage/tablefactory.h"
@@ -35,7 +33,7 @@
 using namespace voltdb;
 
 bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
-        TempTableLimits* limits)
+                                TempTableLimits* limits)
 {
     VOLT_DEBUG("init IndexCount Executor");
 
@@ -53,10 +51,10 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     column_names[0] = m_node->getOutputSchema()[0]->getColumnName();
 
     m_node->setOutputTable(TableFactory::getTempTable(m_node->databaseId(),
-            m_node->getTargetTable()->name(),
-            schema,
-            column_names,
-            limits));
+                                                      m_node->getTargetTable()->name(),
+                                                      schema,
+                                                      column_names,
+                                                      limits));
     delete[] column_names;
 
     //
@@ -64,11 +62,11 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     //
     m_numOfSearchkeys = (int)m_node->getSearchKeyExpressions().size();
     m_searchKeyBeforeSubstituteArrayPtr =
-            boost::shared_array<AbstractExpression*>
+        boost::shared_array<AbstractExpression*>
     (new AbstractExpression*[m_numOfSearchkeys]);
     m_searchKeyBeforeSubstituteArray = m_searchKeyBeforeSubstituteArrayPtr.get();
     m_needsSubstituteSearchKeyPtr =
-            boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
+        boost::shared_array<bool>(new bool[m_numOfSearchkeys]);
     m_needsSubstituteSearchKey = m_needsSubstituteSearchKeyPtr.get();
 
     for (int ctr = 0; ctr < m_numOfSearchkeys; ctr++)
@@ -76,38 +74,35 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
         if (m_node->getSearchKeyExpressions()[ctr] == NULL)
         {
             VOLT_ERROR("The search key expression at position '%d' is NULL for"
-                    " PlanNode '%s'", ctr, m_node->debug().c_str());
+                " PlanNode '%s'", ctr, m_node->debug().c_str());
             return false;
         }
         m_needsSubstituteSearchKeyPtr[ctr] =
-                m_node->getSearchKeyExpressions()[ctr]->hasParameter();
+            m_node->getSearchKeyExpressions()[ctr]->hasParameter();
         m_searchKeyBeforeSubstituteArrayPtr[ctr] =
-                m_node->getSearchKeyExpressions()[ctr];
+            m_node->getSearchKeyExpressions()[ctr];
     }
 
-    if (m_node->getEndKeyExpressions().size() != 0) {
-        m_numOfEndkeys = (int)m_node->getEndKeyExpressions().size();
-        assert(m_numOfEndkeys != 0);
+    m_numOfEndkeys = (int)m_node->getEndKeyExpressions().size();
+    if (m_numOfEndkeys != 0) {
         m_endKeyBeforeSubstituteArrayPtr =
-                boost::shared_array<AbstractExpression*> (new AbstractExpression*[m_numOfEndkeys]);
+            boost::shared_array<AbstractExpression*> (new AbstractExpression*[m_numOfEndkeys]);
         m_endKeyBeforeSubstituteArray = m_endKeyBeforeSubstituteArrayPtr.get();
         m_needsSubstituteEndKeyPtr =
-                boost::shared_array<bool>(new bool[m_numOfEndkeys]);
+            boost::shared_array<bool>(new bool[m_numOfEndkeys]);
         m_needsSubstituteEndKey = m_needsSubstituteEndKeyPtr.get();
         for (int ctr = 0; ctr < m_numOfEndkeys; ctr++)
         {
             if (m_node->getEndKeyExpressions()[ctr] == NULL) {
                 VOLT_ERROR("The end key expression at position '%d' is NULL for"
-                        " PlanNode '%s'", ctr, m_node->debug().c_str());
+                    " PlanNode '%s'", ctr, m_node->debug().c_str());
                 return false;
             }
             m_needsSubstituteEndKeyPtr[ctr] =
-                    m_node->getEndKeyExpressions()[ctr]->hasParameter();
+                m_node->getEndKeyExpressions()[ctr]->hasParameter();
             m_endKeyBeforeSubstituteArrayPtr[ctr] =
-                    m_node->getEndKeyExpressions()[ctr];
+                m_node->getEndKeyExpressions()[ctr];
         }
-    } else {
-        m_numOfEndkeys = 0;
     }
 
     //
@@ -150,7 +145,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     // the planner sometimes lies in this case: index_lookup_type_eq is incorrect.
     // Index_lookup_type_gte is necessary. Make the change here.
     if (m_lookupType == INDEX_LOOKUP_TYPE_EQ &&
-            m_searchKey.getSchema()->columnCount() > m_numOfSearchkeys)
+        m_searchKey.getSchema()->columnCount() > m_numOfSearchkeys)
     {
         VOLT_TRACE("Setting lookup type to GTE for partial covering key.");
         m_lookupType = INDEX_LOOKUP_TYPE_GTE;
@@ -168,12 +163,15 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
     assert(m_targetTable);
     assert(m_targetTable == m_node->getTargetTable());
     VOLT_DEBUG("IndexCount: %s.%s\n", m_targetTable->name().c_str(),
-            m_index->getName().c_str());
+               m_index->getName().c_str());
 
     int activeNumOfSearchKeys = m_numOfSearchkeys;
     IndexLookupType localLookupType = m_lookupType;
     bool searchKeyUnderflow = false, endKeyOverflow = false;
+    // Overflow cases that can return early without accessing the index need this
+    // default 0 count as their result.
     TableTuple& tmptup = m_outputTable->tempTuple();
+    tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
     TableTuple m_dummy;
 
     //
@@ -193,8 +191,10 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             // This next bit of logic handles underflow and overflow while
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
-            // rethow if not an overflow - currently, it's expected to always be an overflow
-            if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+            // re-throw if not an overflow or underflow
+            // currently, it's expected to always be an overflow or underflow
+            if ((e.getInternalFlags() & SQLException::TYPE_OVERFLOW) ||
+                (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW)) {
                 throw e;
             }
 
@@ -202,10 +202,8 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             // comparison is the only place where the executor might return matching tuples
             // e.g. TINYINT < 1000 should return all values
 
-            tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
-
             if ((localLookupType != INDEX_LOOKUP_TYPE_EQ) &&
-                    (ctr == (activeNumOfSearchKeys - 1))) {
+                (ctr == (activeNumOfSearchKeys - 1))) {
                 assert (localLookupType == INDEX_LOOKUP_TYPE_GT || localLookupType == INDEX_LOOKUP_TYPE_GTE);
 
                 if (e.getInternalFlags() & SQLException::TYPE_OVERFLOW) {
@@ -253,11 +251,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                     throw e;
                 }
 
-                // Overflow cases that can return early without accessing the index need this
-                // default 0 count as their result.
-                TableTuple& tmptup = m_outputTable->tempTuple();
-                tmptup.setNValue(0, ValueFactory::getBigIntValue( 0 ));
-
                 if (ctr == (m_numOfEndkeys - 1)) {
                     assert (m_endType == INDEX_LOOKUP_TYPE_LT || m_endType == INDEX_LOOKUP_TYPE_LTE);
                     if (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW) {
@@ -302,7 +295,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     // Deal with multi-map
     VOLT_DEBUG("INDEX_LOOKUP_TYPE(%d) m_numSearchkeys(%d) key:%s",
-            localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
+               localLookupType, activeNumOfSearchKeys, m_searchKey.debugNoHeader().c_str());
     if (searchKeyUnderflow == false) {
         if (localLookupType == INDEX_LOOKUP_TYPE_GT) {
             rkStart = m_index->getCounterLET(&m_searchKey, true);
@@ -327,7 +320,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
         }
     }
     if (m_numOfEndkeys != 0) {
-        if (endKeyOverflow == false) {
+        if (endKeyOverflow) {
+            rkEnd = m_index->getCounterGET(&m_endKey, true);
+        } else {
             IndexLookupType localEndType = m_endType;
             if (localEndType == INDEX_LOOKUP_TYPE_LT) {
                 rkEnd = m_index->getCounterGET(&m_endKey, false);
@@ -340,8 +335,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             } else {
                 return false;
             }
-        } else {
-            rkEnd = m_index->getCounterGET(&m_endKey, true);
         }
     } else {
         rkEnd = m_index->getSize();
