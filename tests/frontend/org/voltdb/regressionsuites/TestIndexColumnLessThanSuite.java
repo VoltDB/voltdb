@@ -44,32 +44,32 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         super(name);
     }
 
-//    public void testFailedSqlcoverageCase() throws Exception {
-//        Client client = getClient();
-//
-//        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(0, 'JOUmtGnsKFCGOaWvg', -27392, 7.30754864900605705103e-01);");
-//        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(1, 'aXwwPrkDwabomDdAZ', 30036, 1.09425040281800223241e-01);");
-//        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(4, 'xJAmmYpKGJJyflOMw', -7060, 14977);");
-//        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(5, 'xybOXumtYDvBNhbUs', 13529, -2025);");
-//
-//        VoltTable table;
-//
-//        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
-//        assertTrue(table.advanceRow() == false);
-//
-//        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID <= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
-//        assertTrue(table.advanceRow() == false);
-//
-//        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID <= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
-//        assertTrue(table.getRowCount() == 4);
-//        assertTrue(table.advanceRow());
-//        //System.err.println("RESULT01:\n" + table);
-//
-//        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID >= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
-//        assertTrue(table.getRowCount() == 4);
-//        assertTrue(table.advanceRow());
-//        //System.err.println("RESULT02:\n" + table);
-//    }
+    public void testFailedSqlcoverageCase() throws Exception {
+        Client client = getClient();
+
+        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(0, 'JOUmtGnsKFCGOaWvg', -27392, 7.30754864900605705103e-01);");
+        client.callProcedure("@AdHoc","INSERT INTO P1 VALUES(1, 'aXwwPrkDwabomDdAZ', 30036, 1.09425040281800223241e-01);");
+        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(4, 'xJAmmYpKGJJyflOMw', -7060, 14977);");
+        client.callProcedure("@AdHoc","INSERT INTO P2 VALUES(5, 'xybOXumtYDvBNhbUs', 13529, -2025);");
+
+        VoltTable table;
+
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        assertTrue(table.advanceRow() == false);
+
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID <= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        assertTrue(table.advanceRow() == false);
+
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID <= P2.P2_ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        assertTrue(table.getRowCount() == 4);
+        assertTrue(table.advanceRow());
+        //System.err.println("RESULT01:\n" + table);
+
+        table = client.callProcedure("@AdHoc","SELECT P1.ID, P2.P2_ID from P1, P2 where P2.P2_ID >= P1.ID order by P1.ID, P2.P2_ID limit 10;").getResults()[0];
+        assertTrue(table.getRowCount() == 4);
+        assertTrue(table.advanceRow());
+        //System.err.println("RESULT02:\n" + table);
+    }
 
     public void testTwoTableJoinBug() throws Exception {
         Client client = getClient();
@@ -96,7 +96,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
     }
 
     /**
-     * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
+     * Build a list of the tests that will be run when TestIndexColumnLess gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
      * This particular class runs all tests on the the local JNI backend with both
      * one and two partition configurations, as well as on the hsql backend.
@@ -136,7 +136,7 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
-/*
+
         /////////////////////////////////////////////////////////////
         // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
@@ -147,14 +147,14 @@ public class TestIndexColumnLessThanSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #3: Local Cluster (of processes) with failed node
+        // CONFIG #3: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("sqlCountingIndex-cluster-rejoin.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI, LocalCluster.FailureState.ONE_FAILURE, false);
+        config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
-        */
+
+
         return builder;
     }
 

@@ -293,8 +293,9 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
 
-            // rethow if not an overflow - currently, it's expected to always be an overflow
-            if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+            // re-throw if not an overflow or underflow
+            // currently, it's expected to always be an overflow or underflow
+            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
                 throw e;
             }
 
@@ -410,15 +411,14 @@ bool IndexScanExecutor::p_execute(const NValueArray &params)
 
     //printf ("<INDEX SCAN> localSortDirection: %d\n", localSortDirection);
     if (localSortDirection != SORT_DIRECTION_TYPE_INVALID) {
-        bool order_by_asc = true;
-        if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
-            // nothing now
-        }
-        else {
-            order_by_asc = false;
-        }
-
         if (activeNumOfSearchKeys == 0) {
+            bool order_by_asc = true;
+            if (localSortDirection == SORT_DIRECTION_TYPE_ASC) {
+                // nothing now
+            }
+            else {
+                order_by_asc = false;
+            }
             m_index->moveToEnd(order_by_asc);
         }
     }
