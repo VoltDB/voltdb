@@ -17,7 +17,8 @@
 
 package org.voltdb.expressions;
 
-import java.util.*;
+import java.util.ArrayList;
+import java.util.List;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
@@ -25,7 +26,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 /**
  *
@@ -118,4 +119,17 @@ public class InComparisonExpression extends ComparisonExpression {
             }
         }
     }
+
+    @Override
+    public void finalizeValueTypes()
+    {
+        super.finalizeValueTypes();
+        // This is probably no-op overkill since values are constants and should have no bearing?
+        for (AbstractExpression exp : m_values) {
+            exp.finalizeValueTypes();
+        }
+    }
+
+
+
 }
