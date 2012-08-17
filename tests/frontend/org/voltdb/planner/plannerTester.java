@@ -78,6 +78,7 @@ public class plannerTester {
     public static ArrayList<String> m_diffMessages = new ArrayList<String>();
     private static String m_reportDir = "/tmp/";
     private static BufferedWriter m_reportWriter;
+    private static ArrayList<String>  m_filters = new ArrayList<String> ();
 
     public static class diffPair {
         private Object m_first;
@@ -164,6 +165,10 @@ public class plannerTester {
             }
             else if( str.startsWith("-s") ){
                 m_showSQLStatement = true;
+            }
+            else if( str.startsWith("-i=") ) {
+                m_filters.add(str.split("=")[1] );
+                System.out.println(str);
             }
             else if( str.startsWith("-help") ){
                 System.out.println("-cs : Compile queries and save the plans according to the config files");
@@ -451,7 +456,15 @@ public class plannerTester {
                 }
 
                 for( String msg : m_diffMessages ) {
-                    m_reportWriter.write( msg+"\n\n" );
+                    boolean isIgnore = false;
+                    for( String filter : m_filters ) {
+                        if( msg.contains( filter ) ) {
+                            isIgnore = true;
+                            break;
+                        }
+                    }
+                    if( !isIgnore )
+                        m_reportWriter.write( msg+"\n\n" );
                 }
                 if( m_showSQLStatement ) {
                     m_reportWriter.write( "SQL statement:\n"+baseStmt+"\n==>\n"+m_stmts.get(i)+"\n");
