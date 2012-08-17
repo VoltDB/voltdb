@@ -25,10 +25,9 @@ import java.util.List;
 import org.voltdb.VoltDB;
 
 /**
- * Holds a batch of planned SQL statements.
- *
- * Both AdHocPlannedStmtBatch and AdHocPlannedStatement are derived from
- * AsyncCompilerResult. So there's some data redundancy, e.g. clientData.
+ * Holds a batch of planned SQL statements exclusively for @Explain.
+ * DO not inherit from AdhocPlannedStmtBatch for efficiency reason( if else check in ClientInterface.processFinishedCompilerWork() ).
+ * Therefore there's this code redundancy
  */
 public class ExplainPlannedStmtBatch extends AsyncCompilerResult implements Cloneable {
 

@@ -1244,49 +1244,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new VoltTable[0], realReason, handle);
     }
 
-    ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
-        ParameterSet params = task.getParams();
-        //String procs = (String) params.toArray()[0];
-        int size = params.toArray().length;
-        VoltTable[] vt = new VoltTable[ size ];
-        for( int i=0; i<size; i++ ) {
-            String procName = (String)( params.toArray() )[i];
-
-            Procedure proc = m_catalogContext.get().procedures.get(procName);
-            if(proc == null) {
-                ClientResponseImpl errorResponse =
-                        new ClientResponseImpl(
-                                ClientResponseImpl.UNEXPECTED_FAILURE,
-                                new VoltTable[0], "Procedure "+procName+" not in catalog",
-                                task.clientHandle);
-                return errorResponse;
-            }
-
-            vt[i] = new VoltTable(new VoltTable.ColumnInfo( "SQL Statement", VoltType.STRING),
-                                  new VoltTable.ColumnInfo( "Execution plan", VoltType.STRING));
-
-            for( Statement stmt : proc.getStatements() ) {
-                vt[i].addRow( stmt.getSqltext(), Encoder.hexDecodeToString( stmt.getExplainplan() ) );
-            }
-        }
-
-        ClientResponseImpl response =
-                new ClientResponseImpl(
-                        ClientResponseImpl.SUCCESS,
-                        ClientResponse.SUCCESS,
-                        null,
-                        vt,
-                        null);
-        response.setClientHandle( task.clientHandle );
-        ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
-        buf.putInt(buf.capacity() - 4);
-        response.flattenToBuffer(buf);
-        buf.flip();
-        ccxn.writeStream().enqueue(buf);
-        return null;
-    }
-
-
+    //this is similar to dispatchAdHoc() : 1. try the cache for plans fisrt. 2. If not in cache, send explainPlannerWork
+    //to planner, handle the completed work in onCompletion().processFinishedCompilerWork()
     ClientResponseImpl dispatchExplainAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
         String sql = (String) params.toArray()[0];
@@ -1344,64 +1303,112 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     private void processExplainPlannedStmtBatch(  ExplainPlannedStmtBatch planBatch ) {
-        final Connection c = (Connection)planBatch.clientData;
-        Database db = m_catalogContext.get().database;
-        int size = planBatch.getPlannedStatementCount();
+            final Connection c = (Connection)planBatch.clientData;
+            Database db = m_catalogContext.get().database;
+            int size = planBatch.getPlannedStatementCount();
 
-        List<byte[]> aggByteArray = new ArrayList<byte[]>( size );
-        for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
-            aggByteArray.add(plannedStatement.aggregatorFragment);
-        }
+            List<byte[]> aggByteArray = new ArrayList<byte[]>( size );
+            for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
+                aggByteArray.add(plannedStatement.aggregatorFragment);
+            }
 
-        List<byte[]> collByteArray = new ArrayList<byte[]>( size );
-        for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
-            collByteArray.add(plannedStatement.collectorFragment );
-        }
+            List<byte[]> collByteArray = new ArrayList<byte[]>( size );
+            for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
+                collByteArray.add(plannedStatement.collectorFragment );
+            }
 
-        VoltTable[] vt = new VoltTable[ size ];
+            VoltTable[] vt = new VoltTable[ size ];
 
-        for( int i = 0; i<size; i++ ) {
-            byte[] aggByte = aggByteArray.get(i);
-            byte[] collByte = collByteArray.get(i);
-            if( collByte == null ) {
-                //signle partition query plan
-                String plan = new String( aggByte, VoltDB.UTF8ENCODING);
-                PlanNodeTree pnt = new PlanNodeTree();
-                try {
-                    JSONObject jobj = new JSONObject( plan );
-                    JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-                    pnt.loadFromJSONArray(jarray, db);
-                    String str = pnt.getRootPlanNode().toExplainPlanString();
-                    vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Execution plan-SP", VoltType.STRING));
-                    vt[i].addRow(str);
-                } catch (JSONException e) {
-                    System.out.println(e.getMessage());
+            for( int i = 0; i<size; i++ ) {
+                byte[] aggByte = aggByteArray.get(i);
+                byte[] collByte = collByteArray.get(i);
+                if( collByte == null ) {
+                    //signle partition query plan
+                    String plan = new String( aggByte, VoltDB.UTF8ENCODING);
+                    PlanNodeTree pnt = new PlanNodeTree();
+                    try {
+                        JSONObject jobj = new JSONObject( plan );
+                        JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
+                        pnt.loadFromJSONArray(jarray, db);
+                        String str = pnt.getRootPlanNode().toExplainPlanString();
+                        vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Execution plan-SP", VoltType.STRING));
+                        vt[i].addRow(str);
+                    } catch (JSONException e) {
+                        System.out.println(e.getMessage());
+                    }
+                }
+                else {
+                    //multi-partition query plan
+                    String aggplan = new String( aggByte, VoltDB.UTF8ENCODING);
+                    String collplan = new String( collByte, VoltDB.UTF8ENCODING);
+                    PlanNodeTree pnt = new PlanNodeTree();
+                    PlanNodeTree collpnt = new PlanNodeTree();
+                    try {
+                        JSONObject jobj = new JSONObject( aggplan );
+                        JSONArray jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
+                        pnt.loadFromJSONArray(jarray, db);
+                        //reattach plan fragments
+                        jobj = new JSONObject( collplan );
+                        jarray =  jobj.getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
+                        collpnt.loadFromJSONArray(jarray, db);
+                        assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
+                        pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
+
+                        String str = pnt.getRootPlanNode().toExplainPlanString();
+                        vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Execution plan-MP", VoltType.STRING));
+                        vt[i].addRow(str);
+                    } catch (JSONException e) {
+                        System.out.println(e.getMessage());
+                    }
                 }
             }
-            else {
-                //multi-partition query plan
-                String aggplan = new String( aggByte, VoltDB.UTF8ENCODING);
-                String collplan = new String( collByte, VoltDB.UTF8ENCODING);
-                PlanNodeTree pnt = new PlanNodeTree();
-                PlanNodeTree collpnt = new PlanNodeTree();
-                try {
-                    JSONObject jobj = new JSONObject( aggplan );
-                    JSONArray jarray =  jobj.getJSONArray("PLAN_NODES");
-                    //TODO  db is null, may need to be set up in some cases.
-                    pnt.loadFromJSONArray(jarray, db);
-                    //reattach plan fragments
-                    jobj = new JSONObject( collplan );
-                    jarray =  jobj.getJSONArray("PLAN_NODES");
-                    collpnt.loadFromJSONArray(jarray, db);
-                    assert( collpnt.getRootPlanNode() instanceof SendPlanNode);
-                    pnt.getRootPlanNode().reattachFragment( (SendPlanNode) collpnt.getRootPlanNode() );
 
-                    String str = pnt.getRootPlanNode().toExplainPlanString();
-                    vt[i] = new VoltTable(new VoltTable.ColumnInfo( "Execution plan-MP", VoltType.STRING));
-                    vt[i].addRow(str);
-                } catch (JSONException e) {
-                    System.out.println(e.getMessage());
-                }
+            ClientResponseImpl response =
+                    new ClientResponseImpl(
+                            ClientResponseImpl.SUCCESS,
+                            ClientResponse.SUCCESS,
+                            null,
+                            vt,
+                            null);
+            response.setClientHandle( planBatch.clientHandle );
+            ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
+            buf.putInt(buf.capacity() - 4);
+            response.flattenToBuffer(buf);
+            buf.flip();
+            c.writeStream().enqueue(buf);
+
+         //do not cache the plans for explainAdhoc
+    //        planBatch.clientData = null;
+    //        for (int index = 0; index < planBatch.getPlannedStatementCount(); index++) {
+    //            m_adhocCache.put(planBatch.getPlannedStatement(index));
+    //        }
+        }
+
+    //go to catolog and fetch all explain plan of queries in the procedure
+    ClientResponseImpl dispatchExplainProcedure(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
+        ParameterSet params = task.getParams();
+        //String procs = (String) params.toArray()[0];
+        List<String> procNames = MiscUtils.splitSQLStatements( (String)params.toArray()[0]);
+        int size = procNames.size();
+        VoltTable[] vt = new VoltTable[ size ];
+        for( int i=0; i<size; i++ ) {
+            String procName = procNames.get(i);
+
+            Procedure proc = m_catalogContext.get().procedures.get(procName);
+            if(proc == null) {
+                ClientResponseImpl errorResponse =
+                        new ClientResponseImpl(
+                                ClientResponseImpl.UNEXPECTED_FAILURE,
+                                new VoltTable[0], "Procedure "+procName+" not in catalog",
+                                task.clientHandle);
+                return errorResponse;
+            }
+
+            vt[i] = new VoltTable(new VoltTable.ColumnInfo( "SQL Statement", VoltType.STRING),
+                                  new VoltTable.ColumnInfo( "Execution plan", VoltType.STRING));
+
+            for( Statement stmt : proc.getStatements() ) {
+                vt[i].addRow( stmt.getSqltext(), Encoder.hexDecodeToString( stmt.getExplainplan() ) );
             }
         }
 
@@ -1412,19 +1419,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         null,
                         vt,
                         null);
-        response.setClientHandle( planBatch.clientHandle );
+        response.setClientHandle( task.clientHandle );
         ByteBuffer buf = ByteBuffer.allocate(response.getSerializedSize() + 4);
         buf.putInt(buf.capacity() - 4);
         response.flattenToBuffer(buf);
         buf.flip();
-        c.writeStream().enqueue(buf);
-
-     //TODO do not cache the plans for explainAdhoc
-//        planBatch.clientData = null;
-//        for (int index = 0; index < planBatch.getPlannedStatementCount(); index++) {
-//            m_adhocCache.put(planBatch.getPlannedStatement(index));
-//        }
+        ccxn.writeStream().enqueue(buf);
+        return null;
     }
+
 
     ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
@@ -1990,7 +1993,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                rest of the system. If the adhoc sql was planned against an
                                obsolete catalog, re-plan. */
                             LocalObjectMessage work = new LocalObjectMessage(
-                                    new AdHocPlannerWork(m_siteId,
+                                    new ExplainPlannerWork(m_siteId,
                                             false,
                                             plannedStmtBatch.clientHandle,
                                             plannedStmtBatch.connectionId,
@@ -2005,7 +2008,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                             true,
                                             m_adhocCompletionHandler));
 
-                            // XXX: Need to know the async mailbox id.
+                         // XXX: Need to know the async mailbox id.
                             m_mailbox.send(Long.MIN_VALUE, work);
                         }
                         else {
