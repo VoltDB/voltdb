@@ -83,6 +83,7 @@ public:
     bool next(TableTuple &out);
     bool hasNext();
     int getLocation() const;
+    uint32_t getSize() const;
 
 private:
     // Get an iterator via table->iterator()
@@ -259,9 +260,12 @@ inline bool TableIterator::tempNext(TableTuple &out) {
     return false;
 }
 
-
 inline int TableIterator::getLocation() const {
     return m_location;
+}
+
+inline uint32_t TableIterator::getSize() const {
+    return m_activeTuples;
 }
 
 }
