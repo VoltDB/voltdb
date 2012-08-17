@@ -736,7 +736,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
 
         infos.add(info1);
         infos.add(info2);
-        SnapshotInfo pickedInfo = RestoreAgent.pickSnapshotInfo(infos);
+        SnapshotInfo pickedInfo = RestoreAgent.consolidateSnapshotInfos(infos);
         assertNotNull(pickedInfo);
         assertEquals(0, pickedInfo.hostId);
 
@@ -744,7 +744,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         infos.clear();
         infos.add(info2);
         infos.add(info1);
-        pickedInfo = RestoreAgent.pickSnapshotInfo(infos);
+        pickedInfo = RestoreAgent.consolidateSnapshotInfos(infos);
         assertNotNull(pickedInfo);
         assertEquals(0, pickedInfo.hostId);
     }
