@@ -327,7 +327,7 @@ public class plannerTester {
     public static void writePlanToFile( AbstractPlanNode pn, String pathToDir, String fileName, String sql) {
         if( pn == null ) {
             System.err.println("the plan node is null, nothing to write");
-            System.exit(-1);
+            return;
         }
         PlanNodeTree pnt = new PlanNodeTree( pn );
         String prettyJson = pnt.toJSONString();
