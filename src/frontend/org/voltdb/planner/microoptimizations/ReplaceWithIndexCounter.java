@@ -77,9 +77,7 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
         if (plan.getChildCount() != 1)
             return plan;
         // check aggregation type
-        List <ExpressionType> et = ((AggregatePlanNode) plan).getAggregateTypes();
-        if ((et.size() == 1 &&
-             et.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR)) == false)
+        if (((AggregatePlanNode)plan).isTableCountStar() == false)
             return plan;
 
         AbstractPlanNode child = plan.getChild(0);
