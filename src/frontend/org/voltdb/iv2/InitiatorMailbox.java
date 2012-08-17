@@ -248,6 +248,9 @@ public class InitiatorMailbox implements Mailbox
         else if (repairWork instanceof CompleteTransactionMessage) {
             send(com.google.common.primitives.Longs.toArray(needsRepair), repairWork);
         }
+        else {
+            throw new RuntimeException("Invalid repair message type: " + repairWork);
+        }
     }
 
     void logRxMessage(VoltMessage message)

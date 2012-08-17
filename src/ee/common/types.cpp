@@ -493,14 +493,8 @@ string expressionToString(ExpressionType type)
     case EXPRESSION_TYPE_AGGREGATE_AVG: {
         return "AGGREGATE_AVG";
     }
-    case EXPRESSION_TYPE_FUNCTION_ABS: {
-        return "FUNCTION_ABS";
-    }
-    case EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM: {
-        return "FUNCTION_SUBSTRING_FROM";
-    }
-    case EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR: {
-        return "FUNCTION_SUBSTRING_FROM_FOR";
+    case EXPRESSION_TYPE_FUNCTION: {
+        return "FUNCTION";
     }
     }
     return "INVALID";
@@ -568,12 +562,8 @@ ExpressionType stringToExpression(string str )
         return EXPRESSION_TYPE_AGGREGATE_MAX;
     } else if (str == "AGGREGATE_AVG") {
         return EXPRESSION_TYPE_AGGREGATE_AVG;
-    } else if (str == "FUNCTION_ABS") {
-        return EXPRESSION_TYPE_FUNCTION_ABS;
-    } else if (str == "FUNCTION_SUBSTRING_FROM") {
-        return EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM;
-    } else if (str == "FUNCTION_SUBSTRING_FROM_FOR") {
-        return EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR;
+    } else if (str == "FUNCTION") {
+        return EXPRESSION_TYPE_FUNCTION;
     }
 
     return EXPRESSION_TYPE_INVALID;
