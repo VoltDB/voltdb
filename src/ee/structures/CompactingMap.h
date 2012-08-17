@@ -25,9 +25,7 @@
 #include <cassert>
 #include "ContiguousAllocator.h"
 
-#ifndef NodeCount
-#define NodeCount u_int32_t
-#endif
+typedef u_int32_t NodeCount;
 
 #ifndef SUBCTMAX
 #define SUBCTMAX INT32_MAX
@@ -147,7 +145,8 @@ public:
 
     size_t bytesAllocated() const { return m_allocator.bytesAllocated(); }
 
-    // TODO(xin): later rename it to ranklower
+    // TODO(xin): later rename it to rankLower
+    // Must pass a key that already in map, or else return -1
     int64_t rankAsc(const Key& key);
     int64_t rankUpper(const Key& key);
 
@@ -196,12 +195,12 @@ CompactingMap<Key, Data, Compare, hasRank>::CompactingMap(bool unique, Compare c
       m_allocator(sizeof(TreeNode) - (hasRank ? 0 : sizeof(NodeCount)), 10000),
       m_unique(unique),
       m_comper(comper)
-{
+  {
     NIL.left = NIL.right = NIL.parent = &NIL;
     NIL.color = BLACK;
     if (hasRank)
         NIL.subct = INVALIDCT;
-}
+  }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
 CompactingMap<Key, Data, Compare, hasRank>::~CompactingMap() {
@@ -237,18 +236,17 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
         while (x != &NIL) {
             y = x;
             int cmp = m_comper(value.first, x->key);
-            if (cmp < 0) {
+            if (cmp < 0)
                 x = x->left;
-            }
             else if (m_unique) {
                 if (cmp == 0) {
-                        if (hasRank) {
-                                while (x != &NIL) {
-                                        x = x->parent;
-                                        decSubct(x);
-                                }
+                    if (hasRank) {
+                        while (x != &NIL) {
+                            x = x->parent;
+                            decSubct(x);
                         }
-                        return false;
+                    }
+                    return false;
                 }
                 else x = x->right;
             }
@@ -269,7 +267,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
         z->parent = y;
         z->color = RED;
         if (hasRank)
-                z->subct = 1;
+            z->subct = 1;
 
         // stitch it in
         if (y == &NIL) m_root = z;
@@ -291,7 +289,7 @@ bool CompactingMap<Key, Data, Compare, hasRank>::insert(std::pair<Key, Data> val
         z->parent = &NIL;
         z->color = BLACK;
         if (hasRank)
-                z->subct = 1;
+            z->subct = 1;
 
         // make it root
         m_root = z;
@@ -380,8 +378,8 @@ void CompactingMap<Key, Data, Compare, hasRank>::erase(TreeNode *z) {
     if (hasRank) {
         TreeNode *ct = delnode;
         while (ct != &NIL) {
-                ct = ct->parent;
-                decSubct(ct);
+            ct = ct->parent;
+            decSubct(ct);
         }
     }
 
@@ -711,7 +709,7 @@ inline void CompactingMap<Key, Data, Compare, hasRank>::decSubct(TreeNode* x) {
     if (x->subct == INVALIDCT) {
         updateSubct(x);
     } else
-          x->subct--;
+        x->subct--;
 }
 template<typename Key, typename Data, typename Compare, bool hasRank>
 inline void CompactingMap<Key, Data, Compare, hasRank>::updateSubct(TreeNode* x) {
@@ -727,152 +725,153 @@ inline void CompactingMap<Key, Data, Compare, hasRank>::updateSubct(TreeNode* x)
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
 int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
-        if (!hasRank) return -1;
-        TreeNode *n = lookup(key);
-        // must pass a key that already in map
-        if (n == &NIL) return -1;
-        TreeNode *x = m_root, *p = n;
-        int64_t ct = 0,ctr = 0, ctl = 0;
-        int m = m_comper(key, x->key);
-        if (m == 0) {
-            if (x->right != &NIL)
-                ctr = getSubct(x->right);
-            ct += getSubct(x) - ctr;
-            if (!m_unique) {
-                while(p->parent != &NIL) {
-                    if (m_comper(key, p->key) == 0) {
-                        if (p->right != &NIL && m_comper(key, p->right->key) == 0)
-                            ct-= getSubct(p->right);
-                        ct--;
-                    }
-                    p = p->parent;
-                }
+    if (!hasRank) return -1;
+    TreeNode *n = lookup(key);
+    // return -1 if the key passed in is not in the map
+    if (n == &NIL) return -1;
+    TreeNode *p = n;
+    int64_t ct = 0,ctr = 0, ctl = 0;
+    int m = m_comper(key, m_root->key);
+    if (m == 0) {
+        if (m_root->right != &NIL)
+            ctr = getSubct(m_root->right);
+        ct = getSubct(m_root) - ctr;
+        while(p->parent != &NIL) {
+            if (m_comper(key, p->key) == 0) {
+                if (p->right != &NIL && m_comper(key, p->right->key) == 0)
+                    ct-= getSubct(p->right);
+                ct--;
             }
-        } else if (m > 0) {
-            if (p->right != &NIL)
-                ctr = getSubct(p->right);
-            ct += getSubct(p) - ctr;
-            while (p->parent != &NIL) {
-                if (p->parent->right == p) {
-                    ct += getSubct(p->parent) - getSubct(p);
-                }
-                p = p->parent;
-            }
-        } else {
-            if (p->left != &NIL)
-                ctl = getSubct(p->left);
-            ct += getSubct(p) - ctl - 1;
-            while (p->parent != &NIL) {
-                if (p->parent->left == p) {
-                    ct += getSubct(p->parent) - getSubct(p);
-                }
-                p = p->parent;
-            }
-            ct = getSubct(x) - ct;
+            p = p->parent;
         }
-        return ct;
+    } else if (m > 0) {
+        if (p->right != &NIL)
+            ctr = getSubct(p->right);
+        ct = getSubct(p) - ctr;
+        while (p->parent != &NIL) {
+            if (p->parent->right == p) {
+                ct += getSubct(p->parent) - getSubct(p);
+            }
+            p = p->parent;
+        }
+    } else {
+        if (p->left != &NIL)
+            ctl = getSubct(p->left);
+        ct = getSubct(p) - ctl - 1;
+        while (p->parent != &NIL) {
+            if (p->parent->left == p) {
+                ct += getSubct(p->parent) - getSubct(p);
+            }
+            p = p->parent;
+        }
+        ct = getSubct(m_root) - ct;
+    }
+    return ct;
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
 int64_t CompactingMap<Key, Data, Compare, hasRank>::rankUpper(const Key& key) {
-        if (!hasRank) return -1;
-        if (m_unique) return rankAsc(key);
+    if (!hasRank) return -1;
+    if (m_unique) return rankAsc(key);
+    TreeNode *n = lookup(key);
+    // return -1 if the key passed in is not in the map
+    if (n == &NIL) return -1;
 
-        iterator it;
-        it = upperBound(key);
-        if (it.isEnd())
-            return m_count;
-        return rankAsc(it.key()) - 1;
+    iterator it;
+    it = upperBound(key);
+    if (it.isEnd())
+        return m_count;
+    return rankAsc(it.key()) - 1;
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
 typename CompactingMap<Key, Data, Compare, hasRank>::TreeNode *CompactingMap<Key, Data, Compare, hasRank>::lookupRank(int64_t ith) {
-        if (!hasRank) return &NIL;
+    if (!hasRank) return &NIL;
 
-        TreeNode *x = m_root;
-        TreeNode *retval = &NIL;
-        if (x == &NIL || ith > getSubct(x) || ith <= 0)
-                return retval;
-
-        int64_t rk = ith;
-        int64_t xl = 0;
-        while (x != &NIL && rk > 0) {
-                if (x->left != &NIL)
-                        xl = getSubct(x->left);
-                if (rk == xl + 1) {
-                        retval = x;
-                        rk = 0;
-                } else if (rk < xl + 1) {
-                        x = x->left;
-                } else {
-                        x = x->right;
-                        rk = rk - xl - 1;
-                }
-                xl = 0;
-        }
+    TreeNode *x = m_root;
+    TreeNode *retval = &NIL;
+    if (x == &NIL || ith > getSubct(x) || ith <= 0)
         return retval;
+
+    int64_t rk = ith;
+    int64_t xl = 0;
+    while (x != &NIL && rk > 0) {
+        if (x->left != &NIL)
+            xl = getSubct(x->left);
+        if (rk == xl + 1) {
+            retval = x;
+            rk = 0;
+        } else if (rk < xl + 1) {
+            x = x->left;
+        } else {
+            x = x->right;
+            rk -= (xl + 1);
+        }
+        xl = 0;
+    }
+    return retval;
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
 bool CompactingMap<Key, Data, Compare, hasRank>::verifyRank() {
-        if (!hasRank)
-                return true;
-
-        iterator it;
-        int64_t rkasc;
-        TreeNode * n = &NIL;
-        // iterate rank start from 1 to m_count
-        for (int64_t i = 1; i <= m_count; i++) {
-                it = findRank(i);
-                if ((n = lookup(it.key())) == &NIL) {
-                        printf("Can not find rank %ld node with key\n", (long)i);
-                        return false;
-                }
-
-                if (m_unique) {
-                        if ((rkasc = rankAsc(it.key())) != i) {
-                                printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
-                                return false;
-                        }
-                } else {
-                        const Key k = it.key();
-                        // test rankUpper
-                        iterator up = upperBound(k);
-                        int64_t rkUpper;
-                        if (up.isEnd() == false) {
-                            up.movePrev();
-                            if (it.equals(up)) {
-                                rkUpper = rankUpper(k);
-                                if (rkUpper != i) {
-                                    printf("false: multi_rankUpper expected %ld, but got %ld\n", (long)i, (long)rkUpper);
-                                    return false;
-                                }
-                            }
-                        } else {
-                            if (m_count == i) {
-                                rkUpper = rankUpper(k);
-                                if (rkUpper != m_count) {
-                                    printf("false: multi_rankUpper expected %ld, but got %ld\n", (long)i, (long)rkUpper);
-                                    return false;
-                                }
-                            }
-                        }
-                        // test rankAsc
-                        rkasc = rankAsc(k);
-                        int64_t nc = 0;
-                        it.movePrev();
-                        while (k == it.key()) {
-                                nc++;
-                                it.movePrev();
-                        }
-                        if (rkasc + nc != i) {
-                                printf("false: multi_rankAsc %ld keys are the same", (long)nc);
-                                printf("false: multi_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
-                                return false;
-                        }
-                }
-        }
+    if (!hasRank)
         return true;
+
+    iterator it;
+    int64_t rkasc;
+    TreeNode * n = &NIL;
+    // iterate rank start from 1 to m_count
+    for (int64_t i = 1; i <= m_count; i++) {
+        it = findRank(i);
+        if ((n = lookup(it.key())) == &NIL) {
+            printf("Can not find rank %ld node with key\n", (long)i);
+            return false;
+        }
+
+        if (m_unique) {
+            if ((rkasc = rankAsc(it.key())) != i) {
+                printf("false: unique_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
+                return false;
+            }
+        } else {
+            const Key k = it.key();
+            // test rankUpper
+            iterator up = upperBound(k);
+            int64_t rkUpper;
+            if (up.isEnd() == false) {
+                up.movePrev();
+                if (it.equals(up)) {
+                    rkUpper = rankUpper(k);
+                    if (rkUpper != i) {
+                        printf("false: multi_rankUpper expected %ld, but got %ld\n", (long)i, (long)rkUpper);
+                        return false;
+                    }
+                }
+            } else {
+                if (m_count == i) {
+                    rkUpper = rankUpper(k);
+                    if (rkUpper != m_count) {
+                        printf("false: multi_rankUpper expected %ld, but got %ld\n", (long)i, (long)rkUpper);
+                        return false;
+                    }
+                }
+            }
+            // test rankAsc
+            rkasc = rankAsc(k);
+            int64_t nc = 0;
+            it.movePrev();
+            while (k == it.key()) {
+                nc++;
+                it.movePrev();
+            }
+            if (rkasc + nc != i) {
+                printf("false: multi_rankAsc %ld keys are the same", (long)nc);
+                printf("false: multi_rankAsc expected %ld, but got %ld\n", (long)i, (long)rkasc);
+                return false;
+            }
+        }
+    }
+    return true;
 }
 
 template<typename Key, typename Data, typename Compare, bool hasRank>
@@ -908,20 +907,20 @@ bool CompactingMap<Key, Data, Compare, hasRank>::verify() const {
 template<typename Key, typename Data, typename Compare, bool hasRank>
 int CompactingMap<Key, Data, Compare, hasRank>::inOrderCounterChecking(const TreeNode *n) const {
 
-        int res = 0;
-        if (n != &NIL) {
-                if ((res = inOrderCounterChecking(n->left)) < 0) return res;
-                // check counter for sub tree nodes
-                int64_t ct = 1;
-                if (n->left != &NIL) ct += getSubct(n->left);
-                if (n->right != &NIL) ct += getSubct(n->right);
-                if (ct != getSubct(n)) {
-                        printf("node counter is not correct, expected %ld but get %ld\n", (long)ct, (long)getSubct(n));
-                        return -1;
-                }
-
-                if ((res = inOrderCounterChecking(n->right)) < 0) return res;
+    int res = 0;
+    if (n != &NIL) {
+        if ((res = inOrderCounterChecking(n->left)) < 0) return res;
+        // check counter for sub tree nodes
+        int64_t ct = 1;
+        if (n->left != &NIL) ct += getSubct(n->left);
+        if (n->right != &NIL) ct += getSubct(n->right);
+        if (ct != getSubct(n)) {
+            printf("node counter is not correct, expected %ld but get %ld\n", (long)ct, (long)getSubct(n));
+            return -1;
         }
+
+        if ((res = inOrderCounterChecking(n->right)) < 0) return res;
+    }
     return res;
 }
 

@@ -60,7 +60,7 @@ namespace voltdb {
  * Index implemented as a Binary Unique Map.
  * @see TableIndex
  */
-template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=false>
+template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=true>
 class CompactingTreeUniqueIndex : public TableIndex
 {
     friend class TableIndexFactory;
@@ -242,6 +242,10 @@ public:
         m_tmp1.setFromKey(searchKey);
         return (m_entries.find(m_tmp1).isEnd() == false);
     }
+
+    /**
+     * See comments in parent class TableIndex
+     */
     int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 
@@ -253,6 +257,10 @@ public:
             return m_entries.rankAsc(m_keyIter.key());
         }
     }
+
+    /**
+     * See comments in parent class TableIndex
+     */
     int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
         if (!hasRank) return -1;
 

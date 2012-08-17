@@ -657,6 +657,21 @@ int32_t hexCharToInt(char c) {
     return retval;
 }
 
+int64_t getMaxTypeValue (ValueType type) {
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+        return static_cast<int64_t>(INT8_MAX);
+    case VALUE_TYPE_SMALLINT:
+        return static_cast<int64_t>(INT16_MAX);
+    case VALUE_TYPE_INTEGER:
+        return static_cast<int64_t>(INT32_MAX);
+    case VALUE_TYPE_BIGINT:
+        return static_cast<int64_t>(INT64_MAX);
+    default:
+        return static_cast<int64_t>(-1);
+    }
+}
+
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString) {
     assert (hexString);
     size_t len = strlen(hexString);

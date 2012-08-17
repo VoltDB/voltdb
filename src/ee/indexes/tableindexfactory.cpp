@@ -167,7 +167,11 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         }
     }
 
-    if (/*(type == BALANCED_TREE_INDEX) &&*/ (unique) && (countable)) {
+    /**
+     * Turning off counting seems of little value for larger keys.
+     * Otherwise this file would be twice as long.
+     */
+    if (/*(type == BALANCED_TREE_INDEX) &&*/ (unique)) {
         if (type == HASH_TABLE_INDEX) {
             VOLT_INFO("Producing a tree index for %s: "
                       "hash index not currently supported for this index key.\n",
@@ -201,41 +205,11 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
         }
     }
 
-    if (/*(type == BALANCED_TREE_INDEX) &&*/ (unique) && (!countable)) {
-        if (type == HASH_TABLE_INDEX) {
-                VOLT_INFO("Producing a tree index for %s: "
-                                "hash index not currently supported for this index key.\n",
-                                scheme.name.c_str());
-        }
-
-        if (keySize <= 4) {
-                return new CompactingTreeUniqueIndex<GenericKey<4>, GenericComparator<4>, GenericEqualityChecker<4> >(schemeCopy);
-        } else if (keySize <= 8) {
-                return new CompactingTreeUniqueIndex<GenericKey<8>, GenericComparator<8>, GenericEqualityChecker<8> >(schemeCopy);
-        } else if (keySize <= 12) {
-                return new CompactingTreeUniqueIndex<GenericKey<12>, GenericComparator<12>, GenericEqualityChecker<12> >(schemeCopy);
-        } else if (keySize <= 16) {
-                return new CompactingTreeUniqueIndex<GenericKey<16>, GenericComparator<16>, GenericEqualityChecker<16> >(schemeCopy);
-        } else if (keySize <= 24) {
-                return new CompactingTreeUniqueIndex<GenericKey<24>, GenericComparator<24>, GenericEqualityChecker<24> >(schemeCopy);
-        } else if (keySize <= 32) {
-                return new CompactingTreeUniqueIndex<GenericKey<32>, GenericComparator<32>, GenericEqualityChecker<32> >(schemeCopy);
-        } else if (keySize <= 48) {
-                return new CompactingTreeUniqueIndex<GenericKey<48>, GenericComparator<48>, GenericEqualityChecker<48> >(schemeCopy);
-        } else if (keySize <= 64) {
-                return new CompactingTreeUniqueIndex<GenericKey<64>, GenericComparator<64>, GenericEqualityChecker<64> >(schemeCopy);
-        } else if (keySize <= 96) {
-                return new CompactingTreeUniqueIndex<GenericKey<96>, GenericComparator<96>, GenericEqualityChecker<96> >(schemeCopy);
-        } else if (keySize <= 128) {
-                return new CompactingTreeUniqueIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
-        } else if (keySize <= 256) {
-                return new CompactingTreeUniqueIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256> >(schemeCopy);
-        } else {
-                return new CompactingTreeUniqueIndex<TupleKey, TupleKeyComparator, TupleKeyEqualityChecker>(schemeCopy);
-        }
-    }
-
-    if (/*(type == BALANCED_TREE_INDEX) &&*/ (!unique) && (countable)) {
+    /**
+     * Turning off counting seems of little value for larger keys.
+     * Otherwise this file would be twice as long.
+     */
+    if (/*(type == BALANCED_TREE_INDEX) &&*/ (!unique)) {
         if (type == HASH_TABLE_INDEX) {
             VOLT_INFO("Producing a tree index for %s: "
                       "hash index not currently supported for this index key.\n",
@@ -266,40 +240,6 @@ TableIndex *TableIndexFactory::getInstance(const TableIndexScheme &scheme) {
             return new CompactingTreeMultiMapIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256>, true >(schemeCopy);
         } else {
             return new CompactingTreeMultiMapIndex<TupleKey, TupleKeyComparator, TupleKeyEqualityChecker, true >(schemeCopy);
-        }
-    }
-
-    if (/*(type == BALANCED_TREE_INDEX) &&*/ (!unique) && (!countable)) {
-        if (type == HASH_TABLE_INDEX) {
-                VOLT_INFO("Producing a tree index for %s: "
-                                "hash index not currently supported for this index key.\n",
-                                scheme.name.c_str());
-        }
-
-        if (keySize <= 4) {
-                return new CompactingTreeMultiMapIndex<GenericKey<4>, GenericComparator<4>, GenericEqualityChecker<4> >(schemeCopy);
-        } else if (keySize <= 8) {
-                return new CompactingTreeMultiMapIndex<GenericKey<8>, GenericComparator<8>, GenericEqualityChecker<8> >(schemeCopy);
-        } else if (keySize <= 12) {
-                return new CompactingTreeMultiMapIndex<GenericKey<12>, GenericComparator<12>, GenericEqualityChecker<12> >(schemeCopy);
-        } else if (keySize <= 16) {
-                return new CompactingTreeMultiMapIndex<GenericKey<16>, GenericComparator<16>, GenericEqualityChecker<16> >(schemeCopy);
-        } else if (keySize <= 24) {
-                return new CompactingTreeMultiMapIndex<GenericKey<24>, GenericComparator<24>, GenericEqualityChecker<24> >(schemeCopy);
-        } else if (keySize <= 32) {
-                return new CompactingTreeMultiMapIndex<GenericKey<32>, GenericComparator<32>, GenericEqualityChecker<32> >(schemeCopy);
-        } else if (keySize <= 48) {
-                return new CompactingTreeMultiMapIndex<GenericKey<48>, GenericComparator<48>, GenericEqualityChecker<48> >(schemeCopy);
-        } else if (keySize <= 64) {
-                return new CompactingTreeMultiMapIndex<GenericKey<64>, GenericComparator<64>, GenericEqualityChecker<64> >(schemeCopy);
-        } else if (keySize <= 96) {
-                return new CompactingTreeMultiMapIndex<GenericKey<96>, GenericComparator<96>, GenericEqualityChecker<96> >(schemeCopy);
-        } else if (keySize <= 128) {
-                return new CompactingTreeMultiMapIndex<GenericKey<128>, GenericComparator<128>, GenericEqualityChecker<128> >(schemeCopy);
-        } else if (keySize <= 256) {
-                return new CompactingTreeMultiMapIndex<GenericKey<256>, GenericComparator<256>, GenericEqualityChecker<256> >(schemeCopy);
-        } else {
-                return new CompactingTreeMultiMapIndex<TupleKey, TupleKeyComparator, TupleKeyEqualityChecker>(schemeCopy);
         }
     }
 
