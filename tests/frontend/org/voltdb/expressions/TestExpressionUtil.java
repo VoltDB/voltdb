@@ -208,14 +208,16 @@ public class TestExpressionUtil extends TestCase {
     public void testClone() {
         AbstractExpression cloned_exp = null;
         try {
-            cloned_exp = ExpressionUtil.clone(ROOT_EXP);
+            if (ROOT_EXP != null) {
+                cloned_exp = (AbstractExpression) ROOT_EXP.clone();
+            }
         } catch (Exception ex) {
             ex.printStackTrace();
         }
         assertNotNull(cloned_exp);
 
         //
-        // First build our lists of information about each node in the orignal tree
+        // First build our lists of information about each node in the original tree
         // It is assumed that the tree will be traversed in the same order
         //
         final ArrayList<AbstractExpression> orig_exps = new ArrayList<AbstractExpression>();
@@ -236,10 +238,12 @@ public class TestExpressionUtil extends TestCase {
                 AbstractExpression orig_exp = orig_exps.remove(0);
                 //
                 // We want to make sure that the cloned Expression doesn't
-                // have the its ID set to its hashCode
-                //
-                assertTrue(orig_exp.hashCode() != exp.hashCode());
-                //assertFalse(orig_exp.getId().equals(Integer.toString(exp.hashCode())));
+                // share components (having the same object identity).
+                // This COULD still fail for wrapped primitive types
+                // IF Expressions ever reference any and
+                // IF the cloning method is not (somehow) working to avoid
+                // pointers into a system-provided wrapped primitive cache.
+                assertFalse(orig_exp == exp);
                 //
                 // Use our general comparison method to check other things
                 //
@@ -332,15 +336,15 @@ public class TestExpressionUtil extends TestCase {
 
         // Simple tuple value type gets pushed through
         op.setValueType(VoltType.FLOAT);
-        ExpressionUtil.assignOutputValueTypesRecursively(root);
+        ExpressionUtil.finalizeValueTypes(root);
         assertEquals(VoltType.FLOAT, root.getValueType());
 
         op.setValueType(VoltType.INTEGER);
-        ExpressionUtil.assignOutputValueTypesRecursively(root);
+        ExpressionUtil.finalizeValueTypes(root);
         assertEquals(VoltType.INTEGER, root.getValueType());
 
         op.setValueType(VoltType.DECIMAL);
-        ExpressionUtil.assignOutputValueTypesRecursively(root);
+        ExpressionUtil.finalizeValueTypes(root);
         assertEquals(VoltType.DECIMAL, root.getValueType());
 
         op = new OperatorExpression();
@@ -355,19 +359,19 @@ public class TestExpressionUtil extends TestCase {
         // FLOAT + int type gets promoted to FLOAT
         left.setValueType(VoltType.FLOAT);
         right.setValueType(VoltType.INTEGER);
-        ExpressionUtil.assignOutputValueTypesRecursively(root);
+        ExpressionUtil.finalizeValueTypes(root);
         assertEquals(VoltType.FLOAT, root.getValueType());
 
         // random INT types get promoted to BIGINT
         left.setValueType(VoltType.TINYINT);
         right.setValueType(VoltType.INTEGER);
-        ExpressionUtil.assignOutputValueTypesRecursively(root);
+        ExpressionUtil.finalizeValueTypes(root);
         assertEquals(VoltType.BIGINT, root.getValueType());
 
         // DECIMAL works, at least
         left.setValueType(VoltType.DECIMAL);
         right.setValueType(VoltType.DECIMAL);
-        ExpressionUtil.assignOutputValueTypesRecursively(root);
+        ExpressionUtil.finalizeValueTypes(root);
         assertEquals(VoltType.DECIMAL, root.getValueType());
     }
 
@@ -389,7 +393,7 @@ public class TestExpressionUtil extends TestCase {
         dec.m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
         lit_dec = new OperatorExpression(ExpressionType.OPERATOR_PLUS, lit, dec);
 
-        ExpressionUtil.assignLiteralConstantTypesRecursively(lit_dec, VoltType.STRING);
+        lit_dec.normalizeOperandTypes_recurse();
         assertEquals(lit.m_valueType, VoltType.DECIMAL);
         assertEquals(lit.m_valueSize, VoltType.DECIMAL.getLengthInBytesForFixedTypes());
         assertEquals(dec.m_valueType, VoltType.DECIMAL);
@@ -404,7 +408,7 @@ public class TestExpressionUtil extends TestCase {
         dec.m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
         dec_lit = new OperatorExpression(ExpressionType.OPERATOR_DIVIDE, dec, lit);
 
-        ExpressionUtil.assignLiteralConstantTypesRecursively(dec_lit, VoltType.STRING);
+        dec_lit.normalizeOperandTypes_recurse();
         assertEquals(lit.m_valueType, VoltType.DECIMAL);
         assertEquals(lit.m_valueSize, VoltType.DECIMAL.getLengthInBytesForFixedTypes());
         assertEquals(dec.m_valueType, VoltType.DECIMAL);
@@ -421,7 +425,7 @@ public class TestExpressionUtil extends TestCase {
         AbstractExpression lit_bint =
             new OperatorExpression(ExpressionType.OPERATOR_MINUS, lit, bint);
 
-        ExpressionUtil.assignLiteralConstantTypesRecursively(lit_bint, VoltType.STRING);
+        lit_bint.normalizeOperandTypes_recurse();
         assertEquals(lit.m_valueType, VoltType.FLOAT);
         assertEquals(lit.m_valueSize, VoltType.FLOAT.getLengthInBytesForFixedTypes());
         assertEquals(bint.m_valueType, VoltType.BIGINT);
@@ -438,7 +442,7 @@ public class TestExpressionUtil extends TestCase {
 
         AbstractExpression root = new OperatorExpression(ExpressionType.OPERATOR_MULTIPLY,
                 lit_bint, new TupleValueExpression());
-        ExpressionUtil.assignLiteralConstantTypesRecursively(root);
+        root.normalizeOperandTypes_recurse();
         assertEquals(lit.m_valueType, VoltType.DECIMAL);
         assertEquals(lit.m_valueSize, VoltType.DECIMAL.getLengthInBytesForFixedTypes());
         assertEquals(bint.m_valueType, VoltType.DECIMAL);

@@ -28,15 +28,33 @@ import java.math.BigDecimal;
 import java.math.BigInteger;
 
 import junit.framework.Test;
+
 import org.voltdb.BackendTarget;
+import org.voltdb.VoltTable;
+import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
+import org.voltdb.benchmark.tpcc.procedures.SelectAll;
 import org.voltdb.client.Client;
 import org.voltdb.client.NoConnectionsException;
-import org.voltdb.VoltTable;
 import org.voltdb.client.ProcCallException;
-import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
-import org.voltdb.benchmark.tpcc.procedures.*;
 import org.voltdb.types.TimestampType;
-import org.voltdb_testprocs.regressionsuites.rollbackprocs.*;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.AllTypesJavaAbort;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.AllTypesJavaError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.AllTypesMultiOpsJavaError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.AllTypesUpdateJavaAbort;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.AllTypesUpdateJavaError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.FetchNORowUsingIndex;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.InsertAllTypes;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.MultiPartitionConstraintError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.MultiPartitionJavaAbort;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.MultiPartitionJavaError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.MultiPartitionParamSerializationError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.ReadMatView;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionConstraintError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionConstraintFailureAndContinue;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionJavaAbort;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionJavaError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionParamSerializationError;
+import org.voltdb_testprocs.regressionsuites.rollbackprocs.SinglePartitionUpdateConstraintError;
 
 public class TestRollbackSuite extends RegressionSuite {
 
@@ -952,25 +970,11 @@ public class TestRollbackSuite extends RegressionSuite {
         boolean success;
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        config = new LocalSingleProcessServer("rollback-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile
-        success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 2 Local Site/Partitions running on JNI backend
+        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        config = new LocalSingleProcessServer("rollback-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("rollback-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile (note the reuse of the TPCC project)
         success = config.compile(project);
@@ -980,19 +984,10 @@ public class TestRollbackSuite extends RegressionSuite {
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #3: 1 Local Site/Partition running on HSQL backend
+        // CONFIG #2: Local Cluster (of processes)
         /////////////////////////////////////////////////////////////
 
-        //config = new LocalSingleProcessServer("rollback-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        //success = config.compile(project);
-        //assert(success);
-        //builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #4: Local Cluster (of processes)
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("rollback-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("rollback-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);

@@ -26,6 +26,8 @@
 #include "common/ValuePeeker.hpp"
 #include "common/serializeio.h"
 #include "common/ThreadLocalPool.h"
+#include "common/executorcontext.hpp"
+#include "expressions/functionexpression.h"
 
 #include <cfloat>
 #include <limits>
@@ -240,6 +242,7 @@ TEST_F(NValueTest, TestCastToBigInt) {
     try
     {
         NValue decimalCastToBigInt = ValueFactory::castAsBigInt(decimalValue);
+        decimalCastToBigInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -251,6 +254,7 @@ TEST_F(NValueTest, TestCastToBigInt) {
     try
     {
         NValue stringCastToBigInt = ValueFactory::castAsBigInt(stringValue);
+        stringCastToBigInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -269,6 +273,7 @@ TEST_F(NValueTest, TestCastToBigInt) {
     try
     {
         NValue doubleCastToBigInt = ValueFactory::castAsBigInt(doubleOutOfRangeH);
+        doubleCastToBigInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -279,6 +284,7 @@ TEST_F(NValueTest, TestCastToBigInt) {
     try
     {
         NValue doubleCastToBigInt = ValueFactory::castAsBigInt(doubleOutOfRangeL);
+        doubleCastToBigInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -317,6 +323,7 @@ TEST_F(NValueTest, TestCastToInteger) {
     try
     {
         NValue decimalCast = ValueFactory::castAsInteger(decimalValue);
+        decimalCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -328,6 +335,7 @@ TEST_F(NValueTest, TestCastToInteger) {
     try
     {
         NValue stringCast = ValueFactory::castAsInteger(stringValue);
+        stringCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -345,6 +353,7 @@ TEST_F(NValueTest, TestCastToInteger) {
     try
     {
         NValue doubleCastToInteger = ValueFactory::castAsInteger(doubleOutOfRangeH);
+        doubleCastToInteger.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -355,6 +364,7 @@ TEST_F(NValueTest, TestCastToInteger) {
     try
     {
         NValue doubleCastToInteger = ValueFactory::castAsInteger(doubleOutOfRangeL);
+        doubleCastToInteger.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -368,6 +378,7 @@ TEST_F(NValueTest, TestCastToInteger) {
     try
     {
         NValue bigIntCastToInteger = ValueFactory::castAsInteger(bigIntOutOfRangeH);
+        bigIntCastToInteger.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -378,6 +389,7 @@ TEST_F(NValueTest, TestCastToInteger) {
     try
     {
         NValue bigIntCastToInteger = ValueFactory::castAsInteger(bigIntOutOfRangeL);
+        bigIntCastToInteger.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -416,6 +428,7 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     try
     {
         NValue decimalCast = ValueFactory::castAsSmallInt(decimalValue);
+        decimalCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -427,6 +440,7 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     try
     {
         NValue stringCast = ValueFactory::castAsSmallInt(stringValue);
+        stringCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -444,6 +458,7 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     try
     {
         NValue doubleCastToSmallInt = ValueFactory::castAsSmallInt(doubleOutOfRangeH);
+        doubleCastToSmallInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -454,6 +469,7 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     try
     {
         NValue doubleCastToSmallInt = ValueFactory::castAsSmallInt(doubleOutOfRangeL);
+        doubleCastToSmallInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -467,6 +483,7 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     try
     {
         NValue bigIntCastToSmallInt = ValueFactory::castAsSmallInt(bigIntOutOfRangeH);
+        bigIntCastToSmallInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -477,6 +494,7 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     try
     {
         NValue bigIntCastToSmallInt = ValueFactory::castAsSmallInt(bigIntOutOfRangeL);
+        bigIntCastToSmallInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -490,6 +508,7 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     try
     {
         NValue integerCastToSmallInt = ValueFactory::castAsSmallInt(integerOutOfRangeH);
+        integerCastToSmallInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -500,6 +519,7 @@ TEST_F(NValueTest, TestCastToSmallInt) {
     try
     {
         NValue integerCastToSmallInt = ValueFactory::castAsSmallInt(integerOutOfRangeL);
+        integerCastToSmallInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -538,6 +558,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue decimalCast = ValueFactory::castAsTinyInt(decimalValue);
+        decimalCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -549,6 +570,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue stringCast = ValueFactory::castAsTinyInt(stringValue);
+        stringCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -566,6 +588,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue doubleCastToTinyInt = ValueFactory::castAsTinyInt(doubleOutOfRangeH);
+        doubleCastToTinyInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -576,6 +599,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue doubleCastToTinyInt = ValueFactory::castAsTinyInt(doubleOutOfRangeL);
+        doubleCastToTinyInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -589,6 +613,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue bigIntCastToTinyInt = ValueFactory::castAsTinyInt(bigIntOutOfRangeH);
+        bigIntCastToTinyInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -599,6 +624,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue bigIntCastToTinyInt = ValueFactory::castAsTinyInt(bigIntOutOfRangeL);
+        bigIntCastToTinyInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -612,6 +638,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue integerCastToTinyInt = ValueFactory::castAsTinyInt(integerOutOfRangeH);
+        integerCastToTinyInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -622,6 +649,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue integerCastToTinyInt = ValueFactory::castAsTinyInt(integerOutOfRangeL);
+        integerCastToTinyInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -635,6 +663,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue smallIntCastToTinyInt = ValueFactory::castAsTinyInt(smallIntOutOfRangeH);
+        smallIntCastToTinyInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -645,6 +674,7 @@ TEST_F(NValueTest, TestCastToTinyInt) {
     try
     {
         NValue smallIntCastToTinyInt = ValueFactory::castAsTinyInt(smallIntOutOfRangeL);
+        smallIntCastToTinyInt.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -688,6 +718,7 @@ TEST_F(NValueTest, TestCastToDouble) {
     try
     {
         NValue decimalCast = ValueFactory::castAsDouble(decimalValue);
+        decimalCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -699,6 +730,7 @@ TEST_F(NValueTest, TestCastToDouble) {
     try
     {
         NValue stringCast = ValueFactory::castAsDouble(stringValue);
+        stringCast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -723,6 +755,7 @@ TEST_F(NValueTest, TestCastToString) {
     try
     {
         NValue cast = ValueFactory::castAsString(tinyInt);
+        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -734,6 +767,7 @@ TEST_F(NValueTest, TestCastToString) {
     try
     {
         NValue cast = ValueFactory::castAsString(smallInt);
+        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -745,6 +779,7 @@ TEST_F(NValueTest, TestCastToString) {
     try
     {
         NValue cast = ValueFactory::castAsString(integer);
+        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -756,6 +791,7 @@ TEST_F(NValueTest, TestCastToString) {
     try
     {
         NValue cast = ValueFactory::castAsString(bigInt);
+        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -767,6 +803,7 @@ TEST_F(NValueTest, TestCastToString) {
     try
     {
         NValue cast = ValueFactory::castAsString(doubleValue);
+        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -778,6 +815,7 @@ TEST_F(NValueTest, TestCastToString) {
     try
     {
         NValue cast = ValueFactory::castAsString(decimalValue);
+        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -811,6 +849,7 @@ TEST_F(NValueTest, TestCastToDecimal) {
     try
     {
         NValue cast = ValueFactory::castAsDecimal(doubleValue);
+        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -822,6 +861,7 @@ TEST_F(NValueTest, TestCastToDecimal) {
     try
     {
         NValue cast = ValueFactory::castAsDecimal(stringValue);
+        cast.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     }
     catch (SQLException& ex)
     {
@@ -842,6 +882,7 @@ TEST_F(NValueTest, TestCastToDecimal) {
     try
     {
         NValue doubleCastToDecimal = ValueFactory::castAsDecimal(doubleOutOfRangeH);
+        doubleCastToDecimal.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -852,6 +893,7 @@ TEST_F(NValueTest, TestCastToDecimal) {
     try
     {
         NValue doubleCastToDecimal = ValueFactory::castAsDecimal(doubleOutOfRangeL);
+        doubleCastToDecimal.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex)
     {
         caught = true;
@@ -868,6 +910,7 @@ TEST_F(NValueTest, TestBigIntOpAddOverflow) {
     bool caught = false;
     try {
         NValue result = lhs.op_add(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -878,6 +921,7 @@ TEST_F(NValueTest, TestBigIntOpAddOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_add(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -889,6 +933,7 @@ TEST_F(NValueTest, TestBigIntOpAddOverflow) {
     lhs = ValueFactory::getBigIntValue(1);
     rhs = ValueFactory::getBigIntValue(4);
     NValue result = lhs.op_add(rhs);
+    result.debug(); // A harmless way to avoid unused variable warnings.
 }
 
 /**
@@ -900,6 +945,7 @@ TEST_F(NValueTest, TestBigIntOpSubtractOverflow) {
     bool caught = false;
     try {
         NValue result = lhs.op_subtract(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -910,6 +956,7 @@ TEST_F(NValueTest, TestBigIntOpSubtractOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_subtract(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -921,6 +968,7 @@ TEST_F(NValueTest, TestBigIntOpSubtractOverflow) {
     lhs = ValueFactory::getBigIntValue(1);
     rhs = ValueFactory::getBigIntValue(4);
     NValue result = lhs.op_subtract(rhs);
+    result.debug(); // This is a harmless way to avoid unused variable warnings.
 }
 
 /**
@@ -932,6 +980,7 @@ TEST_F(NValueTest, TestBigIntOpMultiplyOverflow) {
     bool caught = false;
     try {
         NValue result = lhs.op_multiply(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -942,6 +991,7 @@ TEST_F(NValueTest, TestBigIntOpMultiplyOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_multiply(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -952,6 +1002,7 @@ TEST_F(NValueTest, TestBigIntOpMultiplyOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_multiply(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -962,6 +1013,7 @@ TEST_F(NValueTest, TestBigIntOpMultiplyOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_multiply(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -973,6 +1025,7 @@ TEST_F(NValueTest, TestBigIntOpMultiplyOverflow) {
     lhs = ValueFactory::getBigIntValue(1);
     rhs = ValueFactory::getBigIntValue(4);
     NValue result = lhs.op_multiply(rhs);
+    result.debug(); // This is a harmless way to avoid unused variable warnings.
 }
 
 
@@ -983,6 +1036,7 @@ TEST_F(NValueTest, TestDoubleOpAddOverflow) {
     bool caught = false;
     try {
         NValue result = lhs.op_add(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -994,6 +1048,7 @@ TEST_F(NValueTest, TestDoubleOpAddOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_add(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1005,6 +1060,7 @@ TEST_F(NValueTest, TestDoubleOpAddOverflow) {
     lhs = ValueFactory::getDoubleValue(1);
     rhs = ValueFactory::getDoubleValue(4);
     NValue result = lhs.op_add(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
 }
 
 TEST_F(NValueTest, TestDoubleOpSubtractOverflow) {
@@ -1014,6 +1070,7 @@ TEST_F(NValueTest, TestDoubleOpSubtractOverflow) {
     bool caught = false;
     try {
         NValue result = lhs.op_subtract(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1025,6 +1082,7 @@ TEST_F(NValueTest, TestDoubleOpSubtractOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_subtract(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1036,6 +1094,7 @@ TEST_F(NValueTest, TestDoubleOpSubtractOverflow) {
     lhs = ValueFactory::getDoubleValue(1.23);
     rhs = ValueFactory::getDoubleValue(4.2345346);
     NValue result = lhs.op_subtract(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
 }
 
 TEST_F(NValueTest, TestDoubleOpMultiplyOverflow) {
@@ -1045,6 +1104,7 @@ TEST_F(NValueTest, TestDoubleOpMultiplyOverflow) {
     bool caught = false;
     try {
         NValue result = lhs.op_multiply(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1056,6 +1116,7 @@ TEST_F(NValueTest, TestDoubleOpMultiplyOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_multiply(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1067,6 +1128,7 @@ TEST_F(NValueTest, TestDoubleOpMultiplyOverflow) {
     lhs = ValueFactory::getDoubleValue(1.23);
     rhs = ValueFactory::getDoubleValue(4.2345346);
     NValue result = lhs.op_multiply(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
 }
 
 TEST_F(NValueTest, TestDoubleOpDivideOverflow) {
@@ -1076,6 +1138,7 @@ TEST_F(NValueTest, TestDoubleOpDivideOverflow) {
     bool caught = false;
     try {
         NValue result = lhs.op_divide(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1087,6 +1150,7 @@ TEST_F(NValueTest, TestDoubleOpDivideOverflow) {
     caught = false;
     try {
         NValue result = lhs.op_divide(rhs);
+        result.debug(); // This expected dead code is a harmless way to avoid unused variable warnings.
     } catch (SQLException& ex) {
         caught = true;
     }
@@ -1098,6 +1162,7 @@ TEST_F(NValueTest, TestDoubleOpDivideOverflow) {
     lhs = ValueFactory::getDoubleValue(1.23);
     rhs = ValueFactory::getDoubleValue(4.2345346);
     NValue result = lhs.op_divide(rhs);
+    result.debug(); // This is a harmless way to avoid unused variable warnings.
 }
 
 TEST_F(NValueTest, TestOpIncrementOverflow) {
@@ -1946,6 +2011,231 @@ TEST_F(NValueTest, SerializeToExport)
     EXPECT_EQ('0', sin.readChar());
     sin.unread(out.position());
     out.position(0);
+}
+
+TEST_F(NValueTest, TestLike)
+{
+    std::vector<const char *> testData;
+    testData.push_back("aaaaaaa");
+    testData.push_back("abcccc%");
+    testData.push_back("abcdefg");
+    testData.push_back("âxxxéyy");
+    testData.push_back("â🀲x一xxéyyԱ");
+
+    std::vector<const char *> testExpressions;
+    std::vector<int> testMatches;
+
+    testExpressions.push_back("aaa%"); testMatches.push_back(1);
+    testExpressions.push_back("abc%"); testMatches.push_back(2);
+    testExpressions.push_back("AbC%"); testMatches.push_back(0);
+    testExpressions.push_back("zzz%"); testMatches.push_back(0);
+    testExpressions.push_back("%"); testMatches.push_back(static_cast<int>(testData.size()));
+    testExpressions.push_back("a%"); testMatches.push_back(3);
+    testExpressions.push_back("âxxx%"); testMatches.push_back(1);
+    testExpressions.push_back("aaaaaaa"); testMatches.push_back(1);
+    testExpressions.push_back("aaa"); testMatches.push_back(0);
+    testExpressions.push_back("abcdef_"); testMatches.push_back(1);
+    testExpressions.push_back("ab_d_fg"); testMatches.push_back(1);
+    testExpressions.push_back("%defg"); testMatches.push_back(1);
+    testExpressions.push_back("%de%"); testMatches.push_back(1);
+    testExpressions.push_back("%%g"); testMatches.push_back(1);
+    testExpressions.push_back("%_a%"); testMatches.push_back(1);
+    testExpressions.push_back("%__c%"); testMatches.push_back(2);
+    testExpressions.push_back("a_%c%"); testMatches.push_back(2);
+    //Take me down like i'm a domino
+    testExpressions.push_back("â🀲x一xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â_x一xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x_xxéyyԱ"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x一xxéyy_"); testMatches.push_back(1);
+    testExpressions.push_back("â🀲x一xéyyԱ"); testMatches.push_back(0);
+
+    for (int ii = 0; ii < testExpressions.size(); ii++) {
+        const char *testExpression = testExpressions[ii];
+        const int testMatch = testMatches[ii];
+        int foundMatches = 0;
+
+        voltdb::NValue pattern = voltdb::ValueFactory::getStringValue(testExpression);
+        for (int jj = 0; jj < testData.size(); jj++) {
+            const char *testDatum = testData[jj];
+            NValue testString = voltdb::ValueFactory::getStringValue(testDatum);
+
+            if (testString.like(pattern).isTrue()) {
+                foundMatches++;
+            }
+            testString.free();
+        }
+        pattern.free();
+        if (foundMatches != testMatch) {
+            printf("Pattern %s failed to match %d, matched %d instead\n", testExpression, testMatch, foundMatches);
+        }
+        EXPECT_EQ( foundMatches, testMatch);
+    }
+
+    /*
+     * Test an edge case Paul noticed during his review
+     * https://github.com/VoltDB/voltdb/pull/33#discussion_r926110
+     */
+    NValue value = voltdb::ValueFactory::getStringValue("XY");
+    NValue pattern1 = voltdb::ValueFactory::getStringValue("X%_");
+    NValue pattern2 = voltdb::ValueFactory::getStringValue("X%%");
+    EXPECT_TRUE(value.like(pattern1).isTrue());
+    EXPECT_TRUE(value.like(pattern2).isTrue());
+    pattern2.free();
+    pattern1.free();
+    value.free();
+}
+
+TEST_F(NValueTest, TestSubstring)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+    std::vector<std::string> testData;
+    testData.push_back("abcdefg");
+    testData.push_back("âbcdéfg");
+    testData.push_back("â🀲c一éfԱ");
+
+    NValue startAtOne = ValueFactory::getIntegerValue(1);
+    NValue sureEnd = ValueFactory::getIntegerValue(7);
+    for (int jj = 0; jj < testData.size(); jj++) {
+        std::string& testDatum = testData[jj];
+        NValue testString = ValueFactory::getStringValue(testDatum);
+        size_t testTotalByteLength = testDatum.length();
+        int maxStart = -1;
+        for (int start = 1; start <= 7; start++) {
+            NValue leftLength = ValueFactory::getIntegerValue(start-1);
+            NValue startAt = ValueFactory::getIntegerValue(start);
+            size_t minEnd = testTotalByteLength + 1;
+            size_t nextStart = start;
+            for (int length = 7; length >= 1; length--) {
+                NValue lengthValue = ValueFactory::getIntegerValue(length);
+                NValue endAt = ValueFactory::getIntegerValue(start + length);
+                NValue rightLength = ValueFactory::getIntegerValue(std::max(0, 7 - (start-1 + length)));
+
+                std::vector<NValue> leftArgs(3);
+                leftArgs[0] = testString;
+                leftArgs[1] = startAtOne;
+                leftArgs[2] = leftLength;
+                NValue leftStringValue = NValue::call<FUNC_SUBSTRING_CHAR>(leftArgs);
+
+                std::vector<NValue> midArgs(3);
+                midArgs[0] = testString;
+                midArgs[1] = startAt;
+                midArgs[2] = lengthValue;
+                NValue midStringValue = NValue::call<FUNC_SUBSTRING_CHAR>(midArgs);
+
+                std::vector<NValue> rightArgs(3);
+                rightArgs[0] = testString;
+                rightArgs[1] = endAt;
+                rightArgs[2] = rightLength;
+                NValue rightExactStringValue = NValue::call<FUNC_SUBSTRING_CHAR>(rightArgs);
+
+                // Typically, this extends the substring PAST the end of the string.
+                rightArgs[2] = sureEnd;
+                NValue rightSureStringValue = NValue::call<FUNC_SUBSTRING_CHAR>(rightArgs);
+
+                std::vector<NValue> rightDefaultArgs(2);
+                rightDefaultArgs[0] = testString;
+                rightDefaultArgs[1] = endAt;
+                NValue rightDefaultStringValue = NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(rightDefaultArgs);
+
+                // specifying a length that goes exactly to or past the end of the input string
+                // should have the same effect as not specifying a length at all.
+                EXPECT_TRUE(rightExactStringValue.compare(rightDefaultStringValue) == 0);
+                EXPECT_TRUE(rightSureStringValue.compare(rightDefaultStringValue) == 0);
+
+                std::string leftString = ValuePeeker::peekStringCopy(leftStringValue);
+                std::string midString = ValuePeeker::peekStringCopy(midStringValue);
+                std::string rightString = ValuePeeker::peekStringCopy(rightExactStringValue);
+                std::string recombined = leftString + midString + rightString;
+                EXPECT_TRUE(testDatum.compare(recombined) == 0);
+
+                if (midString.length() > 0) {
+                    nextStart = testDatum.find(midString);
+                    EXPECT_TRUE(nextStart != std::string::npos);
+                    // The offset for a given value, in number of bytes skipped,
+                    // should be at least start-1, the number of characters skipped.
+                    EXPECT_TRUE(nextStart >= start-1);
+                }
+
+                if (rightString.length() > 0) {
+                    size_t nextEnd = testDatum.find(rightString);
+                    EXPECT_TRUE(nextEnd != std::string::npos);
+                    EXPECT_TRUE(minEnd == 0 || minEnd > nextEnd);
+                    minEnd = nextEnd;
+                }
+
+                rightDefaultStringValue.free();
+                rightSureStringValue.free();
+                rightExactStringValue.free();
+                midStringValue.free();
+                leftStringValue.free();
+            }
+            // The offset for a given value of start should increase (at least by 1) as start increases.
+            EXPECT_TRUE(((int)nextStart) > maxStart);
+            maxStart = (int)nextStart;
+        }
+        testString.free();
+    }
+    delete poolHolder;
+    delete testPool;
+}
+
+TEST_F(NValueTest, TestExtract)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+
+    NValue result;
+    NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
+
+    const int EXPECTED_YEAR = 2001;
+    result = midSeptember.callUnary<FUNC_EXTRACT_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
+
+    const int EXPECTED_MONTH = 9;
+    result = midSeptember.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
+
+    const int EXPECTED_DAY = 9;
+    result = midSeptember.callUnary<FUNC_EXTRACT_DAY>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
+
+    const int EXPECTED_DOW = 1;
+    result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
+
+    const int EXPECTED_DOY = 252;
+    result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
+
+    const int EXPECTED_WOY = 36;
+    result = midSeptember.callUnary<FUNC_EXTRACT_WEEK_OF_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_WOY)));
+
+    const int EXPECTED_QUARTER = 3;
+    result = midSeptember.callUnary<FUNC_EXTRACT_QUARTER>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
+
+    const int EXPECTED_HOUR = 1;
+    result = midSeptember.callUnary<FUNC_EXTRACT_HOUR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
+
+    const int EXPECTED_MINUTE = 46;
+    result = midSeptember.callUnary<FUNC_EXTRACT_MINUTE>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
+
+    const std::string EXPECTED_SECONDS = "40";
+    result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
+
+    delete poolHolder;
+    delete testPool;
 }
 
 int main() {

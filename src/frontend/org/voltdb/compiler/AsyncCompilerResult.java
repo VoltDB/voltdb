@@ -19,7 +19,7 @@ package org.voltdb.compiler;
 
 import java.io.Serializable;
 
-public class AsyncCompilerResult implements Serializable {
+public class AsyncCompilerResult implements Serializable, Cloneable {
     private static final long serialVersionUID = -1538141431615585812L;
 
     public long clientHandle = -1;

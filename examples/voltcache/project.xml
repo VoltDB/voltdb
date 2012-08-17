@@ -25,11 +25,8 @@
         </procedures>
         <classdependencies>
             <classdependency class="voltcache.api.VoltCacheResult" />
-            <classdependency class="voltcache.procedures.Shared" />
+            <classdependency class="voltcache.procedures.VoltCacheProcBase" />
         </classdependencies>
-        <partitions>
-            <partition table='cache' column='Key' />
-        </partitions>
     </database>
 </project>
 

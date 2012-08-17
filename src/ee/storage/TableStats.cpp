@@ -102,7 +102,7 @@ void TableStats::configure(
         string name,
         CatalogId hostId,
         string hostname,
-        CatalogId siteId,
+        int64_t siteId,
         CatalogId partitionId,
         CatalogId databaseId) {
     StatsSource::configure(name, hostId, hostname, siteId, partitionId, databaseId);

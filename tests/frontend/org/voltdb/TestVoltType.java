@@ -57,11 +57,17 @@ public class TestVoltType extends TestCase {
         assertEquals(VoltType.STRING, VoltType.typeFromString("STRING"));
         assertEquals(VoltType.VOLTTABLE, VoltType.typeFromString("VOLTTABLE"));
         assertEquals(VoltType.STRING, VoltType.typeFromString("VARCHAR"));
-        // Need to be able to turn CHAR SqlStmt paramters into varchars.
-        assertEquals(VoltType.STRING, VoltType.typeFromString("CHAR"));
+        // Need to be able to turn CHARACTER SqlStmt parameters into varchars.
+        assertEquals(VoltType.STRING, VoltType.typeFromString("CHARACTER"));
         assertEquals(VoltType.TIMESTAMP, VoltType.typeFromString("TIMESTAMP"));
         assertEquals(VoltType.DECIMAL, VoltType.typeFromString("DECIMAL"));
         assertEquals(VoltType.VARBINARY, VoltType.typeFromString("VARBINARY"));
+
+        // test with classname prefix
+        assertEquals(VoltType.VARBINARY, VoltType.typeFromString("VoltType.VARBINARY"));
+        assertEquals(VoltType.STRING, VoltType.typeFromString("VoltType.STRING"));
+        assertEquals(VoltType.STRING, VoltType.typeFromString("VoltType.VARCHAR"));
+        assertEquals(VoltType.FLOAT, VoltType.typeFromString("VoltType.DOUBLE"));
 
         boolean caught = false;
         try {
@@ -129,6 +135,7 @@ public class TestVoltType extends TestCase {
         assertEquals(VoltType.typeFromString("DOUBLE"), VoltType.typeFromClass(Double.class));
         assertEquals(VoltType.typeFromString("TIMESTAMP"), VoltType.typeFromClass(TimestampType.class));
         assertEquals(VoltType.typeFromString("STRING"), VoltType.typeFromClass(String.class));
+        assertEquals(VoltType.typeFromString("CHARACTER"), VoltType.typeFromClass(String.class));
         assertEquals(VoltType.typeFromString("VOLTTABLE"), VoltType.typeFromClass(VoltTable.class));
         assertEquals(VoltType.typeFromString("DECIMAL"), VoltType.typeFromClass(BigDecimal.class));
         assertEquals(VoltType.typeFromString("VARBINARY"), VoltType.typeFromClass(byte[].class));
@@ -152,6 +159,28 @@ public class TestVoltType extends TestCase {
         String date = "2011-06-24 10:30:26.123012";
         TimestampType ts3 = new TimestampType(date);
         assertEquals(date, ts3.toString());
+
+        boolean caught = false;
+
+        caught = false;
+        try {
+            // Date string inputs interpreted as Dates should not have sub-millisecond granularity.
+            // This is the utility function that does this validation.
+            TimestampType.millisFromJDBCformat(date);
+        } catch (IllegalArgumentException ex) {
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            // Date string inputs interpreted as TimestampType should not have sub-microsecond granularity.
+            String nanoNoNos = "2011-06-24 10:30:26.123012001";
+            new TimestampType(nanoNoNos);
+        } catch (IllegalArgumentException ex) {
+            caught = true;
+        }
+        assertTrue(caught);
     }
 
     /* Compare some values that differ by microseconds and by full millis */
@@ -174,7 +203,40 @@ public class TestVoltType extends TestCase {
         assertTrue(ts3.compareTo(ts1) > 0);
         assertTrue(ts1.compareTo(ts4) < 0);
         assertTrue(ts4.compareTo(ts1) > 0);
-    }
+
+        String micro = "2011-06-24 10:30:26.123012";
+        String milli = "2011-06-24 10:30:26.123";
+        TimestampType microTs = new TimestampType(micro);
+        TimestampType milliTs = new TimestampType(milli);
+
+        Date fromString = new Date(TimestampType.millisFromJDBCformat(milli.toString()));
+        Date fromMillis = new Date(milliTs.getTime()/1000);
+        assertEquals(fromString, fromMillis);
+
+        java.sql.Date sqlFromString = new java.sql.Date(TimestampType.millisFromJDBCformat(milliTs.toString()));
+        java.sql.Date sqlFromMillis = new java.sql.Date(milliTs.getTime()/1000);
+        assertEquals(sqlFromString, sqlFromMillis);
+
+        boolean caught = false;
+
+        caught = false;
+        try {
+            // Date string inputs converted from TimestampType should not have sub-millisecond granularity.
+            new Date(TimestampType.millisFromJDBCformat(microTs.toString()));
+        } catch (IllegalArgumentException ex) {
+            caught = true;
+        }
+        assertTrue(caught);
+
+        caught = false;
+        try {
+            // Date string inputs converted from TimestampType should not have sub-millisecond granularity.
+            new java.sql.Date(TimestampType.millisFromJDBCformat(microTs.toString()));
+        } catch (IllegalArgumentException ex) {
+            caught = true;
+        }
+        assertTrue(caught);
+}
 
     public void testTimestampToString() {
         // I suppose these could fall across minute boundaries and fail the

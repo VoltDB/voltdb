@@ -118,6 +118,28 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
     }
 
+    public void testENG3487() throws IOException, ProcCallException {
+        Client client = this.getClient();
+
+        client.callProcedure("A.insert", 1, 1);
+        client.callProcedure("A.insert", 2, 1);
+        client.callProcedure("A.insert", 3, 1);
+        client.callProcedure("A.insert", 4, 4);
+        client.callProcedure("A.insert", 5, 4);
+        client.callProcedure("A.insert", 6, 9);
+
+
+        VoltTable result = client.callProcedure("@AdHoc", "select I, count(*) as tag from A group by I order by tag, I limit 1")
+                .getResults()[0];
+
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        //System.err.println("Result:\n" + result);
+        assertEquals(9, result.getLong(0));
+        assertEquals(1, result.getLong(1));
+
+    }
+
     static public junit.framework.Test suite() {
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(
@@ -126,6 +148,7 @@ public class TestLimitOffsetSuite extends RegressionSuite {
 
         project.addSchema(TestLimitOffsetSuite.class.getResource("testlimitoffset-ddl.sql"));
         project.addPartitionInfo("A", "PKEY");
+
         project.addStmtProcedure("InsertA", "INSERT INTO A VALUES(?, ?);");
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?, ?);");
         project.addStmtProcedure("LimitAPKEY", "SELECT * FROM A ORDER BY PKEY LIMIT ? OFFSET ?;");
@@ -133,20 +156,14 @@ public class TestLimitOffsetSuite extends RegressionSuite {
         project.addStmtProcedure("LimitAI", "SELECT * FROM A ORDER BY I LIMIT ? OFFSET ?;");
         project.addStmtProcedure("LimitBI", "SELECT * FROM B ORDER BY I LIMIT ? OFFSET ?;");
 
-        config = new LocalSingleProcessServer("testlimitoffset-onesite.jar",
-                                              1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
-        config = new LocalSingleProcessServer("testlimitoffset-threesites.jar",
-                                              3, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        // local
+        config = new LocalCluster("testlimitoffset-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("testlimitoffset-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("testlimitoffset-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         return builder;

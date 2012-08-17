@@ -44,6 +44,7 @@ var QueryUI = (function(queryTab){
 								sql = sql.replace('$(SQL_PARSER_STRING_FRAGMENT#' + j + ')', frag[j]);
 						sql = sql.replace(/\$\(SQL_PARSER_ESCAPE_SINGLE_QUOTE\)/g,"''");
                         sql = sql.replace("#SQL_PARSER_STRING_KEYWORD#","");
+                        sql = sql.replace(/\"/g, '\\"');
 						statements.push(sql);
 					}
 				}
@@ -146,8 +147,6 @@ this.execute = function()
 		{
 			var params = SQLParser.parseProcedureCallParameters(statements[i].substr(5));
 			var procedure = params.splice(0,1)[0];
-			if ((procedure.charAt(0) == '@') && (!(procedure in connection.Metadata['sysprocs'])))
-				continue;
 			connectionQueue.BeginExecute(procedure, params, callback.Callback);
 		}
 		else

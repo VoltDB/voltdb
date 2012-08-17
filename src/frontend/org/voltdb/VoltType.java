@@ -92,15 +92,15 @@ public enum VoltType {
      * The epoch is Jan. 1 1970 00:00:00 GMT. Negative values represent
      * time before the epoch. This covers roughly 4000BC to 8000AD.
      */
-    TIMESTAMP ((byte)11, 8, "timestamp", new Class[] {TimestampType.class}, 'p'),
+    TIMESTAMP ((byte)11, 8, "timestamp",
+            new Class[] {TimestampType.class, java.util.Date.class, java.sql.Date.class, java.sql.Timestamp.class}, 'p'),
 
     /**
      * UTF-8 string with up to 32K chars.
      * The database supports char arrays and varchars
      * but the API uses strings.
      */
-    STRING    ((byte)9, -1, "varchar",
-               new Class[] {String.class, byte[].class, Byte[].class}, 'v'),
+    STRING    ((byte)9, -1, "varchar", new Class[] {String.class}, 'v'),
 
     /**
      * VoltTable type for Procedure parameters
@@ -136,7 +136,7 @@ public enum VoltType {
     private final int m_lengthInBytes;
     private final String m_sqlString;
     private final Class<?>[] m_classes;
-    private char m_signatureChar;
+    private final char m_signatureChar;
 
     private VoltType(byte val, int lengthInBytes,
             String sqlString, Class<?>[] classes,
@@ -148,11 +148,24 @@ public enum VoltType {
         m_signatureChar = signatureChar;
     }
 
-    private static Map<Class<?>, VoltType> s_classes;
+    private final static Map<Class<?>, VoltType> s_classes;
     static {
         s_classes = new HashMap<Class<?>, VoltType>();
         for (VoltType type : values()) {
             for (Class<?> cls : type.m_classes) {
+                // Avoid subtle effects when VoltTypes have duplicate m_classes entries (java classes),
+                // so that the association of a java class with the earlier VoltType gets obliterated
+                // by its association with the later VoltType.
+                // The effects of an assert in the middle of class initialization is surprisingly cryptic,
+                // at least when exercised by the "ant junit" suite, so for a SLIGHTLY less cryptic response,
+                // throw a generic runtime exception.
+                // Unfortunately, either response gets associated with the source lines of the first call to
+                // VoltType (like in DDLCompiler), rather than here.
+                // assert(s_classes.get(cls) == null);
+                if (s_classes.get(cls) != null) {
+                    // This message seems to just get buried by the java runtime.
+                    throw new RuntimeException("Associate each java class with at most one VoltType.");
+                }
                 s_classes.put(cls, type);
             }
         }
@@ -198,22 +211,30 @@ public enum VoltType {
 
     /**
      * Converts string representations to an enum value.
-     * @param str A string in the form "VoltType.TYPENAME"
+     * @param str A string in the form "TYPENAME" or "VoltType.TYPENAME",
+     * e.g. "BIGINT" or "VoltType.VARCHAR"
      * @return One of the valid enum values for VoltType
      */
     public static VoltType typeFromString(String str) {
-        if (str.compareToIgnoreCase("null") == 0)
+        if (str == null) {
             return NULL;
+        }
+
+        if (str.startsWith("VoltType.")) {
+            str = str.substring("VoltType.".length());
+        }
+
+        if (str.compareToIgnoreCase("null") == 0) {
+            return NULL;
+        }
 
         for (VoltType type: values()) {
             if (type.matchesString(str)) {
                 return type;
             }
         }
-        if (str.equals("DECIMAL")) return DECIMAL;
         if (str.equals("DOUBLE")) return FLOAT;
-        if (str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
-        if (str.equals("VARBINARY")) return VARBINARY;
+        if (str.equals("CHARACTER") || str.equals("CHAR") || str.equals("VARCHAR")) return STRING;
 
         throw new RuntimeException("Can't find type: " + str);
     }
@@ -260,13 +281,24 @@ public enum VoltType {
     /**
      * Get the number of bytes required to store the type for types
      * with fixed length.
-     * @return An integer value represting a number of bytes.
+     * @return An integer value representing a number of bytes.
      */
     public int getLengthInBytesForFixedTypes() {
         if (m_lengthInBytes == -1) {
             throw new RuntimeException(
                     "Asking for fixed size for non-fixed or unknown type.");
 
+        }
+        return m_lengthInBytes;
+    }
+
+    /**
+     * Get the maximum number of bytes required to store the type
+     * @return An integer value representing a number of bytes.
+     */
+    public int getMaxLengthInBytes() {
+        if (m_lengthInBytes == -1) {
+            return MAX_VALUE_LENGTH;
         }
         return m_lengthInBytes;
     }
@@ -463,6 +495,42 @@ public enum VoltType {
         }
     }
 
+    public boolean isNumber() {
+        switch (this) {
+            case TINYINT:
+            case SMALLINT:
+            case INTEGER:
+            case BIGINT:
+            case FLOAT:
+                return true;
+            default:
+                return false;
+        }
+    }
+
+    /* Indicate whether a value can be assigned to this type without loss of range or precision,
+     * important for index key and partition key initialization. */
+    public boolean canExactlyRepresentAnyValueOf(VoltType otherType) {
+        // self to self conversion is obviously fine.
+        if (this == otherType)
+            return true;
+
+        if (otherType.isInteger()) {
+            if (this.isInteger()) {
+                // Don't allow integers getting smaller.
+                return this.getMaxLengthInBytes() >= otherType.getMaxLengthInBytes();
+            }
+            else if (this == VoltType.FLOAT) {
+                // Non-big integers make acceptable (exact) floats
+                if (otherType != VoltType.BIGINT) {
+                    return true;
+                }
+            }
+            // Not sure about integer-to-decimal: for now, just give up.
+        }
+        return false;
+    }
+
     /**
      * Get a char that uniquely identifies a type. Used to create
      * concise schema signatures.
@@ -528,4 +596,5 @@ public enum VoltType {
     private static final class NullDecimalSigil{}
     /** Null value for <code>DECIMAL</code>.  */
     public static final NullDecimalSigil NULL_DECIMAL = new NullDecimalSigil();
+
 }

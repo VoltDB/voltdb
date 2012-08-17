@@ -72,16 +72,16 @@ public class JDBC4ClientConnectionPool {
      * @see #get(String servers, int port, String user, String password, boolean isHeavyWeight, int
      *      maxOutstandingTxns)
      */
-    public static JDBC4ClientConnection get(String[] servers, int port, String user,
+    public static JDBC4ClientConnection get(String[] servers, String user,
             String password, boolean isHeavyWeight, int maxOutstandingTxns) throws Exception {
-        String clientConnectionKeyBase = getClientConnectionKeyBase(servers, port, user, password,
+        String clientConnectionKeyBase = getClientConnectionKeyBase(servers, user, password,
                 isHeavyWeight, maxOutstandingTxns);
         String clientConnectionKey = clientConnectionKeyBase;
 
         synchronized (ClientConnections) {
             if (!ClientConnections.containsKey(clientConnectionKey))
                 ClientConnections.put(clientConnectionKey, new JDBC4ClientConnection(
-                        clientConnectionKeyBase, clientConnectionKey, servers, port, user,
+                        clientConnectionKeyBase, clientConnectionKey, servers, user,
                         password, isHeavyWeight, maxOutstandingTxns));
             return ClientConnections.get(clientConnectionKey).use();
         }
@@ -144,8 +144,8 @@ public class JDBC4ClientConnectionPool {
      * @see #getStatistics(String[] servers, int port, String user, String password, boolean
      *      isHeavyWeight, int maxOutstandingTxns)
      */
-    public static JDBC4PerfCounterMap getStatistics(String[] servers, int port) {
-        return getStatistics(getClientConnectionKeyBase(servers, port, "", "", false, 0));
+    public static JDBC4PerfCounterMap getStatistics(String[] servers) {
+        return getStatistics(getClientConnectionKeyBase(servers, "", "", false, 0));
     }
 
     /**
@@ -175,9 +175,9 @@ public class JDBC4ClientConnectionPool {
      * @see #getStatistics(String servers, int port, String user, String password, boolean
      *      isHeavyWeight, int maxOutstandingTxns)
      */
-    public static JDBC4PerfCounterMap getStatistics(String[] servers, int port, String user,
+    public static JDBC4PerfCounterMap getStatistics(String[] servers, String user,
             String password, boolean isHeavyWeight, int maxOutstandingTxns) {
-        return getStatistics(getClientConnectionKeyBase(servers, port, user, password,
+        return getStatistics(getClientConnectionKeyBase(servers, user, password,
                 isHeavyWeight, maxOutstandingTxns));
     }
 
@@ -187,7 +187,7 @@ public class JDBC4ClientConnectionPool {
      * provided.
      *
      * @param clientConnectionKeyBase
-     *            the base hash/key identifying the connections from which stattistics will be
+     *            the base hash/key identifying the connections from which statistics will be
      *            pulled.
      * @return the counter map aggregated across all the connections in the pool with the same
      *         parameters as provided.
@@ -205,9 +205,7 @@ public class JDBC4ClientConnectionPool {
      * Generates a hash/key for a connection based on the given list of connection parameters
      *
      * @param servers
-     *            the list of VoltDB servers to connect to.
-     * @param port
-     *            the VoltDB native protocol port to connect to (usually 21212).
+     *            the list of VoltDB servers to connect to in comma separated hostname[:port] format.
      * @param user
      *            the user name to use when connecting to the server(s).
      * @param password
@@ -220,12 +218,12 @@ public class JDBC4ClientConnectionPool {
      *            connection before getting blocked on back-pressure.
      * @return the base hash/key for the given connection parameter
      */
-    private static String getClientConnectionKeyBase(String[] servers, int port, String user,
+    private static String getClientConnectionKeyBase(String[] servers, String user,
             String password, boolean isHeavyWeight, int maxOutstandingTxns) {
         String clientConnectionKeyBase = user + ":" + password + "@";
         for (int i = 0; i < servers.length; i++)
             clientConnectionKeyBase += servers[i].trim() + ",";
-        clientConnectionKeyBase += ":" + Integer.toString(port) + "{"
+        clientConnectionKeyBase += "{"
                 + Boolean.toString(isHeavyWeight) + ":" + Integer.toString(maxOutstandingTxns)
                 + "}";
         return clientConnectionKeyBase;

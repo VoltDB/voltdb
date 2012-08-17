@@ -236,6 +236,9 @@ public class FunctionCustom extends FunctionSQL {
         customValueFuncMap.put(Tokens.NOW, FUNC_CURRENT_TIMESTAMP);
     }
 
+    private static String DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR = "Custom Function";
+    private static String DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD = "Custom Function Special Case";
+
     private int extractSpec;
 
     public static FunctionSQL newCustomFunction(String token, int tokenType) {
@@ -299,10 +302,12 @@ public class FunctionCustom extends FunctionSQL {
 
                 case Tokens.DAYNAME :
                     function.extractSpec = Tokens.DAY_OF_WEEK;
+                    function.voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD;
                     break;
 
                 case Tokens.NONTHNAME :
                     function.extractSpec = Tokens.MONTH_NAME;
+                    function.voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_FACTORY_METHOD;
                     break;
 
                 case Tokens.DAYOFMONTH :
@@ -348,6 +353,7 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_CONCAT :
             case FUNC_LEFT :
                 parseList = doubleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_DATABASE :
@@ -359,6 +365,7 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_ISREADONLYDATABASE :
             case FUNC_ISREADONLYDATABASEFILES :
                 parseList = emptyParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_EXTRACT :
@@ -369,21 +376,25 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_TRIM_CHAR :
                 name      = Tokens.T_TRIM;
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_OVERLAY_CHAR :
                 name      = Tokens.T_OVERLAY;
                 parseList = quadParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_IDENTITY :
                 name      = Tokens.T_IDENTITY;
                 parseList = emptyParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_SYSDATE :
                 name      = Tokens.T_SYSDATE;
                 parseList = noParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_TIMESTAMPADD :
@@ -397,6 +408,7 @@ public class FunctionCustom extends FunctionSQL {
                     Tokens.SQL_TSI_YEAR, Tokens.COMMA, Tokens.QUESTION,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_TIMESTAMPDIFF :
@@ -410,14 +422,17 @@ public class FunctionCustom extends FunctionSQL {
                     Tokens.SQL_TSI_YEAR, Tokens.COMMA, Tokens.QUESTION,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_TRUNCATE :
                 parseList = doubleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_TO_CHAR :
                 parseList = doubleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_TIMESTAMP :
@@ -426,14 +441,17 @@ public class FunctionCustom extends FunctionSQL {
                     Tokens.OPENBRACKET, Tokens.QUESTION, Tokens.X_OPTION, 2,
                     Tokens.COMMA, Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_PI :
                 parseList = emptyParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_RAND :
                 parseList = optionalIntegerParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_ACOS :
@@ -456,6 +474,7 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_RAWTOHEX :
             case FUNC_SPACE :
                 parseList = singleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_ROUND :
@@ -467,6 +486,7 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_DATEDIFF :
             case FUNC_RIGHT :
                 parseList = doubleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_LOCATE :
@@ -475,10 +495,12 @@ public class FunctionCustom extends FunctionSQL {
                     Tokens.QUESTION, Tokens.X_OPTION, 2, Tokens.COMMA,
                     Tokens.QUESTION, Tokens.CLOSEBRACKET
                 };
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             case FUNC_REPLACE :
                 parseList = tripleParamList;
+                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
 
             default :
@@ -486,6 +508,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
+    @Override
     public void setArguments(Expression[] nodes) {
 
         switch (funcType) {
@@ -526,6 +549,7 @@ public class FunctionCustom extends FunctionSQL {
         super.setArguments(nodes);
     }
 
+    @Override
     public Expression getFunctionExpression() {
 
         switch (funcType) {
@@ -548,6 +572,7 @@ public class FunctionCustom extends FunctionSQL {
         return super.getFunctionExpression();
     }
 
+    @Override
     Object getValue(Session session, Object[] data) {
 
         switch (funcType) {
@@ -1108,6 +1133,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
+    @Override
     public void resolveTypes(Session session, Expression parent) {
 
         for (int i = 0; i < nodes.length; i++) {
@@ -1573,6 +1599,7 @@ public class FunctionCustom extends FunctionSQL {
         }
     }
 
+    @Override
     public String getSQL() {
 
         switch (funcType) {

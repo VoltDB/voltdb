@@ -578,25 +578,20 @@ public class TestOrderBySuite extends RegressionSuite {
         project.addStmtProcedure("InsertB", "INSERT INTO B VALUES(?);");
         project.addProcedures(PROCEDURES);
 
-        config = new LocalSingleProcessServer("testorderby-onesite.jar",
-                1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("testorderby-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        boolean success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
-        config = new LocalSingleProcessServer("testorderby-threesites.jar",
-                    3, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
-        config = new LocalSingleProcessServer("testorderby-hsql.jar",
-                1, BackendTarget.HSQLDB_BACKEND);
-        config.compile(project);
+        config = new LocalCluster("testorderby-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("testorderby-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("testorderby-cluster.jar", 3, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         return builder;

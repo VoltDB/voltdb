@@ -18,6 +18,7 @@ package org.voltdb.fault;
 
 import java.util.HashSet;
 
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.fault.VoltFault.FaultType;
 
 public interface FaultDistributorInterface
@@ -56,22 +57,6 @@ public interface FaultDistributorInterface
     public abstract void reportFault(VoltFault fault);
 
     /**
-     * Report that the fault has been handled by the specified handler and that
-     * it should no longer be included in the list of outstanding faults. The report
-     * is asynchronous so it is still possible for the fault to be delivered to the handler
-     * if reportFaultHandled is invoked outside the handler.
-     */
-    public abstract void reportFaultHandled(FaultHandler handler, VoltFault fault);
-
-    /**
-     * Report that a fault (represented by the fault arg) has cleared.  All
-     * registered FaultHandlers for that type will get called.
-     *
-     * @param fault The fault which is being reported as cleared
-     */
-    public abstract void reportFaultCleared(VoltFault fault);
-
-    /**
      * Tell the fault distributor that the server is being shut down.
      * Prevents many false positives that prevent an orderly shutdown.
      */
@@ -81,7 +66,8 @@ public interface FaultDistributorInterface
      * Allow fault manager to make partition detection decisons once
      * a fault set is agreed to by the execution site agreement process
      * @param newFailedSiteIds
+     * @param SiteTracker snapshot
      * @return
      */
-    public abstract PPDPolicyDecision makePPDPolicyDecisions(HashSet<Integer> newFailedSiteIds);
+    public abstract PPDPolicyDecision makePPDPolicyDecisions(HashSet<Long> newFailedSiteIds, SiteTracker st);
 }

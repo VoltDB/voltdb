@@ -37,7 +37,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
  */
     public class PipeToFile extends Thread {
         final static String m_initToken = "Server completed init";
-        final static String m_rejoinToken = "Node recovery completed";
+        final static String m_rejoinToken = "Node rejoin completed";
         final static String m_initiatorID = "Initializing initiator ID:";
 
         FileWriter m_writer ;
@@ -100,7 +100,7 @@ import java.util.concurrent.atomic.AtomicBoolean;
                         String[] split = data.split(" ");
                         synchronized(this) {
                             try {
-                                m_hostId = Integer.parseInt(split[split.length - 1]);
+                                m_hostId = Long.valueOf(split[split.length - 1].split(":")[0]).intValue();
                             } catch (java.lang.NumberFormatException e) {
                                 System.err.println("Had a number format exception processing line: '" + data + "'");
                                 throw e;

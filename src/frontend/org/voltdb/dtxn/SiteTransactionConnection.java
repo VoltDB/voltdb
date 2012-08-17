@@ -20,10 +20,10 @@ package org.voltdb.dtxn;
 import java.util.HashMap;
 import java.util.List;
 
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-import org.voltdb.messaging.VoltMessage;
 
 /**
  *  TransactionState invokes SiteTransactionConnection methods to manipulate
@@ -47,4 +47,10 @@ public interface SiteTransactionConnection {
     // Feels like another bad side-effect of the "site invokes txnState"
     // and "txnState invokes Site" relationship.
     public SiteTracker getSiteTracker();
+
+    /**
+     * Does the id given belong to a live site, or a previously failed site?
+     * @return true if either condition is true, false if previously unknown id.
+     */
+    public boolean isActiveOrPreviouslyKnownSiteId(long hsid);
 }

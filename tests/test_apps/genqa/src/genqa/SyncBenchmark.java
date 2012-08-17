@@ -120,11 +120,11 @@ public class SyncBenchmark
             // Define parameters and pull from command line
             AppHelper apph = new AppHelper(SyncBenchmark.class.getCanonicalName())
                 .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
+                .add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("pool-size", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
+                .add("poolsize", "pool_size", "Size of the record pool to operate on - larger sizes will cause a higher insert/update-delete rate.", 100000)
                 .add("procedure", "procedure_name", "Procedure to call.", "JiggleSinglePartition")
                 .add("wait", "wait_duration", "Wait duration (only when calling one of the Wait procedures), in milliseconds.", 0)
                 .setArguments(args)
@@ -132,19 +132,19 @@ public class SyncBenchmark
 
             // Retrieve parameters
             final int threadCount      = apph.intValue("threads");
-            final long displayInterval = apph.longValue("display-interval");
+            final long displayInterval = apph.longValue("displayinterval");
             final long duration        = apph.longValue("duration");
             final String servers       = apph.stringValue("servers");
             final int port             = apph.intValue("port");
             final int poolSize         = apph.intValue("pool-size");
             final String procedure     = apph.stringValue("procedure");
             final long wait            = apph.intValue("wait");
-            final String csv           = apph.stringValue("stats");
+            final String csv           = apph.stringValue("statsfile");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
                 .validate("threads", (threadCount > 0))
-                .validate("pool-size", (poolSize > 0))
+                .validate("poolsize", (poolSize > 0))
                 .validate("wait", (wait >= 0))
             ;
 

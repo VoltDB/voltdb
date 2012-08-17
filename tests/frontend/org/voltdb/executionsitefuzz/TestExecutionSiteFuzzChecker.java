@@ -49,6 +49,7 @@ public class TestExecutionSiteFuzzChecker extends TestCase
 
     HashMap<Integer, HashMap<Integer, StringWriter>> m_siteLogs;
 
+    @Override
     protected void setUp()
     {
         int site_id = 0;
@@ -64,6 +65,7 @@ public class TestExecutionSiteFuzzChecker extends TestCase
         }
     }
 
+    @Override
     protected void tearDown()
     {
         m_siteLogs = null;

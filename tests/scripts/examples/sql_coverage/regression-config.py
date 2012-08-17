@@ -22,15 +22,40 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+# HACK:
 # This SQL coverage configuration set represents hopefully the largest
-# set of statements that should always pass.  Some of the template sets
-# result in repeated failures due to non-functional issues with HSQL and/or
-# the SQL coverage tool; these sets have been replaced with an input
-# file that is all of the successful statements from a run of the set, and
-# are named regression-<template set name>.sql
+# set of statements that should always pass.  Some of the template files
+# generate statements that result in repeated failures due to functional
+# differences between HSQL and VoltDB backends. In such cases, we work around
+# these errors by generating a fixed sample query file and, after culling out
+# any statements that cause mismatches, using it to replace the original
+# template file name in the configuration list below.
+# In this way, the sample file gets used as a trivial template file that passes
+# through the generator untouched. It also has an unfortunate side-effect of
+# causing any future improvements to the template to be ignored unless/until
+# the sample file is manually re-generated from it and re-edited to eliminate
+# mismatches.
 #
-# To regenerate the regression-*-.sql file for a set, run the SQLGenerateReport.py
-# tool on the report.xml file generated for that set, using the -f true switch,
+# Actually, in the specific case of templates that generate random integer
+# constant timestamp values, the template must be replaced by TWO separate
+# generated sample files -- one generated for hsql with millisecond constants
+# and one for VoltDB with microsecond constants (always 1000 X the hsql values).
+# The hsql version of the sample file gets associated with the optional
+# "template-hsqldb" key in the configuration. Otherwise, both hsql and VoltDB
+# use the same input file associated with the "template" key.
+#
+# The generated sample files follow a naming convention of starting with
+# "regression". The hsql variants end in "-hsql.sql".
+# It is NOT advisable to try to edit these sample files directly.
+# It is better to edit the original template, re-generate the sample(s),
+# and re-cull the resulting "mismatches" -- being careful to cull ONLY
+# mismatches that are NOT accountable to the known backend differences that
+# we are working around in this way. It helps to have comments, below,
+# to describe which specific issues each "regression" file is intended to
+# work around.
+#
+# To regenerate the regression-*.sql file for a configuration, run the SQLGenerateReport.py
+# tool on the report.xml file generated for that configuration, using the -f true switch,
 # which will cause the successful statements to be written to stdout.
 {
 # THESE ALL SUCCEED, USE THE TEMPLATE INPUT
@@ -53,17 +78,30 @@
                    "ddl": "int-DDL.sql",
                    "template": "regression-basic-ints.sql",
                    "normalizer": "normalizer.py"},
-# HSQL HAS BAD DEFAULT PRECISION, USE REGRESSION INPUT
+# HSQL HAS BAD DEFAULT PRECISION
+# AND VoltDB gives VOLTDB ERROR: Type DECIMAL can't be cast as FLOAT
+# AND HSQLDB backend gives the likes of:
+#   VOLTDB ERROR: UNEXPECTED FAILURE: org.voltdb.ExpectedProcedureException:
+#   HSQLDB Backend DML Error (Scale of 56.11063569750000000000000000000000 is 32 and the max is 12)
+# USE REGRESSION INPUT
     "basic-decimal": {"schema": "decimal-schema.py",
                       "ddl": "decimal-DDL.sql",
                       "template": "regression-basic-decimal.sql",
                       "normalizer": "normalizer.py"},
-# FLOATING POINT ROUNDING ISSUES BETWEEN VOLT AND HSQL, USE REGRESSION INPUT
-    "basic-timestamp": {"schema": "timestamp-schema.py",
-                        "ddl": "timestamp-DDL.sql",
-                        "template": "regression-basic-timestamp.sql",
-                        "template-hsqldb": "regression-basic-timestamp-hsql.sql",
-                        "normalizer": "normalizer.py"},
+# If the ONLY problem was that HSQL HAS BAD DEFAULT PRECISION, we could use the original template input
+# and FUZZY MATCHING, instead.
+# Enable this test to investigate the "DECIMAL can't be cast as FLOAT" and/or "Backend DML Error" issues
+# without being thrown off by HSQL HAS BAD DEFAULT PRECISION issues.
+#    "basic-decimal-fuzzy": {"schema": "decimal-schema.py",
+#                      "ddl": "decimal-DDL.sql",
+#                      "template": "basic-decimal.sql",
+#                      "normalizer": "fuzzynormalizer.py"},
+#
+# FLOATING POINT ROUNDING ISSUES BETWEEN VOLT AND HSQL, USE FUZZY MATCHING
+    "basic-timestamp-fuzzy": {"schema": "timestamp-schema.py",
+                              "ddl": "timestamp-DDL.sql",
+                              "template": "basic-timestamp.sql",
+                              "normalizer": "fuzzynormalizer.py"},
 # BIGINT OVERFLOW CAUSES FAILURES IN THIS SUITE, USE REGRESSION INPUT
     "basic-matview": {"schema": "matview-schema.py",
                       "ddl": "matview-DDL.sql",
@@ -100,12 +138,14 @@
         "ddl": "partial-covering-DDL.sql",
         "template": "partial-covering.sql",
         "normalizer": "normalizer.py"},
-# HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION, THE
-# REGRESSION SET IS NEXT TO USELESS, SKIPPING IT
-#    "advanced-decimal": {"schema": "decimal-schema.py",
-#                         "ddl": "decimal-DDL.sql",
-#                         "template": "regression-advanced-decimal.sql",
-#                         "normalizer": "normalizer.py"},
+# HSQL SEEMS TO HAVE A BAD DEFAULT PRECISION
+# AND VoltDB gives VOLTDB ERROR: Type DECIMAL can't be cast as FLOAT, so keep it disabled, for now.
+# If the only problem were HSQL HAS BAD DEFAULT PRECISION, we could USE FUZZY MATCHING.
+# Enable this test to investigate the "DECIMAL can't be cast as FLOAT" issue
+#    "advanced-decimal-fuzzy": {"schema": "decimal-schema.py",
+#                               "ddl": "decimal-DDL.sql",
+#                               "template": "advanced-decimal.sql",
+#                               "normalizer": "fuzzynormalizer.py"},
 }
 
 

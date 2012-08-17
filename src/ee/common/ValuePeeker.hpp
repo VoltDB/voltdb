@@ -83,6 +83,14 @@ public:
         return value.getObjectLength();
     }
 
+    static std::string peekStringCopy(const NValue value) {
+        assert((value.getValueType() == VALUE_TYPE_VARCHAR) ||
+               (value.getValueType() == VALUE_TYPE_VARBINARY));
+        std::string result(reinterpret_cast<const char*>(value.getObjectValue()),
+                                                         value.getObjectLength());
+        return result;
+    }
+
     static inline ValueType peekValueType(const NValue value) {
         return value.getValueType();
     }

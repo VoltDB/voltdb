@@ -121,11 +121,10 @@ public class TestLoadingSuite extends RegressionSuite {
             table.addRow(2, 1, 2, "2", 2.0);
             table.addRow(3, 2, 3, "3", 3.0);
             table.addRow(4, 2, 4, "4", 4.0);
-            r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", table);
-            assertEquals(ClientResponse.SUCCESS, r.getStatus());
-            assertEquals(1, r.getResults().length);
-            assertEquals(4, r.getResults()[0].asScalarLong());
-            assertEquals(4, countPartitionedRows(client));
+            try {
+                r = client.callProcedure("@LoadMultipartitionTable", "PARTITIONED", table);
+                fail();
+            } catch (ProcCallException e) {}
 
             // test rollback to a replicated table (constraint)
             table = m_template.clone(100);
@@ -136,7 +135,7 @@ public class TestLoadingSuite extends RegressionSuite {
                 fail(); // prev stmt should throw exception
             } catch (ProcCallException e) {}
             // 4 rows in the db from the previous test
-            assertEquals(4, countPartitionedRows(client));
+            assertEquals(4, countReplicatedRows(client));
         }
     }
 
@@ -186,7 +185,7 @@ public class TestLoadingSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        VoltServerConfig config = new LocalSingleProcessServer("loading-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("loading-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile (note the reuse of the TPCC project)
         success = config.compile(project);
@@ -199,7 +198,7 @@ public class TestLoadingSuite extends RegressionSuite {
         // CONFIG #2: HSQLDB
         /////////////////////////////////////////////////////////////
 
-        config = new LocalSingleProcessServer("loading-hsqldb.jar", 1, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("loading-hsqldb.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
@@ -208,7 +207,7 @@ public class TestLoadingSuite extends RegressionSuite {
         // CONFIG #3: Local Cluster (of processes)
         /////////////////////////////////////////////////////////////
 
-        config = new LocalCluster("loading-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("loading-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);

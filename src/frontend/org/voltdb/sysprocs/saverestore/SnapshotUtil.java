@@ -40,25 +40,33 @@ import java.util.Map;
 import java.util.Set;
 import java.util.TreeMap;
 import java.util.TreeSet;
+import java.util.concurrent.Exchanger;
+import java.util.concurrent.Future;
+import java.util.concurrent.ThreadFactory;
 import java.util.zip.CRC32;
 
 import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltcore.network.Connection;
+import org.voltcore.network.NIOReadStream;
+import org.voltcore.network.WriteStream;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.DeferredSerialization;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
+import org.voltdb.ClientResponseImpl;
+import org.voltdb.SnapshotDaemon;
+import org.voltdb.SnapshotDaemon.ForwardClientException;
+import org.voltdb.SnapshotFormat;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Host;
-import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ConnectionUtil;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.utils.CatalogUtil;
-import org.voltdb.utils.DBBPool.BBContainer;
-import org.voltdb.utils.Pair;
 import org.voltdb.utils.VoltFile;
 
 public class SnapshotUtil {
@@ -210,7 +218,7 @@ public class SnapshotUtil {
             if (4 != bis.read(crcBuffer.array())) {
                 throw new EOFException(
                         "EOF while attempting to read CRC from snapshot digest " + f +
-                        " on host " + ConnectionUtil.getHostnameOrAddress());
+                        " on host " + CoreUtils.getHostnameOrAddress());
             }
             final int crc = crcBuffer.getInt();
             final InputStreamReader isr = new InputStreamReader(bis, "UTF-8");
@@ -729,8 +737,14 @@ public class SnapshotUtil {
      */
     public static final String constructFilenameForTable(Table table,
                                                          String fileNonce,
-                                                         String hostId)
+                                                         SnapshotFormat format,
+                                                         int hostId)
     {
+        String extension = ".vpt";
+        if (format == SnapshotFormat.CSV) {
+            extension = ".csv";
+        }
+
         StringBuilder filename_builder = new StringBuilder(fileNonce);
         filename_builder.append("-");
         filename_builder.append(table.getTypeName());
@@ -739,17 +753,18 @@ public class SnapshotUtil {
             filename_builder.append("-host_");
             filename_builder.append(hostId);
         }
-        filename_builder.append(".vpt");//Volt partitioned table
+        filename_builder.append(extension);//Volt partitioned table
         return filename_builder.toString();
     }
 
     public static final File constructFileForTable(Table table,
             String filePath,
             String fileNonce,
-            String hostId)
+            SnapshotFormat format,
+            int hostId)
     {
         return new VoltFile(filePath, SnapshotUtil.constructFilenameForTable(
-            table, fileNonce, hostId));
+            table, fileNonce, format, hostId));
     }
 
     /**
@@ -785,25 +800,6 @@ public class SnapshotUtil {
         }
         return my_tables;
     }
-
-    public static final int[] getPartitionsOnHost(
-            SystemProcedureExecutionContext c, Host h) {
-        final ArrayList<Partition> results = new ArrayList<Partition>();
-        for (final Site s : VoltDB.instance().getCatalogContext().siteTracker.getUpSites()) {
-            if (s.getHost().getTypeName().equals(h.getTypeName())) {
-                if (s.getPartition() != null) {
-                    results.add(s.getPartition());
-                }
-            }
-        }
-        final int retval[] = new int[results.size()];
-        int ii = 0;
-        for (final Partition p : results) {
-            retval[ii++] = Integer.parseInt(p.getTypeName());
-        }
-        return retval;
-    }
-
 
     public static File[] retrieveRelevantFiles(String filePath,
                                                final String fileNonce)
@@ -853,5 +849,199 @@ public class SnapshotUtil {
             }
         }
         return inprogress;
+    }
+
+    public static boolean isSnapshotQueued(VoltTable results[]) {
+        final VoltTable result = results[0];
+        result.resetRowPosition();
+        if (result.getColumnCount() == 1) {
+            return false;
+        }
+
+        boolean queued = false;
+        while (result.advanceRow()) {
+            if (result.getString("ERR_MSG").contains("SNAPSHOT REQUEST QUEUED")) {
+                queued = true;
+            }
+        }
+        return queued;
+    }
+
+    /**
+     * Handles response from asynchronous snapshot requests.
+     */
+    public static interface SnapshotResponseHandler {
+        /**
+         *
+         * @param resp could be null
+         */
+        public void handleResponse(ClientResponse resp);
+    }
+
+    /**
+     * Request a new snapshot. It will retry for a couple of times. If it
+     * doesn't succeed in the specified time, an error response will be sent to
+     * the response handler, otherwise a success response will be passed to the
+     * handler.
+     *
+     * The request process runs in a separate thread, this method call will
+     * return immediately.
+     *
+     * @param clientHandle
+     * @param path
+     * @param nonce
+     * @param blocking
+     * @param format
+     * @param data Any data that needs to be passed to the snapshot target
+     * @param handler
+     */
+    public static void requestSnapshot(final long clientHandle,
+                                       final String path,
+                                       final String nonce,
+                                       final boolean blocking,
+                                       final SnapshotFormat format,
+                                       final String data,
+                                       final SnapshotResponseHandler handler,
+                                       final boolean notifyChanges) {
+        final Exchanger<ClientResponse> responseExchanger = new Exchanger<ClientResponse>();
+        final Connection c = new Connection() {
+            @Override
+            public WriteStream writeStream() {
+                return new WriteStream() {
+
+                    @Override
+                    public void enqueue(DeferredSerialization ds) {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public void enqueue(ByteBuffer b) {
+                        ClientResponseImpl resp = new ClientResponseImpl();
+                        try {
+                            b.position(4);
+                            resp.initFromBuffer(b);
+                            responseExchanger.exchange(resp);
+                        } catch (Exception e) {
+                            throw new RuntimeException(e);
+                        }
+                    }
+
+                    @Override
+                    public void enqueue(ByteBuffer[] b)
+                    {
+                        if (b.length != 1)
+                        {
+                            throw new RuntimeException("Cannot use ByteBuffer chaining in enqueue");
+                        }
+                        enqueue(b[0]);
+                    }
+
+                    @Override
+                    public int calculatePendingWriteDelta(long now) {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public boolean isEmpty() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public int getOutstandingMessageCount() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                    @Override
+                    public boolean hadBackPressure() {
+                        throw new UnsupportedOperationException();
+                    }
+
+                };
+            }
+
+            @Override
+            public NIOReadStream readStream() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void disableReadSelection() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void enableReadSelection() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public String getHostnameOrIP() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public long connectionId() {
+                return Long.MIN_VALUE + 2;
+            }
+
+            @Override
+            public Future<?> unregister() {
+                throw new UnsupportedOperationException();
+            }
+
+            @Override
+            public void queueTask(Runnable r) {
+                throw new UnsupportedOperationException();
+            }
+
+        };
+
+        final SnapshotDaemon sd = VoltDB.instance().getClientInterfaces().get(0).getSnapshotDaemon();
+        Runnable work = new Runnable() {
+            @Override
+            public void run() {
+                ClientResponse response = null;
+                // abort if unable to succeed in 2 hours
+                final long startTime = System.currentTimeMillis();
+                boolean hasRequested = false;
+                while (System.currentTimeMillis() - startTime <= (120 * 60000)) {
+                    try {
+                        if (!hasRequested) {
+                            sd.createAndWatchRequestNode(clientHandle, c, path, nonce, blocking,
+                                                         format, data, notifyChanges);
+                            hasRequested = true;
+                        }
+
+                        response = responseExchanger.exchange(null);
+                        VoltTable[] results = response.getResults();
+                        if (response.getStatus() != ClientResponse.SUCCESS) {
+                            break;
+                        } else if (isSnapshotInProgress(results)) {
+                            // retry after a second
+                            Thread.sleep(1000);
+                            // Request again
+                            hasRequested = false;
+                            continue;
+                        } else if (isSnapshotQueued(results) && notifyChanges) {
+                            // retry after a second
+                            Thread.sleep(1000);
+                            continue;
+                        } else {
+                            // other errors are not recoverable
+                            break;
+                        }
+                    } catch (ForwardClientException e) {
+                        break;
+                    } catch (InterruptedException ignore) {}
+                }
+
+                handler.handleResponse(response);
+            }
+        };
+
+        // Use an executor service here to avoid explosion of threads???
+        ThreadFactory factory = CoreUtils.getThreadFactory("Snapshot Request - " + nonce);
+        Thread workThread = factory.newThread(work);
+        workThread.start();
     }
 }

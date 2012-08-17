@@ -33,7 +33,7 @@ import org.voltdb.client.AuthenticatedConnectionCache;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcedureCallback;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.Encoder;
 
 public class HTTPClientInterface {

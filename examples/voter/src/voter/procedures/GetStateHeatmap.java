@@ -38,27 +38,29 @@ import org.voltdb.VoltType;
 @ProcInfo (
     singlePartition = false
 )
-public class GetStateHeatmap extends VoltProcedure
-{
-    public final SQLStmt resultStmt = new SQLStmt( "SELECT contestant_number, state, SUM(num_votes) AS num_votes FROM v_votes_by_contestant_number_state GROUP BY contestant_number, state ORDER BY 2 ASC, 3 DESC;");
+public class GetStateHeatmap extends VoltProcedure {
 
-    static class Result
-    {
-        public final String State;
-        public final int ContestantNumber;
-        public final long Votes;
-        public final byte IsWinning;
-        public Result(String state, int contestantNumber, long votes, byte isWinning)
-        {
-            this.State = state;
-            this.ContestantNumber = contestantNumber;
-            this.Votes = votes;
-            this.IsWinning = isWinning;
+    public final SQLStmt resultStmt = new SQLStmt(
+            "SELECT contestant_number, state, SUM(num_votes) AS num_votes " +
+            "FROM v_votes_by_contestant_number_state " +
+            "GROUP BY contestant_number, state " +
+            "ORDER BY 2 ASC, 3 DESC, 1 ASC;");
+
+    static class Result {
+        public final String state;
+        public final int contestantNumber;
+        public final long votes;
+        public final byte isWinning;
+
+        public Result(String state, int contestantNumber, long votes, byte isWinning) {
+            this.state = state;
+            this.contestantNumber = contestantNumber;
+            this.votes = votes;
+            this.isWinning = isWinning;
         }
     }
 
-    public VoltTable run()
-    {
+    public VoltTable run() {
         ArrayList<Result> results = new ArrayList<Result>();
         voltQueueSQL(resultStmt);
         VoltTable summary = voltExecuteSQL()[0];
@@ -75,9 +77,19 @@ public class GetStateHeatmap extends VoltProcedure
         }
 
         Object[] resultArray = results.toArray();
-        VoltTable result = new VoltTable(new VoltTable.ColumnInfo("state",VoltType.STRING), new VoltTable.ColumnInfo("contestant_number",VoltType.INTEGER), new VoltTable.ColumnInfo("num_votes",VoltType.BIGINT), new VoltTable.ColumnInfo("is_winning",VoltType.TINYINT));
-        for(int i=0;i<resultArray.length;i++)
-            result.addRow(new Object[] { ((Result)resultArray[i]).State, ((Result)resultArray[i]).ContestantNumber, ((Result)resultArray[i]).Votes, ((Result)resultArray[i]).IsWinning });
+        VoltTable result = new VoltTable(
+                new VoltTable.ColumnInfo("state",VoltType.STRING),
+                new VoltTable.ColumnInfo("contestant_number",VoltType.INTEGER),
+                new VoltTable.ColumnInfo("num_votes",VoltType.BIGINT),
+                new VoltTable.ColumnInfo("is_winning",VoltType.TINYINT));
+
+        for(int i=0;i<resultArray.length;i++) {
+            result.addRow(new Object[] {
+                    ((Result)resultArray[i]).state,
+                    ((Result)resultArray[i]).contestantNumber,
+                    ((Result)resultArray[i]).votes,
+                    ((Result)resultArray[i]).isWinning });
+        }
         return result;
     }
 }

@@ -52,49 +52,105 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.math.BigDecimal;
+import java.nio.ByteBuffer;
 
 import junit.framework.TestCase;
 
 import org.json_voltpatches.JSONException;
-import org.voltdb.messaging.FastSerializableTestUtil;
+import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.types.TimestampType;
 
 public class TestParameterSet extends TestCase {
     ParameterSet params;
+
     @Override
     public void setUp() {
         params = new ParameterSet();
     }
 
-    public void testNull() {
-        params.setParameters(new Object[]{null});
+    public void testNull() throws IOException {
+        params.setParameters(new Object[]{null, null, null});
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
 
-        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
-        assertEquals(1, out.toArray().length);
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
+
+        assertEquals(3, out.toArray().length);
         assertNull(out.toArray()[0]);
     }
 
-    public void testStrings() {
+    public void testStrings() throws IOException {
         params.setParameters(new Object[]{"foo"});
-        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
         assertEquals(1, out.toArray().length);
         assertEquals("foo", out.toArray()[0]);
     }
 
-    public void testStringsAsByteArray() {
+    public void testStringsAsByteArray() throws IOException {
         params = new ParameterSet();
         params.setParameters(new Object[]{new byte[]{'f', 'o', 'o'}});
-        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
         assertEquals(1, out.toArray().length);
 
         byte[] bin = (byte[]) out.toArray()[0];
         assertEquals(bin[0], 'f'); assertEquals(bin[1], 'o'); assertEquals(bin[2], 'o');
     }
 
-    public void testFloatsInsteadOfDouble() {
+    private boolean arrayLengthTester(Object[] objs)
+    {
+        params = new ParameterSet();
+        params.setParameters(objs);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        boolean threw = false;
+        try
+        {
+            params.flattenToBuffer(buf);
+        }
+        catch (IOException ioe)
+        {
+            threw = true;
+        }
+        return threw;
+    }
+
+    public void testArraysTooLong() throws IOException {
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new short[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new int[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new long[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new double[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new String[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new TimestampType[Short.MAX_VALUE + 1]}));
+        assertTrue("Array longer than Short.MAX_VALUE didn't fail to serialize",
+                   arrayLengthTester(new Object[]{new BigDecimal[Short.MAX_VALUE + 1]}));
+    }
+
+    public void testFloatsInsteadOfDouble() throws IOException {
         params = new ParameterSet();
         params.setParameters(5.5f);
-        ParameterSet out = FastSerializableTestUtil.roundTrip(params);
+        ByteBuffer buf = ByteBuffer.allocate(params.getSerializedSize());
+        params.flattenToBuffer(buf);
+        buf.rewind();
+
+        ParameterSet out = new ParameterSet();
+        out.readExternal(new FastDeserializer(buf));
         Object value = out.toArray()[0];
         assertTrue(value instanceof Double);
         assertTrue((5.5f - ((Double) value).doubleValue()) < 0.01);
@@ -121,6 +177,6 @@ public class TestParameterSet extends TestCase {
         json = json.replace("[10,26,10]", "\"0a1A0A\"");
         p2 = ParameterSet.fromJSONString(json);
 
-        assertEquals("0a1A0A", p2.m_params[6]);
+        assertEquals("0a1A0A", p2.toArray()[6]);
     }
 }

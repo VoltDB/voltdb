@@ -226,7 +226,7 @@ public class TestSecuritySuite extends RegressionSuite {
 
     public void testAllowedExportConnectorPermissions() throws ExportClientException {
         // user1 can connect (in groups list)
-        ExportTestClient eclient = new ExportTestClient(1);
+        ExportTestClient eclient = new ExportTestClient(1, port(0));
         eclient.addCredentials("user1", "password");
         eclient.connect();
         eclient.disconnect();
@@ -237,7 +237,7 @@ public class TestSecuritySuite extends RegressionSuite {
 
     public void testRejectedExportConnectorPermissions() {
         boolean caught = false;
-        ExportTestClient eclient = new ExportTestClient(1);
+        ExportTestClient eclient = new ExportTestClient(1, port(0));
         try {
             // bad group
             eclient.addCredentials("user2", "password");
@@ -249,6 +249,36 @@ public class TestSecuritySuite extends RegressionSuite {
         assertTrue(caught);
 
         eclient.disconnect();
+    }
+
+    // Tests permissions applied to auto-generated default CRUD procedures.
+    public void testDefaultProcPermissions() throws Exception {
+        Client client;
+        boolean exceptionThrown;
+
+        // userWithDefaultProcPerm is allowed to invoke default CRUD procs
+        m_username = "userWithDefaultProcPerm";
+        client = getClient();
+        exceptionThrown = false;
+        try {
+            client.callProcedure("NEW_ORDER.insert", 100, 100, 100);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertFalse(exceptionThrown);
+
+        // userWithoutDefaultProcPerm is not allowed to invoke default CRUD procs
+        m_username = "userWithoutDefaultProcPerm";
+        client = getClient();
+        exceptionThrown = false;
+        try {
+            client.callProcedure("NEW_ORDER.insert", 101, 101, 101);
+        } catch (ProcCallException e) {
+            e.printStackTrace();
+            exceptionThrown = true;
+        }
+        assertTrue(exceptionThrown);
     }
 
     /**
@@ -279,15 +309,19 @@ public class TestSecuritySuite extends RegressionSuite {
                 new UserInfo("user1", "password", new String[] {"group1"}),
                 new UserInfo("user2", "password", new String[] {"group2"}),
                 new UserInfo("user3", "password", new String[] {"group3"}),
-                new UserInfo("user4", "password", new String[] {"group4"})
+                new UserInfo("user4", "password", new String[] {"group4"}),
+                new UserInfo("userWithDefaultProcPerm", "password", new String[] {"groupWithDefaultProcPerm"}),
+                new UserInfo("userWithoutDefaultProcPerm", "password", new String[] {"groupWithoutDefaultProcPerm"})
         };
         project.addUsers(users);
 
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("group1", false, false),
-                new GroupInfo("group2", false, true),
-                new GroupInfo("group3", true, false),
-                new GroupInfo("group4", true, true)
+                new GroupInfo("group1", false, false, false),
+                new GroupInfo("group2", false, true, true),
+                new GroupInfo("group3", true, false, false),
+                new GroupInfo("group4", true, true, true),
+                new GroupInfo("groupWithDefaultProcPerm", false, false, true),
+                new GroupInfo("groupWithoutDefaultProcPerm", false, false, false)
         };
         project.addGroups(groups);
         project.setSecurityEnabled(true);
@@ -302,19 +336,15 @@ public class TestSecuritySuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        config = new LocalSingleProcessServer("security-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("security-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile
-        config.compile(project);
+        if (!config.compile(project)) fail();
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
-        // Cluster
-        config = new LocalCluster("security-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
+        // Not testing a cluster and assuming security shouldn't be affected by this
 
         return builder;
     }

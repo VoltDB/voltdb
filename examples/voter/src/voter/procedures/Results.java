@@ -46,7 +46,9 @@ public class Results extends VoltProcedure
                                                  + "    WHERE a.contestant_number = b.contestant_number"
                                                  + " GROUP BY a.contestant_name"
                                                  + "        , a.contestant_number"
-                                                 + " ORDER BY total_votes DESC;" );
+                                                 + " ORDER BY total_votes DESC"
+                                                 + "        , contestant_number ASC"
+                                                 + "        , contestant_name ASC;" );
     public VoltTable[] run() {
         voltQueueSQL(resultStmt);
         return voltExecuteSQL(true);

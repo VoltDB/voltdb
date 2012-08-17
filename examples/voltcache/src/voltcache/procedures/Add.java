@@ -22,20 +22,21 @@
  */
 package voltcache.procedures;
 
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+
 import voltcache.api.VoltCacheResult;
-import org.voltdb.*;
 
 @ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
 
-public class Add extends VoltProcedure
+public class Add extends VoltCacheProcBase
 {
-    private final SQLStmt clean  = Shared.CleanSQLStmt;
     private final SQLStmt check  = new SQLStmt("SELECT CASVersion FROM cache WHERE Key = ? AND Expires > ?;");
     private final SQLStmt insert = new SQLStmt("INSERT INTO cache ( Key, Expires, Flags, Value ) VALUES( ?, ?, ?, ? );");
 
     public long run(String key, int flags, int expires, byte[] value)
     {
-        final int now = Shared.init(this, key);
+        final int now = baseInit(key);
 
         // Pre-check for item existence => Fail w/ NOT_STORED status if the record exists (whether active or queued for deletion)
         voltQueueSQL(check, key, now);
@@ -43,7 +44,7 @@ public class Add extends VoltProcedure
             return VoltCacheResult.NOT_STORED;
 
         // Insert new item
-        voltQueueSQL(insert, key, Shared.expires(this, expires), flags, value);
+        voltQueueSQL(insert, key, expirationTimestamp(expires), flags, value);
         voltExecuteSQL(true);
         return VoltCacheResult.STORED;
     }

@@ -22,18 +22,20 @@
  */
 package voltcache.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltTable;
 
 @ProcInfo( singlePartition = false )
 
-public class Gets extends VoltProcedure
+public class Gets extends VoltCacheProcBase
 {
-    private final SQLStmt clean  = Shared.CleanSQLStmt;
     private final SQLStmt select = new SQLStmt("SELECT Key, Flags, Value, CASVersion, Expires FROM cache WHERE Key = ? AND Expires > ? AND CASVersion > -1;");
 
     public VoltTable[] run(String[] keys)
     {
-        final int now = Shared.init(this, keys);
+        final int now = baseInit(keys);
+        voltExecuteSQL();
 
         // Select items (only if not expired/queued for deletion)
         for(String key : keys)

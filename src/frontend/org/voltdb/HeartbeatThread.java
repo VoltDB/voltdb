@@ -21,7 +21,7 @@ import java.util.ArrayList;
 import java.util.concurrent.LinkedBlockingDeque;
 import java.util.concurrent.TimeUnit;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This thread fires a timer every five milliseconds

@@ -18,11 +18,11 @@ package org.voltdb.dtxn;
 
 public abstract class OrderableTransaction implements Comparable<OrderableTransaction> {
     public final long txnId;
-    public final int initiatorSiteId;
+    public final long initiatorHSId;
 
-    public OrderableTransaction(final long txnId, final int initiatorSiteId) {
+    public OrderableTransaction(final long txnId, final long initiatorHSId) {
         this.txnId = txnId;
-        this.initiatorSiteId = initiatorSiteId;
+        this.initiatorHSId = initiatorHSId;
     }
 
     @Override

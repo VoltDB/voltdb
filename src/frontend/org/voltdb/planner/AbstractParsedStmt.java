@@ -21,7 +21,9 @@ import java.util.ArrayDeque;
 import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.List;
 import java.util.Map.Entry;
+import java.util.Set;
 
 import org.hsqldb_voltpatches.VoltXMLElement;
 import org.voltdb.VoltType;
@@ -32,6 +34,7 @@ import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.AggregateExpression;
 import org.voltdb.expressions.ConstantValueExpression;
 import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.FunctionExpression;
 import org.voltdb.expressions.ParameterValueExpression;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.plannodes.SchemaColumn;
@@ -64,9 +67,9 @@ public abstract class AbstractParsedStmt {
 
     public String sql;
 
-    public ArrayList<ParameterInfo> paramList = new ArrayList<ParameterInfo>();
+    public VoltType[] paramList = new VoltType[0];
 
-    public HashMap<Long, ParameterInfo> paramsById = new HashMap<Long, ParameterInfo>();
+    public HashMap<Long, Integer> paramsById = new HashMap<Long, Integer>();
 
     public ArrayList<Table> tableList = new ArrayList<Table>();
 
@@ -82,6 +85,8 @@ public abstract class AbstractParsedStmt {
 
     public HashMap<TablePair, ArrayList<AbstractExpression>> joinSelectionList = new HashMap<TablePair, ArrayList<AbstractExpression>>();
 
+    public HashMap<AbstractExpression, Set<AbstractExpression> > valueEquivalence = new HashMap<AbstractExpression, Set<AbstractExpression>>();
+
     //User specified join order, null if none is specified
     public String joinOrder = null;
 
@@ -96,7 +101,7 @@ public abstract class AbstractParsedStmt {
      * @param xmlSQL
      * @param db
      */
-    public static AbstractParsedStmt parse(String sql, VoltXMLElement xmlSQL, Database db, String joinOrder) {
+    public static AbstractParsedStmt parse(String sql, VoltXMLElement stmtTypeElement, Database db, String joinOrder) {
         final String INSERT_NODE_NAME = "insert";
         final String UPDATE_NODE_NAME = "update";
         final String DELETE_NODE_NAME = "delete";
@@ -104,14 +109,10 @@ public abstract class AbstractParsedStmt {
 
         AbstractParsedStmt retval = null;
 
-        if (xmlSQL == null) {
+        if (stmtTypeElement == null) {
             System.err.println("Unexpected error parsing hsql parsed stmt xml");
             throw new RuntimeException("Unexpected error parsing hsql parsed stmt xml");
         }
-
-        assert(xmlSQL.name.equals("statement"));
-
-        VoltXMLElement stmtTypeElement = xmlSQL.children.get(0);
 
         // create non-abstract instances
         if (stmtTypeElement.name.equalsIgnoreCase(INSERT_NODE_NAME)) {
@@ -189,7 +190,7 @@ public abstract class AbstractParsedStmt {
             retval = parseOperationExpression(root, db);
         }
         else if (elementName.equals("function")) {
-            retval = parseFunctionExpression(root);
+            retval = parseFunctionExpression(root, db);
         }
         else if (elementName.equals("asterisk")) {
             return null;
@@ -347,7 +348,7 @@ public abstract class AbstractParsedStmt {
         assert((leftExpr != null) || (exprType == ExpressionType.AGGREGATE_COUNT));
         expr.setLeft(leftExpr);
 
-        if (ExpressionUtil.needsRightExpression(expr)) {
+        if (expr.needsRightExpression()) {
             assert(rightExprNode != null);
 
             // recursively parse the right subtree
@@ -359,17 +360,63 @@ public abstract class AbstractParsedStmt {
         return expr;
     }
 
+
     /**
      *
      * @param exprNode
-     * @param attrs
-     * @return
+     * @param db
+     * @return a new Function Expression
      */
-    AbstractExpression parseFunctionExpression(VoltXMLElement exprNode) {
+    AbstractExpression parseFunctionExpression(VoltXMLElement exprNode, Database db) {
         String name = exprNode.attributes.get("name").toLowerCase();
+        String disabled = exprNode.attributes.get("disabled");
+        if (disabled != null) {
+            throw new PlanningErrorException("Function '" + name + "' is not supported in VoltDB: " + disabled);
+        }
+        String value_type_name = exprNode.attributes.get("type");
+        VoltType value_type = VoltType.typeFromString(value_type_name);
+        String id = exprNode.attributes.get("id");
+        assert(id != null);
+        int idArg = 0;
+        try {
+            idArg = Integer.parseInt(id);
+        } catch (NumberFormatException nfe) {}
+        assert(idArg > 0);
+        String parameter = exprNode.attributes.get("parameter");
+        String volt_alias = exprNode.attributes.get("volt_alias");
+        if (volt_alias == null) {
+            volt_alias = name; // volt shares the function name with HSQL
+        }
 
-        // we don't currently support ANY functions.
-        throw new PlanningErrorException("Function '" + name + "' is not supported");
+        ArrayList<AbstractExpression> args = new ArrayList<AbstractExpression>();
+        for (VoltXMLElement argNode : exprNode.children) {
+            assert(argNode != null);
+            // recursively parse each argument subtree (could be any kind of expression).
+            AbstractExpression argExpr = parseExpressionTree(argNode, db);
+            assert(argExpr != null);
+            args.add(argExpr);
+        }
+
+        FunctionExpression expr = new FunctionExpression();
+        expr.setAttributes(name, volt_alias, idArg);
+        expr.setArgs(args);
+        if (value_type != null) {
+            expr.setValueType(value_type);
+            expr.setValueSize(value_type.getMaxLengthInBytes());
+        }
+
+        if (parameter != null) {
+            int parameter_idx = -1; // invalid argument index
+            try {
+                parameter_idx = Integer.parseInt(parameter);
+            } catch (NumberFormatException nfe) {}
+            assert(parameter_idx >= 0); // better be valid by now.
+            assert(parameter_idx < args.size()); // must refer to a provided argument
+
+            expr.setParameterArgAndNegotiateInitialValueTypes(parameter_idx);
+        }
+
+        return expr;
     }
 
     /**
@@ -387,8 +434,8 @@ public abstract class AbstractParsedStmt {
         for (VoltXMLElement child : columnsNode.children) {
             assert(child.name.equals("columnref"));
             AbstractExpression col_exp = parseExpressionTree(child, db);
-            ExpressionUtil.assignLiteralConstantTypesRecursively(col_exp);
-            ExpressionUtil.assignOutputValueTypesRecursively(col_exp);
+            // TupleValueExpressions are always specifically typed,
+            // so there is no need for expression type specialization, here.
             assert(col_exp != null);
             assert(col_exp instanceof TupleValueExpression);
             TupleValueExpression tve = (TupleValueExpression)col_exp;
@@ -424,16 +471,16 @@ public abstract class AbstractParsedStmt {
     }
 
     private void parseParameters(VoltXMLElement paramsNode, Database db) {
+        paramList = new VoltType[paramsNode.children.size()];
+
         for (VoltXMLElement node : paramsNode.children) {
             if (node.name.equalsIgnoreCase("parameter")) {
-                ParameterInfo param = new ParameterInfo();
-
                 long id = Long.parseLong(node.attributes.get("id"));
-                param.index = Integer.parseInt(node.attributes.get("index"));
+                int index = Integer.parseInt(node.attributes.get("index"));
                 String typeName = node.attributes.get("type");
-                param.type = VoltType.typeFromString(typeName);
-                paramsById.put(id, param);
-                paramList.add(param);
+                VoltType type = VoltType.typeFromString(typeName);
+                paramsById.put(id, index);
+                paramList[index] = type;
             }
         }
     }
@@ -487,6 +534,8 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     tableFilterList.put(table, exprs);
                 }
+                expr.m_isJoiningClause = false;
+                addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
             else if (tableSet.size() == 2) {
@@ -502,6 +551,8 @@ public abstract class AbstractParsedStmt {
                     exprs = new ArrayList<AbstractExpression>();
                     joinSelectionList.put(pair, exprs);
                 }
+                expr.m_isJoiningClause = true;
+                addExprToEquivalenceSets(expr);
                 exprs.add(expr);
             }
             else if (tableSet.size() > 2) {
@@ -517,12 +568,8 @@ public abstract class AbstractParsedStmt {
      * @param tables
      */
     void getTablesForExpression(Database db, AbstractExpression expr, HashSet<Table> tables) {
-        if (expr.getLeft() != null)
-            getTablesForExpression(db, expr.getLeft(), tables);
-        if (expr.getRight() != null)
-            getTablesForExpression(db, expr.getRight(), tables);
-        if (expr.getExpressionType() == ExpressionType.VALUE_TUPLE) {
-            TupleValueExpression tupleExpr = (TupleValueExpression)expr;
+        List<TupleValueExpression> tves = ExpressionUtil.getTupleValueExpressions(expr);
+        for (TupleValueExpression tupleExpr : tves) {
             String tableName = tupleExpr.getTableName();
             Table table = db.getTables().getIgnoreCase(tableName);
             tables.add(table);
@@ -534,7 +581,7 @@ public abstract class AbstractParsedStmt {
         String retval = "SQL:\n\t" + sql + "\n";
 
         retval += "PARAMETERS:\n\t";
-        for (ParameterInfo param : paramList) {
+        for (VoltType param : paramList) {
             retval += param.toString() + " ";
         }
 
@@ -598,9 +645,74 @@ public abstract class AbstractParsedStmt {
         if (paramId == -1) {
             return -1;
         }
-        ParameterInfo param = paramsById.get(paramId);
-        assert(param != null);
-        return param.index;
+        assert(paramsById.containsKey(paramId));
+        return paramsById.get(paramId);
+    }
+
+    private void addExprToEquivalenceSets(AbstractExpression expr) {
+        // Ignore expressions that are not of COMPARE_EQUAL type
+        if (expr.getExpressionType() != ExpressionType.COMPARE_EQUAL) {
+            return;
+        }
+
+        AbstractExpression leftExpr = expr.getLeft();
+        AbstractExpression rightExpr = expr.getRight();
+        // Can't use an expression based on a column value that is not just a simple column value.
+        if ( ( ! (leftExpr instanceof TupleValueExpression)) && leftExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return;
+        }
+        if ( ( ! (rightExpr instanceof TupleValueExpression)) && rightExpr.hasAnySubexpressionOfClass(TupleValueExpression.class) ) {
+            return;
+        }
+
+        // Any two asserted-equal expressions need to map to the same equivalence set,
+        // which must contain them and must be the only such set that contains them.
+        Set<AbstractExpression> eqSet1 = null;
+        if (valueEquivalence.containsKey(leftExpr)) {
+            eqSet1 = valueEquivalence.get(leftExpr);
+        }
+        if (valueEquivalence.containsKey(rightExpr)) {
+            Set<AbstractExpression> eqSet2 = valueEquivalence.get(rightExpr);
+            if (eqSet1 == null) {
+                // Add new leftExpr into existing rightExpr's eqSet.
+                valueEquivalence.put(leftExpr, eqSet2);
+                eqSet2.add(leftExpr);
+            } else {
+                // Merge eqSets, re-mapping all the rightExpr's equivalents into leftExpr's eqset.
+                for (AbstractExpression eqMember : eqSet2) {
+                    eqSet1.add(eqMember);
+                    valueEquivalence.put(eqMember, eqSet1);
+                }
+            }
+        } else {
+            if (eqSet1 == null) {
+                // Both leftExpr and rightExpr are new -- add leftExpr to the new eqSet first.
+                eqSet1 = new HashSet<AbstractExpression>();
+                valueEquivalence.put(leftExpr, eqSet1);
+                eqSet1.add(leftExpr);
+            }
+            // Add new rightExpr into leftExpr's eqSet.
+            valueEquivalence.put(rightExpr, eqSet1);
+            eqSet1.add(rightExpr);
+        }
+    }
+
+    /** Parse a where clause. This behavior is common to all kinds of statements.
+     *  TODO: It's not clear why ParsedDeleteStmt has its own VERY SIMILAR code to do this in method parseCondition.
+     *  There's a minor difference in how "ANDs" are modeled -- are they multiple condition nodes or
+     *  single condition nodes with multiple children? That distinction may be due to an arbitrary difference
+     *  in the parser's handling of different statements, but even if it's justified, this method could easily
+     *  be extended to handle multiple multi-child conditionNodes.
+     */
+    protected void parseConditions(VoltXMLElement conditionNode, Database db) {
+        if (conditionNode.children.size() == 0)
+            return;
+
+        VoltXMLElement exprNode = conditionNode.children.get(0);
+        assert(where == null); // Should be non-reentrant -- not overwriting any previous value!
+        where = parseExpressionTree(exprNode, db);
+        assert(where != null);
+        ExpressionUtil.finalizeValueTypes(where);
     }
 
 }

@@ -37,8 +37,7 @@ public interface CommandLog {
     *            The txnId of the truncation snapshot at the end of restore, or
     *            Long.MIN if there was none.
     */
-    public abstract void initForRejoin(CatalogContext context, long txnId,
-                                       long faultSequenceNumber, Set<Integer> failedSites);
+    public abstract void initForRejoin(CatalogContext context, long txnId, boolean isRejoin);
 
     public abstract boolean needsInitialization();
 
@@ -47,11 +46,12 @@ public interface CommandLog {
     public abstract void shutdown() throws InterruptedException;
 
     /**
-     * @param failedSites
+     * @param failedInitiators
      * @param faultedTxns
      * @return null if the logger is not initialized
      */
-    public abstract Semaphore logFault(Set<Integer> failedSites, Set<Long> faultedTxns);
+    public abstract Semaphore logFault(Set<Long> failedInitiators,
+                                       Set<Long> faultedTxns);
 
     public abstract void logHeartbeat(final long txnId);
 

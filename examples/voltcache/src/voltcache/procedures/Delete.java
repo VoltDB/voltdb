@@ -22,21 +22,22 @@
  */
 package voltcache.procedures;
 
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+
 import voltcache.api.VoltCacheResult;
-import org.voltdb.*;
 
 @ProcInfo(partitionInfo = "cache.Key: 0", singlePartition = true)
 
-public class Delete extends VoltProcedure
+public class Delete extends VoltCacheProcBase
 {
-    private final SQLStmt clean  = Shared.CleanSQLStmt;
     private final SQLStmt check  = new SQLStmt("SELECT Key FROM cache WHERE Key = ? AND Expires > ? AND CASVersion > -1;");
     private final SQLStmt update = new SQLStmt("UPDATE cache SET Expires = ?, CASVersion = -1 WHERE Key = ?;");
     private final SQLStmt delete = new SQLStmt("DELETE FROM cache WHERE Key = ?;");
 
     public long run(String key, int expires)
     {
-        final int now = Shared.init(this, key);
+        final int now = baseInit(key);
 
         // If immediate-deletion request, honor regardless as to whether item was already queued for deletion
         if (expires <= 0)
@@ -53,7 +54,7 @@ public class Delete extends VoltProcedure
             if (voltExecuteSQL()[1].getRowCount() == 0)
                 return VoltCacheResult.NOT_FOUND;
 
-            voltQueueSQL(update, Shared.expires(this, expires), key);
+            voltQueueSQL(update, expirationTimestamp(expires), key);
             voltExecuteSQL(true);
             return VoltCacheResult.DELETED;
         }

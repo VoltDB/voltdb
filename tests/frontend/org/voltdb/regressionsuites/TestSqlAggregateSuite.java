@@ -33,7 +33,7 @@ import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.aggregates.*;
+import org.voltdb_testprocs.regressionsuites.aggregates.Insert;
 
 /**
  * System tests for basic aggregate and DISTINCT functionality
@@ -321,14 +321,18 @@ public class TestSqlAggregateSuite extends RegressionSuite {
                 results[0].advanceRow();
                 @SuppressWarnings("unused")
                 long long_val = results[0].getLong(0);
-                assert(results[0].wasNull());
+                if ( ! isHSQL()) {
+                    assert(results[0].wasNull());
+                }
                 query = String.format("select %s(%s.RATIO) from %s",
-                                             aggs[i], table, table);
+                        aggs[i], table, table);
                 results = client.callProcedure("@AdHoc", query).getResults();
                 results[0].advanceRow();
                 @SuppressWarnings("unused")
                 double doub_val = results[0].getDouble(0);
-                assert(results[0].wasNull());
+                if ( ! isHSQL()) {
+                    assert(results[0].wasNull());
+                }
             }
             // and finish up with count(*) for good measure
             query = String.format("select count(*) from %s", table);
@@ -405,6 +409,14 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         }
     }
 
+    // ENG-3645 crashed on an aggregates memory management issue.
+    public void testEng3645() throws IOException, ProcCallException {
+        Client client = getClient();
+        VoltTable[] results = client.callProcedure("@AdHoc",
+                "SELECT SUM(HOURS),AVG(HOURS),MIN(HOURS),MAX(HOURS) FROM ENG3465 WHERE EMPNUM='E1';").getResults();
+        assertTrue(results[0].advanceRow());
+    }
+
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -423,23 +435,23 @@ public class TestSqlAggregateSuite extends RegressionSuite {
         project.addPartitionInfo("P1", "ID");
         project.addProcedures(PROCEDURES);
 
-        config = new LocalSingleProcessServer("sqlaggregate-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("sqlaggregate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        //ADHOC sql still returns double the number of modified rows
-        //config = new LocalSingleProcessServer("sqlaggregate-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        //config.compile(project);
-        //builder.addServerConfig(config);
+        config = new LocalCluster("sqlaggregate-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
 
-        //config = new LocalSingleProcessServer("sqlaggregate-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        //config.compile(project);
-        //builder.addServerConfig(config);
+        config = new LocalCluster("sqlaggregate-twosites.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
+        builder.addServerConfig(config);
 
-        // Cluster
-        config = new LocalCluster("sqlaggregate-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        // HSQL backend testing fails a few cases,
+        // probably due to differences in null representation -- it doesn't support MIN_VALUE as null
+        // These specific cases are qualified with if ( ! isHSQL()).
+        config = new LocalCluster("sqlaggregate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         return builder;

@@ -21,7 +21,7 @@ import java.util.List;
 import java.util.Map;
 
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.VoltDB;
@@ -58,7 +58,7 @@ public class UpdateLogging extends VoltSystemProcedure
                            String xmlConfig)
     {
         VoltDB.instance().logUpdate(xmlConfig, getTransactionId());
-        ctx.getExecutionSite().updateBackendLogLevels();
+        ctx.updateBackendLogLevels();
 
         VoltTable t = new VoltTable(VoltSystemProcedure.STATUS_SCHEMA);
         t.addRow(VoltSystemProcedure.STATUS_OK);

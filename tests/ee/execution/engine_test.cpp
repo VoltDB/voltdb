@@ -70,9 +70,6 @@
 #include "storage/tableutil.h"
 #include "catalog/catalog.h"
 #include "catalog/cluster.h"
-#include "catalog/host.h"
-#include "catalog/partition.h"
-#include "catalog/site.h"
 #include "catalog/table.h"
 #include "catalog/database.h"
 #include "catalog/constraint.h"
@@ -144,20 +141,13 @@ class ExecutionEngineTest : public Test {
                 "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] type 5"
                 "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] size 0"
                 "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] nullable false"
-                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] name \"S_QUANTITY\""
-                "\nadd /clusters[cluster] hosts 0"
-                "\nadd /clusters[cluster] partitions 0"
-                "\nadd /clusters[cluster] partitions 1"
-                "\nadd /clusters[cluster] partitions 2"
-                "\nadd /clusters[cluster] sites 0"
-                "\nset /clusters[cluster]/sites[0] partition /clusters[cluster]/partitions[0]"
-                "\nset /clusters[cluster]/sites[0] host /clusters[cluster]/hosts[0]";
+                "\nset /clusters[cluster]/databases[database]/tables[STOCK]/columns[S_QUANTITY] name \"S_QUANTITY\"";
 
             /*
              * Initialize the engine
              */
             engine = new VoltDBEngine();
-            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY));
+            ASSERT_TRUE(engine->initialize(this->cluster_id, this->site_id, 0, 0, "", DEFAULT_TEMP_TABLE_MEMORY, 3));
             ASSERT_TRUE(engine->loadCatalog( -2, catalog_string));
 
             /*

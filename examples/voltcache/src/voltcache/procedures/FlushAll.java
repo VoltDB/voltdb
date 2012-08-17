@@ -22,26 +22,27 @@
  */
 package voltcache.procedures;
 
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+
 import voltcache.api.VoltCacheResult;
-import org.voltdb.*;
 
 @ProcInfo(singlePartition = false)
 
-public class FlushAll extends VoltProcedure
+public class FlushAll extends VoltCacheProcBase
 {
     private final SQLStmt cleanup = new SQLStmt("DELETE FROM cache WHERE Expires < ?;");
     private final SQLStmt update  = new SQLStmt("UPDATE cache SET Expires = ?, CASVersion = -1;");
     private final SQLStmt delete  = new SQLStmt("DELETE FROM cache;");
+
     public long run(int expires)
     {
-        final int now = Shared.now(this);
-
-        if (expires <= 0)
+        if (expires <= 0) {
             voltQueueSQL(delete);
-        else
-        {
-            voltQueueSQL(cleanup, now);
-            voltQueueSQL(update, Shared.expires(this, expires));
+        }
+        else {
+            voltQueueSQL(cleanup, now());
+            voltQueueSQL(update, expirationTimestamp(expires));
         }
         voltExecuteSQL(true);
         return VoltCacheResult.OK;

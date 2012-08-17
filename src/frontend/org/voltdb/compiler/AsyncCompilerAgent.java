@@ -17,43 +17,41 @@
 
 package org.voltdb.compiler;
 
-import java.lang.Runnable;
-
-import java.util.concurrent.ExecutorService;
+import java.util.ArrayList;
+import java.util.List;
 import java.util.concurrent.RejectedExecutionException;
 import java.util.concurrent.TimeUnit;
 
+import org.apache.commons.lang3.StringUtils;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.CatalogContext;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.LocalMailbox;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.MiscUtils;
 import org.voltdb.VoltDB;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogDiffEngine;
-import org.voltdb.logging.VoltLogger;
+import org.voltdb.messaging.LocalMailbox;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
 
+import com.google.common.util.concurrent.ListeningExecutorService;
+
 public class AsyncCompilerAgent {
 
-    private static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
+    static final VoltLogger ahpLog = new VoltLogger("ADHOCPLANNERTHREAD");
 
     // if more than this amount of work is queued, reject new work
-    static final int MAX_QUEUE_DEPTH = 250;
+    static public final int MAX_QUEUE_DEPTH = 250;
 
     // accept work via this mailbox
     Mailbox m_mailbox;
 
     // do work in this executor service
-    final ExecutorService m_es =
-        MiscUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
-
-    // wraps the VoltPlanner and does the actual query planning
-    private PlannerTool m_ptool = null;
+    final ListeningExecutorService m_es =
+        CoreUtils.getBoundedSingleThreadExecutor("Ad Hoc Planner", MAX_QUEUE_DEPTH);
 
     // intended for integration test use. finish planning what's in
     // the queue and terminate the TPE.
@@ -64,8 +62,15 @@ public class AsyncCompilerAgent {
         }
     }
 
-    public Mailbox createMailbox(final HostMessenger hostMessenger, final int siteId) {
-        m_mailbox = new LocalMailbox(hostMessenger, siteId) {
+    public void createMailbox(final HostMessenger hostMessenger, final long hsId) {
+        m_mailbox = new LocalMailbox(hostMessenger) {
+
+            @Override
+            public void send(long destinationHSId, VoltMessage message) {
+                message.m_sourceHSId = hsId;
+                hostMessenger.send(destinationHSId, message);
+            }
+
             @Override
             public void deliver(final VoltMessage message) {
                 try {
@@ -85,69 +90,95 @@ public class AsyncCompilerAgent {
                     retval.hostname = work.hostname;
                     retval.adminConnection = work.adminConnection;
                     retval.clientData = work.clientData;
-                    try {
-                        m_mailbox.send(work.replySiteId, work.replyMailboxId,
-                                       new LocalObjectMessage(retval));
-                    } catch (MessagingException ex) {
-                        ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
-                    }
+                    work.completionHandler.onCompletion(retval);
                 }
             }
         };
-        return m_mailbox;
+        hostMessenger.createMailbox(hsId, m_mailbox);
     }
 
-    private void handleMailboxMessage(final VoltMessage message) {
+    void handleMailboxMessage(final VoltMessage message) {
         final LocalObjectMessage wrapper = (LocalObjectMessage)message;
-        try {
-            if (wrapper.payload instanceof AdHocPlannerWork) {
-                final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
-                final AsyncCompilerResult result = compileAdHocPlan(w);
-                m_mailbox.send(w.replySiteId, w.replyMailboxId, new LocalObjectMessage(result));
-            }
-            else if (wrapper.payload instanceof CatalogChangeWork) {
-                final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
-                final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
-                m_mailbox.send(w.replySiteId, w.replyMailboxId, new LocalObjectMessage(result));
-            }
-        } catch (MessagingException ex) {
-            ahpLog.error("Error replying to Ad Hoc planner request: " + ex.getMessage());
+        if (wrapper.payload instanceof AdHocPlannerWork) {
+            final AdHocPlannerWork w = (AdHocPlannerWork)(wrapper.payload);
+            final AsyncCompilerResult result = compileAdHocPlan(w);
+            w.completionHandler.onCompletion(result);
+        }
+        else if (wrapper.payload instanceof CatalogChangeWork) {
+            final CatalogChangeWork w = (CatalogChangeWork)(wrapper.payload);
+            final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
+            w.completionHandler.onCompletion(result);
         }
     }
 
-    AsyncCompilerResult compileAdHocPlan(AdHocPlannerWork work) {
-        AdHocPlannedStmt plannedStmt = new AdHocPlannedStmt();
-        plannedStmt.clientHandle = work.clientHandle;
-        plannedStmt.connectionId = work.connectionId;
-        plannedStmt.hostname = work.hostname;
-        plannedStmt.adminConnection = work.adminConnection;
-        plannedStmt.clientData = work.clientData;
+    public void compileAdHocPlanForProcedure(final AdHocPlannerWork apw) {
+        m_es.submit(new Runnable() {
+            @Override
+            public void run(){
+                apw.completionHandler.onCompletion(compileAdHocPlan(apw));
+            }
+        });
+    }
+
+    AdHocPlannedStmtBatch compileAdHocPlan(AdHocPlannerWork work) {
 
         // record the catalog version the query is planned against to
         // catch races vs. updateApplicationCatalog.
-        CatalogContext context = VoltDB.instance().getCatalogContext();
-        if (m_ptool == null || m_ptool.m_context.catalogVersion != context.catalogVersion) {
-            if (m_ptool != null) {
-                // cleanly shutdown hsql
-                m_ptool.shutdown();
+        CatalogContext context = work.catalogContext;
+        if (context == null) {
+            context = VoltDB.instance().getCatalogContext();
+        }
+
+        final PlannerTool ptool = context.m_ptool;
+
+        AdHocPlannedStmtBatch plannedStmtBatch =
+                new AdHocPlannedStmtBatch(work.sqlBatchText,
+                                          work.partitionParam,
+                                          work.clientHandle,
+                                          work.connectionId,
+                                          work.hostname,
+                                          work.adminConnection,
+                                          work.clientData);
+
+        List<String> errorMsgs = new ArrayList<String>();
+        assert(work.sqlStatements != null);
+        // Take advantage of the planner optimization for inferring single partition work
+        // when the batch has one statement.
+        if (work.sqlStatements.length == 1) {
+            // Single statement batch.
+            try {
+                String sqlStatement = work.sqlStatements[0];
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
+                                                             work.inferSinglePartition, work.allowParameterization);
+                result.catalogVersion = context.catalogVersion;
+                // The planning tool may have optimized for the single partition case
+                // and generated a partition parameter.
+                plannedStmtBatch.partitionParam = result.partitionParam;
+                plannedStmtBatch.addStatement(result);
             }
-            m_ptool = new PlannerTool(context);
+            catch (Exception e) {
+                errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+            }
         }
-        plannedStmt.catalogVersion = context.catalogVersion;
+        else {
+            // Multi-statement batch.
+            for (final String sqlStatement : work.sqlStatements) {
+                try {
+                    AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
+                                                                 false, work.allowParameterization);
+                    result.catalogVersion = context.catalogVersion;
+                    plannedStmtBatch.addStatement(result);
+                }
+                catch (Exception e) {
+                    errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+                }
+            }
+        }
+        if (!errorMsgs.isEmpty()) {
+            plannedStmtBatch.errorMsg = StringUtils.join(errorMsgs, "\n");
+        }
 
-        try {
-            PlannerTool.Result result = m_ptool.planSql(work.sql, work.partitionParam != null);
-            plannedStmt.aggregatorFragment = result.onePlan;
-            plannedStmt.collectorFragment = result.allPlan;
-            plannedStmt.isReplicatedTableDML = result.replicatedDML;
-            plannedStmt.sql = work.sql;
-            plannedStmt.partitionParam = work.partitionParam;
-        }
-        catch (Exception e) {
-            plannedStmt.errorMsg = "Unexpected Ad Hoc Planning Error: " + e.getMessage();
-        }
-
-        return plannedStmt;
+        return plannedStmtBatch;
     }
 
     private AsyncCompilerResult prepareApplicationCatalogDiff(CatalogChangeWork work) {
@@ -201,11 +232,6 @@ public class AsyncCompilerAgent {
 
             // since diff commands can be stupidly big, compress them here
             retval.encodedDiffCommands = Encoder.compressAndBase64Encode(diff.commands());
-            // check if the resulting string is small enough to fit in our parameter sets (about 2mb)
-            if (retval.encodedDiffCommands.length() > (2 * 1000 * 1000)) {
-                throw new Exception("The requested catalog change is too large for this version of VoltDB. " +
-                                    "Try a series of smaller updates.");
-            }
         }
         catch (Exception e) {
             e.printStackTrace();

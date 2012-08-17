@@ -37,21 +37,14 @@ import java.sql.CallableStatement;
 import java.sql.Connection;
 import java.sql.DriverManager;
 import java.sql.ResultSet;
-
 import java.util.ArrayList;
 import java.util.Random;
 import java.util.Timer;
 import java.util.TimerTask;
 import java.util.concurrent.atomic.AtomicLongArray;
 
-// The VoltDB JDBC driver exposes extended methoed through the IVoltDBConnection interface.
-// Specifically for this example, we will use the embedded performance statistics.
+import org.voltdb.CLIConfig;
 import org.voltdb.jdbc.IVoltDBConnection;
-
-// This sample also use a simple utility class for command-line applications, however, note
-// that there is otherwise no VoltDB-specific imports.  The sample is only using standard
-// Java and JDBC statements.
-import org.voltdb.client.exampleutils.AppHelper;
 
 public class JDBCBenchmark
 {
@@ -63,6 +56,70 @@ public class JDBCBenchmark
 
     // Reference to the database connection we will use in them main thread
     private static Connection Con;
+
+    /**
+     * Uses included {@link CLIConfig} class to
+     * declaratively state command line options with defaults
+     * and validation.
+     */
+    static class KVConfig extends CLIConfig {
+        @Option(desc = "Interval for performance feedback, in seconds.")
+        long displayinterval = 5;
+
+        @Option(desc = "Benchmark duration, in seconds.")
+        int duration = 10;
+
+        @Option(desc = "Comma separated list of the form server[:port] to connect to.")
+        String servers = "localhost";
+
+        @Option(desc = "Number of keys to preload.")
+        int poolsize = 100000;
+
+        @Option(desc = "Whether to preload a specified number of keys and values.")
+        boolean preload = true;
+
+        @Option(desc = "Fraction of ops that are gets (vs puts).")
+        double getputratio = 0.90;
+
+        @Option(desc = "Size of keys in bytes.")
+        int keysize = 32;
+
+        @Option(desc = "Minimum value size in bytes.")
+        int minvaluesize = 1024;
+
+        @Option(desc = "Maximum value size in bytes.")
+        int maxvaluesize = 1024;
+
+        @Option(desc = "Number of values considered for each value byte.")
+        int entropy = 127;
+
+        @Option(desc = "Compress values on the client side.")
+        boolean usecompression= false;
+
+        @Option(desc = "Number of concurrent threads synchronously calling procedures.")
+        int threads = 40;
+
+        @Option(desc = "Filename to write raw summary statistics to.")
+        String statsfile = "";
+
+        @Override
+        public void validate() {
+            if (duration <= 0) exitWithMessageAndUsage("duration must be > 0");
+            if (displayinterval <= 0) exitWithMessageAndUsage("displayinterval must be > 0");
+            if (poolsize <= 0) exitWithMessageAndUsage("poolsize must be > 0");
+            if (getputratio < 0) exitWithMessageAndUsage("getputratio must be >= 0");
+            if (getputratio > 1) exitWithMessageAndUsage("getputratio must be <= 1");
+
+            if (keysize <= 0) exitWithMessageAndUsage("keysize must be > 0");
+            if (keysize > 250) exitWithMessageAndUsage("keysize must be <= 250");
+            if (minvaluesize <= 0) exitWithMessageAndUsage("minvaluesize must be > 0");
+            if (maxvaluesize <= 0) exitWithMessageAndUsage("maxvaluesize must be > 0");
+            if (entropy <= 0) exitWithMessageAndUsage("entropy must be > 0");
+            if (entropy > 127) exitWithMessageAndUsage("entropy must be <= 127");
+
+            if (threads <= 0) exitWithMessageAndUsage("threads must be > 0");
+        }
+    }
 
     // Class for each thread that will be run in parallel, performing JDBC requests against the VoltDB server
     private static class ClientThread implements Runnable
@@ -155,58 +212,10 @@ public class JDBCBenchmark
     {
         try
         {
+            KVConfig config = new KVConfig();
+            config.parse(JDBCBenchmark.class.getName(), args);
 
-// ---------------------------------------------------------------------------------------------------------------------------------------------------
-
-            // Use the AppHelper utility class to retrieve command line application parameters
-
-            // Define parameters and pull from command line
-            AppHelper apph = new AppHelper(AsyncBenchmark.class.getCanonicalName())
-                .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
-                .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
-                .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
-                .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
-                .add("pool-size", "pool_size", "Size of the pool of keys to work with (10,00, 10,000, 100,000 items, etc.).", 100000)
-                .add("preload", "preload", "Whether the data store should be initialized with default values before the benchmark is run (true|false).", true)
-                .add("get-put-ratio", "get_put_ratio", "Ratio of GET versus PUT operations: 1.0 => 100% GETs; 0.0 => 0% GETs; 0.95 => 95% GETs, 5% PUTs. Value between 0 and 1", 0.95)
-                .add("key-size", "key_size", "Size of the keys in number of characters. Max: 250", 50)
-                .add("min-value-size", "min_value_size", "Minimum size for the value blob (in bytes, uncompressed). Max: 1048576", 1000)
-                .add("max-value-size", "max_value_size", "Maximum size for the value blob (in bytes, uncompressed) - set equal to min-value-size for constant size. Max: 1048576", 1000)
-                .add("entropy", "entropy", "How compressible the payload should be, lower is more compressible", 127)
-                .add("use-compression", "use_compression", "Whether value blobs should be compressed (GZip) for storage in the database (true|false).", false)
-                .setArguments(args)
-            ;
-
-            // Retrieve parameters
-            int threadCount        = apph.intValue("threads");
-            long displayInterval   = apph.longValue("display-interval");
-            long duration          = apph.longValue("duration");
-            String servers         = apph.stringValue("servers");
-            int port               = apph.intValue("port");
-            double getPutRatio     = apph.doubleValue("get-put-ratio");
-            int poolSize           = apph.intValue("pool-size");
-            boolean preload        = apph.booleanValue("preload");
-            int keySize            = apph.intValue("key-size");
-            int minValueSize       = apph.intValue("min-value-size");
-            int maxValueSize       = apph.intValue("max-value-size");
-            boolean useCompression = apph.booleanValue("use-compression");
-            final String csv       = apph.stringValue("stats");
-            final int entropy      = apph.intValue("entropy");
-
-            // Validate parameters
-            apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
-                .validate("threads", (threadCount > 0))
-                .validate("pool-size", (poolSize > 0))
-                .validate("get-put-ratio", (getPutRatio >= 0) && (getPutRatio <= 1))
-                .validate("key-size", (keySize > 0) && (keySize < 251))
-                .validate("min-value-size", (minValueSize > 0) && (minValueSize < 1048576))
-                .validate("max-value-size", (maxValueSize > 0) && (maxValueSize < 1048576) && (maxValueSize >= minValueSize))
-            ;
-
-            // Display actual parameters, for reference
-            apph.printActualUsage();
+            System.out.println(config.getConfigDumpString());
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
@@ -214,7 +223,7 @@ public class JDBCBenchmark
             Class.forName("org.voltdb.jdbc.Driver");
 
             // Prepare the JDBC URL for the VoltDB driver
-            String url = "jdbc:voltdb://" + servers + ":" + port;
+            String url = "jdbc:voltdb://" + config.servers;
 
             // Get a client connection - we retry for a while in case the server hasn't started yet
             System.out.printf("Connecting to: %s\n", url);
@@ -237,17 +246,19 @@ public class JDBCBenchmark
             System.out.println("Connected.  Starting benchmark.");
 
             // Get a payload generator to create random Key-Value pairs to store in the database and process (uncompress) pairs retrieved from the database.
-            final PayloadProcessor processor = new PayloadProcessor(keySize, minValueSize, maxValueSize, entropy, poolSize, useCompression);
+            final PayloadProcessor processor = new PayloadProcessor(
+                    config.keysize, config.minvaluesize, config.maxvaluesize,
+                    config.entropy, config.poolsize, config.usecompression);
 
             // Initialize the store
-            if (preload)
+            if (config.preload)
             {
                 System.out.print("Initializing data store... ");
                 final CallableStatement initializeCS = Con.prepareCall("{call Initialize(?,?,?,?)}");
-                for(int i=0;i<poolSize;i+=1000)
+                for(int i=0;i<config.poolsize;i+=1000)
                 {
                     initializeCS.setInt(1, i);
-                    initializeCS.setInt(2, Math.min(i+1000,poolSize));
+                    initializeCS.setInt(2, Math.min(i+1000,config.poolsize));
                     initializeCS.setString(3, processor.KeyFormat);
                     initializeCS.setBytes(4, processor.generateForStore().getStoreValue());
                     initializeCS.executeUpdate();
@@ -267,16 +278,16 @@ public class JDBCBenchmark
                     try { System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics("Get", "Put")); } catch(Exception x) {}
                 }
             }
-            , displayInterval*1000l
-            , displayInterval*1000l
+            , config.displayinterval*1000l
+            , config.displayinterval*1000l
             );
 
 // ---------------------------------------------------------------------------------------------------------------------------------------------------
 
             // Create multiple processing threads
             ArrayList<Thread> threads = new ArrayList<Thread>();
-            for (int i = 0; i < threadCount; i++)
-                threads.add(new Thread(new ClientThread(url, processor, duration, getPutRatio)));
+            for (int i = 0; i < config.threads; i++)
+                threads.add(new Thread(new ClientThread(url, processor, config.duration, config.getputratio)));
 
             // Start threads
             for (Thread thread : threads)
@@ -318,14 +329,14 @@ public class JDBCBenchmark
             , GetStoreResults.get(1)
             , GetCompressionResults.get(0)/1048576l
             , GetCompressionResults.get(1)/1048576l
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
+            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*config.keysize)/(134217728d*config.duration)
             , PutStoreResults.get(0)
             , PutStoreResults.get(1)
             , PutCompressionResults.get(0)/1048576l
             , PutCompressionResults.get(1)/1048576l
-            , ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
-            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*keySize)/(134217728d*duration)
-            + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*keySize)/(134217728d*duration)
+            , ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*config.keysize)/(134217728d*config.duration)
+            , ((double)GetCompressionResults.get(0) + (GetStoreResults.get(0)+GetStoreResults.get(1))*config.keysize)/(134217728d*config.duration)
+            + ((double)PutCompressionResults.get(0) + (PutStoreResults.get(0)+PutStoreResults.get(1))*config.keysize)/(134217728d*config.duration)
             );
 
             // 2. Overall performance statistics for GET/PUT operations
@@ -343,7 +354,7 @@ public class JDBCBenchmark
             System.out.print(Con.unwrap(IVoltDBConnection.class).getStatistics().toString(false));
 
             // Dump statistics to a CSV file
-            Con.unwrap(IVoltDBConnection.class).saveStatistics(csv);
+            Con.unwrap(IVoltDBConnection.class).saveStatistics(config.statsfile);
 
             Con.close();
 

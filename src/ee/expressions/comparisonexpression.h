@@ -84,6 +84,10 @@ class CmpGte {
 public:
     inline NValue cmp(NValue l, NValue r) const { return l.op_greaterThanOrEqual(r);}
 };
+class CmpLike {
+public:
+    inline NValue cmp(NValue l, NValue r) const { return l.like(r);}
+};
 
 template <typename C>
 class ComparisonExpression : public AbstractExpression {

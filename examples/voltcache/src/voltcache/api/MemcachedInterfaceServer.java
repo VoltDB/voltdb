@@ -23,6 +23,7 @@
 package voltcache.api;
 
 import java.net.ServerSocket;
+
 import org.voltdb.client.exampleutils.AppHelper;
 
 public class MemcachedInterfaceServer
@@ -40,13 +41,11 @@ public class MemcachedInterfaceServer
             AppHelper apph = new AppHelper(MemcachedInterfaceServer.class.getCanonicalName())
                 .add("mport", "memcached_port_number", "Port against which the interface will listen for connection of Memcache clients.", 11211)
                 .add("vservers", "comma_separated_voltdb_server_list", "List of VoltDB servers to connect to.", "localhost")
-                .add("vport", "voltdb_port_number", "Client port to connect to on VoltDB nodes.", 21212)
                 .setArguments(args)
             ;
 
             // Retrieve parameters
             String vservers = apph.stringValue("vservers");
-            int vport       = apph.intValue("vport");
             int mport       = apph.intValue("mport");
 
             // Display actual parameters, for reference
@@ -61,7 +60,7 @@ public class MemcachedInterfaceServer
             {
                 // Should really be using NIO, but the translation interface is bound to have cost no matter what
                 for(;;)
-                    (new Thread(new MemcachedTextProtocolService(socket.accept(), vservers, vport))).start();
+                    (new Thread(new MemcachedTextProtocolService(socket.accept(), vservers))).start();
             }
             catch(Exception x)
             {

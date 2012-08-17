@@ -56,7 +56,7 @@ public class CrashVoltDBTest extends TestCase {
         final String listener = cluster.getListenerAddresses().get(0);
         final Client client = ClientFactory.createClient();
         //client.createConnection(listener);
-        client.createConnection(listener, VoltDB.DEFAULT_PORT + 1);
+        client.createConnection(listener);
 
         try {
             client.callProcedure("CrashVoltDBProc");

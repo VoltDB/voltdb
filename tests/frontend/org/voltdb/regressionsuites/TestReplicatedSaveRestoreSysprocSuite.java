@@ -78,6 +78,27 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
 
     @Override
     public void testRestore12Snapshot() {}
+//
+    @Override
+    public void testQueueUserSnapshot() {}
+
+    @Override
+    public void testQueueFailedUserSnapshot() {}
+
+    @Override
+    public void testTSVConversion() {}
+
+    @Override
+    public void testCSVConversion() {}
+
+    @Override
+    public void testBadSnapshotParams() {}
+
+    @Override
+    public void testIdleOnlineSnapshot() {}
+
+    @Override
+    public void testRestoreMissingPartitionFile() {}
 
     /**
      * Build a list of the tests to be run. Use the regression suite
@@ -95,7 +116,7 @@ public class TestReplicatedSaveRestoreSysprocSuite extends TestSaveRestoreSyspro
         project.addAllDefaultsNoPartitioning();
 
         config =
-            new CatalogChangeSingleProcessServer("sysproc-threesites.jar", 3,
+            new CatalogChangeSingleProcessServer( JAR_NAME, 3,
                                                  BackendTarget.NATIVE_EE_JNI);
         boolean success = config.compile(project);
         assert(success);

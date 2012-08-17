@@ -52,37 +52,27 @@ package org.voltdb.messaging;
 
 import java.io.IOException;
 
-import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool;
-
 import junit.framework.TestCase;
 
 public class TestFastSerializer extends TestCase {
     FastSerializer heapOut;
     FastSerializer directOut;
-    FastSerializer poolOut;
-    DBBPool pool;
+    @Override
     public void setUp() {
         heapOut = new FastSerializer();
         directOut = new FastSerializer(true, true);
-        pool = new DBBPool();
-        poolOut = new FastSerializer(pool);
     }
 
+    @Override
     public void tearDown() {
-        poolOut.getBBContainer().discard();
-        pool.clear();
-        pool = null;
         heapOut = null;
         directOut = null;
-        poolOut = null;
         System.gc();
     }
 
     public void testHugeMessage() throws IOException {
         testHM(heapOut);
         testHM(directOut);
-        testHM(poolOut);
     }
 
     private void testHM(FastSerializer fs) throws IOException {
@@ -96,7 +86,6 @@ public class TestFastSerializer extends TestCase {
     public void testHugeMessageBigEndian() throws IOException {
         testHMLE(heapOut);
         testHMLE(directOut);
-        testHMLE(poolOut);
     }
 
     private void testHMLE(FastSerializer out) throws IOException {
@@ -118,7 +107,6 @@ public class TestFastSerializer extends TestCase {
     public void testClear() throws IOException {
         testClearP(heapOut);
         testClearP(directOut);
-        testClearP(poolOut);
     }
 
     private void testClearP(FastSerializer out) throws IOException {

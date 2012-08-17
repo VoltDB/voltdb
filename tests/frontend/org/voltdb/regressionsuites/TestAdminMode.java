@@ -204,7 +204,7 @@ public class TestAdminMode extends RegressionSuite
             results = adminclient.callProcedure("@Resume").getResults();
             System.out.println(results[0].toString());
             // queue up a bunch of invocations but don't read the responses
-            for (int i = 0; i < 1000; i++)
+            for (int i = 0; i < 10000; i++)
             {
                 ConnectionUtil.sendInvocation(channel, "InsertA", i, 1000 + i);
                 ConnectionUtil.sendInvocation(channel, "SelectA");
@@ -312,6 +312,19 @@ public class TestAdminMode extends RegressionSuite
 //        }
 //    }
 
+    /**
+     * LocalSingleProcessServer is verboten, but it needs to be used here because
+     * LocalCluster doesn't yet do the right admin mode thing yet.
+     */
+    @SuppressWarnings("deprecation")
+    static class ForcedLocalSingleProcessServer extends LocalSingleProcessServer {
+        public ForcedLocalSingleProcessServer(String jarFileName,
+                int siteCount, BackendTarget target) {
+            super(jarFileName, siteCount, target);
+        }
+    }
+
+    @SuppressWarnings("deprecation")
     static public Test suite() throws IOException {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestAdminMode.class);
@@ -319,7 +332,9 @@ public class TestAdminMode extends RegressionSuite
         // build up a project builder for the workload
         VoltProjectBuilder project = getBuilderForTest();
         boolean success;
-        LocalSingleProcessServer config = new LocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        ForcedLocalSingleProcessServer config =
+                new ForcedLocalSingleProcessServer("admin-mode1.jar", 2, BackendTarget.NATIVE_EE_JNI);
+
         // Start in admin mode
         success = config.compileWithAdminMode(project, 32323, true);
         assertTrue(success);

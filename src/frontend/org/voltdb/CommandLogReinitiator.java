@@ -17,6 +17,7 @@
 
 package org.voltdb;
 
+import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionInitiator;
 
 public interface CommandLogReinitiator {
@@ -33,6 +34,8 @@ public interface CommandLogReinitiator {
     public void setCallback(Callback callback);
 
     public void setCatalogContext(CatalogContext context);
+
+    public void setSiteTracker(SiteTracker siteTracker);
 
     public void setInitiator(TransactionInitiator initiator);
 

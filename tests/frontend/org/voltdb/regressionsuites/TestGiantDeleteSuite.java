@@ -46,34 +46,28 @@ public class TestGiantDeleteSuite extends RegressionSuite {
         if (isValgrind()) {
             return;
         }
-        Client client = getClient();
-        client.callProcedure("InsertBatch", 20000000, 0);
-        boolean threw = false;
-        try
-        {
+        Client client = getClient(1000 * 60 * 10);
+        for (int i = 0; i < 100; i++) {
+            client.callProcedure("InsertBatch", 200000, 0, i * 200000);
+        }
+        try {
             client.callProcedure("Delete");
         }
-        catch (ProcCallException pce)
-        {
+        catch (ProcCallException pce) {
             pce.printStackTrace();
-            threw = true;
+            fail("Expected to be able to delete large batch but failed");
         }
-        assertFalse("Expected to be able to delete large batch but failed",
-                    threw);
         // Test repeatability
-        client.callProcedure("InsertBatch", 20000000, 0);
-        threw = false;
-        try
-        {
+        for (int i = 0; i < 100; i++) {
+            client.callProcedure("InsertBatch", 200000, 0, i * 200000);
+        }
+        try {
             client.callProcedure("Delete");
         }
-        catch (ProcCallException pce)
-        {
+        catch (ProcCallException pce) {
             pce.printStackTrace();
-            threw = true;
+            fail("Expected to be able to delete large batch but failed");
         }
-        assertFalse("Expected to be able to delete large batch but failed",
-                    threw);
     }
 
     //
@@ -95,8 +89,7 @@ public class TestGiantDeleteSuite extends RegressionSuite {
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("Delete", "DELETE FROM ASSET WHERE ASSET_ID > -1;");
 
-        config = new LocalSingleProcessServer("giantdelete-onesite.jar", 2,
-                                              BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("giantdelete-onesite.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
         config.compile(project);
         builder.addServerConfig(config);
 

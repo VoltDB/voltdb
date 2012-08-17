@@ -26,319 +26,34 @@ import org.voltdb.VoltType;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.Encoder;
-import org.voltdb.utils.NotImplementedException;
-import org.voltdb.utils.Pair;
-import org.voltdb.utils.VoltTypeUtil;
 
 /**
  *
  */
 public abstract class ExpressionUtil {
 
-    /**
-     * Convenience method for determining whether an Expression object should have a child
-     * Expression on its RIGHT side. The follow types of Expressions do not need a right child:
-     *      OPERATOR_NOT
-     *      COMPARISON_IN
-     *      OPERATOR_IS_NULL
-     *      AggregageExpression
-     *
-     * @param exp
-     * @return Does this expression need a right expression to be valid?
-     */
-    public static Boolean needsRightExpression(AbstractExpression exp) {
-        assert(exp != null);
-        return (exp.getExpressionType() != ExpressionType.OPERATOR_NOT &&
-                exp.getExpressionType() != ExpressionType.COMPARE_IN &&
-                exp.getExpressionType() != ExpressionType.OPERATOR_IS_NULL &&
-                !(exp instanceof AggregateExpression));
-    }
-
-    /**
-     * Given an expression, find and convert its NUMERIC literals to
-     * acceptable VoltTypes. Inserts may have expressions that are stand-alone
-     * constant value expressions. In this case, allow the caller to pass
-     * a column type. Otherwise, base the NUMERIC to VoltType conversion
-     * on the other operand's type.
-     */
-    public static void assignLiteralConstantTypesRecursively(AbstractExpression exp) {
-        assignLiteralConstantTypesRecursively(exp, VoltType.INVALID);
-    }
-
-    public static void assignLiteralConstantTypesRecursively(
-            AbstractExpression exp, VoltType columnType)
+    public static void finalizeValueTypes(AbstractExpression exp)
     {
-        if (exp == null)
-            return;
-
-        if ((exp instanceof ConstantValueExpression) &&
-            (exp.m_valueType == VoltType.NUMERIC))
-        {
-            assert(columnType != VoltType.INVALID);
-
-            if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL)) {
-                exp.m_valueType = columnType;
-                exp.m_valueSize = columnType.getLengthInBytesForFixedTypes();
-                return;
-            }
-            else if (columnType.isInteger()) {
-                ConstantValueExpression cve = (ConstantValueExpression) exp;
-                Long.parseLong(cve.getValue());
-                exp.m_valueType = columnType;
-                exp.m_valueSize = columnType.getLengthInBytesForFixedTypes();
-            }
-            else {
-                throw new NumberFormatException("NUMERIC constant value type must match a FLOAT or DECIMAL column");
-            }
-        }
-        assignLiteralConstantTypes_recurse(exp);
+        exp.normalizeOperandTypes_recurse();
+        exp.finalizeValueTypes();
     }
-
-    /**
-     * Constant literals have a place-holder type of NUMERIC. These types
-     * need to be converted to DECIMAL or DOUBLE in Volt based on the other
-     * operand's type.
-     */
-    private static void assignLiteralConstantTypes_recurse(AbstractExpression exp)
-    {
-        // Depth first search for NUMERIC children.
-        if (exp == null) {
-            return;
-        }
-
-        assignLiteralConstantTypes_recurse(exp.m_left);
-        assignLiteralConstantTypes_recurse(exp.m_right);
-
-        if (exp.m_left != null && exp.m_left.m_valueType == VoltType.NUMERIC) {
-            assignLiteralConstantType(exp.m_left, exp.m_right);
-        }
-        if (exp.m_right != null && exp.m_right.m_valueType == VoltType.NUMERIC) {
-            assignLiteralConstantType(exp.m_right, exp.m_left);
-        }
-    }
-
-    /**
-     * Helper function to patch up NUMERIC typed constants.
-     */
-    private static void assignLiteralConstantType(AbstractExpression literal,
-                                                  AbstractExpression other)
-    {
-        if (other.m_valueType != VoltType.DECIMAL) {
-            literal.m_valueType = VoltType.FLOAT;
-            literal.m_valueSize = VoltType.FLOAT.getLengthInBytesForFixedTypes();
-        }
-        else {
-            literal.m_valueType = VoltType.DECIMAL;
-            literal.m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
-        }
-    }
-
-    public static void assignOutputValueTypesRecursively(AbstractExpression exp) {
-        if (exp == null)
-            return;
-        if (exp.m_left != null)
-            assignOutputValueTypesRecursively(exp.m_left);
-        if (exp.m_right != null)
-            assignOutputValueTypesRecursively(exp.m_right);
-
-        Pair<VoltType,Integer> exprData = calculateOutputValueTypes(exp);
-        exp.m_valueType = exprData.getFirst();
-        exp.m_valueSize = exprData.getSecond();
-    }
-
-    /**
-     * For a given Expression node, figure out what its output values are
-     * This method only looks at a single node and will not recursively walk through the tree
-     *
-     * @param exp
-     */
-    public static Pair<VoltType,Integer> calculateOutputValueTypes(AbstractExpression exp) {
-        VoltType retType = VoltType.INVALID;
-        int retSize = 0;
-        //
-        // First get the value types for the left and right children
-        //
-        ExpressionType exp_type = exp.getExpressionType();
-        AbstractExpression left_exp = exp.getLeft();
-        AbstractExpression right_exp = exp.getRight();
-
-        // -------------------------------
-        // CONSTANT/NULL/PARAMETER/TUPLE VALUES
-        // If our current expression is a Value node, then the QueryPlanner should have
-        // already figured out our types and there is nothing we need to do here
-        // -------------------------------
-        if (exp instanceof ConstantValueExpression ||
-            exp instanceof NullValueExpression ||
-            exp instanceof ParameterValueExpression ||
-            exp instanceof TupleValueExpression) {
-            //
-            // Nothing to do...
-            // We have to return what we already have to keep the QueryPlanner happy
-            //
-            retType = exp.getValueType();
-            retSize = exp.getValueSize();
-        // -------------------------------
-        // CONJUNCTION & COMPARISON
-        // If it is an Comparison or Conjunction node, then the output is always
-        // going to be either true or false
-        // -------------------------------
-        } else if (exp instanceof ComparisonExpression ||
-                   exp instanceof ConjunctionExpression) {
-            //
-            // Make sure that they have the same number of output values
-            // NOTE: We do not need to do this check for COMPARE_IN
-            //
-            if (exp_type != ExpressionType.COMPARE_IN) {
-                //
-                // IMPORTANT:
-                // We are not handling the case where one of types is NULL. That is because we
-                // are only dealing with what the *output* type should be, not what the actual
-                // value is at execution time. There will need to be special handling code
-                // over on the ExecutionEngine to handle special cases for conjunctions with NULLs
-                // Therefore, it is safe to assume that the output is always going to be an
-                // integer (for booleans)
-                //
-                retType = VoltType.BIGINT;
-                retSize = retType.getLengthInBytesForFixedTypes();
-            //
-            // Everything else...
-            //
-            } else {
-                // TODO: Need to figure out how COMPARE_IN is going to work
-                throw new NotImplementedException("The '" + exp_type + "' Expression is not yet supported");
-            }
-        // -------------------------------
-        // UNARY BOOLEAN OPERATORS
-        // -------------------------------
-        } else if (exp instanceof OperatorExpression &&
-                (exp_type == ExpressionType.OPERATOR_IS_NULL ||
-                 exp_type == ExpressionType.OPERATOR_NOT)) {
-            retType = VoltType.BIGINT;
-            retSize = retType.getLengthInBytesForFixedTypes();
-        // -------------------------------
-        // AGGREGATES
-        // -------------------------------
-        } else if (exp instanceof AggregateExpression) {
-            switch (exp_type) {
-                case AGGREGATE_COUNT:
-                case AGGREGATE_COUNT_STAR:
-                    //
-                    // Always an integer
-                    //
-                    retType = VoltType.BIGINT;
-                    retSize = retType.getLengthInBytesForFixedTypes();
-                    break;
-                case AGGREGATE_AVG:
-                case AGGREGATE_MAX:
-                case AGGREGATE_MIN:
-                    //
-                    // It's always whatever the base type is
-                    //
-                    retType = left_exp.getValueType();
-                    retSize = left_exp.getValueSize();
-                    break;
-                case AGGREGATE_SUM:
-                    if (left_exp.getValueType() == VoltType.TINYINT ||
-                            left_exp.getValueType() == VoltType.SMALLINT ||
-                            left_exp.getValueType() == VoltType.INTEGER) {
-                        retType = VoltType.BIGINT;
-                        retSize = retType.getLengthInBytesForFixedTypes();
-                    } else {
-                        retType = left_exp.getValueType();
-                        retSize = left_exp.getValueSize();
-                    }
-                    break;
-                default:
-                    throw new RuntimeException("ERROR: Invalid Expression type '" + exp_type + "' for Expression '" + exp + "'");
-            } // SWITCH
-        // -------------------------------
-        // EVERYTHING ELSE
-        // We need to look at our children and iterate through their
-        // output value types. We will match up the left and right output types
-        // at each position and call the method to figure out the cast type
-        // -------------------------------
-        } else {
-            VoltType left_type = left_exp.getValueType();
-            VoltType right_type = right_exp.getValueType();
-            VoltType cast_type = VoltType.INVALID;
-            //
-            // If there doesn't need to be a a right expression, then the type will always be a integer (for booleans)
-            //
-            if (!ExpressionUtil.needsRightExpression(exp)) {
-                //
-                // Make sure that they can cast the left-side expression with integer
-                // This is just a simple check to make sure that it is a numeric value
-                //
-                try {
-                    // NOTE: in some brave new Decimal world, this check will be
-                    // unnecessary.  This code path is currently extremely unlikely
-                    // anyway since we don't support any of the ways to get here
-                    cast_type = VoltType.DECIMAL;
-                    if (left_type != VoltType.DECIMAL)
-                    {
-                        VoltTypeUtil.determineImplicitCasting(left_type, VoltType.BIGINT);
-                        cast_type = VoltType.BIGINT;
-                    }
-                } catch (Exception ex) {
-                    throw new RuntimeException("ERROR: Invalid type '" + left_type + "' used in a '" + exp_type + "' Expression");
-                }
-            //
-            // Otherwise, use VoltTypeUtil to figure out what to case the value to
-            //
-            } else {
-                cast_type = VoltTypeUtil.determineImplicitCasting(left_type, right_type);
-            }
-            if (cast_type == VoltType.INVALID) {
-                throw new RuntimeException("ERROR: Invalid output value type for Expression '" + exp + "'");
-            }
-            retType = cast_type;
-            // this may not always be safe
-            retSize = cast_type.getLengthInBytesForFixedTypes();
-        }
-        return new Pair<VoltType, Integer>(retType, retSize);
-    }
-
-    /**
-     * Returns true if the provided Expression object is a ConstantValueExpression and its
-     * value will evaluate to true.
-     * @param exp the Expression to check whether it is a
-     * @return true if the exp is a ConstantValueExpression that evaluates to true
-     */
-    public static Boolean isTrueBooleanExpression(AbstractExpression exp) {
-        return (exp instanceof ConstantValueExpression &&
-                Integer.valueOf(((ConstantValueExpression)exp).getValue()) == 1);
-    }
-
-    /**
-     *
-     * @param exp
-     * @throws Exception
-     */
-    public static AbstractExpression clone(AbstractExpression exp) throws Exception {
-        AbstractExpression ret = (AbstractExpression)exp.clone();
-        if (exp.getLeft() != null) {
-            ret.setLeft(ExpressionUtil.clone(exp.getLeft()));
-        }
-        if (exp.getRight() != null) {
-            ret.setRight(ExpressionUtil.clone(exp.getRight()));
-        }
-        return ret;
-    }
-
 
     /**
      *
      * @param exps
      */
     public static AbstractExpression combine(List<AbstractExpression> exps) {
+        if (exps.isEmpty()) {
+            return null;
+        }
         Stack<AbstractExpression> stack = new Stack<AbstractExpression>();
         stack.addAll(exps);
 
-        if (stack.isEmpty()) {
-            return null;
-        } else if (stack.size() == 1) {
-            return stack.pop();
-        }
+        // TODO: This code probably doesn't need to go through all this trouble to create balanced AND trees
+        // like "(A and B) and (C and D)".
+        // Simpler skewed AND trees like "A and (B and (C and D))" are likely as good if not better and can be
+        // constructed serially with much less effort.
+
         AbstractExpression ret = null;
         while (stack.size() > 1) {
             AbstractExpression child_exp = stack.pop();
@@ -372,11 +87,7 @@ public abstract class ExpressionUtil {
      * @return Both expressions passed in combined by an And conjunction.
      */
     public static AbstractExpression combine(AbstractExpression left, AbstractExpression right) {
-        AbstractExpression ret = null;
-        ret = new ConjunctionExpression(ExpressionType.CONJUNCTION_AND);
-        ret.setLeft(left);
-        ret.setRight(right);
-        return ret;
+        return new ConjunctionExpression(ExpressionType.CONJUNCTION_AND, left, right);
     }
 
     public static AbstractExpression getOtherTableExpression(AbstractExpression expr, String tableName) {
@@ -426,6 +137,11 @@ public abstract class ExpressionUtil {
         // recursive calls
         tves.addAll(getTupleValueExpressions(input.m_left));
         tves.addAll(getTupleValueExpressions(input.m_right));
+        if (input.m_args != null) {
+            for (AbstractExpression argument : input.m_args) {
+                tves.addAll(getTupleValueExpressions(argument));
+            }
+        }
         return tves;
     }
 

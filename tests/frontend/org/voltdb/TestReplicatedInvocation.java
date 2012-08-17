@@ -43,20 +43,12 @@ import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ReplicaProcCaller;
 import org.voltdb.client.SyncCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb.messaging.FastSerializable;
 import org.voltdb.utils.VoltFile;
 
 public class TestReplicatedInvocation {
     ServerThread server;
     File root;
     ReplicationRole role = ReplicationRole.REPLICA;
-
-    static class MockWriteStream extends org.voltdb.network.MockWriteStream {
-        @Override
-        public boolean enqueue(FastSerializable f) {
-            return true;
-        }
-    }
 
     @Before
     public void setUp() throws IOException {

@@ -471,42 +471,15 @@ public class TestFailuresSuite extends RegressionSuite {
         assertEquals(response.getAppStatus(), 4);
     }
 
-    public void testBatchTooBig() throws Exception {
-        // HSQL has a different error... skip it
-        if (isHSQL()) return;
-
-        System.out.println("STARTING testAppStatus");
-        Client client = getClient();
-
-        try {
-            client.callProcedure( "BatchTooBig", 0, 0, (byte)0);
-            fail();
-        }
-        catch (ProcCallException e) {
-            String msg = e.getMessage();
-            System.out.println(msg);
-            assertTrue(msg.contains("attempted to queue"));
-        }
-    }
-
     /**
-     * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
+     * Build a list of the tests that will be run when TestFailuresSuite gets run by JUnit.
      * Use helper classes that are part of the RegressionSuite framework.
-     * This particular class runs all tests on the the local JNI backend with both
-     * one and two partition configurations, as well as on the hsql backend.
      *
      * @return The TestSuite containing all the tests to be run.
      */
     static public Test suite() {
         // the suite made here will all be using the tests from this class
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestFailuresSuite.class);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalSingleProcessServer("failures-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -518,43 +491,38 @@ public class TestFailuresSuite extends RegressionSuite {
         //project.addPartitionInfo("BAD_COMPARES", "ID");
         project.addProcedures(PROCEDURES);
         project.addStmtProcedure("InsertNewOrder", "INSERT INTO NEW_ORDER VALUES (?, ?, ?);", "NEW_ORDER.NO_W_ID: 2");
-        // build the jarfile
-        if (!config.compile(project))
-            fail();
-
-        // add this config to the set of tests to run
-        //builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #2: 2 Local Site/Partitions running on JNI backend
+        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with two sites/partitions
-        config = new LocalSingleProcessServer("failures-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("failures-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile (note the reuse of the TPCC project)
-        config.compile(project);
+        if (!config.compile(project)) fail();
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #3: 1 Local Site/Partition running on HSQL backend
+        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
 
         // get a server config that similar, but doesn't use the same backend
-        config = new LocalSingleProcessServer("failures-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
+        config = new LocalCluster("failures-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
 
         // build the jarfile (note the reuse of the TPCC project)
-        config.compile(project);
+        if (!config.compile(project)) fail();
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
-        // CLUSTER?
-        config = new LocalCluster("failures-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        /////////////////////////////////////////////////////////////
+        // CONFIG #3: N=2 K=1 Cluster
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("failures-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         return builder;

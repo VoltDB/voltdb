@@ -67,7 +67,8 @@ public class FileSnap implements SnapShot {
      * deserialize a data tree from the most recent snapshot
      * @return the zxid of the snapshot
      */
-    public long deserialize(DataTree dt, Map<Long, Integer> sessions)
+    @Override
+    public long deserialize(DataTree dt, Map<Long, Long> sessions)
             throws IOException {
         // we run through 100 snapshots (not all of them)
         // if we cannot get it running within 100 snapshots
@@ -118,7 +119,7 @@ public class FileSnap implements SnapShot {
      * @param ia the input archive to restore from
      * @throws IOException
      */
-    public void deserialize(DataTree dt, Map<Long, Integer> sessions,
+    public void deserialize(DataTree dt, Map<Long, Long> sessions,
             InputArchive ia) throws IOException {
         FileHeader header = new FileHeader();
         header.deserialize(ia, "fileheader");
@@ -134,6 +135,7 @@ public class FileSnap implements SnapShot {
      * find the most recent snapshot in the database.
      * @return the file containing the most recent snapshot
      */
+    @Override
     public File findMostRecentSnapshot() throws IOException {
         List<File> files = findNValidSnapshots(1);
         if (files.size() == 0) {
@@ -205,7 +207,7 @@ public class FileSnap implements SnapShot {
      * @param header the header of this snapshot
      * @throws IOException
      */
-    protected void serialize(DataTree dt,Map<Long, Integer> sessions,
+    protected void serialize(DataTree dt,Map<Long, Long> sessions,
             OutputArchive oa, FileHeader header) throws IOException {
         // this is really a programmatic error and not something that can
         // happen at runtime
@@ -222,7 +224,8 @@ public class FileSnap implements SnapShot {
      * @param sessions the sessions to be serialized
      * @param snapShot the file to store snapshot into
      */
-    public synchronized void serialize(DataTree dt, Map<Long, Integer> sessions, File snapShot)
+    @Override
+    public synchronized void serialize(DataTree dt, Map<Long, Long> sessions, File snapShot)
             throws IOException {
         if (!close) {
             OutputStream sessOS = new BufferedOutputStream(new FileOutputStream(snapShot));

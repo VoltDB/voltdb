@@ -69,7 +69,7 @@ public class TestDeterminism extends TestCase {
     {
         CompiledPlan cp = null;
         try {
-            cp = aide.compilePlan(sql, 0, false, null);
+            cp = aide.compileAdHocPlan(sql);
         }
         catch (NullPointerException ex) {
             // aide may throw NPE if no plangraph was created
@@ -128,7 +128,33 @@ public class TestDeterminism extends TestCase {
         assertPlanDeterminism("select * from tpk where a > 1 order by a;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
     }
 
+    public void testDeterminismOfSelectOrderGroupKeys() {
+        assertPlanDeterminism("select z, max(a)    from ttree group by z    order by z   ;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select    max(a)    from ttree group by z    order by z   ;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+
+        assertPlanDeterminism("select z, max(a), b from ttree group by z, b order by z, b;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select z, max(a)    from ttree group by z, b order by z, b;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select    max(a)    from ttree group by z, b order by z, b;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+
+        assertPlanDeterminism("select z, max(a), b from ttree group by z, b order by z   ;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select z, max(a)    from ttree group by z, b order by z   ;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select    max(a)    from ttree group by z, b order by z   ;", UNORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+
+        // Odd edge cases of needlessly long ORDER BY clause
+        // not yet supported by planner assertPlanDeterminism("select z, max(a), max(b) from ttree group by z order by z, max(b);", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        assertPlanDeterminism("select z, max(a), max(b) from ttree group by z order by z, 3;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select    max(a), max(b) from ttree group by z order by z, max(b);", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select z, max(a)         from ttree group by z order by z, max(b);", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select    max(a)         from ttree group by z order by z, max(b);", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+
+        // not yet supported by planner assertPlanDeterminism("select z, max(a), max(b) from ttree group by z order by max(b), z;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select    max(a)         from ttree group by z order by max(b), z;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select z, max(a), max(b) from ttree group by z order by max(b), z;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+        // not yet supported by planner assertPlanDeterminism("select    max(a)         from ttree group by z order by max(b), z;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
+    }
+
     public void testDeterminismOfSelectOrderAll() {
+        assertPlanDeterminism("select z from ttree order by z;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
         assertPlanDeterminism("select a, b, z from ttree order by 1, 2, 3;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
         assertPlanDeterminism("select a, b, z from ttree order by b, a, z;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);
         assertPlanDeterminism("select a, b, z from ttree order by 3, 2, 1;", ORDERED, CONSISTENT, ALSO_TRY_LIMIT);

@@ -45,23 +45,38 @@ package org.voltdb.client;
 import java.io.BufferedReader;
 import java.io.IOException;
 import java.io.InputStreamReader;
-import org.voltdb.ClientResponseImpl;
-import org.voltdb.messaging.FastDeserializer;
-import org.voltdb.client.ProcedureCallback;
-import org.voltdb.client.ProcedureInvocation;
-import org.voltdb.messaging.FastSerializer;
 import java.lang.reflect.Constructor;
 import java.net.InetSocketAddress;
-import java.net.UnknownHostException;
 import java.net.SocketException;
-import java.nio.*;
-import java.nio.channels.*;
+import java.net.UnknownHostException;
+import java.nio.ByteBuffer;
+import java.nio.channels.CancelledKeyException;
+import java.nio.channels.GatheringByteChannel;
+import java.nio.channels.ReadableByteChannel;
+import java.nio.channels.SelectableChannel;
+import java.nio.channels.SelectionKey;
+import java.nio.channels.Selector;
+import java.nio.channels.SocketChannel;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
-import java.util.*;
-import java.util.concurrent.*;
-import java.util.concurrent.locks.*;
-import java.util.concurrent.atomic.*;
+import java.util.ArrayDeque;
+import java.util.ArrayList;
+import java.util.HashMap;
+import java.util.Random;
+import java.util.Set;
+import java.util.concurrent.Callable;
+import java.util.concurrent.ExecutionException;
+import java.util.concurrent.ExecutorService;
+import java.util.concurrent.Executors;
+import java.util.concurrent.FutureTask;
+import java.util.concurrent.TimeUnit;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicLong;
+import java.util.concurrent.locks.ReadWriteLock;
+import java.util.concurrent.locks.ReentrantReadWriteLock;
+
+import org.voltcore.utils.CoreUtils;
+import org.voltdb.ClientResponseImpl;
 
 /*
  * A client designed to create thousands of connections and distribute
@@ -331,6 +346,7 @@ public abstract class BulkClient {
                     m_controlState.display, m_reason);
         }
 
+        @Override
         @SuppressWarnings("finally")
         public void run() {
             String command = "";
@@ -643,7 +659,7 @@ public abstract class BulkClient {
          * it will not have work distributed to it. If too many connections have pushback then no work
          * work will be generated.
          */
-        private Random r = new Random();
+        private final Random r = new Random();
         private void generateWork() {
             final long now = System.currentTimeMillis();
             final long delta = now - lastGeneratedWork;
@@ -927,7 +943,7 @@ public abstract class BulkClient {
         private int m_nextLength;
         /** messages read by this connection */
         private int m_sequenceId;
-        private AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
+        private final AtomicLong m_handle = new AtomicLong(Long.MIN_VALUE);
 
         protected HashMap<Long, ProcedureCallback> m_callbacks = new HashMap<Long, ProcedureCallback>();
 
@@ -1006,15 +1022,11 @@ public abstract class BulkClient {
 
         /**
          * Handle an incoming message
+         * @throws IOException
          */
-        public void handleInput(ByteBuffer message, Connection connection) {
-            ClientResponseImpl response = null;
-            FastDeserializer fds = new FastDeserializer(message);
-            try {
-                response = fds.readObject(ClientResponseImpl.class);
-            } catch (IOException e) {
-                e.printStackTrace();
-            }
+        public void handleInput(ByteBuffer message, Connection connection) throws IOException {
+            ClientResponseImpl response = new ClientResponseImpl();
+            response.initFromBuffer(message);
             ProcedureCallback cb = null;
             cb = m_callbacks.remove(response.getClientHandle());
             if (cb != null) {
@@ -1045,9 +1057,8 @@ public abstract class BulkClient {
             ProcedureInvocation invocation = new ProcedureInvocation(
                         handle, procName, -1, parameters);
             m_callbacks.put(handle, callback);
-            FastSerializer fs = new FastSerializer();
-            fs.writeObjectForMessaging(invocation);
-            connection.writeStream().enqueue(fs.getBuffer());
+            ByteBuffer buf = ByteBuffer.allocate(invocation.getSerializedSize());
+            connection.writeStream().enqueue(invocation.flattenToBuffer(buf));
         }
     }
 
@@ -1056,7 +1067,7 @@ public abstract class BulkClient {
     /**
      * List of connections that have been created. Synchronized on before access or modification.
      */
-    private ArrayList<Connection> m_connections = new ArrayList<Connection>();
+    private final ArrayList<Connection> m_connections = new ArrayList<Connection>();
 
     /**
      * Manage input and output to the framework
@@ -1080,7 +1091,7 @@ public abstract class BulkClient {
     protected AtomicInteger m_counts[];
 
     private final ExecutorService m_executor = Executors
-        .newFixedThreadPool(Runtime.getRuntime().availableProcessors() - 1);
+        .newFixedThreadPool(CoreUtils.availableProcessors());
 
     private final Dispatcher m_dispatcher = new Dispatcher(m_executor);
 

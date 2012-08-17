@@ -17,34 +17,51 @@
 
 package org.voltdb.compiler;
 
+import java.util.List;
+
+import org.voltdb.CatalogContext;
+
+
 public class AdHocPlannerWork extends AsyncCompilerWork {
     private static final long serialVersionUID = -6567283432846270119L;
 
-    final String sql;
+    final String sqlBatchText;
+    final String[] sqlStatements;
     final Object partitionParam;
+    final CatalogContext catalogContext;
+    final boolean allowParameterization;
+    final boolean inferSinglePartition;
 
-    public AdHocPlannerWork(int replySiteId, int replyMailboxId,
-            boolean shouldShutdown, long clientHandle,
-            long connectionId, String hostname, boolean adminConnection,
-            Object clientData, String sql, Object partitionParam)
+    public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
+            long connectionId, String hostname, boolean adminConnection, Object clientData,
+            String sqlBatchText, List<String> sqlStatements, Object partitionParam, CatalogContext context,
+            boolean allowParameterization, final boolean inferSinglePartition,
+            AsyncCompilerWorkCompletionHandler completionHandler)
     {
-        super(replySiteId, replyMailboxId,
-              shouldShutdown, clientHandle, connectionId, hostname,
-              adminConnection, clientData);
-        this.sql = sql;
+        super(replySiteId, shouldShutdown, clientHandle, connectionId, hostname,
+              adminConnection, clientData, completionHandler);
+        this.sqlBatchText = sqlBatchText;
+        this.sqlStatements = sqlStatements.toArray(new String[sqlStatements.size()]);
         this.partitionParam = partitionParam;
-    }
-
-    public static AdHocPlannerWork forShutdown(int replySiteId, int replyMailboxId) {
-        return new AdHocPlannerWork(replySiteId, replyMailboxId,
-                true, -1L, -1L, "", false, null, "", null);
+        this.catalogContext = context;
+        this.allowParameterization = allowParameterization;
+        this.inferSinglePartition = inferSinglePartition;
     }
 
     @Override
     public String toString() {
         String retval = super.toString();
         retval += "\n  partition param: " + ((partitionParam != null) ? partitionParam.toString() : "null");
-        retval += "\n  sql: " + ((sql != null) ? sql : "null");
+        assert(sqlStatements != null);
+        if (sqlStatements.length == 0) {
+            retval += "\n  sql: empty";
+        } else {
+            int i = 0;
+            for (String sql : sqlStatements) {
+                i++;
+                retval += String.format("\n  sql[%d]: %s", i, sql);
+            }
+        }
         return retval;
     }
 }

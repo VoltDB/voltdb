@@ -26,11 +26,13 @@ package org.voltdb.sqlgenerator;
 import java.util.ArrayList;
 
 import org.voltdb.BackendTarget;
+import org.voltdb.ServerThread;
 import org.voltdb.VoltDB;
-import org.voltdb.regressionsuites.LocalCluster;
+import org.voltdb.VoltDB.Configuration;
+import org.voltdb.utils.MiscUtils;
 
 public class SimpleServer {
-    public static void main(String[] args) {
+    public static void main(String[] args) throws NumberFormatException, Exception {
         SimpleProjectBuilder builder = null;
         String[] arg;
         ArrayList<String> host_manager_args = new ArrayList<String>();
@@ -65,9 +67,8 @@ public class SimpleServer {
 
         String[] hostargs = new String[host_manager_args.size()];
 
-        VoltDB.Configuration config =
-            new VoltDB.Configuration(host_manager_args.toArray(hostargs));
-        config.setPathToCatalogForTest("simple.jar");
+        VoltDB.Configuration config = new VoltDB.Configuration(host_manager_args.toArray(hostargs));
+
         if (config.m_backend != BackendTarget.NATIVE_EE_JNI)
         {
             sites = 1;
@@ -85,20 +86,18 @@ public class SimpleServer {
 
         System.out.println("config path: " + config.m_pathToCatalog);
 
-        LocalCluster cluster = new LocalCluster("simple.jar",
-                                                sites, hosts, k_factor,
-                                                config.m_backend);
-
-        if (!cluster.compile(builder))
-        {
+        if (!builder.compile(Configuration.getPathToCatalogForTest("simple.jar"), sites, hosts, k_factor)) {
             System.err.println("Compilation failed");
             System.exit(-1);
         }
+        MiscUtils.copyFile(builder.getPathToDeployment(), Configuration.getPathToCatalogForTest("simple.xml"));
+        config.m_pathToCatalog = Configuration.getPathToCatalogForTest("simple.jar");
+        config.m_pathToDeployment = Configuration.getPathToCatalogForTest("simple.xml");
+        config.m_port = VoltDB.DEFAULT_PORT;
+        ServerThread server = new ServerThread(config);
+        server.start();
 
-        cluster.startUp();
-
-        //VoltDB.initialize(config);
-        //VoltDB.instance().run();
+        server.join();
     }
 
 }

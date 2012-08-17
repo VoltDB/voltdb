@@ -15,7 +15,7 @@ if [ ! -z `which gnome-terminal` ]; then
     # wait for voltdb to start (hack)
     sleep 7
     # start the client
-    gnome-terminal -e 'bash -c "cd '`dirname $0`'/../../examples/'$1';./run.sh client;exec bash"' --geometry=120x10+0+150
+    gnome-terminal -e 'bash -c "cd '`dirname $0`'/../../examples/'$1';./run.sh client;exec bash"' --geometry=120x16+0+150
     exit 0
 fi
 

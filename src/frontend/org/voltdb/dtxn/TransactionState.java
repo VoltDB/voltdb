@@ -21,16 +21,18 @@ import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExecutionSite;
+import org.voltdb.SiteProcedureConnection;
+import org.voltdb.iv2.Site;
 import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
 
 /**
  * Controls the state of a transaction. Encapsulates from the SimpleDTXNConnection
@@ -40,15 +42,39 @@ import org.voltdb.messaging.TransactionInfoBaseMessage;
  *
  */
 public abstract class TransactionState extends OrderableTransaction  {
-    public final int coordinatorSiteId;
+
+    public static enum RejoinState {
+        NORMAL,
+        REJOINING,
+        REPLAYING
+    }
+
+    public final long coordinatorSiteId;
     protected final boolean m_isReadOnly;
+    protected final TransactionInfoBaseMessage m_notice;
     protected int m_nextDepId = 1;
     protected final Mailbox m_mbox;
     protected final SiteTransactionConnection m_site;
-    protected boolean m_done = false;
+    volatile protected boolean m_done = false;
     protected long m_beginUndoToken;
-    protected boolean m_needsRollback = false;
+    volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
+
+    // is this transaction run during a rejoin
+    protected RejoinState m_rejoinState = RejoinState.NORMAL;
+
+    /** Iv2 constructor */
+    protected TransactionState(long txnId, Mailbox mbox,
+                               TransactionInfoBaseMessage notice)
+    {
+        super(txnId, notice.getInitiatorHSId());
+        m_mbox = mbox;
+        m_site = null;
+        m_notice = notice;
+        coordinatorSiteId = notice.getCoordinatorHSId();
+        m_isReadOnly = notice.isReadOnly();
+        m_beginUndoToken = Site.kInvalidUndoToken;
+    }
 
     /**
      * Set up the final member variables from the parameters. This will
@@ -61,12 +87,30 @@ public abstract class TransactionState extends OrderableTransaction  {
                                ExecutionSite site,
                                TransactionInfoBaseMessage notice)
     {
-        super(notice.getTxnId(), notice.getInitiatorSiteId());
+        super(notice.getTxnId(), notice.getInitiatorHSId());
         m_mbox = mbox;
         m_site = site;
-        coordinatorSiteId = notice.getCoordinatorSiteId();
+        m_notice = notice;
+        coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
+    }
+
+    final public TransactionInfoBaseMessage getNotice() {
+        return m_notice;
+    }
+
+    public TransactionInfoBaseMessage getTransactionInfoBaseMessageForRejoinLog() {
+        return m_notice;
+    }
+
+    public RejoinState getRejoinState() {
+        return m_rejoinState;
+    }
+
+    // Assume that done-ness is a latch.
+    public void setDone() {
+        m_done = true;
     }
 
     final public boolean isDone() {
@@ -95,7 +139,7 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract boolean hasTransactionalWork();
 
-    public abstract boolean doWork(boolean recovering);
+    public abstract boolean doWork(boolean rejoining);
 
     public void storeResults(ClientResponseImpl response) {
         m_response = response;
@@ -119,6 +163,12 @@ public abstract class TransactionState extends OrderableTransaction  {
         return m_beginUndoToken;
     }
 
+    // Assume that rollback-ness is a latch.
+    public void setNeedsRollback()
+    {
+        m_needsRollback = true;
+    }
+
     public boolean needsRollback()
     {
         return m_needsRollback;
@@ -126,7 +176,7 @@ public abstract class TransactionState extends OrderableTransaction  {
 
     public abstract StoredProcedureInvocation getInvocation();
 
-    public void createFragmentWork(int[] partitions, FragmentTaskMessage task) {
+    public void createFragmentWork(long[] partitions, FragmentTaskMessage task) {
         String msg = "The current transaction context of type " + this.getClass().getName();
         msg += " doesn't support creating fragment tasks.";
         throw new UnsupportedOperationException(msg);
@@ -190,5 +240,21 @@ public abstract class TransactionState extends OrderableTransaction  {
      * @param globalCommitPoint greatest committed transaction id in the cluster
      * @param failedSites list of execution and initiator sites that have failed
      */
-    public abstract void handleSiteFaults(HashSet<Integer> failedSites);
+    public abstract void handleSiteFaults(HashSet<Long> failedSites);
+
+    /**
+     * IV2 implementation: in iv2, recursable run is a function on the
+     * transaction state; we block in the transaction state recording
+     * until all dependencies / workunits are received.
+     * IV2's SiteProcedureConnection.recursableRun(TransactionState) delegates
+     * to this recursableRun method.
+     *
+     * The IV2 initiator mailbox knows how to offer() incoming fragment
+     * responses to the waiting transaction state.
+     * @return
+     */
+    public Map<Integer, List<VoltTable>> recursableRun(SiteProcedureConnection siteConnection)
+    {
+        return null;
+    }
 }

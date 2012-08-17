@@ -39,7 +39,7 @@ const int METADATA_COL_CNT = 6;
 const int MAX_BUFFER_AGE = 4000;
 
 TupleStreamWrapper::TupleStreamWrapper(CatalogId partitionId,
-                                       CatalogId siteId)
+                                       int64_t siteId)
     : m_partitionId(partitionId), m_siteId(siteId),
       m_lastFlush(0), m_defaultCapacity(EL_BUFFER_SIZE),
       m_uso(0), m_currBlock(NULL),

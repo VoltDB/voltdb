@@ -22,78 +22,93 @@ import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
 import java.io.Writer;
+import java.lang.reflect.Constructor;
+import java.lang.reflect.InvocationTargetException;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.util.ArrayList;
 import java.util.Deque;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.Iterator;
 import java.util.List;
 import java.util.Map;
-import java.util.Map.Entry;
 import java.util.Set;
+import java.util.TreeMap;
+import java.util.concurrent.CountDownLatch;
+import java.util.concurrent.Future;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 import java.util.concurrent.atomic.AtomicLong;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
+import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.FailureSiteUpdateMessage;
+import org.voltcore.messaging.HeartbeatMessage;
+import org.voltcore.messaging.HeartbeatResponseMessage;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.RecoveryMessage;
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.TransactionInfoBaseMessage;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.utils.EstTime;
+import org.voltcore.utils.Pair;
 import org.voltdb.RecoverySiteProcessor.MessageHandler;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.SystemProcedureCatalog.Config;
+import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Database;
-import org.voltdb.catalog.Procedure;
-import org.voltdb.catalog.Site;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
+import org.voltdb.dtxn.ReplayedTxnState;
 import org.voltdb.dtxn.RestrictedPriorityQueue;
 import org.voltdb.dtxn.RestrictedPriorityQueue.QueueState;
 import org.voltdb.dtxn.SinglePartitionTxnState;
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.SiteTransactionConnection;
 import org.voltdb.dtxn.TransactionState;
+import org.voltdb.dtxn.TransactionState.RejoinState;
 import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SQLException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.export.processors.RawProcessor;
 import org.voltdb.fault.FaultDistributorInterface.PPDPolicyDecision;
 import org.voltdb.fault.FaultHandler;
-import org.voltdb.fault.NodeFailureFault;
+import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault;
 import org.voltdb.fault.VoltFault.FaultType;
 import org.voltdb.jni.ExecutionEngine;
 import org.voltdb.jni.ExecutionEngineIPC;
 import org.voltdb.jni.ExecutionEngineJNI;
 import org.voltdb.jni.MockExecutionEngine;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.CompleteTransactionResponseMessage;
-import org.voltdb.messaging.FailureSiteUpdateMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FragmentResponseMessage;
+import org.voltdb.messaging.FragmentTaskLogMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.HeartbeatMessage;
-import org.voltdb.messaging.HeartbeatResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.Mailbox;
-import org.voltdb.messaging.MessagingException;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
-import org.voltdb.messaging.RecoveryMessage;
-import org.voltdb.messaging.Subject;
-import org.voltdb.messaging.TransactionInfoBaseMessage;
-import org.voltdb.messaging.VoltMessage;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.Encoder;
-import org.voltdb.utils.EstTime;
+import org.voltdb.messaging.RejoinMessage;
+import org.voltdb.messaging.RejoinMessage.Type;
+import org.voltdb.rejoin.RejoinSiteProcessor;
+import org.voltdb.rejoin.StreamSnapshotSink;
+import org.voltdb.rejoin.TaskLog;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil;
+import org.voltdb.sysprocs.saverestore.SnapshotUtil.SnapshotResponseHandler;
 import org.voltdb.utils.LogKeys;
+import org.voltdb.utils.MiscUtils;
 
 /**
  * The main executor of transactional work in the system. Controls running
@@ -102,24 +117,22 @@ import org.voltdb.utils.LogKeys;
  * do other things, but this is where the good stuff happens.
  */
 public class ExecutionSite
-implements Runnable, SiteTransactionConnection, SiteProcedureConnection
+implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSnapshotConnection
 {
     private VoltLogger m_txnlog;
-    private final VoltLogger m_recoveryLog = new VoltLogger("RECOVERY");
+    private final VoltLogger m_rejoinLog = new VoltLogger("JOIN");
     private static final VoltLogger log = new VoltLogger("EXEC");
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final AtomicInteger siteIndexCounter = new AtomicInteger(0);
-    static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
     private final int siteIndex = siteIndexCounter.getAndIncrement();
     private final ExecutionSiteNodeFailureFaultHandler m_faultHandler =
         new ExecutionSiteNodeFailureFaultHandler();
 
-    final HashMap<String, ProcedureRunner> procs = new HashMap<String, ProcedureRunner>(16, (float) .1);
-    private final Mailbox m_mailbox;
+    final LoadedProcedureSet m_loadedProcedures;
+    final Mailbox m_mailbox;
     final ExecutionEngine ee;
     final HsqlBackend hsql;
     public volatile boolean m_shouldContinue = true;
-    final ProcedureRunnerFactory m_runnerFactory;
 
     private final long m_startupTime = System.currentTimeMillis();
     private PartitionDRGateway m_partitionDRGateway = null;
@@ -132,19 +145,17 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      */
     public static final Semaphore m_recoveryPermit = new Semaphore(Integer.MAX_VALUE);
 
-    private boolean m_recovering = false;
+    private boolean m_rejoining = false;
     private boolean m_haveRecoveryPermit = false;
     private long m_recoveryStartTime = 0;
     private static AtomicLong m_recoveryBytesTransferred = new AtomicLong();
 
     // Catalog
     public CatalogContext m_context;
-    Site getCatalogSite() {
-        return m_context.cluster.getSites().get(Integer.toString(getSiteId()));
-    }
+    protected SiteTracker m_tracker;
 
-    final int m_siteId;
-    public final int getSiteId() {
+    final long m_siteId;
+    public long getSiteId() {
         return m_siteId;
     }
 
@@ -174,6 +185,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     public final static long kInvalidUndoToken = -1L;
     private long latestUndoToken = 0L;
 
+    @Override
+    public long getLatestUndoToken() {
+        return latestUndoToken;
+    }
+
+    @Override
     public long getNextUndoToken() {
         return ++latestUndoToken;
     }
@@ -182,6 +199,45 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private final SnapshotSiteProcessor m_snapshotter;
 
     private RecoverySiteProcessor m_recoveryProcessor = null;
+    // The following variables are used for new rejoin
+    private RejoinSiteProcessor m_rejoinSnapshotProcessor = null;
+    private volatile long m_rejoinSnapshotTxnId = -1;
+    // The snapshot completion handler will set this to true
+    private volatile boolean m_rejoinSnapshotFinished = false;
+    private long m_rejoinSnapshotBytes = 0;
+    private long m_rejoinCoordinatorHSId = -1;
+    private TaskLog m_rejoinTaskLog = null;
+    // Used to track if the site can keep up on rejoin, default is 10 seconds
+    private static final long MAX_BEHIND_DURATION =
+            Long.parseLong(System.getProperty("MAX_REJOIN_BEHIND_DURATION", "10000"));
+    private long m_lastTimeMadeProgress = 0;
+    private long m_remainingTasks = 0;
+    private long m_executedTaskCount = 0;
+    private long m_loggedTaskCount = 0;
+    private long m_taskExeStartTime = 0;
+    private final SnapshotCompletionInterest m_snapshotCompletionHandler =
+            new SnapshotCompletionInterest() {
+        @Override
+        public CountDownLatch snapshotCompleted(String nonce,
+                                                long txnId,
+                                                boolean truncationSnapshot) {
+            if (m_rejoinSnapshotTxnId != -1) {
+                if (m_rejoinSnapshotTxnId == txnId) {
+                    m_rejoinLog.debug("Rejoin snapshot for site " + getSiteId() +
+                                        " is finished");
+                    VoltDB.instance().getSnapshotCompletionMonitor().removeInterest(this);
+                    // Notify the rejoin coordinator so that it can start the next site
+                    if (m_rejoinCoordinatorHSId != -1) {
+                        RejoinMessage msg =
+                                new RejoinMessage(getSiteId(), RejoinMessage.Type.SNAPSHOT_FINISHED);
+                        m_mailbox.send(m_rejoinCoordinatorHSId, msg);
+                    }
+                    m_rejoinSnapshotFinished = true;
+                }
+            }
+            return new CountDownLatch(0);
+        }
+    };
 
     // Trigger if shutdown has been run already.
     private boolean haveShutdownAlready;
@@ -189,59 +245,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private final TableStats m_tableStats;
     private final IndexStats m_indexStats;
     private final StarvationTracker m_starvationTracker;
-    private final Watchdog m_watchdog;
-    private class Watchdog extends Thread {
-        private volatile boolean m_shouldContinue = true;
-        private volatile boolean m_petted = false;
-        private final int m_siteIndex;
-        private final int m_siteId;
-        private Thread m_watchThread = null;
-        public Watchdog(final int siteIndex, final int siteId) {
-            super(null, null, "ExecutionSite " + siteIndex + " siteId: " + siteId + " watchdog ", 262144);
-            m_siteIndex = siteIndex;
-            m_siteId = siteId;
-        }
-
-        public void pet() {
-            m_petted = true;
-        }
-
-        @Override
-        public void run() {
-            if (m_watchThread == null) {
-                throw new RuntimeException("Use start(Thread watchThread) not Thread.start()");
-            }
-            try {
-                Thread.sleep(30000);
-            } catch (final InterruptedException e) {
-                return;
-            }
-            while (m_shouldContinue) {
-                try {
-                    Thread.sleep(5000);
-                } catch (final InterruptedException e) {
-                    return;
-                }
-                if (!m_petted) {
-                    final StackTraceElement trace[] = m_watchThread.getStackTrace();
-                    final Throwable throwable = new Throwable();
-                    throwable.setStackTrace(trace);
-                    log.l7dlog( Level.WARN, LogKeys.org_voltdb_ExecutionSite_Watchdog_possibleHang.name(), new Object[]{ m_siteIndex, m_siteId}, throwable);
-                }
-                m_petted = false;
-            }
-        }
-
-        @Override
-        public void start() {
-            throw new UnsupportedOperationException("Use start(Thread watchThread)");
-        }
-
-        public void start(final Thread thread) {
-            m_watchThread = thread;
-            super.start();
-        }
-    }
 
     // This message is used to start a local snapshot. The snapshot
     // is *not* automatically coordinated across the full node set.
@@ -269,42 +272,47 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
 
         @Override
-        protected void flattenToBuffer(DBBPool pool) {
-            // can be empty if only used locally
-        }
-
-        @Override
-        protected void initFromBuffer() {
-            // can be empty if only used locally
-        }
-
-        @Override
         public byte getSubject() {
             return Subject.FAILURE.getId();
         }
 
         long m_roadblockTransactionId;
+
+        @Override
+        protected void initFromBuffer(ByteBuffer buf)
+        {
+        }
+
+        @Override
+        public void flattenToBuffer(ByteBuffer buf)
+        {
+        }
     }
 
     // This message is used locally to schedule a node failure event's
     // required  processing at an execution site.
-    static class ExecutionSiteNodeFailureMessage extends VoltMessage
+    class ExecutionSiteNodeFailureMessage extends VoltMessage
     {
-        final HashSet<NodeFailureFault> m_failedHosts;
-        ExecutionSiteNodeFailureMessage(HashSet<NodeFailureFault> failedHosts)
+        final HashSet<SiteFailureFault> m_failedSites;
+        ExecutionSiteNodeFailureMessage(HashSet<SiteFailureFault> failedSites)
         {
-            m_failedHosts = failedHosts;
+            m_failedSites = failedSites;
+            m_sourceHSId = m_siteId;
         }
-
-        @Override
-        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
-
-        @Override
-        protected void initFromBuffer() {} // can be empty if only used locally
 
         @Override
         public byte getSubject() {
             return Subject.FAILURE.getId();
+        }
+
+        @Override
+        protected void initFromBuffer(ByteBuffer buf)
+        {
+        }
+
+        @Override
+        public void flattenToBuffer(ByteBuffer buf)
+        {
         }
     }
 
@@ -312,16 +320,25 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Generated when a snapshot buffer is discarded. Reminds the EE thread
      * that there is probably more snapshot work to do.
      */
-    static class PotentialSnapshotWorkMessage extends VoltMessage
+    private class PotentialSnapshotWorkMessage extends VoltMessage
     {
-        @Override
-        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
-        @Override
-        protected void initFromBuffer() {} // can be empty if only used locally
+        public PotentialSnapshotWorkMessage() {
+            m_sourceHSId = m_siteId;
+        }
 
         @Override
         public byte getSubject() {
             return Subject.DEFAULT.getId();
+        }
+
+        @Override
+        protected void initFromBuffer(ByteBuffer buf)
+        {
+        }
+
+        @Override
+        public void flattenToBuffer(ByteBuffer buf)
+        {
         }
     }
 
@@ -331,54 +348,86 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     static class CheckTxnStateCompletionMessage extends VoltMessage
     {
         final long m_txnId;
-        CheckTxnStateCompletionMessage(long txnId)
+        CheckTxnStateCompletionMessage(long txnId, long siteId)
         {
             m_txnId = txnId;
+            m_sourceHSId = siteId;
         }
 
         @Override
-        protected void flattenToBuffer(DBBPool pool) {} // can be empty if only used locally
+        protected void initFromBuffer(ByteBuffer buf)
+        {
+        }
+
         @Override
-        protected void initFromBuffer() {} // can be empty if only used locally
+        public void flattenToBuffer(ByteBuffer buf)
+        {
+        }
     }
 
     private class ExecutionSiteNodeFailureFaultHandler implements FaultHandler
     {
+        /** Remember the complete set of all faulted sites */
+        protected Set<Long> m_failedHsids = new HashSet<Long>();
+
         @Override
         public void faultOccured(Set<VoltFault> faults)
         {
             if (m_shouldContinue == false) {
                 return;
             }
-            HashSet<NodeFailureFault> failedNodes = new HashSet<NodeFailureFault>();
+            HashSet<SiteFailureFault> failedSites = new HashSet<SiteFailureFault>();
             for (VoltFault fault : faults) {
-                if (fault instanceof NodeFailureFault)
+                if (fault instanceof SiteFailureFault)
                 {
-                    NodeFailureFault node_fault = (NodeFailureFault)fault;
-                    failedNodes.add(node_fault);
-                }
-                else
-                {
-                    VoltDB.instance().getFaultDistributor().reportFaultHandled(this, fault);
+                    SiteFailureFault site_fault = (SiteFailureFault)fault;
+                    failedSites.add(site_fault);
+                    // record the failed site ids for future queries on this object
+                    m_failedHsids.addAll(site_fault.getSiteIds());
                 }
             }
-            if (!failedNodes.isEmpty()) {
-                m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedNodes));
+            if (!failedSites.isEmpty()) {
+                m_mailbox.deliver(new ExecutionSiteNodeFailureMessage(failedSites));
             }
         }
 
-        @Override
-        public void faultCleared(Set<VoltFault> faults) {
+        /**
+         * Was the given site id in the log of all witnessed faults?
+         */
+        public boolean isWitnessedFailedSite(long hsid) {
+            return m_failedHsids.contains(hsid);
         }
     }
 
-    private final HashMap<Long, ProcedureRunner> m_registeredSysProcPlanFragments =
-        new HashMap<Long, ProcedureRunner>();
+    @Override
+    public boolean isActiveOrPreviouslyKnownSiteId(long hsid) {
+        // if the host id is less than this one, then it existed when this site
+        // was created (or it failed before this site existed)
+        // This relies on the non-resuse and monotonically increasingness of host ids
+        // this also assumes no garbage input
+        if (CoreUtils.getHostIdFromHSId(hsid) <= CoreUtils.getHostIdFromHSId(m_siteId)) {
+            return true;
+        }
 
+        // check whether this site has witnessed a failure
+        if (m_faultHandler.isWitnessedFailedSite(hsid)) {
+            return true;
+        }
+
+        // check if it's a live site
+        if (m_tracker.getAllSites().contains(hsid)) {
+            return true;
+        }
+
+        // this case should point to this id belonging to a currently joining node,
+        // whose status has just not been reflected in the local tracker yet.
+        return false;
+    }
 
     /**
      * Log settings changed. Signal EE to update log level.
      */
+    @Override
     public void updateBackendLogLevels() {
         ee.setLogLevels(org.voltdb.jni.EELoggers.getLogLevels());
     }
@@ -401,12 +450,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         boolean finished = false;
         while (!finished) {
             try {
-                if (m_watchdog.isAlive()) {
-                    m_watchdog.m_shouldContinue = false;
-                    m_watchdog.interrupt();
-                    m_watchdog.join();
-                }
-
                 m_transactionQueue.shutdown();
 
                 // Forget the m_partitionDrGateway. InvocationBufferServer
@@ -414,7 +457,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 m_partitionDRGateway = null;
 
                 if (hsql != null) {
-                    hsql.shutdown();
+                    HsqlBackend.shutdownInstance();
                 }
                 if (ee != null) {
                     ee.release();
@@ -454,13 +497,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                         CompleteTransactionMessage complete = (CompleteTransactionMessage)message;
                         CompleteTransactionResponseMessage ctrm =
                             new CompleteTransactionResponseMessage(complete, m_siteId);
-                        try
-                        {
-                            m_mailbox.send(complete.getCoordinatorSiteId(), 0, ctrm);
-                        }
-                        catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
+                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
                     } else if (message instanceof FragmentTaskMessage) {
                         FragmentTaskMessage ftask = (FragmentTaskMessage)message;
                         FragmentResponseMessage response = new FragmentResponseMessage(ftask, m_siteId);
@@ -473,12 +510,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                     new VoltTable(new VoltTable.ColumnInfo("DUMMY", VoltType.BIGINT)));
                         }
 
-                        try {
-                            m_mailbox.send(response.getDestinationSiteId(), 0, response);
-                        } catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
-
+                        m_mailbox.send(response.getDestinationSiteId(), response);
                     } else {
                         handleMailboxMessageNonRecursable(message);
                     }
@@ -495,33 +527,85 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     /**
      * This is invoked after all recovery data has been received/sent. The processor can be nulled out for GC.
      */
-    private final Runnable m_onRecoveryCompletion = new Runnable() {
+    private final Runnable m_onRejoinCompletion = new Runnable() {
         @Override
         public void run() {
             final long now = System.currentTimeMillis();
-            final long transferred = m_recoveryProcessor.bytesTransferred();
+            final boolean liveRejoin = m_recoveryProcessor == null;
+            long transferred = 0;
+            if (m_recoveryProcessor != null) {
+                transferred = m_recoveryProcessor.bytesTransferred();
+            } else {
+                transferred = m_rejoinSnapshotBytes;
+            }
             final long bytesTransferredTotal = m_recoveryBytesTransferred.addAndGet(transferred);
             final long megabytes = transferred / (1024 * 1024);
             final double megabytesPerSecond = megabytes / ((now - m_recoveryStartTime) / 1000.0);
+            if (liveRejoin) {
+                /*
+                 * The logged txn count will be greater than the replayed txn count
+                 * because some logged ones were before the stream snapshot
+                 */
+                final long duration = (System.currentTimeMillis() - m_taskExeStartTime) / 1000;
+                final long throughput = duration == 0 ? m_executedTaskCount : m_executedTaskCount / duration;
+                m_rejoinLog.info("Logged " + m_loggedTaskCount + " tasks");
+                m_rejoinLog.info("Executed " + m_executedTaskCount + " tasks in " +
+                        duration + " seconds at a rate of " +
+                        throughput + " tasks/second");
+            }
             m_recoveryProcessor = null;
-            m_recovering = false;
+            m_rejoinSnapshotProcessor = null;
+            m_rejoinSnapshotTxnId = -1;
+            m_rejoinSnapshotFinished = false;
+            m_rejoinTaskLog = null;
+            m_rejoining = false;
             if (m_haveRecoveryPermit) {
                 m_haveRecoveryPermit = false;
-                m_recoveryPermit.release();
-                m_recoveryLog.info(
-                        "Destination recovery complete for site " + m_siteId +
-                        " partition " + m_context.siteTracker.getPartitionForSite(m_siteId) +
+                /*
+                 * If it's not using pauseless rejoin, no need to release the
+                 * permit here because it was never set. Pauseless rejoin has
+                 * its own coordinator that makes sure only one site is doing
+                 * snapshot streaming at any point of time.
+                 */
+                if (!liveRejoin) {
+                    m_recoveryPermit.release();
+                }
+                m_rejoinLog.info(
+                        "Destination rejoin complete for site " +
+                        CoreUtils.hsIdToString(m_siteId) +
+                        " partition " + m_tracker.getPartitionForSite(m_siteId) +
                         " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
                         " with " + megabytes + " megabytes transferred " +
                         " at a rate of " + megabytesPerSecond + " megabytes/sec");
-                int remaining = recoveringSiteCount.decrementAndGet();
+                int remaining = SnapshotSaveAPI.recoveringSiteCount.decrementAndGet();
                 if (remaining == 0) {
                     ee.toggleProfiler(0);
-                    VoltDB.instance().onExecutionSiteRecoveryCompletion(bytesTransferredTotal);
+
+                    /*
+                     * If it's the new rejoin code, the rejoin coordinator
+                     * handles this.
+                     */
+                    if (!liveRejoin) {
+                        VoltDB.instance().onExecutionSiteRejoinCompletion(bytesTransferredTotal);
+                    }
+                }
+
+                /*
+                 * New rejoin is site independent, so don't have to look at the
+                 * remaining count
+                 */
+                if (liveRejoin) {
+                    // Notify the rejoin coordinator that this site has finished
+                    if (m_rejoinCoordinatorHSId != -1) {
+                        RejoinMessage msg =
+                                new RejoinMessage(getSiteId(), RejoinMessage.Type.REPLAY_FINISHED);
+                        m_mailbox.send(m_rejoinCoordinatorHSId, msg);
+                    }
+                    m_rejoinCoordinatorHSId = -1;
                 }
             } else {
-                m_recoveryLog.info("Source recovery complete for site " + m_siteId +
-                        " partition " + m_context.siteTracker.getPartitionForSite(m_siteId) +
+                m_rejoinLog.info("Source recovery complete for site " + m_siteId +
+                        " partition " + m_tracker.getPartitionForSite(m_siteId) +
                         " after " + ((now - m_recoveryStartTime) / 1000) + " seconds " +
                         " with " + megabytes + " megabytes transferred " +
                         " at a rate of " + megabytesPerSecond + " megabytes/sec");
@@ -565,7 +649,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         // do other periodic work
         m_snapshotter.doSnapshotWork(ee, false);
-        m_watchdog.pet();
 
         /*
          * grab the table statistics from ee and put it into the statistics
@@ -644,37 +727,57 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * SystemProcedures are "friends" with ExecutionSites and granted
      * access to internal state via m_systemProcedureContext.
      */
-    public interface SystemProcedureExecutionContext {
-        public Database getDatabase();
-        public Cluster getCluster();
-        public Site getSite();
-        public ExecutionEngine getExecutionEngine();
-        public long getLastCommittedTxnId();
-        public long getCurrentTxnId();
-        public long getNextUndo();
-        public ExecutionSite getExecutionSite();
-        public HashMap<String, ProcedureRunner> getProcedures();
-    }
-
     protected class SystemProcedureContext implements SystemProcedureExecutionContext {
         @Override
-        public Database getDatabase()                         { return m_context.database; }
+        public Database getDatabase()                           { return m_context.database; }
         @Override
-        public Cluster getCluster()                           { return m_context.cluster; }
+        public Cluster getCluster()                             { return m_context.cluster; }
         @Override
-        public Site getSite()                                 { return getCatalogSite(); }
+        public long getLastCommittedTxnId()                     { return lastCommittedTxnId; }
         @Override
-        public ExecutionEngine getExecutionEngine()           { return ee; }
+        public long getCurrentTxnId()                           { return m_currentTransactionState.txnId; }
         @Override
-        public long getLastCommittedTxnId()                   { return lastCommittedTxnId; }
+        public long getNextUndo()                               { return getNextUndoToken(); }
         @Override
-        public long getCurrentTxnId()                         { return m_currentTransactionState.txnId; }
+        public HashMap<String, ProcedureRunner> getProcedures() { return m_loadedProcedures.procs; }
         @Override
-        public long getNextUndo()                             { return getNextUndoToken(); }
+        public long getSiteId()                                 { return m_siteId; }
         @Override
-        public ExecutionSite getExecutionSite()               { return ExecutionSite.this; }
+        public boolean isLowestSiteId()                         { return m_siteId == m_tracker.getLowestSiteForHost(getHostId()); }
         @Override
-        public HashMap<String, ProcedureRunner> getProcedures() { return procs; }
+        public int getHostId()                                  { return SiteTracker.getHostForSite(m_siteId); }
+        @Override
+        public int getPartitionId()                             { return m_tracker.getPartitionForSite(m_siteId); }
+        @Override
+        public long getCatalogCRC()                             { return m_context.getCatalogCRC(); }
+        @Override
+        public int getCatalogVersion()                          { return m_context.catalogVersion; }
+        @Override
+        public SiteTracker getSiteTracker()                     { return m_tracker; }
+        @Override
+        public SiteTracker getSiteTrackerForSnapshot()          { return m_tracker; }
+        @Override
+        public int getNumberOfPartitions()                      { return m_tracker.m_numberOfPartitions; }
+        @Override
+        public SiteProcedureConnection getSiteProcedureConnection()
+        {
+            return ExecutionSite.this;
+        }
+        @Override
+        public SiteSnapshotConnection getSiteSnapshotConnection()
+        {
+            return ExecutionSite.this;
+        }
+        @Override
+        public void updateBackendLogLevels()
+        {
+            ExecutionSite.this.updateBackendLogLevels();
+        }
+        @Override
+        public boolean updateCatalog(String diffCmds, CatalogContext context, CatalogSpecificPlanner csp)
+        {
+            return ExecutionSite.this.updateCatalog(diffCmds, context, csp);
+        }
     }
 
     SystemProcedureContext m_systemProcedureContext;
@@ -683,69 +786,67 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Dummy ExecutionSite useful to some tests that require Mock/Do-Nothing sites.
      * @param siteId
      */
-    ExecutionSite(int siteId) {
+    ExecutionSite(long siteId) {
         m_siteId = siteId;
         m_systemProcedureContext = new SystemProcedureContext();
-        m_watchdog = null;
         ee = null;
         hsql = null;
+        m_loadedProcedures = new LoadedProcedureSet(this, null, m_siteId, siteIndex, 2);
         m_snapshotter = null;
         m_mailbox = null;
         m_transactionQueue = null;
         m_starvationTracker = null;
         m_tableStats = null;
         m_indexStats = null;
-        m_runnerFactory = null;
 
         // initialize the DR gateway
         m_partitionDRGateway = new PartitionDRGateway();
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
-            final int siteId, String serializedCatalog,
+            String serializedCatalog,
             RestrictedPriorityQueue transactionQueue,
             boolean recovering,
             boolean replicationActive,
-            HashSet<Integer> failedHostIds,
-            final long txnId)
+            final long txnId,
+            int configuredNumberOfPartitions,
+            CatalogSpecificPlanner csp) throws Exception
     {
-        this(voltdb, mailbox, siteId, serializedCatalog, transactionQueue,
+        this(voltdb, mailbox, serializedCatalog, transactionQueue,
              new ProcedureRunnerFactory(), recovering, replicationActive,
-             failedHostIds, txnId);
+             txnId, configuredNumberOfPartitions, csp);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
-                  final int siteId, String serializedCatalog,
+                  String serializedCatalog,
                   RestrictedPriorityQueue transactionQueue,
                   ProcedureRunnerFactory runnerFactory,
                   boolean recovering,
                   boolean replicationActive,
-                  HashSet<Integer> failedHostIds,
-                  final long txnId)
+                  final long txnId,
+                  int configuredNumberOfPartitions,
+                  CatalogSpecificPlanner csp) throws Exception
     {
+        m_siteId = mailbox.getHSId();
         hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_Initializing.name(),
-                new Object[] { String.valueOf(siteId) }, null);
+                new Object[] { String.valueOf(m_siteId) }, null);
 
-        m_siteId = siteId;
+        m_context = voltdb.getCatalogContext();
+        m_tracker = VoltDB.instance().getSiteTracker();
+        final int partitionId = m_tracker.getPartitionForSite(m_siteId);
         String txnlog_name = ExecutionSite.class.getName() + "." + m_siteId;
         m_txnlog = new VoltLogger(txnlog_name);
-        m_runnerFactory = runnerFactory;
-        m_recovering = recovering;
-        m_context = voltdb.getCatalogContext();
+        m_rejoining = recovering;
         //lastCommittedTxnId = txnId;
-        for (Integer failedHostId : failedHostIds) {
-            m_knownFailedSites.addAll(m_context.siteTracker.getAllSitesForHost(failedHostId));
-        }
-        m_handledFailedSites.addAll(m_knownFailedSites);
 
         VoltDB.instance().getFaultDistributor().
-        registerFaultHandler(NodeFailureFault.NODE_FAILURE_EXECUTION_SITE,
+        registerFaultHandler(SiteFailureFault.SITE_FAILURE_EXECUTION_SITE,
                              m_faultHandler,
-                             FaultType.NODE_FAILURE);
+                             FaultType.SITE_FAILURE);
 
         // initialize the DR gateway
-        int partitionId = m_context.siteTracker.getPartitionForSite(m_siteId);
         File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "dr_overflow");
+
         m_partitionDRGateway =
             PartitionDRGateway.getInstance(partitionId, replicationActive, overflowDir);
 
@@ -754,7 +855,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             hsql = null;
         }
         else if (voltdb.getBackendTargetType() == BackendTarget.HSQLDB_BACKEND) {
-            hsql = initializeHSQLBackend();
+            hsql = HsqlBackend.initializeHSQLBackend(m_siteId, m_context);
             ee = new MockExecutionEngine();
         }
         else {
@@ -762,20 +863,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 serializedCatalog = voltdb.getCatalogContext().catalog.serialize();
             }
             hsql = null;
-            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog, txnId);
+            ee = initializeEE(voltdb.getBackendTargetType(), serializedCatalog, txnId, configuredNumberOfPartitions);
         }
-
-        // Should pass in the watchdog class to allow sleepy dogs..
-        m_watchdog = new Watchdog(siteId, siteIndex);
 
         m_systemProcedureContext = new SystemProcedureContext();
         m_mailbox = mailbox;
 
         // allow dependency injection of the transaction queue implementation
         m_transactionQueue =
-            (transactionQueue != null) ? transactionQueue : initializeTransactionQueue(siteId);
+            (transactionQueue != null) ? transactionQueue : initializeTransactionQueue(m_siteId);
 
-        loadProcedures(voltdb.getBackendTargetType());
+        // setup the procedure runner wrappers.
+        if (runnerFactory != null) {
+            runnerFactory.configure(this, m_systemProcedureContext);
+        }
+        m_loadedProcedures = new LoadedProcedureSet(this, runnerFactory, getSiteId(), siteIndex, m_tracker.m_numberOfPartitions);
+        m_loadedProcedures.loadProcedures(m_context, voltdb.getBackendTargetType(), csp);
 
         int snapshotPriority = 6;
         if (m_context.cluster.getDeployment().get("deployment") != null) {
@@ -791,110 +894,79 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
          snapshotPriority);
 
         final StatsAgent statsAgent = VoltDB.instance().getStatsAgent();
-        m_starvationTracker = new StarvationTracker( getCorrespondingSiteId());
+        m_starvationTracker = new StarvationTracker(getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.STARVATION,
-                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       m_siteId,
                                        m_starvationTracker);
         m_tableStats = new TableStats( getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.TABLE,
-                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       m_siteId,
                                        m_tableStats);
         m_indexStats = new IndexStats(getCorrespondingSiteId());
         statsAgent.registerStatsSource(SysProcSelector.INDEX,
-                                       Integer.parseInt(getCorrespondingCatalogSite().getTypeName()),
+                                       m_siteId,
                                        m_indexStats);
 
     }
 
-    private RestrictedPriorityQueue initializeTransactionQueue(final int siteId)
+    private RestrictedPriorityQueue initializeTransactionQueue(final long siteId)
     {
         // build an array of all the initiators
-        int initiatorCount = 0;
-        for (final Site s : m_context.siteTracker.getUpSites())
-            if (s.getIsexec() == false)
-                initiatorCount++;
-        final int[] initiatorIds = new int[initiatorCount];
+        Set<Long> allInitiators = m_tracker.getAllInitiators();
+        int initiatorCount = allInitiators.size();
+        final long[] initiatorIds = new long[initiatorCount];
         int index = 0;
-        for (final Site s : m_context.siteTracker.getUpSites())
-            if (s.getIsexec() == false)
-                initiatorIds[index++] = Integer.parseInt(s.getTypeName());
+        for (long s : allInitiators)
+            initiatorIds[index++] = s;
 
         // turn off the safety dance for single-node voltdb
-        boolean useSafetyDance = m_context.numberOfNodes > 1;
+        boolean useSafetyDance = m_tracker.getAllHosts().size() > 1;
 
         assert(m_mailbox != null);
         RestrictedPriorityQueue retval = new RestrictedPriorityQueue(
                 initiatorIds,
                 siteId,
                 m_mailbox,
-                VoltDB.DTXN_MAILBOX_ID,
                 useSafetyDance);
         return retval;
     }
 
-    private HsqlBackend initializeHSQLBackend()
-    {
-        HsqlBackend hsqlTemp = null;
-        try {
-            hsqlTemp = new HsqlBackend(getSiteId());
-            final String hexDDL = m_context.database.getSchema();
-            final String ddl = Encoder.hexDecodeToString(hexDDL);
-            final String[] commands = ddl.split("\n");
-            for (String command : commands) {
-                String decoded_cmd = Encoder.hexDecodeToString(command);
-                decoded_cmd = decoded_cmd.trim();
-                if (decoded_cmd.length() == 0) {
-                    continue;
-                }
-                hsqlTemp.runDDL(decoded_cmd);
-            }
-        }
-        catch (final Exception ex) {
-            hostLog.l7dlog( Level.FATAL, LogKeys.host_ExecutionSite_FailedConstruction.name(),
-                            new Object[] { getSiteId(), siteIndex }, ex);
-            VoltDB.crashLocalVoltDB(ex.getMessage(), true, ex);
-        }
-        return hsqlTemp;
-    }
-
     private ExecutionEngine
-    initializeEE(BackendTarget target, String serializedCatalog, final long txnId)
+    initializeEE(BackendTarget target, String serializedCatalog, final long txnId, int configuredNumberOfPartitions)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
 
         ExecutionEngine eeTemp = null;
         try {
             if (target == BackendTarget.NATIVE_EE_JNI) {
-                Site site = getCatalogSite();
                 eeTemp =
                     new ExecutionEngineJNI(
-                        this,
                         m_context.cluster.getRelativeIndex(),
                         getSiteId(),
-                        Integer.valueOf(site.getPartition().getTypeName()),
-                        Integer.valueOf(site.getHost().getTypeName()),
+                        m_tracker.getPartitionForSite(getSiteId()),
+                        SiteTracker.getHostForSite(getSiteId()),
                         hostname,
                         m_context.cluster.getDeployment().get("deployment").
-                        getSystemsettings().get("systemsettings").getMaxtemptablesize());
+                        getSystemsettings().get("systemsettings").getMaxtemptablesize(),
+                        configuredNumberOfPartitions);
                 eeTemp.loadCatalog( txnId, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, txnId);
             }
             else {
                 // set up the EE over IPC
-                Site site = getCatalogSite();
                 eeTemp =
                     new ExecutionEngineIPC(
-                            this,
                             m_context.cluster.getRelativeIndex(),
                             getSiteId(),
-                            Integer.valueOf(site.getPartition().getTypeName()),
-                            Integer.valueOf(site.getHost().getTypeName()),
+                            m_tracker.getPartitionForSite(getSiteId()),
+                            SiteTracker.getHostForSite(getSiteId()),
                             hostname,
                             m_context.cluster.getDeployment().get("deployment").
                             getSystemsettings().get("systemsettings").getMaxtemptablesize(),
                             target,
-                            VoltDB.instance().getConfig().m_ipcPorts.remove(0));
+                            VoltDB.instance().getConfig().m_ipcPorts.remove(0),
+                            m_tracker.m_numberOfPartitions);
                 eeTemp.loadCatalog( 0, serializedCatalog);
                 lastTickTime = EstTime.currentTimeMillis();
                 eeTemp.tick( lastTickTime, 0);
@@ -909,27 +981,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         return eeTemp;
     }
 
-    public boolean updateClusterState(String catalogDiffCommands) {
-        m_context = VoltDB.instance().getCatalogContext();
-        m_knownFailedSites.removeAll(m_context.siteTracker.getAllLiveSites());
-        m_handledFailedSites.removeAll(m_context.siteTracker.getAllLiveSites());
-
-        // make sure the restricted priority queue knows about all of the up initiators
-        // for most catalog changes this will do nothing
-        // for rejoin, it will matter
-        int newInitiators = 0;
-        for (Site s : m_context.catalog.getClusters().get("cluster").getSites()) {
-            if (s.getIsexec() == false && s.getIsup()) {
-                newInitiators += m_transactionQueue.ensureInitiatorIsKnown(Integer.parseInt(s.getTypeName()));
-            }
-        }
-
+    public boolean updateClusterState() {
         return true;
     }
 
-    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context) {
+    public boolean updateCatalog(String catalogDiffCommands, CatalogContext context, CatalogSpecificPlanner csp) {
         m_context = context;
-        loadProcedures(VoltDB.getEEBackendType());
+        m_loadedProcedures.loadProcedures(m_context, VoltDB.getEEBackendType(), csp);
 
         //Necessary to quiesce before updating the catalog
         //so export data for the old generation is pushed to Java.
@@ -939,114 +997,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         return true;
     }
 
-    void loadProcedures(BackendTarget backendTarget) {
-        procs.clear();
-        m_registeredSysProcPlanFragments.clear();
-        loadProceduresFromCatalog(backendTarget);
-        loadSystemProcedures(backendTarget);
-    }
-
-    private void loadProceduresFromCatalog(BackendTarget backendTarget) {
-        // load up all the stored procedures
-        final CatalogMap<Procedure> catalogProcedures = m_context.database.getProcedures();
-        for (final Procedure proc : catalogProcedures) {
-
-            // Sysprocs used to be in the catalog. Now they aren't. Ignore
-            // sysprocs found in old catalog versions. (PRO-365)
-            if (proc.getTypeName().startsWith("@")) {
-                continue;
-            }
-
-            ProcedureRunner runner = null;
-            VoltProcedure procedure = null;
-            if (proc.getHasjava()) {
-                final String className = proc.getClassname();
-                Class<?> procClass = null;
-                try {
-                    procClass = m_context.classForProcedure(className);
-                }
-                catch (final ClassNotFoundException e) {
-                    if (className.startsWith("org.voltdb.")) {
-                        VoltDB.crashLocalVoltDB("VoltDB does not support procedures with package names " +
-                                                        "that are prefixed with \"org.voltdb\". Please use a different " +
-                                                        "package name and retry.", false, null);
-                    }
-                    else {
-                        VoltDB.crashLocalVoltDB("VoltDB was unable to load a procedure it expected to be in the " +
-                                                "catalog jarfile and will now exit.", false, null);
-                    }
-                }
-                try {
-                    procedure = (VoltProcedure) procClass.newInstance();
-                }
-                catch (final InstantiationException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { getSiteId(), siteIndex }, e);
-                }
-                catch (final IllegalAccessException e) {
-                    hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                                    new Object[] { getSiteId(), siteIndex }, e);
-                }
-            }
-            else {
-                procedure = new ProcedureRunner.StmtProcedure();
-            }
-
-            assert(procedure != null);
-            runner = m_runnerFactory.create(procedure,
-                         m_context.cluster.getPartitions().size(),
-                         this, proc, hsql);
-            procs.put(proc.getTypeName(), runner);
-        }
-    }
-
-    private void loadSystemProcedures(BackendTarget backendTarget) {
-        Set<Entry<String,Config>> entrySet = SystemProcedureCatalog.listing.entrySet();
-        for (Entry<String, Config> entry : entrySet) {
-            Config sysProc = entry.getValue();
-            Procedure proc = sysProc.asCatalogProcedure();
-
-            VoltSystemProcedure procedure = null;
-            ProcedureRunner runner = null;
-
-            final String className = sysProc.getClassname();
-            Class<?> procClass = null;
-            try {
-                procClass = m_context.classForProcedure(className);
-            }
-            catch (final ClassNotFoundException e) {
-                // TODO: check community/pro condition here.
-                if (sysProc.commercial) {
-                    continue;
-                }
-                hostLog.l7dlog(
-                        Level.WARN,
-                        LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { getSiteId(), siteIndex },
-                        e);
-                VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-            }
-
-            try {
-                procedure = (VoltSystemProcedure) procClass.newInstance();
-            }
-            catch (final InstantiationException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { getSiteId(), siteIndex }, e);
-            }
-            catch (final IllegalAccessException e) {
-                hostLog.l7dlog( Level.WARN, LogKeys.host_ExecutionSite_GenericException.name(),
-                        new Object[] { getSiteId(), siteIndex }, e);
-            }
-
-            runner = m_runnerFactory.create(procedure, m_context.cluster.getPartitions().size(),
-                         this, proc, hsql);
-            procedure.initSysProc(m_context.cluster.getPartitions().size(), this, proc, m_context.cluster);
-            procs.put(entry.getKey(), runner);
-        }
-    }
-
-
     /**
      * Primary run method that is invoked a single time when the thread is started.
      * Has the opportunity to do startup config.
@@ -1054,18 +1004,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     @Override
     public void run() {
         // enumerate site id (pad to 4 digits for sort)
-        String name = "ExecutionSite:";
-        if (getSiteId() < 10) name += "0";
-        if (getSiteId() < 100) name += "0";
-        if (getSiteId() < 1000) name += "0";
-        name += String.valueOf(getSiteId());
+        String name = "ExecutionSite: ";
+        name += CoreUtils.hsIdToString(getSiteId());
         Thread.currentThread().setName(name);
-
-        // Commenting this out when making logging more abstrace (is that ok?)
-        //NDC.push("ExecutionSite - " + getSiteId() + " index " + siteIndex);
-        if (VoltDB.getUseWatchdogs()) {
-            m_watchdog.start(Thread.currentThread());
-        }
 
         try {
             // Only poll messaging layer if necessary. Allow the poll
@@ -1076,20 +1017,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                  * readiness. If it is time, create a recovery processor and send
                  * the initiate message.
                  */
-                if (m_recovering && !m_haveRecoveryPermit) {
+                if (m_rejoining && !m_haveRecoveryPermit &&
+                    VoltDB.instance().getConfig().m_startAction == START_ACTION.REJOIN) {
                     Long safeTxnId = m_transactionQueue.safeToRecover();
                     if (safeTxnId != null && m_recoveryPermit.tryAcquire()) {
                         m_haveRecoveryPermit = true;
                         m_recoveryStartTime = System.currentTimeMillis();
+
                         m_recoveryProcessor =
-                            RecoverySiteProcessorDestination.createProcessor(
-                                    m_context.database,
-                                    m_context.siteTracker,
-                                    ee,
-                                    m_mailbox,
-                                    m_siteId,
-                                    m_onRecoveryCompletion,
-                                    m_recoveryMessageHandler);
+                                RecoverySiteProcessorDestination.createProcessor(
+                                        m_context.database,
+                                        m_tracker,
+                                        ee,
+                                        m_mailbox,
+                                        m_siteId,
+                                        m_onRejoinCompletion,
+                                        m_recoveryMessageHandler);
                     }
                 }
 
@@ -1102,11 +1045,22 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     VoltMessage message = m_mailbox.recv();
                     if (message == null) {
                         //Will return null if there is no work, safe to block on the mailbox if there is no work
-                        Object hadWork =
-                            m_snapshotter.doSnapshotWork(
+                        boolean hadWork =
+                            (m_snapshotter.doSnapshotWork(
                                     ee,
-                                    EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
-                        if ( hadWork != null) {
+                                    EstTime.currentTimeMillis() - lastCommittedTxnTime > 5) != null);
+
+                        /*
+                         * Do rejoin work here before it blocks on the mailbox
+                         * so that it can rejoin quickly without interrupting
+                         * load too much.
+                         *
+                         * Rejoin and snapshot should never happen at the same
+                         * time on a rejoining node, so it's fine to assign the
+                         * value to hadWork here.
+                         */
+                        hadWork = doRejoinWork();
+                        if (hadWork) {
                             continue;
                         } else {
                             m_starvationTracker.beginStarvation();
@@ -1122,6 +1076,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     } else {
                         //idle, do snapshot work
                         m_snapshotter.doSnapshotWork(ee, EstTime.currentTimeMillis() - lastCommittedTxnTime > 5);
+                        // do some rejoin work
+                        doRejoinWork();
                     }
                 }
                 if (currentTxnState != null) {
@@ -1153,6 +1109,323 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             throw e;
         }
         shutdown();
+    }
+
+    /**
+     * Do rejoin work, including streaming snapshot blocks and replaying logged
+     * transactions.
+     *
+     * @return true if there was real work done.
+     */
+    private boolean doRejoinWork() {
+        boolean doneWork = false;
+
+        /*
+         * Wait until we know the txnId of the rejoin snapshot, then start
+         * restoring the snapshot blocks. When the snapshot transfer is over,
+         * the snapshot processor will be set to null. If the task log is not
+         * null, replay any transactions logged.
+         */
+        if (m_rejoinSnapshotProcessor != null && m_rejoinSnapshotTxnId != -1) {
+            doneWork = restoreSnapshotForRejoin();
+        } else if (m_rejoinSnapshotProcessor == null && m_rejoinTaskLog != null) {
+            /*
+             * snapshot streaming is done, try to replay a batch of transactions
+             * to speed up the rejoin process. it should be really fast.
+             */
+            for (int i = 0; i < 1000; i++) {
+                doneWork = replayTransactionForRejoin();
+                if (!doneWork) {
+                    // no more work to do for now
+                    break;
+                }
+            }
+
+            checkTaskExecutionProgress();
+        }
+
+        return doneWork;
+    }
+
+    /**
+     * Check if the site is executing tasks faster than they come in. If the
+     * site cannot keep up in a certain period of time, break rejoin.
+     */
+    private void checkTaskExecutionProgress() {
+        final long remainingTasks = m_loggedTaskCount - m_executedTaskCount;
+        final long currTime = System.currentTimeMillis();
+        if (m_lastTimeMadeProgress == 0 || remainingTasks < m_remainingTasks) {
+            m_lastTimeMadeProgress = currTime;
+        }
+        m_remainingTasks = remainingTasks;
+
+        if (currTime > (m_lastTimeMadeProgress + MAX_BEHIND_DURATION)) {
+            int duration = (int) (currTime - m_lastTimeMadeProgress) / 1000;
+            m_rejoinLog.debug("Current remaining task is " + m_remainingTasks +
+                                " snapshot finished " + m_rejoinSnapshotFinished);
+            VoltDB.crashLocalVoltDB("Site " + CoreUtils.hsIdToString(getSiteId()) +
+                                    " has not made any progress in " + duration +
+                                    " seconds, please reduce workload and " +
+                                    "try live rejoin again, or use " +
+                                    "blocking rejoin",
+                                    false, null);
+        }
+    }
+
+    /**
+     * Restore snapshot blocks streamed from other site if there are any.
+     *
+     * @return true if there was real work done.
+     */
+    private boolean restoreSnapshotForRejoin() {
+        boolean doneWork = false;
+        Pair<Integer, ByteBuffer> rejoinWork = m_rejoinSnapshotProcessor.poll();
+        if (rejoinWork != null) {
+            int tableId = rejoinWork.getFirst();
+            ByteBuffer buffer = rejoinWork.getSecond();
+            VoltTable table =
+                    PrivateVoltTableFactory.createVoltTableFromBuffer(buffer.duplicate(),
+                                                                      true);
+            //m_recoveryLog.info("table " + tableId + ": " + table.toString());
+            loadTable(m_rejoinSnapshotTxnId, tableId, table);
+            doneWork = true;
+        } else if (m_rejoinSnapshotProcessor.isEOF()) {
+            m_rejoinLog.debug("Rejoin snapshot transfer is finished");
+            m_rejoinSnapshotProcessor.close();
+            m_rejoinSnapshotBytes = m_rejoinSnapshotProcessor.bytesTransferred();
+            m_rejoinSnapshotProcessor = null;
+            m_taskExeStartTime = System.currentTimeMillis();
+            /*
+             * Don't notify the rejoin coordinator yet. The stream snapshot may
+             * have not finished on all nodes, let the snapshot completion
+             * monitor tell the rejoin coordinator.
+             */
+        }
+
+        return doneWork;
+    }
+
+    /**
+     * Replays transactions logged for rejoin since the stream snapshot was
+     * initiated.
+     *
+     * @return true if actual work was done, false otherwise
+     */
+    private boolean replayTransactionForRejoin() {
+        boolean doneWork = false;
+        if (m_rejoinTaskLog == null) {
+            return doneWork;
+        }
+
+        // get the next task to replay
+        TransactionState ts = null;
+        try {
+            TransactionInfoBaseMessage msg = m_rejoinTaskLog.getNextMessage();
+            if (msg != null) {
+                ts = new ReplayedTxnState(this, msg);
+            }
+        } catch (IOException e) {
+            m_rejoinLog.error("Failed to replay logged transactions: " +
+                    e.getMessage());
+        }
+
+        if (ts != null) {
+            // Run the transaction, but don't send response
+            recursableRun(ts);
+            doneWork = true;
+            m_rejoinLog.trace("Replayed " + ts.getNotice().getTxnId());
+            m_executedTaskCount++;
+        } else {
+            boolean rejoinCompleted = false;
+            try {
+                if (m_rejoinTaskLog.isEmpty() && m_rejoinSnapshotFinished) {
+                    rejoinCompleted = true;
+                }
+            } catch (IOException e) {
+                m_rejoinLog.error("Failed to determine if the task log is empty: " +
+                        e.getMessage());
+            }
+
+            if (rejoinCompleted) {
+                try {
+                    m_rejoinTaskLog.close();
+                } catch (IOException e) {
+                    m_rejoinLog.error("Failed to close the task log:" +
+                            e.getMessage());
+                }
+                m_onRejoinCompletion.run();
+            }
+        }
+
+        return doneWork;
+    }
+
+    /**
+     * Construct a stream snapshot receiver and initiate rejoin snapshot.
+     */
+    private void initiateRejoin(long rejoinCoordinatorHSId) {
+        m_rejoinCoordinatorHSId = rejoinCoordinatorHSId;
+
+        // Set rejoin permit
+        m_haveRecoveryPermit = true;
+        m_recoveryStartTime = System.currentTimeMillis();
+
+        // Construct a snapshot stream receiver
+        m_rejoinSnapshotProcessor = new StreamSnapshotSink(getSiteId());
+
+        Pair<List<byte[]>, Integer> endPoints = m_rejoinSnapshotProcessor.initialize();
+        List<byte[]> addresses = endPoints.getFirst();
+        int port = endPoints.getSecond();
+
+        // Construct task log and start logging task messages
+        int partition = getCorrespondingPartitionId();
+        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(),
+                                    "rejoin_overflow");
+        Class<?> taskLogKlass =
+                MiscUtils.loadProClass("org.voltdb.rejoin.TaskLogImpl",
+                                       "Rejoin", false);
+        Constructor<?> taskLogConstructor;
+        try {
+            taskLogConstructor = taskLogKlass.getConstructor(int.class, File.class);
+            m_rejoinTaskLog = (TaskLog) taskLogConstructor.newInstance(partition, overflowDir);
+        } catch (InvocationTargetException e) {
+            VoltDB.crashLocalVoltDB("Unable to construct rejoin task log",
+                                    true, e.getCause());
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Unable to construct rejoin task log",
+                                    true, e);
+        }
+
+        m_rejoinLog.info("Initiating rejoin for site " +
+                CoreUtils.hsIdToString(getSiteId()));
+        initiateRejoinSnapshot(addresses, port);
+    }
+
+    /**
+     * Try to request a stream snapshot.
+     *
+     * @param addresses The addresses other replica can connect to.
+     * @param port The port number other replica can connect to.
+     */
+    private RejoinMessage initiateRejoinSnapshot(List<byte[]> addresses, int port) {
+        // Pick a replica of the same partition to send us data
+        int partition = getCorrespondingPartitionId();
+        long sourceSite = 0;
+        List<Long> sourceSites = new ArrayList<Long>(m_tracker.getSitesForPartition(partition));
+        // Order the sites by host ID so that we won't get one that's still rejoining
+        TreeMap<Integer, Long> orderedSourceSites = new TreeMap<Integer, Long>();
+        for (long HSId : sourceSites) {
+            orderedSourceSites.put(CoreUtils.getHostIdFromHSId(HSId), HSId);
+        }
+        orderedSourceSites.remove(CoreUtils.getHostIdFromHSId(getSiteId()));
+        if (!orderedSourceSites.isEmpty()) {
+            sourceSite = orderedSourceSites.pollFirstEntry().getValue();
+        } else {
+            VoltDB.crashLocalVoltDB("No source for partition " + partition,
+                                    false, null);
+        }
+
+        // Initiate a snapshot with stream snapshot target
+        String data = null;
+        try {
+            JSONStringer jsStringer = new JSONStringer();
+            jsStringer.object();
+            jsStringer.key("addresses").array();
+            for (byte[] addr : addresses) {
+                InetAddress inetAddress = InetAddress.getByAddress(addr);
+                jsStringer.value(inetAddress.getHostAddress());
+            }
+            jsStringer.endArray();
+            jsStringer.key("port").value(port);
+            // make this snapshot only contain data from this site
+            m_rejoinLog.info("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
+                               " is " + CoreUtils.hsIdToString(sourceSite));
+            jsStringer.key("target_hsid").value(sourceSite);
+            jsStringer.endObject();
+            data = jsStringer.toString();
+        } catch (Exception e) {
+            VoltDB.crashLocalVoltDB("Failed to serialize to JSON", true, e);
+        }
+
+        /*
+         * The handler will be called when a snapshot request response comes
+         * back. It could potentially take a long time to successfully queue the
+         * snapshot request, or it may fail.
+         */
+        SnapshotResponseHandler handler = new SnapshotResponseHandler() {
+            @Override
+            public void handleResponse(ClientResponse resp) {
+                if (resp == null) {
+                    VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot",
+                                            false, null);
+                } else if (resp.getStatus() != ClientResponseImpl.SUCCESS) {
+                    VoltDB.crashLocalVoltDB("Failed to initiate rejoin snapshot: " +
+                            resp.getStatusString(), false, null);
+                }
+
+                VoltTable[] results = resp.getResults();
+                if (SnapshotUtil.didSnapshotRequestSucceed(results)) {
+                    if (SnapshotUtil.isSnapshotQueued(results)) {
+                        m_rejoinLog.debug("Rejoin snapshot queued, waiting...");
+                        return;
+                    }
+
+                    long txnId = -1;
+                    String appStatus = resp.getAppStatusString();
+                    if (appStatus == null) {
+                        VoltDB.crashLocalVoltDB("Rejoin snapshot request failed: " +
+                                resp.getStatusString(), false, null);
+                    }
+
+                    try {
+                        JSONObject jsObj = new JSONObject(appStatus);
+                        txnId = jsObj.getLong("txnId");
+                    } catch (JSONException e) {
+                        VoltDB.crashLocalVoltDB("Failed to get the rejoin snapshot txnId",
+                                                true, e);
+                        return;
+                    }
+
+                    m_rejoinLog.debug("Received rejoin snapshot txnId " + txnId);
+
+                    // Send a message to self to avoid synchronization
+                    RejoinMessage msg = new RejoinMessage(txnId);
+                    m_mailbox.send(getSiteId(), msg);
+                } else {
+                    VoltDB.crashLocalVoltDB("Snapshot request for rejoin failed",
+                                            false, null);
+                }
+            }
+        };
+
+        String nonce = "Rejoin_" + getSiteId() + "_" + System.currentTimeMillis();
+        SnapshotUtil.requestSnapshot(0l, "", nonce, false,
+                                     SnapshotFormat.STREAM, data, handler, true);
+
+        return null;
+    }
+
+    /**
+     * Handle rejoin message for live rejoin, not blocking rejoin
+     * @param rm
+     */
+    private void handleRejoinMessage(RejoinMessage rm) {
+        Type type = rm.getType();
+        if (type == RejoinMessage.Type.INITIATION) {
+            // rejoin coordinator says go ahead
+            initiateRejoin(rm.m_sourceHSId);
+        } else if (type == RejoinMessage.Type.REQUEST_RESPONSE) {
+            m_rejoinSnapshotTxnId = rm.getSnapshotTxnId();
+            if (m_rejoinTaskLog != null) {
+                m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
+            }
+            m_rejoinSnapshotProcessor.startCountDown();
+            VoltDB.instance().getSnapshotCompletionMonitor()
+                  .addInterest(m_snapshotCompletionHandler);
+        } else {
+            VoltDB.crashLocalVoltDB("Unknown rejoin message type " + type,
+                                    false, null);
+        }
     }
 
     /**
@@ -1192,7 +1465,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             assert(latestUndoToken >= txnState.getBeginUndoToken());
 
             if (txnState.getBeginUndoToken() == kInvalidUndoToken) {
-                if (m_recovering == false) {
+                if (m_rejoining == false) {
                     throw new AssertionError("Non-recovering write txn has invalid undo state.");
                 }
             }
@@ -1209,9 +1482,51 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
              */
             StoredProcedureInvocation invocation = txnState.getInvocation();
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
-            if ((invocation != null) && (m_recovering == false) && (ts > m_startupTime)) {
+            if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
                     m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+                }
+            }
+
+            /*
+             * log task message for rejoin if it's not a replayed transaction.
+             * Replayed transactions do not send responses.
+             */
+            if ((txnState.getRejoinState() == RejoinState.REJOINING) &&
+                m_rejoinTaskLog != null && !txnState.needsRollback()) {
+                try {
+                    TransactionInfoBaseMessage base = txnState.getTransactionInfoBaseMessageForRejoinLog();
+                    if (base != null) {
+                        // this is for multi-partition only
+                        // sysproc frags should be exempt
+                        if (base instanceof FragmentTaskLogMessage) {
+                            FragmentTaskLogMessage ftlm = (FragmentTaskLogMessage) base;
+                            if (ftlm.getFragmentTasks().size() > 0) {
+                                m_rejoinTaskLog.logTask(ftlm);
+                                m_loggedTaskCount++;
+                            }
+                        }
+                        // this is for single-partition only
+                        else if (base instanceof InitiateTaskMessage) {
+                            InitiateTaskMessage itm = (InitiateTaskMessage) base;
+                            // TODO: this is a pretty horrible hack
+                            if ((itm.getStoredProcedureName().startsWith("@") == false) ||
+                                (itm.getStoredProcedureName().startsWith("@AdHoc") == true)) {
+                                m_rejoinTaskLog.logTask(itm);
+                                m_loggedTaskCount++;
+                            }
+                        }
+                        // the base message should hit one of the ifs above
+                        else {
+                            hostLog.error("Logged a notice of type: " + base.getClass().getCanonicalName() + "for replay.");
+                            assert(false);
+                        }
+                    }
+                    else {
+                        //hostLog.info("not logging transaction that didn't write");
+                    }
+                } catch (IOException e) {
+                    VoltDB.crashLocalVoltDB("Failed to log task message", false, e);
                 }
             }
 
@@ -1237,7 +1552,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     }
 
     private void handleMailboxMessage(VoltMessage message) {
-        if (m_recovering == true && m_recoveryProcessor == null && m_currentTransactionState != null) {
+        if (m_rejoining == true && m_recoveryProcessor == null && m_currentTransactionState != null) {
             m_recoveryMessageHandler.handleMessage(message, m_currentTransactionState.txnId);
         } else {
             handleMailboxMessageNonRecursable(message);
@@ -1246,6 +1561,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     private void handleMailboxMessageNonRecursable(VoltMessage message)
     {
+        /*
+         * Don't listen to messages from unknown sources. The expectation is that they are from beyond
+         * the grave
+         */
+        if (!m_tracker.m_allSitesImmutable.contains(message.m_sourceHSId)) {
+            hostLog.warn("Dropping message " + message + " because it is from a unknown site id " +
+                    CoreUtils.hsIdToString(message.m_sourceHSId));
+            return;
+        }
         if (message instanceof TransactionInfoBaseMessage) {
             TransactionInfoBaseMessage info = (TransactionInfoBaseMessage)message;
             assertTxnIdOrdering(info);
@@ -1254,24 +1578,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             if (info instanceof HeartbeatMessage) {
                 // use the heartbeat to unclog the priority queue if clogged
                 long lastSeenTxnFromInitiator = m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(
-                        info.getInitiatorSiteId(), info.getTxnId(),
+                        info.getInitiatorHSId(), info.getTxnId(),
                         true, ((HeartbeatMessage) info).getLastSafeTxnId());
 
                 // respond to the initiator with the last seen transaction
                 HeartbeatResponseMessage response = new HeartbeatResponseMessage(
                         m_siteId, lastSeenTxnFromInitiator,
                         m_transactionQueue.getQueueState() == QueueState.BLOCKED_SAFETY);
-                try {
-                    m_mailbox.send(info.getInitiatorSiteId(), VoltDB.DTXN_MAILBOX_ID, response);
-                } catch (MessagingException e) {
-                    // hope this never happens... it doesn't right?
-                    throw new RuntimeException(e);
-                }
+                m_mailbox.send(info.getInitiatorHSId(), response);
                 // we're done here (in the case of heartbeats)
                 return;
             }
             else if (info instanceof InitiateTaskMessage) {
-                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorSiteId(),
+                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorHSId(),
                                                   info.getTxnId(),
                                                   false,
                                                   ((InitiateTaskMessage) info).getLastSafeTxnId());
@@ -1280,7 +1599,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             // and don't communicate any information about safe replication, hence DUMMY_LAST_SEEN_TXN_ID
             // it can be used for global ordering since it is a valid txnid from an initiator
             else if (info instanceof MultiPartitionParticipantMessage) {
-                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorSiteId(),
+                m_transactionQueue.noteTransactionRecievedAndReturnLastSeen(info.getInitiatorHSId(),
                                                   info.getTxnId(),
                                                   false,
                                                   DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
@@ -1306,13 +1625,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     {
                         CompleteTransactionResponseMessage ctrm =
                             new CompleteTransactionResponseMessage(complete, m_siteId);
-                        try
-                        {
-                            m_mailbox.send(complete.getCoordinatorSiteId(), 0, ctrm);
-                        }
-                        catch (MessagingException e) {
-                            throw new RuntimeException(e);
-                        }
+                        m_mailbox.send(complete.getCoordinatorHSId(), ctrm);
                     }
                 }
                 return;
@@ -1329,7 +1642,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     m_transactionsById.put(ts.txnId, ts);
                 } else {
                     hostLog.info(
-                            "Dropping txn " + ts.txnId + " data from failed initiatorSiteId: " + ts.initiatorSiteId);
+                            "Dropping txn " + ts.txnId + " data from failed initiatorSiteId: " + ts.initiatorHSId);
                 }
             }
 
@@ -1340,28 +1653,47 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
             }
         } else if (message instanceof RecoveryMessage) {
-            RecoveryMessage rm = (RecoveryMessage)message;
+            final RecoveryMessage rm = (RecoveryMessage)message;
             if (rm.recoveryMessagesAvailable()) {
                 return;
             }
-            assert(!m_recovering);
-            assert(m_recoveryProcessor == null);
+            assert(!m_rejoining);
+
+            /*
+             * Recovery site processor hasn't been cleaned up from the previous
+             * rejoin. New rejoin request cannot be processed now. Telling the
+             * rejoining site to retry later.
+             */
+            if (m_recoveryProcessor != null || m_rejoinSnapshotProcessor != null) {
+                m_rejoinLog.error("ExecutionSite is not ready to handle " +
+                        "recovery request from site " +
+                        CoreUtils.hsIdToString(rm.sourceSite()));
+                RecoveryMessage recoveryResponse = new RecoveryMessage(false);
+                m_mailbox.send(rm.sourceSite(), recoveryResponse);
+                return;
+            }
+
             final long recoveringPartitionTxnId = rm.txnId();
             m_recoveryStartTime = System.currentTimeMillis();
-            m_recoveryLog.info(
-                    "Recovery initiate received at site " + m_siteId +
-                    " from site " + rm.sourceSite() + " requesting recovery start before txnid " +
+            m_rejoinLog.info(
+                    "Recovery initiate received at site " + CoreUtils.hsIdToString(m_siteId) +
+                    " from site " + CoreUtils.hsIdToString(rm.sourceSite()) + " requesting recovery start before txnid " +
                     recoveringPartitionTxnId);
+
             m_recoveryProcessor = RecoverySiteProcessorSource.createProcessor(
-                    this,
-                    rm,
-                    m_context.database,
-                    m_context.siteTracker,
-                    ee,
-                    m_mailbox,
-                    m_siteId,
-                    m_onRecoveryCompletion,
-                    m_recoveryMessageHandler);
+                        this,
+                        rm,
+                        m_context.database,
+                        m_tracker,
+                        ee,
+                        m_mailbox,
+                        m_siteId,
+                        m_onRejoinCompletion,
+                        m_recoveryMessageHandler);
+        }
+        else if (message instanceof RejoinMessage) {
+            RejoinMessage rm = (RejoinMessage) message;
+            handleRejoinMessage(rm);
         }
         else if (message instanceof FragmentResponseMessage) {
             FragmentResponseMessage response = (FragmentResponseMessage)message;
@@ -1435,10 +1767,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable startSnapshotting = saveAPI.startSnapshotting(snapshotMsg.path,
                                       nonce,
+                                      SnapshotFormat.NATIVE,
                                       (byte) 0x1,
                                       snapshotMsg.m_roadblockTransactionId,
+                                      null,
                                       m_systemProcedureContext,
-                                      ConnectionUtil.getHostnameOrAddress());
+                                      CoreUtils.getHostnameOrAddress());
             if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() == -1 &&
                 snapshotMsg.crash) {
                 String msg = "Executing local snapshot. Finished final snapshot. Shutting down. " +
@@ -1493,9 +1827,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
         if (notice instanceof InitiateTaskMessage) {
             InitiateTaskMessage task = (InitiateTaskMessage)notice;
-            assert (task.getInitiatorSiteId() != getSiteId());
+            assert (task.getInitiatorHSId() != getSiteId());
         }
     }
+
+    /*
+     * When doing fault handling, it may not finish if their
+     * are concurrent faults. New faults are added to this set.
+     */
+    private final HashSet<Long> m_pendingFailedSites = new HashSet<Long>();
 
     /**
      * Find the global multi-partition commit point and the global initiator point for the
@@ -1506,84 +1846,129 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     private void discoverGlobalFaultData(ExecutionSiteNodeFailureMessage message)
     {
         //Keep it simple and don't try to recover on the recovering node.
-        if (m_recovering) {
-            VoltDB.crashLocalVoltDB("Aborting recovery due to a remote node failure. Retry again.", false, null);
+        if (m_rejoining) {
+            VoltDB.crashLocalVoltDB("Aborting rejoin due to a remote node failure. Retry again.", false, null);
         }
-        HashSet<NodeFailureFault> failures = message.m_failedHosts;
+        SiteTracker newTracker = VoltDB.instance().getSiteTracker();
+        HashSet<SiteFailureFault> failures = message.m_failedSites;
 
         // Fix context and associated site tracker first - need
         // an accurate topology to perform discovery.
         m_context = VoltDB.instance().getCatalogContext();
 
-        HashSet<Integer> failedSiteIds = new HashSet<Integer>();
-        for (NodeFailureFault fault : failures) {
-            failedSiteIds.addAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()));
+        for (SiteFailureFault fault : failures) {
+            for (Long siteId : fault.getSiteIds()) {
+                if (!m_pendingFailedSites.add(siteId)) {
+                    VoltDB.crashLocalVoltDB("A site id shouldn't be distributed as a fault twice", true, null);
+                }
+            }
         }
-        m_knownFailedSites.addAll(failedSiteIds);
 
-        HashMap<Integer, Long> initiatorSafeInitPoint = new HashMap<Integer, Long>();
-        int expectedResponses = discoverGlobalFaultData_send();
-        Long multiPartitionCommitPoint = discoverGlobalFaultData_rcv(expectedResponses, initiatorSafeInitPoint);
+        /*
+         * Check and make sure the delta between site trackers matches the report of sites
+         * that have failed e.g. we got the right one
+         */
+        HashSet<Long> delta = new HashSet<Long>(m_tracker.m_allSitesImmutable);
+        delta.removeAll(newTracker.m_allSitesImmutable);
 
-        if (multiPartitionCommitPoint == null) {
+        /*
+         * In this case there were concurrent failures and the necessary matching site trackers
+         * are not available for this set of failures bail out and wait for the next fault report
+         * from the fault distributor that will contain a set that matches the new site tracker
+         * Should the site tracker be versioned and come with the fault set?
+         */
+//        if (!delta.equals(m_pendingFailedSites)) {
+//            System.out.println("Bailing out because delta does not = pending failed sites");
+//            return;
+//        }
+
+        HashMap<Long, Long> initiatorSafeInitPoint = new HashMap<Long, Long>();
+        discoverGlobalFaultData_send(newTracker);
+        Long multiPartitionCommitPoint = null;
+        if (discoverGlobalFaultData_rcv( newTracker)) {
+            multiPartitionCommitPoint = extractGlobalFaultData( newTracker, initiatorSafeInitPoint);
+        } else {
             return;
         }
-
-
-        // Agreed on a fault set.
-
-        // Do the work of patching up the execution site.
-        // Do a little work to identify the newly failed site ids and only handle those
-
-        HashSet<Integer> newFailedSiteIds = new HashSet<Integer>(failedSiteIds);
-        newFailedSiteIds.removeAll(m_handledFailedSites);
 
         // Use this agreed new-fault set to make PPD decisions.
         // Since this agreement process should eventually be moved to
         // the fault distributor - this is written with some intentional
         // feature envy.
-
         PPDPolicyDecision makePPDPolicyDecisions =
-            VoltDB.instance().getFaultDistributor().makePPDPolicyDecisions(newFailedSiteIds);
+            VoltDB.instance().getFaultDistributor().makePPDPolicyDecisions(m_pendingFailedSites, newTracker);
 
         if (makePPDPolicyDecisions == PPDPolicyDecision.NodeFailure) {
             handleSiteFaults(false,
-                    newFailedSiteIds,
+                    m_pendingFailedSites,
                     multiPartitionCommitPoint,
                     initiatorSafeInitPoint);
         }
         else if (makePPDPolicyDecisions == PPDPolicyDecision.PartitionDetection) {
             handleSiteFaults(true,
-                    newFailedSiteIds,
+                    m_pendingFailedSites,
                     multiPartitionCommitPoint,
                     initiatorSafeInitPoint);
         }
 
-        m_handledFailedSites.addAll(failedSiteIds);
-        for (NodeFailureFault fault : failures) {
-            if (newFailedSiteIds.containsAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()))) {
-                VoltDB.instance().getFaultDistributor().
-                reportFaultHandled(m_faultHandler, fault);
-            }
+        m_tracker = newTracker;//Get a snapshot of the site tracker
+
+        // make sure the restricted priority queue knows about all of the up initiators
+        // for most catalog changes this will do nothing
+        // for rejoin, it will matter
+        for (Long initiator : m_tracker.m_allInitiatorsImmutable) {
+            m_transactionQueue.ensureInitiatorIsKnown(initiator);
         }
+
+        m_pendingFailedSites.clear();
     }
 
-    /**
-     * The list of failed sites we know about. Included with all failure messages
-     * to identify what the information was used to generate commit points
-     */
-    private final HashSet<Integer> m_knownFailedSites = new HashSet<Integer>();
+    private Long extractGlobalFaultData(
+            SiteTracker newTracker,
+            HashMap<Long, Long> initiatorSafeInitPoint) {
+        if (!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false)) {
+            VoltDB.crashLocalVoltDB("Error extracting fault data", true, null);
+        }
 
-    /**
-     * Failed sites for which agreement has been reached.
-     */
-    private final HashSet<Integer> m_handledFailedSites = new HashSet<Integer>();
+        long commitPoint = Long.MIN_VALUE;
 
-    /**
-     * Store values from older failed nodes. They are repeated with every failure message
-     */
-    private final HashMap<Integer, HashMap<Integer, Long>> m_newestSafeTransactionForInitiatorLedger =
-        new HashMap<Integer, HashMap<Integer, Long>>();
+        final int localPartitionId =
+            newTracker.getPartitionForSite(m_siteId);
+
+        Iterator<Map.Entry<Pair<Long, Long>, Pair<Long, Long>>> iter =
+            m_failureSiteUpdateLedger.entrySet().iterator();
+
+        while (iter.hasNext()) {
+            final Map.Entry<Pair<Long, Long>, Pair<Long, Long>> entry = iter.next();
+            final Pair<Long, Long> key = entry.getKey();
+            final Pair<Long, Long> value = entry.getValue();
+            final Long safeTxnId = value.getFirst();
+            final Long commitedTxnId = value.getSecond();
+
+            /*
+             * Can receive messages from beyond the grave
+             */
+            if (!m_tracker.m_allExecutionSitesImmutable.contains(key.getFirst())) {
+                continue;
+            }
+
+            final int remotePartitionId =
+                    m_tracker.getPartitionForSite(key.getFirst());
+
+            commitPoint = Math.max(commitPoint, commitedTxnId);
+            if (remotePartitionId == localPartitionId) {
+                Long initiatorId = key.getSecond();
+                if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
+                    initiatorSafeInitPoint.put( initiatorId, Long.MIN_VALUE);
+                }
+
+                initiatorSafeInitPoint.put( initiatorId,
+                        Math.max(initiatorSafeInitPoint.get(initiatorId), safeTxnId));
+            }
+        }
+        assert(commitPoint != Long.MIN_VALUE);
+        return commitPoint;
+    }
 
     /**
      * Send one message to each surviving execution site providing this site's
@@ -1592,60 +1977,38 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * own partition). Do this once for each failed initiator that we know about.
      * Sends all data all the time to avoid a need for request/response.
      */
-    private int discoverGlobalFaultData_send()
+    private void discoverGlobalFaultData_send(SiteTracker newTracker)
     {
-        int expectedResponses = 0;
-        int[] survivors = m_context.siteTracker.getUpExecutionSites();
-        HashSet<Integer> survivorSet = new HashSet<Integer>();
-        for (int survivor : survivors) {
-            survivorSet.add(survivor);
-        }
-        m_recoveryLog.info("Sending fault data " + m_knownFailedSites.toString() + " to "
-                + survivorSet.toString() + " survivors with lastKnownGloballyCommitedMultiPartTxnId "
+        Set<Long> survivors = newTracker.getAllSites();
+        m_rejoinLog.info("Sending fault data " + CoreUtils.hsIdCollectionToString(m_pendingFailedSites) + " to "
+                + CoreUtils.hsIdCollectionToString(survivors) +
+                " survivors with lastKnownGloballyCommitedMultiPartTxnId "
                 + lastKnownGloballyCommitedMultiPartTxnId);
-        try {
-            for (Integer site : m_knownFailedSites) {
-                Integer hostId = m_context.siteTracker.getHostForSite(site);
-                HashMap<Integer, Long> siteMap = m_newestSafeTransactionForInitiatorLedger.get(hostId);
-                if (siteMap == null) {
-                    siteMap = new HashMap<Integer, Long>();
-                    m_newestSafeTransactionForInitiatorLedger.put(hostId, siteMap);
-                }
 
-                if (m_context.siteTracker.getSiteForId(site).getIsexec() == false) {
-                    /*
-                     * Check the queue for the data and get it from the ledger if necessary.\
-                     * It might not even be in the ledger if the site has been failed
-                     * since recovery of this node began.
-                     */
-                    Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
-                    if (txnId == null) {
-                        txnId = siteMap.get(site);
-                        //assert(txnId != null);
-                    } else {
-                        siteMap.put(site, txnId);
-                    }
+        for (Long site : m_pendingFailedSites) {
+            /*
+             * Check the queue for the data and get it from the ledger if necessary.\
+             * It might not even be in the ledger if the site has been failed
+             * since recovery of this node began.
+             */
+            Long txnId = m_transactionQueue.getNewestSafeTransactionForInitiator(site);
+            FailureSiteUpdateMessage srcmsg =
+                new FailureSiteUpdateMessage(
+                        m_pendingFailedSites,
+                        site,
+                        txnId != null ? txnId : Long.MIN_VALUE,
+                        lastKnownGloballyCommitedMultiPartTxnId);
 
-                    FailureSiteUpdateMessage srcmsg =
-                        new FailureSiteUpdateMessage(m_siteId,
-                                                     m_knownFailedSites,
-                                                     site,
-                                                     txnId != null ? txnId : Long.MIN_VALUE,
-                                                     //txnId,
-                                                     lastKnownGloballyCommitedMultiPartTxnId);
-
-                    m_mailbox.send(survivors, 0, srcmsg);
-                    expectedResponses += (survivors.length);
-                }
-            }
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(survivors), srcmsg);
         }
-        catch (MessagingException e) {
-            // TODO: unsure what to do with this. maybe it implies concurrent failure?
-            VoltDB.crashLocalVoltDB(e.getMessage(), true, e);
-        }
-        m_recoveryLog.info("Sent fault data. Expecting " + expectedResponses + " responses.");
-        return expectedResponses;
     }
+
+    /*
+     * Key is source site, and initiator id
+     * Value is safe txnid, last committed txnid
+     */
+    private final HashMap<Pair<Long, Long>, Pair<Long, Long>>
+                    m_failureSiteUpdateLedger = new HashMap<Pair<Long, Long>, Pair<Long, Long>>();
 
     /**
      * Collect the failure site update messages from all sites This site sent
@@ -1655,122 +2018,102 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Concurrent failures can be detected by additional reports from the FaultDistributor
      * or a mismatch in the set of failed hosts reported in a message from another site
      */
-    private Long discoverGlobalFaultData_rcv(int expectedResponses, Map<Integer, Long> initiatorSafeInitPoint)
+    private boolean discoverGlobalFaultData_rcv(
+            SiteTracker newTracker)
     {
-        final int localPartitionId =
-            m_context.siteTracker.getPartitionForSite(m_siteId);
-        int responses = 0;
-        int responsesFromSamePartition = 0;
-        long commitPoint = Long.MIN_VALUE;
         java.util.ArrayList<FailureSiteUpdateMessage> messages = new java.util.ArrayList<FailureSiteUpdateMessage>();
+        long blockedOnReceiveStart = System.currentTimeMillis();
+        long lastReportTime = 0;
+
         do {
             VoltMessage m = m_mailbox.recvBlocking(new Subject[] { Subject.FAILURE, Subject.FAILURE_SITE_UPDATE }, 5);
+
+            /*
+             * If fault resolution takes longer then 10 seconds start logging
+             */
+            final long now = System.currentTimeMillis();
+            if (now - blockedOnReceiveStart > 10000) {
+                if (now - lastReportTime > 60000) {
+                    lastReportTime = System.currentTimeMillis();
+                    haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, true);
+                }
+            }
+
             //Invoke tick periodically to ensure that the last snapshot continues in the event that the failure
             //process does not complete
             if (m == null) {
                 tick();
                 continue;
             }
+
             FailureSiteUpdateMessage fm = null;
 
             if (m.getSubject() == Subject.FAILURE_SITE_UPDATE.getId()) {
                 fm = (FailureSiteUpdateMessage)m;
                 messages.add(fm);
+                m_failureSiteUpdateLedger.put(
+                        Pair.of(fm.m_sourceHSId, fm.m_initiatorForSafeTxnId),
+                        Pair.of(fm.m_safeTxnId, fm.m_committedTxnId));
             } else if (m.getSubject() == Subject.FAILURE.getId()) {
                 /*
-                 * If the fault distributor reports a new fault, assert that the fault currently
-                 * being handled is included, redeliver the message to ourself and then abort so
+                 * If the fault distributor reports a new fault, redeliver the message to ourself and then abort so
                  * that the process can restart.
                  */
-                HashSet<NodeFailureFault> faults = ((ExecutionSiteNodeFailureMessage)m).m_failedHosts;
-                HashSet<Integer> newFailedSiteIds = new HashSet<Integer>();
-                for (NodeFailureFault fault : faults) {
-                    newFailedSiteIds.addAll(m_context.siteTracker.getAllSitesForHost(fault.getHostId()));
+                HashSet<SiteFailureFault> faults = ((ExecutionSiteNodeFailureMessage)m).m_failedSites;
+                HashSet<Long> newFailedSiteIds = new HashSet<Long>();
+                for (SiteFailureFault fault : faults) {
+                    newFailedSiteIds.addAll((fault).getSiteIds());
                 }
                 m_mailbox.deliverFront(m);
-                m_recoveryLog.info("Detected a concurrent failure from FaultDistributor, new failed sites "
-                        + newFailedSiteIds);
-                return null;
+                hostLog.info("Detected a concurrent failure from FaultDistributor, new failed sites "
+                        + CoreUtils.hsIdCollectionToString(newFailedSiteIds));
+                return false;
             }
 
-            /*
-             * If the other surviving host saw a different set of failures
-             */
-            if (!m_knownFailedSites.equals(fm.m_failedSiteIds)) {
-                if (!m_knownFailedSites.containsAll(fm.m_failedSiteIds)) {
-                    /*
-                     * In this case there is a new failed site we didn't know about. Time to
-                     * start the process again from square 1 with knowledge of the new failed hosts
-                     * First fail all the ones we didn't know about.
-                     */
-                    HashSet<Integer> difference = new HashSet<Integer>(fm.m_failedSiteIds);
-                    difference.removeAll(m_knownFailedSites);
-                    Set<Integer> differenceHosts = new HashSet<Integer>();
-                    for (Integer siteId : difference) {
-                        differenceHosts.add(m_context.siteTracker.getHostForSite(siteId));
-                    }
-                    for (Integer hostId : differenceHosts) {
-                        String hostname = String.valueOf(hostId);
-                        if (VoltDB.instance() != null) {
-                            if (VoltDB.instance().getHostMessenger() != null) {
-                                String hostnameTemp = VoltDB.instance().getHostMessenger().getHostnameForHostID(hostId);
-                                if (hostnameTemp != null) hostname = hostnameTemp;
-                            }
-                        }
-                        VoltDB.instance().getFaultDistributor().
-                            reportFault(new NodeFailureFault(
-                                    hostId,
-                                    m_context.siteTracker.getNonExecSitesForHost(hostId),
-                                    hostname));
-                    }
-                    m_recoveryLog.info("Detected a concurrent failure from " +
-                            fm.m_sourceSiteId + " with new failed sites " + difference.toString());
-                    m_mailbox.deliver(m);
-                    /*
-                     * Return null and skip handling the fault for now. Will try again
-                     * later once the other failed hosts are detected and can be dealt with at once.
-                     */
-                    return null;
-                } else {
-                    /*
-                     * In this instance they are not equal because the message is missing some
-                     * failed sites. Drop the message. The sender will detect the fault and resend
-                     * the message later with the correct information.
-                     */
-                    HashSet<Integer> difference = new HashSet<Integer>(m_knownFailedSites);
-                    difference.removeAll(fm.m_failedSiteIds);
-                    m_recoveryLog.info("Discarding failure message from " +
-                            fm.m_sourceSiteId + " because it was missing failed sites " + difference.toString());
-                    continue;
-                }
-            }
-
-            ++responses;
-            m_recoveryLog.info("Received failure message " + responses + " of " + expectedResponses
-                    + " from " + fm.m_sourceSiteId + " for failed sites " + fm.m_failedSiteIds +
+            hostLog.info("Received failure message from " + CoreUtils.hsIdToString(fm.m_sourceHSId) +
+                    " for failed sites " +
+                    CoreUtils.hsIdCollectionToString(fm.m_failedHSIds) + " for initiator id " +
+                    CoreUtils.hsIdToString(fm.m_initiatorForSafeTxnId) +
                     " with commit point " + fm.m_committedTxnId + " safe txn id " + fm.m_safeTxnId);
-            commitPoint =
-                Math.max(commitPoint, fm.m_committedTxnId);
+        } while(!haveNecessaryFaultInfo(newTracker, m_pendingFailedSites, false));
 
-            final int remotePartitionId =
-                m_context.siteTracker.getPartitionForSite(fm.m_sourceSiteId);
-
-            if (remotePartitionId == localPartitionId) {
-                Integer initiatorId = fm.m_initiatorForSafeTxnId;
-                if (!initiatorSafeInitPoint.containsKey(initiatorId)) {
-                    initiatorSafeInitPoint.put(initiatorId, Long.MIN_VALUE);
-                }
-                initiatorSafeInitPoint.put(
-                        initiatorId, Math.max(initiatorSafeInitPoint.get(initiatorId), fm.m_safeTxnId));
-                responsesFromSamePartition++;
-            }
-        } while(responses < expectedResponses);
-
-        assert(commitPoint != Long.MIN_VALUE);
-        assert(!initiatorSafeInitPoint.containsValue(Long.MIN_VALUE));
-        return commitPoint;
+        return true;
     }
 
+
+    private boolean haveNecessaryFaultInfo(
+            SiteTracker newTracker,
+            Set<Long> sitesBeingFailed,
+            boolean log) {
+        Set<Long> failingInitiators = new HashSet<Long>(sitesBeingFailed);
+        failingInitiators.retainAll(m_tracker.getAllInitiators());
+        List<Pair<Long, Long>> missingMessages = new ArrayList<Pair<Long, Long>>();
+        for (long otherSite : newTracker.getAllSites()) {
+            for (Long failingInitiator : failingInitiators) {
+                Pair<Long, Long> key = Pair.of( otherSite, failingInitiator);
+                if (!m_failureSiteUpdateLedger.containsKey(key)) {
+                    missingMessages.add(key);
+                }
+            }
+        }
+        if (log) {
+            StringBuilder sb = new StringBuilder();
+            sb.append('[');
+            boolean first = true;
+            for (Pair<Long, Long> p : missingMessages) {
+                if (!first) sb.append(", ");
+                first = false;
+                sb.append(CoreUtils.hsIdToString(p.getFirst()));
+                sb.append('-');
+                sb.append(CoreUtils.hsIdToString(p.getSecond()));
+            }
+            sb.append(']');
+
+            m_rejoinLog.warn("Failure resolution stalled waiting for ( ExecutionSite, Initiator ) " +
+                                "information: " + sb.toString());
+        }
+        return missingMessages.isEmpty();
+    }
 
     /**
      * Process a node failure detection.
@@ -1780,35 +2123,37 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * handleNodeFault.
      * @param partitionDetected
      *
-     * @param siteIds Hashset<Integer> of host ids of failed nodes
+     * @param siteIds Hashset<Long> of host ids of failed nodes
      * @param globalCommitPoint the surviving cluster's greatest committed multi-partition transaction id
      * @param globalInitiationPoint the greatest transaction id acknowledged as globally
      * 2PC to any surviving cluster execution site by the failed initiator.
      *
      */
     void handleSiteFaults(boolean partitionDetected,
-            HashSet<Integer> failedSites,
+            HashSet<Long> failedSites,
             long globalMultiPartCommitPoint,
-            HashMap<Integer, Long> initiatorSafeInitiationPoint)
+            HashMap<Long, Long> initiatorSafeInitiationPoint)
     {
+        HashSet<Long> failedInitiators = new HashSet<Long>();
         HashSet<Integer> failedHosts = new HashSet<Integer>();
-        for (Integer siteId : failedSites) {
-            failedHosts.add(m_context.siteTracker.getHostForSite(siteId));
+        for (Long siteId : failedSites) {
+            failedHosts.add(SiteTracker.getHostForSite(siteId));
         }
 
         StringBuilder sb = new StringBuilder();
         for (Integer hostId : failedHosts) {
             sb.append(hostId).append(' ');
         }
+        final String failedHostsString = sb.toString();
         if (m_txnlog.isTraceEnabled())
         {
-            m_txnlog.trace("FUZZTEST handleNodeFault " + sb.toString() +
+            m_txnlog.trace("FUZZTEST handleNodeFault " + failedHostsString +
                     " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and safeInitiationPoints "
                     + initiatorSafeInitiationPoint);
         } else {
-            m_recoveryLog.info("Handling node faults " + sb.toString() +
+            m_rejoinLog.info("Handling node faults " + failedHostsString +
                     " with globalMultiPartCommitPoint " + globalMultiPartCommitPoint + " and safeInitiationPoints "
-                    + initiatorSafeInitiationPoint);
+                    + CoreUtils.hsIdKeyMapToString(initiatorSafeInitiationPoint));
         }
         lastKnownGloballyCommitedMultiPartTxnId = globalMultiPartCommitPoint;
 
@@ -1819,7 +2164,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             for (Long initiationPoint : initiatorSafeInitiationPoint.values()) {
                 globalInitiationPoint = Math.max( initiationPoint, globalInitiationPoint);
             }
-            m_recoveryLog.info("Scheduling snapshot after txnId " + globalInitiationPoint +
+            m_rejoinLog.info("Scheduling snapshot after txnId " + globalInitiationPoint +
                                " for cluster partition fault. Current commit point: " + this.lastCommittedTxnId);
 
             SnapshotSchedule schedule = m_context.cluster.getFaultsnapshots().get("CLUSTER_PARTITION");
@@ -1832,13 +2177,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                                                       true));
         }
 
-
         // Fix safe transaction scoreboard in transaction queue
-        for (Integer i : failedSites)
+        // Not all of these are initiators, but it is safe...
+        for (Long i : failedSites)
         {
-            if (m_context.siteTracker.getSiteForId(i).getIsexec() == false) {
-                m_transactionQueue.gotFaultForInitiator(i);
-            }
+            failedInitiators.add(i);
+            m_transactionQueue.gotFaultForInitiator(i);
         }
 
         /*
@@ -1859,11 +2203,11 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             ts.handleSiteFaults(failedSites);
 
             // Fault a transaction that was not globally initiated by a failed initiator
-            if (initiatorSafeInitiationPoint.containsKey(ts.initiatorSiteId) &&
-                    ts.txnId > initiatorSafeInitiationPoint.get(ts.initiatorSiteId) &&
-                failedSites.contains(ts.initiatorSiteId))
+            if (initiatorSafeInitiationPoint.containsKey(ts.initiatorHSId) &&
+                    ts.txnId > initiatorSafeInitiationPoint.get(ts.initiatorHSId) &&
+                failedSites.contains(ts.initiatorHSId))
             {
-                m_recoveryLog.info("Site " + m_siteId + " faulting non-globally initiated transaction " + ts.txnId);
+                m_rejoinLog.info("Site " + m_siteId + " faulting non-globally initiated transaction " + ts.txnId);
                 it.remove();
                 if (!ts.isReadOnly()) {
                     faultedTxns.add(ts.txnId);
@@ -1883,19 +2227,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 MultiPartitionParticipantTxnState mpts = (MultiPartitionParticipantTxnState) ts;
                 if (ts.isInProgress() && ts.txnId <= globalMultiPartCommitPoint)
                 {
-                    m_recoveryLog.info("Committing in progress multi-partition txn " + ts.txnId +
+                    m_rejoinLog.info("Committing in progress multi-partition txn " + ts.txnId +
                             " even though coordinator was on a failed host because the txnId <= " +
                             "the global multi-part commit point");
                     CompleteTransactionMessage ft =
                         mpts.createCompleteTransactionMessage(false, false);
+                    ft.m_sourceHSId = m_siteId;
                     m_mailbox.deliverFront(ft);
                 }
                 else if (ts.isInProgress() && ts.txnId > globalMultiPartCommitPoint) {
-                    m_recoveryLog.info("Rolling back in progress multi-partition txn " + ts.txnId +
+                    m_rejoinLog.info("Rolling back in progress multi-partition txn " + ts.txnId +
                             " because the coordinator was on a failed host and the txnId > " +
                             "the global multi-part commit point");
                     CompleteTransactionMessage ft =
                         mpts.createCompleteTransactionMessage(true, false);
+                    ft.m_sourceHSId = m_siteId;
                     if (!ts.isReadOnly()) {
                         faultedTxns.add(ts.txnId);
                     }
@@ -1903,7 +2249,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 }
                 else
                 {
-                    m_recoveryLog.info("Faulting multi-part transaction " + ts.txnId +
+                    m_rejoinLog.info("Faulting multi-part transaction " + ts.txnId +
                             " because the coordinator was on a failed node");
                     it.remove();
                     if (!ts.isReadOnly()) {
@@ -1922,16 +2268,25 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             {
                 if (ts.isInProgress())
                 {
-                    m_mailbox.deliverFront(new CheckTxnStateCompletionMessage(ts.txnId));
+                    m_mailbox.deliverFront(new CheckTxnStateCompletionMessage(ts.txnId, m_siteId));
                 }
             }
         }
         if (m_recoveryProcessor != null) {
-            m_recoveryProcessor.handleSiteFaults( failedSites, m_context.siteTracker);
+            m_recoveryProcessor.handleSiteFaults(failedSites, m_tracker);
         }
         try {
             //Log it and acquire the completion permit from the semaphore
-            VoltDB.instance().getCommandLog().logFault( failedSites, faultedTxns).acquire();
+            Semaphore logFault = VoltDB.instance().getCommandLog().logFault(failedInitiators, faultedTxns);
+            if (logFault != null) {
+                logFault.acquire();
+            } else {
+                /*
+                 * If the log is not initialized yet, crash the node because it
+                 * will be missing fault information.
+                 */
+                VoltDB.crashLocalVoltDB("Node failure before log is initialized", false, null);
+            }
         } catch (InterruptedException e) {
             VoltDB.crashLocalVoltDB("Interrupted while attempting to log a fault", true, e);
         }
@@ -1946,22 +2301,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     {
         // assume success. errors correct this assumption as they occur
         currentFragResponse.setStatus(FragmentResponseMessage.SUCCESS, null);
-
-        ProcedureRunner runner = null;
-        synchronized (m_registeredSysProcPlanFragments) {
-            runner = m_registeredSysProcPlanFragments.get(fragmentId);
-        }
-        if (runner == null) {
-            assert(false);
-        }
+        ProcedureRunner runner = m_loadedProcedures.getSysproc(fragmentId);
 
         try {
             final DependencyPair dep
                 = runner.executePlanFragment(txnState,
                                              dependencies,
                                              fragmentId,
-                                             params,
-                                             m_systemProcedureContext);
+                                             params);
 
             sendDependency(currentFragResponse, dep.depId, dep.dependency);
         }
@@ -1984,7 +2331,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         return currentFragResponse;
     }
 
-
     private void sendDependency(
             final FragmentResponseMessage currentFragResponse,
             final int dependencyId,
@@ -2003,10 +2349,12 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * Do snapshot work exclusively until there is no more. Also blocks
      * until the syncing and closing of snapshot data targets has completed.
      */
+    @Override
     public void initiateSnapshots(Deque<SnapshotTableTask> tasks, long txnId, int numLiveHosts) {
         m_snapshotter.initiateSnapshots(ee, tasks, txnId, numLiveHosts);
     }
 
+    @Override
     public HashSet<Exception> completeSnapshotWork() throws InterruptedException {
         return m_snapshotter.completeSnapshotWork(ee);
     }
@@ -2015,34 +2363,21 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     /*
      *  SiteConnection Interface (VoltProcedure -> ExecutionSite)
      */
-
     @Override
-    public void registerPlanFragment(final long pfId, final ProcedureRunner proc) {
-        synchronized (m_registeredSysProcPlanFragments) {
-            assert(m_registeredSysProcPlanFragments.containsKey(pfId) == false);
-            m_registeredSysProcPlanFragments.put(pfId, proc);
-        }
-    }
-
-    @Override
-    public Site getCorrespondingCatalogSite() {
-        return getCatalogSite();
-    }
-
-    @Override
-    public int getCorrespondingSiteId() {
+    public long getCorrespondingSiteId() {
         return m_siteId;
     }
 
     @Override
     public int getCorrespondingPartitionId() {
-        return Integer.valueOf(getCatalogSite().getPartition().getTypeName());
+        return m_tracker.getPartitionForSite(m_siteId);
     }
 
     @Override
     public int getCorrespondingHostId() {
-        return Integer.valueOf(getCatalogSite().getHost().getTypeName());
+        return SiteTracker.getHostForSite(m_siteId);
     }
+
 
     @Override
     public void loadTable(
@@ -2066,29 +2401,41 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             throw new VoltAbortException("table '" + tableName + "' does not exist in database " + clusterName + "." + databaseName);
         }
 
-        long undo_token = getNextUndoToken();
-        ee.loadTable(table.getRelativeIndex(), data,
+        loadTable(txnId, table.getRelativeIndex(), data);
+    }
+
+    /**
+     * @param txnId
+     * @param data
+     * @param table
+     */
+    @Override
+    public void loadTable(long txnId, int tableId, VoltTable data) {
+        ee.loadTable(tableId, data,
                      txnId,
-                     lastCommittedTxnId,
-                     undo_token);
-        ee.releaseUndoToken(undo_token);
-        getNextUndoToken();
+                     lastCommittedTxnId);
     }
 
     @Override
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
-            long[] planFragmentIds,
+    public long loadPlanFragment(byte[] plan)
+    {
+        return ee.loadPlanFragment(plan);
+    }
+
+    @Override
+    public VoltTable[] executePlanFragments(
             int numFragmentIds,
+            long[] planFragmentIds,
+            long[] inputDepIds,
             ParameterSet[] parameterSets,
-            int numParameterSets,
             long txnId,
             boolean readOnly) throws EEException
     {
-        return ee.executeQueryPlanFragmentsAndGetResults(
-            planFragmentIds,
+        return ee.executePlanFragments(
             numFragmentIds,
+            planFragmentIds,
+            inputDepIds,
             parameterSets,
-            numParameterSets,
             txnId,
             lastCommittedTxnId,
             readOnly ? Long.MAX_VALUE : getNextUndoToken());
@@ -2118,14 +2465,20 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
     recursableRun(TransactionState currentTxnState)
     {
         while (m_shouldContinue) {
-            if (currentTxnState.doWork(m_recovering)) {
+            /*
+             * when it's replaying transactions during rejoin, we want real work
+             * to be done. If during rejoin, a transaction needs to send a
+             * response, only send a dummy response. A replayed transaction
+             * during rejoin needs real work to be done, but no response to be
+             * sent.
+             */
+            if (currentTxnState.doWork(m_rejoining)) {
                 if (currentTxnState.needsRollback())
                 {
                     rollbackTransaction(currentTxnState);
                 }
                 completeTransaction(currentTxnState);
-                TransactionState ts = m_transactionsById.remove(currentTxnState.txnId);
-                assert(ts != null);
+                m_transactionsById.remove(currentTxnState.txnId);
                 return null;
             }
             else if (currentTxnState.shouldResumeProcedure()){
@@ -2145,6 +2498,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             {
                 assert(!currentTxnState.isSinglePartition());
                 tryToSneakInASinglePartitionProcedure();
+                if (m_recoveryProcessor != null) {
+                    m_recoveryProcessor.notifyBlockedOnMultiPartTxn( currentTxnState.txnId );
+                }
             }
             else
             {
@@ -2182,7 +2538,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     @Override
     public SiteTracker getSiteTracker() {
-        return m_context.siteTracker;
+        return m_tracker;
     }
 
     /**
@@ -2193,7 +2549,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      * when the transaction ID changes.
      */
     @Override
-    public final void beginNewTxn(TransactionState txnState)
+    public void beginNewTxn(TransactionState txnState)
     {
         if (m_txnlog.isTraceEnabled())
         {
@@ -2209,7 +2565,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         }
     }
 
-    public final void rollbackTransaction(TransactionState txnState)
+    public void rollbackTransaction(TransactionState txnState)
     {
         if (m_txnlog.isTraceEnabled())
         {
@@ -2242,13 +2598,13 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
         {
             if (dependencies != null)
             {
-                ee.stashWorkUnitDependencies(dependencies);
+                stashWorkUnitDependencies(dependencies);
             }
         }
 
         for (int frag = 0; frag < ftask.getFragmentCount(); frag++)
         {
-            final long fragmentId = ftask.getFragmentId(frag);
+            long fragmentId = ftask.getFragmentId(frag);
             final int outputDepId = ftask.getOutputDepId(frag);
 
             // this is a horrible performance hack, and can be removed with small changes
@@ -2270,6 +2626,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                 params = new ParameterSet();
             }
 
+            byte[] fragmentPlan = ftask.getFragmentPlan(frag);
             if (ftask.isSysProcTask()) {
                 return processSysprocFragmentTask(txnState, dependencies, fragmentId,
                                                   currentFragResponse, params);
@@ -2283,17 +2640,27 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                  * abort type errors that should result in a roll back.
                  * Assume that it is ninja: succeeds or doesn't return.
                  * No roll back support.
+                 *
+                 * AW in 2012, the preceding comment might be wrong,
+                 * I am pretty sure what we don't support is partial rollback.
+                 * The entire procedure will roll back successfully on failure
                  */
                 try {
-                    final DependencyPair dep = ee.executePlanFragment(fragmentId,
-                                                                      outputDepId,
-                                                                      inputDepId,
-                                                                      params,
-                                                                      txnState.txnId,
-                                                                      lastCommittedTxnId,
-                                                                      txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken());
+                    // if custom fragment, load the plan
+                    if (fragmentPlan != null) {
+                        fragmentId = ee.loadPlanFragment(fragmentPlan);
+                    }
 
-                    sendDependency(currentFragResponse, dep.depId, dep.dependency);
+                    final VoltTable dependency = ee.executePlanFragments(
+                            1,
+                            new long[] { fragmentId },
+                            new long[] { inputDepId },
+                            new ParameterSet[] { params },
+                            txnState.txnId,
+                            lastCommittedTxnId,
+                            txnState.isReadOnly() ? Long.MAX_VALUE : getNextUndoToken())[0];
+
+                    sendDependency(currentFragResponse, outputDepId, dependency);
 
                 } catch (final EEException e) {
                     hostLog.l7dlog( Level.TRACE, LogKeys.host_ExecutionSite_ExceptionExecutingPF.name(), new Object[] { fragmentId }, e);
@@ -2316,7 +2683,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             final VoltMessage task)
     {
         final InitiateTaskMessage itask = (InitiateTaskMessage)task;
-        final ProcedureRunner runner = procs.get(itask.getStoredProcedureName());
+        final ProcedureRunner runner = m_loadedProcedures.procs.get(itask.getStoredProcedureName());
 
         final InitiateResponseMessage response = new InitiateResponseMessage(itask);
 
@@ -2352,22 +2719,19 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
                     // find the txn id visible to the proc
                     long txnId = txnState.txnId;
                     StoredProcedureInvocation invocation = txnState.getInvocation();
-                    if ((invocation != null) && (invocation.getType() == ProcedureInvocationType.REPLICATED)) {
+                    // this can't be null, initiate task must have an invocation
+                    if (invocation == null) {
+                        VoltDB.crashLocalVoltDB("Initiate task " + txnId + " missing invocation", false, null);
+                    }
+                    if ((invocation.getType() == ProcedureInvocationType.REPLICATED)) {
                         txnId = invocation.getOriginalTxnId();
                     }
 
                     // call the proc
                     runner.setupTransaction(txnState);
-                    if (runner.isSystemProcedure()) {
-                        final Object[] combinedParams = new Object[callerParams.length + 1];
-                        combinedParams[0] = m_systemProcedureContext;
-                        for (int i=0; i < callerParams.length; ++i) combinedParams[i+1] = callerParams[i];
-                        cr = runner.call(txnId, combinedParams);
-                    }
-                    else {
-                        cr = runner.call(txnId, itask.getParameters());
-                    }
-                    response.setResults(cr, itask);
+                    cr = runner.call(txnId, itask.getParameters());
+                    response.setResults(cr);
+
                     // record the results of write transactions to the transaction state
                     // this may be used to verify the DR replica cluster gets the same value
                     // skip for multi-partition txns because only 1 of k+1 partitions will
@@ -2403,7 +2767,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
      *
      * @return false if there is no possibility for speculative work.
      */
-    public boolean tryToSneakInASinglePartitionProcedure() {
+    private boolean tryToSneakInASinglePartitionProcedure() {
         // poll for an available message. don't block
         VoltMessage message = m_mailbox.recv();
         tick(); // unclear if this necessary (rtb)
@@ -2417,7 +2781,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
             // only sneak in single partition work
             if (nextTxn instanceof SinglePartitionTxnState)
             {
-                boolean success = nextTxn.doWork(m_recovering);
+                boolean success = nextTxn.doWork(m_rejoining);
                 assert(success);
                 return true;
             }
@@ -2430,5 +2794,113 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection
 
     public PartitionDRGateway getPartitionDRGateway() {
         return m_partitionDRGateway;
+    }
+
+    @Override
+    public long getReplicatedDMLDivisor() {
+        return m_tracker.m_numberOfPartitions;
+    }
+
+    public void notifySitesAdded(final SiteTracker st) {
+        Runnable r = new Runnable() {
+            @Override
+            public void run() {
+                if (!m_pendingFailedSites.isEmpty()) {
+                    return;
+                }
+
+                /*
+                 * Failure processing may pick up the site tracker eagerly
+                 */
+                if (st.m_version <= m_tracker.m_version){
+                    return;
+                }
+
+                m_tracker = st;
+                // make sure the restricted priority queue knows about all of the up initiators
+                // for most catalog changes this will do nothing
+                // for rejoin, it will matter
+                for (Long initiator : m_tracker.m_allInitiatorsImmutable) {
+                    m_transactionQueue.ensureInitiatorIsKnown(initiator);
+                }
+            }
+        };
+        LocalObjectMessage lom = new LocalObjectMessage(r);
+        lom.m_sourceHSId = m_siteId;
+        m_mailbox.deliver(lom);
+    }
+
+    // do-nothing implementation of IV2 SiteProcedeConnection API
+    @Override
+    public void truncateUndoLog(boolean rollback, long token, long txnId) {
+        throw new RuntimeException("Unsupported IV2-only API.");
+    }
+
+    // do-nothing implementation of IV2 sysproc fragment API.
+    @Override
+    public DependencyPair executeSysProcPlanFragment(
+            TransactionState txnState,
+            Map<Integer, List<VoltTable>> dependencies, long fragmentId,
+            ParameterSet params) {
+        throw new RuntimeException("Unsupported IV2-only API.");
+     }
+
+    @Override
+    public Future<?> doSnapshotWork(boolean ignoreQuietPeriod)
+    {
+        throw new RuntimeException("Unsupported IV2-only API.");
+    }
+
+    @Override
+    public void stashWorkUnitDependencies(Map<Integer, List<VoltTable>> dependencies)
+    {
+        ee.stashWorkUnitDependencies(dependencies);
+    }
+
+    @Override
+    public HsqlBackend getHsqlBackendIfExists()
+    {
+        return hsql;
+    }
+
+    @Override
+    public long[] getUSOForExportTable(String signature)
+    {
+        return ee.getUSOForExportTable(signature);
+    }
+
+    @Override
+    public void toggleProfiler(int toggle)
+    {
+        ee.toggleProfiler(toggle);
+    }
+
+    @Override
+    public void quiesce()
+    {
+        ee.quiesce(lastCommittedTxnId);
+    }
+
+    @Override
+    public void exportAction(boolean syncAction,
+                             int ackOffset,
+                             Long sequenceNumber,
+                             Integer partitionId,
+                             String tableSignature)
+    {
+        ee.exportAction(syncAction, ackOffset, sequenceNumber, partitionId,
+                        tableSignature);
+    }
+
+    @Override
+    public VoltTable[] getStats(SysProcSelector selector, int[] locators,
+                                boolean interval, Long now)
+    {
+        return ee.getStats(selector, locators, interval, now);
+    }
+
+    @Override
+    public void setRejoinComplete() {
+        throw new RuntimeException("setRejoinComplete is an IV2-only interface.");
     }
 }

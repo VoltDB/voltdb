@@ -30,11 +30,11 @@ SELECT _agg(_variable) FROM @from_tables
 SELECT COUNT(*) FROM @from_tables
 -- test where expressions
 --- test comparison operators (<, <=, =, >=, >)
-SELECT * FROM @from_tables WHERE _variable _cmp @cmp_type
+SELECT * FROM @from_tables WHERE _variable[@col_type] _cmp @cmp_type
 --- test arithmetic operators (+, -, *, /) with comparison ops
-SELECT * FROM @from_tables WHERE (_variable _math _value[int:0,100]) _cmp @cmp_type
+SELECT * FROM @from_tables WHERE (_variable[@col_type] _math _value[int:0,100]) _cmp @cmp_type
 --- test logic operators (AND) with comparison ops
-SELECT * FROM @from_tables WHERE (_variable _cmp @cmp_type) _logic (_variable _cmp _variable)
+SELECT * FROM @from_tables WHERE (_variable[@col_type] _cmp @cmp_type) _logic (_variable _cmp _variable)
 -- test GROUP BY
 SELECT _variable FROM @from_tables GROUP BY _variable
 -- test ORDER BY
@@ -50,4 +50,5 @@ SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@
 -- test GROUP BY ORDER BY COUNT(*) with OFFSET
 SELECT _variable[@order], COUNT(*) AS FOO FROM @from_tables GROUP BY _variable[@order] ORDER BY FOO DESC, _variable[@order] LIMIT _value[int:1,3] OFFSET _value[int:1,3]
 -- test INNER JOIN (we'll do more two-table join fun separately, this just checks syntax)
-SELECT * FROM _table INNER JOIN _table ON _variable = _variable
+SELECT * FROM _table[@lhs] INNER JOIN _table[@rhs] ON __[@lhs]._variable = __[@rhs]._variable
+SELECT * FROM _table[@lhs] INNER JOIN _table[@rhs] ON __[@lhs].@id_col = __[@rhs].@id_col

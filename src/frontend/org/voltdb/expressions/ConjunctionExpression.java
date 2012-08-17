@@ -21,7 +21,7 @@ import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
-import org.voltdb.types.*;
+import org.voltdb.types.ExpressionType;
 
 public class ConjunctionExpression extends AbstractExpression {
     public ConjunctionExpression(ExpressionType type) {
@@ -41,4 +41,26 @@ public class ConjunctionExpression extends AbstractExpression {
 
     @Override
     protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException {}
+
+    @Override
+    public boolean needsRightExpression() {
+        return true;
+    }
+
+    @Override
+    public void finalizeValueTypes()
+    {
+        finalizeChildValueTypes();
+        //
+        // IMPORTANT:
+        // We are not handling the case where one of types is NULL. That is because we
+        // are only dealing with what the *output* type should be, not what the actual
+        // value is at execution time. There will need to be special handling code
+        // over on the ExecutionEngine to handle special cases for conjunctions with NULLs
+        // Therefore, it is safe to assume that the output is always going to be an
+        // integer (for booleans)
+        //
+        m_valueType = VoltType.BIGINT;
+        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+    }
 }

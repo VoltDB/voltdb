@@ -31,8 +31,8 @@ import java.util.NoSuchElementException;
 import java.util.TreeMap;
 import java.util.Iterator;
 
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * A deque that specializes in providing persistence of binary objects to disk. Any object placed
@@ -569,7 +569,7 @@ public class PersistentBinaryDeque implements BinaryDeque {
     }
 
     @Override
-    public void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
+    public synchronized void parseAndTruncate(BinaryDequeTruncator truncator) throws IOException {
         if (m_finishedSegments.isEmpty()) {
             exportLog.debug("PBD " + m_nonce + " has no finished segments");
             return;

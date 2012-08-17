@@ -336,12 +336,12 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         MultiConfigSuiteBuilder builder = new MultiConfigSuiteBuilder(TestMaterializedViewSuite.class);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #1: 1 Local Site/Partitions running on JNI backend
+        // CONFIG #1: 2 Local Site/Partitions running on JNI backend
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
         //VoltServerConfig config = new LocalSingleProcessServer("matview-onesite.jar", 1, BackendTarget.NATIVE_EE_IPC);
-        VoltServerConfig config = new LocalSingleProcessServer("matview-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("matview-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build up a project builder for the workload
         VoltProjectBuilder project = new VoltProjectBuilder();
@@ -352,39 +352,27 @@ public class TestMaterializedViewSuite extends RegressionSuite {
         project.addPartitionInfo("ENG798", "C1");
         project.addProcedures(PROCEDURES);
         // build the jarfile
-        //config.compile(project);
-
-        // add this config to the set of tests to run
-        //builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #2: 2 Local Site/Partitions running on JNI backend
-        /////////////////////////////////////////////////////////////
-
-        // get a server config for the native backend with two sites/partitions
-        config = new LocalSingleProcessServer("matview-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile (note the reuse of the TPCC project)
-        boolean compile = config.compile(project);
-        assertTrue(compile);
+        boolean success = config.compile(project);
+        assertTrue(success);
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #3: 1 Local Site/Partition running on HSQL backend
+        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
         /////////////////////////////////////////////////////////////
 
-        config = new LocalSingleProcessServer("matview-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        boolean compile2 = config.compile(project);
-        assertTrue(compile2);
+        config = new LocalCluster("matview-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
-        // Cluster
-        config = new LocalCluster("matview-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        boolean compile3 = config.compile(project);
-        assertTrue(compile3);
+        /////////////////////////////////////////////////////////////
+        // CONFIG #3: 3-node k=1 cluster
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("matview-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         return builder;

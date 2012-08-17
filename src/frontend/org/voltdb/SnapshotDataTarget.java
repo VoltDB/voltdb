@@ -17,9 +17,12 @@
 
 package org.voltdb;
 
-import org.voltdb.utils.DBBPool.BBContainer;
+import com.google.common.util.concurrent.ListenableFuture;
+
 import java.io.IOException;
-import java.util.concurrent.Future;
+import java.util.concurrent.Callable;
+
+import org.voltcore.utils.DBBPool.BBContainer;
 
 public interface SnapshotDataTarget {
     /**
@@ -34,8 +37,9 @@ public interface SnapshotDataTarget {
      * Write a block of tuple data to this target
      * @param tupleData Tuple data in a <code>ByteBuffer</code> with the required number of bytes available
      * for a header
+     * @param context A context that contains some information about the table
      */
-    public Future<?> write(BBContainer tupleData);
+    public ListenableFuture<?> write(Callable<BBContainer> tupleData, SnapshotTableTask context);
 
     /**
      * Close this target releasing any held resources and writing any footer info
@@ -50,5 +54,10 @@ public interface SnapshotDataTarget {
     /**
      * Get last cached exception that occurred during writes
      */
-    public IOException getLastWriteException();
+    public Throwable getLastWriteException();
+
+    /**
+     * Get the snapshot format this target uses
+     */
+    public SnapshotFormat getFormat();
 }

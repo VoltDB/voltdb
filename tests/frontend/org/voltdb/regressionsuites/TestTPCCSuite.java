@@ -781,19 +781,13 @@ public class TestTPCCSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
         // CONFIG #1: 1 Local Site/Partition running on JNI backend
         /////////////////////////////////////////////////////////////
-        config = new LocalSingleProcessServer("tpcc.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("tpcc.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
         //config = new LocalSingleProcessServer("tpcc.jar", 1, BackendTarget.NATIVE_EE_IPC);
         boolean success = config.compile(project);
         assert(success);
         builder.addServerConfig(config);
 
-        ////////////////////////////////////////////////////////////
-        // CONFIG #2: cluster of 2 nodes running 2 site each, one replica
-        ////////////////////////////////////////////////////////////
-        config = new LocalCluster("tpcc-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
-        builder.addServerConfig(config);
+        // no cluster tests as this is primarily a SQL correctness test
 
         return builder;
     }

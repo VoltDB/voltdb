@@ -99,50 +99,84 @@ public class TestVoltDB extends TestCase {
     public void testConfigurationValidate() {
         VoltDB.Configuration config;
 
-        // missing leader, catalog and missing deployment
+        // missing leader, catalog and missing deployment:
+        // implied START with all defaults.
         String[] args1 = {};
         config = new VoltDB.Configuration(args1);
-        assertFalse(config.validate());
+        assertTrue(config.validate());
+        assertEquals(START_ACTION.START, config.m_startAction);
 
-        // missing leader
+        // missing leader provided deployment - not okay.
         String[] argsya = {"catalog", "qwerty", "deployment", "qwerty"};
         config = new VoltDB.Configuration(argsya);
         assertFalse(config.validate());
 
-        // missing deployment
-        String[] args3 = {"leader", "hola", "catalog", "teststring2"};
+        // missing deployment (it's okay now that a default deployment is supported)
+        String[] args3 = {"host", "hola", "catalog", "teststring2"};
         config = new VoltDB.Configuration(args3);
-        assertFalse(config.validate());
+        assertTrue(config.validate());
 
-        // empty leader
-        String[] argsyo = {"leader", "", "catalog", "sdfs", "deployment", "sdfsd"};
+        // default deployment with default leader -- okay.
+        config = new VoltDB.Configuration(new String[]{"catalog", "catalog.jar"});
+        assertTrue(config.validate());
+
+        // empty leader -- tests could pass in empty leader to indicate bind to all interfaces on mac
+        String[] argsyo = {"host", "", "catalog", "sdfs", "deployment", "sdfsd"};
         config = new VoltDB.Configuration(argsyo);
-        assertFalse(config.validate());
+        assertTrue(config.validate());
 
         // empty deployment
-        String[] args6 = {"leader", "hola", "catalog", "teststring6", "deployment", ""};
+        String[] args6 = {"host", "hola", "catalog", "teststring6", "deployment", ""};
         config = new VoltDB.Configuration(args6);
         assertFalse(config.validate());
 
         // replica with non-create
-        String[] args7 = {"leader", "hola", "deployment", "teststring4", "replica", "recover"};
+        String[] args7 = {"host", "hola", "deployment", "teststring4", "replica", "recover"};
         config = new VoltDB.Configuration(args7);
         assertFalse(config.validate());
+        // rtb: START is idiotic -- here it always implies CREATE.
+        config = new VoltDB.Configuration(new String[]{"host", "l", "deployment", "d.xml", "replica", "start"});
+        assertTrue(config.validate());
+        assertEquals(START_ACTION.CREATE, config.m_startAction);
 
-        // replica with create
-        String[] args8 = {"leader", "hola", "deployment", "teststring4", "replica", "create"};
+        // replica with explicit create
+        String[] args8 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica", "create"};
         config = new VoltDB.Configuration(args8);
         assertTrue(config.validate());
 
-        // replica with default
-        String[] args9 = {"leader", "hola", "deployment", "teststring4", "replica"};
+        // replica with default action of create
+        String[] args9 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar", "replica"};
         config = new VoltDB.Configuration(args9);
         assertTrue(config.validate());
         assertEquals(START_ACTION.CREATE, config.m_startAction);
 
         // valid config
-        String[] args100 = {"leader", "hola", "deployment", "teststring4"};
+        String[] args10 = {"create", "leader", "localhost", "deployment", "te", "catalog", "catalog.jar"};
+        config = new VoltDB.Configuration(args10);
+        assertTrue(config.validate());
+
+        // valid config
+        String[] args100 = {"host", "hola", "deployment", "teststring4", "catalog", "catalog.jar"};
         config = new VoltDB.Configuration(args100);
+        assertTrue(config.validate());
+
+        // valid config -- assumes start, so catalog is correctly optional
+        config = new VoltDB.Configuration(new String[]{"host", "ldr", "deployment", "d.xml"});
+        assertTrue(config.validate());
+
+        // valid rejoin config
+        String[] args200 = {"rejoin", "host", "localhost"};
+        config = new VoltDB.Configuration(args200);
+        assertTrue(config.validate());
+
+        // invalid rejoin config, missing rejoin host
+        String[] args250 = {"rejoin"};
+        config = new VoltDB.Configuration(args250);
+        assertFalse(config.validate());
+
+        // rejoinhost should still work
+        String[] args201 = {"rejoinhost", "localhost"};
+        config = new VoltDB.Configuration(args201);
         assertTrue(config.validate());
     }
 
@@ -161,8 +195,8 @@ public class TestVoltDB extends TestCase {
 
         project.setSecurityEnabled(true);
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false),
-                new GroupInfo("blah", false, false)
+                new GroupInfo("foo", false, false, false),
+                new GroupInfo("blah", false, false, false)
         };
         project.addGroups(groups);
         UserInfo users[] = new UserInfo[] {
@@ -203,8 +237,8 @@ public class TestVoltDB extends TestCase {
 
         project.setSecurityEnabled(true);
         GroupInfo groups[] = new GroupInfo[] {
-                new GroupInfo("foo", false, false),
-                new GroupInfo("blah", false, false)
+                new GroupInfo("foo", false, false, false),
+                new GroupInfo("blah", false, false, false)
         };
         project.addGroups(groups);
         UserInfo users[] = new UserInfo[] {};

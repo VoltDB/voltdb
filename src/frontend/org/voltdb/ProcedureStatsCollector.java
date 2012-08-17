@@ -20,14 +20,14 @@ package org.voltdb;
 import java.util.ArrayList;
 import java.util.Iterator;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Procedure;
-import org.voltdb.logging.VoltLogger;
 
 /**
  * Derivation of StatsSource to expose timing information of procedure invocations.
  *
  */
-final class ProcedureStatsCollector extends SiteStatsSource {
+class ProcedureStatsCollector extends SiteStatsSource {
 
     private static final VoltLogger log = new VoltLogger("HOST");
 
@@ -91,10 +91,13 @@ final class ProcedureStatsCollector extends SiteStatsSource {
     private final Procedure m_catProc;
     private final int m_partitionId;
 
-    public ProcedureStatsCollector(int siteId, int partitionId, Procedure catProc) {
+    /**
+     * Constructor requires no args because it has access to the enclosing classes members.
+     */
+    public ProcedureStatsCollector(long siteId, int partitionId, Procedure catProc) {
         super(siteId, false);
-        m_catProc = catProc;
         m_partitionId = partitionId;
+        m_catProc = catProc;
     }
 
     /**

@@ -36,6 +36,9 @@ import java.util.Map;
 import java.util.Properties;
 import java.util.concurrent.Executor;
 
+import org.voltdb.client.ClientStats;
+import org.voltdb.client.ClientStatsContext;
+
 public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
 {
     protected final JDBC4ClientConnection NativeConnection;
@@ -373,7 +376,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     public void setAutoCommit(boolean autoCommit) throws SQLException
     {
         checkClosed();
-    if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
+        if (!autoCommit) // Always true - error out only if the client is trying to set somethign else
             throw SQLError.noSupport();
     }
 
@@ -470,6 +473,15 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         }
     }
 
+    /**
+     * Gets the new version of the performance statistics for this connection only.
+     * @return A {@link ClientStatsContext} that correctly represents the client statistics.
+     */
+    @Override
+    public ClientStatsContext createStatsContext() {
+        return this.NativeConnection.getClientStatsContext();
+    }
+
     // IVoltDBConnection extended method
     // Return global performance statistics for the underlying connection (pooled information)
     @Override
@@ -493,6 +505,7 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
     }
 
     // Save statistics to a file
+    @Deprecated
     @Override
     public void saveStatistics(String file) throws IOException
     {
@@ -520,5 +533,11 @@ public class JDBC4Connection implements java.sql.Connection, IVoltDBConnection
         throw SQLError.noSupport();
     }
 
-}
+    @Override
+    public void writeSummaryCSV(ClientStats stats, String path)
+            throws IOException {
+        this.NativeConnection.writeSummaryCSV(stats, path);
 
+    }
+
+}

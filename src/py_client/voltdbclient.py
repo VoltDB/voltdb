@@ -398,6 +398,9 @@ class FastSerializer:
         val = self.readByteArrayContent(1)[0]
         return self.NullCheck[self.VOLTTYPE_TINYINT](val)
 
+    def readByteRaw(self):
+        return self.readByteArrayContent(1)[0]
+
     def writeByte(self, value):
         if value == None:
             val = self.__class__.NULL_TINYINT_INDICATOR
@@ -933,7 +936,7 @@ class VoltResponse:
         fser.bufferForRead()
         self.version = fser.readByte()
         self.clientHandle = fser.readInt64()
-        presentFields = fser.readByte();
+        presentFields = fser.readByteRaw();
         self.status = fser.readByte()
         if presentFields & (1 << 5) != 0:
             self.statusString = fser.readString()
@@ -958,7 +961,9 @@ class VoltResponse:
             self.tables.append(table.readFromSerializer())
 
     def __str__(self):
-        tablestr = "\n\n".join([str(i) for i in self.tables])
+        tablestr=""
+        if self.tables != None:
+            tablestr = "\n\n".join([str(i) for i in self.tables])
         if self.exception is None:
             return "Status: %d\nInformation: %s\n%s" % (self.status,
                                                         self.statusString,

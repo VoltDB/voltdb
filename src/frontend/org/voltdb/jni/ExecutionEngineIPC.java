@@ -27,9 +27,8 @@ import java.nio.channels.SocketChannel;
 import java.util.logging.Level;
 import java.util.logging.Logger;
 
+import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.BackendTarget;
-import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite;
 import org.voltdb.ParameterSet;
 import org.voltdb.PrivateVoltTableFactory;
 import org.voltdb.SysProcSelector;
@@ -41,7 +40,6 @@ import org.voltdb.export.ExportManager;
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
-import org.voltdb.utils.DBBPool.BBContainer;
 
 /* Serializes data over a connection that presumably is being read
  * by a voltdb execution engine. The serialization is currently a
@@ -116,7 +114,8 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         TableHashCode(22),
         Hashinate(23),
         GetPoolAllocations(24),
-        GetUSOs(25);
+        GetUSOs(25),
+        LoadFragment(26);
         Commands(final int id) {
             m_id = id;
         }
@@ -136,16 +135,17 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         private SocketChannel m_socketChannel = null;
         Connection(BackendTarget target, int port) {
             if (target == BackendTarget.NATIVE_EE_IPC) {
+                System.out.printf("Ready to connect to voltdbipc process on port %d\n", port);
                 System.out
                         .println("Press enter after you have started the EE process to initiate the connection to the EE");
                 try {
                     System.in.read();
                 } catch (final IOException e1) {
-                    // TODO Auto-generated catch block
                     e1.printStackTrace();
                 }
             }
             try {
+                System.out.println("Connecting to localhost:" + port);
                 m_socketChannel = SocketChannel.open(new InetSocketAddress(
                         "localhost", port));
                 m_socketChannel.configureBlocking(true);
@@ -174,22 +174,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
                 m_socket = null;
             }
         }
-
-//        /** blocking write of all m_data to outputstream */
-//        void write(final byte data[], final int amount) throws IOException {
-//            // write 4 byte length (which includes its own 4 bytes) in big-endian
-//            // order. this hurts .. but I'm not sure of a better way.
-//            final byte[] length = new byte[4];
-//            int amt = amount + 4;
-//            // System.out.println("Sending " + amt + " bytes");
-//            assert (amt >= 8);
-//            for (int i = 3; i >= 0; --i) {
-//                length[i] = (byte) (amt & 0xff);
-//                amt >>= 8;
-//            }
-//            m_socket.getOutputStream().write(length);
-//            m_socket.getOutputStream().write(data, 0, amount);
-//        }
 
         /** blocking write of all m_data to outputstream */
         void write() throws IOException {
@@ -438,52 +422,22 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         /**
-         * Read the result dependencies returned from the execution of a plan fragment.
-         * Returns a list of pairs of dependency ids and dependency tables.
+         * Read and deserialize a long from the wire.
          */
-        public DependencyPair readDependencies() throws IOException {
-            // read the result set size, which doesn't include this 4 byte
-            // length notification!
-            final ByteBuffer resultSetSizeBuff = ByteBuffer.allocate(4);
-            resultSetSizeBuff.rewind();
-            while (resultSetSizeBuff.hasRemaining()) {
-                int read = m_socketChannel.read(resultSetSizeBuff);
+        public long readLong() throws IOException {
+            final ByteBuffer longBytes = ByteBuffer.allocate(8);
+
+            //resultTablesLengthBytes.order(ByteOrder.LITTLE_ENDIAN);
+            while (longBytes.hasRemaining()) {
+                int read = m_socketChannel.read(longBytes);
                 if (read == -1) {
                     throw new EOFException();
                 }
             }
+            longBytes.flip();
 
-            resultSetSizeBuff.rewind();
-            final int resultsSize = resultSetSizeBuff.getInt();
-
-            // read the serialized dependencies
-            final ByteBuffer depsBuff = ByteBuffer.allocate(resultsSize);
-            depsBuff.clear().rewind();
-            while (depsBuff.hasRemaining()) {
-                int read = m_socketChannel.read(depsBuff);
-                if (read == -1) {
-                    throw new EOFException();
-                }
-            }
-
-            // deserialize the dependencies
-            depsBuff.rewind();
-            final boolean dirty = depsBuff.get() > 0;
-            if (dirty) {
-                m_dirty = true;
-            }
-            final int numDependencies = depsBuff.getInt();
-            final int[] depIds = new int[numDependencies];
-            final VoltTable[] dependencies = new VoltTable[numDependencies];
-            final FastDeserializer fds = new FastDeserializer(depsBuff);
-            for (int ii = 0; ii < numDependencies; ++ii) {
-                depIds[ii] = fds.readInt();
-                dependencies[ii] = fds.readObject(VoltTable.class);
-            }
-            assert(depIds.length == 1);
-
-            // and finally return the constructed dependency set
-            return new DependencyPair(depIds[0], dependencies[0]);
+            final long retval = longBytes.getLong();
+            return retval;
         }
 
         public void throwException(final int errorCode) throws IOException {
@@ -516,7 +470,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     /** Local m_data */
     private final int m_clusterIndex;
-    private final int m_siteId;
+    private final long m_siteId;
     private final int m_partitionId;
     private final int m_hostId;
     private final String m_hostname;
@@ -529,16 +483,16 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     // private int m_counter;
 
     public ExecutionEngineIPC(
-            final ExecutionSite site,
             final int clusterIndex,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             final int hostId,
             final String hostname,
             final int tempTableMemory,
             final BackendTarget target,
-            final int port) {
-        super(site);
+            final int port,
+            final int totalPartitions) {
+        super();
         // m_counter = 0;
         m_clusterIndex = clusterIndex;
         m_siteId = siteId;
@@ -549,12 +503,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_connection = new Connection(target, port);
 
         // voltdbipc assumes host byte order everywhere
-        m_dataNetworkOrigin = org.voltdb.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
+        m_dataNetworkOrigin = org.voltcore.utils.DBBPool.allocateDirect(1024 * 1024 * 10);
         m_dataNetwork = m_dataNetworkOrigin.b;
         m_dataNetwork.position(4);
         m_data = m_dataNetwork.slice();
 
-        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory);
+        initialize(m_clusterIndex, m_siteId, m_partitionId, m_hostId, m_hostname, 1024 * 1024 * tempTableMemory, totalPartitions);
     }
 
     /** Utility method to generate an EEXception that can be overriden by derived classes**/
@@ -582,12 +536,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
      */
     public void initialize(
             final int clusterIndex,
-            final int siteId,
+            final long siteId,
             final int partitionId,
             final int hostId,
             final String hostname,
-            final long tempTableMemory
-            )
+            final long tempTableMemory,
+            final int totalPartitions)
     {
         synchronized(printLockObject) {
             System.out.println("Initializing an IPC EE " + this + " for hostId " + hostId + " siteId " + siteId + " from thread " + Thread.currentThread().getId());
@@ -596,10 +550,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.clear();
         m_data.putInt(Commands.Initialize.m_id);
         m_data.putInt(clusterIndex);
-        m_data.putInt(siteId);
+        m_data.putLong(siteId);
         m_data.putInt(partitionId);
         m_data.putInt(hostId);
         m_data.putLong(EELoggers.getLogLevels());
+        m_data.putLong(tempTableMemory);
+        m_data.putInt(totalPartitions);
         m_data.putShort((short)hostname.length());
         try {
             m_data.put(hostname.getBytes("UTF-8"));
@@ -716,9 +672,14 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     private void sendPlanFragmentsInvocation(final Commands cmd,
-            final long[] planFragmentIds, final int numFragmentIds,
-            final ParameterSet[] parameterSets, final int numParameterSets, final long txnId,
-            final long lastCommittedTxnId, final long undoToken) {
+            final int numFragmentIds,
+            final long[] planFragmentIds,
+            long[] inputDepIds,
+            final ParameterSet[] parameterSets,
+            final long txnId,
+            final long lastCommittedTxnId,
+            final long undoToken)
+    {
         // big endian, not direct
         final FastSerializer fser = new FastSerializer();
         try {
@@ -729,16 +690,26 @@ public class ExecutionEngineIPC extends ExecutionEngine {
             throw new RuntimeException(exception);
         }
 
+        // if inputDepIds is null, make a bunch of dummies
+        if (inputDepIds == null) {
+            inputDepIds = new long[numFragmentIds];
+            for (int i = 0; i < inputDepIds.length; i++) {
+                inputDepIds[0] = -1;
+            }
+        }
+
         m_data.clear();
         m_data.putInt(cmd.m_id);
         m_data.putLong(txnId);
         m_data.putLong(lastCommittedTxnId);
         m_data.putLong(undoToken);
         m_data.putInt(numFragmentIds);
-        m_data.putInt(numParameterSets);
         for (int i = 0; i < numFragmentIds; ++i) {
             m_data.putLong(planFragmentIds[i]);
         }
+        for (int i = 0; i < numFragmentIds; ++i) {
+            m_data.putLong(inputDepIds[i]);
+        }
         m_data.put(fser.getBuffer());
 
         try {
@@ -751,77 +722,12 @@ public class ExecutionEngineIPC extends ExecutionEngine {
     }
 
     @Override
-    public DependencyPair executePlanFragment(final long planFragmentId, final int outputDepId,
-            final int inputDepId, final ParameterSet parameterSet, final long txnId,
-            final long lastCommittedTxnId, final long undoToken)
-            throws EEException {
-        // big endian, not direct
-        final FastSerializer fser = new FastSerializer();
-        try {
-            parameterSet.writeExternal(fser);
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception);
-        }
-
-        m_data.clear();
-        m_data.putInt(Commands.PlanFragment.m_id);
-        m_data.putLong(txnId);
-        m_data.putLong(lastCommittedTxnId);
-        m_data.putLong(undoToken);
-        m_data.putLong(planFragmentId);
-        m_data.putInt(outputDepId);
-        m_data.putInt(inputDepId);
-        m_data.put(fser.getBuffer());
-
-        try {
-            m_data.flip();
-            m_connection.write();
-        } catch (final Exception e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        int result = ExecutionEngine.ERRORCODE_ERROR;
-        try {
-            result = m_connection.readStatusByte();
-        } catch (final IOException e) {
-            System.out.println("Exception: " + e.getMessage());
-            throw new RuntimeException(e);
-        }
-
-        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
-            throw new EEException(result);
-        } else {
-            try {
-                return m_connection.readDependencies();
-            } catch (final IOException e) {
-                // TODO Auto-generated catch block
-                e.printStackTrace();
-            }
-        }
-        return null;
-    }
-
-    @Override
-    public VoltTable executeCustomPlanFragment(final String plan, int outputDepId,
-            int inputDepId, final long txnId, final long lastCommittedTxnId,
-            final long undoQuantumToken) throws EEException
+    public long loadPlanFragment(byte[] plan) throws EEException
     {
-        final FastSerializer fser = new FastSerializer();
-        try {
-            fser.writeString(plan);
-        } catch (final IOException exception) {
-            throw new RuntimeException(exception);
-        }
-
         m_data.clear();
-        m_data.putInt(Commands.CustomPlanFragment.m_id);
-        m_data.putLong(txnId);
-        m_data.putLong(lastCommittedTxnId);
-        m_data.putLong(undoQuantumToken);
-        m_data.putInt(outputDepId);
-        m_data.putInt(inputDepId);
-        m_data.put(fser.getBuffer());
+        m_data.putInt(Commands.LoadFragment.m_id);
+        m_data.putInt(plan.length);
+        m_data.put(plan);
 
         try {
             m_data.flip();
@@ -832,34 +738,36 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         }
 
         int result = ExecutionEngine.ERRORCODE_ERROR;
+        long planFragId = 0;
+        boolean cacheHit = false;
+        long cacheSize = 0;
         try {
             result = m_connection.readStatusByte();
+            planFragId = m_connection.readLong();
+            cacheHit = m_connection.readLong() != 0;
+            cacheSize = m_connection.readLong();
         } catch (final IOException e) {
             System.out.println("Exception: " + e.getMessage());
             throw new RuntimeException(e);
         }
-        if (result == ExecutionEngine.ERRORCODE_SUCCESS) {
-            final VoltTable resultTables[] = new VoltTable[1];
-            resultTables[0] = PrivateVoltTableFactory.createUninitializedVoltTable();
-            try {
-                m_connection.readResultTables(resultTables);
-            } catch (final IOException e) {
-                throw new EEException(
-                        ExecutionEngine.ERRORCODE_WRONG_SERIALIZED_BYTES);
-            }
-            return resultTables[0];
+        if (result != ExecutionEngine.ERRORCODE_SUCCESS) {
+            throw new EEException(ExecutionEngine.ERRORCODE_ERROR);
         }
-        return null;
+        return planFragId;
     }
 
     @Override
-    public VoltTable[] executeQueryPlanFragmentsAndGetResults(
-            final long[] planFragmentIds, final int numFragmentIds,
-            final ParameterSet[] parameterSets, final int numParameterSets, final long txnId,
-            final long lastCommittedTxnId, final long undoToken) throws EEException {
+    public VoltTable[] executePlanFragments(
+            final int numFragmentIds,
+            final long[] planFragmentIds,
+            final long[] inputDepIds,
+            final ParameterSet[] parameterSets,
+            final long txnId,
+            final long lastCommittedTxnId,
+            final long undoToken) throws EEException {
         sendPlanFragmentsInvocation(Commands.QueryPlanFragments,
-                planFragmentIds, numFragmentIds, parameterSets,
-                numParameterSets, txnId, lastCommittedTxnId, undoToken);
+                numFragmentIds, planFragmentIds, inputDepIds, parameterSets,
+                txnId, lastCommittedTxnId, undoToken);
         int result = ExecutionEngine.ERRORCODE_ERROR;
         try {
             result = m_connection.readStatusByte();
@@ -899,7 +807,7 @@ public class ExecutionEngineIPC extends ExecutionEngine {
 
     @Override
     public void loadTable(final int tableId, final VoltTable table, final long txnId,
-            final long lastCommittedTxnId, final long undoToken)
+            final long lastCommittedTxnId)
         throws EEException
     {
         m_data.clear();
@@ -907,7 +815,6 @@ public class ExecutionEngineIPC extends ExecutionEngine {
         m_data.putInt(tableId);
         m_data.putLong(txnId);
         m_data.putLong(lastCommittedTxnId);
-        m_data.putLong(undoToken);
 
         final ByteBuffer tableBytes = table.getTableDataReference();
         if (m_data.remaining() < tableBytes.remaining()) {

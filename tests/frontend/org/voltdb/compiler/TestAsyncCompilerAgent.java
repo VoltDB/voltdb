@@ -23,7 +23,10 @@
 
 package org.voltdb.compiler;
 
+import java.util.Arrays;
 import java.util.concurrent.Semaphore;
+import java.util.concurrent.atomic.AtomicInteger;
+import java.util.concurrent.atomic.AtomicReference;
 
 import org.junit.After;
 import org.junit.Before;
@@ -32,9 +35,9 @@ import org.mockito.ArgumentCaptor;
 import org.mockito.invocation.InvocationOnMock;
 import org.mockito.stubbing.Answer;
 import org.mockito.verification.VerificationMode;
-import org.voltdb.messaging.HostMessenger;
-import org.voltdb.messaging.LocalObjectMessage;
-import org.voltdb.messaging.MessagingException;
+import org.voltcore.messaging.HostMessenger;
+import org.voltcore.messaging.LocalObjectMessage;
+import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 
 import static org.junit.Assert.*;
 import static org.mockito.Mockito.*;
@@ -72,7 +75,7 @@ public class TestAsyncCompilerAgent {
      * @throws InterruptedException
      */
     @Test
-    public void testMaxQueueDepth() throws MessagingException, InterruptedException {
+    public void testMaxQueueDepth() throws InterruptedException {
         /*
          * mock the compileAdHocPlan method so that we can control how many
          * things will be waiting in the queue
@@ -89,24 +92,42 @@ public class TestAsyncCompilerAgent {
          * of messages will use up all the capacity, the last one will be
          * rejected.
          */
+        final AtomicInteger completedRequests = new AtomicInteger();
+        final AtomicReference<AsyncCompilerResult> result = new AtomicReference<AsyncCompilerResult>();
+        final long threadId = Thread.currentThread().getId();
         for (int i = 0; i < AsyncCompilerAgent.MAX_QUEUE_DEPTH + 2; ++i) {
             AdHocPlannerWork work =
-                    new AdHocPlannerWork(100, 0, false, 0, 0, "localhost", false, null,
-                                         "select * from a", 0);
+                    new AdHocPlannerWork(100l, false, 0, 0, "localhost", false, null,
+                            "select * from a", Arrays.asList(new String[] {"select * from a"}), 0, null, false, true,
+                            new AsyncCompilerWorkCompletionHandler() {
+
+                                @Override
+                                public void onCompletion(
+                                        AsyncCompilerResult compilerResult) {
+                                    completedRequests.incrementAndGet();
+                                    /*
+                                     * A rejected request will be handled in the current thread invoking deliver
+                                     * so use that to record the error response
+                                     */
+                                    if (Thread.currentThread().getId() == threadId) {
+                                        result.set(compilerResult);
+                                    }
+                                }
+
+                    });
             LocalObjectMessage msg = new LocalObjectMessage(work);
+            msg.m_sourceHSId = 100;
             m_agent.m_mailbox.deliver(msg);
         }
 
         // check for one rejected request
-        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
-        verify(m_agent.m_mailbox).send(eq(100), eq(0), captor.capture());
-        assertNotNull(((AsyncCompilerResult) captor.getValue().payload).errorMsg);
+        assertNotNull(result.get().errorMsg);
+
         // let all requests return
-        blockingAnswer.flag.release(AsyncCompilerAgent.MAX_QUEUE_DEPTH + 1);
+        blockingAnswer.flag.release(AsyncCompilerAgent.MAX_QUEUE_DEPTH + 5);
 
         // check if all previous requests finish
         m_agent.shutdown();
-        VerificationMode expected = times(AsyncCompilerAgent.MAX_QUEUE_DEPTH + 2);
-        verify(m_agent.m_mailbox, expected).send(eq(100), eq(0), any(LocalObjectMessage.class));
+        assertEquals(AsyncCompilerAgent.MAX_QUEUE_DEPTH + 2, completedRequests.get());
     }
 }

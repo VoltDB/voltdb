@@ -448,36 +448,22 @@ public class TestMaliciousClientSuite extends RegressionSuite {
         /////////////////////////////////////////////////////////////
 
         // get a server config for the native backend with one sites/partitions
-        VoltServerConfig config = new LocalSingleProcessServer("malicious-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
+        VoltServerConfig config = new LocalCluster("malicious-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
 
         // build the jarfile
         success = config.compile(project);
-        assert(success);
+        assertTrue(success);
 
         // add this config to the set of tests to run
         builder.addServerConfig(config);
 
         /////////////////////////////////////////////////////////////
-        // CONFIG #2: 2 Local Site/Partitions running on JNI backend
+        // CONFIG #2: Local Cluster (of processes)
         /////////////////////////////////////////////////////////////
 
-        // get a server config for the native backend with two sites/partitions
-        config = new LocalSingleProcessServer("malicious-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
-
-        // build the jarfile (note the reuse of the TPCC project)
+        config = new LocalCluster("malicious-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
-        assert(success);
-
-        // add this config to the set of tests to run
-        builder.addServerConfig(config);
-
-        /////////////////////////////////////////////////////////////
-        // CONFIG #4: Local Cluster (of processes)
-        /////////////////////////////////////////////////////////////
-
-        config = new LocalCluster("malicious-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
-        success = config.compile(project);
-        assert(success);
+        assertTrue(success);
         builder.addServerConfig(config);
 
         return builder;

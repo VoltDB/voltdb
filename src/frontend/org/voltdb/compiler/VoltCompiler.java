@@ -48,6 +48,8 @@ import javax.xml.validation.Schema;
 import javax.xml.validation.SchemaFactory;
 
 import org.hsqldb_voltpatches.HSQLInterface;
+import org.voltcore.logging.Level;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.ProcInfoData;
 import org.voltdb.RealVoltDB;
 import org.voltdb.TransactionIdManager;
@@ -73,8 +75,6 @@ import org.voltdb.compiler.projectfile.ProceduresType;
 import org.voltdb.compiler.projectfile.ProjectType;
 import org.voltdb.compiler.projectfile.SchemasType;
 import org.voltdb.compiler.projectfile.SecurityType;
-import org.voltdb.logging.Level;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.types.ConstraintType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.Encoder;
@@ -92,7 +92,7 @@ import org.xml.sax.SAXParseException;
  */
 public class VoltCompiler {
     /** Represents the level of severity for a Feedback message generated during compiling. */
-    public static enum Severity { INFORMATIONAL, WARNING, ERROR, UNEXPECTED };
+    public static enum Severity { INFORMATIONAL, WARNING, ERROR, UNEXPECTED }
     public static final int NO_LINE_NUMBER = -1;
 
     // feedback by filename
@@ -114,6 +114,8 @@ public class VoltCompiler {
     HSQLInterface m_hsql = null;
 
     DatabaseEstimates m_estimates = new DatabaseEstimates();
+
+    private List<String> m_capturedDiagnosticDetail = null;
 
     private static final VoltLogger compilerLog = new VoltLogger("COMPILER");
     @SuppressWarnings("unused")
@@ -442,8 +444,6 @@ public class VoltCompiler {
             compileXMLRootNode(project);
         } catch (final VoltCompilerException e) {
             compilerLog.l7dlog( Level.ERROR, LogKeys.compiler_VoltCompiler_FailedToCompileXML.name(), null);
-            compilerLog.error(e.getMessage());
-            // e.printStackTrace();
             return null;
         }
         assert(m_catalog != null);
@@ -497,7 +497,7 @@ public class VoltCompiler {
         final ArrayList<String> schemas = new ArrayList<String>();
         final ArrayList<ProcedureDescriptor> procedures = new ArrayList<ProcedureDescriptor>();
         final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
-        final ArrayList<String[]> partitions = new ArrayList<String[]>();
+        final TablePartitionMap partitionMap = new TablePartitionMap(this);
 
         final String databaseName = database.getName();
 
@@ -525,6 +525,7 @@ public class VoltCompiler {
                 org.voltdb.catalog.Group catGroup = db.getGroups().add(group.getName());
                 catGroup.setAdhoc(group.isAdhoc());
                 catGroup.setSysproc(group.isSysproc());
+                catGroup.setDefaultproc(group.isDefaultproc());
             }
         }
 
@@ -545,7 +546,7 @@ public class VoltCompiler {
         // partitions/table
         if (database.getPartitions() != null) {
             for (org.voltdb.compiler.projectfile.PartitionsType.Partition table : database.getPartitions().getPartition()) {
-                partitions.add(getPartition(table));
+                partitionMap.put(table.getTable(), table.getColumn());
             }
         }
 
@@ -558,7 +559,9 @@ public class VoltCompiler {
         }
 
         // Actually parse and handle all the DDL
-        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql);
+        // DDLCompiler also provides partition descriptors for DDL PARTITION
+        // and REPLICATE statements.
+        final DDLCompiler ddlcompiler = new DDLCompiler(this, m_hsql, partitionMap);
 
         for (final String schemaPath : schemas) {
             File schemaFile = null;
@@ -592,51 +595,55 @@ public class VoltCompiler {
         // this needs to happen before procedures are compiled
         String msg = "In database \"" + databaseName + "\", ";
         final CatalogMap<Table> tables = db.getTables();
-        for (final String[] partition : partitions) {
-            final String tableName = partition[0];
-            final String colName = partition[1];
-            final Table t = tables.getIgnoreCase(tableName);
-            if (t == null) {
-                msg += "\"partition\" element has unknown \"table\" attribute '" + tableName + "'";
-                throw new VoltCompilerException(msg);
-            }
-            final Column c = t.getColumns().getIgnoreCase(colName);
-            // make sure the column exists
-            if (c == null) {
-                msg += "\"partition\" element has unknown \"column\" attribute '" + colName + "'";
-                throw new VoltCompilerException(msg);
-            }
-            // make sure the column is marked not-nullable
-            if (c.getNullable() == true) {
-                msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
-                    "Partition columns must be constrained \"NOT NULL\".";
-                throw new VoltCompilerException(msg);
-            }
-            // verify that the partition column is a supported type
-            VoltType pcolType = VoltType.get((byte) c.getType());
-            switch (pcolType) {
-                case TINYINT:
-                case SMALLINT:
-                case INTEGER:
-                case BIGINT:
-                case STRING:
-                    break;
-                default:
-                    msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
-                    "Partition columns must be an integer or varchar type.";
+        for (String tableName : partitionMap.m_map.keySet()) {
+            String colName = partitionMap.m_map.get(tableName);
+            // A null column name indicates a replicated table. Ignore it here
+            // because it defaults to replicated in the catalog.
+            if (colName != null) {
+                final Table t = tables.getIgnoreCase(tableName);
+                if (t == null) {
+                    msg += "PARTITION has unknown TABLE '" + tableName + "'";
                     throw new VoltCompilerException(msg);
-            }
+                }
+                final Column c = t.getColumns().getIgnoreCase(colName);
+                // make sure the column exists
+                if (c == null) {
+                    msg += "PARTITION has unknown COLUMN '" + colName + "'";
+                    throw new VoltCompilerException(msg);
+                }
+                // make sure the column is marked not-nullable
+                if (c.getNullable() == true) {
+                    msg += "Partition column '" + tableName + "." + colName + "' is nullable. " +
+                        "Partition columns must be constrained \"NOT NULL\".";
+                    throw new VoltCompilerException(msg);
+                }
+                // verify that the partition column is a supported type
+                VoltType pcolType = VoltType.get((byte) c.getType());
+                switch (pcolType) {
+                    case TINYINT:
+                    case SMALLINT:
+                    case INTEGER:
+                    case BIGINT:
+                    case STRING:
+                        break;
+                    default:
+                        msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
+                        "Partition columns must be an integer or varchar type.";
+                        throw new VoltCompilerException(msg);
+                }
 
-            t.setPartitioncolumn(c);
-            t.setIsreplicated(false);
+                t.setPartitioncolumn(c);
+                t.setIsreplicated(false);
 
-            // Set the destination tables of associated views non-replicated.
-            // If a view's source table is replicated, then a full scan of the
-            // associated view is singled-sited. If the source is partitioned,
-            // a full scan of the view must be distributed.
-            final CatalogMap<MaterializedViewInfo> views = t.getViews();
-            for (final MaterializedViewInfo mvi : views) {
-                mvi.getDest().setIsreplicated(false);
+                // Set the destination tables of associated views non-replicated.
+                // If a view's source table is replicated, then a full scan of the
+                // associated view is singled-sited. If the source is partitioned,
+                // a full scan of the view must be distributed.
+                final CatalogMap<MaterializedViewInfo> views = t.getViews();
+                for (final MaterializedViewInfo mvi : views) {
+                    mvi.getDest().setIsreplicated(false);
+                    setGroupedTablePartitionColumn(mvi, c);
+                }
             }
         }
 
@@ -681,9 +688,60 @@ public class VoltCompiler {
             addClassToJar( classDependency, this );
         }
 
-        m_hsql.close();
     }
 
+    static private void setGroupedTablePartitionColumn(MaterializedViewInfo mvi, Column partitionColumn) {
+        // A view of a replicated table is replicated.
+        // A view of a partitioned table is partitioned -- regardless of whether it has a partition key
+        // -- it certainly isn't replicated!
+        // If the partitioning column is grouped, its counterpart is the partitioning column of the view table.
+        // Otherwise, the view table just doesn't have a partitioning column
+        // -- it is seemingly randomly distributed,
+        // and its grouped columns are only locally unique but not globally unique.
+        Table destTable = mvi.getDest();
+        // Get the grouped columns in "index" order.
+        // This order corresponds to the iteration order of the MaterializedViewInfo's getGroupbycols.
+        List<Column> destColumnArray = CatalogUtil.getSortedCatalogItems(destTable.getColumns(), "index");
+        String partitionColName = partitionColumn.getTypeName(); // Note getTypeName gets the column name -- go figure.
+        int index = 0;
+        for (ColumnRef cref : mvi.getGroupbycols()) {
+            Column srcCol = cref.getColumn();
+            if (srcCol.getName().equals(partitionColName)) {
+                Column destCol = destColumnArray.get(index);
+                destTable.setPartitioncolumn(destCol);
+                return;
+            }
+            ++index;
+        }
+    }
+
+    /** Provide a feedback path to monitor plan output via harvestCapturedDetail */
+    public void enableDetailedCapture() {
+        m_capturedDiagnosticDetail = new ArrayList<String>();
+    }
+
+    /** Access recent plan output, for diagnostic purposes */
+    public List<String> harvestCapturedDetail() {
+        List<String> harvested = m_capturedDiagnosticDetail;
+        m_capturedDiagnosticDetail = null;
+        return harvested;
+    }
+
+    /** Capture plan context info -- statement, cost, high-level "explain". */
+    public void captureDiagnosticContext(String planDescription) {
+        if (m_capturedDiagnosticDetail == null) {
+            return;
+        }
+        m_capturedDiagnosticDetail.add(planDescription);
+    }
+
+    /** Capture plan content in terse json format. */
+    public void captureDiagnosticJsonFragment(String json) {
+        if (m_capturedDiagnosticDetail == null) {
+            return;
+        }
+        m_capturedDiagnosticDetail.add(json);
+    }
 
     /**
      * Create INSERT, UPDATE, DELETE and SELECT procedure descriptors for all partitioned,
@@ -770,6 +828,9 @@ public class VoltCompiler {
 
     /** Helper to sort table columns by table column order */
     private static class TableColumnComparator implements Comparator<Column> {
+        public TableColumnComparator() {
+        }
+
         @Override
         public int compare(Column o1, Column o2) {
             return o1.getIndex() - o2.getIndex();
@@ -778,6 +839,9 @@ public class VoltCompiler {
 
     /** Helper to sort index columnrefs by index column order */
     private static class ColumnRefComparator implements Comparator<ColumnRef> {
+        public ColumnRefComparator() {
+        }
+
         @Override
         public int compare(ColumnRef o1, ColumnRef o2) {
             return o1.getIndex() - o2.getIndex();
@@ -1095,28 +1159,6 @@ public class VoltCompiler {
         return cls;
     }
 
-    String[] getPartition(org.voltdb.compiler.projectfile.PartitionsType.Partition xmltable)
-    throws VoltCompilerException
-    {
-        String msg = "";
-        final String tableName = xmltable.getTable();
-        final String columnName = xmltable.getColumn();
-
-        // where is table and column validity checked?
-        if (tableName.length() == 0) {
-            msg += "\"partition\" element has empty \"table\" attribute";
-            throw new VoltCompilerException(msg);
-        }
-
-        if (columnName.length() == 0) {
-            msg += "\"partition\" element has empty \"column\" attribute";
-            throw new VoltCompilerException(msg);
-        }
-
-        final String[] retval = { tableName, columnName };
-        return retval;
-    }
-
     void compileExport(final ExportType export, final Database catdb)
         throws VoltCompilerException
     {
@@ -1194,8 +1236,7 @@ public class VoltCompiler {
     public static void main(final String[] args) {
         // Parse arguments
         if (args.length != 2) {
-            System.err.println("USAGE (1): voltcompiler [classpath] [project file] [output JAR]");
-            System.err.println("USAGE (2): java -cp $CLASSPATH org.voltdb.compiler.VoltCompiler [project file] [output JAR]");
+            System.err.println("Usage: voltcompiler <classpath> <project-file> <output-JAR>");
             System.exit(1);
         }
         final String projectPath = args[0];
@@ -1205,13 +1246,13 @@ public class VoltCompiler {
         final VoltCompiler compiler = new VoltCompiler();
         final boolean success = compiler.compile(projectPath, outputJar);
         if (!success) {
-            compiler.summarizeErrors(System.out);
+            compiler.summarizeErrors(System.out, null);
             System.exit(-1);
         }
-        compiler.summarizeSuccess(System.out);
+        compiler.summarizeSuccess(System.out, null);
     }
 
-    public void summarizeSuccess(PrintStream outputStream) {
+    public void summarizeSuccess(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
 
             Database database = m_catalog.getClusters().get("cluster").
@@ -1261,6 +1302,14 @@ public class VoltCompiler {
             }
             outputStream.println("------------------------------------------");
         }
+        if (feedbackStream != null) {
+            for (Feedback fb : m_warnings) {
+                feedbackStream.println(fb.getLogString());
+            }
+            for (Feedback fb : m_infos) {
+                feedbackStream.println(fb.getLogString());
+            }
+        }
     }
 
     /**
@@ -1274,11 +1323,16 @@ public class VoltCompiler {
         return compact;
     }
 
-    private void summarizeErrors(PrintStream outputStream) {
+    public void summarizeErrors(PrintStream outputStream, PrintStream feedbackStream) {
         if (outputStream != null) {
             outputStream.println("------------------------------------------");
             outputStream.println("Project compilation failed. See log for errors.");
             outputStream.println("------------------------------------------");
+        }
+        if (feedbackStream != null) {
+            for (Feedback fb : m_errors) {
+                feedbackStream.println(fb.getLogString());
+            }
         }
     }
 
@@ -1331,6 +1385,8 @@ public class VoltCompiler {
         } catch (final UnsupportedEncodingException e) {
             e.printStackTrace();
             System.exit(-1);
+            // Prevent warning  about fis possibly being null below.
+            return;
         }
 
         assert(fileSize > 0);
@@ -1380,6 +1436,7 @@ public class VoltCompiler {
             catEntry = jarIn.getNextJarEntry();
         }
         if (catEntry == null) {
+            jarIn.close();
             return null;
         }
 

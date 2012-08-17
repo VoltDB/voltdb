@@ -17,13 +17,14 @@
 
 package org.voltdb.messaging;
 
-import java.io.IOException;
+import java.nio.ByteBuffer;
 
-import org.voltdb.utils.DBBPool;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 
 public class CompleteTransactionResponseMessage extends VoltMessage
 {
-    int m_executionSiteId;
+    long m_executionHSId;
     long m_txnId;
 
     /** Empty constructor for de-serialization */
@@ -32,9 +33,9 @@ public class CompleteTransactionResponseMessage extends VoltMessage
     }
 
     public CompleteTransactionResponseMessage(CompleteTransactionMessage msg,
-                                              int siteId)
+                                              long siteId)
     {
-        m_executionSiteId = siteId;
+        m_executionHSId = siteId;
         m_txnId = msg.getTxnId();
     }
 
@@ -43,37 +44,35 @@ public class CompleteTransactionResponseMessage extends VoltMessage
         return m_txnId;
     }
 
-    public int getExecutionSiteId()
+    public long getExecutionSiteId()
     {
-        return m_executionSiteId;
+        return m_executionHSId;
     }
 
     @Override
-    protected void flattenToBuffer(DBBPool pool) throws IOException
+    public int getSerializedSize()
     {
-        int msgsize = 4 + 8;
-
-        if (m_buffer == null) {
-            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
-            m_buffer = m_container.b;
-        }
-        setBufferSize(msgsize + 1, pool);
-
-        m_buffer.position(HEADER_SIZE);
-        m_buffer.put(COMPLETE_TRANSACTION_RESPONSE_ID);
-
-        m_buffer.putInt(m_executionSiteId);
-        m_buffer.putLong(m_txnId);
-        m_buffer.limit(m_buffer.position());
+        int msgsize = super.getSerializedSize();
+        msgsize += 8 + 8;
+        return msgsize;
     }
 
     @Override
-    protected void initFromBuffer()
+    public void flattenToBuffer(ByteBuffer buf)
     {
-        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
+        buf.put(VoltDbMessageFactory.COMPLETE_TRANSACTION_RESPONSE_ID);
+        buf.putLong(m_executionHSId);
+        buf.putLong(m_txnId);
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
+    }
 
-        m_executionSiteId = m_buffer.getInt();
-        m_txnId = m_buffer.getLong();
+    @Override
+    protected void initFromBuffer(ByteBuffer buf)
+    {
+        m_executionHSId = buf.getLong();
+        m_txnId = buf.getLong();
+        assert(buf.capacity() == buf.position());
     }
 
     @Override
@@ -82,7 +81,7 @@ public class CompleteTransactionResponseMessage extends VoltMessage
 
         sb.append("COMPLETE_TRANSACTION_RESPONSE");
         sb.append(" (FROM EXEC SITE: ");
-        sb.append(m_executionSiteId);
+        sb.append(CoreUtils.hsIdToString(m_executionHSId));
         sb.append(") FOR TXN ID: ");
         sb.append(m_txnId);
 

@@ -21,12 +21,19 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
+import java.net.InetAddress;
 import java.nio.ByteBuffer;
+import java.security.MessageDigest;
+import java.security.NoSuchAlgorithmException;
 import java.util.ArrayDeque;
 import java.util.ArrayList;
+import java.util.Arrays;
+import java.util.Collections;
 import java.util.Deque;
+import java.util.HashMap;
 import java.util.HashSet;
 import java.util.List;
+import java.util.Map;
 import java.util.concurrent.Semaphore;
 import java.util.concurrent.atomic.AtomicInteger;
 
@@ -34,18 +41,24 @@ import org.apache.zookeeper_voltpatches.CreateMode;
 import org.apache.zookeeper_voltpatches.KeeperException;
 import org.apache.zookeeper_voltpatches.KeeperException.NodeExistsException;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
+import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.apache.zookeeper_voltpatches.data.Stat;
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
-import org.voltdb.SnapshotSiteProcessor.SnapshotTableTask;
-import org.voltdb.agreement.ZKUtil;
-import org.voltdb.catalog.Host;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
+import org.voltcore.zk.ZKUtil;
 import org.voltdb.catalog.Table;
-import org.voltdb.logging.VoltLogger;
+import org.voltdb.dtxn.SiteTracker;
+import org.voltdb.rejoin.StreamSnapshotDataTarget;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotSave;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 import org.voltdb.utils.CatalogUtil;
+import com.google.common.primitives.Ints;
+import com.google.common.primitives.Longs;
 
 /**
  * SnapshotSaveAPI extracts reusuable snapshot production code
@@ -58,6 +71,9 @@ public class SnapshotSaveAPI
     private static final VoltLogger TRACE_LOG = new VoltLogger(SnapshotSaveAPI.class.getName());
     private static final VoltLogger HOST_LOG = new VoltLogger("HOST");
 
+    // ugh, ick, ugh
+    public static final AtomicInteger recoveringSiteCount = new AtomicInteger(0);
+
     /**
      * The only public method: do all the work to start a snapshot.
      * Assumes that a snapshot is feasible, that the caller has validated it can
@@ -66,18 +82,22 @@ public class SnapshotSaveAPI
      *
      * @param file_path
      * @param file_nonce
+     * @param format
      * @param block
-     * @param startTime
+     * @param txnId
+     * @param data
      * @param context
      * @param hostname
      * @return VoltTable describing the results of the snapshot attempt
      */
-    public VoltTable startSnapshotting(String file_path, String file_nonce, byte block,
-            long txnId, SystemProcedureExecutionContext context, String hostname)
+    public VoltTable startSnapshotting(
+            String file_path, String file_nonce, SnapshotFormat format, byte block,
+            long txnId, String data, SystemProcedureExecutionContext context, String hostname)
     {
         TRACE_LOG.trace("Creating snapshot target and handing to EEs");
         final VoltTable result = SnapshotSave.constructNodeResultsTable();
-        final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
+        final int numLocalSites = (context.getSiteTrackerForSnapshot().getLocalSites().length -
+                recoveringSiteCount.get());
 
         // One site wins the race to create the snapshot targets, populating
         // m_taskListsForSites for the other sites and creating an appropriate
@@ -95,7 +115,8 @@ public class SnapshotSaveAPI
                 SnapshotSiteProcessor.populateExportSequenceNumbersForExecutionSite(context);
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.acquire();
             } catch (InterruptedException e) {
-                result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                result.addRow(
+                        context.getHostId(),
                         hostname,
                         "",
                         "FAILURE",
@@ -104,7 +125,7 @@ public class SnapshotSaveAPI
             }
 
             if (SnapshotSiteProcessor.m_snapshotCreateSetupPermit.availablePermits() == 0) {
-                createSetup(file_path, file_nonce, txnId, context, hostname, result);
+                createSetup(file_path, file_nonce, format, txnId, data, context, hostname, result);
                 // release permits for the next setup, now that is one is complete
                 SnapshotSiteProcessor.m_snapshotCreateSetupPermit.release(numLocalSites);
             }
@@ -122,10 +143,10 @@ public class SnapshotSaveAPI
                 return result;
             } else {
                 assert(SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() > 0);
-                context.getExecutionSite().initiateSnapshots(
+                context.getSiteSnapshotConnection().initiateSnapshots(
                         m_taskList,
                         txnId,
-                        context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size());
+                        context.getSiteTrackerForSnapshot().getAllHosts().size());
             }
         }
 
@@ -134,18 +155,20 @@ public class SnapshotSaveAPI
             String status = "SUCCESS";
             String err = "";
             try {
-                failures = context.getExecutionSite().completeSnapshotWork();
+                failures = context.getSiteSnapshotConnection().completeSnapshotWork();
             } catch (InterruptedException e) {
                 status = "FAILURE";
                 err = e.toString();
+                failures = new HashSet<Exception>();
+                failures.add(e);
             }
             final VoltTable blockingResult = SnapshotSave.constructPartitionResultsTable();
 
             if (failures.isEmpty()) {
                 blockingResult.addRow(
-                        Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        context.getHostId(),
                         hostname,
-                        Integer.parseInt(context.getSite().getTypeName()),
+                        CoreUtils.getSiteIdFromHSId(context.getSiteId()),
                         status,
                         err);
             } else {
@@ -154,9 +177,9 @@ public class SnapshotSaveAPI
                     err = e.toString();
                 }
                 blockingResult.addRow(
-                        Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        context.getHostId(),
                         hostname,
-                        Integer.parseInt(context.getSite().getTypeName()),
+                        CoreUtils.getSiteIdFromHSId(context.getSiteId()),
                         status,
                         err);
             }
@@ -179,13 +202,13 @@ public class SnapshotSaveAPI
          */
         try {
             //This node shouldn't already exist... should have been erased when the last snapshot finished
-            assert(VoltDB.instance().getZK().exists(
-                    "/nodes_currently_snapshotting/" + VoltDB.instance().getHostMessenger().getHostId(), false)
+            assert(VoltDB.instance().getHostMessenger().getZK().exists(
+                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(), false)
                     == null);
             ByteBuffer snapshotTxnId = ByteBuffer.allocate(8);
             snapshotTxnId.putLong(txnId);
-            VoltDB.instance().getZK().create(
-                    "/nodes_currently_snapshotting/" + VoltDB.instance().getHostMessenger().getHostId(),
+            VoltDB.instance().getHostMessenger().getZK().create(
+                    VoltZK.nodes_currently_snapshotting + "/" + VoltDB.instance().getHostMessenger().getHostId(),
                     snapshotTxnId.array(), Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL, cb1, null);
         } catch (NodeExistsException e) {
             HOST_LOG.warn("Didn't expect the snapshot node to already exist", e);
@@ -197,7 +220,7 @@ public class SnapshotSaveAPI
         boolean isTruncation = false;
         try {
             final byte payloadBytes[] =
-                VoltDB.instance().getZK().getData("/request_truncation_snapshot", false, null);
+                VoltDB.instance().getHostMessenger().getZK().getData(VoltZK.request_truncation_snapshot, false, null);
             //request_truncation_snapshot data may be null when initially created. If that is the case
             //then this snapshot is definitely not a truncation snapshot because
             //the snapshot daemon hasn't gotten around to asking for a truncation snapshot
@@ -222,8 +245,10 @@ public class SnapshotSaveAPI
         /*
          * Race with the others to create the place where will count down to completing the snapshot
          */
-        int hosts = context.getExecutionSite().m_context.siteTracker.getAllLiveHosts().size();
-        createSnapshotCompletionNode( nonce, txnId, isTruncation, hosts);
+        if (!createSnapshotCompletionNode(nonce, txnId, context.getHostId(), isTruncation)) {
+            // the node already exists, add local host ID to the list
+            increaseParticipateHostCount(txnId, context.getHostId());
+        }
 
         try {
             cb1.get();
@@ -234,33 +259,82 @@ public class SnapshotSaveAPI
         }
     }
 
+    /**
+     * Add the host to the list of hosts participating in this snapshot.
+     *
+     * @param txnId The snapshot txnId
+     * @param hostId The host ID of the host that's calling this
+     */
+    public static void increaseParticipateHostCount(long txnId, int hostId) {
+        ZooKeeper zk = VoltDB.instance().getHostMessenger().getZK();
+
+        final String snapshotPath = VoltZK.completed_snapshots + "/" + txnId;
+        boolean success = false;
+        while (!success) {
+            Stat stat = new Stat();
+            byte data[] = null;
+            try {
+                data = zk.getData(snapshotPath, false, stat);
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("This ZK get should never fail", true, e);
+            }
+            if (data == null) {
+                VoltDB.crashLocalVoltDB("Data should not be null if the node exists", false, null);
+            }
+
+            try {
+                JSONObject jsonObj = new JSONObject(new String(data, "UTF-8"));
+                if (jsonObj.getLong("txnId") != txnId) {
+                    VoltDB.crashLocalVoltDB("TxnId should match", false, null);
+                }
+
+                boolean hasLocalhost = false;
+                JSONArray hosts = jsonObj.getJSONArray("hosts");
+                for (int i = 0; i < hosts.length(); i++) {
+                    if (hosts.getInt(i) == hostId) {
+                        hasLocalhost = true;
+                        break;
+                    }
+                }
+                if (!hasLocalhost) {
+                    hosts.put(hostId);
+                }
+
+                zk.setData(snapshotPath, jsonObj.toString(4).getBytes("UTF-8"), stat.getVersion());
+            } catch (KeeperException.BadVersionException e) {
+                continue;
+            } catch (Exception e) {
+                VoltDB.crashLocalVoltDB("This ZK call should never fail", true, e);
+            }
+            success = true;
+        }
+    }
 
     /**
      * Create the completion node for the snapshot identified by the txnId. It
      * assumes that all hosts will race to call this, so it doesn't fail if the
      * node already exists.
      *
+     * @param nonce Nonce of the snapshot
      * @param txnId
+     * @param hostId The local host ID
      * @param isTruncation Whether or not this is a truncation snapshot
-     * @param hosts The total number of live hosts
+     * @return true if the node is created successfully, false if the node already exists.
      */
-    public static void createSnapshotCompletionNode(String nonce,
-                                                    long txnId,
-                                                    boolean isTruncation,
-                                                    int hosts) {
-        if (hosts == 0) {
-            VoltDB.crashGlobalVoltDB("Hosts must be greater than 0", true, null);
-        }
+    public static boolean createSnapshotCompletionNode(String nonce,
+                                                       long txnId,
+                                                       int hostId,
+                                                       boolean isTruncation) {
         if (!(txnId > 0)) {
             VoltDB.crashGlobalVoltDB("Txnid must be greather than 0", true, null);
         }
 
-        byte  nodeBytes[] = null;
+        byte nodeBytes[] = null;
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
             stringer.key("txnId").value(txnId);
-            stringer.key("hosts").value(hosts);
+            stringer.key("hosts").array().value(hostId).endArray();
             stringer.key("isTruncation").value(isTruncation);
             stringer.key("finishedHosts").value(0);
             stringer.key("nonce").value(nonce);
@@ -272,26 +346,73 @@ public class SnapshotSaveAPI
         }
 
         ZKUtil.StringCallback cb = new ZKUtil.StringCallback();
-        final String snapshotPath = "/completed_snapshots/" + txnId;
-        VoltDB.instance().getZK().create(
+        final String snapshotPath = VoltZK.completed_snapshots + "/" +  txnId;
+        VoltDB.instance().getHostMessenger().getZK().create(
                 snapshotPath, nodeBytes, Ids.OPEN_ACL_UNSAFE, CreateMode.PERSISTENT,
                 cb, null);
 
         try {
             cb.get();
+            return true;
         } catch (KeeperException.NodeExistsException e) {
         } catch (Exception e) {
             VoltDB.crashLocalVoltDB("Unexpected exception logging snapshot completion to ZK", true, e);
         }
+
+        return false;
     }
 
-
-    @SuppressWarnings("unused")
-    private void createSetup(String file_path, String file_nonce,
-            long txnId, SystemProcedureExecutionContext context,
+    private void createSetup(
+            String file_path, String file_nonce, SnapshotFormat format,
+            long txnId, String data, SystemProcedureExecutionContext context,
             String hostname, final VoltTable result) {
         {
-            final int numLocalSites = VoltDB.instance().getLocalSites().values().size();
+            SiteTracker tracker = context.getSiteTrackerForSnapshot();
+            final int numLocalSites =
+                    (tracker.getLocalSites().length - recoveringSiteCount.get());
+
+            // non-null if targeting only one site (used for rejoin)
+            // set later from the "data" JSON string
+            Long targetHSid = null;
+
+            MessageDigest digest;
+            try {
+                digest = MessageDigest.getInstance("SHA-1");
+            } catch (NoSuchAlgorithmException e) {
+                throw new AssertionError(e);
+            }
+
+            /*
+             * List of partitions to include if this snapshot is
+             * going to be deduped. Attempts to break up the work
+             * by seeding an RNG selecting
+             * a random replica to do the work. Will not work in failure
+             * cases, but we don't use dedupe when we want durability.
+             *
+             * Originally used the partition id as the seed, but it turns out
+             * that nextInt(2) returns a 1 for seeds 0-4095. Now use SHA-1
+             * on the txnid + partition id.
+             */
+            List<Integer> partitionsToInclude = new ArrayList<Integer>();
+            List<Long> sitesToInclude = new ArrayList<Long>();
+            for (long localSite : tracker.getLocalSites()) {
+                final int partitionId = tracker.getPartitionForSite(localSite);
+                List<Long> sites =
+                        new ArrayList<Long>(tracker.getSitesForPartition(tracker.getPartitionForSite(localSite)));
+                Collections.sort(sites);
+
+                digest.update(Longs.toByteArray(txnId));
+                final long seed = Longs.fromByteArray(Arrays.copyOf( digest.digest(Ints.toByteArray(partitionId)), 8));
+
+                int siteIndex = new java.util.Random(seed).nextInt(sites.size());
+                if (localSite == sites.get(siteIndex)) {
+                    partitionsToInclude.add(partitionId);
+                    sitesToInclude.add(localSite);
+                }
+            }
+
+            assert(partitionsToInclude.size() == sitesToInclude.size());
+
             /*
              * Used to close targets on failure
              */
@@ -305,49 +426,119 @@ public class SnapshotSaveAPI
 
                 final List<Table> tables = SnapshotUtil.getTablesToSave(context.getDatabase());
 
-                Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
-                        txnId,
-                        context.getExecutionSite().m_context.getCatalogCRC(),
-                        file_path,
-                        file_nonce,
-                        tables,
-                        context.getExecutionSite().getCorrespondingHostId(),
-                        SnapshotSiteProcessor.getExportSequenceNumbers());
-                if (completionTask != null) {
-                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+                if (format.isFileBased()) {
+                    Runnable completionTask = SnapshotUtil.writeSnapshotDigest(
+                                                  txnId,
+                                                  context.getCatalogCRC(),
+                                                  file_path,
+                                                  file_nonce,
+                                                  tables,
+                                                  context.getHostId(),
+                                                  SnapshotSiteProcessor.getExportSequenceNumbers());
+                    if (completionTask != null) {
+                        SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+                    }
+                    completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
+                    if (completionTask != null) {
+                        SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
+                    }
                 }
-                completionTask = SnapshotUtil.writeSnapshotCatalog(file_path, file_nonce);
-                if (completionTask != null) {
-                    SnapshotSiteProcessor.m_tasksOnSnapshotCompletion.offer(completionTask);
-                }
+
                 final AtomicInteger numTables = new AtomicInteger(tables.size());
                 final SnapshotRegistry.Snapshot snapshotRecord =
                     SnapshotRegistry.startSnapshot(
                             txnId,
-                            context.getExecutionSite().getCorrespondingHostId(),
+                            context.getHostId(),
                             file_path,
                             file_nonce,
+                            format,
                             tables.toArray(new Table[0]));
+
+                SnapshotDataTarget sdt = null;
+                if (!format.isTableBased()) {
+                    // table schemas for all the tables we'll snapshot on this partition
+                    Map<Integer, byte[]> schemas = new HashMap<Integer, byte[]>();
+                    for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase())) {
+                        VoltTable schemaTable = CatalogUtil.getVoltTable(table);
+                        schemas.put(table.getRelativeIndex(), schemaTable.getSchemaBytes());
+                    }
+
+                    if (format == SnapshotFormat.STREAM && data != null) {
+                        JSONObject jsObj = new JSONObject(data);
+                        int port = jsObj.getInt("port");
+                        JSONArray jsAddresses = jsObj.getJSONArray("addresses");
+                        ArrayList<byte[]> addresses = new ArrayList<byte[]>();
+                        for (int i = 0; i < jsAddresses.length(); i++) {
+                            InetAddress addr = InetAddress.getByName(jsAddresses.getString(i));
+                            addresses.add(addr.getAddress());
+                        }
+
+                        // if a target_hsid exists, set it for filtering a snapshot for a specific site
+                        try {
+                            targetHSid = jsObj.getLong("target_hsid");
+                        }
+                        catch (JSONException e) {} // leave value as null on exception
+
+                        // if this snapshot targets a specific site...
+                        if (targetHSid != null) {
+                            // get the list of sites on this node
+                            List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
+                            // if the target site is local to this node...
+                            if (localHSids.contains(targetHSid)) {
+                                sdt = new StreamSnapshotDataTarget(addresses, port, schemas);
+                            }
+                            else {
+                                sdt = new DevNullSnapshotTarget();
+                            }
+                        }
+                    }
+                }
+
                 for (final Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
+                    /*
+                     * For a deduped csv snapshot, only produce the replicated tables on the "leader"
+                     * host.
+                     */
+                    if (format == SnapshotFormat.CSV && table.getIsreplicated() && !tracker.isFirstHost()) {
+                        snapshotRecord.removeTable(table.getTypeName());
+                        continue;
+                    }
                     String canSnapshot = "SUCCESS";
                     String err_msg = "";
-                    final File saveFilePath =
-                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce,
-                                              context.getSite().getHost().getTypeName());
-                    SnapshotDataTarget sdt = null;
-                    try {
-                        sdt =
-                            constructSnapshotDataTargetForTable(
-                                    context,
-                                    saveFilePath,
+
+                    File saveFilePath = null;
+                    if (format.isFileBased()) {
+                        saveFilePath = SnapshotUtil.constructFileForTable(
                                     table,
-                                    context.getSite().getHost(),
-                                    context.getCluster().getPartitions().size(),
-                                    txnId);
+                                    file_path,
+                                    file_nonce,
+                                    format,
+                                    context.getHostId());
+                    }
+
+                    try {
+                        if (format == SnapshotFormat.CSV) {
+                            sdt = new SimpleFileSnapshotDataTarget(saveFilePath);
+                        } else if (format == SnapshotFormat.NATIVE) {
+                            sdt =
+                                constructSnapshotDataTargetForTable(
+                                        context,
+                                        saveFilePath,
+                                        table,
+                                        context.getHostId(),
+                                        tracker.m_numberOfPartitions,
+                                        txnId);
+                        }
+
+                        if (sdt == null) {
+                            throw new IOException("Unable to create snapshot target");
+                        }
+
                         targets.add(sdt);
                         final SnapshotDataTarget sdtFinal = sdt;
                         final Runnable onClose = new Runnable() {
+                            @SuppressWarnings("synthetic-access")
                             @Override
                             public void run() {
                                 snapshotRecord.updateTable(table.getTypeName(),
@@ -377,10 +568,44 @@ public class SnapshotSaveAPI
 
                         sdt.setOnCloseHandler(onClose);
 
+                        List<SnapshotDataFilter> filters = new ArrayList<SnapshotDataFilter>();
+                        if (format == SnapshotFormat.CSV) {
+                            /*
+                             * Don't need to do filtering on a replicated table.
+                             */
+                            if (!table.getIsreplicated()) {
+                                filters.add(
+                                        new PartitionProjectionSnapshotFilter(
+                                                Ints.toArray(partitionsToInclude),
+                                                0));
+                            }
+                            filters.add(new CSVSnapshotFilter(CatalogUtil.getVoltTable(table), ',', null));
+                        }
+
+                        // if this snapshot targets a specific site...
+                        if (targetHSid != null) {
+                            // get the list of sites on this node
+                            List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
+                            // if the target site is local to this node...
+                            if (localHSids.contains(targetHSid)) {
+                                // ...get its partition id...
+                                int partitionId = tracker.getPartitionForSite(targetHSid);
+                                // ...and build a filter to only get that partition
+                                filters.add(new PartitionProjectionSnapshotFilter(
+                                        new int[] { partitionId }, sdt.getHeaderSize()));
+                            }
+                            else {
+                                // filter EVERYTHING because the site we want isn't local
+                                filters.add(new PartitionProjectionSnapshotFilter(
+                                        new int[0], sdt.getHeaderSize()));
+                            }
+                        }
+
                         final SnapshotTableTask task =
                             new SnapshotTableTask(
                                     table.getRelativeIndex(),
                                     sdt,
+                                    filters.toArray(new SnapshotDataFilter[filters.size()]),
                                     table.getIsreplicated(),
                                     table.getTypeName());
 
@@ -409,11 +634,11 @@ public class SnapshotSaveAPI
                         ex.printStackTrace(pw);
                         pw.flush();
                         canSnapshot = "FAILURE";
-                        err_msg = "SNAPSHOT INITIATION OF " + saveFilePath +
+                        err_msg = "SNAPSHOT INITIATION OF " + file_nonce +
                         "RESULTED IN IOException: \n" + sw.toString();
                     }
 
-                    result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+                    result.addRow(context.getHostId(),
                             hostname,
                             table.getTypeName(),
                             canSnapshot,
@@ -423,8 +648,7 @@ public class SnapshotSaveAPI
                 synchronized (SnapshotSiteProcessor.m_taskListsForSites) {
                     boolean aborted = false;
                     if (!partitionedSnapshotTasks.isEmpty() || !replicatedSnapshotTasks.isEmpty()) {
-                        SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(
-                                VoltDB.instance().getLocalSites().values().size());
+                        SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.set(numLocalSites);
                         for (int ii = 0; ii < numLocalSites; ii++) {
                             SnapshotSiteProcessor.m_taskListsForSites.add(new ArrayDeque<SnapshotTableTask>());
                         }
@@ -438,11 +662,16 @@ public class SnapshotSaveAPI
                      */
                     for (int ii = 0; ii < numLocalSites && !partitionedSnapshotTasks.isEmpty(); ii++) {
                         SnapshotSiteProcessor.m_taskListsForSites.get(ii).addAll(partitionedSnapshotTasks);
+                        if (!format.isTableBased()) {
+                            SnapshotSiteProcessor.m_taskListsForSites.get(ii).addAll(replicatedSnapshotTasks);
+                        }
                     }
 
-                    int siteIndex = 0;
-                    for (SnapshotTableTask t : replicatedSnapshotTasks) {
-                        SnapshotSiteProcessor.m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
+                    if (format.isTableBased()) {
+                        int siteIndex = 0;
+                        for (SnapshotTableTask t : replicatedSnapshotTasks) {
+                            SnapshotSiteProcessor.m_taskListsForSites.get(siteIndex++ % numLocalSites).offer(t);
+                        }
                     }
                     if (!aborted) {
                         logSnapshotStartToZK( txnId, context, file_nonce);
@@ -466,7 +695,7 @@ public class SnapshotSaveAPI
                 ex.printStackTrace(pw);
                 pw.flush();
                 result.addRow(
-                        Integer.parseInt(context.getSite().getHost().getTypeName()),
+                        context.getHostId(),
                         hostname,
                         "",
                         "FAILURE",
@@ -485,7 +714,7 @@ public class SnapshotSaveAPI
         try {
             SnapshotSiteProcessor.m_snapshotPermits.acquire();
         } catch (Exception e) {
-            result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+            result.addRow(context.getHostId(),
                     hostname,
                     "",
                     "FAILURE",
@@ -500,19 +729,19 @@ public class SnapshotSaveAPI
             SystemProcedureExecutionContext context,
             File f,
             Table table,
-            Host h,
+            int hostId,
             int numPartitions,
             long txnId)
     throws IOException
     {
         return new DefaultSnapshotDataTarget(f,
-                                             Integer.parseInt(h.getTypeName()),
+                                             hostId,
                                              context.getCluster().getTypeName(),
                                              context.getDatabase().getTypeName(),
                                              table.getTypeName(),
                                              numPartitions,
                                              table.getIsreplicated(),
-                                             SnapshotUtil.getPartitionsOnHost(context, h),
+                                             context.getSiteTrackerForSnapshot().getPartitionsForHost(hostId),
                                              CatalogUtil.getVoltTable(table),
                                              txnId);
     }

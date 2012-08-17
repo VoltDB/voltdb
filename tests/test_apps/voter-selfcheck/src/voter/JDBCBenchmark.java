@@ -121,33 +121,33 @@ public class JDBCBenchmark
             // Define parameters and pull from command line
             AppHelper apph = new AppHelper(JDBCBenchmark.class.getCanonicalName())
                 .add("threads", "thread_count", "Number of concurrent threads attacking the database.", 1)
-                .add("display-interval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
+                .add("displayinterval", "display_interval_in_seconds", "Interval for performance feedback, in seconds.", 10)
                 .add("duration", "run_duration_in_seconds", "Benchmark duration, in seconds.", 120)
                 .add("servers", "comma_separated_server_list", "List of VoltDB servers to connect to.", "localhost")
                 .add("port", "port_number", "Client port to connect to on cluster nodes.", 21212)
                 .add("contestants", "contestant_count", "Number of contestants in the voting contest (from 1 to 10).", 6)
                 .add("voter", "voter_count", "Max number of voters (from 305 to 3050000000)", 3050000000l)
-                .add("max-votes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
+                .add("maxvotes", "max_votes_per_phone_number", "Maximum number of votes accepted for a given voter (phone number).", 2)
                 .setArguments(args)
             ;
 
             // Retrieve parameters
             int threadCount      = apph.intValue("threads");
-            long displayInterval = apph.longValue("display-interval");
+            long displayInterval = apph.longValue("displayinterval");
             long duration        = apph.longValue("duration");
             String servers       = apph.stringValue("servers");
             int port             = apph.intValue("port");
             int contestantCount  = apph.intValue("contestants");
             long voterCount      = apph.longValue("voter");
-            int maxVoteCount     = apph.intValue("max-votes");
-            final String csv     = apph.stringValue("stats");
+            int maxVoteCount     = apph.intValue("maxvotes");
+            final String csv     = apph.stringValue("statsfile");
 
             // Validate parameters
             apph.validate("duration", (duration > 0))
-                .validate("display-interval", (displayInterval > 0))
+                .validate("displayinterval", (displayInterval > 0))
                 .validate("threads", (threadCount > 0))
                 .validate("contestants", (contestantCount > 0))
-                .validate("max-votes", (maxVoteCount > 0))
+                .validate("maxvotes", (maxVoteCount > 0))
             ;
 
             // Display actual parameters, for reference

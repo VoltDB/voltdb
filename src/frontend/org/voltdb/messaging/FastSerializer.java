@@ -24,13 +24,14 @@ import java.math.BigDecimal;
 import java.nio.ByteBuffer;
 import java.nio.ByteOrder;
 
+import org.apache.jute_voltpatches.BinaryInputArchive;
+import org.voltcore.utils.DBBPool;
+import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltdb.VoltTable;
 import org.voltdb.VoltType;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
-import org.voltdb.utils.DBBPool;
-import org.voltdb.utils.DBBPool.BBContainer;
 import org.voltdb.utils.Encoder;
-
 
 /**
  * <code>DataInputStream</code> subclass to write objects that implement
@@ -46,7 +47,6 @@ public class FastSerializer implements DataOutput {
     public static final int INITIAL_ALLOCATION = 2048;
     private BBContainer buffer;
     private final BufferGrowCallback callback;
-    private final DBBPool m_pool;
     private final boolean isDirect;
 
     /**
@@ -57,27 +57,19 @@ public class FastSerializer implements DataOutput {
     }
 
     /**
-     * Create a FastSerializer that will use the provided pool for all of its allocations
-     * @param pool
-     */
-    public FastSerializer(DBBPool pool) {
-        this(pool, INITIAL_ALLOCATION);
-    }
-
-    /**
      * Create a FastSerializer that will use the provided pool for all its allocations
      * with an initial allocation of the specified size
      * @param pool
      * @param initialAllocation
      */
-    public FastSerializer(DBBPool pool, int initialAllocation) {
-        this(true, false, null, pool, initialAllocation);
+    public FastSerializer(int initialAllocation) {
+        this(true, false, null, initialAllocation);
     }
 
 
     /** Warning: use direct ByteBuffers with caution, as they are generally slower. */
     public FastSerializer(boolean bigEndian, boolean isDirect) {
-        this(bigEndian, isDirect, null, null, INITIAL_ALLOCATION);
+        this(bigEndian, isDirect, null, INITIAL_ALLOCATION);
     }
 
     /**
@@ -88,8 +80,8 @@ public class FastSerializer implements DataOutput {
      * @param callback
      * @param pool
      */
-    public FastSerializer(boolean bigEndian, BufferGrowCallback callback, DBBPool pool) {
-        this(bigEndian, pool == null ? true : false, callback, pool, INITIAL_ALLOCATION);
+    public FastSerializer(boolean bigEndian, BufferGrowCallback callback) {
+        this(bigEndian, true, callback, INITIAL_ALLOCATION);
     }
 
     /**
@@ -97,21 +89,13 @@ public class FastSerializer implements DataOutput {
      * is absolutely necessary for the serialized result then use isDirect and a null pool
      */
     /** constructor that sets callback object. */
-    public FastSerializer(boolean bigEndian, boolean isDirect, BufferGrowCallback callback, DBBPool pool, int initialAllocation) {
+    public FastSerializer(boolean bigEndian, boolean isDirect, BufferGrowCallback callback, int initialAllocation) {
         assert(initialAllocation > 0);
-        assert(pool == null && isDirect || pool != null && !isDirect || pool == null && !isDirect);
         this.isDirect = isDirect;
-        if (pool != null) {
-           m_pool = pool;
-           buffer = pool.acquire(initialAllocation);
-        } else if (isDirect) {
-           assert(pool == null);
-           m_pool = null;
+        if (isDirect) {
            buffer = DBBPool.allocateDirect(initialAllocation);
         } else {
            buffer = DBBPool.wrapBB(ByteBuffer.allocate(initialAllocation));
-           m_pool = null;
-           assert(pool == null);
         }
         this.callback = callback;
         buffer.b.order(bigEndian ? ByteOrder.BIG_ENDIAN : ByteOrder.LITTLE_ENDIAN);
@@ -141,8 +125,6 @@ public class FastSerializer implements DataOutput {
             BBContainer next;
             if (isDirect) {
                 next = DBBPool.allocateDirect(newCapacity);
-            } else if (m_pool != null) {
-                next = m_pool.acquire(newCapacity);
             } else {
                 next = DBBPool.wrapBB(ByteBuffer.allocate(newCapacity));
             }
@@ -166,18 +148,6 @@ public class FastSerializer implements DataOutput {
         FastSerializer out = new FastSerializer();
         object.writeExternal(out);
         return out.getBBContainer().b.array();
-    }
-
-    public BBContainer writeObjectForMessaging(FastSerializable object) throws IOException {
-        final int startPosition = buffer.b.position();
-        buffer.b.putInt(0);
-        object.writeExternal(this);
-        final int len = buffer.b.position() - (4 + startPosition);
-        buffer.b.rewind();
-        buffer.b.putInt(len);
-        buffer.b.position(len + 4);
-        buffer.b.flip();
-        return buffer;
     }
 
     /** @return a reference to the underlying ByteBuffer. */
@@ -207,7 +177,6 @@ public class FastSerializer implements DataOutput {
      * Only use this if using a non-direct ByteBuffer!
      */
     public ByteBuffer getBuffer() {
-        assert(m_pool == null);
         assert(isDirect == false);
         assert(buffer.b.hasArray());
         assert(!buffer.b.isDirect());
@@ -222,7 +191,6 @@ public class FastSerializer implements DataOutput {
      * to the shared buffer when the parameter buffer grows.
      */
     public BBContainer getContainerNoFlip() {
-        assert(m_pool == null);
         assert(isDirect == true);
         assert(buffer.b.isDirect());
         return buffer;
@@ -256,24 +224,10 @@ public class FastSerializer implements DataOutput {
     }
 
     /**
-     * Write a timestamp to a FastSerializer. Store the value as a long
-     * representing microseconds from the epoch.
-     *
-     * @param timestamp The {@link org.voltdb.types.TimestampType TimestampType} to serialize.
-     * @throws IOException Rethrows any IOExceptions thrown.
-     */
-    public void writeTimestamp(TimestampType timestamp) throws IOException {
-        assert timestamp != null;
-        long val = timestamp.getTime();
-        writeLong(val);
-    }
-
-    /**
      * Write a string in the standard VoltDB way without
      * wrapping the byte buffer.
      */
     public static void writeString(String string, ByteBuffer buffer) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
         final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
             buffer.putInt(NULL_STRING_INDICATOR);
@@ -288,10 +242,7 @@ public class FastSerializer implements DataOutput {
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-        if (len > MAX_LENGTH) {
-            throw new IOException("String exceeds maximum length of "
-                                  + MAX_LENGTH + " bytes.");
-        }
+
         buffer.putInt(len);
         buffer.put(strbytes);
     }
@@ -305,7 +256,6 @@ public class FastSerializer implements DataOutput {
      * @throws IOException Rethrows any IOExceptions thrown.
      */
     public void writeString(String string) throws IOException {
-        final int MAX_LENGTH = VoltType.MAX_VALUE_LENGTH;
         final int NULL_STRING_INDICATOR = -1;
         if (string == null) {
             writeInt(NULL_STRING_INDICATOR);
@@ -320,16 +270,13 @@ public class FastSerializer implements DataOutput {
         } catch (UnsupportedEncodingException e) {
             throw new RuntimeException(e);
         }
-        if (len > MAX_LENGTH) {
-            throw new IOException("String exceeds maximum length of "
-                                  + MAX_LENGTH + " bytes.");
-        }
+
         writeInt(len);
         write(strbytes);
     }
 
     /**
-     * Write a varbinary in the standard VoltDB way. That is, two
+     * Write a varbinary in the standard VoltDB way. That is, four
      * bytes of length info followed by the bytes.
      *
      * @param bin The byte array value to be serialized.
@@ -354,6 +301,35 @@ public class FastSerializer implements DataOutput {
     // These writeArray() methods are tested in TestSQLTypesSuite.
     // If changing the max limits, please update testInvalidParameterSerializations.
 
+    public static void writeArray(VoltTable[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null)
+                throw new IOException("Array being fastserialized can't contain null values (position " + i + ")");
+            values[i].flattenToBuffer(buf);
+        }
+    }
+
+    public static void writeArray(byte[][] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                buf.putInt(-1); // null length prefix
+            }
+            else {
+                writeArray(values[i], buf);
+            }
+        }
+    }
+
     public void writeArray(FastSerializable[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -367,14 +343,48 @@ public class FastSerializer implements DataOutput {
         }
     }
 
+    public static void writeArray(byte[] values, ByteBuffer buf) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        buf.putInt(values.length);
+        buf.put(values);
+    }
+
+    public void writeArray(byte[][] values) throws IOException {
+        if (values.length > VoltType.MAX_VALUE_LENGTH) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + VoltType.MAX_VALUE_LENGTH + " bytes");
+        }
+        writeShort(values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                writeInt(-1);
+            }
+            else {
+                writeArray(values[i]);
+            }
+        }
+    }
+
     public void writeArray(byte[] values) throws IOException {
         if (values.length > VoltType.MAX_VALUE_LENGTH) {
             throw new IOException("Array exceeds maximum length of "
                                   + VoltType.MAX_VALUE_LENGTH + " bytes");
         }
         writeInt(values.length);
+        write(values);
+    }
+
+    public static void writeArray(short[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
         for (int i = 0; i < values.length; ++i) {
-            writeByte(values[i]);
+            buf.putShort(values[i]);
         }
     }
 
@@ -389,6 +399,17 @@ public class FastSerializer implements DataOutput {
         }
     }
 
+    public static void writeArray(int[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            buf.putInt(values[i]);
+        }
+    }
+
     public void writeArray(int[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -400,6 +421,17 @@ public class FastSerializer implements DataOutput {
         }
     }
 
+    public static void writeArray(long[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            buf.putLong(values[i]);
+        }
+    }
+
     public void writeArray(long[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -408,6 +440,17 @@ public class FastSerializer implements DataOutput {
         writeShort(values.length);
         for (int i = 0; i < values.length; ++i) {
             writeLong(values[i]);
+        }
+    }
+
+    public static void writeArray(double[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            buf.putDouble(values[i]);
         }
     }
 
@@ -433,6 +476,18 @@ public class FastSerializer implements DataOutput {
         }
     }
 
+    public static void writeArray(TimestampType[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) buf.putLong(Long.MIN_VALUE);
+            else buf.putLong(values[i].getTime());
+        }
+    }
+
     public void writeArray(TimestampType[] values) throws IOException {
         if (values.length > Short.MAX_VALUE) {
             throw new IOException("Array exceeds maximum length of "
@@ -442,6 +497,22 @@ public class FastSerializer implements DataOutput {
         for (int i = 0; i < values.length; ++i) {
             if (values[i] == null) writeLong(Long.MIN_VALUE);
             else writeLong(values[i].getTime());
+        }
+    }
+
+    public static void writeArray(BigDecimal[] values, ByteBuffer buf) throws IOException {
+        if (values.length > Short.MAX_VALUE) {
+            throw new IOException("Array exceeds maximum length of "
+                                  + Short.MAX_VALUE + " bytes");
+        }
+        buf.putShort((short)values.length);
+        for (int i = 0; i < values.length; ++i) {
+            if (values[i] == null) {
+                VoltDecimalHelper.serializeNull(buf);
+            }
+            else {
+                VoltDecimalHelper.serializeBigDecimal(values[i], buf);
+            }
         }
     }
 
@@ -558,5 +629,15 @@ public class FastSerializer implements DataOutput {
      */
     public void setPosition(int pos) {
         buffer.b.position(pos);
+    }
+
+    public static void writeString(byte[] m_procNameBytes, ByteBuffer buf) throws IOException {
+        final int NULL_STRING_INDICATOR = -1;
+        if (m_procNameBytes == null) {
+            buf.putInt(NULL_STRING_INDICATOR);
+            return;
+        }
+        buf.putInt(m_procNameBytes.length);
+        buf.put(m_procNameBytes);
     }
 }

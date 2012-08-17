@@ -18,10 +18,9 @@
 package org.voltdb.client;
 
 import java.io.File;
+import java.io.FileWriter;
 import java.io.IOException;
 import java.net.UnknownHostException;
-
-import org.voltdb.VoltTable;
 
 /**
  *  <p>
@@ -77,7 +76,8 @@ public interface Client {
 
     /**
      * Create a connection to another VoltDB node.
-     * @param host Hostname or IP address of the host to connect to.
+     * @param host Hostname or IP address of the host to connect to including
+     * optional port int hostname:port format.
      * @throws UnknownHostException
      * @throws IOException
      */
@@ -108,9 +108,9 @@ public interface Client {
     throws IOException, NoConnectionsException, ProcCallException;
 
     /**
-     * Asynchronously invoke a procedure. Does not guarantee that the invocation is actually queued. If there
-     * is backpressure on all connections to the cluster then the invocation will not be queued. Check the return value
-     * to determine if queuing actually took place.
+     * Asynchronously invoke a replicated procedure. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check the return value to determine if queuing actually took place.
      * @param callback ProcedureCallback that will be invoked with procedure results.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
@@ -120,9 +120,13 @@ public interface Client {
     throws IOException, NoConnectionsException;
 
     /**
-     * Asynchronously invoke a procedure. Does not guarantee that the invocation is actually queued. If there
-     * is backpressure on all connections to the cluster then the invocation will not be queued. Check the return value
-     * to determine if queuing actually took place. An opportunity is provided to hint what the size of the invocation
+     * Deprecated because hinting at the serialized size no longer has any effect
+     *
+     * Asynchronously invoke a replicated procedure. If there is backpressure
+     * this call will block until the invocation is queued. If configureBlocking(false) is invoked
+     * then it will return immediately. Check the return value to determine if queuing actually took place.
+     *
+     * An opportunity is provided to hint what the size of the invocation
      * will be once serialized. This is used to perform more efficient memory allocation and serialization. The size
      * of an invocation can be calculated using {@link #calculateInvocationSerializedSize(String, Object...)}.
      * Only Clients that are resource constrained or expect to process hundreds of thousands of txns/sec will benefit
@@ -134,6 +138,7 @@ public interface Client {
      *                               once serialized. Allocations are done in powers of two.
      * @return <code>true</code> if the procedure was queued and <code>false</code> otherwise
      */
+    @Deprecated
     public boolean callProcedure(
             ProcedureCallback callback,
             int expectedSerializedSize,
@@ -142,12 +147,14 @@ public interface Client {
     throws IOException, NoConnectionsException;
 
     /**
+     * Deprecated because hinting at the serialized size no longer has any effect
      * Calculate the size of a stored procedure invocation once it is serialized. This is computationally intensive
      * as the invocation is serialized as part of the calculation.
      * @param procName class name (not qualified by package) of the procedure to execute.
      * @param parameters vararg list of procedure's parameter values.
      * @return The size of the invocation once serialized
      */
+    @Deprecated
     public int calculateInvocationSerializedSize(String procName, Object... parameters);
 
     /**
@@ -190,8 +197,9 @@ public interface Client {
 
     /**
      * Block the current thread until all queued stored procedure invocations have received responses
-     * or there are no more connections to the cluster
-     * @throws NoConnectionsException
+     * or there are no more connections to the cluster.
+     * @throws NoConnectionsException never, this is deprecated behavior, declared only for backward compatibility.
+     * @throws InterruptedException
      */
     public void drain() throws NoConnectionsException, InterruptedException;
 
@@ -212,50 +220,13 @@ public interface Client {
     public void backpressureBarrier() throws InterruptedException;
 
     /**
-     * Get IO stats for each connection as well as globally
-     * @return Table containing IO stats
+     * Get a {@link ClientStatsContext} instance to fetch and process performance
+     * statistics. Each instance is linked to this client, but provides a custom
+     * view of statistics for a desired time period.
+     *
+     * @return Statistics context object linked to this client.
      */
-    public VoltTable getIOStats();
-
-    /**
-     * Get IO stats for each connection as well as globally counting since the last
-     * time this method was called. Don't call this interval version
-     * if the client API is uploading stats via JDBC, it messes up the counters
-     * @return Table containing IO states
-     */
-    public VoltTable getIOStatsInterval();
-
-    /**
-     * Get procedure invocation counts and round trip time stats for each connection
-     * @return Table containing procedure stats
-     */
-    public VoltTable getProcedureStats();
-
-    /**
-     * Get procedure invocation counts and round trip time stats for each connection
-     * since the last time this method was called. Don't call this interval version
-     * if the client API is uploading stats via JDBC, it messes up the counters
-     * @return Table containing procedure stats
-     */
-    public VoltTable getProcedureStatsInterval();
-
-    /**
-     * Get client round trip latency bucket values for each connection and procedure.
-     * Bucket 1 contains transactions completed in 0-9ms, bucket 2 10ms-19ms. The
-     * final bucket includes all remaining, unaccounted, transactions.
-     * @return Table containing latency bucket stats.
-     */
-    VoltTable getClientRTTLatencies();
-
-    /**
-     * Get cluster round trip latency bucket values for each connection and procedure.
-     * This RTT is calculated by the cluster and represents the time from initiation
-     * to transaction completion within the VoltDB process.
-     * Bucket 1 contains transactions completed in 0-9ms, bucket 2 10ms-19ms. The
-     * final bucket includes all remaining, unaccounted, transactions.
-     * @return Table containing latency bucket stats.
-     */
-    VoltTable getClusterRTTLatencies();
+    public ClientStatsContext createStatsContext();
 
     /**
      * Get an identifier for the cluster that this client is currently connected to.
@@ -277,12 +248,34 @@ public interface Client {
      * immediately if it is not possible to queue the procedure invocation due to backpressure.
      * @param blocking
      */
-    void configureBlocking(boolean blocking);
+    public void configureBlocking(boolean blocking);
 
     /**
      * Whether callProcedure will return immediately if a an async procedure invocation could not be queued
      * due to backpressure
      * @return true if callProcedure will block until backpressure ceases and false otherwise
      */
-    boolean blocking();
+    public boolean blocking();
+
+    /**
+     * Get the instantaneous values of the rate limiting values for this client.
+     * @return A length-2 array of integers representing max throughput/sec and
+     * max outstanding txns.
+     */
+    public int[] getThroughputAndOutstandingTxnLimits();
+
+    /**
+     * Write a single line of comma separated values to the file specified.
+     * Used mainly for collecting results from benchmarks.
+     * Format:
+     * 1) Timestamp (ms) of creation of this client, or last call to {@link Client#resetGlobalStats()}.
+     * 2) Duration from first procedure call until this call in ms.
+     * 3) 1-percentile round trip latency estimate in ms.
+     * 4) Max measure round trip latency in ms.
+     * 5) 95-percentile round trip latency estimate in ms.
+     * 6) 99-percentile round trip latency estimate in ms.
+     * @param path Path to write to, passed to {@link FileWriter#FileWriter(String)}.
+     * @throws IOException on any file write error.
+     */
+    public void writeSummaryCSV(ClientStats stats, String path) throws IOException;
 }

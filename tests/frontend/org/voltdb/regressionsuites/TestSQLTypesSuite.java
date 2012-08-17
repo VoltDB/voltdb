@@ -33,9 +33,11 @@ import org.voltdb.VoltTable;
 import org.voltdb.VoltTableRow;
 import org.voltdb.VoltType;
 import org.voltdb.client.Client;
+import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
+import org.voltdb.exceptions.SQLException;
 import org.voltdb.types.TimestampType;
 import org.voltdb.types.VoltDecimalHelper;
 import org.voltdb.utils.Encoder;
@@ -65,7 +67,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
             UpdateDecimal.class, ParamSetArrays.class };
 
     /** Utility to create an array of bytes with value "b" of length "length" */
-    public byte[] byteArray(final int length, final byte b) {
+    public static byte[] byteArray(final int length, final byte b) {
         final byte[] arr = new byte[length];
         for (int i = 0; i < length; ++i) {
             arr[i] = b;
@@ -74,6 +76,7 @@ public class TestSQLTypesSuite extends RegressionSuite {
     }
 
     /** Utility to compare two instances of a VoltType for equality */
+    @SuppressWarnings({ "incomplete-switch", "null" })
     private boolean comparisonHelper(final Object lhs, final Object rhs,
             final VoltType vt) {
         switch (vt) {
@@ -158,103 +161,147 @@ public class TestSQLTypesSuite extends RegressionSuite {
     }
 
     //
-    // UPDATE WHEN ADDING NEW TYPE
+    // UPDATE THE COLUMN LIST WHEN ADDING NEW TYPE
     //
 
-    // Column count in each sqltypessuite-ddl.sql table NOT including PKEY
-    public static int COLS = 13;
+    // Class to hold column test information.
+    private static class Column {
+        final String m_columnName;
+        final VoltType m_type;
+        final boolean m_supportsMath;
+        final Object m_nullValue;
+        final Object m_defaultValue;
+        final Object m_minValue;
+        final Object m_midValue;
+        Object m_maxValue;
 
-    // Interesting sets of values for the various types
+        Column(String columnName,
+               VoltType type,
+               boolean supportsMath,
+               Object nullValue,
+               Object defaultValue,
+               Object minValue,
+               Object midValue,
+               Object maxValue) {
+            m_type = type;
+            m_supportsMath = supportsMath;
+            m_columnName = columnName;
+            m_nullValue = nullValue;
+            m_defaultValue = defaultValue;
+            m_minValue = minValue;
+            m_midValue = midValue;
+            m_maxValue = maxValue;
+        }
+    }
 
-    // tests rely on this ordering of the string varchar widths
-    public static VoltType[] m_types = { VoltType.TINYINT, VoltType.SMALLINT,
-            VoltType.INTEGER, VoltType.BIGINT, VoltType.FLOAT,
-            VoltType.TIMESTAMP, VoltType.STRING, // varchar(4)
-            VoltType.STRING, // varchar(63)
-            VoltType.STRING, // varchar(1024)
-            VoltType.STRING, // varchar(42000)
-            VoltType.VARBINARY, // varbinary(32)
-            VoltType.VARBINARY, // varbinary(256)
-            VoltType.DECIMAL
-    // UPDATE WHEN ADDING NEW TYPE
+    // Non-PKEY column information, including interesting sets of values for the various types.
+    // Tests rely on this ordering of the string varchar widths.
+    // APPEND HERE WHEN ADDING NEW TYPE/COLUMN
+    private static Column[] m_columns = {
+        new Column("A_TINYINT", VoltType.TINYINT, true ,
+                   VoltType.NULL_TINYINT,
+                   new Byte((byte) (1)),
+                   new Byte((byte) (Byte.MIN_VALUE + 1)), // MIN is NULL
+                   new Byte((byte) 10),
+                   Byte.MAX_VALUE),
+        new Column("A_SMALLINT", VoltType.SMALLINT, true,
+                   VoltType.NULL_SMALLINT,
+                   new Short((short) (2)),
+                   new Short((short) (Short.MIN_VALUE + 1)), // MIN is NULL
+                   new Short((short) 11),
+                   Short.MAX_VALUE),
+        new Column("A_INTEGER", VoltType.INTEGER, true ,
+                   VoltType.NULL_INTEGER,
+                   3,
+                   Integer.MIN_VALUE + 1, // MIN is NULL
+                   new Integer(12),
+                   Integer.MAX_VALUE),
+        new Column("A_BIGINT", VoltType.BIGINT, true,
+                   VoltType.NULL_BIGINT,
+                   4L,
+                   Long.MIN_VALUE + 1, // MIN is NULL
+                   new Long(13),
+                   Long.MAX_VALUE),
+        new Column("A_FLOAT", VoltType.FLOAT, true,
+                   VoltType.NULL_FLOAT,
+                   5.1,
+                   Double.MIN_VALUE, // NULL is -1.7E308.
+                   new Double(14.5),
+                   Double.MAX_VALUE),
+        new Column("A_TIMESTAMP", VoltType.TIMESTAMP, false,
+                   VoltType.NULL_TIMESTAMP,
+                   new TimestampType(600000),
+                   new TimestampType(Long.MIN_VALUE + 1),
+                   new TimestampType(),
+                   new TimestampType(Long.MAX_VALUE)),
+        new Column("A_INLINE_S1", VoltType.STRING, false,
+                   VoltType.NULL_STRING_OR_VARBINARY,
+                   new String("abcd"),
+                   new String(byteArray(1, OO)),
+                   new String("xyz"),
+                   new String("ZZZZ")),
+        new Column("A_INLINE_S2", VoltType.STRING, false,
+                   VoltType.NULL_STRING_OR_VARBINARY,
+                   new String("abcdefghij"),
+                   new String(byteArray(1, OO)),
+                   new String("xyzab"),
+                   new String("ZZZZZZZZZZ" + // 10
+                              "ZZZZZZZZZZ" + // 20
+                              "ZZZZZZZZZZ" + // 30
+                              "ZZZZZZZZZZ" + // 40
+                              "ZZZZZZZZZZ" + // 50
+                              "ZZZZZZZZZZ" + // 60
+                              "ZZZ")), // 63
+        new Column("A_POOL_S", VoltType.STRING, false,
+                   VoltType.NULL_STRING_OR_VARBINARY,
+                   new String("abcdefghijklmnopqrstuvwxyz"),
+                   new String(byteArray(1, OO)),
+                   new String("xyzabcdefghijklmnopqrstuvw"),
+                   ""),
+        new Column("A_POOL_MAX_S", VoltType.STRING, false,
+                   VoltType.NULL_STRING_OR_VARBINARY,
+                   new String("abcdefghijklmnopqrstuvwxyz"),
+                   new String(byteArray(1, OO)),
+                   new String("xyzabcdefghijklmnopqrstuvw"),
+                   ""),
+        new Column("A_INLINE_B", VoltType.VARBINARY, false,
+                   VoltType.NULL_STRING_OR_VARBINARY,
+                   new String("ABCDEFABCDEF0123"),
+                   new byte[] { 0 },
+                   new byte[] { 'a', 'b', 'c' },
+                   new String("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").getBytes()),
+        new Column("A_POOL_B", VoltType.VARBINARY, false,
+                   VoltType.NULL_STRING_OR_VARBINARY,
+                   new String("ABCDEFABCDEF0123456789"),
+                   new byte[] { 0 },
+                   new byte[] { 'a', 'b', 'c' },
+                   new byte[] {}),
+        new Column("A_DECIMAL", VoltType.DECIMAL, true,
+                   VoltType.NULL_DECIMAL,
+                   new BigDecimal(new BigInteger("6000000000000"))
+                       .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale),
+                   new BigDecimal(new BigInteger(
+                       "-99999999999999999999999999999999999999"))
+                       .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale),
+                   new BigDecimal(new BigInteger("5115101010101010345634"))
+                       .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale),
+                   new BigDecimal(new BigInteger(
+                       "99999999999999999999999999999999999999"))
+                       .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale))
     };
 
-    // used to filter types that don't support arithmetic expressions
-    public boolean[] m_supportsMath = { true, // tinyint
-            true, // smallint
-            true, // integer
-            true, // bigint
-            true, // float
-            false, // timestamp
-            false, // string
-            false, // string
-            false, // string
-            false, // string
-            false, // varbinary
-            false, // varbinary
-            true // decimal
-    // UPDATE WHEN ADDING NEW TYPE
-    };
-
-    // the column names from the DDL used to dynamically create
-    // sql select lists.
-    public static String[] m_columnNames = { "A_TINYINT", "A_SMALLINT",
-            "A_INTEGER", "A_BIGINT", "A_FLOAT", "A_TIMESTAMP", "A_INLINE_S1",
-            "A_INLINE_S2", "A_POOL_S", "A_POOL_MAX_S", "A_INLINE_B", "A_POOL_B",
-            "A_DECIMAL"
-    // UPDATE WHEN ADDING NEW TYPE
-    };
-
-    // sql null representation for each type
-    public Object[] m_nullValues = { VoltType.NULL_TINYINT,
-            VoltType.NULL_SMALLINT, VoltType.NULL_INTEGER,
-            VoltType.NULL_BIGINT, VoltType.NULL_FLOAT,
-            VoltType.NULL_TIMESTAMP,
-            VoltType.NULL_STRING_OR_VARBINARY, // inlined LT ptr size
-            VoltType.NULL_STRING_OR_VARBINARY, // inlined GT ptr size
-            VoltType.NULL_STRING_OR_VARBINARY, // not inlined (1024)
-            VoltType.NULL_STRING_OR_VARBINARY, // not inlined (max length)
-            VoltType.NULL_STRING_OR_VARBINARY,
-            VoltType.NULL_STRING_OR_VARBINARY, VoltType.NULL_DECIMAL
-    // UPDATE WHEN ADDING NEW TYPE
-    };
-
-    // maximum value for each type
-    public static Object[] m_maxValues = { Byte.MAX_VALUE,
-            Short.MAX_VALUE,
-            Integer.MAX_VALUE,
-            Long.MAX_VALUE,
-            Double.MAX_VALUE,
-            new TimestampType(Long.MAX_VALUE),
-            new String("ZZZZ"),
-            new String("ZZZZZZZZZZ" + // 10
-                    "ZZZZZZZZZZ" + // 20
-                    "ZZZZZZZZZZ" + // 30
-                    "ZZZZZZZZZZ" + // 40
-                    "ZZZZZZZZZZ" + // 50
-                    "ZZZZZZZZZZ" + // 60
-                    "ZZZ"), // 63
-            "",
-            "",
-            new String("ZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZZ").getBytes(),
-            new byte[] {},
-            new BigDecimal(new BigInteger(
-                    "99999999999999999999999999999999999999"))
-                    .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale)
-    // UPDATE WHEN ADDING NEW TYPE
-    };
-
+    // Generate additional m_maxValue data and ReallyLongString..
     static {
         StringBuilder sb = new StringBuilder(1048576);
         int ii = 0;
         for (; ii < 65536; ii++) {
             sb.append('Z');
         }
-        m_maxValues[8] = sb.toString();
+        m_columns[8].m_maxValue = sb.toString();
         for (; ii < 1048576; ii++) {
             sb.append('Z');
         }
-        m_maxValues[9] = sb.toString();
+        m_columns[9].m_maxValue = sb.toString();
         sb = new StringBuilder(102400);
         for (ii = 0; ii < 102400; ii++) {
             sb.append('a');
@@ -262,63 +309,29 @@ public class TestSQLTypesSuite extends RegressionSuite {
         ReallyLongString = sb.toString();
     }
 
-    // a non-max, non-min value for each type
-    public static Object[] m_midValues = {
-            new Byte((byte) 10),
-            new Short((short) 11),
-            new Integer(12),
-            new Long(13),
-            new Double(14.5),
-            new TimestampType(),
-            new String("xyz"),
-            new String("xyzab"),
-            new String("xyzabcdefghijklmnopqrstuvw"),
-            new String("xyzabcdefghijklmnopqrstuvw"),
-            new byte[] { 'a', 'b', 'c' },
-            new byte[] { 'a', 'b', 'c' },
-            new BigDecimal(new BigInteger("5115101010101010345634"))
-                    .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale)
-    // UPDATE WHEN ADDING NEW TYPE
-    };
-
-    // minimum value for each type
-    public Object[] m_minValues = {
-            new Byte((byte) (Byte.MIN_VALUE + 1)), // MIN is NULL
-            new Short((short) (Short.MIN_VALUE + 1)), // MIN is NULL
-            Integer.MIN_VALUE + 1, // MIN is NULL
-            Long.MIN_VALUE + 1, // MIN is NULL
-            Double.MIN_VALUE, // NULL is -1.7E308.
-            new TimestampType(Long.MIN_VALUE + 1),
-            new String(byteArray(1, OO)),
-            new String(byteArray(1, OO)),
-            new String(byteArray(1, OO)),
-            new String(byteArray(1, OO)),
-            new byte[] { 0 },
-            new byte[] { 0 },
-            new BigDecimal(new BigInteger(
-                    "-99999999999999999999999999999999999999"))
-                    .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale)
-    // UPDATE WHEN ADDING NEW TYPE
-    };
-
-    // default (defined in DDL) value for each type
-    public static Object[] m_defaultValues = {
-            new Byte((byte) (1)),
-            new Short((short) (2)),
-            3,
-            4L,
-            5.1,
-            new TimestampType(600000),
-            new String("abcd"),
-            new String("abcdefghij"),
-            new String("abcdefghijklmnopqrstuvwxyz"),
-            new String("abcdefghijklmnopqrstuvwxyz"),
-            new String("ABCDEFABCDEF0123"),
-            new String("ABCDEFABCDEF0123456789"),
-            new BigDecimal(new BigInteger("6000000000000"))
-                    .scaleByPowerOfTen(-1 * VoltDecimalHelper.kDefaultScale)
-    // UPDATE WHEN ADDING NEW TYPE
-    };
+    // Populate these members from m_columns for backward compatibility.
+    // Changing all the references to use m_columns would be much more painful.
+    public static int COLS = m_columns.length;
+    public static VoltType[] m_types = new VoltType[m_columns.length];
+    public static boolean[] m_supportsMath = new boolean[m_columns.length];
+    public static String[] m_columnNames = new String[m_columns.length];
+    public static Object[] m_nullValues = new Object[m_columns.length];
+    public static Object[] m_defaultValues = new Object[m_columns.length];
+    public static Object[] m_minValues = new Object[m_columns.length];
+    public static Object[] m_midValues = new Object[m_columns.length];
+    public static Object[] m_maxValues = new Object[m_columns.length];
+    static {
+        for (int i = 0; i < m_columns.length; i++) {
+            m_types[i] = m_columns[i].m_type;
+            m_supportsMath[i] = m_columns[i].m_supportsMath;
+            m_columnNames[i] = m_columns[i].m_columnName;
+            m_nullValues[i] = m_columns[i].m_nullValue;
+            m_defaultValues[i] = m_columns[i].m_defaultValue;
+            m_minValues[i] = m_columns[i].m_minValue;
+            m_midValues[i] = m_columns[i].m_midValue;
+            m_maxValues[i] = m_columns[i].m_maxValue;
+        }
+    }
 
     public void testPassingNullObjectToSingleStmtProcedure() throws Exception {
         final Client client = this.getClient();
@@ -326,6 +339,164 @@ public class TestSQLTypesSuite extends RegressionSuite {
         client.callProcedure("PassObjectNull", 0, 0, 0, 0, 0, 0.0, null, null,
                 null, null, null, null, null, null);
     }
+
+    public void testPassingDateAndTimeObjectsToStatements() throws Exception {
+        final Client client = this.getClient();
+
+        // Capture the same value within the supported millisecond granularity
+        // in each of the supported time formats to demonstrate that they are interchangeable.
+        long millisecondsSinceEpoch = 1001001001L;
+        TimestampType tst = new TimestampType(millisecondsSinceEpoch * 1000);
+        java.util.Date utild = new java.util.Date(millisecondsSinceEpoch);
+        java.sql.Date sqld = new java.sql.Date(millisecondsSinceEpoch);
+        java.sql.Timestamp ts = new java.sql.Timestamp(millisecondsSinceEpoch);
+
+        int lowerBound = pkey.incrementAndGet();
+        // system-defined CRUD inputs
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, utild,
+                null, null, null, null, null, null, null);
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, sqld,
+                null, null, null, null, null, null, null);
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts,
+                null, null, null, null, null, null, null);
+
+        // user-defined statement inputs
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, utild,
+                null, null, null, null, null, null, null);
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, sqld,
+                null, null, null, null, null, null, null);
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts,
+                null, null, null, null, null, null, null);
+
+        // stored procedure inputs into queued statement
+        // -- this doesn't exercise passing the java types into the stored procedure
+        // -- that's covered by TestSQLFeaturesSuite's testPassAllArgTypes
+        client.callProcedure("Insert", "ALLOW_NULLS", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("Insert", "ALLOW_NULLS and use sql.Timestamp", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("Insert", "ALLOW_NULLS and use sql.Date", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+        client.callProcedure("Insert", "ALLOW_NULLS and use util.Date", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst,
+                null, null, null, null, null, null, null);
+
+        ClientResponse cr;
+        VoltTable[] result;
+        VoltTable vt;
+        cr = client.callProcedure("@AdHoc", "SELECT A_TIMESTAMP from ALLOW_NULLS where PKEY > " + lowerBound + ";");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults();
+        assertEquals(12, result[0].getRowCount());
+        vt = result[0];
+        while (vt.advanceRow()) {
+            // Within the millisecond granularity all formats should encapsulate the same value.
+            assertEquals(tst, vt.getTimestampAsTimestamp(0));
+            assertEquals(ts, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(sqld, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(utild, vt.getTimestampAsSqlTimestamp(0));
+        }
+
+        // Demonstrate that TimestampType and java.sql.Timestamp support microseconds while Dates truncate to milliseconds.
+        // Capture the same value within the supported millisecond granularity
+        // in each of the supported time formats to demonstrate that they are interchangeable.
+        long microsecondsSinceEpoch = 1001001001001L;
+        TimestampType tst_micro = new TimestampType(microsecondsSinceEpoch);
+        java.sql.Timestamp ts_micro = new java.sql.Timestamp(microsecondsSinceEpoch/1000);
+        // At this point, the additional 1 microsecond was truncated in the division, and so is still not reflected in ts_micro.
+        assertEquals(ts, ts_micro);
+        // Extract the 1000000 nanos (doubly-counted milliseconds)
+        assertEquals(1000000, ts_micro.getNanos());
+        // and explicitly add in the truncated 1000 nanos (1 microsecond)
+        ts_micro.setNanos(ts_micro.getNanos()+1000);
+
+        assertNotSame(tst, tst_micro);
+        assertNotSame(ts, ts_micro);
+
+        // A new round of inserts, just using the more accurate formats.
+        lowerBound = pkey.incrementAndGet();
+        // system-defined CRUD inputs
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst_micro,
+                null, null, null, null, null, null, null);
+        client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_micro,
+                null, null, null, null, null, null, null);
+
+        // user-defined statement inputs
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst_micro,
+                null, null, null, null, null, null, null);
+        client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_micro,
+                null, null, null, null, null, null, null);
+
+        // stored procedure inputs into queued statement
+        client.callProcedure("Insert", "ALLOW_NULLS", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst_micro,
+                null, null, null, null, null, null, null);
+        client.callProcedure("Insert", "ALLOW_NULLS and use sql.Timestamp", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, tst_micro,
+                null, null, null, null, null, null, null);
+
+        cr = client.callProcedure("@AdHoc", "SELECT A_TIMESTAMP from ALLOW_NULLS where PKEY > " + lowerBound + ";");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults();
+        assertEquals(6, result[0].getRowCount());
+        vt = result[0];
+        while (vt.advanceRow()) {
+            // Within the microsecond granularity only the detailed formats preserve the "full" accuracy.
+            assertNotSame(tst, vt.getTimestampAsTimestamp(0));
+            assertNotSame(ts, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(tst_micro, vt.getTimestampAsTimestamp(0));
+            assertEquals(ts_micro, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(sqld, vt.getTimestampAsSqlTimestamp(0));
+            assertEquals(utild, vt.getTimestampAsSqlTimestamp(0));
+        }
+
+        // Now, go overboard, trying to preserve nano accuracy.
+        // XXX: The following tests are a little controversial.
+        // Some would prefer a gentler response -- just truncating/rounding to the nearest microsecond.
+        // When these voices of reason prevail, this test should be replaced by a test that nano-noise
+        // gets filtered out but the result is still correct to microsecond granularity.
+        java.sql.Timestamp ts_nano = new java.sql.Timestamp(millisecondsSinceEpoch);
+        assertEquals(ts, ts_nano);
+        // Extract the 1000000 nanos (doubly-counted milliseconds)
+        assertEquals(1000000, ts_nano.getNanos());
+        // and explicitly add in 1001 nanos (1 microsecond + 1 nanosecond)
+        ts_nano.setNanos(ts_nano.getNanos()+1001);
+
+        // Should be off by 1 nano.
+        assertNotSame(ts_micro, ts_nano);
+
+        // A new round of inserts, trying to use the too accurate format.
+        lowerBound = pkey.incrementAndGet();
+
+        boolean caught;
+        try {
+            caught = false;
+            // system-defined CRUD inputs
+            cr = client.callProcedure("ALLOW_NULLS.insert", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_nano,
+                    null, null, null, null, null, null, null);
+        } catch (RuntimeException e) {
+            caught = true;
+        }
+        assert(caught);
+
+        try {
+            caught = false;
+            // user-defined statement inputs
+            cr = client.callProcedure("PassObjectNull", pkey.incrementAndGet(), 0, 0, 0, 0, 0.0, ts_nano,
+                    null, null, null, null, null, null, null);
+        } catch (RuntimeException e) {
+            caught = true;
+        }
+        assert(caught);
+
+        // Smuggling nanos into a stored procedure is also already covered by TestSQLFeaturesSuite's testPassAllArgTypes
+
+        // Exceptions above should have pre-empted execution (and not just come after successful writes).
+        cr = client.callProcedure("@AdHoc", "SELECT A_TIMESTAMP from ALLOW_NULLS where PKEY > " + lowerBound + ";");
+        result = cr.getResults();
+        assertEquals(0, result[0].getRowCount());
+}
 
     // ENG-1276
     public void testPassingFloatToDoubleArg() throws Exception {
@@ -415,10 +586,10 @@ public class TestSQLTypesSuite extends RegressionSuite {
             try {
                 caught = false;
                 client.callProcedure("Insert", params);
-            } catch (final RuntimeException e) {
-                assertTrue(e.getCause() instanceof java.io.IOException);
-                assertTrue(e.toString().contains(
-                        "String exceeds maximum length of"));
+            }
+            catch (final ProcCallException e) {
+                assertTrue(e.getCause() instanceof SQLException);
+                assertTrue(e.toString().contains("exceeds specified size"));
                 caught = true;
             }
             assertTrue(caught);
@@ -1096,30 +1267,18 @@ public class TestSQLTypesSuite extends RegressionSuite {
 
         boolean success;
 
-        /*
-         * // CONFIG #1: Local Site/Partitions running on IPC backend config =
-         * new LocalSingleProcessServer("sqltypes-onesite.jar", 1,
-         * BackendTarget.NATIVE_EE_IPC); success = config.compile(project);
-         * assertTrue(success); builder.addServerConfig(config); // CONFIG #2:
-         * HSQL config = new LocalSingleProcessServer("sqltypes-hsql.jar", 1,
-         * BackendTarget.HSQLDB_BACKEND); success = config.compile(project);
-         * assertTrue(success); builder.addServerConfig(config);
-         */
         // JNI
-        config = new LocalSingleProcessServer("sqltypes-onesite.jar", 1,
-                BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
         // CLUSTER?
-        config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 1,
-                BackendTarget.NATIVE_EE_JNI);
+        config = new LocalCluster("sqltypes-cluster.jar", 2, 2, 1, BackendTarget.NATIVE_EE_JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
 
         return builder;
     }
-
 }

@@ -23,7 +23,7 @@ import java.util.Iterator;
 import java.util.Map;
 
 import org.voltdb.VoltTable.ColumnInfo;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 // This StatsSource is a bit of a hackjob, in that it exists only to make StatsAgent
 // happy.  The updating is never used, and the code in the Statistics sysproc

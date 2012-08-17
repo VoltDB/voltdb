@@ -26,7 +26,7 @@ import java.util.Queue;
 
 import org.voltdb.export.ExportProtoMessage;
 import org.voltdb.export.ExportProtoMessage.AdvertisedDataSource;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Represents the export connection to a single export table in the database for

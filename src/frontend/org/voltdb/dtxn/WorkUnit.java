@@ -24,10 +24,12 @@ import java.util.List;
 import java.util.Set;
 import java.util.TreeMap;
 
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.VoltMessage;
+import org.voltdb.ClientInterface;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltTable;
 import org.voltdb.messaging.FragmentTaskMessage;
-import org.voltdb.messaging.VoltMessage;
 
 /**
  * <p>A <code>WorkUnit</code> represents some "work" to be done
@@ -43,24 +45,26 @@ import org.voltdb.messaging.VoltMessage;
  */
 class WorkUnit
 {
+private static final VoltLogger log = new VoltLogger(WorkUnit.class.getName());
+
     class DependencyTracker
     {
         // needs to be a TreeMap so iterator has deterministic order
-        TreeMap<Integer, VoltTable> m_results;
+        TreeMap<Long, VoltTable> m_results;
         int m_depId;
         int m_expectedDeps;
-        HashSet<Integer> m_expectedSites;
+        HashSet<Long> m_expectedSites;
 
         DependencyTracker(int depId, int expectedDeps,
-                          HashSet<Integer> expectedSites)
+                          HashSet<Long> expectedSites)
         {
             m_depId = depId;
-            m_results = new TreeMap<Integer, VoltTable>();
+            m_results = new TreeMap<Long, VoltTable>();
             m_expectedDeps = expectedDeps;
             m_expectedSites = expectedSites;
         }
 
-        boolean addResult(int siteId, int mapId, VoltTable result)
+        boolean addResult(long HSId, long mapId, VoltTable result, boolean allowMismatchedResults)
         {
             boolean retval = true;
             if (!(m_results.containsKey(mapId)))
@@ -69,12 +73,13 @@ class WorkUnit
             }
             else
             {
-                if (!m_results.get(mapId).hasSameContents(result))
+                // Look for a mismatch unless we're being lenient.
+                if (!allowMismatchedResults && !m_results.get(mapId).hasSameContents(result))
                 {
                     retval = false;
                 }
             }
-            m_expectedSites.remove(siteId);
+            m_expectedSites.remove(HSId);
             m_expectedDeps--;
             return retval;
         }
@@ -82,12 +87,12 @@ class WorkUnit
         /**
          * Dependencies from recovering sites use this.
          */
-        void addDummyResult(int siteId, int mapId) {
-            m_expectedSites.remove(siteId);
+        void addDummyResult(long HSId) {
+            m_expectedSites.remove(HSId);
             m_expectedDeps--;
         }
 
-        void removeSite(int siteId)
+        void removeSite(long HSId)
         {
             // This is a really horrible hack to work around the fact that
             // we don't know the set of remote sites from which to expect
@@ -99,9 +104,9 @@ class WorkUnit
             // not handle site failures (yet).
             if ((m_depId & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0)
             {
-                if (m_expectedSites.contains(siteId))
+                if (m_expectedSites.contains(HSId))
                 {
-                    m_expectedSites.remove(siteId);
+                    m_expectedSites.remove(HSId);
                 }
             }
         }
@@ -123,7 +128,7 @@ class WorkUnit
             }
         }
 
-        VoltTable getResult(int mapId)
+        VoltTable getResult(long mapId)
         {
             return m_results.get(mapId);
         }
@@ -168,6 +173,9 @@ class WorkUnit
     int m_stackCount = 0;
     boolean commitEvenIfDirty = false;
     boolean nonTransactional = false;
+    // ENG-3288 - Be lenient about mis-matched results for read-only queries that are
+    // flagged as non-deterministic.
+    final boolean m_allowMismatchedResults;
 
     /**
      * Get the "payload" for this <code>WorkUnit</code>. The payload is
@@ -240,12 +248,14 @@ class WorkUnit
     }
 
     WorkUnit(SiteTracker siteTracker, VoltMessage payload,
-             int[] dependencyIds, int siteId,
-             int[] nonCoordinatingSiteIds,
-             boolean shouldResumeProcedure)
+             int[] dependencyIds, long HSId,
+             long[] nonCoordinatingHSIds,
+             boolean shouldResumeProcedure,
+             boolean allowMismatchedResults)
     {
         this.m_payload = payload;
         m_shouldResumeProcedure = shouldResumeProcedure;
+        m_allowMismatchedResults = allowMismatchedResults;
         if (payload != null && payload instanceof FragmentTaskMessage)
         {
             m_taskType = ((FragmentTaskMessage) payload).getFragmentTaskType();
@@ -255,13 +265,13 @@ class WorkUnit
             m_dependencies = new HashMap<Integer, DependencyTracker>();
             for (int dependency : dependencyIds) {
                 int depsToExpect = 1;
-                HashSet<Integer> expected_sites = new HashSet<Integer>();
-                expected_sites.add(siteId);
+                HashSet<Long> expected_sites = new HashSet<Long>();
+                expected_sites.add(HSId);
                 if ((dependency & DtxnConstants.MULTIPARTITION_DEPENDENCY) != 0) {
-                    depsToExpect = siteTracker.getLiveSiteCount();
-                    for (Integer site_id : nonCoordinatingSiteIds)
+                    depsToExpect = siteTracker.getAllSites().size();
+                    for (Long hs_id : nonCoordinatingHSIds)
                     {
-                        expected_sites.add(site_id);
+                        expected_sites.add(hs_id);
                     }
                 }
                 m_dependencies.put(dependency,
@@ -272,17 +282,23 @@ class WorkUnit
         }
     }
 
-    void putDependency(int dependencyId, int siteId, VoltTable payload) {
+    void putDependency(int dependencyId, long HSId, VoltTable payload, SiteTracker st) {
         assert payload != null;
         assert m_dependencies != null;
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
 
-        int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(siteId);
-        int map_id = partition;
+        int partition = 0;
+        try {
+            partition = st.getPartitionForSite(HSId);
+        } catch (NullPointerException e) {
+            System.out.println("NPE on site " + HSId);
+            throw e;
+        }
+        long map_id = partition;
         if (m_taskType == FragmentTaskMessage.SYS_PROC_PER_SITE)
         {
-            map_id = siteId;
+            map_id = HSId;
         }
 
         // Check that the replica fragments are the same (non-deterministic SQL)
@@ -290,12 +306,13 @@ class WorkUnit
         // If not same, kill entire cluster and hide the bodies.
         // In all seriousness, we have no valid way to recover from a non-deterministic event
         // The safest thing is to make the user aware and stop doing potentially corrupt work.
-        boolean duplicate_okay =
-            m_dependencies.get(dependencyId).addResult(siteId, map_id, payload);
-        if (!duplicate_okay)
-        {
+        // ENG-3288 - Allow non-deterministic read-only transactions to have mismatched results
+        // so that LIMIT queries without ORDER BY clauses work.
+        boolean addOkay =
+            m_dependencies.get(dependencyId).addResult(HSId, map_id, payload, m_allowMismatchedResults);
+        if (!addOkay) {
             String msg = "Mismatched results received for partition: " + partition;
-            msg += "\n  from execution site: " + siteId;
+            msg += "\n  from execution site: " + HSId;
             msg += "\n  Original results: " + m_dependencies.get(dependencyId).getResult(map_id).toString();
             msg += "\n  Mismatched results: " + payload.toString();
             // die die die (German: the the the)
@@ -307,19 +324,12 @@ class WorkUnit
     /**
      * Dependencies from recovering sites use this.
      */
-    void putDummyDependency(int dependencyId, int siteId) {
+    void putDummyDependency(int dependencyId, long HSId) {
         assert m_dependencies != null;
         assert m_dependencies.containsKey(dependencyId);
         assert m_dependencies.get(dependencyId) != null;
 
-        int partition = VoltDB.instance().getCatalogContext().siteTracker.getPartitionForSite(siteId);
-        int map_id = partition;
-        if (m_taskType == FragmentTaskMessage.SYS_PROC_PER_SITE)
-        {
-            map_id = siteId;
-        }
-
-        m_dependencies.get(dependencyId).addDummyResult(siteId, map_id);
+        m_dependencies.get(dependencyId).addDummyResult(HSId);
     }
 
     boolean allDependenciesSatisfied() {
@@ -337,13 +347,13 @@ class WorkUnit
         return satisfied && (m_stackCount == 0);
     }
 
-    void removeSite(int siteId)
+    void removeSite(long HSId)
     {
         if (m_dependencies != null)
         {
             for (DependencyTracker tracker : m_dependencies.values())
             {
-                tracker.removeSite(siteId);
+                tracker.removeSite(HSId);
             }
         }
     }

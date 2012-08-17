@@ -37,14 +37,4 @@ public interface FaultHandler
      *              with any new faults that are detected until the unhandled fault is reported as handled.
      */
     public void faultOccured(Set<VoltFault> faults);
-
-    /**
-     * This method will be called by the FaultDistributor when this object
-     * is a registered handler for a fault.
-     *
-     * @param faults The faults which have occured and been cleared.  Objects implementing this interface
-     *              and registering interest in particular FaultTypes will
-     *              need to downcast this VoltFault to the appropriate subclass.
-     */
-    public void faultCleared(Set<VoltFault> faults);
 }

@@ -24,12 +24,13 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.compiler.VoltProjectBuilder;
-import org.voltdb_testprocs.regressionsuites.fixedsql.*;
+import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
 
 /**
  * System tests for UPDATE, mainly focusing on the correctness of the WHERE
@@ -206,23 +207,17 @@ public class TestSqlUpdateSuite extends RegressionSuite {
         project.addPartitionInfo("P1", "ID");
         project.addProcedures(PROCEDURES);
 
-        config = new LocalSingleProcessServer("sqlupdate-onesite.jar", 1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("sqlupdate-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
-        //ADHOC sql still returns double the number of modified rows
-        config = new LocalSingleProcessServer("sqlupdate-twosites.jar", 2, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
-        builder.addServerConfig(config);
-
-        config = new LocalSingleProcessServer("sqlupdate-hsql.jar", 1, BackendTarget.HSQLDB_BACKEND);
-        config.compile(project);
+        config = new LocalCluster("sqlupdate-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         // Cluster
-        config = new LocalCluster("sqlupdate-cluster.jar", 2, 2,
-                                  1, BackendTarget.NATIVE_EE_JNI);
-        config.compile(project);
+        config = new LocalCluster("sqlupdate-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
+        if (!config.compile(project)) fail();
         builder.addServerConfig(config);
 
         return builder;

@@ -34,8 +34,16 @@ public abstract class AbstractValueExpression extends AbstractExpression {
         super(type);
     }
 
-    public AbstractValueExpression(ExpressionType type, AbstractExpression left, AbstractExpression right) {
-        super(type, right, left);
+    @Override
+    public void normalizeOperandTypes_recurse()
+    {
+        // Nothing to do... no operands.
+    }
+
+    @Override
+    public void finalizeValueTypes()
+    {
+        // Nothing to do... This is all about pulling types UP from child expressions.
     }
 
 }

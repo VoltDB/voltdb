@@ -1,12 +1,30 @@
 #!/usr/bin/env bash
 
 APPNAME="voltkv"
-CLASSPATH="`ls -x ../../../voltdb/voltdb-*.jar | tr '[:space:]' ':'``ls -x ../../../lib/*.jar | tr '[:space:]' ':'`"
-VOLTDB="../../../bin/voltdb"
-VOLTCOMPILER="../../../bin/voltcompiler"
-LOG4J="`pwd`/../../../voltdb/log4j.xml"
-LICENSE="../../../voltdb/license.xml"
-LEADER="localhost"
+
+# find voltdb binaries in either installation or distribution directory.
+if [ -n "$(which voltdb 2> /dev/null)" ]; then
+    VOLTDB_BIN=$(dirname "$(which voltdb)")
+else
+    VOLTDB_BIN="$(pwd)/../../../bin"
+fi
+# installation layout has all libraries in $VOLTDB_ROOT/lib/voltdb
+if [ -d "$VOLTDB_BIN/../lib/voltdb" ]; then
+    VOLTDB_BASE=$(dirname "$VOLTDB_BIN")
+    VOLTDB_LIB="$VOLTDB_BASE/lib/voltdb"
+    VOLTDB_VOLTDB="$VOLTDB_LIB"
+# distribution layout has libraries in separate lib and voltdb directories
+else
+    VOLTDB_LIB="`pwd`/../../../lib"
+    VOLTDB_VOLTDB="`pwd`/../../../voltdb"
+fi
+
+CLASSPATH=$(ls -x "$VOLTDB_VOLTDB"/voltdb-*.jar | tr '[:space:]' ':')$(ls -x "$VOLTDB_LIB"/*.jar | egrep -v 'voltdb[a-z0-9.-]+\.jar' | tr '[:space:]' ':')
+VOLTDB="$VOLTDB_BIN/voltdb"
+VOLTCOMPILER="$VOLTDB_BIN/voltcompiler"
+LOG4J="$VOLTDB_VOLTDB/log4j.xml"
+LICENSE="$VOLTDB_VOLTDB/license.xml"
+HOST="localhost"
 
 # remove build artifacts
 function clean() {
@@ -37,7 +55,7 @@ function server() {
     if [ ! -f $APPNAME.jar ]; then catalog; fi
     # run the server
     $VOLTDB create catalog $APPNAME.jar deployment deployment.xml \
-        license $LICENSE leader $LEADER
+        license $LICENSE host $HOST
 }
 
 # run the client that drives the example
@@ -56,21 +74,20 @@ function async-benchmark() {
     srccompile
     java -classpath obj:$CLASSPATH:obj -Dlog4j.configuration=file://$LOG4J \
         voltkvqa.AsyncBenchmark \
-        --display-interval=5 \
+        --displayinterval=5 \
         --duration=60 \
         --servers=localhost \
         --port=21212 \
-        --pool-size=100000 \
+        --poolsize=100000 \
         --preload=true \
-        --get-put-ratio=0.9 \
-        --key-size=32 \
-        --min-value-size=1024 \
-        --max-value-size=1024 \
+        --getputratio=0.9 \
+        --keysize=32 \
+        --minvaluesize=1024 \
+        --maxvaluesize=1024 \
         --entropy=127 \
-        --use-compression=false \
-        --rate-limit=100000 \
-        --auto-tune=false \
-        --latency-target=10.0
+        --usecompression=false \
+        --ratelimit=100000 \
+        --latencytarget=10
 }
 
 

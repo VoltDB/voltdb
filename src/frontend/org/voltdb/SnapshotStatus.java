@@ -26,7 +26,7 @@ import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.sysprocs.SnapshotRegistry;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot;
 import org.voltdb.sysprocs.SnapshotRegistry.Snapshot.Table;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 public class SnapshotStatus extends StatsSource {
 

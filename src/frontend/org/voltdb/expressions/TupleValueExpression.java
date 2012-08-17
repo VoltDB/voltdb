@@ -40,14 +40,20 @@ public class TupleValueExpression extends AbstractValueExpression {
     protected String m_columnName = null;
     protected String m_columnAlias = null;
 
-    public TupleValueExpression() {
-        super(ExpressionType.VALUE_TUPLE);
+    private boolean m_hasAggregate = false;
+
+    /// Only set for the special case of an aggregate function result used in an "ORDER BY" clause.
+    /// This TupleValueExpression represents the corresponding "column" in the aggregate's generated output TEMP table.
+    public boolean hasAggregate() {
+        return m_hasAggregate;
     }
 
-    public TupleValueExpression(AbstractExpression left, AbstractExpression right) {
-        super(ExpressionType.VALUE_TUPLE, null, null);
-        assert(left == null);
-        assert(right == null);
+    public void setHasAggregate(boolean m_hasAggregate) {
+        this.m_hasAggregate = m_hasAggregate;
+    }
+
+    public TupleValueExpression() {
+        super(ExpressionType.VALUE_TUPLE);
     }
 
     @Override
@@ -148,6 +154,20 @@ public class TupleValueExpression extends AbstractValueExpression {
 
         // if all seems well, defer to the superclass, which checks kids
         return super.equals(obj);
+    }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = 0;
+        if (m_tableName != null) {
+            result += m_tableName.hashCode();
+        }
+        if (m_columnName != null) {
+            result += m_columnName.hashCode();
+        }
+        // defer to the superclass, which factors in other attributes
+        return result += super.hashCode();
     }
 
     @Override

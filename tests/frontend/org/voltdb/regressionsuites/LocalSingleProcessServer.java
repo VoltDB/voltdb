@@ -30,6 +30,7 @@ import java.util.List;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.ServerThread;
+import org.voltdb.VoltDB;
 import org.voltdb.VoltDB.Configuration;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -38,8 +39,12 @@ import org.voltdb.compiler.VoltProjectBuilder;
  * Implementation of a VoltServerConfig for the simplest case:
  * the single-process VoltServer that's so easy to use.
  *
+ * Edit: Please don't use this.
+ * Use ServerThread or single-node, in-process LocalCluster.
+ *
  */
-public class LocalSingleProcessServer implements VoltServerConfig {
+@Deprecated
+public abstract class LocalSingleProcessServer implements VoltServerConfig {
 
     public final String m_jarFileName;
     public int m_siteCount;
@@ -73,6 +78,12 @@ public class LocalSingleProcessServer implements VoltServerConfig {
             }
         }
     }
+
+    @Override
+    public void setCallingMethodName(String name) {
+        // do nothing yet
+    }
+
     @Override
     public boolean compile(VoltProjectBuilder builder) {
         if (m_compiled == true) {
@@ -154,7 +165,6 @@ public class LocalSingleProcessServer implements VoltServerConfig {
 
     @Override
     public void shutDown() throws InterruptedException {
-        org.voltdb.sysprocs.SnapshotRestore.m_haveDoneRestore = false;
         m_server.shutdown();
         for (EEProcess proc : m_siteProcesses) {
             proc.waitForShutdown();
@@ -192,6 +202,7 @@ public class LocalSingleProcessServer implements VoltServerConfig {
         config.m_pathToCatalog = m_jarFileName;
         config.m_pathToDeployment = m_pathToDeployment;
         config.m_startAction = START_ACTION.CREATE;
+        config.m_enableIV2 = VoltDB.checkTestEnvForIv2();
 
         config.m_ipcPorts = java.util.Collections.synchronizedList(new ArrayList<Integer>());
         for (int ii = 0; ii < m_siteCount; ii++) {

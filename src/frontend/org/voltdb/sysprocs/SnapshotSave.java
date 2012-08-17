@@ -22,22 +22,23 @@ import java.io.IOException;
 import java.util.List;
 import java.util.Map;
 
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
-import org.voltdb.ExecutionSite.SystemProcedureExecutionContext;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
+import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
-import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Table;
-import org.voltdb.client.ConnectionUtil;
 import org.voltdb.dtxn.DtxnConstants;
-import org.voltdb.logging.VoltLogger;
 import org.voltdb.sysprocs.saverestore.SnapshotUtil;
 
 @ProcInfo(singlePartition = false)
@@ -106,14 +107,18 @@ public class SnapshotSave extends VoltSystemProcedure
                         ParameterSet params,
                         SystemProcedureExecutionContext context)
     {
-        String hostname = ConnectionUtil.getHostnameOrAddress();
+        String hostname = CoreUtils.getHostnameOrAddress();
         if (fragmentId == SysProcFragmentId.PF_saveTest)
         {
             assert(params.toArray()[0] != null);
             assert(params.toArray()[1] != null);
+            assert(params.toArray()[2] != null);
             String file_path = (String) params.toArray()[0];
             String file_nonce = (String) params.toArray()[1];
-            return saveTest(file_path, file_nonce, context, hostname);
+            SnapshotFormat format =
+                    SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[2]);
+            String data = (String) params.toArray()[3];
+            return saveTest(file_path, file_nonce, format, data, context, hostname);
         }
         else if (fragmentId == SysProcFragmentId.PF_saveTestResults)
         {
@@ -125,12 +130,18 @@ public class SnapshotSave extends VoltSystemProcedure
             assert(params.toArray()[1] != null);
             assert(params.toArray()[2] != null);
             assert(params.toArray()[3] != null);
+            assert(params.toArray()[4] != null);
             final String file_path = (String) params.toArray()[0];
             final String file_nonce = (String) params.toArray()[1];
             final long txnId = (Long)params.toArray()[2];
             byte block = (Byte)params.toArray()[3];
+            SnapshotFormat format =
+                    SnapshotFormat.getEnumIgnoreCase((String) params.toArray()[4]);
+            String data = (String) params.toArray()[5];
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
-            VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce, block, txnId, context, hostname);
+            VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
+                                                         format, block, txnId,
+                                                         data, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }
         else if (fragmentId == SysProcFragmentId.PF_createSnapshotTargetsResults)
@@ -138,9 +149,9 @@ public class SnapshotSave extends VoltSystemProcedure
             return createSnapshotTargetsResults(dependencies);
         } else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesce) {
             // tell each site to quiesce
-            context.getExecutionEngine().quiesce(context.getLastCommittedTxnId());
-            VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.INTEGER));
-            results.addRow(Integer.parseInt(context.getSite().getTypeName()));
+            context.getSiteProcedureConnection().quiesce();
+            VoltTable results = new VoltTable(new ColumnInfo("id", VoltType.BIGINT));
+            results.addRow(context.getSiteId());
             return new DependencyPair(DEP_snapshotSaveQuiesce, results);
         }
         else if (fragmentId == SysProcFragmentId.PF_snapshotSaveQuiesceResults) {
@@ -186,23 +197,25 @@ public class SnapshotSave extends VoltSystemProcedure
     }
 
     private DependencyPair saveTest(String file_path, String file_nonce,
-            SystemProcedureExecutionContext context, String hostname) {
+                                    SnapshotFormat format,
+                                    String data,
+                                    SystemProcedureExecutionContext context,
+                                    String hostname) {
         {
             VoltTable result = constructNodeResultsTable();
             // Choose the lowest site ID on this host to do the file scan
             // All other sites should just return empty results tables.
-            int host_id = context.getExecutionSite().getCorrespondingHostId();
-            Integer lowest_site_id =
-                VoltDB.instance().getCatalogContext().siteTracker.
-                getLowestLiveExecSiteIdForHost(host_id);
-            if (context.getExecutionSite().getSiteId() == lowest_site_id)
+            if (context.isLowestSiteId())
             {
                 TRACE_LOG.trace("Checking feasibility of save with path and nonce: "
                                 + file_path + ", " + file_nonce);
 
                 if (SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() != -1) {
+                    HOST_LOG.debug("Snapshot in progress, " +
+                            SnapshotSiteProcessor.ExecutionSitesCurrentlySnapshotting.get() +
+                            " sites are still snapshotting");
                     result.addRow(
-                                  Integer.parseInt(context.getSite().getHost().getTypeName()),
+                                  context.getHostId(),
                                   hostname,
                                   "",
                                   "FAILURE",
@@ -212,46 +225,53 @@ public class SnapshotSave extends VoltSystemProcedure
 
                 for (Table table : SnapshotUtil.getTablesToSave(context.getDatabase()))
                 {
-                    File saveFilePath =
-                        SnapshotUtil.constructFileForTable(table, file_path, file_nonce,
-                                              context.getSite().getHost().getTypeName());
-                    TRACE_LOG.trace("Host ID " + context.getSite().getHost().getTypeName() +
-                                    " table: " + table.getTypeName() +
-                                    " to path: " + saveFilePath);
                     String file_valid = "SUCCESS";
                     String err_msg = "";
-                    if (saveFilePath.exists())
-                    {
-                        file_valid = "FAILURE";
-                        err_msg = "SAVE FILE ALREADY EXISTS: " + saveFilePath;
-                    }
-                    else if (!saveFilePath.getParentFile().canWrite())
-                    {
-                        file_valid = "FAILURE";
-                        err_msg = "FILE LOCATION UNWRITABLE: " + saveFilePath;
-                    }
-                    else
-                    {
-                        try
-                        {
-                            /*
-                             * Sanity check that the file can be created
-                             * and then delete it so empty files aren't
-                             * orphaned if another part of the snapshot
-                             * test fails.
-                             */
-                            if (saveFilePath.createNewFile()) {
-                                saveFilePath.delete();
-                            }
-                        }
-                        catch (IOException ex)
+                    if (format.isFileBased()) {
+                        File saveFilePath =
+                                SnapshotUtil.constructFileForTable(
+                                                                   table,
+                                                                   file_path,
+                                                                   file_nonce,
+                                                                   format,
+                                                                   context.getHostId());
+                        TRACE_LOG.trace("Host ID " + context.getHostId() +
+                                        " table: " + table.getTypeName() +
+                                        " to path: " + saveFilePath);
+                        if (saveFilePath.exists())
                         {
                             file_valid = "FAILURE";
-                            err_msg = "FILE CREATION OF " + saveFilePath +
-                            "RESULTED IN IOException: " + ex.getMessage();
+                            err_msg = "SAVE FILE ALREADY EXISTS: " + saveFilePath;
+                        }
+                        else if (!saveFilePath.getParentFile().canWrite())
+                        {
+                            file_valid = "FAILURE";
+                            err_msg = "FILE LOCATION UNWRITABLE: " + saveFilePath;
+                        }
+                        else
+                        {
+                            try
+                            {
+                                /*
+                                 * Sanity check that the file can be created
+                                 * and then delete it so empty files aren't
+                                 * orphaned if another part of the snapshot
+                                 * test fails.
+                                 */
+                                if (saveFilePath.createNewFile()) {
+                                    saveFilePath.delete();
+                                }
+                            }
+                            catch (IOException ex)
+                            {
+                                file_valid = "FAILURE";
+                                err_msg = "FILE CREATION OF " + saveFilePath +
+                                        "RESULTED IN IOException: " + ex.getMessage();
+                            }
                         }
                     }
-                    result.addRow(Integer.parseInt(context.getSite().getHost().getTypeName()),
+
+                    result.addRow(context.getHostId(),
                                   hostname,
                                   table.getTypeName(),
                                   file_valid,
@@ -281,22 +301,30 @@ public class SnapshotSave extends VoltSystemProcedure
         }
     }
 
-
-
-
-
-    public VoltTable[] run(SystemProcedureExecutionContext ctx,
-            String path, String nonce, long block) throws VoltAbortException
+    public VoltTable[] run(SystemProcedureExecutionContext ctx, String command) throws Exception
     {
         final long startTime = System.currentTimeMillis();
-        String async = (block == 0) ? "Asynchronously" : "Synchronously";
-        HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
+
+        JSONObject jsObj = new JSONObject(command);
+        final boolean block = jsObj.optBoolean("block", false);
+        final String async = !block ? "Asynchronously" : "Synchronously";
+        final String path = jsObj.getString("path");
+        final String nonce = jsObj.getString("nonce");
+        String formatStr = jsObj.optString("format", SnapshotFormat.NATIVE.toString());
+        final SnapshotFormat format = SnapshotFormat.getEnumIgnoreCase(formatStr);
+        final String data = jsObj.optString("data");
+
+        if (format == SnapshotFormat.STREAM) {
+            HOST_LOG.info(async + " streaming database, ID: " + nonce + " at " + startTime);
+        } else {
+            HOST_LOG.info(async + " saving database to path: " + path + ", ID: " + nonce + " at " + startTime);
+        }
 
         ColumnInfo[] error_result_columns = new ColumnInfo[2];
         int ii = 0;
         error_result_columns[ii++] = new ColumnInfo("RESULT", VoltType.STRING);
         error_result_columns[ii++] = new ColumnInfo("ERR_MSG", VoltType.STRING);
-        if (path == null || path.equals("")) {
+        if (format.isFileBased() && (path == null || path.equals(""))) {
             VoltTable results[] = new VoltTable[] { new VoltTable(error_result_columns) };
             results[0].addRow("FAILURE", "Provided path was null or the empty string");
             return results;
@@ -316,7 +344,7 @@ public class SnapshotSave extends VoltSystemProcedure
 
         // See if we think the save will succeed
         VoltTable[] results;
-        results = performSaveFeasibilityWork(path, nonce);
+        results = performSaveFeasibilityWork(path, nonce, format, data);
 
         // Test feasibility results for fail
         while (results[0].advanceRow())
@@ -332,7 +360,9 @@ public class SnapshotSave extends VoltSystemProcedure
 
         performQuiesce();
 
-        results = performSnapshotCreationWork( path, nonce, ctx.getCurrentTxnId(), (byte)block);
+        results = performSnapshotCreationWork(path, nonce, ctx.getCurrentTxnId(),
+                                              (byte)(block ? 1 : 0), format,
+                                              data);
         try {
             JSONStringer stringer = new JSONStringer();
             stringer.object();
@@ -350,7 +380,9 @@ public class SnapshotSave extends VoltSystemProcedure
     }
 
     private final VoltTable[] performSaveFeasibilityWork(String filePath,
-                                                         String fileNonce)
+                                                         String fileNonce,
+                                                         SnapshotFormat format,
+                                                         String data)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -362,7 +394,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce);
+        params.setParameters(filePath, fileNonce, format.name(), data);
         pfs[0].parameters = params;
 
         // This fragment aggregates the save-to-disk sanity check results
@@ -381,7 +413,9 @@ public class SnapshotSave extends VoltSystemProcedure
     private final VoltTable[] performSnapshotCreationWork(String filePath,
             String fileNonce,
             long txnId,
-            byte block)
+            byte block,
+            SnapshotFormat format,
+            String data)
     {
         SynthesizedPlanFragment[] pfs = new SynthesizedPlanFragment[2];
 
@@ -393,7 +427,7 @@ public class SnapshotSave extends VoltSystemProcedure
         pfs[0].inputDepIds = new int[] {};
         pfs[0].multipartition = true;
         ParameterSet params = new ParameterSet();
-        params.setParameters(filePath, fileNonce, txnId, block);
+        params.setParameters(filePath, fileNonce, txnId, block, format.name(), data);
         pfs[0].parameters = params;
 
         // This fragment aggregates the results of creating those files

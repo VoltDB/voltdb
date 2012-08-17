@@ -35,4 +35,10 @@ public abstract class PrivateVoltTableFactory {
     public static VoltTable createVoltTableFromBuffer(ByteBuffer backing, boolean readOnly) {
         return new VoltTable(backing, readOnly);
     }
+
+    public static VoltTable createVoltTableFromSharedBuffer(ByteBuffer shared) {
+        VoltTable vt = new VoltTable();
+        vt.initFromBuffer(shared);
+        return vt;
+    }
 }

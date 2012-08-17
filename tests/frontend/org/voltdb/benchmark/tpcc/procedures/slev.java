@@ -50,7 +50,10 @@
 
 package org.voltdb.benchmark.tpcc.procedures;
 
-import org.voltdb.*;
+import org.voltdb.ProcInfo;
+import org.voltdb.SQLStmt;
+import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 
 //Notes on Stored Procedure:
 //return VoltTable[] has 1 element:
@@ -70,7 +73,7 @@ public class slev extends VoltProcedure {
         "OL_D_ID = ? AND " +
         "OL_O_ID < ? AND " +
         "OL_O_ID >= ? AND " +
-        "S_W_ID = ? AND " +
+        "S_W_ID = OL_W_ID AND " +
         "S_I_ID = OL_I_ID AND " +
         "S_QUANTITY < ?;");
 
@@ -87,7 +90,7 @@ public class slev extends VoltProcedure {
 //          o_id = 0;
         final long o_id = result.asScalarLong(); //if invalid (i.e. no matching o_id), we expect a fail here.
 
-        voltQueueSQL(GetStockCount, w_id, d_id, o_id, o_id - 20, w_id, threshold);
+        voltQueueSQL(GetStockCount, w_id, d_id, o_id, o_id - 20, threshold);
         //return assumes that o_id is a temporary variable, and that stock_count is a necessarily returned variable.
         return voltExecuteSQL();
     }

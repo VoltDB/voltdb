@@ -19,10 +19,13 @@ package org.voltdb.export;
 import java.io.File;
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.util.ArrayList;
 import java.util.HashMap;
 import java.util.Iterator;
+import java.util.List;
 import java.util.concurrent.atomic.AtomicInteger;
+
+import org.voltcore.logging.VoltLogger;
+import org.voltcore.utils.DBBPool;
 
 import org.voltdb.CatalogContext;
 import org.voltdb.VoltDB;
@@ -30,8 +33,6 @@ import org.voltdb.catalog.Connector;
 import org.voltdb.catalog.ConnectorTableInfo;
 import org.voltdb.catalog.Table;
 import org.voltdb.dtxn.SiteTracker;
-import org.voltdb.logging.VoltLogger;
-import org.voltdb.utils.DBBPool;
 import org.voltdb.utils.VoltFile;
 
 /**
@@ -214,10 +215,10 @@ public class ExportGeneration {
     private void addDataSources(
             Table table, int hostId, CatalogContext catalogContext)
     {
-        SiteTracker siteTracker = catalogContext.siteTracker;
-        ArrayList<Integer> sites = siteTracker.getLiveExecutionSitesForHost(hostId);
+        SiteTracker siteTracker = VoltDB.instance().getSiteTracker();
+        List<Long> sites = siteTracker.getSitesForHost(hostId);
 
-        for (Integer site : sites) {
+        for (Long site : sites) {
             Integer partition = siteTracker.getPartitionForSite(site);
             /*
              * IOException can occur if there is a problem

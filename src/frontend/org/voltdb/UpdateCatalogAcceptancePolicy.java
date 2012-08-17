@@ -37,9 +37,9 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
         }
 
         ParameterSet params = invocation.getParams();
-        if (params.m_params.length != 2 ||
-            params.m_params[0] == null ||
-            params.m_params[1] == null)
+        if (params.toArray().length != 2 ||
+            params.toArray()[0] == null ||
+            params.toArray()[1] == null)
         {
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0],
@@ -50,15 +50,15 @@ public class UpdateCatalogAcceptancePolicy extends InvocationAcceptancePolicy {
         }
 
         boolean isHex = false;
-        if (params.m_params[0] instanceof String) {
-            isHex = Encoder.isHexEncodedString((String) params.m_params[0]);
+        if (params.toArray()[0] instanceof String) {
+            isHex = Encoder.isHexEncodedString((String) params.toArray()[0]);
         }
-        if (!isHex && !(params.m_params[0] instanceof byte[])) {
+        if (!isHex && !(params.toArray()[0] instanceof byte[])) {
             return new ClientResponseImpl(ClientResponseImpl.UNEXPECTED_FAILURE,
                     new VoltTable[0],
                     "UpdateApplicationCatalog system procedure takes the " +
                     "catalog bytes as a byte array. The received parameter " +
-                    "is of type " + params.m_params[0].getClass() + ".",
+                    "is of type " + params.toArray()[0].getClass() + ".",
                     invocation.clientHandle);
         }
 

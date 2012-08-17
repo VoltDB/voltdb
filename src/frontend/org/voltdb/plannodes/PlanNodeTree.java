@@ -22,7 +22,7 @@ import org.voltdb.VoltType;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 /**
  *

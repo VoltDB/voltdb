@@ -20,31 +20,46 @@ package org.voltdb.messaging;
 import java.io.IOException;
 import java.nio.ByteBuffer;
 
+import org.voltcore.messaging.Subject;
+import org.voltcore.messaging.VoltMessage;
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.ClientResponseImpl;
-import org.voltdb.utils.DBBPool;
 
 /**
- * Message from an initiator to an execution site, informing the
- * site that it may be requested to do work for a multi-partition
- * transaction, and to reserve a slot in its ordered work queue
- * for this transaction.
- *
+ * Message from an execution site to initiator with the final response for
+ * the client
  */
 public class InitiateResponseMessage extends VoltMessage {
 
     private long m_txnId;
-    private int m_initiatorSiteId;
-    private int m_coordinatorSiteId;
+    private long m_spHandle;
+    private long m_initiatorHSId;
+    private long m_coordinatorHSId;
+    private long m_clientInterfaceHandle;
+    private long m_connectionId;
     private boolean m_commit;
     private boolean m_recovering;
     private ClientResponseImpl m_response;
 
     /** Empty constructor for de-serialization */
-    InitiateResponseMessage()
+    public InitiateResponseMessage()
     {
-        m_initiatorSiteId = -1;
-        m_coordinatorSiteId = -1;
+        m_initiatorHSId = -1;
+        m_coordinatorHSId = -1;
         m_subject = Subject.DEFAULT.getId();
+    }
+
+    /**
+     * IV2 constructor
+     */
+    public InitiateResponseMessage(Iv2InitiateTaskMessage task) {
+        m_txnId = task.getTxnId();
+        m_spHandle = task.getSpHandle();
+        m_initiatorHSId = task.getInitiatorHSId();
+        m_coordinatorHSId = task.getCoordinatorHSId();
+        m_subject = Subject.DEFAULT.getId();
+        m_clientInterfaceHandle = task.getClientInterfaceHandle();
+        m_connectionId = task.getConnectionId();
     }
 
     /**
@@ -54,10 +69,13 @@ public class InitiateResponseMessage extends VoltMessage {
      * metadata from.
      */
     public InitiateResponseMessage(InitiateTaskMessage task) {
-        m_txnId = task.m_txnId;
-        m_initiatorSiteId = task.m_initiatorSiteId;
-        m_coordinatorSiteId = task.m_coordinatorSiteId;
+        m_txnId = task.getTxnId();
+        m_spHandle = task.getSpHandle();
+        m_initiatorHSId = task.getInitiatorHSId();
+        m_coordinatorHSId = task.getCoordinatorHSId();
         m_subject = Subject.DEFAULT.getId();
+        m_clientInterfaceHandle = Long.MIN_VALUE;
+        m_connectionId = Long.MIN_VALUE;
     }
 
     public void setClientHandle(long clientHandle) {
@@ -68,12 +86,24 @@ public class InitiateResponseMessage extends VoltMessage {
         return m_txnId;
     }
 
-    public int getInitiatorSiteId() {
-        return m_initiatorSiteId;
+    public long getSpHandle() {
+        return m_spHandle;
     }
 
-    public int getCoordinatorSiteId() {
-        return m_coordinatorSiteId;
+    public long getInitiatorHSId() {
+        return m_initiatorHSId;
+    }
+
+    public long getCoordinatorHSId() {
+        return m_coordinatorHSId;
+    }
+
+    public long getClientInterfaceHandle() {
+        return m_clientInterfaceHandle;
+    }
+
+    public long getClientConnectionId() {
+        return m_connectionId;
     }
 
     public boolean shouldCommit() {
@@ -93,81 +123,74 @@ public class InitiateResponseMessage extends VoltMessage {
     }
 
     public void setResults(ClientResponseImpl r) {
-        setResults( r, null);
-    }
-
-    public void setResults(ClientResponseImpl r, InitiateTaskMessage task) {
         m_commit = (r.getStatus() == ClientResponseImpl.SUCCESS);
         m_response = r;
     }
 
     @Override
-    protected void flattenToBuffer(final DBBPool pool) {
-        // stupid lame flattening of the client response
-        FastSerializer fs = new FastSerializer();
-        try {
-            fs.writeObject(m_response);
-        } catch (IOException e) {
-            e.printStackTrace();
-            assert(false);
-        }
-        ByteBuffer responseBytes = fs.getBuffer();
+    public int getSerializedSize()
+    {
+        int msgsize = super.getSerializedSize();
+        msgsize += 8 // txnId
+            + 8 // m_spHandle
+            + 8 // initiator HSId
+            + 8 // coordinator HSId
+            + 8 // client interface handle
+            + 8 // client connection id
+            + 1; // node recovering indication
 
-        // I don't know where the two fours that were originally here come from.
-        int msgsize = 8 + 4 + 4 + 4 + 4 + 1 + 8 + responseBytes.remaining();
+        msgsize += m_response.getSerializedSize();
 
-        if (m_buffer == null) {
-            m_container = pool.acquire(msgsize + 1 + HEADER_SIZE);
-            m_buffer = m_container.b;
-        }
-        setBufferSize(msgsize + 1, pool);
-
-        m_buffer.position(HEADER_SIZE);
-        m_buffer.put(INITIATE_RESPONSE_ID);
-
-        m_buffer.putLong(m_txnId);
-        m_buffer.putInt(m_initiatorSiteId);
-        m_buffer.putInt(m_coordinatorSiteId);
-        m_buffer.put((byte) (m_recovering == true ? 1 : 0));
-        m_buffer.put(responseBytes);
-        m_buffer.limit(m_buffer.position());
+        return msgsize;
     }
 
     @Override
-    protected void initFromBuffer() {
-        m_buffer.position(HEADER_SIZE + 1); // skip the msg id
-        m_txnId = m_buffer.getLong();
-        m_initiatorSiteId = m_buffer.getInt();
-        m_coordinatorSiteId = m_buffer.getInt();
-        m_recovering = m_buffer.get() == 1;
+    public void flattenToBuffer(ByteBuffer buf)
+    {
+        buf.put(VoltDbMessageFactory.INITIATE_RESPONSE_ID);
+        buf.putLong(m_txnId);
+        buf.putLong(m_spHandle);
+        buf.putLong(m_initiatorHSId);
+        buf.putLong(m_coordinatorHSId);
+        buf.putLong(m_clientInterfaceHandle);
+        buf.putLong(m_connectionId);
+        buf.put((byte) (m_recovering == true ? 1 : 0));
+        m_response.flattenToBuffer(buf);
+        assert(buf.capacity() == buf.position());
+        buf.limit(buf.position());
+    }
 
-        FastDeserializer fds = new FastDeserializer(m_buffer);
-        try {
-            m_response = fds.readObject(ClientResponseImpl.class);
-            m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
-        } catch (IOException e) {
-            e.printStackTrace();
-            assert(false);
-        }
+    @Override
+    public void initFromBuffer(ByteBuffer buf) throws IOException
+    {
+        m_txnId = buf.getLong();
+        m_spHandle = buf.getLong();
+        m_initiatorHSId = buf.getLong();
+        m_coordinatorHSId = buf.getLong();
+        m_clientInterfaceHandle = buf.getLong();
+        m_connectionId = buf.getLong();
+        m_recovering = buf.get() == 1;
+        m_response = new ClientResponseImpl();
+        m_response.initFromBuffer(buf);
+        m_commit = (m_response.getStatus() == ClientResponseImpl.SUCCESS);
+        assert(buf.capacity() == buf.position());
     }
 
     @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append("INITITATE_RESPONSE (TO ");
-        sb.append(receivedFromSiteId);
-        sb.append(") FOR TXN ");
+        sb.append("INITITATE_RESPONSE FOR TXN ");
         sb.append(m_txnId);
-        sb.append("\n INITIATOR SITE ID: " + m_initiatorSiteId);
-        sb.append("\n COORDINATOR SITE ID: " + m_coordinatorSiteId);
-
+        sb.append("\n SP HANDLE: " + m_spHandle);
+        sb.append("\n INITIATOR HSID: " + CoreUtils.hsIdToString(m_initiatorHSId));
+        sb.append("\n COORDINATOR HSID: " + CoreUtils.hsIdToString(m_coordinatorHSId));
+        sb.append("\n CLIENT INTERFACE HANDLE: " + m_clientInterfaceHandle);
+        sb.append("\n CLIENT CONNECTION ID: " + m_connectionId);
         if (m_commit)
             sb.append("\n  COMMIT");
         else
             sb.append("\n  ROLLBACK/ABORT, ");
-
-        // TODO More work here
 
         return sb.toString();
     }

@@ -38,7 +38,7 @@ import org.voltdb.exportclient.ExportClientBase;
 import org.voltdb.exportclient.ExportClientException;
 import org.voltdb.exportclient.ExportConnection;
 import org.voltdb.exportclient.ExportDecoderBase;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public class ExportTestClient extends ExportClientBase
 {
@@ -51,9 +51,9 @@ public class ExportTestClient extends ExportClientBase
 
     public TreeSet<Long> m_generationsSeen = new TreeSet<Long>();
 
-    public ExportTestClient(int nodeCount)
+    public ExportTestClient(int nodeCount, int port)
     {
-        super.addServerInfo(new InetSocketAddress("localhost", VoltDB.DEFAULT_PORT));
+        super.addServerInfo(new InetSocketAddress("localhost", port));
     }
 
     /*

@@ -19,9 +19,15 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.util.Arrays;
+import java.util.HashMap;
+import java.util.HashSet;
 import java.util.List;
 import java.util.Map;
+import java.util.Set;
 
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.VoltMessage;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Procedure;
@@ -29,6 +35,7 @@ import org.voltdb.dtxn.DtxnConstants;
 import org.voltdb.dtxn.MultiPartitionParticipantTxnState;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.FastSerializer;
+import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 
 /**
@@ -60,19 +67,32 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     protected int m_numberOfPartitions;
     protected Procedure m_catProc;
     protected Cluster m_cluster;
-    protected ExecutionSite m_site;
+    protected SiteProcedureConnection m_site;
+    private LoadedProcedureSet m_loadedProcedureSet;
+    protected ProcedureRunner m_runner; // overrides private parent var
 
-    void initSysProc(int numberOfPartitions, ExecutionSite site,
+    @Override
+    void init(ProcedureRunner procRunner) {
+        super.init(procRunner);
+        m_runner = procRunner;
+    }
+
+    void initSysProc(int numberOfPartitions, SiteProcedureConnection site,
+            LoadedProcedureSet loadedProcedureSet,
             Procedure catProc, Cluster cluster) {
 
         m_numberOfPartitions = numberOfPartitions;
         m_site = site;
         m_catProc = catProc;
         m_cluster = cluster;
+        m_loadedProcedureSet = loadedProcedureSet;
 
         init();
     }
 
+    /**
+     * For Sysproc init tasks like registering plan frags
+     */
     abstract public void init();
 
     /**
@@ -102,7 +122,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
     /** Bundles the data needed to describe a plan fragment. */
     public static class SynthesizedPlanFragment {
-        public int siteId = -1;
+        public long siteId = -1;
         public long fragmentId = -1;
         public int outputDepId = -1;
         public int inputDepIds[] = null;
@@ -121,7 +141,7 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
     abstract public DependencyPair executePlanFragment(
             Map<Integer, List<VoltTable>> dependencies, long fragmentId,
             ParameterSet params,
-            ExecutionSite.SystemProcedureExecutionContext context);
+            SystemProcedureExecutionContext context);
 
     /**
      * Produce work units, possibly on all sites, for a list of plan fragments.
@@ -141,14 +161,13 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
 
         TransactionState txnState = m_runner.getTxnState();
 
-        VoltTable[] results = new VoltTable[1];
-        executeSysProcPlanFragmentsAsync(pfs);
-
         // the stack frame drop terminates the recursion and resumes
         // execution of the current stored procedure.
         assert (txnState != null);
-        assert (txnState instanceof MultiPartitionParticipantTxnState);
         txnState.setupProcedureResume(false, new int[] { aggregatorOutputDependencyId });
+
+        VoltTable[] results = new VoltTable[1];
+        executeSysProcPlanFragmentsAsync(pfs);
 
         // execute the tasks that just got queued.
         // recursively call recurableRun and don't allow it to shutdown
@@ -162,6 +181,112 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
             results[0] = matchingTablesForId.get(0);
         }
 
+        return results;
+    }
+
+    /*
+     * A helper method for snapshot restore that manages a mailbox run loop and dependency tracking.
+     * The mailbox is a dedicated mailbox for snapshot restore. This assumes a very specific plan fragment
+     * worklow where fragments 0 - (N - 1) all have a single output dependency that is aggregated
+     * by fragment N which uses their output dependencies as it's input dependencies.
+     *
+     * This matches the workflow of snapshot restore
+     */
+    public VoltTable[] executeSysProcPlanFragments(SynthesizedPlanFragment pfs[], Mailbox m) {
+        Set<Integer> dependencyIds = new HashSet<Integer>();
+        VoltTable results[] = new VoltTable[1];
+
+        /*
+         * Iterate the plan fragments and distribute them. Each
+         * plan fragment goes to an individual site.
+         * The output dependency of each fragment is added to the
+         * set of expected dependencies
+         */
+        for (int ii = 0; ii < pfs.length - 1; ii++) {
+            SynthesizedPlanFragment pf = pfs[ii];
+            dependencyIds.add(pf.outputDepId);
+
+            // serialize parameters
+            ByteBuffer parambytes = null;
+            if (pf.parameters != null) {
+                FastSerializer fs = new FastSerializer();
+                try {
+                    fs.writeObject(pf.parameters);
+                }
+                catch (IOException e) {
+                    e.printStackTrace();
+                    assert (false);
+                }
+                parambytes = fs.getBuffer();
+            }
+
+            /*
+             * The only real data is the fragment id, output dep id,
+             * and parameters. Transactions ids, readonly-ness, and finality-ness
+             * are unused.
+             */
+            FragmentTaskMessage ftm =
+                    FragmentTaskMessage.createWithOneFragment(
+                            0,
+                            m.getHSId(),
+                            0,
+                            false,
+                            pf.fragmentId,
+                            pf.outputDepId,
+                            parambytes,
+                            false);
+            m.send(pf.siteId, ftm);
+        }
+
+        /*
+         * Track the received dependencies. Stored as a list because executePlanFragment for
+         * the aggregator plan fragment expects the tables as a list in the dependency map,
+         * but sysproc fragments only every have a single output dependency.
+         */
+        Map<Integer, List<VoltTable>> receivedDependencyIds = new HashMap<Integer, List<VoltTable>>();
+
+        /*
+         * This loop will wait for all the responses to the fragment that was sent out,
+         * but will also respond to incoming fragment tasks by executing them.
+         */
+        while (true) {
+            //Lightly spinning makes debugging easier by allowing inspection
+            //of stuff on the stack
+            VoltMessage vm = m.recvBlocking(1000);
+            if (vm == null) continue;
+
+            if (vm instanceof FragmentTaskMessage) {
+                FragmentTaskMessage ftm = (FragmentTaskMessage)vm;
+                DependencyPair dp =
+                        m_runner.executePlanFragment(
+                                m_runner.getTxnState(),
+                                null,
+                                ftm.getFragmentId(0),
+                                ftm.getParameterSetForFragment(0));
+                FragmentResponseMessage frm = new FragmentResponseMessage(ftm, m.getHSId());
+                frm.addDependency(dp.depId, dp.dependency);
+                m.send(ftm.getCoordinatorHSId(), frm);
+            } else if (vm instanceof FragmentResponseMessage) {
+                FragmentResponseMessage frm = (FragmentResponseMessage)vm;
+                receivedDependencyIds.put(
+                        frm.getTableDependencyIdAtIndex(0),
+                        Arrays.asList(new VoltTable[] {frm.getTableAtIndex(0)}));
+                if (receivedDependencyIds.size() == dependencyIds.size() &&
+                        receivedDependencyIds.keySet().equals(dependencyIds)) {
+                    break;
+                }
+            }
+        }
+
+        /*
+         * Executing the last aggregator plan fragment in the list produces the result
+         */
+        results[0] =
+                m_runner.executePlanFragment(
+                        m_runner.getTxnState(),
+                        receivedDependencyIds,
+                        pfs[pfs.length - 1].fragmentId,
+                        pfs[pfs.length - 1].parameters).dependency;
         return results;
     }
 
@@ -205,15 +330,15 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 parambytes = fs.getBuffer();
             }
 
-            FragmentTaskMessage task = new FragmentTaskMessage(
-                txnState.initiatorSiteId,
-                m_site.getCorrespondingSiteId(),
-                txnState.txnId,
-                false,
-                new long[] { pf.fragmentId },
-                new int[] { pf.outputDepId },
-                new ByteBuffer[] { parambytes },
-                false);
+            FragmentTaskMessage task = FragmentTaskMessage.createWithOneFragment(
+                    txnState.initiatorHSId,
+                    m_site.getCorrespondingSiteId(),
+                    txnState.txnId,
+                    txnState.isReadOnly(),
+                    pf.fragmentId,
+                    pf.outputDepId,
+                    parambytes,
+                    false);
             if (pf.inputDepIds != null) {
                 for (int depId : pf.inputDepIds) {
                     task.addInputDepId(0, depId);
@@ -232,14 +357,18 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                 if (pf.siteId == -1)
                     txnState.createLocalFragmentWork(task, false);
                 else
-                    txnState.createFragmentWork(new int[] { pf.siteId },
+                    txnState.createFragmentWork(new long[] { pf.siteId },
                                                          task);
             }
         }
     }
 
+    // It would be nicer if init() on a sysproc was really "getPlanFragmentIds()"
+    // and then the loader could ask for the ids directly instead of stashing
+    // its reference here and inverting the relationship between loaded procedure
+    // set and system procedure.
     public void registerPlanFragment(long fragmentId) {
         assert(m_runner != null);
-        m_site.registerPlanFragment(fragmentId, m_runner);
+        m_loadedProcedureSet.registerPlanFragment(fragmentId, m_runner);
     }
 }

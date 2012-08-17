@@ -22,15 +22,19 @@ import org.voltdb.catalog.Statement;
 /**
  * <p>A simple wrapper of a parameterized SQL statement. VoltDB uses this instead of
  * a Java String type for performance reasons and to cache statement meta-data like
- * result schema, etc..</p>
+ * result schema, compiled plan, etc..</p>
  *
  * <p>SQLStmts are used exclusively in subclasses of {@link VoltProcedure}</p>
  *
  * @see VoltProcedure
  */
 public class SQLStmt {
-    String sqlText;
+    // Used for uncompiled SQL.
+    byte[] sqlText;
     String joinOrder;
+
+    // Used for compiled SQL
+    SQLStmtPlan plan = null;
 
     /**
      * Construct a SQLStmt instance from a SQL statement.
@@ -43,6 +47,13 @@ public class SQLStmt {
     }
 
     /**
+     * Construct a SQLStmt instance from a byte array for internal use.
+     */
+    private SQLStmt(byte[] sqlText) {
+        this.sqlText = sqlText;
+    }
+
+    /**
      * Construct a SQLStmt instance from a SQL statement.
      *
      * @param sqlText Valid VoltDB compliant SQL with question marks as parameter
@@ -50,8 +61,40 @@ public class SQLStmt {
      * @param joinOrder separated list of tables used by the query specifying the order they should be joined in
      */
     public SQLStmt(String sqlText, String joinOrder) {
-        this.sqlText = sqlText;
+        this.sqlText = sqlText.getBytes(VoltDB.UTF8ENCODING);
         this.joinOrder = joinOrder;
+    }
+
+    /**
+     * Factory method to construct a SQLStmt instance with a compiled plan attached.
+     *
+     * @param sqlText Valid VoltDB compliant SQL
+     * @param aggregatorFragment Compiled aggregator fragment
+     * @param collectorFragment Compiled collector fragment
+     * @param isReplicatedTableDML Flag set to true if replicated
+     * @param params Description of parameters expected by the statement
+     * @return SQLStmt object with plan added
+     */
+    static SQLStmt createWithPlan(byte[] sqlText,
+                                  byte[] aggregatorFragment,
+                                  byte[] collectorFragment,
+                                  boolean isReplicatedTableDML,
+                                  VoltType[] params) {
+        SQLStmt stmt = new SQLStmt(sqlText);
+
+        /*
+         * Fill out the parameter types
+         */
+        if (params != null) {
+            stmt.statementParamJavaTypes = new byte[params.length];
+            stmt.numStatementParamJavaTypes = params.length;
+            for (int i = 0; i < params.length; i++) {
+                stmt.statementParamJavaTypes[i] = params[i].getValue();
+            }
+        }
+
+        stmt.plan = new SQLStmtPlan(aggregatorFragment, collectorFragment, isReplicatedTableDML);
+        return stmt;
     }
 
     /**
@@ -60,7 +103,16 @@ public class SQLStmt {
      * @return String containing the text of the SQL statement represented.
      */
     public String getText() {
-        return sqlText;
+        return new String(sqlText, VoltDB.UTF8ENCODING);
+    }
+
+    /**
+     * Get the pre-compiled plan, if available.
+     *
+     * @return pre-compiled plan object or null
+     */
+    SQLStmtPlan getPlan() {
+        return plan;
     }
 
     /**
@@ -70,6 +122,17 @@ public class SQLStmt {
      */
     public String getJoinOrder() {
         return joinOrder;
+    }
+
+    /**
+     * Check if single partition.
+     *
+     * @return true if it is single partition
+     */
+    boolean isSinglePartition() {
+        // Check the catalog or the plan, depending on which (if any) is available.
+        return (   (this.catStmt != null && this.catStmt.getSinglepartition())
+                || (this.plan != null && this.plan.getCollectorFragment() == null));
     }
 
     byte statementParamJavaTypes[];

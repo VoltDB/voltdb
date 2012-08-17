@@ -97,7 +97,7 @@ public class TestCtrlC extends TestCase {
         public void run() {
             try {
                 org.voltdb.client.Client client = org.voltdb.client.ClientFactory.createClient();
-                client.createConnection("localhost");
+                client.createConnection("localhost", VoltDBFickleCluster.getPort(0));
                 for (long i = 0; allIsGo.get(); i++) {
                     ClientResponse r = client.callProcedure("Insert", i);
                     assertEquals(r.getStatus(), ClientResponse.SUCCESS);

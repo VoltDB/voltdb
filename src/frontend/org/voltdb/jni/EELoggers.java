@@ -17,7 +17,7 @@
 
 package org.voltdb.jni;
 
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * Only a subset of log4j loggers are made available for use with in the EE. A long is passed in to the EE

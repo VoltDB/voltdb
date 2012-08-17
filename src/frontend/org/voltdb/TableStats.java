@@ -20,7 +20,7 @@ package org.voltdb;
 import java.util.Iterator;
 
 public class TableStats extends SiteStatsSource {
-    public TableStats(int siteId) {
+    public TableStats(long siteId) {
         super( siteId, true);
     }
 

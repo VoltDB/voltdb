@@ -42,49 +42,6 @@ import org.voltdb.utils.MiscUtils;
 
 public class TestHSQLBackend extends TestCase {
 
-    public void testMilestoneOneHSQL() throws InterruptedException, IOException, ProcCallException {
-        String ddl =
-            "CREATE TABLE WAREHOUSE (" +
-            "W_ID INTEGER DEFAULT '0' NOT NULL, "+
-            "W_NAME VARCHAR(16) DEFAULT NULL, " +
-            "PRIMARY KEY  (W_ID)" +
-            ");";
-
-        VoltProjectBuilder builder = new VoltProjectBuilder();
-        builder.addLiteralSchema(ddl);
-        builder.addProcedures(
-                org.voltdb.compiler.procedures.MilestoneOneInsert.class,
-                org.voltdb.compiler.procedures.MilestoneOneSelect.class,
-                org.voltdb.compiler.procedures.MilestoneOneCombined.class);
-
-        assertTrue(builder.compile("test.jar"));
-        final File jar = new File("test.jar");
-        jar.deleteOnExit();
-
-        // start VoltDB server using hsqlsb backend
-        ServerThread server = new ServerThread( "test.jar", builder.getPathToDeployment(), BackendTarget.HSQLDB_BACKEND);
-        server.start();
-        server.waitForInitialization();
-
-        // run the test
-        ClientConfig config = new ClientConfig("program", "none");
-        Client client = ClientFactory.createClient(config);
-        client.createConnection("localhost");
-
-        // call the insert procedure
-        VoltTable[] results = client.callProcedure("MilestoneOneCombined", 99L, "TEST").getResults();
-        // check one table was returned
-        assertTrue(results.length == 1);
-        // check one tuple was modified
-        VoltTable result = results[0];
-        VoltTableRow row = result.fetchRow(0);
-        String resultStr = row.getString(0);
-        assertTrue(resultStr.equals("TEST"));
-
-        server.shutdown();
-        server.join();
-    }
-
     public void testAdHocEmptyQuery() throws Exception {
         TPCCProjectBuilder builder = new TPCCProjectBuilder();
         builder.addDefaultSchema();

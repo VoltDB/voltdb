@@ -28,7 +28,7 @@ import java.util.ArrayDeque;
 import java.util.HashMap;
 
 import org.voltdb.jni.ExecutionEngine;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.processtools.ShellTools;
 
 /**

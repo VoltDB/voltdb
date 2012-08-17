@@ -64,7 +64,8 @@ public abstract class TransactionInitiator {
             int numPartitions,
             Object clientData,
             int messageSize,
-            long now);
+            long now,
+            boolean allowMismatchedResults);
 
     /**
      * <p>
@@ -111,7 +112,8 @@ public abstract class TransactionInitiator {
             int numPartitions,
             Object clientData,
             int messageSize,
-            long now);
+            long now,
+            boolean allowMismatchedResults);
 
     /**
      * This method should be called every X ms or so, where X is probably
@@ -141,7 +143,7 @@ public abstract class TransactionInitiator {
      * to rejoined sites.
      * @param executorSiteIds The ids of the sites that joined.
      */
-    public abstract void notifyExecutionSiteRejoin(ArrayList<Integer> executorSiteIds);
+    public abstract void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds);
 
     public abstract Map<Long, long[]> getOutstandingTxnStats();
 

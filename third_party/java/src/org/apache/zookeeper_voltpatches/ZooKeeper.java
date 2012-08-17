@@ -27,7 +27,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.Set;
 
-import org.apache.log4j.Logger;
+import org.voltcore.logging.VoltLogger;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ACLCallback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.Children2Callback;
 import org.apache.zookeeper_voltpatches.AsyncCallback.ChildrenCallback;
@@ -102,10 +102,10 @@ import org.apache.zookeeper_voltpatches.server.DataTree;
  *
  */
 public class ZooKeeper {
-    private static final Logger LOG;
+    private static final VoltLogger LOG;
 
     static {
-        LOG = Logger.getLogger("ZK-SERVER");
+        LOG = new VoltLogger("ZK-SERVER");
         //Environment.logEnv("Client environment:", LOG);
     }
 
@@ -233,8 +233,8 @@ public class ZooKeeper {
      * Register a watcher for a particular path.
      */
     abstract class WatchRegistration {
-        private Watcher watcher;
-        private String clientPath;
+        private final Watcher watcher;
+        private final String clientPath;
 
         public WatchRegistration(Watcher watcher, String clientPath) {
             this.watcher = watcher;

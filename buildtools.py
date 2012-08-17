@@ -157,6 +157,8 @@ def buildMakefile(CTX):
         tests += [TEST_PREFIX + "/" + dir + "/" + x for x in input]
 
     makefile = file(OUTPUT_PREFIX + "/makefile", 'w')
+    makefile.write("CC = gcc\n")
+    makefile.write("CXX = g++\n")
     makefile.write("CPPFLAGS += %s\n" % (MAKECPPFLAGS))
     makefile.write("LDFLAGS += %s\n" % (CTX.LDFLAGS))
     makefile.write("JNILIBFLAGS += %s\n" % (JNILIBFLAGS))
@@ -171,7 +173,7 @@ def buildMakefile(CTX):
     if CTX.TARGET == "CLEAN":
         makefile.write(".PHONY: clean\n")
         makefile.write("clean: \n")
-        makefile.write("\trm -drf *\n")
+        makefile.write("\trm -rf *\n")
         makefile.close()
         return
 
@@ -212,7 +214,7 @@ def buildMakefile(CTX):
 
     makefile.write("# voltdb execution engine that accepts work on a tcp socket (vs. jni)\n")
     makefile.write("prod/voltdbipc: $(SRC)/voltdbipc.cpp " + " objects/volt.a\n")
-    makefile.write("\t$(LINK.cpp) %s -o $@ $^\n" % CTX.TEST_EXTRAFLAGS)
+    makefile.write("\t$(LINK.cpp) %s -o $@ $^ %s\n" % (CTX.TEST_EXTRAFLAGS, CTX.LASTLDFLAGS))
     makefile.write("\n")
 
 
@@ -310,7 +312,6 @@ def runTests(CTX):
     retval = os.system("make --directory=%s test -j4" % (CTX.OUTPUT_PREFIX))
     if retval != 0:
         return -1
-    CATALOG_PATH = os.environ['M1CATALOG_PATH']
     TESTOBJECTS_DIR = os.environ['TEST_DIR']
     TEST_PREFIX = CTX.TEST_PREFIX.rstrip("/")
     OUTPUT_PREFIX = CTX.OUTPUT_PREFIX.rstrip("/")

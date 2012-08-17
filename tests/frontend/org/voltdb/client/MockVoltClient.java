@@ -152,7 +152,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public void drain() throws NoConnectionsException {
+    public void drain() {
         // TODO Auto-generated method stub
 
     }
@@ -188,35 +188,11 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public VoltTable getIOStats() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getIOStatsInterval() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
     public Object[] getInstanceId() {
         Object[] dumb = new Object[2];
-        dumb[0] = (Long)m_startTime;
-        dumb[1] = (Integer)0;
+        dumb[0] = m_startTime;
+        dumb[1] = 0;
         return dumb;
-    }
-
-    @Override
-    public VoltTable getProcedureStats() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getProcedureStatsInterval() {
-        // TODO Auto-generated method stub
-        return null;
     }
 
     @Override
@@ -250,18 +226,6 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
     }
 
     @Override
-    public VoltTable getClientRTTLatencies() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
-    public VoltTable getClusterRTTLatencies() {
-        // TODO Auto-generated method stub
-        return null;
-    }
-
-    @Override
     public ClientResponse updateApplicationCatalog(File catalogPath, File deploymentPath) throws IOException,
                                                                                          NoConnectionsException,
                                                                                          ProcCallException {
@@ -278,6 +242,7 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
         return false;
     }
 
+    @Override
     public boolean callProcedure(long originalTxnId,
                                  ProcedureCallback callback,
                                  String procName,
@@ -332,5 +297,21 @@ public class MockVoltClient implements Client, ReplicaProcCaller{
             lastOrigTxnId = originalTxnId;
         }
         return new ClientResponseImpl(ClientResponse.SUCCESS, new VoltTable[0], "");
+    }
+
+    @Override
+    public ClientStatsContext createStatsContext() {
+        return null;
+    }
+
+    @Override
+    public int[] getThroughputAndOutstandingTxnLimits() {
+        return null;
+    }
+
+    @Override
+    public void writeSummaryCSV(ClientStats stats, String path) throws IOException {
+        // TODO Auto-generated method stub
+
     }
 }

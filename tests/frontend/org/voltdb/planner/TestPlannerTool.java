@@ -31,6 +31,7 @@ import junit.framework.TestCase;
 import org.voltdb.CatalogContext;
 import org.voltdb.benchmark.tpcc.TPCCProjectBuilder;
 import org.voltdb.catalog.Catalog;
+import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.PlannerTool;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.utils.CatalogUtil;
@@ -60,10 +61,10 @@ public class TestPlannerTool extends TestCase {
         catalog.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, catalog, bytes, 0, 0, 0);
 
-        m_pt = new PlannerTool(context);
+        m_pt = new PlannerTool(context.cluster, context.database);
 
-        PlannerTool.Result result = null;
-        result = m_pt.planSql("select * from warehouse;", false);
+        AdHocPlannedStatement result = null;
+        result = m_pt.planSql("select * from warehouse;", false, true, false);
         System.out.println(result);
 
         // try too many tables
@@ -77,7 +78,7 @@ public class TestPlannerTool extends TestCase {
                 "WAREHOUSE.W_ID = ORDERS.O_W_ID and " +
                 "WAREHOUSE.W_ID = NEW_ORDER.NO_W_ID and " +
                 "WAREHOUSE.W_ID = ORDER_LINE.OL_W_ID and " +
-                "WAREHOUSE.W_ID = 0", false);
+                "WAREHOUSE.W_ID = 0", false, true, false);
             fail();
         }
         catch (Exception e) {}
@@ -94,7 +95,7 @@ public class TestPlannerTool extends TestCase {
                 "CUSTOMER.C_W_ID = ORDERS.O_W_ID and " +
                 "CUSTOMER.C_W_ID = ORDER_LINE.OL_W_ID and " +
                 "CUSTOMER.C_W_ID = NEW_ORDER.NO_W_ID and " +
-                "CUSTOMER.C_W_ID = 0", true);
+                "CUSTOMER.C_W_ID = 0", true, true, false);
         }
         catch (Exception e) {
             e.printStackTrace();
@@ -106,7 +107,7 @@ public class TestPlannerTool extends TestCase {
 
         // try garbage
         try {
-            result = m_pt.planSql("ryan likes the yankees", false);
+            result = m_pt.planSql("ryan likes the yankees", false, true, false);
             fail();
         }
         catch (Exception e) {}
@@ -119,12 +120,12 @@ public class TestPlannerTool extends TestCase {
         }
 
         try {
-            result = m_pt.planSql("ryan likes the yankees", false);
+            result = m_pt.planSql("ryan likes the yankees", false, true, false);
             fail();
         }
         catch (Exception e) {}
 
-        result = m_pt.planSql("select * from warehouse;", false);
+        result = m_pt.planSql("select * from warehouse;", false, true, false);
         System.out.println(result);
     }
 
@@ -153,10 +154,10 @@ public class TestPlannerTool extends TestCase {
         c.execute(serializedCatalog);
         CatalogContext context = new CatalogContext(0, c, bytes, 0, 0, 0);
 
-        m_pt = new PlannerTool(context);
+        m_pt = new PlannerTool(context.cluster, context.database);
 
         // Bad DDL would kill the planner before it starts and this query
         // would return a Stream Closed error
-        m_pt.planSql("select * from A;", false);
+        m_pt.planSql("select * from A;", false, true, false);
     }
 }

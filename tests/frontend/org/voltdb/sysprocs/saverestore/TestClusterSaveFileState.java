@@ -29,7 +29,7 @@ import java.util.Set;
 import junit.framework.TestCase;
 
 import org.voltdb.VoltTable;
-import org.voltdb.utils.Pair;
+import org.voltcore.utils.Pair;
 
 
 public class TestClusterSaveFileState extends TestCase

@@ -135,7 +135,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
 
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true);
+        gi[0] = new GroupInfo("group1", true, true, true);
         String updated = compileWithGroups(false, gi, null, "base", BASEPROCS);
         Catalog catUpdated = catalogForJar(updated);
 
@@ -147,7 +147,7 @@ public class TestCatalogDiffs extends TestCase {
         Catalog catOriginal = catalogForJar(original);
 
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true);
+        gi[0] = new GroupInfo("group1", true, true, true);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -160,7 +160,7 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testModifyUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true);
+        gi[0] = new GroupInfo("group1", true, true, true);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -178,7 +178,7 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testDeleteUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true);
+        gi[0] = new GroupInfo("group1", true, true, true);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -195,7 +195,7 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testDeleteGroupAndUser() throws IOException {
         GroupInfo gi[] = new GroupInfo[1];
-        gi[0] = new GroupInfo("group1", true, true);
+        gi[0] = new GroupInfo("group1", true, true, true);
 
         UserInfo ui[] = new UserInfo[1];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -212,8 +212,8 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testChangeUsersAssignedGroups() throws IOException {
         GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true);
-        gi[1] = new GroupInfo("group2", true, true);
+        gi[0] = new GroupInfo("group1", true, true, true);
+        gi[1] = new GroupInfo("group2", true, true, true);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -233,8 +233,8 @@ public class TestCatalogDiffs extends TestCase {
 
     public void testChangeSecurityEnabled() throws IOException {
         GroupInfo gi[] = new GroupInfo[2];
-        gi[0] = new GroupInfo("group1", true, true);
-        gi[1] = new GroupInfo("group2", true, true);
+        gi[0] = new GroupInfo("group1", true, true, true);
+        gi[1] = new GroupInfo("group2", true, true, true);
 
         UserInfo ui[] = new UserInfo[2];
         ui[0] = new UserInfo("user1", "password", new String[] {"group1"});
@@ -270,24 +270,6 @@ public class TestCatalogDiffs extends TestCase {
         assertFalse(diff.supported());
     }
 
-    public void testIsUpIgnored() throws IOException {
-        String original = compile("base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-        catOriginal.getClusters().get("cluster").getSites().add("999");
-        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "true");
-        Catalog cat_copy = catOriginal.deepCopy();
-
-        CatalogDiffEngine diff = new CatalogDiffEngine(catOriginal, cat_copy);
-        String null_diff = diff.commands();
-        assertTrue(diff.supported());
-        assertEquals("", null_diff);
-
-        cat_copy.getClusters().get("cluster").getSites().get("999").set("isUp", "false");
-        diff = new CatalogDiffEngine(catOriginal, cat_copy);
-        assertTrue(diff.supported());
-        assertEquals("", diff.commands());
-    }
-
     public void testDiffOfIdenticalCatalogs() throws IOException {
         String testDir = BuildDirectoryUtils.getBuildDirectoryPath();
 
@@ -313,26 +295,6 @@ public class TestCatalogDiffs extends TestCase {
         assertTrue(diff.supported());
         String updatedOriginalSerialized = c3.serialize();
         assertEquals(updatedOriginalSerialized, c4.serialize());
-    }
-
-    public void testDeepCopyPreservesIsDown() throws IOException
-    {
-        String original = compile("base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-        catOriginal.getClusters().get("cluster").getSites().add("999");
-        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "false");
-        Catalog cat_copy = catOriginal.deepCopy();
-        assertFalse(cat_copy.getClusters().get("cluster").getSites().get("999").m_isUp);
-    }
-
-    public void testDeepCopyPreservesIsUp() throws IOException
-    {
-        String original = compile("base", BASEPROCS);
-        Catalog catOriginal = catalogForJar(original);
-        catOriginal.getClusters().get("cluster").getSites().add("999");
-        catOriginal.getClusters().get("cluster").getSites().get("999").set("isUp", "true");
-        Catalog cat_copy = catOriginal.deepCopy();
-        assertTrue(cat_copy.getClusters().get("cluster").getSites().get("999").m_isUp);
     }
 
     // N.B. Some of the testcases assume this exact table structure... if you change it,

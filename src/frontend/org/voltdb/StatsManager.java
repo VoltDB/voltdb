@@ -26,6 +26,6 @@ public interface StatsManager {
     // Global constant
     public static final int POLL_INTERVAL = 500; // 500ms
 
-    public void initialize(ArrayList<Integer> localSiteIds) throws JMException,  IOException;
+    public void initialize(ArrayList<Long> localSiteIds) throws JMException,  IOException;
     public void sendNotification();
 }

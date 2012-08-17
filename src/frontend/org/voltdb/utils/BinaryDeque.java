@@ -19,7 +19,7 @@ package org.voltdb.utils;
 import java.io.IOException;
 
 import java.nio.ByteBuffer;
-import org.voltdb.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DBBPool.BBContainer;
 
 /**
  * Specialized deque interface for storing binary objects. Objects can be provided as a buffer chain

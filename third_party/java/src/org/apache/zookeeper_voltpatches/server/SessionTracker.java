@@ -35,12 +35,12 @@ public interface SessionTracker {
         void expire(long sessionId);
     }
 
-    void addSession(long id, int owner);
+    void addSession(long id, long owner);
 
     /**
      * @param sessionId
      */
-    void expireSessionsWithOwner(int owner);
+    void expireSessionsWithOwner(long owner);
 
     void removeSession(long id);
 

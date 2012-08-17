@@ -23,7 +23,6 @@
 
 package org.voltdb.planner;
 
-import java.io.PrintStream;
 import java.net.URL;
 import java.net.URLDecoder;
 import java.util.ArrayList;
@@ -32,6 +31,7 @@ import java.util.List;
 import org.hsqldb_voltpatches.HSQLInterface;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
+import org.voltcore.utils.Pair;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.Column;
@@ -42,13 +42,13 @@ import org.voltdb.catalog.StmtParameter;
 import org.voltdb.compiler.DDLCompiler;
 import org.voltdb.compiler.DatabaseEstimates;
 import org.voltdb.compiler.StatementCompiler;
+import org.voltdb.compiler.TablePartitionMap;
 import org.voltdb.compiler.VoltCompiler;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.PlanNodeList;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.types.QueryType;
 import org.voltdb.utils.BuildDirectoryUtils;
-import org.voltdb.utils.Pair;
 
 /**
  * Some utility functions to compile SQL statements for plan generation tests.
@@ -61,9 +61,7 @@ public class PlannerTestAideDeCamp {
     private final Database db;
     int compileCounter = 0;
 
-    private Statement m_currentCatalogStmt = null;
     private CompiledPlan m_currentPlan = null;
-    private List<AbstractPlanNode> m_planNodes = null;
 
     /**
      * Loads the schema at ddlurl and setups a voltcompiler / hsql instance.
@@ -83,16 +81,13 @@ public class PlannerTestAideDeCamp {
         VoltCompiler compiler = new VoltCompiler();
         hsql = HSQLInterface.loadHsqldb();
         //hsql.runDDLFile(schemaPath);
-        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql);
+        TablePartitionMap partitionMap = new TablePartitionMap(compiler);
+        DDLCompiler ddl_compiler = new DDLCompiler(compiler, hsql, partitionMap);
         ddl_compiler.loadSchema(schemaPath);
         ddl_compiler.compileToCatalog(catalog, db);
     }
 
-    /**
-     * Cleans up HSQL. Mandatory - call this when done!
-     */
     public void tearDown() {
-        hsql.close();
     }
 
     public Catalog getCatalog() {
@@ -102,21 +97,28 @@ public class PlannerTestAideDeCamp {
     /**
      * Compile a statement and return the head of the plan.
      * @param sql
-     * @param paramCount
      */
-    public CompiledPlan compilePlan(String sql, int paramCount, boolean singlePartition, String joinOrder)
+    public CompiledPlan compileAdHocPlan(String sql)
     {
-        compile(sql, paramCount, singlePartition, joinOrder);
+        compile(sql, 0, null, null, true, false);
         return m_currentPlan;
     }
 
     public List<AbstractPlanNode> compile(String sql, int paramCount)
     {
-        return compile(sql, paramCount, false);
+        return compile(sql, paramCount, false, null);
     }
 
     public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition) {
         return compile(sql, paramCount, singlePartition, null);
+    }
+
+    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder) {
+        Object partitionBy = null;
+        if (singlePartition) {
+            partitionBy = "Forced single partitioning";
+        }
+        return compile(sql, paramCount, joinOrder, partitionBy, true, false);
     }
 
     /**
@@ -124,11 +126,11 @@ public class PlannerTestAideDeCamp {
      * @param sql
      * @param paramCount
      */
-    public List<AbstractPlanNode> compile(String sql, int paramCount, boolean singlePartition, String joinOrder)
+    public List<AbstractPlanNode> compile(String sql, int paramCount, String joinOrder, Object partitionParameter, boolean inferSP, boolean lockInSP)
     {
         Statement catalogStmt = proc.getStatements().add("stmt-" + String.valueOf(compileCounter++));
         catalogStmt.setSqltext(sql);
-        catalogStmt.setSinglepartition(singlePartition);
+        catalogStmt.setSinglepartition(partitionParameter != null);
         catalogStmt.setBatched(false);
         catalogStmt.setParamnum(paramCount);
 
@@ -153,15 +155,16 @@ public class PlannerTestAideDeCamp {
 
         DatabaseEstimates estimates = new DatabaseEstimates();
         TrivialCostModel costModel = new TrivialCostModel();
+        PartitioningForStatement partitioning = new PartitioningForStatement(partitionParameter, inferSP, lockInSP);
         QueryPlanner planner =
-            new QueryPlanner(catalog.getClusters().get("cluster"), db, catalogStmt.getSinglepartition(),
-                             hsql, estimates, true, false);
+            new QueryPlanner(catalog.getClusters().get("cluster"), db, partitioning,
+                             hsql, estimates, false);
 
         CompiledPlan plan = null;
         plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
                                    catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null);
-
+                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null, false);
+        //TODO: Some day, when compilePlan throws a proper PlanningErrorException for all error cases, this test can become an assert.
         if (plan == null)
         {
             String msg = "planner.compilePlan returned null plan";
@@ -170,16 +173,16 @@ public class PlannerTestAideDeCamp {
             {
                 msg += " with error: \"" + plannerMsg + "\"";
             }
-            throw new NullPointerException(msg);
+            throw new PlanningErrorException(msg);
         }
 
         // Input Parameters
         // We will need to update the system catalogs with this new information
         // If this is an adhoc query then there won't be any parameters
-        for (ParameterInfo param : plan.parameters) {
-            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(param.index));
-            catalogParam.setJavatype(param.type.getValue());
-            catalogParam.setIndex(param.index);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            StmtParameter catalogParam = catalogStmt.getParameters().add(String.valueOf(i));
+            catalogParam.setJavatype(plan.parameters[i].getValue());
+            catalogParam.setIndex(i);
         }
 
         // Output Columns
@@ -196,15 +199,15 @@ public class PlannerTestAideDeCamp {
         }
 
         List<PlanNodeList> nodeLists = new ArrayList<PlanNodeList>();
-        for (CompiledPlan.Fragment fragment : plan.fragments) {
-            PlanNodeList nodeList = new PlanNodeList(fragment.planGraph);
-            nodeLists.add(nodeList);
+        nodeLists.add(new PlanNodeList(plan.rootPlanGraph));
+        if (plan.subPlanGraph != null) {
+            nodeLists.add(new PlanNodeList(plan.subPlanGraph));
         }
 
         //Store the list of parameters types and indexes in the plan node list.
         List<Pair<Integer, VoltType>> parameters = nodeLists.get(0).getParameters();
-        for (ParameterInfo param : plan.parameters) {
-            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(param.index, param.type);
+        for (int i = 0; i < plan.parameters.length; ++i) {
+            Pair<Integer, VoltType> parameter = new Pair<Integer, VoltType>(i, plan.parameters[i]);
             parameters.add(parameter);
         }
 
@@ -226,15 +229,8 @@ public class PlannerTestAideDeCamp {
         // We then stick a serialized version of PlanNodeTree into a PlanFragment
         //
         try {
-            PrintStream plansJSONOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                    "statement-plans", name + "_json.txt");
-            plansJSONOut.print(json);
-            plansJSONOut.close();
-
-            PrintStream plansDOTOut = BuildDirectoryUtils.getDebugOutputPrintStream(
-                     "statement-plans", name + ".dot");
-            plansDOTOut.print(nodeLists.get(0).toDOTString("name"));
-            plansDOTOut.close();
+            BuildDirectoryUtils.writeFile("statement-plans", name + "_json.txt", json);
+            BuildDirectoryUtils.writeFile("statement-plans", name + ".dot", nodeLists.get(0).toDOTString("name"));
         } catch (Exception e) {
             e.printStackTrace();
         }
@@ -244,9 +240,7 @@ public class PlannerTestAideDeCamp {
             plannodes.add(nodeList.getRootPlanNode());
         }
 
-        m_currentCatalogStmt = catalogStmt;
         m_currentPlan = plan;
-        m_planNodes = plannodes;
         return plannodes;
     }
 

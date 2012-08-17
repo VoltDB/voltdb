@@ -179,6 +179,7 @@ public class TestSimpleCJK extends TestCase {
         assertTrue(response.status == ClientResponse.SUCCESS);
 
         // Call select
+        pset = new ParameterSet();
         pset.setParameters();
         responseJSON = TestJSONInterface.callProcOverJSON("Select", pset, null, null, false);
         System.out.println(responseJSON);

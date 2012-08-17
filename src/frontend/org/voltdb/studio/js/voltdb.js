@@ -1,4 +1,4 @@
-(function( window, undefined ){
+(function (window, unused){
 
 var IVoltDB = (function(){
 
@@ -27,22 +27,33 @@ var IVoltDB = (function(){
         this.BuildURI = function(procedure, parameters)
         {
             var s = [];
-            if (!(procedure in this.Procedures))
+            if (!this.Procedures.hasOwnProperty(procedure)) {
                 return ['Procedure "' + procedure + '" is undefined.'];
-            if (jQuery.isArray(parameters) && (parameters.length != this.Procedures[procedure].length))
-                return ['Invalid parameter count for procedure "' + procedure + '" (received: ' + parameters.length + ', expected: ' + this.Procedures[procedure].length + ')' ];
+            }
+
+            var signatures = this.Procedures[procedure];
+            var localParameters = [];
+            localParameters = localParameters.concat(parameters);
+
+            if (!(signatures['' + localParameters.length])) {
+                var retval = 'Invalid parameter count for procedure "' + procedure + '" (received: ' + localParameters.length + ', expected: ';
+                for ( x in signatures ) {
+                    retval += x + ', ';
+                }
+                return [ retval + ')' ];
+            }
+            var signature = signatures['' + localParameters.length];
 
             s[s.length] = encodeURIComponent('Procedure') + '=' + encodeURIComponent(procedure);
-            if (parameters != null)
+            if (localParameters != null)
             {
                 var params = '[';
-                if (!jQuery.isArray(parameters))
-                    parameters = [parameters];
-                for(var i = 0; i < parameters.length; i++)
-                {
-                    if (i > 0)
+                var i = 0;
+                for(i = 0; i < localParameters.length; i++) {               
+                    if (i > 0) {
                         params += ',';
-                    switch(this.Procedures[procedure][i])
+                    }
+                    switch(signature[i])
                     {
                         case 'tinyint':
                         case 'smallint':
@@ -50,22 +61,22 @@ var IVoltDB = (function(){
                         case 'integer':
                         case 'bigint':
                         case 'float':
-                            params += parameters[i];
+                            params += localParameters[i];
                             break;
                         case 'decimal':
-                            params += '"' + parameters[i] + '"';
+                            params += '"' + localParameters[i] + '"';
                             break;
                         case 'bit':
-                            if (parameters[i] == "'true'" || parameters[i] == 'true' || parameters[i] == "'yes'" || parameters[i] == 'yes' || parameters[i] == '1' || parameters[i] == 1)
+                            if (localParameters[i] == "'true'" || localParameters[i] == 'true' || localParameters[i] == "'yes'" || localParameters[i] == 'yes' || localParameters[i] == '1' || localParameters[i] == 1)
                                 params += '1';
                             else
                                 params += '0';
                             break;
                         default:
                             if (procedure == '@SnapshotDelete')
-                                params += '["' + parameters[i].replace(/^'|'$/g,'') + '"]';
+                                params += '["' + localParameters[i].replace(/^'|'$/g,'') + '"]';
                             else
-                                params += (typeof(parameters[i]) == 'string' ? '"' + parameters[i].replace(/^'|'$/g,'') + '"' : parameters[i]).replace(/''/g,"'");
+                                params += (typeof(localParameters[i]) == 'string' ? '"' + localParameters[i].replace(/^'|'$/g,'') + '"' : localParameters[i]).replace(/''/g,"'");
                     }
                 }
                 params += ']';
@@ -205,22 +216,22 @@ var IVoltDB = (function(){
             return (new IQueue(this));
         }
         this.Procedures = {
-                            '@AdHoc': ['varchar']
-                          , '@Pause': []
-                          , '@Quiesce': []
-                          , '@Resume': []
-                          , '@Shutdown': []
-                          , '@SnapshotDelete': ['varchar', 'varchar']
-                          , '@SnapshotRestore': ['varchar', 'varchar']
-                          , '@SnapshotSave': ['varchar', 'varchar', 'bit']
-                          , '@SnapshotScan': ['varchar']
-                          , '@SnapshotStatus': []
-                          , '@Statistics': ['StatisticsComponent', 'bit' ]
-                          , '@SystemCatalog': ['CatalogComponent']
-                          , '@SystemInformation': ['SysInfoSelector']
-                          , '@UpdateApplicationCatalog': ['varchar', 'varchar']
-                          , '@UpdateLogging': ['xml']
-                          , '@Promote': []
+                            '@AdHoc': { '1' : ['varchar'] }
+                          , '@Pause': { '0' : [] }
+                          , '@Quiesce': { '0' : [] }
+                          , '@Resume': { '0' : [] }
+                          , '@Shutdown': { '0' : [] }
+                          , '@SnapshotDelete': { '2' : ['varchar', 'varchar'] }
+                          , '@SnapshotRestore': { '2' : ['varchar', 'varchar'] }
+                          , '@SnapshotSave': { '3' : ['varchar', 'varchar', 'bit'], '1' : ['varchar'] }
+                          , '@SnapshotScan': { '1' : ['varchar'] }
+                          , '@SnapshotStatus': { '0' : [] }
+                          , '@Statistics': { '2' : ['StatisticsComponent', 'bit' ] }
+                          , '@SystemCatalog': { '1' : ['CatalogComponent'] }
+                          , '@SystemInformation': { '1' : ['SysInfoSelector'] }
+                          , '@UpdateApplicationCatalog': { '2' : ['varchar', 'varchar'] }
+                          , '@UpdateLogging': { '1' : ['xml'] }
+                          , '@Promote': { '0' : [] }
                         };
         return this;
     }
@@ -272,21 +283,21 @@ var IVoltDB = (function(){
                 connection.Metadata['views'] = views;
                 connection.Metadata['exports'] = exports;
                 connection.Metadata['sysprocs'] = {
-                                                    '@Pause': ['Returns bit']
-                                                  , '@Quiesce': ['Returns bit']
-                                                  , '@Resume': ['Returns bit']
-                                                  , '@Shutdown': ['Returns bit']
-                                                  , '@SnapshotDelete': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]']
-                                                  , '@SnapshotRestore': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]']
-                                                  , '@SnapshotSave': ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Blocking (bit)', 'Returns Table[]']
-                                                  , '@SnapshotScan': ['DirectoryPath (varchar)', 'Returns Table[]']
-                                                  , '@SnapshotStatus': ['Returns Table[]']
-                                                  , '@Statistics': ['Statistic (StatisticsComponent)', 'Interval (bit)', 'Returns Table[]' ]
-                                                  , '@SystemCatalog':['SystemCatalog (CatalogComponent)', 'Returns Table[]']
-                                                  , '@SystemInformation': ['Selector (SysInfoSelector)', 'Returns Table[]']
-                                                  , '@UpdateApplicationCatalog': ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]']
-                                                  , '@UpdateLogging': ['Configuration (xml)', 'Returns Table[]']
-                                                  , '@Promote': ['Returns bit']
+                                                    '@Pause': { '0' : ['Returns bit'] }
+                                                  , '@Quiesce': { '0' : ['Returns bit'] }
+                                                  , '@Resume': { '0' : ['Returns bit'] }
+                                                  , '@Shutdown': { '0' : ['Returns bit'] }
+                                                  , '@SnapshotDelete': { '2' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'] }
+                                                  , '@SnapshotRestore': { '2' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Returns Table[]'] }
+                                                  , '@SnapshotSave': { '3' : ['DirectoryPath (varchar)', 'UniqueId (varchar)', 'Blocking (bit)', 'Returns Table[]'], '1' : ['JSON (varchar)', 'Returns Table[]']  }
+                                                  , '@SnapshotScan': { '1' : ['DirectoryPath (varchar)', 'Returns Table[]'] }
+                                                  , '@SnapshotStatus': { '0' : ['Returns Table[]'] }
+                                                  , '@Statistics': { '2' : ['Statistic (StatisticsComponent)', 'Interval (bit)', 'Returns Table[]' ] }
+                                                  , '@SystemCatalog': { '1' : ['SystemCatalog (CatalogComponent)', 'Returns Table[]'] }
+                                                  , '@SystemInformation': { '1' : ['Selector (SysInfoSelector)', 'Returns Table[]'] }
+                                                  , '@UpdateApplicationCatalog': { '2' : ['CatalogPath (varchar)', 'DeploymentConfigPath (varchar)', 'Returns Table[]'] }
+                                                  , '@UpdateLogging': { '1' : ['Configuration (xml)', 'Returns Table[]'] }
+                                                  , '@Promote': { '0' : ['Returns bit'] }
                                                   };
 
                 /*
@@ -315,7 +326,34 @@ var IVoltDB = (function(){
                             ' (' + connection.Metadata['rawColumns'].data[i][5].toLowerCase() + ')';
                     }
                 }
-
+                 
+                 // User Procedures
+                 for (var i = 0; i < connection.Metadata['procedures'].data.length; ++i)
+                 {
+                    var connTypeParams = [];
+                    var procParams = [];
+                    var procName = connection.Metadata['procedures'].data[i][2];
+                    for (var p = 0; p < connection.Metadata['procedurecolumns'].data.length; ++p)
+                    {
+                        if (connection.Metadata['procedurecolumns'].data[p][2] == procName)
+                        {
+                            paramType = connection.Metadata['procedurecolumns'].data[p][6];
+                            paramName = connection.Metadata['procedurecolumns'].data[p][3];
+                            procParams[procParams.length] = {'name': paramName, 'type': paramType.toLowerCase()};
+                        }
+                    }
+                    // the name field is really ordinal position: 1, 2, 3...
+                    procParams.sort(function(a,b) {return a.name - b.name;});
+                 
+                    for (var p = 0; p < procParams.length; ++p) {
+                        connTypeParams[connTypeParams.length] = procParams[p].type;
+                    }
+                 
+                    // make the procedure callable.
+                    connection.Procedures[procName] = {};
+                    connection.Procedures[procName]['' + connTypeParams.length] = connTypeParams;
+                 }
+                 
                 var childConnectionQueue = connection.getQueue();
                 childConnectionQueue.Start(true);
                 childConnectionQueue.End(function(state) { connection.Ready = true; if (onconnectionready != null) onconnectionready(connection, state); }, null);

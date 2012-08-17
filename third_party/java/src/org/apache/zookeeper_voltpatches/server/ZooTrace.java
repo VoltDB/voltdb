@@ -22,6 +22,7 @@ import org.apache.log4j.Logger;
 
 import org.apache.zookeeper_voltpatches.server.Request;
 import org.apache.zookeeper_voltpatches.server.ZooTrace;
+import org.voltcore.logging.VoltLogger;
 
 /**
  * This class encapsulates and centralizes tracing for the ZooKeeper server.
@@ -62,17 +63,17 @@ public class ZooTrace {
         LOG.info("Set text trace mask to 0x" + Long.toHexString(mask));
     }
 
-    public static boolean isTraceEnabled(Logger log, long mask) {
+    public static boolean isTraceEnabled(VoltLogger log, long mask) {
         return log.isTraceEnabled() && (mask & traceMask) != 0;
     }
 
-    public static void logTraceMessage(Logger log, long mask, String msg) {
+    public static void logTraceMessage(VoltLogger log, long mask, String msg) {
         if (isTraceEnabled(log, mask)) {
             log.trace(msg);
         }
     }
 
-    static public void logRequest(Logger log, long mask,
+    static public void logRequest(VoltLogger log, long mask,
             char rp, Request request, String header)
     {
         if (isTraceEnabled(log, mask)) {

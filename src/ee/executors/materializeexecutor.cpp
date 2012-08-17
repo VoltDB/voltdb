@@ -84,7 +84,7 @@ bool MaterializeExecutor::p_init(AbstractPlanNode* abstractNode,
     delete[] column_names;
 
     // initialize local variables
-    all_param_array_ptr = expressionutil::convertIfAllParameterValues(node->getOutputColumnExpressions());
+    all_param_array_ptr = ExpressionUtil::convertIfAllParameterValues(node->getOutputColumnExpressions());
     all_param_array = all_param_array_ptr.get();
 
     needs_substitute_ptr = boost::shared_array<bool>(new bool[m_columnCount]);

@@ -59,7 +59,6 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SchemaColumn;
 import org.voltdb.plannodes.SendPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.types.PlanNodeType;
@@ -90,11 +89,8 @@ public class PlanAssembler {
     /** parsed statement for an select */
     ParsedSelectStmt m_parsedSelect = null;
 
-    /** does the statement touch more than one partition? */
-    final boolean m_singlePartition;
-
-    /** The number of partitions (fetched from the cluster info) */
-    final int m_partitionCount;
+    /** Describes the specified and inferred partition context. */
+    private final PartitioningForStatement m_partitioning;
 
     /**
      * Used to generate the table-touching parts of a plan. All join-order and
@@ -119,12 +115,13 @@ public class PlanAssembler {
      *            Catalog info about the physical layout of the cluster.
      * @param catalogDb
      *            Catalog info about schema, metadata and procedures.
+     * @param partitioning
+     *            Describes the specified and inferred partition context.
      */
-    PlanAssembler(Cluster catalogCluster, Database catalogDb, boolean singlePartition) {
+    PlanAssembler(Cluster catalogCluster, Database catalogDb, PartitioningForStatement partitioning) {
         m_catalogCluster = catalogCluster;
         m_catalogDb = catalogDb;
-        m_partitionCount = m_catalogCluster.getPartitions().size();
-        m_singlePartition = singlePartition;
+        m_partitioning = partitioning;
     }
 
     String getSQLText() {
@@ -190,25 +187,53 @@ public class PlanAssembler {
      * Clear any old state and get ready to plan a new plan. The next call to
      * getNextPlan() will return the first candidate plan for these parameters.
      *
-     * @param xmlSQL
-     *            The parsed/analyzed SQL in XML form from HSQLDB to be planned.
-     * @param readOnly
-     *            Is the SQL statement read only.
-     * @param singlePartition
-     *            Does the SQL statement use only a single partition?
      */
     void setupForNewPlans(AbstractParsedStmt parsedStmt)
     {
+        int countOfPartitionedTables = 0;
+        Map<String, String> partitionColumnByTable = new HashMap<String, String>();
+        // Do we have a need for a distributed scan at all?
+        // Iterate over the tables to collect partition columns.
+        for (Table table : parsedStmt.tableList) {
+            if (table.getIsreplicated()) {
+                continue;
+            }
+            ++countOfPartitionedTables;
+            String colName = null;
+            Column partitionCol = table.getPartitioncolumn();
+            // "(partitionCol != null)" tests around an obscure edge case.
+            // The table is declared non-replicated yet specifies no partitioning column.
+            // This can occur legitimately when views based on partitioned tables neglect to group by the partition column.
+            // The interpretation of this edge case is that the table has "randomly distributed data".
+            // In such a case, the table is valid for use by MP queries only and can only be joined with replicated tables
+            // because it has no recognized partitioning join key.
+            if (partitionCol != null) {
+                colName = partitionCol.getTypeName(); // Note getTypeName gets the column name -- go figure.
+            }
+
+            //TODO: This map really wants to be indexed by table "alias" (the in-query table scan identifier)
+            // so self-joins can be supported without ambiguity.
+            String partitionedTable = table.getTypeName();
+            partitionColumnByTable.put(partitionedTable, colName);
+        }
+        m_partitioning.setPartitionedTables(partitionColumnByTable, countOfPartitionedTables);
+        if ((m_partitioning.wasSpecifiedAsSingle() == false) && m_partitioning.getCountOfPartitionedTables() > 0) {
+            m_partitioning.analyzeForMultiPartitionAccess(parsedStmt.tableList, parsedStmt.valueEquivalence);
+            int multiPartitionScanCount = m_partitioning.getCountOfIndependentlyPartitionedTables();
+            if (multiPartitionScanCount > 1) {
+                // The case of more than one independent partitioned table would result in an illegal plan with more than two fragments.
+                String msg = "Join of multiple partitioned tables has insufficient join criteria.";
+                throw new PlanningErrorException(msg);
+            }
+        }
+
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                 throw new RuntimeException(
                 "Illegal to read an export table.");
             }
             m_parsedSelect = (ParsedSelectStmt) parsedStmt;
-            subAssembler =
-                new SelectSubPlanAssembler(m_catalogDb,
-                                           parsedStmt, m_singlePartition,
-                                           m_partitionCount);
+            subAssembler = new SelectSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         } else {
             // check that no modification happens to views
             if (tableListIncludesView(parsedStmt.tableList)) {
@@ -216,27 +241,43 @@ public class PlanAssembler {
                 "Illegal to modify a materialized view.");
             }
 
+            // Check that only multi-partition writes are made to replicated tables.
+            // figure out which table we're updating/deleting
+            assert (parsedStmt.tableList.size() == 1);
+            Table targetTable = parsedStmt.tableList.get(0);
+            if (targetTable.getIsreplicated()) {
+                if (m_partitioning.wasSpecifiedAsSingle()) {
+                    String msg = "Trying to write to replicated table '" + targetTable.getTypeName()
+                                 + "' in a single-partition procedure.";
+                    throw new PlanningErrorException(msg);
+                }
+            } else if (m_partitioning.wasSpecifiedAsSingle() == false) {
+                m_partitioning.setPartitioningColumn(targetTable.getPartitioncolumn());
+            }
+
             if (parsedStmt instanceof ParsedInsertStmt) {
                 m_parsedInsert = (ParsedInsertStmt) parsedStmt;
-            } else if (parsedStmt instanceof ParsedUpdateStmt) {
+                // The currently handled inserts are too simple to even require a subplan assembler. So, done.
+                return;
+            }
+
+            if (parsedStmt instanceof ParsedUpdateStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
                     "Illegal to update an export table.");
                 }
                 m_parsedUpdate = (ParsedUpdateStmt) parsedStmt;
-                subAssembler =
-                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition, m_partitionCount);
             } else if (parsedStmt instanceof ParsedDeleteStmt) {
                 if (tableListIncludesExportOnly(parsedStmt.tableList)) {
                     throw new RuntimeException(
                     "Illegal to delete from an export table.");
                 }
                 m_parsedDelete = (ParsedDeleteStmt) parsedStmt;
-                subAssembler =
-                    new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_singlePartition, m_partitionCount);
-            } else
+            } else {
                 throw new RuntimeException(
                         "Unknown subclass of AbstractParsedStmt.");
+            }
+            subAssembler = new WriterSubPlanAssembler(m_catalogDb, parsedStmt, m_partitioning);
         }
     }
 
@@ -253,13 +294,12 @@ public class PlanAssembler {
         //PlanColumn.resetAll();
 
         CompiledPlan retval = new CompiledPlan();
-        CompiledPlan.Fragment fragment = new CompiledPlan.Fragment();
-        retval.fragments.add(fragment);
         AbstractParsedStmt nextStmt = null;
         if (m_parsedSelect != null) {
             nextStmt = m_parsedSelect;
-            fragment.planGraph = getNextSelectPlan();
-            if (fragment.planGraph != null)
+            retval.rootPlanGraph = getNextSelectPlan();
+            retval.readOnly = true;
+            if (retval.rootPlanGraph != null)
             {
                 // only add the output columns if we actually have a plan
                 // avoid PlanColumn resource leakage
@@ -269,17 +309,18 @@ public class PlanAssembler {
                 retval.statementGuaranteesDeterminism(contentIsDeterministic, orderIsDeterministic);
             }
         } else {
+            retval.readOnly = false;
             if (m_parsedInsert != null) {
                 nextStmt = m_parsedInsert;
-                fragment.planGraph = getNextInsertPlan();
+                retval.rootPlanGraph = getNextInsertPlan();
             } else if (m_parsedUpdate != null) {
                 nextStmt = m_parsedUpdate;
-                fragment.planGraph = getNextUpdatePlan();
+                retval.rootPlanGraph = getNextUpdatePlan();
                 // note that for replicated tables, multi-fragment plans
                 // need to divide the result by the number of partitions
             } else if (m_parsedDelete != null) {
                 nextStmt = m_parsedDelete;
-                fragment.planGraph = getNextDeletePlan();
+                retval.rootPlanGraph = getNextDeletePlan();
                 // note that for replicated tables, multi-fragment plans
                 // need to divide the result by the number of partitions
             } else {
@@ -292,23 +333,22 @@ public class PlanAssembler {
             retval.statementGuaranteesDeterminism(true, true); // Until we support DML w/ subqueries/limits
         }
 
-        if (fragment.planGraph == null)
-        {
+        if (retval.rootPlanGraph == null) {
             return null;
         }
 
         assert (nextStmt != null);
         addParameters(retval, nextStmt);
         retval.fullWhereClause = nextStmt.where;
-        retval.fullWinnerPlan = fragment.planGraph;
+        retval.fullWinnerPlan = retval.rootPlanGraph;
         // Do a final generateOutputSchema pass.
-        fragment.planGraph.generateOutputSchema(m_catalogDb);
-
+        retval.rootPlanGraph.generateOutputSchema(m_catalogDb);
+        retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
     }
 
     private void addColumns(CompiledPlan plan, ParsedSelectStmt stmt) {
-        NodeSchema output_schema = plan.fragments.get(0).planGraph.getOutputSchema();
+        NodeSchema output_schema = plan.rootPlanGraph.getOutputSchema();
         // Sanity-check the output NodeSchema columns against the display columns
         if (stmt.displayColumns.size() != output_schema.size())
         {
@@ -330,19 +370,16 @@ public class PlanAssembler {
     }
 
     private void addParameters(CompiledPlan plan, AbstractParsedStmt stmt) {
-        ParameterInfo outParam = null;
-        for (ParameterInfo param : stmt.paramList) {
-            outParam = new ParameterInfo();
-            outParam.index = param.index;
+        plan.parameters = new VoltType[stmt.paramList.length];
 
-            VoltType override = m_paramTypeOverrideMap.get(param.index);
+        for (int i = 0; i < stmt.paramList.length; ++i) {
+            VoltType override = m_paramTypeOverrideMap.get(i);
             if (override != null) {
-                outParam.type = override;
+                plan.parameters[i] = override;
             }
             else {
-                outParam.type = param.type;
+                plan.parameters[i] = stmt.paramList[i];
             }
-            plan.parameters.add(outParam);
         }
     }
 
@@ -396,15 +433,6 @@ public class PlanAssembler {
         assert (m_parsedDelete.tableList.size() == 1);
         Table targetTable = m_parsedDelete.tableList.get(0);
 
-        // this is never going to go well
-        if (m_singlePartition && (targetTable.getIsreplicated())) {
-            String msg =
-                "Trying to delete from replicated table '"
-                        + targetTable.getTypeName() + "'";
-            msg += " in a single-partition procedure.";
-            throw new PlanningErrorException(msg);
-        }
-
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
         if (subSelectRoot == null)
             return null;
@@ -423,85 +451,49 @@ public class PlanAssembler {
                                                addressExpr));
         projectionNode.setOutputSchema(proj_schema);
 
-        if (m_singlePartition == true) {
+        assert(subSelectRoot instanceof AbstractScanPlanNode);
 
-            assert(subSelectRoot instanceof AbstractScanPlanNode);
+        // if the scan below matches all nodes, we can throw away the scan
+        // nodes and use a truncate delete node
+        if (m_partitioning.wasSpecifiedAsSingle() &&
+                (((AbstractScanPlanNode) subSelectRoot).getPredicate() == null)) {
+            deleteNode.setTruncate(true);
+            return deleteNode;
+        }
 
-            // if the scan below matches all nodes, we can throw away the scan
-            // nodes and use a truncate delete node
-            if ((subSelectRoot instanceof SeqScanPlanNode)
-                    && (((AbstractScanPlanNode) subSelectRoot).getPredicate() == null)) {
-                deleteNode.setTruncate(true);
-                return deleteNode;
-            }
+        // OPTIMIZATION: Projection Inline
+        // If the root node we got back from createSelectTree() is an
+        // AbstractScanNode, then
+        // we put the Projection node we just created inside of it
+        // When we inline this projection into the scan, we're going
+        // to overwrite any original projection that we might have inlined
+        // in order to simply cull the columns from the persistent table.
+        // The call here to generateOutputSchema() will recurse down to
+        // the scan node and cause it to update appropriately.
+        subSelectRoot.addInlinePlanNode(projectionNode);
+        // connect the nodes to build the graph
+        deleteNode.addAndLinkChild(subSelectRoot);
 
-            // OPTIMIZATION: Projection Inline
-            // If the root node we got back from createSelectTree() is an
-            // AbstractScanNode, then
-            // we put the Projection node we just created inside of it
-            // When we inline this projection into the scan, we're going
-            // to overwrite any original projection that we might have inlined
-            // in order to simply cull the columns from the persistent table.
-            // The call here to generateOutputSchema() will recurse down to
-            // the scan node and cause it to update appropriately.
-            subSelectRoot.addInlinePlanNode(projectionNode);
-            // connect the nodes to build the graph
-            deleteNode.addAndLinkChild(subSelectRoot);
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
             deleteNode.generateOutputSchema(m_catalogDb);
             return deleteNode;
-
-        } else {
-            // make sure the thing we have is a receive node which
-            // indicates it's a multi-site plan
-            assert (subSelectRoot instanceof ReceivePlanNode);
-
-            // put the delete node in the right place
-            // get the recv node
-            ReceivePlanNode recvNode = (ReceivePlanNode) subSelectRoot;
-            // get the send node
-            assert (recvNode.getChildCount() == 1);
-            AbstractPlanNode sendNode = recvNode.getChild(0);
-
-            // get the scan node and unlink
-            assert (sendNode.getChildCount() == 1);
-            AbstractPlanNode scanNode = sendNode.getChild(0);
-            sendNode.unlinkChild(scanNode);
-
-            // link in the delete node
-            assert (scanNode instanceof AbstractScanPlanNode);
-            scanNode.addInlinePlanNode(projectionNode);
-            deleteNode.addAndLinkChild(scanNode);
-            deleteNode.generateOutputSchema(m_catalogDb);
-            sendNode.addAndLinkChild(deleteNode);
-            sendNode.generateOutputSchema(m_catalogDb);
-            // fix the receive node's output columns
-            recvNode.generateOutputSchema(m_catalogDb);
-            // add a sum and send on top of the union
-            return addSumAndSendToDMLNode(subSelectRoot);
         }
+
+        // Send the local result counts to the coordinator.
+        AbstractPlanNode recvNode = subAssembler.addSendReceivePair(deleteNode);
+        // add a sum and send on top of the union
+        return addSumAndSendToDMLNode(recvNode);
     }
 
     private AbstractPlanNode getNextUpdatePlan() {
         assert (subAssembler != null);
-
-        // figure out which table we're updating
-        assert (m_parsedUpdate.tableList.size() == 1);
-        Table targetTable = m_parsedUpdate.tableList.get(0);
-
-        // this is never going to go well
-        if (m_singlePartition && (targetTable.getIsreplicated())) {
-            String msg =
-                "Trying to update replicated table '" + targetTable.getTypeName()
-                        + "'";
-            msg += " in a single-partition procedure.";
-            throw new PlanningErrorException(msg);
-        }
 
         AbstractPlanNode subSelectRoot = subAssembler.nextPlan();
         if (subSelectRoot == null)
             return null;
 
         UpdatePlanNode updateNode = new UpdatePlanNode();
+        Table targetTable = m_parsedUpdate.tableList.get(0);
         updateNode.setTargetTableName(targetTable.getTypeName());
         // set this to false until proven otherwise
         updateNode.setUpdateIndexes(false);
@@ -550,53 +542,31 @@ public class PlanAssembler {
         }
         projectionNode.setOutputSchema(proj_schema);
 
-        if (m_singlePartition == true) {
 
-            // add the projection inline (TODO: this will break if more than one
-            // layer is below this)
-            //
-            // When we inline this projection into the scan, we're going
-            // to overwrite any original projection that we might have inlined
-            // in order to simply cull the columns from the persistent table.
-            // The call here to generateOutputSchema() will recurse down to
-            // the scan node and cause it to update appropriately.
-            assert(subSelectRoot instanceof AbstractScanPlanNode);
-            subSelectRoot.addInlinePlanNode(projectionNode);
+        // add the projection inline (TODO: this will break if more than one
+        // layer is below this)
+        //
+        // When we inline this projection into the scan, we're going
+        // to overwrite any original projection that we might have inlined
+        // in order to simply cull the columns from the persistent table.
+        // The call here to generateOutputSchema() will recurse down to
+        // the scan node and cause it to update appropriately.
+        assert(subSelectRoot instanceof AbstractScanPlanNode);
+        subSelectRoot.addInlinePlanNode(projectionNode);
 
-            // connect the nodes to build the graph
-            updateNode.addAndLinkChild(subSelectRoot);
+        // connect the nodes to build the graph
+        updateNode.addAndLinkChild(subSelectRoot);
+
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
             updateNode.generateOutputSchema(m_catalogDb);
 
             return updateNode;
-        } else {
-            // make sure the thing we have is a receive node which
-            // indicates it's a multi-site plan
-            assert (subSelectRoot instanceof ReceivePlanNode);
-
-            // put the update node in the right place
-            // get the recv node
-            ReceivePlanNode recvNode = (ReceivePlanNode) subSelectRoot;
-            // get the send node
-            assert (recvNode.getChildCount() == 1);
-            AbstractPlanNode sendNode = recvNode.getChild(0);
-
-            // get the scan node and unlink
-            assert (sendNode.getChildCount() == 1);
-            AbstractPlanNode scanNode = sendNode.getChild(0);
-            sendNode.unlinkChild(scanNode);
-
-            // link in the update node
-            assert (scanNode instanceof AbstractScanPlanNode);
-            scanNode.addInlinePlanNode(projectionNode);
-            updateNode.addAndLinkChild(scanNode);
-            updateNode.generateOutputSchema(m_catalogDb);
-            sendNode.addAndLinkChild(updateNode);
-            sendNode.generateOutputSchema(m_catalogDb);
-            // fix the receive node's output columns
-            recvNode.generateOutputSchema(m_catalogDb);
-            // add a count and send on top of the union
-            return addSumAndSendToDMLNode(subSelectRoot);
         }
+
+        // Send the local result counts to the coordinator.
+        AbstractPlanNode recvNode = subAssembler.addSendReceivePair(updateNode);
+        // add a sum and send on top of the union
+        return addSumAndSendToDMLNode(recvNode);
     }
 
     /**
@@ -616,19 +586,10 @@ public class PlanAssembler {
         assert (m_parsedInsert.tableList.size() == 1);
         Table targetTable = m_parsedInsert.tableList.get(0);
 
-        // this is never going to go well
-        if (m_singlePartition && targetTable.getIsreplicated()) {
-            String msg =
-                "Trying to insert into replicated table '"
-                        + targetTable.getTypeName() + "'";
-            msg += " in a single-partition procedure.";
-            throw new PlanningErrorException(msg);
-        }
-
         // the root of the insert plan is always an InsertPlanNode
         InsertPlanNode insertNode = new InsertPlanNode();
         insertNode.setTargetTableName(targetTable.getTypeName());
-        insertNode.setMultiPartition(m_singlePartition == false);
+        insertNode.setMultiPartition(m_partitioning.wasSpecifiedAsSingle() == false);
 
         // the materialize node creates a tuple to insert (which is frankly not
         // always optimal)
@@ -682,6 +643,13 @@ public class PlanAssembler {
                 throw new PlanningErrorException(e.getMessage());
             }
 
+            // Hint that this statement can be executed SP.
+            if (column.equals(m_partitioning.getColumn())) {
+                String fullColumnName = targetTable.getTypeName() + "." + column.getTypeName();
+                m_partitioning.addPartitioningExpression(fullColumnName, expr);
+                m_partitioning.setInferredValue(ConstantValueExpression.extractPartitioningValue(expr.getValueType(), expr));
+            }
+
             // add column to the materialize node.
             // This table name is magic.
             mat_schema.addColumn(new SchemaColumn("VOLT_TEMP_TABLE",
@@ -694,28 +662,23 @@ public class PlanAssembler {
         // connect the insert and the materialize nodes together
         insertNode.addAndLinkChild(materializeNode);
         insertNode.generateOutputSchema(m_catalogDb);
-        AbstractPlanNode rootNode = insertNode;
 
-        if (m_singlePartition == false) {
-            // all sites to a scan -> send
-            // root site has many recvs feeding into a union
-
-            SendPlanNode sendNode = new SendPlanNode();
-            // this will make the child planfragment be sent to all partitions
-            sendNode.isMultiPartition = true;
-            sendNode.addAndLinkChild(rootNode);
-            sendNode.generateOutputSchema(m_catalogDb);
-
-            ReceivePlanNode recvNode = new ReceivePlanNode();
-            recvNode.addAndLinkChild(sendNode);
-            recvNode.generateOutputSchema(m_catalogDb);
-            rootNode = recvNode;
-
-            // add a count and send on top of the union
-            rootNode = addSumAndSendToDMLNode(rootNode);
+        if (m_partitioning.wasSpecifiedAsSingle() || m_partitioning.hasPartitioningConstantLockedIn()) {
+            return insertNode;
         }
 
-        return rootNode;
+        SendPlanNode sendNode = new SendPlanNode();
+        // this will make the child plan fragment be sent to all partitions
+        sendNode.isMultiPartition = true;
+        sendNode.addAndLinkChild(insertNode);
+        // sendNode.generateOutputSchema(m_catalogDb);
+
+        AbstractPlanNode recvNode = new ReceivePlanNode();
+        recvNode.addAndLinkChild(sendNode);
+        recvNode.generateOutputSchema(m_catalogDb);
+
+        // add a count and send on top of the union
+        return addSumAndSendToDMLNode(recvNode);
     }
 
     AbstractPlanNode addSumAndSendToDMLNode(AbstractPlanNode dmlRoot)
@@ -1353,6 +1316,16 @@ public class PlanAssembler {
                 !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
                 receiveNode = null;
                 break;
+            } else if (receiveNode instanceof OrderByPlanNode) {
+                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderByColumns()) {
+                    AbstractExpression rootExpr = col.expression;
+                    // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
+                    if (rootExpr instanceof TupleValueExpression) {
+                        if  (((TupleValueExpression) rootExpr).hasAggregate()) {
+                            return null;
+                        }
+                    }
+                }
             }
 
             // Traverse...

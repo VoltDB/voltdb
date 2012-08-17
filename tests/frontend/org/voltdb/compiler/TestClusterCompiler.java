@@ -22,35 +22,44 @@
  */
 package org.voltdb.compiler;
 
-import org.voltdb.catalog.Catalog;
-import org.voltdb.catalog.CatalogMap;
-import org.voltdb.catalog.Cluster;
-import org.voltdb.catalog.Partition;
-import org.voltdb.catalog.Site;
+import java.util.Arrays;
+import java.util.HashSet;
+import java.util.List;
+
+import org.json_voltpatches.JSONArray;
+import org.json_voltpatches.JSONObject;
 
 import junit.framework.TestCase;
 
 public class TestClusterCompiler extends TestCase
 {
-    public void testNonZeroReplicationFactor()
+    public void testNonZeroReplicationFactor() throws Exception
     {
         ClusterConfig config = new ClusterConfig(3, 1, 2);
-        Catalog catalog = new Catalog();
-        catalog.execute("add / clusters cluster");
-        ClusterCompiler.compile(catalog, config);
-        System.out.println(catalog.serialize());
-        Cluster cluster = catalog.getClusters().get("cluster");
-        CatalogMap<Partition> partitions = cluster.getPartitions();
+        List<Integer> topology = Arrays.asList(new Integer[] { 0, 1, 2 });
+        JSONObject obj = config.getTopology(topology);
+        config.validate();
+        System.out.println(obj.toString(4));
+        JSONArray partitions = obj.getJSONArray("partitions");
+
         // despite 3 hosts, should only have 1 partition with k-safety of 2
-        assertEquals(1, partitions.size());
+        assertEquals(1, partitions.length());
+
         // All the execution sites should have the same relative index
-        int part_guid = partitions.get("0").getRelativeIndex();
-        for (Site site : cluster.getSites())
-        {
-            if (site.getIsexec())
-            {
-                assertEquals(part_guid, site.getPartition().getRelativeIndex());
+        for (int ii = 0; ii < partitions.length(); ii++) {
+            JSONObject partition = partitions.getJSONObject(ii);
+            assertEquals(0, partition.getInt("partition_id"));
+            JSONArray replicas = partition.getJSONArray("replicas");
+            assertEquals(3, replicas.length());
+            HashSet<Integer> replicasContents = new HashSet<Integer>();
+            for (int zz = 0; zz < replicas.length(); zz++) {
+                replicasContents.add(replicas.getInt(zz));
             }
+            assertTrue(replicasContents.contains(0));
+            assertTrue(replicasContents.contains(1));
+            assertTrue(replicasContents.contains(2));
+
+
         }
     }
 
@@ -59,20 +68,19 @@ public class TestClusterCompiler extends TestCase
         // 2 hosts, 6 sites per host, 2 copies of each partition.
         // there are sufficient execution sites, but insufficient hosts
         ClusterConfig config = new ClusterConfig(2, 6, 2);
-        Catalog catalog = new Catalog();
-        catalog.execute("add / clusters cluster");
-        boolean caught = false;
         try
         {
-            ClusterCompiler.compile(catalog, config);
+            if (!config.validate()) {
+                throw new RuntimeException(config.getErrorMsg());
+            }
         }
         catch (RuntimeException e)
         {
             if (e.getMessage().contains("servers required"))
             {
-                caught = true;
+                return;
             }
         }
-        assertTrue(caught);
+        fail();
     }
 }

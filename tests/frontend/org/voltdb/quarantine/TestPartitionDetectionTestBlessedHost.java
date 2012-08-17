@@ -54,7 +54,7 @@ public class TestPartitionDetectionTestBlessedHost extends TestCase
     }
 
     static class Callback implements ProcedureCallback {
-        private Semaphore m_rateLimit;
+        private final Semaphore m_rateLimit;
         public Callback(Semaphore rateLimit) {
             m_rateLimit = rateLimit;
         }
@@ -75,7 +75,7 @@ public class TestPartitionDetectionTestBlessedHost extends TestCase
     }
 
     static class CallbackGood implements ProcedureCallback {
-        private Semaphore m_rateLimit;
+        private final Semaphore m_rateLimit;
         public static AtomicBoolean allOk = new AtomicBoolean(true);
 
         public CallbackGood(Semaphore rateLimit) {
@@ -111,7 +111,7 @@ public class TestPartitionDetectionTestBlessedHost extends TestCase
         boolean success = cluster.compileWithPartitionDetection(builder, TMPDIR, TESTNONCE);
         assertTrue(success);
         cluster.startUp();
-        client.createConnection("localhost");
+        client.createConnection("localhost", cluster.port(0));
 
         // add several tuples
         for (int i=0; i < 100; i++) {
@@ -130,7 +130,7 @@ public class TestPartitionDetectionTestBlessedHost extends TestCase
         }
 
         client = ClientFactory.createClient();
-        client.createConnection("localhost", Client.VOLTDB_SERVER_PORT + blessed);
+        client.createConnection("localhost", cluster.port(blessed));
         for (int i=100; i < 200; i++) {
             rateLimit.acquire();
             client.callProcedure(new Callback(rateLimit), "InsertA", i, 1000+i);

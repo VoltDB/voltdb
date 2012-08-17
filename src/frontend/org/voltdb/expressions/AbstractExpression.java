@@ -18,7 +18,9 @@
 package org.voltdb.expressions;
 
 import java.util.ArrayList;
+import java.util.List;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
@@ -37,13 +39,20 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         LEFT,
         RIGHT,
         VALUE_TYPE,
-        VALUE_SIZE;
+        VALUE_SIZE,
+        ARGS,
     }
 
     protected String m_id;
     protected ExpressionType m_type;
     protected AbstractExpression m_left = null;
     protected AbstractExpression m_right = null;
+    protected List<AbstractExpression> m_args = null; // Never includes left and right "operator args".
+
+    public void setArgs(List<AbstractExpression> arguments) {
+        m_args = arguments;
+    }
+
     protected VoltType m_valueType = null;
     protected int m_valueSize = 0;
 
@@ -74,6 +83,13 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null) {
             m_right.validate();
         }
+
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.validate();
+            }
+        }
+
         //
         // Expression Type
         //
@@ -117,6 +133,13 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             AbstractExpression right_clone = (AbstractExpression)m_right.clone();
             clone.m_right = right_clone;
         }
+        if (m_args != null) {
+            clone.m_args = new ArrayList<AbstractExpression>();
+            for (AbstractExpression argument : m_args) {
+                clone.m_args.add((AbstractExpression) argument.clone());
+            }
+        }
+
         return clone;
     }
 
@@ -231,11 +254,36 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             if (expr.m_right.equals(m_right) == false)
                 return false;
 
+        if (expr.m_args != null)
+            if (expr.m_args.equals(m_args) == false) {
+                return false;
+        }
+
         if (m_type != expr.m_type)
             return false;
 
         // this abstract base class gets here if the children verify local members
         return true;
+    }
+
+    @Override
+    public int hashCode() {
+        // based on implementation of equals
+        int result = 0;
+        // hash the children
+        if (m_left != null) {
+            result += m_left.hashCode();
+        }
+        if (m_right != null) {
+            result += m_right.hashCode();
+        }
+        if (m_args != null) {
+            result += m_args.hashCode();
+        }
+        if (m_type != null) {
+            result += m_type.hashCode();
+        }
+        return result;
     }
 
     @Override
@@ -265,6 +313,16 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null) {
             assert (m_right instanceof JSONString);
             stringer.key(Members.RIGHT.name()).value(m_right);
+        }
+
+        if (m_args != null) {
+            stringer.key(Members.ARGS.name()).array();
+            for (AbstractExpression argument : m_args) {
+                assert (argument instanceof JSONString);
+                stringer.value(argument);
+            }
+            stringer.endArray();
+
         }
     }
 
@@ -314,6 +372,24 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
             expr.m_right = AbstractExpression.fromJSONObject(obj.getJSONObject(Members.RIGHT.name()), db);
         }
 
+        if (!obj.isNull(Members.ARGS.name())) {
+            ArrayList<AbstractExpression> arguments = new ArrayList<AbstractExpression>();
+            try {
+                JSONArray argsObject = obj.getJSONArray(Members.ARGS.name());
+                if (argsObject != null) {
+                    for (int i = 0; i < argsObject.length(); i++) {
+                        JSONObject argObject = argsObject.getJSONObject(i);
+                        if (argObject != null) {
+                            arguments.add(AbstractExpression.fromJSONObject(argObject, db));
+                        }
+                    }
+                }
+            } catch (JSONException e) {
+                // ok for it not to be there?
+            }
+            expr.setArgs(arguments);
+        }
+
         expr.loadFromJSONObject(obj, db);
 
         return expr;
@@ -343,6 +419,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null) {
             m_right.findAllSubexpressionsOfType_recurse(type, collected);
         }
+        if (m_args != null) {
+        for (AbstractExpression argument : m_args) {
+            argument.findAllSubexpressionsOfType_recurse(type, collected);
+        }
+    }
     }
 
     /**
@@ -360,6 +441,13 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
 
         if (m_right != null && m_right.hasAnySubexpressionOfType(type)) {
             return true;
+        }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                if (argument.hasAnySubexpressionOfType(type)) {
+                    return true;
+                }
+            }
         }
         return false;
     }
@@ -385,6 +473,11 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null) {
             m_right.findAllSubexpressionsOfClass_recurse(aeClass, collected);
         }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.findAllSubexpressionsOfClass_recurse(aeClass, collected);
+            }
+        }
     }
 
     /**
@@ -403,7 +496,142 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_right != null && m_right.hasAnySubexpressionOfClass(aeClass)) {
             return true;
         }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                if (argument.hasAnySubexpressionOfClass(aeClass)) {
+                    return true;
+                }
+            }
+        }
         return false;
+    }
+
+    /**
+     * Convenience method for determining whether an Expression object should have a child
+     * Expression on its RIGHT side. The follow types of Expressions do not need a right child:
+     *      OPERATOR_NOT
+     *      COMPARISON_IN
+     *      OPERATOR_IS_NULL
+     *      AggregageExpression
+     *
+     * @return Does this expression need a right expression to be valid?
+     */
+    public boolean needsRightExpression() {
+        return false;
+    }
+
+    /**
+     * Constant literals have a place-holder type of NUMERIC. These types
+     * need to be converted to DECIMAL or FLOAT when used in a binary operator,
+     * the choice based on the other operand's type
+     * -- DECIMAL goes with DECIMAL, FLOAT goes with anything else.
+     * This gets specialized as a NO-OP for leaf Expressions (AbstractValueExpression)
+     */
+    public void normalizeOperandTypes_recurse()
+    {
+        // Depth first search for NUMERIC children.
+        if (m_left != null) {
+            m_left.normalizeOperandTypes_recurse();
+        }
+        if (m_right != null) {
+            m_right.normalizeOperandTypes_recurse();
+
+            // XXX: There's no check here that the Numeric operands are actually constants.
+            // Can a sub-expression of type Numeric arise in any other case?
+            // Would that case always be amenable to having its valueType/valueSize redefined here?
+            if (m_left != null) {
+                if (m_left.m_valueType == VoltType.NUMERIC) {
+                    m_left.refineOperandType(m_right.m_valueType);
+                }
+                if (m_right.m_valueType == VoltType.NUMERIC) {
+                    m_right.refineOperandType(m_left.m_valueType);
+                }
+            }
+
+        }
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.normalizeOperandTypes_recurse();
+            }
+        }
+    }
+
+    /**
+     * Helper function to patch up NUMERIC typed constant operands and
+     * the functions and operators that they parameterize.
+     */
+    void refineOperandType(VoltType valueType)
+    {
+        if (m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        if (valueType == VoltType.DECIMAL) {
+            m_valueType = VoltType.DECIMAL;
+            m_valueSize = VoltType.DECIMAL.getLengthInBytesForFixedTypes();
+        } else {
+            m_valueType = VoltType.FLOAT;
+            m_valueSize = VoltType.FLOAT.getLengthInBytesForFixedTypes();
+        }
+    }
+
+    /**
+     * Helper function to patch up NUMERIC or untyped constants and parameters and
+     * the functions and operators that they parameterize,
+     * especially when they need to match an expected INSERT/UPDATE column
+     * or to match a parameterized function that HSQL or other planner
+     * processing has determined the return type for.
+     * This default implementation is currently a no-op which is fine for most purposes --
+     * 99% of the time, we are trying to refine a type to itself.
+     * TODO: we might want to enable asserts when we fall out of well-known non-no-op cases.
+     * We don't just go ahead and arbitrarily change any AbstractExpression's value type on the assumption
+     * that AbstractExpression classes usually either have immutable value types
+     * (hard-coded or easily determined up front by HSQL),
+     * OR they have their own specific restrictions or side effects -- and so their own refineValueType method.
+     */
+    public void refineValueType(VoltType columnType) {
+        if (columnType.equals(m_valueType)) {
+            return; // HSQL already initialized the expression to have the refined type.
+        }
+        //TODO: For added safety, we MAY want to (re)enable this general assert
+        // OR the one after we give a pass for the "generic types". See the comment below.
+        // assert(false);
+        if ((m_valueType != null) && (m_valueType != VoltType.NUMERIC)) {
+            // This code path leaves a generic type (null or NUMERIC) in the expression tree rather than assume that
+            // it's safe to change the value type of an arbitrary AbstractExpression.
+            // The EE MAY complain about it later.
+            // There may be special cases where we want to assert(false) rather than waiting for the EE to complain.
+            // or even special cases where we want to go ahead and switch the type (scary!).
+            return;
+        }
+        // A request to switch an arbitrary AbstractExpression from the specific value type that HSQL assigned to it
+        // to a different specific value type that SEEMS to be called for by the usage (target column) is a hard thing.
+        // It seems equally dangerous to ignore the HSQL type OR the target type.
+        // Maybe this will never occur because HSQL is so smart (and we keep it that way),
+        // or maybe the type difference won't really matter to the EE because it's so flexible.
+        // Or maybe some of each -- this no-op behavior assumes something like that.
+        // BUT maybe it's just always wrong to be trying any such thing, so we should assert(false).
+        // Or maybe there need to be special cases.
+        // The sad news is that when this assert first went live, it just caused quiet thread death and hanging rather
+        // than an identifiable assert, even when run in the debugger.
+        // assert(false);
+    }
+
+    /** Instead of recursing by default, allow derived classes to recurse as needed
+     * using finalizeChildValueTypes.
+     */
+    public abstract void finalizeValueTypes();
+
+    /** Do the recursive part of finalizeValueTypes as requested. */
+    public final void finalizeChildValueTypes() {
+        if (m_left != null)
+            m_left.finalizeValueTypes();
+        if (m_right != null)
+            m_right.finalizeValueTypes();
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.finalizeValueTypes();
+            }
+        }
     }
 
 }

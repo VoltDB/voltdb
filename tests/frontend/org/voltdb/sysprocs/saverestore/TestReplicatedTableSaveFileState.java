@@ -29,10 +29,12 @@ import java.util.Set;
 
 import junit.framework.TestCase;
 
+import org.voltcore.utils.CoreUtils;
 import org.voltdb.MockVoltDB;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Table;
 import org.voltdb.sysprocs.SysProcFragmentId;
 
@@ -122,13 +124,11 @@ public class TestReplicatedTableSaveFileState extends TestCase
         for (int i = 0; i < number_of_sites; ++i)
         {
             addHostToTestData(i);
-            catalog_creator.addPartition(i);
-            catalog_creator.addHost(i);
-            catalog_creator.addSite(i, i, i, true);
+            catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( i, i), i);
         }
         // Add some non-exec sites for more test coverage
-        catalog_creator.addSite(number_of_sites, 0, 0, false);
-        catalog_creator.addSite(number_of_sites + 1, 1, 0, false);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( 0, number_of_sites), MailboxType.Initiator);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( 1, number_of_sites + 1), MailboxType.Initiator);
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
         {
@@ -147,14 +147,14 @@ public class TestReplicatedTableSaveFileState extends TestCase
         Table test_table = catalog_creator.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table);
+            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTracker());
         assertEquals(test_plan.length, number_of_sites + 1);
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
             assertEquals(test_plan[i].fragmentId,
                          SysProcFragmentId.PF_restoreLoadReplicatedTable);
             assertFalse(test_plan[i].multipartition);
-            assertEquals(test_plan[i].siteId, i);
+            assertEquals((int)test_plan[i].siteId, i);
             assertEquals(test_plan[i].parameters.toArray()[0], TABLE_NAME);
         }
         assertEquals(test_plan[number_of_sites].fragmentId,
@@ -181,19 +181,13 @@ public class TestReplicatedTableSaveFileState extends TestCase
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
             addHostToTestData(i);
-            catalog_creator.addPartition(i);
-            catalog_creator.addHost(i);
-            catalog_creator.addSite(i, i, i, true);
+            catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( i, i), i);
         }
-        catalog_creator.addPartition(number_of_sites - 1);
-        catalog_creator.addHost(number_of_sites - 1);
-        catalog_creator.addSite(number_of_sites - 1,
-                                number_of_sites - 1,
-                                number_of_sites - 1,
-                                true);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( number_of_sites - 1, number_of_sites - 1),
+                                number_of_sites - 1);
         // Add some non-exec sites for more test coverage
-        catalog_creator.addSite(number_of_sites, 0, 0, false);
-        catalog_creator.addSite(number_of_sites + 1, 1, 0, false);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( 0, number_of_sites), MailboxType.Initiator);
+        catalog_creator.addSite(CoreUtils.getHSIdFromHostAndSite( 1, number_of_sites + 1), MailboxType.Initiator);
 
         m_siteInput.resetRowPosition();
         while (m_siteInput.advanceRow())
@@ -213,14 +207,14 @@ public class TestReplicatedTableSaveFileState extends TestCase
         Table test_table = catalog_creator.getTable(TABLE_NAME);
 
         SynthesizedPlanFragment[] test_plan =
-            m_state.generateRestorePlan(test_table);
+            m_state.generateRestorePlan(test_table, VoltDB.instance().getSiteTracker());
         assertEquals(test_plan.length, number_of_sites + 1);
         for (int i = 0; i < number_of_sites - 1; ++i)
         {
             assertEquals(test_plan[i].fragmentId,
                          SysProcFragmentId.PF_restoreLoadReplicatedTable);
             assertFalse(test_plan[i].multipartition);
-            assertEquals(test_plan[i].siteId, i);
+            assertEquals(test_plan[i].siteId, CoreUtils.getHSIdFromHostAndSite( i, i));
             assertEquals(test_plan[i].parameters.toArray()[0], TABLE_NAME);
         }
         assertEquals(test_plan[number_of_sites - 1].fragmentId,
@@ -229,7 +223,7 @@ public class TestReplicatedTableSaveFileState extends TestCase
         assertFalse(test_plan[number_of_sites - 1].multipartition);
         assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[0],
                      TABLE_NAME);
-        assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[1], 3);
+        assertEquals(test_plan[number_of_sites - 1].parameters.toArray()[1],  CoreUtils.getHSIdFromHostAndSite( 3, 3));
 
         assertEquals(test_plan[number_of_sites].fragmentId,
                      SysProcFragmentId.PF_restoreLoadReplicatedTableResults);

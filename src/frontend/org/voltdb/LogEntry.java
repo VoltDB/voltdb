@@ -19,6 +19,7 @@ package org.voltdb;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
+import java.nio.channels.ByteChannel;
 import java.nio.channels.FileChannel;
 
 public abstract class LogEntry {
@@ -31,7 +32,7 @@ public abstract class LogEntry {
      * @throws IOException
      *             If there is any error reading the log entry
      */
-    public static LogEntry readExternal(FileChannel in) throws IOException {
+    public static LogEntry readExternal(ByteChannel in) throws IOException {
         throw new UnsupportedOperationException();
     }
 

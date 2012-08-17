@@ -20,7 +20,7 @@ package org.voltdb.utils;
 import java.lang.Thread.UncaughtExceptionHandler;
 
 import org.voltdb.VoltDB;
-import org.voltdb.logging.VoltLogger;
+import org.voltcore.logging.VoltLogger;
 
 public class VoltUncaughtExceptionHandler implements UncaughtExceptionHandler {
 

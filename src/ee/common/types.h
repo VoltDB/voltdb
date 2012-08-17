@@ -62,7 +62,7 @@ class NValue;
 enum ValueType {
     VALUE_TYPE_INVALID      = 0,    // a column should never be this type!
     VALUE_TYPE_NULL         = 1,    // and they should never be this either!
-    // VALUE_TYPE_HSQL_NUMERIC = 2, // Java planner only. Not used in EE.
+    VALUE_TYPE_FOR_DIAGNOSTICS_ONLY_NUMERIC = 2, // Java planner only. Not used in EE.
 
     //
     // Column Types
@@ -272,7 +272,12 @@ enum ExpressionType {
     EXPRESSION_TYPE_AGGREGATE_SUM                   = 42,
     EXPRESSION_TYPE_AGGREGATE_MIN                   = 43,
     EXPRESSION_TYPE_AGGREGATE_MAX                   = 44,
-    EXPRESSION_TYPE_AGGREGATE_AVG                   = 45
+    EXPRESSION_TYPE_AGGREGATE_AVG                   = 45,
+
+    // -----------------------------
+    // Functions
+    // -----------------------------
+    EXPRESSION_TYPE_FUNCTION                        = 100,
 
 };
 

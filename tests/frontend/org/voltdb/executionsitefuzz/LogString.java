@@ -34,6 +34,7 @@ public class LogString
         m_text = text;
     }
 
+    @Override
     public boolean equals(Object o)
     {
         if (o == this)
@@ -48,6 +49,7 @@ public class LogString
         return m_text.equals(other.m_text);
     }
 
+    @Override
     public String toString()
     {
         return m_text;
@@ -108,20 +110,20 @@ public class LogString
         return m_text.contains("selfNodeFailure");
     }
 
-    HashSet<Integer> getFaultNodes()
+    HashSet<Long> getFaultNodes()
     {
         if (!isOtherFault())
         {
             throw new RuntimeException("getFaultNode called on non-fault message");
         }
-        HashSet<Integer> retval = new HashSet<Integer>();
+        HashSet<Long> retval = new HashSet<Long>();
         String[] failed_nodes =
             m_text.substring(m_text.indexOf("handleNodeFault"),
                              m_text.indexOf("with")).split(" ");
         // index 0 is handleNodeFault, skip it
         for (int i = 1; i < failed_nodes.length; i++)
         {
-            retval.add(Integer.valueOf(failed_nodes[i]));
+            retval.add(Long.valueOf(failed_nodes[i]));
         }
         return retval;
     }
