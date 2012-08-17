@@ -213,7 +213,7 @@ contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
 def generate_html_reports(seed, statements_path, hsql_path, jni_path,
-                          output_dir, report_all, is_matching = False, cntonly = False):
+                          output_dir, report_all, cntonly = False, is_matching = False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
