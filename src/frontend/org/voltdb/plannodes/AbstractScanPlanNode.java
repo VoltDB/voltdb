@@ -325,7 +325,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
     }
 
     @Override
-    public void getScanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
+    public void getScanNodeList_recurse(ArrayList<AbstractScanPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";

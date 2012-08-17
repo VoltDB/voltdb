@@ -662,15 +662,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     protected abstract String explainPlanForNode(String indent);
 
-    public ArrayList<AbstractPlanNode> getScanNodeList () {
+    public ArrayList<AbstractScanPlanNode> getScanNodeList () {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        ArrayList<AbstractScanPlanNode> collected = new ArrayList<AbstractScanPlanNode>();
         getScanNodeList_recurse( collected, visited);
         return collected;
     }
 
     //postorder adding scan nodes
-    public void getScanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
+    public void getScanNodeList_recurse(ArrayList<AbstractScanPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";

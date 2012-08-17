@@ -37,6 +37,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AbstractScanPlanNode;
 import org.voltdb.plannodes.PlanNodeTree;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.types.PlanNodeType;
@@ -93,7 +94,7 @@ public class testPlannerTester extends TestCase {
         pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
         assertTrue(pn != null);
 
-        ArrayList<AbstractPlanNode> collected = pn.getScanNodeList();
+        ArrayList<AbstractScanPlanNode> collected = pn.getScanNodeList();
         System.out.println( collected );
         System.out.println( collected.size() );
         for( AbstractPlanNode n : collected ) {
@@ -109,15 +110,6 @@ public class testPlannerTester extends TestCase {
             e.printStackTrace();
         }
     }
-
-//    public void testBatchCompileSave() {
-//        try {
-//            plannerTester.setUp(m_homeDir+"/test1");
-//            plannerTester.batchCompileSave();
-//        } catch (Exception e) {
-//            e.printStackTrace();
-//        }
-//    }
 
     public void testCompile() {
         try {
@@ -173,6 +165,8 @@ public class testPlannerTester extends TestCase {
         pn = compile("select * from l, t where l.b=t.b limit ?;", 3, true);
 
         String path = m_homeDir+"/";
+        plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
+                "testplans-plannerTester-ddl", "L", "a");
         System.out.println( pn.toExplainPlanString() );
         System.out.println( pn.toJSONString() );
         plannerTester.writePlanToFile( pn, path, "prettyJson.txt", "");
@@ -192,74 +186,6 @@ public class testPlannerTester extends TestCase {
             }
         }
     }
-
-    //    public void testLoadFromJSON() {
-    //          AbstractPlanNode pn1 = null;
-    //        //pn1 = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-    //          pn1 = compile("select * from l, t where t.b=l.b limit ?;", 3, true);
-    //        assertTrue(pn1 != null);
-    //        PlanNodeTree pnt = new PlanNodeTree( pn1 );
-    //
-    //        JSONObject jobj;
-    //        String prettyJson = null;
-    //
-    //        prettyJson = pnt.toJSONString();
-    //        System.out.println( prettyJson );
-    //        try {
-    //                  jobj = new JSONObject( prettyJson );
-    //
-    //                  JSONArray values = jobj.getJSONArray("PLAN_NODES");
-    //                  System.out.println( values.getJSONObject(0).toString() );
-    //                  System.out.println( values.getJSONObject(0).getString("OUTPUT_SCHEMA") );
-    //                  for( int i = 0; i < 6; i++ )
-    //                          System.out.println( values.getJSONObject(i).getString("PLAN_NODE_TYPE") );
-    //                  String str = values.getJSONObject(3).getString("CHILDREN_IDS");
-    //                  System.out.println(str);
-    //                  System.out.println( str.split(",")[1] );
-    //                  System.out.println( values.getJSONObject(0).getJSONArray("CHILDREN_IDS").get(0));
-    //                  //ArrayList<Integer> intlist =
-    //                  System.out.println( jobj.toString() );
-    //          } catch (JSONException e1) {
-    //                  //
-    //                  e1.printStackTrace();
-    //          }
-    //        //write plan to file
-    ////        try {
-    ////                        BufferedWriter writer = new BufferedWriter( new FileWriter(m_homeDir+"/prettyJson.txt") );
-    ////                        writer.write( prettyJson );
-    ////                        writer.flush();
-    ////                        writer.close();
-    ////                } catch (IOException e) {
-    ////                        //
-    ////                        e.printStackTrace();
-    ////                }
-    //        prettyJson = "";
-    //        String line = null;
-    //        //load plan from file
-    //        try {
-    //                  BufferedReader reader = new BufferedReader( new FileReader( m_homeDir+"/prettyJson.txt" ));
-    //                          while( (line = reader.readLine() ) != null ){
-    //                                  line = line.trim();
-    //                                  prettyJson += line;
-    //                          }
-    //                  }
-    //        catch (IOException e) {
-    //                  //
-    //                  e.printStackTrace();
-    //          }
-    //          System.out.println( prettyJson );
-    //          JSONObject jobj1;
-    //          try {
-    //                  jobj1 = new JSONObject( prettyJson );
-    //                  JSONArray jarray =      jobj1.getJSONArray("PLAN_NODES");
-    //                  PlanNodeTree pnt1 = new PlanNodeTree();
-    //                  pnt1.loadFromJSONArray(jarray);
-    //                  System.out.println( pnt1.toJSONString() );
-    //          } catch (JSONException e) {
-    //                  //
-    //                  e.printStackTrace();
-    //          }
-    //    }
 
     public void testGetList() {
         AbstractPlanNode pn1 = null;
@@ -283,8 +209,8 @@ public class testPlannerTester extends TestCase {
                 "(1 => 2)",
                 "Table diff at leaf 0:",
                 "(INDEXSCAN on T => SEQSCAN on L)",
-                "Diff at leaf 1 :",
-                "(Empty => INDEXSCAN on T using COVER2_TREE)"
+                "Table diff at leaf 1:",
+                "([] => INDEXSCAN on T)"
                 ) );
     }
 
@@ -303,7 +229,7 @@ public class testPlannerTester extends TestCase {
                 ) );
     }
 
-    public void testPlanNodeandInlinePositionDiff() {
+    public void testPlanNodeAndInlinePositionDiff() {
       assertTrue( compileDiffMatchPattern(
       "select * from l order by a;", 3, true,
       "select * from l order by a limit ?;", 3, true,
@@ -364,58 +290,16 @@ public class testPlannerTester extends TestCase {
             return false;
     }
 
-  public void testMain() {
-  String[] args = {"-d","-s","-e","-cs",
-          "-C="+m_currentDir+"/tests/scripts/plannertester/config/test1",
-//          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voltcache",
-//          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voltkv",
-//          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voter",
-          "-r="+m_homeDir,
-//          "-help"
-          };
-  plannerTester.main(args);
-}
-
-  //    public void testBatchDiff() {
-  //          int size = 7;
-  //          String pathBaseline = "/tmp/volttest/test1Baseline/";
-  //          String pathNew = "/tmp/volttest/test1New/";
-  //          plannerTester.setTestName( "Test1" );
-  //          try {
-  //                  plannerTester.batchDiff(pathBaseline, pathNew, size);
-  //          } catch (IOException e) {
-  //                  e.printStackTrace();
-  //          }
-  //    }
-
-  //        public void testWholeProcess() {
-  //              try {
-  //                      plannerTester.setUp(m_homeDir+"/test1");
-  //                      plannerTester.batchCompileSave();
-  //                      plannerTester.batchDiff();
-  //              } catch (Exception e) {
-  //                      e.printStackTrace();
-  //              }
-  //        }
-
-  //make sure plan files are already in baseline directories
-  //    public void testDiffVoltExamples() {
-  //          try {
-  //                  plannerTester.setUp(m_homeDir+"/test1");
-  //                  plannerTester.batchDiff();
-  //
-  //                  plannerTester.setUp(m_homeDir+"/Voter");
-  //                  plannerTester.batchDiff();
-  //
-  //                  plannerTester.setUp(m_homeDir+"/voltcache");
-  //                  plannerTester.batchDiff();
-  //
-  //                  plannerTester.setUp(m_homeDir+"/voltkv");
-  //                  plannerTester.batchDiff();
-  //          }
-  //          catch ( Exception e ) {
-  //                  e.printStackTrace();
-  //          }
-  //    }
+//  public void testMain() {
+//  String[] args = {"-d","-s","-e","-cs",
+//          "-C="+m_currentDir+"/tests/scripts/plannertester/config/test1",
+////          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voltcache",
+////          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voltkv",
+////          "-C="+m_currentDir+"/tests/scripts/plannertester/config/voter",
+//          "-r="+m_homeDir,
+////          "-help"
+//          };
+//  plannerTester.main(args);
+//}
 
 }
