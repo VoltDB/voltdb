@@ -729,13 +729,13 @@ int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
     TreeNode *n = lookup(key);
     // return -1 if the key passed in is not in the map
     if (n == &NIL) return -1;
-    TreeNode *x = m_root, *p = n;
+    TreeNode *p = n;
     int64_t ct = 0,ctr = 0, ctl = 0;
-    int m = m_comper(key, x->key);
+    int m = m_comper(key, m_root->key);
     if (m == 0) {
-        if (x->right != &NIL)
-            ctr = getSubct(x->right);
-        ct = getSubct(x) - ctr;
+        if (m_root->right != &NIL)
+            ctr = getSubct(m_root->right);
+        ct = getSubct(m_root) - ctr;
         while(p->parent != &NIL) {
             if (m_comper(key, p->key) == 0) {
                 if (p->right != &NIL && m_comper(key, p->right->key) == 0)
@@ -764,7 +764,7 @@ int64_t CompactingMap<Key, Data, Compare, hasRank>::rankAsc(const Key& key) {
             }
             p = p->parent;
         }
-        ct = getSubct(x) - ct;
+        ct = getSubct(m_root) - ct;
     }
     return ct;
 }
