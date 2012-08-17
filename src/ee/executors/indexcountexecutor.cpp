@@ -191,10 +191,10 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             // This next bit of logic handles underflow and overflow while
             // setting up the search keys.
             // e.g. TINYINT > 200 or INT <= 6000000000
+
             // re-throw if not an overflow or underflow
             // currently, it's expected to always be an overflow or underflow
-            if ((e.getInternalFlags() & SQLException::TYPE_OVERFLOW) ||
-                (e.getInternalFlags() & SQLException::TYPE_UNDERFLOW)) {
+            if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
                 throw e;
             }
 
@@ -246,8 +246,9 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 // setting up the search keys.
                 // e.g. TINYINT > 200 or INT <= 6000000000
 
-                // rethow if not an overflow - currently, it's expected to always be an overflow
-                if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+                // re-throw if not an overflow or underflow
+                // currently, it's expected to always be an overflow or underflow
+                if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
                     throw e;
                 }
 
