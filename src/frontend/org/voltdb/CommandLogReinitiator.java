@@ -29,7 +29,7 @@ public interface CommandLogReinitiator {
      * Set the snapshot transaction ID that got restored
      * @param txnId
      */
-    public void setSnapshotTxnId(long txnId);
+    public void setSnapshotTxnId(RestoreAgent.SnapshotInfo info);
 
     public void setCallback(Callback callback);
 

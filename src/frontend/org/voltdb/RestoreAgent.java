@@ -185,12 +185,8 @@ SnapshotCompletionInterest
                     changeState();
                 }
                 else {
-                    long txnId = 0;
-                    if (m_snapshotToRestore != null) {
-                        txnId = m_snapshotToRestore.txnId;
-                    }
                     // will release the non-leaders waiting on VoltZK.restore_snapshot_id.
-                    sendSnapshotTxnId(txnId);
+                    sendSnapshotTxnId(m_snapshotToRestore);
 
                     if (m_snapshotToRestore != null) {
                         LOG.debug("Initiating snapshot " + m_snapshotToRestore.nonce +
@@ -220,7 +216,7 @@ SnapshotCompletionInterest
      * Information about the local files of a specific snapshot that will be
      * used to generate a restore plan
      */
-    static class SnapshotInfo {
+    public static class SnapshotInfo {
         public final long txnId;
         public final String path;
         public final String nonce;
@@ -675,13 +671,12 @@ SnapshotCompletionInterest
      *
      * @param txnId
      */
-    private void sendSnapshotTxnId(long txnId) {
-        ByteBuffer buf = ByteBuffer.allocate(8);
-        buf.putLong(txnId);
-
+    private void sendSnapshotTxnId(SnapshotInfo toRestore) {
+        long txnId = toRestore != null ? toRestore.txnId : 0;
+        String jsonData = toRestore != null ? toRestore.toJSONObject().toString() : "{}";
         LOG.debug("Sending snapshot ID " + txnId + " for restore to other nodes");
         try {
-            m_zk.create(VoltZK.restore_snapshot_id, buf.array(),
+            m_zk.create(VoltZK.restore_snapshot_id, jsonData.getBytes(VoltDB.UTF8ENCODING),
                         Ids.OPEN_ACL_UNSAFE, CreateMode.EPHEMERAL);
         } catch (Exception e) {
             VoltDB.crashGlobalVoltDB("Failed to create Zookeeper node: " + e.getMessage(),
@@ -700,17 +695,24 @@ SnapshotCompletionInterest
         long txnId = 0;
         try {
             byte[] data = m_zk.getData(VoltZK.restore_snapshot_id, false, null);
-            txnId = ByteBuffer.wrap(data).getLong();
+
+            String jsonData = new String(data, VoltDB.UTF8ENCODING);
+            if (!jsonData.equals("{}")) {
+                m_hasRestored = true;
+                JSONObject jo = new JSONObject(jsonData);
+                SnapshotInfo info = new SnapshotInfo(jo);
+                m_replayAgent.setSnapshotTxnId(info);
+            }
+            else {
+                m_hasRestored = false;
+                m_replayAgent.setSnapshotTxnId(null);
+            }
         } catch (KeeperException e2) {
             VoltDB.crashGlobalVoltDB(e2.getMessage(), false, e2);
-        } catch (InterruptedException e2) {}
-
-        // If the txnId is not 0, it means we restored a snapshot
-        if (txnId != 0) {
-            m_hasRestored = true;
+        } catch (InterruptedException e2) {
+        } catch (JSONException je) {
+            VoltDB.crashLocalVoltDB(je.getMessage(), true, je);
         }
-
-        m_replayAgent.setSnapshotTxnId(txnId);
     }
 
     /**

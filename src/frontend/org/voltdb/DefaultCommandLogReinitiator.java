@@ -64,7 +64,7 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
     }
 
     @Override
-    public void setSnapshotTxnId(long txnId) {
+    public void setSnapshotTxnId(RestoreAgent.SnapshotInfo info) {
     }
 
     @Override
