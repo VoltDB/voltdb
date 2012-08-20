@@ -277,9 +277,7 @@ enum ExpressionType {
     // -----------------------------
     // Functions
     // -----------------------------
-    EXPRESSION_TYPE_FUNCTION_ABS                    = 100,
-    EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM         = 110,
-    EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR     = 111,
+    EXPRESSION_TYPE_FUNCTION                        = 100,
 
 };
 
