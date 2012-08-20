@@ -18,8 +18,6 @@ for f in $VOLTDB_HOME/lib/*.jar; do
   CLASSPATH=${CLASSPATH}:$f;
 done
 
-
-
-java -Xmx512m -classpath $TEST_HOME:${CLASSPATH} org.voltdb.planner.plannerTester $@
+java -Xmx512m -classpath $TEST_HOME:${CLASSPATH} org.voltdb.planner.plannerTester "$@"
 
 #exec $CMDVAL

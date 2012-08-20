@@ -168,7 +168,6 @@ public class plannerTester {
             }
             else if( str.startsWith("-i=") ) {
                 m_filters.add(str.split("=")[1] );
-                System.out.println(str);
             }
             else if( str.startsWith("-help") ){
                 System.out.println("-cs : Compile queries and save the plans according to the config files");
@@ -177,6 +176,7 @@ public class plannerTester {
                 System.out.println("-s  : Output sql statement along with diff");
                 System.out.println("-C=configFile  : Specify the path to a config file");
                 System.out.println("-r=reportFileDir  : Specify report file path, default will be tmp/, report file name is plannerTester.report");
+                System.out.println("-i=ignorePattern : Specify a pattern to ignore, the pattern will not be recorded in the report file");
                 System.exit(0);
             }
         }
