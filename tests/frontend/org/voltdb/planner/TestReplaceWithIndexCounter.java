@@ -204,6 +204,17 @@ public class TestReplaceWithIndexCounter extends TestCase {
         assertTrue(p instanceof IndexScanPlanNode);
     }
 
+    // Test counting index feature with partitioned table
+    public void testCountStar22() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from P1 WHERE NUM < ?", 1, false);
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexCountPlanNode);
+    }
+
     /**
      * Check Whether or not the original plan is replaced with CountingIndexPlanNode.
      *
