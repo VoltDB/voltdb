@@ -143,14 +143,14 @@ public:
      * The address of the newTupleValue is used as the value in the index (and multimaps) as
      * well as the key for the new entry.
      */
-    virtual bool replaceEntry(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
+    virtual bool replaceEntry(const TableTuple *newTupleValue,
+                              const TableTuple *oldTupleValue) = 0;
 
     /**
      * Update in place an index entry with a new tuple address
      */
-    virtual bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
+    virtual bool replaceEntryNoKeyChange(const TableTuple *newTupleValue,
+                                         const TableTuple *oldTupleValue) = 0;
 
     /**
      * just returns whether the value is already stored. no

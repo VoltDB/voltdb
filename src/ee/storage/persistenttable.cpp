@@ -46,10 +46,9 @@
 #include <sstream>
 #include <cassert>
 #include <cstdio>
-
-#include "boost/scoped_ptr.hpp"
+#include <boost/foreach.hpp>
+#include <boost/scoped_ptr.hpp>
 #include "storage/persistenttable.h"
-
 #include "common/debuglog.h"
 #include "common/serializeio.h"
 #include "common/FailureInjection.h"
@@ -319,75 +318,83 @@ void PersistentTable::insertTupleForUndo(char *tuple) {
 
 /*
  * Regular tuple update function that does a copy and allocation for
- * updated strings and creates an UndoAction.
+ * updated strings and creates an UndoAction. Additional optimization
+ * for callers that know which indexes to update.
  */
-bool PersistentTable::updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes) {
+bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWithNewValues,
+                                                     TableTuple &targetTupleToUpdate,
+                                                     std::vector<TableIndex*> &indexesToUpdate)
+{
+    if (!checkUpdateOnUniqueIndexes(targetTupleToUpdate,
+                                    sourceTupleWithNewValues,
+                                    indexesToUpdate))
+    {
+        throw ConstraintFailureException(this, sourceTupleWithNewValues,
+                                         targetTupleToUpdate,
+                                         CONSTRAINT_TYPE_UNIQUE);
+    }
 
     /*
      * Create and register an undo action and then use the copy of
      * the target (old value with no updates)
      */
-     UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
-     assert(undoQuantum);
-     Pool *pool = undoQuantum->getDataPool();
-     assert(pool);
-     PersistentTableUndoUpdateAction *ptuua =
-       new (pool->allocate(sizeof(PersistentTableUndoUpdateAction)))
-       PersistentTableUndoUpdateAction(target, this, pool);
+    UndoQuantum *undoQuantum = m_executorContext->getCurrentUndoQuantum();
+    assert(undoQuantum);
+    Pool *pool = undoQuantum->getDataPool();
+    assert(pool);
+    PersistentTableUndoUpdateAction *ptuua =
+        new (pool->allocate(sizeof(PersistentTableUndoUpdateAction)))
+             PersistentTableUndoUpdateAction(targetTupleToUpdate, this, pool);
 
-     if (m_COWContext.get() != NULL) {
-         m_COWContext->markTupleDirty(target, false);
-     }
+    if (m_COWContext.get() != NULL) {
+        m_COWContext->markTupleDirty(targetTupleToUpdate, false);
+    }
 
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
-        decreaseStringMemCount(target.getNonInlinedMemorySize());
-        increaseStringMemCount(source.getNonInlinedMemorySize());
+        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
+        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
     }
 
-     source.setActiveTrue();
-     //Copy the dirty status that was set by markTupleDirty.
-     if (target.isDirty()) {
-         source.setDirtyTrue();
-     } else {
-         source.setDirtyFalse();
-     }
-     target.copyForPersistentUpdate(source);
+    sourceTupleWithNewValues.setActiveTrue();
+    //Copy the dirty status that was set by markTupleDirty.
+    if (targetTupleToUpdate.isDirty()) {
+        sourceTupleWithNewValues.setDirtyTrue();
+    } else {
+        sourceTupleWithNewValues.setDirtyFalse();
+    }
+    targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues);
 
-     ptuua->setNewTuple(target, pool);
+    ptuua->setNewTuple(targetTupleToUpdate, pool);
 
-     if (!undoQuantum->isDummy()) {
-         //DummyUndoQuantum calls destructor upon register.
-         undoQuantum->registerUndoAction(ptuua);
-     }
+    if (!undoQuantum->isDummy()) {
+        //DummyUndoQuantum calls destructor upon register.
+        undoQuantum->registerUndoAction(ptuua);
+    }
 
-    // the planner should determine if this update can affect indexes.
-    // if so, update the indexes here
-    if (updatesIndexes) {
-        if (!checkUpdateOnUniqueIndexes(ptuua->getOldTuple(), target)) {
-            throw ConstraintFailureException(this, ptuua->getOldTuple(),
-                                             target,
-                                             CONSTRAINT_TYPE_UNIQUE);
-        }
-
-        //If the CFE is thrown the Undo action should not attempt to revert the
-        //indexes.
+    // update the indexes here
+    if (indexesToUpdate.size()) {
         ptuua->needToRevertIndexes();
-        updateFromAllIndexes(ptuua->getOldTuple(), target);
+        BOOST_FOREACH(TableIndex *index, indexesToUpdate) {
+            if (!index->replaceEntry(&targetTupleToUpdate, &ptuua->getOldTuple())) {
+                throwFatalException("Failed to update tuple in Table: %s Index %s",
+                                    m_name.c_str(), index->getName().c_str());
+            }
+        }
     }
 
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleUpdate(ptuua->getOldTuple(), target);
+        m_views[i]->processTupleUpdate(targetTupleToUpdate, ptuua->getOldTuple());
     }
 
     /**
      * Check for nulls after the update has been performed because the source tuple may have garbage in
      * some columns
      */
-    FAIL_IF(!checkNulls(target)) {
+    FAIL_IF(!checkNulls(targetTupleToUpdate)) {
         throw ConstraintFailureException(this, ptuua->getOldTuple(),
-                                         target,
+                                         targetTupleToUpdate,
                                          CONSTRAINT_TYPE_NOT_NULL);
     }
 
@@ -440,14 +447,12 @@ void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
-        if (!checkUpdateOnUniqueIndexes(targetBackup, target)) {
-            // TODO: this might be too strict. see insertTuple()
-            throwFatalException("Failed to update tuple in table %s for undo:"
-                                " unique constraint violation\n%s\n%s\n", m_name.c_str(),
-                                targetBackup.debugNoHeader().c_str(),
-                                target.debugNoHeader().c_str());
+        for (int i = m_indexCount - 1; i >= 0; --i) {
+            if (!m_indexes[i]->replaceEntry(&target, &targetBackup)) {
+                throwFatalException("Failed to update tuple in Table: %s Index %s",
+                                    m_name.c_str(), m_indexes[i]->getName().c_str());
+            }
         }
-        updateFromAllIndexes(targetBackup, target);
     }
 }
 
@@ -567,18 +572,10 @@ void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
     }
 }
 
-void PersistentTable::updateFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
+void PersistentTable::updateIndexesForTupleMove(TableTuple &targetTupleToUpdate,
+                                                const TableTuple &sourceTupleWithNewValues) {
     for (int i = m_indexCount - 1; i >= 0;--i) {
-        if (!m_indexes[i]->replaceEntry(&targetTuple, &sourceTuple)) {
-            throwFatalException(
-                    "Failed to update tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
-        }
-    }
-}
-
-void PersistentTable::updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
-    for (int i = m_indexCount - 1; i >= 0;--i) {
-        if (!m_indexes[i]->replaceEntryNoKeyChange(&targetTuple, &sourceTuple)) {
+        if (!m_indexes[i]->replaceEntryNoKeyChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
             throwFatalException(
                     "Failed to update tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
@@ -600,18 +597,24 @@ bool PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
     return true;
 }
 
-bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple) {
-    for (int i = m_uniqueIndexCount - 1; i >= 0;--i) {
-        if (m_uniqueIndexes[i]->checkForIndexChange(&targetTuple, &sourceTuple) == false)
-            continue; // no update is needed for this index
+bool PersistentTable::checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
+                                                 const TableTuple &sourceTupleWithNewValues,
+                                                 std::vector<TableIndex*> &indexesToUpdate)
+{
+    BOOST_FOREACH(TableIndex* index, indexesToUpdate) {
+        if (index->isUniqueIndex()) {
+            if (index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues) == false)
+                continue; // no update is needed for this index
 
-        // if there is a change, the new_key has to be checked
-        FAIL_IF (m_uniqueIndexes[i]->exists(&sourceTuple)) {
-            VOLT_WARN("Unique Index '%s' complained to the update",
-                      m_uniqueIndexes[i]->debug().c_str());
-            return false; // cannot insert the new value
+            // if there is a change, the new_key has to be checked
+            FAIL_IF (index->exists(&sourceTupleWithNewValues)) {
+                VOLT_WARN("Unique Index '%s' complained to the update",
+                          index->debug().c_str());
+                return false; // cannot insert the new value
+            }
         }
     }
+
     return true;
 }
 
@@ -866,10 +869,11 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
 
 }
 
-void PersistentTable::swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
-    ::memcpy(destinationTuple.address(), sourceTuple.address(), m_tupleLength);
-    sourceTuple.setActiveFalse();
-    assert(!sourceTuple.isPendingDeleteOnUndoRelease());
+void PersistentTable::swapTuples(TableTuple &sourceTupleWithNewValues,
+                                 TableTuple &destinationTuple) {
+    ::memcpy(destinationTuple.address(), sourceTupleWithNewValues.address(), m_tupleLength);
+    sourceTupleWithNewValues.setActiveFalse();
+    assert(!sourceTupleWithNewValues.isPendingDeleteOnUndoRelease());
 
     /*
      * If the tuple is pending deletion then it isn't in any of the indexes.
@@ -887,8 +891,8 @@ void PersistentTable::swapTuples(TableTuple sourceTuple, TableTuple destinationT
      * back and update the undo action (how would you find it?) or
      * not move the tuple.
      */
-    if (!sourceTuple.isPendingDelete()) {
-        updateWithSameKeyFromAllIndexes(sourceTuple, destinationTuple);
+    if (!sourceTupleWithNewValues.isPendingDelete()) {
+        updateIndexesForTupleMove(destinationTuple, sourceTupleWithNewValues);
     }
 }
 

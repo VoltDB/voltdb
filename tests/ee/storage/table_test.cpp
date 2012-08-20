@@ -234,7 +234,9 @@ TEST_F(TableTest, TupleUpdate) {
                 }
             }
         }
-        if (update) EXPECT_EQ(true, temp_table->updateTuple(temp_tuple, tuple, true));
+        if (update) {
+            EXPECT_EQ(true, temp_table->updateTuple(temp_tuple, tuple));
+        }
     }
 
     //

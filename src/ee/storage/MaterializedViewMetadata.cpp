@@ -182,14 +182,14 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
     if (exists) {
         // shouldn't need to update indexes as this shouldn't ever change the
         // key
-        m_target->updateTuple(m_updatedTuple, m_existingTuple, false);
+        m_target->updateTupleWithSpecificIndexes(m_updatedTuple, m_existingTuple, m_emptyIndexUpdateList);
     }
     else {
         m_target->insertTuple(m_updatedTuple);
     }
 }
 
-void MaterializedViewMetadata::processTupleUpdate(TableTuple &oldTuple, TableTuple &newTuple) {
+void MaterializedViewMetadata::processTupleUpdate(TableTuple &newTuple, TableTuple &oldTuple) {
     // this approach is far from optimal, but should be technically correct
     processTupleDelete(oldTuple);
     processTupleInsert(newTuple);
@@ -255,7 +255,7 @@ void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
 
     // update the row
     // shouldn't need to update indexes as this shouldn't ever change the key
-    m_target->updateTuple(m_updatedTuple, m_existingTuple, false);
+    m_target->updateTupleWithSpecificIndexes(m_updatedTuple, m_existingTuple, m_emptyIndexUpdateList);
 }
 
 bool MaterializedViewMetadata::findExistingTuple(TableTuple &oldTuple, bool expected) {
