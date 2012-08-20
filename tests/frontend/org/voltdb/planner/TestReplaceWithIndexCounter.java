@@ -31,6 +31,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 
@@ -82,10 +83,19 @@ public class TestReplaceWithIndexCounter extends TestCase {
 
     // DOES NOT support the cases down below right now
 
-    // This is treated as new TABLE COUNT plan
-    public void testCountStar00() {
+    // This is treated as new TABLE COUNT plan for replicated table
+    public void testCountStar000() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
         AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+    }
+    // This is treated as new TABLE COUNT plan for partitioned table
+    public void testCountStar001() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from P1", 0, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        // AGGREGATE_SUM
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
     }
 
@@ -199,8 +209,6 @@ public class TestReplaceWithIndexCounter extends TestCase {
             System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
         }
         AbstractPlanNode p = pn.get(0).getChild(0);
-        //System.out.println("PlanNode DOT string:\n" + p.toDOTString());
-        //System.out.println("PlanNode Explan string:\n" + p.toExplainPlanString());
         if (isReplaceable)
             assertTrue(p instanceof IndexCountPlanNode);
         else
