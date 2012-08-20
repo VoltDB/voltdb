@@ -33,6 +33,7 @@ import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.plannodes.TableCountPlanNode;
 
 public class TestReplaceWithIndexCounter extends TestCase {
@@ -97,6 +98,14 @@ public class TestReplaceWithIndexCounter extends TestCase {
         assertTrue(p instanceof AggregatePlanNode);
         p = pn.get(1).getChild(0);
         assertTrue(p instanceof TableCountPlanNode);
+    }
+
+    public void testCountStar002() {
+        List<AbstractPlanNode> pn = compile("SELECT POINTS, count(*) from T1 Group by POINTS", 0, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof SeqScanPlanNode);
     }
 
     // This is generated as IndexScan other than SeqScan as "SELECT count(*) from T1"
