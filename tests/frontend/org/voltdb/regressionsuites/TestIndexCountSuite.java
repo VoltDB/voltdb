@@ -147,7 +147,7 @@ public class TestIndexCountSuite extends RegressionSuite {
             assertTrue(e instanceof ProcCallException);
             ex = e;
         } finally {
-            assertTrue(ex != null);
+            assertNotNull(ex);
         }
 
         table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU1 WHERE POINTS < -1").getResults()[0];
