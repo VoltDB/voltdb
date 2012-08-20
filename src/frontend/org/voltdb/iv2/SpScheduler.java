@@ -353,6 +353,10 @@ public class SpScheduler extends Scheduler
             TxnEgo ego = advanceTxnEgo();
             newSpHandle = ego.getTxnId();
             msg.setSpHandle(newSpHandle);
+            if (msg.getInitiateTask() != null) {
+                msg.getInitiateTask().setSpHandle(newSpHandle);//set the handle
+                msg.setInitiateTask(msg.getInitiateTask());//Trigger reserialization so the new handle is used
+            }
             // If we have input dependencies, it's borrow work, there's no way we
             // can actually distribute it
             if (m_sendToHSIds.size() > 0) {
@@ -378,6 +382,9 @@ public class SpScheduler extends Scheduler
         else {
             newSpHandle = msg.getSpHandle();
             setMaxSeenTxnId(newSpHandle);
+        }
+        if (msg.getInitiateTask() != null && !msg.getInitiateTask().isReadOnly()) {
+            m_cl.log(msg.getInitiateTask());
         }
         TransactionState txn = m_outstandingTxns.get(msg.getTxnId());
         Iv2Trace.logFragmentTaskMessage(message, m_mailbox.getHSId(), newSpHandle, false);

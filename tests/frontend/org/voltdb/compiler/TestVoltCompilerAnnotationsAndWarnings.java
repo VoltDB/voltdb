@@ -166,13 +166,13 @@ public class TestVoltCompilerAnnotationsAndWarnings extends TestCase {
         // test SP improvement warnings
         assertEquals(4, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:0.*")); // StmtSPcandidates 1,2,3,4
         assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*partitioninfo=BLAH\\.IVAL:0.*")); // 2, 3
-        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*ABS.*partitioninfo=BLAH\\.IVAL:0.*")); // just 4
+        assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*abs.*partitioninfo=BLAH\\.IVAL:0.*")); // just 4
         assertEquals(1, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*12345678.*partitioninfo=BLAH\\.IVAL:1.*")); // just 5
         assertEquals(2, countLinesMatching(lines, ".*\\[StmtSPcandidate.].*partitioninfo=BLAH\\.IVAL:1.*")); // 5, 6
 
         assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 0 .*")); // ProcSPcandidate 1
         assertEquals(4, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*87654321.*")); // 2, 3, 5, 6
-        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*ABS.*")); // just 4
+        assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*added parameter .*abs.*")); // just 4
         assertEquals(1, countLinesMatching(lines, ".*\\[ProcSPcandidate.\\.class].*designating parameter 1 .*")); // 7
 
         // Non-candidates disqualify themselves by various means.

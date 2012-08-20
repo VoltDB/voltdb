@@ -53,6 +53,7 @@ import org.voltdb.exceptions.EEException;
 import org.voltdb.exceptions.SerializableException;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.FragmentTaskMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.types.TimestampType;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.MiscUtils;
@@ -91,6 +92,7 @@ public class ProcedureRunner {
     protected TransactionState m_txnState; // used for sysprocs only
     // Status code that can be set by stored procedure upon invocation that will be returned with the response.
     protected byte m_statusCode = Byte.MIN_VALUE;
+    protected boolean m_haveSentFirstFragment;//When sending first fragment, include the initiate task for write MP
     protected String m_statusString = null;
     // cached txnid-seeded RNG so all calls to getSeededRandomNumberGenerator() for
     // a given call don't re-seed and generate the same number over and over
@@ -315,6 +317,7 @@ public class ProcedureRunner {
             m_txnId = -1;
             m_txnState = null;
             m_statusCode = Byte.MIN_VALUE;
+            m_haveSentFirstFragment = false;
             m_statusString = null;
             m_cachedRNG = null;
             m_cachedSingleStmt.params = null;
@@ -942,7 +945,7 @@ public class ProcedureRunner {
        // holds query results
        final VoltTable[] m_results;
 
-       BatchState(int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
+       BatchState(ProcedureRunner runner, int batchSize, TransactionState txnState, long siteId, boolean finalTask) {
            m_batchSize = batchSize;
            m_txnState = txnState;
 
@@ -965,6 +968,11 @@ public class ProcedureRunner {
                                                        m_txnState.timestamp,
                                                        m_txnState.isReadOnly(),
                                                        finalTask);
+
+           if (!m_txnState.isReadOnly() && !runner.m_haveSentFirstFragment && VoltDB.instance().isIV2Enabled()) {
+               runner.m_haveSentFirstFragment = true;
+               m_distributedTask.setInitiateTask((Iv2InitiateTaskMessage)m_txnState.getNotice());
+           }
        }
 
        /*
@@ -1054,7 +1062,7 @@ public class ProcedureRunner {
     */
    VoltTable[] executeSlowHomogeneousBatch(final List<QueuedSQL> batch, final boolean finalTask) {
 
-       BatchState state = new BatchState(batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
+       BatchState state = new BatchState(this, batch.size(), m_txnState, m_site.getCorrespondingSiteId(), finalTask);
 
        // iterate over all sql in the batch, filling out the above data structures
        for (int i = 0; i < batch.size(); ++i) {

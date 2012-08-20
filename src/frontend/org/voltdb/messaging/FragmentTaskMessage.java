@@ -99,6 +99,8 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
     // Unused, should get removed from this message
     boolean m_shouldUndo = false;
     int m_inputDepCount = 0;
+    Iv2InitiateTaskMessage m_initiateTask;
+    ByteBuffer m_initiateTaskBuffer;
 
     /** Empty constructor for de-serialization */
     FragmentTaskMessage() {
@@ -141,6 +143,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         m_subject = ftask.m_subject;
         m_inputDepCount = ftask.m_inputDepCount;
         m_items = ftask.m_items;
+        m_initiateTask = ftask.m_initiateTask;
+        if (ftask.m_initiateTaskBuffer != null) {
+            m_initiateTaskBuffer = ftask.m_initiateTaskBuffer.duplicate();
+        }
         assert(selfCheck());
     }
 
@@ -278,6 +284,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_items.size();
     }
 
+    public void setInitiateTask(Iv2InitiateTaskMessage initiateTask) {
+        m_initiateTask = initiateTask;
+        m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
+        try {
+            initiateTask.flattenToBuffer(m_initiateTaskBuffer);
+            m_initiateTaskBuffer.flip();
+        } catch (IOException e) {
+            //Executive decision, don't throw a checked exception. Let it burn.
+            throw new RuntimeException(e);
+        }
+    }
+
+    public Iv2InitiateTaskMessage getInitiateTask() {
+        return m_initiateTask;
+    }
+
     public long getFragmentId(int index) {
         assert(index >= 0 && index < m_items.size());
         FragmentData item = m_items.get(index);
@@ -406,6 +428,11 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
             }
         }
 
+        msgsize += 4;//nested initiate task message length prefix
+        if (m_initiateTaskBuffer != null) {
+            msgsize += m_initiateTaskBuffer.remaining();
+        }
+
         return msgsize;
     }
 
@@ -499,6 +526,14 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 buf.put(item.m_fragmentPlan);
             }
         }
+
+        if (m_initiateTaskBuffer != null) {
+            ByteBuffer dup = m_initiateTaskBuffer.duplicate();
+            buf.putInt(dup.remaining());
+            buf.put(dup);
+        } else {
+            buf.putInt(0);
+        }
     }
 
     @Override
@@ -579,6 +614,22 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                 item.m_fragmentPlan = new byte[fragmentPlanLength];
                 buf.get(item.m_fragmentPlan);
             }
+        }
+
+        int initiateTaskMessageLength = buf.getInt();
+        if (initiateTaskMessageLength > 0) {
+            int startPosition = buf.position();
+            Iv2InitiateTaskMessage message = new Iv2InitiateTaskMessage();
+            message.initFromBuffer(buf);
+            m_initiateTask = message;
+
+            /*
+             * There is an assertion that all bytes of the message are consumed.
+             * Initiate task lazily deserializes the parameter buffer and doesn't consume
+             * all the bytes so do it here so the assertion doesn't trip
+             */
+            buf.position(startPosition + initiateTaskMessageLength);
+
         }
     }
 
