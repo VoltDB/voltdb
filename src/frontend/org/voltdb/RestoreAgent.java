@@ -654,6 +654,9 @@ SnapshotCompletionInterest
                 SnapshotInfo next = i.next();
                 if (chosen == null) {
                     chosen = next;
+                } else if (next.hostId < chosen.hostId) {
+                    next.partitionToTxnId.putAll(chosen.partitionToTxnId);
+                    chosen = next;
                 }
                 else {
                     // create a full mapping of txn ids to partition ids.
