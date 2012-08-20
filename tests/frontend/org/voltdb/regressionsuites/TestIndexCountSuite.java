@@ -58,7 +58,73 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(count, result.getLong(0));
     }
+    
+    public void testOverflow() throws Exception {
+        Client client = getClient();
+        // Unique Map, Single column index
+        client.callProcedure("TU1.insert", 1, 1);
+        client.callProcedure("TU1.insert", 2, 2);
+        client.callProcedure("TU1.insert", 3, 3);
+        client.callProcedure("TU1.insert", 6, 6);
+        client.callProcedure("TU1.insert", 8, 8);
 
+        callWithExpectedCount(client, 5, "TU1_LT", 6000000000L);
+        callWithExpectedCount(client, 5, "TU1_LET", 6000000000L);
+        callWithExpectedCount(client, 0, "TU1_GT", 6000000000L);
+        callWithExpectedCount(client, 0, "TU1_GET", 6000000000L);
+        
+        callWithExpectedCount(client, 0, "TU1_LT", -6000000000L);
+        callWithExpectedCount(client, 0, "TU1_LET", -6000000000L);
+        callWithExpectedCount(client, 5, "TU1_GT", -6000000000L);
+        callWithExpectedCount(client, 5, "TU1_GET", -6000000000L);
+        
+        // Unique Map, two column index
+        client.callProcedure("TU3.insert", 1, 1, 123);
+        client.callProcedure("TU3.insert", 2, 2, 123);
+        client.callProcedure("TU3.insert", 3, 3, 123);
+        client.callProcedure("TU3.insert", 4, 6, 123);
+        client.callProcedure("TU3.insert", 5, 8, 123);
+        client.callProcedure("TU3.insert", 6, 1, 456);
+        client.callProcedure("TU3.insert", 7, 2, 456);
+        client.callProcedure("TU3.insert", 8, 3, 456);
+        client.callProcedure("TU3.insert", 9, 6, 456);
+        client.callProcedure("TU3.insert", 10, 8, 456);
+        
+        callWithExpectedCount(client, 5, "TU3_LT", 123, 6000000000L);
+        callWithExpectedCount(client, 3, "TU3_GET_LT", 123, 3, 6000000000L);
+        callWithExpectedCount(client, 3, "TU3_GET_LET", 123, 3, 6000000000L);
+        callWithExpectedCount(client, 2, "TU3_GT_LET", 123, 3, 6000000000L);
+        callWithExpectedCount(client, 2, "TU3_GT_LT", 123, 3, 6000000000L);
+        
+        // Multi-map, two column index
+        client.callProcedure("TM2.insert", 1, 1, "xin");
+        client.callProcedure("TM2.insert", 2, 2, "xin");
+        client.callProcedure("TM2.insert", 3, 3, "xin");
+        client.callProcedure("TM2.insert", 4, 3, "xin");
+        client.callProcedure("TM2.insert", 5, 3, "xin");
+        client.callProcedure("TM2.insert", 6, 5, "xin");
+        client.callProcedure("TM2.insert", 7, 6, "xin");
+        client.callProcedure("TM2.insert", 8, 6, "xin");
+        client.callProcedure("TM2.insert", 9, 8, "xin");
+        client.callProcedure("TM2.insert", 10, 8, "xin");
+
+        client.callProcedure("TM2.insert", 11, 1, "jia");
+        client.callProcedure("TM2.insert", 12, 2, "jia");
+        client.callProcedure("TM2.insert", 13, 3, "jia");
+        client.callProcedure("TM2.insert", 14, 3, "jia");
+        client.callProcedure("TM2.insert", 15, 3, "jia");
+        client.callProcedure("TM2.insert", 16, 5, "jia");
+        client.callProcedure("TM2.insert", 17, 6, "jia");
+        client.callProcedure("TM2.insert", 18, 6, "jia");
+        client.callProcedure("TM2.insert", 19, 8, "jia");
+        client.callProcedure("TM2.insert", 20, 8, "jia");
+
+        callWithExpectedCount(client, 5, "TM2_GT_LT", "xin", 3, 6000000000L);
+        callWithExpectedCount(client, 8, "TM2_GET_LT", "xin", 3, 6000000000L);
+        callWithExpectedCount(client, 5, "TM2_GT_LET", "xin", 3, 6000000000L);
+        callWithExpectedCount(client, 8, "TM2_GET_LET", "xin", 3, 6000000000L);
+    }
+/*
     public void testOneColumnUniqueIndex() throws Exception {
         Client client = getClient();
 
@@ -67,11 +133,6 @@ public class TestIndexCountSuite extends RegressionSuite {
         client.callProcedure("TU1.insert", 3, 3);
         client.callProcedure("TU1.insert", 6, 6);
         client.callProcedure("TU1.insert", 8, 8);
-
-        callWithExpectedCount(client, 5, "TU1_LT", 6000000000L);
-        callWithExpectedCount(client, 0, "TU1_GT", 6000000000L);
-        callWithExpectedCount(client, 0, "TU1_LT", -6000000000L);
-        callWithExpectedCount(client, 5, "TU1_GT", -6000000000L);
 
         VoltTable table;
 
@@ -816,7 +877,7 @@ public class TestIndexCountSuite extends RegressionSuite {
         assertTrue(table.advanceRow());
         assertEquals(1, table.getLong(0));
 
-    }
+    }*/
 
     /**
      * Build a list of the tests that will be run when TestTPCCSuite gets run by JUnit.
