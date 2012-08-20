@@ -44,7 +44,7 @@ public class TestTableCountSuite extends RegressionSuite {
         super(name);
     }
 
-    public void testOneColumnUniqueIndex() throws Exception {
+    public void testTableCounts() throws Exception {
         Client client = getClient();
 
         client.callProcedure("TU1.insert", 1, 1);
@@ -59,6 +59,52 @@ public class TestTableCountSuite extends RegressionSuite {
         assertTrue(table.getRowCount() == 1);
         assertTrue(table.advanceRow());
         assertEquals(5, table.getLong(0));
+
+
+        // Unique Map, two column index
+        client.callProcedure("TU3.insert", 1, 1, 123);
+        client.callProcedure("TU3.insert", 2, 2, 123);
+        client.callProcedure("TU3.insert", 3, 3, 123);
+        client.callProcedure("TU3.insert", 4, 6, 123);
+        client.callProcedure("TU3.insert", 5, 8, 123);
+        client.callProcedure("TU3.insert", 6, 1, 456);
+        client.callProcedure("TU3.insert", 7, 2, 456);
+        client.callProcedure("TU3.insert", 8, 3, 456);
+        client.callProcedure("TU3.insert", 9, 6, 456);
+        client.callProcedure("TU3.insert", 10, 8, 456);
+
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TU3").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(10, table.getLong(0));
+
+     // Multi-map, two column index
+        client.callProcedure("TM2.insert", 1, 1, "xin");
+        client.callProcedure("TM2.insert", 2, 2, "xin");
+        client.callProcedure("TM2.insert", 3, 3, "xin");
+        client.callProcedure("TM2.insert", 4, 3, "xin");
+        client.callProcedure("TM2.insert", 5, 3, "xin");
+        client.callProcedure("TM2.insert", 6, 5, "xin");
+        client.callProcedure("TM2.insert", 7, 6, "xin");
+        client.callProcedure("TM2.insert", 8, 6, "xin");
+        client.callProcedure("TM2.insert", 9, 8, "xin");
+        client.callProcedure("TM2.insert", 10, 8, "xin");
+
+        client.callProcedure("TM2.insert", 11, 1, "jia");
+        client.callProcedure("TM2.insert", 12, 2, "jia");
+        client.callProcedure("TM2.insert", 13, 3, "jia");
+        client.callProcedure("TM2.insert", 14, 3, "jia");
+        client.callProcedure("TM2.insert", 15, 3, "jia");
+        client.callProcedure("TM2.insert", 16, 5, "jia");
+        client.callProcedure("TM2.insert", 17, 6, "jia");
+        client.callProcedure("TM2.insert", 18, 6, "jia");
+        client.callProcedure("TM2.insert", 19, 8, "jia");
+        client.callProcedure("TM2.insert", 20, 8, "jia");
+
+        table = client.callProcedure("@AdHoc","SELECT COUNT(*) FROM TM2").getResults()[0];
+        assertTrue(table.getRowCount() == 1);
+        assertTrue(table.advanceRow());
+        assertEquals(20, table.getLong(0));
     }
 
     /**
@@ -100,6 +146,23 @@ public class TestTableCountSuite extends RegressionSuite {
         assert(success);
 
         // add this config to the set of tests to run
+        builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #2: 1 Local Site/Partition running on HSQL backend
+        /////////////////////////////////////////////////////////////
+
+        config = new LocalCluster("sqlCountingIndex-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+        success = config.compile(project);
+        assert(success);
+        builder.addServerConfig(config);
+
+        /////////////////////////////////////////////////////////////
+        // CONFIG #3: 2 Local Site/Partitions running on JNI backend
+        /////////////////////////////////////////////////////////////
+        config = new LocalCluster("sql-twosites.jar", 2, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        success = config.compile(project);
+        assert(success);
         builder.addServerConfig(config);
 
         return builder;

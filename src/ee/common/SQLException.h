@@ -34,8 +34,12 @@ public:
     static const char* data_exception_most_specific_type_mismatch;
     static const char* data_exception_numeric_value_out_of_range;
     static const char* data_exception_string_data_length_mismatch;
-    static const char* integrity_constraint_violation;
     static const char* dynamic_sql_error;
+    static const char* integrity_constraint_violation;
+
+    // This is non-standard -- keep it unique.
+    static const char* nonspecific_error_code_for_error_forced_by_user;
+    static const char* specific_error_specified_by_user;
 
     // These are ordered by error code. Names and codes are volt
     // specific - must find merge conflicts on duplicate codes.
@@ -43,12 +47,12 @@ public:
     static const char* volt_temp_table_memory_overflow;
     static const char* volt_decimal_serialization_error;
 
-    SQLException(const char* sqlState, std::string message);
-    SQLException(const char* sqlState, std::string message, VoltEEExceptionType type);
-    SQLException(const char* sqlState, std::string message, int internalFlags);
+    SQLException(std::string sqlState, std::string message);
+    SQLException(std::string sqlState, std::string message, VoltEEExceptionType type);
+    SQLException(std::string sqlState, std::string message, int internalFlags);
     virtual ~SQLException() {}
 
-    const char* getSqlState() const { return m_sqlState; }
+    const std::string& getSqlState() const { return m_sqlState; }
 
     // internal flags that are not serialized to java
     static const int TYPE_UNDERFLOW = 1;
@@ -58,7 +62,7 @@ public:
 protected:
     void p_serialize(ReferenceSerializeOutput *output);
 private:
-    const char* m_sqlState;
+    std::string m_sqlState;
 
     // internal and not sent to java
     const int m_internalFlags;

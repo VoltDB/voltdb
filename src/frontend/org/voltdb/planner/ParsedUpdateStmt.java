@@ -51,7 +51,7 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
             if (child.name.equalsIgnoreCase("columns"))
                 parseColumns(child, db);
             else if (child.name.equalsIgnoreCase("condition"))
-                parseCondition(child, db);
+                parseConditions(child, db);
         }
     }
 
@@ -68,23 +68,14 @@ public class ParsedUpdateStmt extends AbstractParsedStmt {
             col = table.getColumns().getIgnoreCase(name.trim());
 
             AbstractExpression expr = null;
-            for (VoltXMLElement subChild : child.children) {
-                expr = parseExpressionTree(subChild, db);
-                ExpressionUtil.assignLiteralConstantTypesRecursively(expr, VoltType.get((byte)col.getType()));
-                ExpressionUtil.assignOutputValueTypesRecursively(expr);
-            }
+            assert(child.children.size() == 1);
+            VoltXMLElement subChild = child.children.get(0);
+            expr = parseExpressionTree(subChild, db);
             assert(expr != null);
+            expr.refineValueType(VoltType.get((byte)col.getType()));
+            ExpressionUtil.finalizeValueTypes(expr);
             columns.put(col, expr);
         }
-    }
-
-    void parseCondition(VoltXMLElement conditionNode, Database db) {
-        if (conditionNode.children.size() == 0)
-            return;
-        VoltXMLElement exprNode = conditionNode.children.get(0);
-        where = parseExpressionTree(exprNode, db);
-        ExpressionUtil.assignLiteralConstantTypesRecursively(where);
-        ExpressionUtil.assignOutputValueTypesRecursively(where);
     }
 
     @Override

@@ -32,6 +32,7 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
 
 public class TestReplaceWithIndexCounter extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -80,16 +81,21 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     // DOES NOT support the cases down below right now
+
+    // This is treated as new TABLE COUNT plan
     public void testCountStar00() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-        checkIndexCounter(pn, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
     }
 
+    // This is generated as IndexScan other than SeqScan as "SELECT count(*) from T1"
+    // "Order by" here cheat planner at this point
+    // Maybe we should fix it later
     public void testCountStar01() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 ORDER BY POINTS ASC", 0, false);
         checkIndexCounter(pn, false);
     }
-
 
     public void testCountStar02() {
         List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, false);
