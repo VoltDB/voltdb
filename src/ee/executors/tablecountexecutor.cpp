@@ -76,9 +76,8 @@ bool TableCountExecutor::p_execute(const NValueArray &params) {
 
     assert (node->getPredicate() == NULL);
 
-    TableIterator iterator = target_table->iterator();
     TableTuple& tmptup = output_table->tempTuple();
-    tmptup.setNValue(0, ValueFactory::getBigIntValue( iterator.getSize() ));
+    tmptup.setNValue(0, ValueFactory::getBigIntValue( target_table->activeTupleCount() ));
     output_table->insertTuple(tmptup);
 
 
