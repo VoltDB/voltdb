@@ -78,6 +78,7 @@ public class plannerTester {
     public static ArrayList<String> m_diffMessages = new ArrayList<String>();
     private static String m_reportDir = "/tmp/";
     private static BufferedWriter m_reportWriter;
+    private static ArrayList<String>  m_filters = new ArrayList<String> ();
 
     public static class diffPair {
         private Object m_first;
@@ -165,6 +166,9 @@ public class plannerTester {
             else if( str.startsWith("-s") ){
                 m_showSQLStatement = true;
             }
+            else if( str.startsWith("-i=") ) {
+                m_filters.add(str.split("=")[1] );
+            }
             else if( str.startsWith("-help") ){
                 System.out.println("-cs : Compile queries and save the plans according to the config files");
                 System.out.println("-d  : Do the diff between plan files in baseline and currentplan");
@@ -172,6 +176,7 @@ public class plannerTester {
                 System.out.println("-s  : Output sql statement along with diff");
                 System.out.println("-C=configFile  : Specify the path to a config file");
                 System.out.println("-r=reportFileDir  : Specify report file path, default will be tmp/, report file name is plannerTester.report");
+                System.out.println("-i=ignorePattern : Specify a pattern to ignore, the pattern will not be recorded in the report file");
                 System.exit(0);
             }
         }
@@ -327,7 +332,7 @@ public class plannerTester {
     public static void writePlanToFile( AbstractPlanNode pn, String pathToDir, String fileName, String sql) {
         if( pn == null ) {
             System.err.println("the plan node is null, nothing to write");
-            System.exit(-1);
+            return;
         }
         PlanNodeTree pnt = new PlanNodeTree( pn );
         String prettyJson = pnt.toJSONString();
@@ -412,7 +417,7 @@ public class plannerTester {
                 pnt1 = loadPlanFromFile( m_pathRefPlan+m_testName+".plan"+i, getsql );
                 baseStmt = getsql.get(0);
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+m_pathRefPlan+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
+                System.err.println("Plan file "+m_pathRefPlan+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
                 System.exit(1);
             }
 
@@ -428,7 +433,7 @@ public class plannerTester {
             try{
                 pnt2  = loadPlanFromFile( m_savePlanPath+m_testName+".plan"+i, getsql );
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+m_savePlanPath+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
+                System.err.println("Plan file "+m_savePlanPath+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
                 System.exit(1);
             }
             AbstractPlanNode pn1 = pnt1.getRootPlanNode();
@@ -451,7 +456,15 @@ public class plannerTester {
                 }
 
                 for( String msg : m_diffMessages ) {
-                    m_reportWriter.write( msg+"\n\n" );
+                    boolean isIgnore = false;
+                    for( String filter : m_filters ) {
+                        if( msg.contains( filter ) ) {
+                            isIgnore = true;
+                            break;
+                        }
+                    }
+                    if( !isIgnore )
+                        m_reportWriter.write( msg+"\n\n" );
                 }
                 if( m_showSQLStatement ) {
                     m_reportWriter.write( "SQL statement:\n"+baseStmt+"\n==>\n"+m_stmts.get(i)+"\n");

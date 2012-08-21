@@ -11,7 +11,7 @@ Base Name:
 testplans-plannerTester-ddl
 
 SQL:
-select * from t where a = ? order by b limit ?;
+select * from t where a = ? order by b;
 select * from t where a > ? order by b limit ?;
 select * from t where a < ? order by b limit ?;
 select * from t where a > ? and a < ? order by b limit ?;

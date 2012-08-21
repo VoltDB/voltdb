@@ -484,7 +484,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // NOTE: ignores inline nodes.
 
-}
+    }
 
     /**
      * @param type plan node type to search for
@@ -738,20 +738,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     public boolean reattachFragment( SendPlanNode child ) {
-        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        return reattachFragment_recurse( visited, child );
-    }
-
-    public boolean reattachFragment_recurse( HashSet<AbstractPlanNode> visited, SendPlanNode child ) {
-        visited.add(this);
         for( AbstractPlanNode pn : m_inlineNodes.values() ) {
-            if( pn.reattachFragment_recurse(visited, child) )
+            if( pn.reattachFragment( child) )
                 return true;
         }
         for( AbstractPlanNode pn : m_children ) {
-            if( pn.reattachFragment_recurse(visited, child) )
+            if( pn.reattachFragment( child) )
                 return true;
         }
         return false;
     }
+
 }
