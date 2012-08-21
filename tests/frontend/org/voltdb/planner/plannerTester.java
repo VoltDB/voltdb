@@ -33,6 +33,7 @@ import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
 import java.util.HashSet;
+import java.util.Iterator;
 import java.util.LinkedHashMap;
 import java.util.List;
 import java.util.Map;
@@ -60,7 +61,9 @@ public class plannerTester {
     private static String m_pathRefPlan;
     private static String m_baseName;
     private static String m_pathDDL;
+    private static ArrayList<String> m_savePlanPaths = new ArrayList<String>();
     private static String m_savePlanPath;
+    private static boolean m_isSavePathFromCML = false;
 //    private static ArrayList<Pair<String,String>> m_partitionColumns = new ArrayList<Pair<String,String>>();
     private static Map<String,String> m_partitionColumns = new HashMap<String, String>();
     private static ArrayList<String> m_stmts = new ArrayList<String>();
@@ -149,7 +152,17 @@ public class plannerTester {
                 String subStr = str.split("=")[1];
                 String [] configs = subStr.split(",");
                 for( String config : configs ) {
-                    m_config.add( config );
+                    m_config.add( config.trim() );
+                }
+            }
+            if( str.startsWith("-sp=")) {
+                m_isSavePathFromCML = true;
+                String subStr = str.split("=")[1];
+                String [] savePaths = subStr.split(",");
+                for( String savePath : savePaths ) {
+                    if( !savePath.endsWith("/") )
+                        savePath += "/";
+                    m_savePlanPaths.add( savePath.trim() );
                 }
             }
             else if( str.startsWith("-cd") ) {
@@ -179,22 +192,20 @@ public class plannerTester {
             else if( str.startsWith("-i=") ) {
                 m_filters.add(str.split("=")[1] );
             }
-            else if( str.startsWith("-help") ){
-                System.out.println("-cs : Compile queries and save the plans according to the config files");
-                System.out.println("-d  : Do the diff between plan files in baseline and currentplan");
-                System.out.println("-e  : Output explained plan along with diff");
-                System.out.println("-s  : Output sql statement along with diff");
-                System.out.println("-C=configFile  : Specify the path to a config file");
-                System.out.println("-r=reportFileDir  : Specify report file path, default will be tmp/, report file name is plannerTester.report");
-                System.out.println("-i=ignorePattern : Specify a pattern to ignore, the pattern will not be recorded in the report file");
+            else if( str.startsWith("-help") || str.startsWith("-h") ){
+                printUsage();
                 System.exit(0);
             }
         }
         size = m_config.size();
         if( m_isCompileSave ) {
+            Iterator<String> it = m_savePlanPaths.iterator();
             for( String config : m_config ) {
                 try {
                     setUp( config );
+                    if( m_isSavePathFromCML && it.hasNext() ) {
+                        m_savePlanPath = it.next();
+                    }
                     batchCompileSave();
                 } catch (Exception e) {
                     e.printStackTrace();
@@ -241,6 +252,18 @@ public class plannerTester {
         }
     }
 
+    public static void printUsage() {
+        System.out.println("-C='configFile1, configFile2, ...'  : Specify the path to a config file");
+        System.out.println("-cs : Compile queries and save the plans according to the config files");
+        System.out.println("-cd : -cs -d -e -s");
+        System.out.println("-sp='savePath1, savePath2, ...': specify save paths for newly generated plan files, should be in the same order of the config files");
+        System.out.println("-d  : Do the diff between plan files in baseline and currentplan");
+        System.out.println("-e  : Output explained plan along with diff");
+        System.out.println("-s  : Output sql statement along with diff");
+        System.out.println("-r=reportFileDir  : Specify report file path, default will be tmp/, report file name is plannerTester.report");
+        System.out.println("-i=ignorePattern : Specify a pattern to ignore, the pattern will not be recorded in the report file");
+    }
+
     public static void setUp( String pathConfigFile ) throws IOException {
         m_currentConfig = pathConfigFile;
         m_partitionColumns.clear();
@@ -277,9 +300,8 @@ public class plannerTester {
                 }
             }
             else if( line.equalsIgnoreCase("Save Path:") ) {
-                line = reader.readLine();
-                m_savePlanPath = new File( line ).getCanonicalPath();
-                m_savePlanPath += "/";
+                    line = reader.readLine();
+                    m_savePlanPath = ( new File( line ).getCanonicalPath() ) + "/";
             }
             else if( line.equalsIgnoreCase("Partition Columns:") ) {
                 line = reader.readLine();
@@ -412,6 +434,7 @@ public class plannerTester {
             }
             writePlanToFile(pn, m_savePlanPath, m_testName+".plan"+i, m_stmts.get(i) );
         }
+        System.out.println("Plan files generated at: "+m_savePlanPath);
     }
 
     //parameters : path to baseline and the new plans
