@@ -24,13 +24,14 @@
 package org.voltdb.iv2;
 
 import java.util.ArrayList;
-
 import java.util.concurrent.atomic.AtomicBoolean;
 import java.util.List;
 
 import org.mockito.InOrder;
 import static org.mockito.Mockito.*;
 
+import org.voltcore.messaging.VoltMessage;
+import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.Iv2RepairLogResponseMessage;
 
 import junit.framework.TestCase;
@@ -42,6 +43,8 @@ public class TestSpPromoteAlgo extends TestCase
     {
         Iv2RepairLogResponseMessage m = mock(Iv2RepairLogResponseMessage.class);
         when(m.getHandle()).thenReturn(spHandle);
+        Iv2InitiateTaskMessage im = mock(Iv2InitiateTaskMessage.class);
+        when(m.getPayload()).thenReturn(im);
         return m;
     }
 
@@ -49,6 +52,8 @@ public class TestSpPromoteAlgo extends TestCase
     {
         Iv2RepairLogResponseMessage m = makeResponse(spHandle);
         when(m.getRequestId()).thenReturn(requestId);
+        Iv2InitiateTaskMessage im = mock(Iv2InitiateTaskMessage.class);
+        when(m.getPayload()).thenReturn(im);
         return m;
     }
 
@@ -165,16 +170,16 @@ public class TestSpPromoteAlgo extends TestCase
 
         List<Long> repair3 = new ArrayList<Long>();
         repair3.add(3L);
-        verify(mailbox).repairReplicasWith(repair3, msgs[3]);
+        verify(mailbox).repairReplicasWith(repair3, msgs[3].getPayload());
 
         List<Long> repair4And5 = new ArrayList<Long>();
         repair4And5.add(1L);
         repair4And5.add(3L);
-        verify(mailbox).repairReplicasWith(repair4And5, msgs[4]);
-        verify(mailbox).repairReplicasWith(repair4And5, msgs[5]);
+        verify(mailbox).repairReplicasWith(repair4And5, msgs[4].getPayload());
+        verify(mailbox).repairReplicasWith(repair4And5, msgs[5].getPayload());
 
         // verify exactly 3 repairs happened.
-        verify(mailbox, times(3)).repairReplicasWith(any(repair3.getClass()), any(Iv2RepairLogResponseMessage.class));
+        verify(mailbox, times(3)).repairReplicasWith(any(repair3.getClass()), any(VoltMessage.class));
     }
 
     // be a little a paranoid about order. note that the union test also verifies
@@ -210,9 +215,9 @@ public class TestSpPromoteAlgo extends TestCase
         repair3.add(3L);
 
         // verify that r3 saw 3, 4, 5
-        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[3]);
-        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[4]);
-        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[5]);
+        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[3].getPayload());
+        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[4].getPayload());
+        inOrder.verify(mailbox).repairReplicasWith(repair3, msgs[5].getPayload());
 
         // verify exactly 3 repairs happened.
         verify(mailbox, times(3)).repairReplicasWith(any(repair3.getClass()), any(Iv2RepairLogResponseMessage.class));

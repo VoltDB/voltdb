@@ -1321,7 +1321,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                     handler.isAdmin(), ccxn, catalogBytes, deploymentString,
                     m_adhocCompletionHandler));
 
-        // XXX: need to know the async compiler mailbox id.
         m_mailbox.send(m_plannerSiteId, work);
         return null;
     }
@@ -1743,8 +1742,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                                          true,
                                                          m_adhocCompletionHandler));
 
-                            // XXX: Need to know the async mailbox id.
-                            m_mailbox.send(Long.MIN_VALUE, work);
+                            m_mailbox.send(m_plannerSiteId, work);
                         }
                         else {
                             createAdHocTransaction(plannedStmtBatch);

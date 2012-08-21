@@ -27,6 +27,7 @@
 #include "common/serializeio.h"
 #include "common/ThreadLocalPool.h"
 #include "common/executorcontext.hpp"
+#include "expressions/functionexpression.h"
 
 #include <cfloat>
 #include <limits>
@@ -2117,28 +2118,28 @@ TEST_F(NValueTest, TestSubstring)
                 leftArgs[0] = testString;
                 leftArgs[1] = startAtOne;
                 leftArgs[2] = leftLength;
-                NValue leftStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(leftArgs);
+                NValue leftStringValue = NValue::call<FUNC_SUBSTRING_CHAR>(leftArgs);
 
                 std::vector<NValue> midArgs(3);
                 midArgs[0] = testString;
                 midArgs[1] = startAt;
                 midArgs[2] = lengthValue;
-                NValue midStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(midArgs);
+                NValue midStringValue = NValue::call<FUNC_SUBSTRING_CHAR>(midArgs);
 
                 std::vector<NValue> rightArgs(3);
                 rightArgs[0] = testString;
                 rightArgs[1] = endAt;
                 rightArgs[2] = rightLength;
-                NValue rightExactStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(rightArgs);
+                NValue rightExactStringValue = NValue::call<FUNC_SUBSTRING_CHAR>(rightArgs);
 
                 // Typically, this extends the substring PAST the end of the string.
                 rightArgs[2] = sureEnd;
-                NValue rightSureStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR>(rightArgs);
+                NValue rightSureStringValue = NValue::call<FUNC_SUBSTRING_CHAR>(rightArgs);
 
                 std::vector<NValue> rightDefaultArgs(2);
                 rightDefaultArgs[0] = testString;
                 rightDefaultArgs[1] = endAt;
-                NValue rightDefaultStringValue = NValue::call<EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM>(rightDefaultArgs);
+                NValue rightDefaultStringValue = NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(rightDefaultArgs);
 
                 // specifying a length that goes exactly to or past the end of the input string
                 // should have the same effect as not specifying a length at all.
@@ -2178,6 +2179,61 @@ TEST_F(NValueTest, TestSubstring)
         }
         testString.free();
     }
+    delete poolHolder;
+    delete testPool;
+}
+
+TEST_F(NValueTest, TestExtract)
+{
+    assert(ExecutorContext::getExecutorContext() == NULL);
+    Pool* testPool = new Pool();
+    UndoQuantum* wantNoQuantum = NULL;
+    Topend* topless = NULL;
+    ExecutorContext* poolHolder = new ExecutorContext(0, 0, wantNoQuantum, topless, testPool, false, "", 0);
+
+    NValue result;
+    NValue midSeptember = ValueFactory::getTimestampValue(1000000000000000);
+
+    const int EXPECTED_YEAR = 2001;
+    result = midSeptember.callUnary<FUNC_EXTRACT_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getIntegerValue(EXPECTED_YEAR)));
+
+    const int EXPECTED_MONTH = 9;
+    result = midSeptember.callUnary<FUNC_EXTRACT_MONTH>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MONTH)));
+
+    const int EXPECTED_DAY = 9;
+    result = midSeptember.callUnary<FUNC_EXTRACT_DAY>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DAY)));
+
+    const int EXPECTED_DOW = 1;
+    result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_WEEK>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_DOW)));
+
+    const int EXPECTED_DOY = 252;
+    result = midSeptember.callUnary<FUNC_EXTRACT_DAY_OF_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getSmallIntValue(EXPECTED_DOY)));
+
+    const int EXPECTED_WOY = 36;
+    result = midSeptember.callUnary<FUNC_EXTRACT_WEEK_OF_YEAR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_WOY)));
+
+    const int EXPECTED_QUARTER = 3;
+    result = midSeptember.callUnary<FUNC_EXTRACT_QUARTER>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_QUARTER)));
+
+    const int EXPECTED_HOUR = 1;
+    result = midSeptember.callUnary<FUNC_EXTRACT_HOUR>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_HOUR)));
+
+    const int EXPECTED_MINUTE = 46;
+    result = midSeptember.callUnary<FUNC_EXTRACT_MINUTE>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getTinyIntValue(EXPECTED_MINUTE)));
+
+    const std::string EXPECTED_SECONDS = "40";
+    result = midSeptember.callUnary<FUNC_EXTRACT_SECOND>();
+    EXPECT_EQ(0, result.compare(ValueFactory::getDecimalValueFromString(EXPECTED_SECONDS)));
+
     delete poolHolder;
     delete testPool;
 }

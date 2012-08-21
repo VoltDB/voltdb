@@ -1316,6 +1316,16 @@ public class PlanAssembler {
                 !((AggregatePlanNode)receiveNode).m_isCoordinatingAggregator) {
                 receiveNode = null;
                 break;
+            } else if (receiveNode instanceof OrderByPlanNode) {
+                for (ParsedSelectStmt.ParsedColInfo col : m_parsedSelect.orderByColumns()) {
+                    AbstractExpression rootExpr = col.expression;
+                    // Fix ENG-3487: can't push down limits when results are ordered by aggregate values.
+                    if (rootExpr instanceof TupleValueExpression) {
+                        if  (((TupleValueExpression) rootExpr).hasAggregate()) {
+                            return null;
+                        }
+                    }
+                }
             }
 
             // Traverse...
