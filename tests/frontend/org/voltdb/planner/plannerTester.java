@@ -146,7 +146,17 @@ public class plannerTester {
         for( int i=0; i<size; i++ ) {
             String str = args[i];
             if( str.startsWith("-C=")) {
-                m_config.add(str.split("=")[1]);
+                String subStr = str.split("=")[1];
+                String [] configs = subStr.split(",");
+                for( String config : configs ) {
+                    m_config.add( config );
+                }
+            }
+            else if( str.startsWith("-cd") ) {
+                m_isCompileSave = true;
+                m_isDiff = true;
+                m_showExpainedPlan = true;
+                m_showSQLStatement = true;
             }
             else if( str.startsWith("-cs") ) {
                 m_isCompileSave = true;
