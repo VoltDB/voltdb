@@ -109,6 +109,11 @@ public class AsyncCompilerAgent {
             final AsyncCompilerResult result = prepareApplicationCatalogDiff(w);
             w.completionHandler.onCompletion(result);
         }
+        else if (wrapper.payload instanceof ExplainPlannerWork) {
+            final ExplainPlannerWork w = (ExplainPlannerWork)(wrapper.payload);
+            final AsyncCompilerResult result = compileAdHocPlan(w);
+            w.completionHandler.onCompletion(result);
+        }
     }
 
     public void compileAdHocPlanForProcedure(final AdHocPlannerWork apw) {
@@ -133,6 +138,67 @@ public class AsyncCompilerAgent {
 
         AdHocPlannedStmtBatch plannedStmtBatch =
                 new AdHocPlannedStmtBatch(work.sqlBatchText,
+                                          work.partitionParam,
+                                          work.clientHandle,
+                                          work.connectionId,
+                                          work.hostname,
+                                          work.adminConnection,
+                                          work.clientData);
+
+        List<String> errorMsgs = new ArrayList<String>();
+        assert(work.sqlStatements != null);
+        // Take advantage of the planner optimization for inferring single partition work
+        // when the batch has one statement.
+        if (work.sqlStatements.length == 1) {
+            // Single statement batch.
+            try {
+                String sqlStatement = work.sqlStatements[0];
+                AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
+                                                             work.inferSinglePartition, work.allowParameterization);
+                result.catalogVersion = context.catalogVersion;
+                // The planning tool may have optimized for the single partition case
+                // and generated a partition parameter.
+                plannedStmtBatch.partitionParam = result.partitionParam;
+                plannedStmtBatch.addStatement(result);
+            }
+            catch (Exception e) {
+                errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+            }
+        }
+        else {
+            // Multi-statement batch.
+            for (final String sqlStatement : work.sqlStatements) {
+                try {
+                    AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
+                                                                 false, work.allowParameterization);
+                    result.catalogVersion = context.catalogVersion;
+                    plannedStmtBatch.addStatement(result);
+                }
+                catch (Exception e) {
+                    errorMsgs.add("Unexpected Ad Hoc Planning Error: " + e.getMessage());
+                }
+            }
+        }
+        if (!errorMsgs.isEmpty()) {
+            plannedStmtBatch.errorMsg = StringUtils.join(errorMsgs, "\n");
+        }
+
+        return plannedStmtBatch;
+    }
+
+    ExplainPlannedStmtBatch compileAdHocPlan(ExplainPlannerWork work) {
+
+        // record the catalog version the query is planned against to
+        // catch races vs. updateApplicationCatalog.
+        CatalogContext context = work.catalogContext;
+        if (context == null) {
+            context = VoltDB.instance().getCatalogContext();
+        }
+
+        final PlannerTool ptool = context.m_ptool;
+
+        ExplainPlannedStmtBatch plannedStmtBatch =
+                new ExplainPlannedStmtBatch(work.sqlBatchText,
                                           work.partitionParam,
                                           work.clientHandle,
                                           work.connectionId,

@@ -69,6 +69,7 @@ import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
+import org.voltdb.compiler.ExplainPlannerWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
@@ -244,6 +245,18 @@ public class TestClientInterface {
             assertEquals(m_allPartitions, partitionCaptor.getValue());
         }
         return invocationCaptor.getValue();
+    }
+
+    @Test
+    public void testExplain() throws IOException {
+        ByteBuffer msg = createMsg("@Explain", "select * from a");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNull(resp);
+        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
+        verify(m_messenger).send(eq(32L), captor.capture());
+        assertTrue(captor.getValue().payload instanceof ExplainPlannerWork );
+        System.out.println( captor.getValue().payload.toString() );
+        assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
     }
 
     @Test
