@@ -1,0 +1,7 @@
+select * from t where a = ? order by b limit ?;
+select * from t where a > ? order by b limit ?;
+select * from t where a < ? order by b limit ?;
+select * from t where a > ? and a < ? order by b limit ?;
+select * from t where a = ? order by b limit ?;
+select * from l, t where l.b=t.b order by l.a limit ?;
+select * from t, l where t.a=l.a;
