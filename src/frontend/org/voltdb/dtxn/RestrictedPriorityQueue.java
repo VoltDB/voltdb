@@ -21,7 +21,6 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
-import java.util.PriorityQueue;
 
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
@@ -41,7 +40,7 @@ import org.voltcore.logging.VoltLogger;
  *
  * <p>This class manages all that state.</p>
  */
-public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> {
+public class RestrictedPriorityQueue extends RPQBase {
     private static final long serialVersionUID = 1L;
     private final VoltLogger m_joinLog = new VoltLogger("JOIN");
 
