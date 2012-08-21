@@ -299,6 +299,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_INDEXSCAN: {
         return "INDEXSCAN";
     }
+    case PLAN_NODE_TYPE_INDEXCOUNT: {
+        return "INDEXCOUNT";
+    }
     case PLAN_NODE_TYPE_NESTLOOP: {
         return "NESTLOOP";
     }
@@ -359,6 +362,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_SEQSCAN;
     } else if (str == "INDEXSCAN") {
         return PLAN_NODE_TYPE_INDEXSCAN;
+    } else if (str == "INDEXCOUNT") {
+        return PLAN_NODE_TYPE_INDEXCOUNT;
     } else if (str == "NESTLOOP") {
         return PLAN_NODE_TYPE_NESTLOOP;
     } else if (str == "NESTLOOPINDEX") {
@@ -640,6 +645,21 @@ int32_t hexCharToInt(char c) {
         retval = c - '0';
     assert(retval >=0 && retval < 16);
     return retval;
+}
+
+int64_t getMaxTypeValue (ValueType type) {
+    switch(type) {
+    case VALUE_TYPE_TINYINT:
+        return static_cast<int64_t>(INT8_MAX);
+    case VALUE_TYPE_SMALLINT:
+        return static_cast<int64_t>(INT16_MAX);
+    case VALUE_TYPE_INTEGER:
+        return static_cast<int64_t>(INT32_MAX);
+    case VALUE_TYPE_BIGINT:
+        return static_cast<int64_t>(INT64_MAX);
+    default:
+        return static_cast<int64_t>(-1);
+    }
 }
 
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString) {

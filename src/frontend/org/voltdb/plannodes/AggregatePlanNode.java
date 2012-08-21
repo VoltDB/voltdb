@@ -88,11 +88,23 @@ public class AggregatePlanNode extends AbstractPlanNode {
         }
     }
 
+    public boolean isTableCountStar() {
+        if (m_groupByExpressions.isEmpty() == false)
+            return false;
+        if (m_aggregateTypes.size() != 1)
+            return false;
+        if (m_aggregateTypes.get(0).equals(ExpressionType.AGGREGATE_COUNT_STAR) == false)
+            return false;
+
+        return true;
+    }
+
     public void setOutputSchema(NodeSchema schema)
     {
         // aggregates currently have their output schema specified
         m_outputSchema = schema.clone();
     }
+
 
     @Override
     public void generateOutputSchema(Database db)
