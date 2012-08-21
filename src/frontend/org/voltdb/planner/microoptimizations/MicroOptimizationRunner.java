@@ -19,6 +19,7 @@ package org.voltdb.planner.microoptimizations;
 
 import java.util.ArrayList;
 import java.util.List;
+
 import org.voltdb.planner.CompiledPlan;
 
 public class MicroOptimizationRunner {
@@ -27,6 +28,7 @@ public class MicroOptimizationRunner {
     static ArrayList<MicroOptimization> optimizations = new ArrayList<MicroOptimization>();
     static {
         optimizations.add(new PushdownLimitsIntoScans());
+        optimizations.add(new ReplaceWithIndexCounter());
         // optimizations.add(new PushdownReceiveDominators());
     }
 
