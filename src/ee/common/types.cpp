@@ -302,6 +302,9 @@ string planNodeToString(PlanNodeType type)
     case PLAN_NODE_TYPE_INDEXCOUNT: {
         return "INDEXCOUNT";
     }
+    case PLAN_NODE_TYPE_TABLECOUNT: {
+        return "TABLECOUNT";
+    }
     case PLAN_NODE_TYPE_NESTLOOP: {
         return "NESTLOOP";
     }
@@ -364,6 +367,8 @@ PlanNodeType stringToPlanNode(string str )
         return PLAN_NODE_TYPE_INDEXSCAN;
     } else if (str == "INDEXCOUNT") {
         return PLAN_NODE_TYPE_INDEXCOUNT;
+    } else if (str == "TABLECOUNT") {
+        return PLAN_NODE_TYPE_TABLECOUNT;
     } else if (str == "NESTLOOP") {
         return PLAN_NODE_TYPE_NESTLOOP;
     } else if (str == "NESTLOOPINDEX") {

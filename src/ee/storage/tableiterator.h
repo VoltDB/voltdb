@@ -259,7 +259,6 @@ inline bool TableIterator::tempNext(TableTuple &out) {
     return false;
 }
 
-
 inline int TableIterator::getLocation() const {
     return m_location;
 }

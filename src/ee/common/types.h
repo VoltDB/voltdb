@@ -160,7 +160,7 @@ enum PlanNodeType {
     PLAN_NODE_TYPE_INDEXSCAN        = 11,
     // special counting index
     PLAN_NODE_TYPE_INDEXCOUNT        = 12,
-
+    PLAN_NODE_TYPE_TABLECOUNT        = 13,
     //
     // Join Nodes
     //
