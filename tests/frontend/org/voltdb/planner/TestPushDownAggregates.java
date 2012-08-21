@@ -86,20 +86,6 @@ public class TestPushDownAggregates extends TestCase {
         aide.tearDown();
     }
 
-    public void testCountStarOnReplicatedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from D1", 0, true);
-        checkPushedDown(pn, false,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
-    }
-
-    public void testCountStarOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-        checkPushedDown(pn, true,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
-    }
-
     public void testCountOnPartitionedTable() {
         List<AbstractPlanNode> pn = compile("SELECT count(A1) from T1", 0, false);
         checkPushedDown(pn, true,

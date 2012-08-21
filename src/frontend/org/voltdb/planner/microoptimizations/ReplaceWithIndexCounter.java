@@ -32,6 +32,8 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.types.ExpressionType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -81,6 +83,13 @@ public class ReplaceWithIndexCounter implements MicroOptimization {
             return plan;
 
         AbstractPlanNode child = plan.getChild(0);
+        // What else should I check if it is a query like:
+        // "Select Count(*) from Table"
+        if (child instanceof SeqScanPlanNode) {
+            if (((SeqScanPlanNode)child).getPredicate() == null) {
+                return new TableCountPlanNode((SeqScanPlanNode)child, (AggregatePlanNode) plan) ;
+            }
+        }
         if ((child instanceof IndexScanPlanNode) == false)
             return plan;
 
