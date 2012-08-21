@@ -417,7 +417,7 @@ public class plannerTester {
                 pnt1 = loadPlanFromFile( m_pathRefPlan+m_testName+".plan"+i, getsql );
                 baseStmt = getsql.get(0);
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+m_pathRefPlan+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
+                System.err.println("Plan file "+m_pathRefPlan+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate plans and copy base plans to baseline directory.");
                 System.exit(1);
             }
 
@@ -433,7 +433,7 @@ public class plannerTester {
             try{
                 pnt2  = loadPlanFromFile( m_savePlanPath+m_testName+".plan"+i, getsql );
             } catch (FileNotFoundException e) {
-                System.err.println("Plan files in"+m_savePlanPath+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
+                System.err.println("Plan file "+m_savePlanPath+m_testName+".plan"+i+" don't exist. Use -cs(batchCompileSave) to generate and save plans.");
                 System.exit(1);
             }
             AbstractPlanNode pn1 = pnt1.getRootPlanNode();
