@@ -113,4 +113,10 @@ public class ReceivePlanNode extends AbstractPlanNode {
             m_isContentDeterministic = childNode.isContentDeterministic();
         }
     }
+
+    @Override
+    public boolean reattachFragment( SendPlanNode child  ) {
+        this.addAndLinkChild(child);
+        return true;
+    }
 }

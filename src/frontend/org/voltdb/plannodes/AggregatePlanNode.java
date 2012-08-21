@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -271,9 +272,31 @@ public class AggregatePlanNode extends AbstractPlanNode {
         return sb.toString();
     }
 
- // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
+        JSONArray jarray = jobj.getJSONArray( Members.AGGREGATE_COLUMNS.name() );
+        int size = jarray.length();
+        for( int i = 0; i < size; i++ ) {
+            JSONObject tempObj = jarray.getJSONObject( i );
+            m_aggregateTypes.add( ExpressionType.get( tempObj.getString( Members.AGGREGATE_TYPE.name() )));
+            m_aggregateDistinct.add( tempObj.getInt( Members.AGGREGATE_DISTINCT.name() ) );
+            m_aggregateOutputColumns.add( tempObj.getInt( Members.AGGREGATE_OUTPUT_COLUMN.name() ));
+
+            if( !tempObj.isNull( Members.AGGREGATE_EXPRESSION.name() ) ) {
+                m_aggregateExpressions.add(
+                        AbstractExpression.fromJSONObject(
+                                tempObj.getJSONObject( Members.AGGREGATE_EXPRESSION.name() ),
+                                db) );
+            }
+        }
+        if( !jobj.isNull(Members.GROUPBY_EXPRESSIONS.name() ) ) {
+            jarray = jobj.getJSONArray( Members.GROUPBY_EXPRESSIONS.name() );
+            size = jarray.length();
+            for( int i = 0; i < size; i++ ) {
+                m_groupByExpressions.add(
+                        AbstractExpression.fromJSONObject( jarray.getJSONObject(i), db));
+            }
+        }
     }
 }

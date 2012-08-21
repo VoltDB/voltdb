@@ -27,15 +27,16 @@ import java.util.List;
 
 import junit.framework.TestCase;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.PlanNodeTree;
 
-public class TestIndexSelection extends TestCase {
-
+public class testLoadPlanNodeFromJSON extends TestCase {
     private PlannerTestAideDeCamp aide;
 
     private AbstractPlanNode compile(String sql, int paramCount,
@@ -79,38 +80,21 @@ public class TestIndexSelection extends TestCase {
         aide.tearDown();
     }
 
-    /*public void testEng931Plan()
-    {
-        AbstractPlanNode pn = null;
-        pn =
-            compile("select a from t where a = ? and b = ? and c = ? and d = ? and e >= ? and e <= ?;", 6, true);
-        assertTrue(pn != null);
+    public void testLoadQueryPlans () throws JSONException {
+        testLoadQueryPlanTree( "select count(*) from l,t where lname=? and l.a=t.a order by l.b limit ?;", 3, true );
+        testLoadQueryPlanTree( "select * from l,t where lname=? and l.a=t.a order by l.b limit ?;", 3, true );
+        testLoadQueryPlanTree( "select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;", 3, true );
+    }
 
-        pn = pn.getChild(0);
-        assertTrue(pn instanceof IndexScanPlanNode);
-        assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
-
-        if (pn != null) {
-            System.out.println(pn.toJSONString());
-        }
-    }*/
-
-    public void testEng2541Plan() throws JSONException
-    {
-        AbstractPlanNode pn = null;
-        pn = compile("select * from l where lname=? and b=0 order by id asc limit ?;", 3, true);
-        assertTrue(pn != null);
-
-        pn = pn.getChild(0);
-        //assertTrue(pn instanceof IndexScanPlanNode);
-        //assertTrue(pn.toJSONString().contains("\"TARGET_INDEX_NAME\":\"IDX_1\""));
-
-        if (pn != null) {
-            JSONObject j = new JSONObject(pn.toJSONString());
-            System.out.println(j.toString(2));
-            System.out.println();
-            System.out.println(pn.toExplainPlanString());
-        }
+    public void testLoadQueryPlanTree( String sql, int paraCount, boolean singlePartition ) throws JSONException {
+        AbstractPlanNode pn = compile(sql, paraCount, singlePartition );
+        PlanNodeTree pnt = new PlanNodeTree( pn );
+        String str = pnt.toJSONString();
+        System.out.println( str );
+        JSONArray jarray = new JSONObject( str ).getJSONArray( PlanNodeTree.Members.PLAN_NODES.name() );
+        PlanNodeTree pnt1 = new PlanNodeTree();
+        pnt1.loadFromJSONArray(jarray, aide.getDatabase() );
+        String str1 = pnt1.toJSONString();
+        assertTrue( str.equals(str1) );
     }
 }
-

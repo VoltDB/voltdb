@@ -484,7 +484,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // NOTE: ignores inline nodes.
 
-}
+    }
 
     /**
      * @param type plan node type to search for
@@ -662,15 +662,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
     protected abstract String explainPlanForNode(String indent);
 
-    public ArrayList<AbstractPlanNode> getScanNodeList () {
+    public ArrayList<AbstractScanPlanNode> getScanNodeList () {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
-        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        ArrayList<AbstractScanPlanNode> collected = new ArrayList<AbstractScanPlanNode>();
         getScanNodeList_recurse( collected, visited);
         return collected;
     }
 
     //postorder adding scan nodes
-    public void getScanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
+    public void getScanNodeList_recurse(ArrayList<AbstractScanPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";
@@ -686,15 +686,15 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         }
     }
 
-    public ArrayList<AbstractPlanNode> getLists () {
+    public ArrayList<AbstractPlanNode> getPlanNodeList () {
         HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
         ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
-        getLists_recurse( collected, visited);
+        getPlanNodeList_recurse( collected, visited);
         return collected;
     }
 
     //postorder add nodes
-    public void getLists_recurse(ArrayList<AbstractPlanNode> collected,
+    public void getPlanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
             HashSet<AbstractPlanNode> visited) {
         if (visited.contains(this)) {
             assert(false): "do not expect loops in plangraph.";
@@ -703,29 +703,20 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         visited.add(this);
 
         for (AbstractPlanNode n : m_children) {
-            n.getLists_recurse(collected, visited);
+            n.getPlanNodeList_recurse(collected, visited);
         }
         collected.add(this);
-
-        // NOTE: ignores inline nodes.
     }
 
   //TODO outputSchema not loaded
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        if( jobj == null ) {
-            System.err.println("JSONObject is null");
-            return;
-        }
-        String str = jobj.getString( Members.ID.name() );
-        m_id = Integer.parseInt( str );
+        assert( jobj != null );
+        m_id = jobj.getInt( Members.ID.name() );
 
-        //todo : need to set up output_schema, inline_nodes and members in various plannodes
-
-        m_outputSchema = new NodeSchema();
-
+        JSONArray jarray = null;
         //load inline nodes
-        JSONArray jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
-        if( jarray.length() != 0 ) {
+        if( !jobj.isNull( Members.INLINE_NODES.name() ) ){
+            jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
             PlanNodeTree pnt = new PlanNodeTree();
             pnt.loadFromJSONArray(jarray, db);
             List<AbstractPlanNode> list = pnt.getNodeList();
@@ -733,5 +724,29 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
                 m_inlineNodes.put( pn.getPlanNodeType(), pn);
             }
         }
+        //children and parents list loading implemented in planNodeTree.loadFromJsonArray
+
+        //load output shchema
+        m_outputSchema = new NodeSchema();
+        if( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ){
+            jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
+        }
+        int size = jarray.length();
+        for( int i = 0; i < size; i++ ) {
+            m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i), db) );
+        }
     }
+
+    public boolean reattachFragment( SendPlanNode child ) {
+        for( AbstractPlanNode pn : m_inlineNodes.values() ) {
+            if( pn.reattachFragment( child) )
+                return true;
+        }
+        for( AbstractPlanNode pn : m_children ) {
+            if( pn.reattachFragment( child) )
+                return true;
+        }
+        return false;
+    }
+
 }

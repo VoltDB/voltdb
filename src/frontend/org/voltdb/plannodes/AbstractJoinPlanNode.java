@@ -198,14 +198,12 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
         stringer.key(Members.PREDICATE.name()).value(m_predicate);
     }
 
- // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        try {
-            this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
-        } catch (JSONException e) {
-            System.out.println( e.getMessage() );
+        this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
+        if( !jobj.isNull( Members.PREDICATE.name() )) {
+            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
         }
     }
 }

@@ -20,6 +20,7 @@ package org.voltdb.plannodes;
 import java.util.ArrayList;
 import java.util.List;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
@@ -194,10 +195,19 @@ public class OrderByPlanNode extends AbstractPlanNode {
         stringer.endArray();
     }
 
- // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
+        JSONArray jarray = null;
+        if( !jobj.isNull(Members.SORT_COLUMNS.name()) ){
+            jarray = jobj.getJSONArray( Members.SORT_COLUMNS.name() );
+        }
+        int size = jarray.length();
+        for( int i = 0; i < size; i++ ) {
+            JSONObject tempObj = jarray.getJSONObject(i);
+            m_sortDirections.add( SortDirectionType.get(tempObj.getString( Members.SORT_DIRECTION.name())) );
+            m_sortExpressions.add( AbstractExpression.fromJSONObject( tempObj.getJSONObject( Members.SORT_EXPRESSION.name()), db) );
+        }
     }
 
     @Override

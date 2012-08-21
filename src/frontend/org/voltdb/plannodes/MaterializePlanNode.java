@@ -70,10 +70,10 @@ public class MaterializePlanNode extends ProjectionPlanNode {
         stringer.key(Members.BATCHED.name()).value(m_batched);
     }
 
-    // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
+        m_batched = jobj.getBoolean( Members.BATCHED.name() );
     }
 
     @Override

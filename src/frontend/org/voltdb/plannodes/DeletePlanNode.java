@@ -54,10 +54,10 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
         stringer.key(Members.TRUNCATE.name()).value(m_truncate);
     }
 
-    // TODO:Members not loaded
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
+        m_truncate = jobj.getBoolean( Members.TRUNCATE.name() );
     }
 
     @Override

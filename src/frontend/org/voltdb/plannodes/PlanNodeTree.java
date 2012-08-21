@@ -121,70 +121,24 @@ public class PlanNodeTree implements JSONString {
         return m_planNodes;
     }
 
-    public void loadFromJSONArray( JSONArray jArray, Database db ) {
+    public void loadFromJSONArray( JSONArray jArray, Database db )  {
         int size = jArray.length();
 
         try {
             for( int i = 0; i < size; i++ ) {
                 JSONObject jobj;
                 jobj = jArray.getJSONObject(i);
-                String nodeType = jobj.getString("PLAN_NODE_TYPE");
-                int nodeTypeInt = PlanNodeType.get( nodeType ).getValue();
+                String nodeTypeStr = jobj.getString("PLAN_NODE_TYPE");
+                PlanNodeType nodeType = PlanNodeType.get( nodeTypeStr );
                 AbstractPlanNode apn = null;
-
-                if( nodeTypeInt == PlanNodeType.AGGREGATE.getValue() ) {
-                    apn = new AggregatePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.DELETE.getValue() ) {
-                    apn = new DeletePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.DISTINCT.getValue() ) {
-                    apn = new DistinctPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.HASHAGGREGATE.getValue() ) {
-                    apn = new HashAggregatePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.INDEXSCAN.getValue() ) {
-                    apn = new IndexScanPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.SEQSCAN.getValue() ) {
-                    apn = new SeqScanPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.INSERT.getValue() ) {
-                    apn = new InsertPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.LIMIT.getValue() ) {
-                    apn = new LimitPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.MATERIALIZE.getValue() ) {
-                    apn = new MaterializePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.NESTLOOP.getValue() ) {
-                    apn = new NestLoopPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.NESTLOOPINDEX.getValue() ) {
-                    apn = new NestLoopIndexPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.ORDERBY.getValue() ) {
-                    apn = new OrderByPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.PROJECTION.getValue() ) {
-                    apn = new ProjectionPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.RECEIVE.getValue() ) {
-                    apn = new ReceivePlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.SEND.getValue() ) {
-                    apn = new SendPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.UNION.getValue() ) {
-                    apn = new UnionPlanNode();
-                }
-                else if( nodeTypeInt == PlanNodeType.UPDATE.getValue() ) {
-                    apn = new UpdatePlanNode();
-                }
-                else {
-                    System.err.println("plan node type not support: "+nodeType);
+                try {
+                    apn = nodeType.getPlanNodeClass().newInstance();
+                } catch (InstantiationException e) {
+                    e.printStackTrace();
+                    return;
+                } catch (IllegalAccessException e) {
+                    e.printStackTrace();
+                    return;
                 }
                 apn.loadFromJSONObject(jobj, db);
                 m_planNodes.add(apn);
@@ -213,13 +167,5 @@ public class PlanNodeTree implements JSONString {
             }
         }
         return null;
-    }
-
-    public AbstractPlanNode concatenate ( AbstractPlanNode pn ) {
-        PlanNodeTree pnt = new PlanNodeTree( pn );
-        int size = m_planNodes.size();
-        m_planNodes.addAll( pnt.getNodeList() );
-        m_planNodes.get(size-1).addAndLinkChild( m_planNodes.get(size) );
-        return getRootPlanNode();
     }
 }

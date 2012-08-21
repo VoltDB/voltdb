@@ -2,7 +2,7 @@ Name:
 test1
 
 Ref:
-./tests/frontend/org/voltdb/planner/baseline/test1/
+./tests/scripts/plannertester/baseline/test1
 
 DDL:
 ./tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql
@@ -11,7 +11,7 @@ Base Name:
 testplans-plannerTester-ddl
 
 SQL:
-select * from t where a = ? order by b limit ?;
+select * from t where a = ? order by b;
 select * from t where a > ? order by b limit ?;
 select * from t where a < ? order by b limit ?;
 select * from t where a > ? and a < ? order by b limit ?;
