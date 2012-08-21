@@ -292,9 +292,6 @@ protected:
     // ------------------------------------------------------------------
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
-    void updateIndexesForTupleMove(TableTuple &targetTupleToUpdate,
-                                   const TableTuple &sourceTupleWithNewValues);
-
     bool tryInsertOnAllIndexes(TableTuple *tuple);
     bool checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
                                     const TableTuple &sourceTupleWithNewValues,

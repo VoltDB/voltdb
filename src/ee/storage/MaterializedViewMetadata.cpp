@@ -189,12 +189,6 @@ void MaterializedViewMetadata::processTupleInsert(TableTuple &newTuple) {
     }
 }
 
-void MaterializedViewMetadata::processTupleUpdate(TableTuple &newTuple, TableTuple &oldTuple) {
-    // this approach is far from optimal, but should be technically correct
-    processTupleDelete(oldTuple);
-    processTupleInsert(newTuple);
-}
-
 void MaterializedViewMetadata::processTupleDelete(TableTuple &oldTuple) {
     // don't change the view if this tuple doesn't match the predicate
     if (m_filterPredicate && (m_filterPredicate->eval(&oldTuple, NULL).isFalse()))

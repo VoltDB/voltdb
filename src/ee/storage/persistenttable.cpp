@@ -325,6 +325,9 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWith
                                                      TableTuple &targetTupleToUpdate,
                                                      std::vector<TableIndex*> &indexesToUpdate)
 {
+    /**
+     * Check for index constraint violations.
+     */
     if (!checkUpdateOnUniqueIndexes(targetTupleToUpdate,
                                     sourceTupleWithNewValues,
                                     indexesToUpdate))
@@ -332,6 +335,15 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWith
         throw ConstraintFailureException(this, sourceTupleWithNewValues,
                                          targetTupleToUpdate,
                                          CONSTRAINT_TYPE_UNIQUE);
+    }
+
+    /**
+     * Check for null constraint violations. Assumes source tuple is fully fleshed out.
+     */
+    FAIL_IF(!checkNulls(sourceTupleWithNewValues)) {
+        throw ConstraintFailureException(this, targetTupleToUpdate,
+                                         sourceTupleWithNewValues,
+                                         CONSTRAINT_TYPE_NOT_NULL);
     }
 
     /*
@@ -350,6 +362,32 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWith
         m_COWContext->markTupleDirty(targetTupleToUpdate, false);
     }
 
+    /**
+     * Remove the current tuple from any indexes.
+     */
+    bool indexRequiresUpdate[indexesToUpdate.size()];
+    if (indexesToUpdate.size()) {
+        ptuua->needToRevertIndexes();
+        for (int i = 0; i < indexesToUpdate.size(); i++) {
+            TableIndex *index = indexesToUpdate[i];
+            if (!index->keyUsesNonInlinedMemory()) {
+                if (!index->checkForIndexChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
+                    indexRequiresUpdate[i] = false;
+                    continue;
+                }
+            }
+            indexRequiresUpdate[i] = true;
+            if (!index->deleteEntry(&targetTupleToUpdate)) {
+                throwFatalException("Failed to remove tuple from index (during update) in Table: %s Index %s",
+                                    m_name.c_str(), index->getName().c_str());
+            }
+        }
+    }
+    // handle any materialized views
+    for (int i = 0; i < m_views.size(); i++) {
+        m_views[i]->processTupleDelete(targetTupleToUpdate);
+    }
+
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
         decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
@@ -363,6 +401,7 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWith
     } else {
         sourceTupleWithNewValues.setDirtyFalse();
     }
+    // this is the actual write of the new values
     targetTupleToUpdate.copyForPersistentUpdate(sourceTupleWithNewValues);
 
     ptuua->setNewTuple(targetTupleToUpdate, pool);
@@ -372,30 +411,22 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWith
         undoQuantum->registerUndoAction(ptuua);
     }
 
-    // update the indexes here
-    if (indexesToUpdate.size()) {
-        ptuua->needToRevertIndexes();
-        BOOST_FOREACH(TableIndex *index, indexesToUpdate) {
-            if (!index->replaceEntry(&targetTupleToUpdate, &ptuua->getOldTuple())) {
-                throwFatalException("Failed to update tuple in Table: %s Index %s",
-                                    m_name.c_str(), index->getName().c_str());
-            }
+    /**
+     * Insert the updated tuple back into the indexes.
+     */
+    for (int i = 0; i < indexesToUpdate.size(); i++) {
+        TableIndex *index = indexesToUpdate[i];
+        if (!indexRequiresUpdate[i]) {
+            continue;
+        }
+        if (!index->addEntry(&targetTupleToUpdate)) {
+            throwFatalException("Failed to insert updated tuple into index in Table: %s Index %s",
+                                m_name.c_str(), index->getName().c_str());
         }
     }
-
     // handle any materialized views
     for (int i = 0; i < m_views.size(); i++) {
-        m_views[i]->processTupleUpdate(targetTupleToUpdate, ptuua->getOldTuple());
-    }
-
-    /**
-     * Check for nulls after the update has been performed because the source tuple may have garbage in
-     * some columns
-     */
-    FAIL_IF(!checkNulls(targetTupleToUpdate)) {
-        throw ConstraintFailureException(this, ptuua->getOldTuple(),
-                                         targetTupleToUpdate,
-                                         CONSTRAINT_TYPE_NOT_NULL);
+        m_views[i]->processTupleInsert(targetTupleToUpdate);
     }
 
     if (undoQuantum->isDummy()) {
@@ -408,47 +439,48 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWith
 }
 
 /*
- * Source contains the tuple before the update and target is a
- * reference to the updated tuple including the actual table
- * storage. First backup the target to a temp tuple so it will be
- * available for updating indexes. Then revert the tuple to the
- * original preupdate values by copying the source to the target. Then
- * update the indexes to use the new key value (if the key has
- * changed). The backup is necessary because the indexes expect the
- * data ptr that will be used as the value in the index.
+ * sourceTupleWithNewValues contains the tuple before the update
+ * and targetTupleToUpdate is a reference to the updated tuple
+ * including the actual table storage. First remove the current
+ * tuple value from any indexes (if asked to do so). Then revert the
+ * tuple to the original preupdate values by copying the source to
+ * the target. Then insert the new (or rather, old) value back into
+ * the indexes.
  */
-void PersistentTable::updateTupleForUndo(TableTuple &source, TableTuple &target,
-                                         bool revertIndexes) {
+void PersistentTable::updateTupleForUndo(TableTuple &sourceTupleWithNewValues,
+                                         TableTuple &targetTupleToUpdate,
+                                         bool revertIndexes)
+{
+    //If the indexes were never updated there is no need to revert them.
+    if (revertIndexes) {
+        for (int i = m_indexCount - 1; i >= 0; --i) {
+            if (!m_indexes[i]->deleteEntry(&targetTupleToUpdate)) {
+                throwFatalException("Failed to update tuple in Table: %s Index %s",
+                                    m_name.c_str(), m_indexes[i]->getName().c_str());
+            }
+        }
+    }
+
     if (m_schema->getUninlinedObjectColumnCount() != 0)
     {
-        decreaseStringMemCount(target.getNonInlinedMemorySize());
-        increaseStringMemCount(source.getNonInlinedMemorySize());
+        decreaseStringMemCount(targetTupleToUpdate.getNonInlinedMemorySize());
+        increaseStringMemCount(sourceTupleWithNewValues.getNonInlinedMemorySize());
     }
 
-    //Need to back up the updated version of the tuple to provide to
-    //the indexes when updating The indexes expect source's data Ptr
-    //to point into the table so it is necessary to copy source to
-    //target. Without this backup the target would be lost and it
-    //there would be nothing to provide to the index to lookup. In
-    //regular updateTuple this storage is provided by the undo
-    //quantum.
-    TableTuple targetBackup = tempTuple();
-    targetBackup.copy(target);
-
-    bool dirty = target.isDirty();
+    bool dirty = targetTupleToUpdate.isDirty();
     // this is the actual in-place revert to the old version
-    target.copy(source);
+    targetTupleToUpdate.copy(sourceTupleWithNewValues);
     if (dirty) {
-        target.setDirtyTrue();
+        targetTupleToUpdate.setDirtyTrue();
     } else {
-        target.setDirtyFalse();
+        targetTupleToUpdate.setDirtyFalse();
     }
-    target.isDirty();
+    targetTupleToUpdate.isDirty();
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
         for (int i = m_indexCount - 1; i >= 0; --i) {
-            if (!m_indexes[i]->replaceEntry(&target, &targetBackup)) {
+            if (!m_indexes[i]->addEntry(&targetTupleToUpdate)) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
                                     m_name.c_str(), m_indexes[i]->getName().c_str());
             }
@@ -568,16 +600,6 @@ void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
         if (!m_indexes[i]->deleteEntry(tuple)) {
             throwFatalException(
                     "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
-        }
-    }
-}
-
-void PersistentTable::updateIndexesForTupleMove(TableTuple &targetTupleToUpdate,
-                                                const TableTuple &sourceTupleWithNewValues) {
-    for (int i = m_indexCount - 1; i >= 0;--i) {
-        if (!m_indexes[i]->replaceEntryNoKeyChange(&targetTupleToUpdate, &sourceTupleWithNewValues)) {
-            throwFatalException(
-                    "Failed to update tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
         }
     }
 }
@@ -869,11 +891,11 @@ void PersistentTable::notifyBlockWasCompactedAway(TBPtr block) {
 
 }
 
-void PersistentTable::swapTuples(TableTuple &sourceTupleWithNewValues,
+void PersistentTable::swapTuples(TableTuple &originalTuple,
                                  TableTuple &destinationTuple) {
-    ::memcpy(destinationTuple.address(), sourceTupleWithNewValues.address(), m_tupleLength);
-    sourceTupleWithNewValues.setActiveFalse();
-    assert(!sourceTupleWithNewValues.isPendingDeleteOnUndoRelease());
+    ::memcpy(destinationTuple.address(), originalTuple.address(), m_tupleLength);
+    originalTuple.setActiveFalse();
+    assert(!originalTuple.isPendingDeleteOnUndoRelease());
 
     /*
      * If the tuple is pending deletion then it isn't in any of the indexes.
@@ -891,8 +913,13 @@ void PersistentTable::swapTuples(TableTuple &sourceTupleWithNewValues,
      * back and update the undo action (how would you find it?) or
      * not move the tuple.
      */
-    if (!sourceTupleWithNewValues.isPendingDelete()) {
-        updateIndexesForTupleMove(destinationTuple, sourceTupleWithNewValues);
+    if (!originalTuple.isPendingDelete()) {
+        for (int i = m_indexCount - 1; i >= 0;--i) {
+            if (!m_indexes[i]->replaceEntryNoKeyChange(destinationTuple, originalTuple)) {
+                throwFatalException("Failed to update tuple in Table: %s Index %s",
+                                    m_name.c_str(), m_indexes[i]->getName().c_str());
+            }
+        }
     }
 }
 

@@ -49,12 +49,6 @@ public:
     void processTupleInsert(TableTuple &newTuple);
 
     /**
-     * Called when the source table is updating a tuple. This will update the materialized view
-     * destination table to reflect this change. For now, this just calls delete, then insert.
-     */
-    void processTupleUpdate(TableTuple &newTuple, TableTuple &oldTuple);
-
-    /**
      * Called when the source table is deleting a tuple. This will update the materialized view
      * destination table to reflect this change.
      */

@@ -96,13 +96,12 @@ public class TestCompactingViewsSuite extends RegressionSuite {
         }
 
         // adding view duplicates for half of the rows
-        // this currently crashes due to a bug in updating tuplekey indices
-        /*System.out.printf("Inserting duplicates of half of the tuples (with unique primary keys)\n");
+        System.out.printf("Inserting duplicates of half of the tuples (with unique primary keys)\n");
         for (int i = MAX_ROWS + 1; i < (MAX_ROWS * 2); i += 2) {
             VoltTable table = client.callProcedure(insertName, i, String.valueOf(i / 2),
                     filler, filler, filler, filler, filler, filler, filler, filler).getResults()[0];
             assertEquals(1, table.asScalarLong());
-        }*/
+        }
 
         // delete all of the rows again, but in three passes to trigger more compaction
         System.out.printf("Deleting all %d rows\n", MAX_ROWS);
@@ -114,11 +113,10 @@ public class TestCompactingViewsSuite extends RegressionSuite {
             VoltTable table = client.callProcedure(deleteName, i).getResults()[0];
             assertEquals(1, table.asScalarLong());
         }
-        // this goes with the commented out code above
-        /*for (int i = MAX_ROWS + 1; i < (MAX_ROWS * 2); i += 2) {
+        for (int i = MAX_ROWS + 1; i < (MAX_ROWS * 2); i += 2) {
             VoltTable table = client.callProcedure(deleteName, i).getResults()[0];
             assertEquals(1, table.asScalarLong());
-        }*/
+        }
     }
 
     public void testPartitionedCompactingViews() throws Exception {
@@ -141,7 +139,7 @@ public class TestCompactingViewsSuite extends RegressionSuite {
                     "PRIMARY KEY (id)); "
             );
             project.addLiteralSchema(
-                    "CREATE UNIQUE INDEX FOO ON PP (value, e1, e2, e3, e4, e5, e6, e7, e8);"
+                    "CREATE INDEX FOO ON PP (value, e1, e2, e3, e4, e5, e6, e7, e8);"
             );
             project.addLiteralSchema(
                     "CREATE VIEW VP(value, e1, e2, e3, e4, e5, e6, e7, e8, c) " +
