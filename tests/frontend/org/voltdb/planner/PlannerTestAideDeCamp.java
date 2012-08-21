@@ -94,6 +94,10 @@ public class PlannerTestAideDeCamp {
         return catalog;
     }
 
+    public Database getDatabase() {
+        return db;
+    }
+
     /**
      * Compile a statement and return the head of the plan.
      * @param sql
