@@ -31,7 +31,9 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
 
 public class TestReplaceWithIndexCounter extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -102,7 +104,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar04() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS = ?", 0, false);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS = ?", 1, false);
         checkIndexCounter(pn, false);
     }
 
@@ -117,7 +119,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar07() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?", 2, false);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND AGE = 3 AND POINTS < ?", 1, false);
         checkIndexCounter(pn, false);
     }
 
@@ -138,7 +140,7 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar12() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 0, false);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 WHERE POINTS < ?", 1, false);
         checkIndexCounter(pn, true);
     }
 
@@ -168,14 +170,49 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     public void testCountStar18() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN'", 1, false);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN'", 0, false);
         checkIndexCounter(pn, false);
     }
 
-    // Planner bug: Fix it with true replaceable flag
+    // Planner bug with Constant value overflow
     public void testCountStar19() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000", 2, false);
-        checkIndexCounter(pn, false);
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from T2 WHERE USERNAME ='XIN' AND POINTS >= 3 AND POINTS <= 600000000000000000000000000", 0, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue((p instanceof IndexCountPlanNode) == false);
+    }
+    // test with group by with Replicated table
+    public void testCountStar20() {
+        List<AbstractPlanNode> pn = compile("SELECT AGE, count(*) from T2 WHERE USERNAME ='XIN' AND POINTS < 1 Group by AGE", 0, false);
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+    }
+
+    // test with group by with Partitioned table
+    public void testCountStar21() {
+        List<AbstractPlanNode> pn = compile("SELECT RATIO, count(*) from P1 WHERE NUM < 1 Group by RATIO", 0, false);
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof IndexScanPlanNode);
+    }
+
+    // Test counting index feature with partitioned table
+    public void testCountStar22() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from P1 WHERE NUM < ?", 1, false);
+        for ( AbstractPlanNode nd : pn)
+            System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof IndexCountPlanNode);
     }
 
     /**
