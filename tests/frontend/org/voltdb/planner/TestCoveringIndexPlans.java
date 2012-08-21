@@ -32,7 +32,6 @@ import org.voltdb.catalog.Cluster;
 import org.voltdb.catalog.Table;
 import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
-import org.voltdb.plannodes.SeqScanPlanNode;
 import org.voltdb.types.IndexLookupType;
 
 public class TestCoveringIndexPlans extends TestCase {
@@ -185,6 +184,6 @@ public class TestCoveringIndexPlans extends TestCase {
         if (pn != null) {
             System.out.println(pn.toJSONString());
         }
-        assertTrue(pn instanceof SeqScanPlanNode);
+        assertTrue(pn instanceof IndexScanPlanNode);
     }
 }
