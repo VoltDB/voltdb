@@ -17,14 +17,10 @@
 
 package org.voltdb.rejoin;
 
-import java.io.IOException;
-import java.nio.ByteBuffer;
-import java.nio.channels.ClosedByInterruptException;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
-import org.voltdb.VoltDB;
+import org.voltcore.messaging.Mailbox;
 
 /**
  * Sends acks of snapshot blocks to the snapshot sender.
@@ -32,14 +28,17 @@ import org.voltdb.VoltDB;
 public class StreamSnapshotAckSender implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
-    private final long m_HSId;
-    private final SocketChannel m_sock;
+    private volatile long m_sourceHSId = -1;
+    private final Mailbox m_mb;
     private final LinkedBlockingQueue<Integer> m_blockIndices =
             new LinkedBlockingQueue<Integer>();
 
-    public StreamSnapshotAckSender(SocketChannel sock, long HSId) {
-        m_sock = sock;
-        m_HSId = HSId;
+    public StreamSnapshotAckSender(Mailbox mb) {
+        m_mb = mb;
+    }
+
+    public void setSourceHSId(long sourceHSId) {
+        m_sourceHSId = sourceHSId;
     }
 
     public void close() {
@@ -72,25 +71,9 @@ public class StreamSnapshotAckSender implements Runnable {
                 break;
             }
 
-            ByteBuffer ack = ByteBuffer.allocate(16);
-            ack.putInt(12); // length prefix
-            ack.putLong(m_HSId);
-            ack.putInt(blockIndex);
-            ack.flip();
-
-            while (ack.hasRemaining()) {
-                int written = 0;
-                try {
-                    written = m_sock.write(ack);
-                } catch (ClosedByInterruptException ignore) {
-                    break;
-                } catch (IOException e) {
-                    VoltDB.crashLocalVoltDB("Unable to ack snapshot block", true, e);
-                }
-                if (written == -1) {
-                    VoltDB.crashLocalVoltDB("Unable to ack snapshot block", false, null);
-                }
-            }
+            RejoinDataAckMessage msg = new RejoinDataAckMessage(blockIndex);
+            assert(m_sourceHSId != -1);
+            m_mb.send(m_sourceHSId, msg);
         }
     }
 }
