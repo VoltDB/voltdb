@@ -708,8 +708,9 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
         collected.add(this);
     }
 
-  //TODO outputSchema not loaded
-    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+    abstract protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException;
+
+    public final void helpLoadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         assert( jobj != null );
         m_id = jobj.getInt( Members.ID.name() );
 

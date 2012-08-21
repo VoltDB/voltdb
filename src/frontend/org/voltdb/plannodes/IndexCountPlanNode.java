@@ -21,7 +21,9 @@ import java.util.ArrayList;
 import java.util.Collections;
 import java.util.List;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
@@ -61,14 +63,14 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected Boolean m_keyIterate = false;
 
     //
-    protected List<AbstractExpression> m_endkeyExpressions = null;
+    protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
     protected List<AbstractExpression> m_searchkeyExpressions = new ArrayList<AbstractExpression>();
 
     // The overall index lookup operation type
-    protected IndexLookupType m_LookupType = IndexLookupType.EQ;
+    protected IndexLookupType m_lookupType = IndexLookupType.EQ;
 
     // The overall index lookup operation type
     protected IndexLookupType m_endType = IndexLookupType.EQ;
@@ -94,7 +96,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         m_targetTableName = isp.m_targetTableName;
         m_targetIndexName = isp.m_targetIndexName;
 
-        m_LookupType = isp.m_lookupType;
+        m_lookupType = isp.m_lookupType;
         m_searchkeyExpressions = isp.m_searchkeyExpressions;
         m_predicate = null;
 
@@ -161,7 +163,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
      * @return The type of this lookup.
      */
     public IndexLookupType getLookupType() {
-        return m_LookupType;
+        return m_lookupType;
     }
 
     /**
@@ -169,7 +171,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
      * @param lookupType
      */
     public void setLookupType(IndexLookupType lookupType) {
-        m_LookupType = lookupType;
+        m_lookupType = lookupType;
     }
 
     /**
@@ -287,7 +289,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.KEY_ITERATE.name()).value(m_keyIterate);
-        stringer.key(Members.LOOKUP_TYPE.name()).value(m_LookupType.toString());
+        stringer.key(Members.LOOKUP_TYPE.name()).value(m_lookupType.toString());
         stringer.key(Members.END_TYPE.name()).value(m_endType.toString());
         stringer.key(Members.TARGET_INDEX_NAME.name()).value(m_targetIndexName);
 
@@ -313,6 +315,41 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     }
 
     @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        super.loadFromJSONObject(jobj, db);
+        if( !jobj.isNull( Members.KEY_ITERATE.name() ) ) {
+            m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
+        }
+        if( !jobj.isNull( Members.LOOKUP_TYPE.name() )) {
+            m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
+        }
+        if( !jobj.isNull( Members.END_TYPE.name() )) {
+            m_endType = IndexLookupType.get( jobj.getString( Members.END_TYPE.name() ) );
+        }
+        m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
+        m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
+        JSONObject tempjobj = null;
+        //load end_expression
+        if( !jobj.isNull( Members.ENDKEY_EXPRESSIONS.name() ) ) {
+            JSONArray jarray = jobj.getJSONArray(Members.ENDKEY_EXPRESSIONS.name());
+            int size = jarray.length();
+            for( int i = 0; i < size; i++ ){
+                tempjobj = jarray.getJSONObject(i);
+                m_endkeyExpressions.add( AbstractExpression.fromJSONObject( tempjobj, db) );
+            }
+        }
+        //load searchkey_expressions
+        if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
+            JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
+                int size = jarray.length();
+                for( int i = 0 ; i < size; i++ ) {
+                    tempjobj = jarray.getJSONObject( i );
+                    m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
+                }
+        }
+    }
+
+    @Override
     protected String explainPlanForNode(String indent) {
         assert(m_catalogIndex != null);
 
@@ -320,7 +357,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
         int keySize = m_searchkeyExpressions.size();
 
         String scanType = "tree-counter";
-        if (m_LookupType != IndexLookupType.EQ)
+        if (m_lookupType != IndexLookupType.EQ)
             scanType = "tree-counter";
 
         String cover = "covering";

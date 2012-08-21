@@ -90,6 +90,9 @@ public class testLoadPlanNodeFromJSON extends TestCase {
         testLoadQueryPlanTree(
                 "select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;",
                 3, true);
+        testLoadQueryPlanTree(
+                "select count(*) from l where lname=? and id < ?;",
+                3, true);
     }
 
     public void testLoadQueryPlanTree(String sql, int paraCount,

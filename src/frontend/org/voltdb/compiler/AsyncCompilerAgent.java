@@ -112,6 +112,7 @@ public class AsyncCompilerAgent {
         else if (wrapper.payload instanceof ExplainPlannerWork) {
             final ExplainPlannerWork w = (ExplainPlannerWork)(wrapper.payload);
             final AsyncCompilerResult result = compileAdHocPlan(w);
+            System.out.println("AsyncCompilerAgent result: "+result.toString() );
             w.completionHandler.onCompletion(result);
         }
     }

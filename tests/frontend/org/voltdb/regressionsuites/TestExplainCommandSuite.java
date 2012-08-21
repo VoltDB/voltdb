@@ -37,6 +37,14 @@ public class TestExplainCommandSuite extends RegressionSuite {
             assertTrue( plan.contains( "AGGREGATION ops: count(*)" ));
             assertTrue( plan.contains( "SEQUENTIAL SCAN of \"T1\"" ));
         }
+
+        //test the index count node
+        vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM t3 where I3 < 100" ).getResults()[0];
+        while( vt.advanceRow() ) {
+            System.out.println(vt);
+            String plan = (String) vt.get(0, VoltType.STRING );
+            assertTrue( plan.contains("INDEX COUNT") );
+        }
     }
 
     public void testExplainProc() throws IOException, ProcCallException {
