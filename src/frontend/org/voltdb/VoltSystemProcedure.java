@@ -234,7 +234,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                             pf.fragmentId,
                             pf.outputDepId,
                             parambytes,
-                            false);
+                            false,
+                            m_runner.getTxnState().isForReplay());
             m.send(pf.siteId, ftm);
         }
 
@@ -339,7 +340,8 @@ public abstract class VoltSystemProcedure extends VoltProcedure {
                     pf.fragmentId,
                     pf.outputDepId,
                     parambytes,
-                    false);
+                    false,
+                    txnState.isForReplay());
             if (pf.inputDepIds != null) {
                 for (int depId : pf.inputDepIds) {
                     task.addInputDepId(0, depId);

@@ -43,7 +43,7 @@ public class CoalescedHeartbeatMessage extends TransactionInfoBaseMessage {
                                      long destinationHSIds[],
                                      long lastSafeTxnIds[])
     {
-        super(initiatorHSId, -1, txnId, TransactionIdManager.getTimestampFromTransactionId(txnId), true);
+        super(initiatorHSId, -1, txnId, TransactionIdManager.getTimestampFromTransactionId(txnId), true, false);
         m_destinationHSIds = destinationHSIds;
         m_lastSafeTxnIds = lastSafeTxnIds;
     }

@@ -959,7 +959,8 @@ public class ProcedureRunner {
                                                  m_txnState.txnId,
                                                  m_txnState.timestamp,
                                                  m_txnState.isReadOnly(),
-                                                 false);
+                                                 false,
+                                                 txnState.isForReplay());
 
            // the data and message for all sites in the transaction
            m_distributedTask = new FragmentTaskMessage(m_txnState.initiatorHSId,
@@ -967,9 +968,19 @@ public class ProcedureRunner {
                                                        m_txnState.txnId,
                                                        m_txnState.timestamp,
                                                        m_txnState.isReadOnly(),
-                                                       finalTask);
+                                                       finalTask,
+                                                       txnState.isForReplay());
 
-           if (!m_txnState.isReadOnly() && !runner.m_haveSentFirstFragment && VoltDB.instance().isIV2Enabled()) {
+           /*
+            * Only need to send the initiate task during actual execution for CL not during replay
+            * Don't penalize pre-IV2 code by forcing it to send the initiate task everywhere
+            * No need to send initiate tasks for readonly transactions, the CL doesn't care
+            * Only send the initiation with the first fragment.
+            */
+           if (!txnState.isForReplay() &&
+                   VoltDB.instance().isIV2Enabled() &&
+                   !m_txnState.isReadOnly() &&
+                   !runner.m_haveSentFirstFragment) {
                runner.m_haveSentFirstFragment = true;
                m_distributedTask.setInitiateTask((Iv2InitiateTaskMessage)m_txnState.getNotice());
            }

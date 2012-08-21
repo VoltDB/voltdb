@@ -60,6 +60,7 @@ public abstract class TransactionState extends OrderableTransaction  {
     protected long m_beginUndoToken;
     volatile public boolean m_needsRollback = false;
     protected ClientResponseImpl m_response = null;
+    protected final boolean m_isForReplay;
 
     // is this transaction run during a rejoin
     protected RejoinState m_rejoinState = RejoinState.NORMAL;
@@ -75,6 +76,7 @@ public abstract class TransactionState extends OrderableTransaction  {
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = Site.kInvalidUndoToken;
+        m_isForReplay = notice.isForReplay();
     }
 
     /**
@@ -97,6 +99,7 @@ public abstract class TransactionState extends OrderableTransaction  {
         coordinatorSiteId = notice.getCoordinatorHSId();
         m_isReadOnly = notice.isReadOnly();
         m_beginUndoToken = ExecutionSite.kInvalidUndoToken;
+        m_isForReplay = notice.isForReplay();
     }
 
     final public TransactionInfoBaseMessage getNotice() {
@@ -128,6 +131,11 @@ public abstract class TransactionState extends OrderableTransaction  {
     {
         return m_isReadOnly;
     }
+
+    public boolean isForReplay() {
+        return m_isForReplay;
+    }
+
 
     /**
      * Indicate whether or not the transaction represented by this

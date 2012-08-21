@@ -113,7 +113,7 @@ public class Iv2TestMpTransactionState extends TestCase
                                                   Long.MIN_VALUE, // try not to care?
                                                   1234l, // magic, change if it matters
                                                   readOnly,
-                                                  false);  // IV2 doesn't use final task (yet)
+                                                  false, false);  // IV2 doesn't use final task (yet)
 
         for (int i = 0; i < distributedOutputDepIds.size(); i++) {
             plan.remoteWork.addFragment(Long.MIN_VALUE,
@@ -149,6 +149,7 @@ public class Iv2TestMpTransactionState extends TestCase
                 Long.MIN_VALUE,
                 1234l,
                 readOnly,
+                false,
                 false);
 
         for (int i = 0; i < batchSize; i++) {

@@ -120,9 +120,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                long txnId,
                                long timestamp,
                                boolean isReadOnly,
-                               boolean isFinal) {
-        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly);
-
+                               boolean isFinal,
+                               boolean isForReplay) {
+        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
         m_isFinal = isFinal;
         m_subject = Subject.DEFAULT.getId();
         assert(selfCheck());
@@ -204,9 +204,10 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
                                                             long fragmentId,
                                                             int outputDepId,
                                                             ByteBuffer parameterSet,
-                                                            boolean isFinal) {
+                                                            boolean isFinal,
+                                                            boolean isForReplay) {
         FragmentTaskMessage ret = new FragmentTaskMessage(initiatorHSId, coordinatorHSId,
-                                                          txnId, timestamp, isReadOnly, isFinal);
+                                                          txnId, timestamp, isReadOnly, isFinal, isForReplay);
         ret.addFragment(fragmentId, outputDepId, parameterSet);
         return ret;
     }
@@ -284,6 +285,9 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         return m_items.size();
     }
 
+    /*
+     * The first fragment contains the initiate task for a multi-part txn for command logging
+     */
     public void setInitiateTask(Iv2InitiateTaskMessage initiateTask) {
         m_initiateTask = initiateTask;
         m_initiateTaskBuffer = ByteBuffer.allocate(initiateTask.getSerializedSize());
@@ -641,6 +645,7 @@ public class FragmentTaskMessage extends TransactionInfoBaseMessage
         sb.append(CoreUtils.hsIdToString(m_coordinatorHSId));
         sb.append(") FOR TXN ");
         sb.append(m_txnId);
+        sb.append(" FOR REPLAY ").append(isForReplay());
         sb.append(", SP HANDLE: ").append(getSpHandle());
         sb.append("\n");
         if (m_isReadOnly)

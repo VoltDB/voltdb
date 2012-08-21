@@ -339,6 +339,8 @@ public class SpScheduler extends Scheduler
     //   aggregation fragments, or not, if it's a replicated table read.
     // For multi-batch MP transactions, we'll need to look up the transaction state
     // that gets created when the first batch arrives.
+    // During command log replay a new SP handle is going to be generated, but it really
+    // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
         FragmentTaskMessage msg = message;

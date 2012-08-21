@@ -697,6 +697,7 @@ public class TestExecutionSite extends TestCase {
                                                 1,
                                                 localTask_outputDep,
                                                 paramBuf,
+                                                false,
                                                 false);
 
                     localTask.addInputDepId(0, localTask_startDep);
@@ -710,7 +711,8 @@ public class TestExecutionSite extends TestCase {
                                                 0,
                                                 localTask_startDep,
                                                 paramBuf,
-                                                finalTask);
+                                                finalTask,
+                                                false);
 
                     m_txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask);
                     m_txnState.createAllParticipatingFragmentWork(distributedTask);
