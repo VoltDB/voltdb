@@ -29,8 +29,13 @@ const char* SQLException::data_exception_invalid_parameter = "22023";
 const char* SQLException::data_exception_most_specific_type_mismatch = "2200G";
 const char* SQLException::data_exception_numeric_value_out_of_range = "22003";
 const char* SQLException::data_exception_string_data_length_mismatch = "22026";
-const char* SQLException::integrity_constraint_violation = "23000";
 const char* SQLException::dynamic_sql_error = "07000";
+const char* SQLException::integrity_constraint_violation = "23000";
+
+// This is non-standard -- keep it unique.
+const char* SQLException::nonspecific_error_code_for_error_forced_by_user = "99999";
+const char* SQLException::specific_error_specified_by_user = "Specific error code specified by user invocation of SQL_ERROR";
+
 
 // These are ordered by error code. Names and codes are volt
 // specific - must find merge conflicts on duplicate codes.
@@ -38,22 +43,30 @@ const char* SQLException::volt_output_buffer_overflow = "V0001";
 const char* SQLException::volt_temp_table_memory_overflow = "V0002";
 const char* SQLException::volt_decimal_serialization_error = "V0003";
 
-SQLException::SQLException(const char* sqlState, std::string message) :
+SQLException::SQLException(std::string sqlState, std::string message) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
-    m_sqlState(sqlState), m_internalFlags(0) {
-    assert(m_sqlState[5] == '\0');
+    m_sqlState(sqlState), m_internalFlags(0)
+{
+    assert(m_sqlState.length() == 5);
 }
 
-SQLException::SQLException(const char* sqlState, std::string message, VoltEEExceptionType type) :
+SQLException::SQLException(std::string sqlState, std::string message, VoltEEExceptionType type) :
     SerializableEEException(type, message),
-    m_sqlState(sqlState), m_internalFlags(0) {}
+    m_sqlState(sqlState), m_internalFlags(0)
+{
+    assert(m_sqlState.length() == 5);
+}
 
-SQLException::SQLException(const char* sqlState, std::string message, int internalFlags) :
+SQLException::SQLException(std::string sqlState, std::string message, int internalFlags) :
     SerializableEEException(VOLT_EE_EXCEPTION_TYPE_SQL, message),
-    m_sqlState(sqlState), m_internalFlags(internalFlags) {}
+    m_sqlState(sqlState), m_internalFlags(internalFlags)
+{
+    assert(m_sqlState.length() == 5);
+}
 
 void SQLException::p_serialize(ReferenceSerializeOutput *output) {
-    for (int ii = 0; m_sqlState != NULL && ii < 5; ii++) {
-        output->writeByte(m_sqlState[ii]);
+    const char* sqlState = m_sqlState.c_str();
+    for (int ii = 0; ii < 5; ii++) {
+        output->writeByte(sqlState[ii]);
     }
 }

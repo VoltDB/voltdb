@@ -86,6 +86,11 @@
 <property name='deployment.parsergen.xsd'    value='org/voltdb/compiler/DeploymentFileSchema.xsd' />
 <property name='debian.package.dir'          value='obj/debian' />
 
+<!-- os.mac is set when build is running on Mac OSX -->
+<condition property="os.mac">
+    <os family="mac"/>
+</condition>
+
 <!-- emma build instrumentation location -->
 <property name='build.instr.dir'             location='${build.dir}/instr' />
 
@@ -353,20 +358,8 @@ DISTRIBUTION
         </fileset>
     </copy>
 
-    <!-- save the symbols from the shared library -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
-    </exec>
-
-    <!-- strip the voltbin shared library (~40x size reduction) -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/strip --strip-debug --strip-unneeded libvoltdb*'"/>
-    </exec>
-
-    <!-- embed the path to the symbol file into the ELF binary -->
-    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
-        <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
-    </exec>
+    <!-- OS-specific preparation of libvoltdb* -->
+    <antcall target="dist_libvoltdb" />
 
     <!-- copy studio.web -->
     <mkdir dir="${dist.dir}/tools/studio.web" />
@@ -478,6 +471,39 @@ DISTRIBUTION
     <exec executable="mv" failonerror="true">
         <arg value="${raw.dist.dir}/voltdb-client-java-${dist.version}"/>
         <arg value="${raw.dist.dir}/dist-client-java"/>
+    </exec>
+</target>
+
+<!-- Prepare libvoltdb* for distribution. -->
+<target name="dist_libvoltdb" depends="dist_libvoltdb_linux, dist_libvoltdb_mac" />
+
+<!-- Linux prepare libvoltdb* for distribution. -->
+<target name="dist_libvoltdb_linux" unless="os.mac">
+
+    <!-- save the symbols from the shared library -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/objcopy --only-keep-debug libvoltdb-${dist.version}.so ${build.dir}/voltdb-${dist.version}.sym'" />
+    </exec>
+
+    <!-- strip the voltbin shared library (~40x size reduction) -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/strip --strip-debug --strip-unneeded libvoltdb*'"/>
+    </exec>
+
+    <!-- embed the path to the symbol file into the ELF binary -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/objcopy --add-gnu-debuglink=voltdb-${dist.version}.sym libvoltdb-${dist.version}.so'" />
+    </exec>
+
+</target>
+
+<!-- Mac prepare libvoltdb* for distribution. -->
+<target name="dist_libvoltdb_mac" if="os.mac">
+    <!-- objcopy is unavailable by default on Mac -->
+
+    <!-- Just use strip -S since strip-unneeded option is unavailable. -->
+    <exec dir='${dist.dir}/voltdb' executable='/bin/sh'>
+        <arg line="-c '/usr/bin/strip -S libvoltdb*'"/>
     </exec>
 </target>
 
