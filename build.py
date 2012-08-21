@@ -224,6 +224,7 @@ CTX.INPUT['executors'] = """
  distinctexecutor.cpp
  executorutil.cpp
  indexscanexecutor.cpp
+ indexcountexecutor.cpp
  insertexecutor.cpp
  limitexecutor.cpp
  materializeexecutor.cpp
@@ -254,6 +255,7 @@ CTX.INPUT['plannodes'] = """
  deletenode.cpp
  distinctnode.cpp
  indexscannode.cpp
+ indexcountnode.cpp
  insertnode.cpp
  limitnode.cpp
  materializenode.cpp
@@ -393,6 +395,7 @@ if whichtests in ("${eetestsuite}", "storage"):
 if whichtests in ("${eetestsuite}", "structures"):
     CTX.TESTS['structures'] = """
      CompactingMapTest
+     CompactingMapIndexCountTest
      CompactingHashTest
      CompactingPoolTest
     """

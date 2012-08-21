@@ -17,7 +17,9 @@
 
 package org.voltdb.types;
 
-import java.util.*;
+import java.util.EnumSet;
+import java.util.HashMap;
+import java.util.Map;
 
 /**
  *
