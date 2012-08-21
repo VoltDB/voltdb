@@ -111,7 +111,7 @@ public class testPlannerTester extends TestCase {
         }
     }
 
-    public void testCompile() {
+    public void testReAttachFragments() {
         try {
             plannerTester.setUpForTest(m_currentDir+"/tests/frontend/org/voltdb/planner/testplans-plannerTester-ddl.sql",
                     "testplans-plannerTester-ddl", "L", "a");
@@ -121,8 +121,11 @@ public class testPlannerTester extends TestCase {
 
             assert( pnList.size() == 2 );
             assert( pnList.get(1) instanceof SendPlanNode );
-            if ( pnList.get(0).reattachFragment( ( SendPlanNode )pnList.get(1) ) )
-                System.out.println( pnList.get(0).toExplainPlanString() );
+            if ( pnList.get(0).reattachFragment( ( SendPlanNode )pnList.get(1) ) ) {
+                AbstractPlanNode pn = pnList.get(0);
+                System.out.println( pn.toExplainPlanString() );
+                assertTrue( pn.toExplainPlanString().contains("SEND PARTITION RESULTS TO COORDINATOR"));
+            }
         } catch (Exception e) {
             e.printStackTrace();
         }
