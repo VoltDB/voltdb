@@ -1644,19 +1644,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // configured differently for @AdHoc... variants this code will have to
         // change in order to use the proper variant based on whether the work
         // is single or multi partition and read-only or read-write.
-        if (sysProc == null && task.procName.equals("@AdHoc")) {
-            sysProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP");
-            assert(sysProc != null);
+        if (sysProc == null ) {
+            if( task.procName.equals("@AdHoc") ){
+                sysProc = SystemProcedureCatalog.listing.get("@AdHoc_RW_MP");
+                assert(sysProc != null);
+            }
+            else if( task.procName.equals("@Explain") ){
+                return dispatchExplainAdHoc(task, handler, ccxn);
+            }
+            else if(task.procName.equals("@ExplainProc")) {
+                return dispatchExplainProcedure(task, handler, ccxn);
+            }
         }
-
-        else if ( sysProc == null && task.procName.equals("@Explain") ) {
-            return dispatchExplainAdHoc(task, handler, ccxn);
-        }
-
-        else if ( sysProc == null && task.procName.equals("@ExplainProc") ) {
-            return dispatchExplainProcedure(task, handler, ccxn);
-        }
-
 
         if (user == null) {
             authLog.info("User " + handler.m_username + " has been removed from the system via a catalog update");
