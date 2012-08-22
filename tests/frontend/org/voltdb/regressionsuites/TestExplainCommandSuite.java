@@ -34,8 +34,7 @@ public class TestExplainCommandSuite extends RegressionSuite {
             assertTrue( plan.contains( "AGGREGATION ops: sum" ));
             assertTrue( plan.contains( "RECEIVE FROM ALL PARTITIONS" ));
             assertTrue( plan.contains( "SEND PARTITION RESULTS TO COORDINATOR" ));
-            assertTrue( plan.contains( "AGGREGATION ops: count(*)" ));
-            assertTrue( plan.contains( "SEQUENTIAL SCAN of \"T1\"" ));
+            assertTrue( plan.contains( "TABLE COUNT" ));
         }
 
         //test the index count node
@@ -44,6 +43,14 @@ public class TestExplainCommandSuite extends RegressionSuite {
             System.out.println(vt);
             String plan = (String) vt.get(0, VoltType.STRING );
             assertTrue( plan.contains("INDEX COUNT") );
+        }
+
+        //test table count node
+        vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM t3" ).getResults()[0];
+        while( vt.advanceRow() ) {
+            System.out.println(vt);
+            String plan = (String) vt.get(0, VoltType.STRING );
+            assertTrue( plan.contains("TABLE COUNT") );
         }
     }
 
