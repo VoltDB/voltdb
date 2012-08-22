@@ -124,7 +124,7 @@ bool IndexCountExecutor::p_init(AbstractPlanNode *abstractNode,
     assert (m_index != NULL);
 
     // This index should have a true countable flag
-    assert(m_index->is_countable_index_);
+    assert(m_index->isCountableIndex());
 
     m_searchKey = TableTuple(m_index->getKeySchema());
     m_searchKeyBackingStore = new char[m_index->getKeySchema()->tupleLength()];
@@ -288,7 +288,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
 
     assert (m_index);
     assert (m_index == m_targetTable->index(m_node->getTargetIndexName()));
-    assert (m_index->is_countable_index_);
+    assert (m_index->isCountableIndex());
 
     // An index count has two cases: unique and non-unique
     int64_t rkStart = 0, rkEnd = 0, rkRes = 0;
