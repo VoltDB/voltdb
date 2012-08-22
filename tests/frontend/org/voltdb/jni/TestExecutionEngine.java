@@ -23,7 +23,6 @@
 
 package org.voltdb.jni;
 
-import java.nio.channels.SocketChannel;
 import java.util.HashMap;
 import java.util.HashSet;
 import java.util.concurrent.atomic.AtomicReference;
@@ -292,43 +291,37 @@ public class TestExecutionEngine extends TestCase {
         Thread sourceThread = new Thread("Source thread") {
             @Override
             public void run() {
-                try {
-                    final ExecutionEngine sourceEngine =
+                final ExecutionEngine sourceEngine =
                         new ExecutionEngineJNI(CLUSTER_ID, NODE_ID,
                                                (int)sourceId, (int)sourceId,
                                                "", 100, 1);
-                    sourceReference.set(sourceEngine);
-                    sourceEngine.loadCatalog( 0, serializedCatalog);
+                sourceReference.set(sourceEngine);
+                sourceEngine.loadCatalog( 0, serializedCatalog);
 
-                    try {
-                        loadTestTables( sourceEngine, m_catalog);
-                    } catch (Exception e) {
-                        // TODO Auto-generated catch block
-                        e.printStackTrace();
-                    }
-
-                    VoltMessage message = sourceMailbox.recvBlocking();
-                    assertTrue(message != null);
-                    assertTrue(message instanceof RecoveryMessage);
-                    RecoveryMessage rm = (RecoveryMessage)message;
-                    SocketChannel sc = RecoverySiteProcessorSource.createRecoveryConnection(rm.addresses(), rm.port());
-                    final RecoverySiteProcessorSource sourceProcessor =
-                        new RecoverySiteProcessorSource(
-                                null,
-                                rm.txnId(),
-                                rm.sourceSite(),
-                                tablesAndDestinations,
-                                sourceEngine,
-                                sourceMailbox,
-                                sourceId,
-                                onSourceCompletion,
-                                mh,
-                                sc);
-                    sourceProcessor.doRecoveryWork(0);
-                } catch (java.io.IOException e) {
+                try {
+                    loadTestTables( sourceEngine, m_catalog);
+                } catch (Exception e) {
+                    // TODO Auto-generated catch block
                     e.printStackTrace();
-                    return;
                 }
+
+                VoltMessage message = sourceMailbox.recvBlocking();
+                assertTrue(message != null);
+                assertTrue(message instanceof RecoveryMessage);
+                RecoveryMessage rm = (RecoveryMessage)message;
+                final RecoverySiteProcessorSource sourceProcessor =
+                        new RecoverySiteProcessorSource(
+                                                        null,
+                                                        rm.txnId(),
+                                                        rm.sourceSite(),
+                                                        rm.getHSId(),
+                                                        tablesAndDestinations,
+                                                        sourceEngine,
+                                                        sourceMailbox,
+                                                        sourceId,
+                                                        onSourceCompletion,
+                                                        mh);
+                sourceProcessor.doRecoveryWork(0);
             }
         };
         sourceThread.start();

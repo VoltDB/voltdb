@@ -81,7 +81,6 @@ public class StreamSnapshotSender implements Runnable {
 
                 try {
                     if (message.b.isDirect()) {
-                        //Leave space for a new length prefix
                         compressionBuffer.clear();
                         final int compressedSize =
                                 CompressionService.compressBuffer(message.b, compressionBuffer);
