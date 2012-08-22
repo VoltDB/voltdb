@@ -176,41 +176,30 @@ public class TestDtxnInitiatorMailbox extends TestCase
         }
 
         @Override
-        public void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {
-            // TODO Auto-generated method stub
-
-        }
+        public void notifyExecutionSiteRejoin(ArrayList<Long> executorSiteIds) {}
 
         @Override
         public Map<Long, long[]> getOutstandingTxnStats()
         {
-            // TODO Auto-generated method stub
             return null;
         }
 
         @Override
-        public void setSendHeartbeats(boolean val) {
-            // TODO Auto-generated method stub
-
-        }
+        public void setSendHeartbeats(boolean val) {}
 
         @Override
-        public void sendHeartbeat(long txnId) {
-            // TODO Auto-generated method stub
-
-        }
+        public void sendHeartbeat(long txnId) {}
 
         @Override
         public boolean isOnBackPressure() {
-            // TODO Auto-generated method stub
             return false;
         }
 
         @Override
-        public void removeConnectionStats(long connectionId) {
-            // TODO Auto-generated method stub
+        public void removeConnectionStats(long connectionId) {}
 
-        }
+        @Override
+        public void sendSentinel(long txnId, int partitionId) {}
     }
 
     InFlightTxnState createTxnState(long txnId, int[] coordIds, boolean readOnly,

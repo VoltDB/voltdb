@@ -531,4 +531,9 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
     public void removeConnectionStats(long connectionId) {
         m_mailbox.removeConnectionStats(connectionId);
     }
+
+    @Override
+    public void sendSentinel(long txnId, int partitionId) {
+        //Does nothing pre-IV2
+    }
 }

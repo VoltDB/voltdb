@@ -36,6 +36,7 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class SpScheduler extends Scheduler
 {
@@ -122,9 +123,24 @@ public class SpScheduler extends Scheduler
         }
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
+        } if (message instanceof MultiPartitionParticipantMessage) {
+            handleMultipartSentinel((MultiPartitionParticipantMessage)message);
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
+        }
+    }
+
+    /*
+     * Use the sentinel to block the pending tasks queue until the multipart arrives
+     * and forward it to replicas so that their queues are blocked as well.
+     */
+    private void handleMultipartSentinel(
+            MultiPartitionParticipantMessage message) {
+        m_pendingTasks.offerMPSentinel(message.getTxnId());
+        if (m_sendToHSIds.size() > 0) {
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                    message);
         }
     }
 

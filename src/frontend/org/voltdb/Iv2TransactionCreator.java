@@ -83,6 +83,11 @@ public class Iv2TransactionCreator implements TransactionCreator
     }
 
     @Override
+    public void sendSentinel(long txnId, int partitionId) {
+        m_ci.sendSentinel( txnId, partitionId);
+    }
+
+    @Override
     public void setSendHeartbeats(boolean val)
     {
         // Iv2 does not require heartbeating.
