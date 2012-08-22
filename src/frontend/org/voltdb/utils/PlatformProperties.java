@@ -42,6 +42,7 @@ public class PlatformProperties implements Serializable {
     public final int coreCount;
     public final int socketCount;
     public final String cpuDesc;
+    public final boolean isCoreReportedByJava;
 
     // operating system
     public final String osArch;
@@ -194,7 +195,14 @@ public class PlatformProperties implements Serializable {
         // hardware
         ramInMegabytes = hw.ramInMegabytes;
         hardwareThreads = hw.hardwareThreads;
-        coreCount = hw.coreCount;
+        if (hw.coreCount == -1) {
+            // some VMs don't provide cpu core count
+            coreCount = Runtime.getRuntime().availableProcessors();
+            isCoreReportedByJava = true;
+        } else {
+            coreCount = hw.coreCount;
+            isCoreReportedByJava = false;
+        }
         socketCount = hw.socketCount;
         cpuDesc = hw.cpuDesc;
 
@@ -222,8 +230,9 @@ public class PlatformProperties implements Serializable {
     public String toLogLines() {
         StringBuilder sb = new StringBuilder();
 
-        sb.append(String.format("CPU INFO:         %d Cores, %d Sockets, %d Hardware Threads\n",
-                                coreCount, socketCount, hardwareThreads));
+        sb.append(String.format("CPU INFO:         %d Cores%s, %d Sockets, %d Hardware Threads\n",
+                                coreCount, isCoreReportedByJava ? " (Reported by Java)" : "",
+                                socketCount, hardwareThreads));
         sb.append(String.format("CPU DESC:         %s\n", cpuDesc));
         sb.append(String.format("HOST MEMORY (MB): %d\n", ramInMegabytes));
 
