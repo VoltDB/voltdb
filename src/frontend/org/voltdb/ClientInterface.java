@@ -93,6 +93,7 @@ import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
@@ -2210,5 +2211,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public SnapshotDaemon getSnapshotDaemon() {
         return m_snapshotDaemon;
+    }
+
+    public void sendSentinel(long txnId, int partitionId) {
+        assert(VoltDB.instance().isIV2Enabled());
+        final long initiatorHSId = m_iv2Masters.get(partitionId);
+
+        //The only field that is relevant is txnid
+        MultiPartitionParticipantMessage mppm =
+                new MultiPartitionParticipantMessage(
+                        initiatorHSId,
+                        m_cartographer.getHSIdForMultiPartitionInitiator(),
+                        txnId,
+                        false);
+        m_mailbox.send(initiatorHSId, mppm);
     }
 }

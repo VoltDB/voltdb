@@ -117,6 +117,7 @@ public class Iv2TestSpSchedulerDedupe extends TestCase
                                     txnId,
                                     System.currentTimeMillis(),
                                     readOnly,
+                                    false,
                                     false);
         frag.setSpHandle(TxnEgo.makeZero(0).getTxnId());
         return frag;

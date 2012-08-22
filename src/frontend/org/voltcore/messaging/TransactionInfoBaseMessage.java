@@ -40,6 +40,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
     // IV2: allow PI to signal RI repair log truncation with a new task.
     private long m_truncationHandle;
     protected boolean m_isReadOnly;
+    protected boolean m_isForReplay;
+
 
     /** Empty constructor for de-serialization */
     protected TransactionInfoBaseMessage() {
@@ -50,7 +52,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
                                       long coordinatorHSId,
                                       long txnId,
                                       long timestamp,
-                                      boolean isReadOnly) {
+                                      boolean isReadOnly,
+                                      boolean isForReplay) {
         m_initiatorHSId = initiatorHSId;
         m_coordinatorHSId = coordinatorHSId;
         m_txnId = txnId;
@@ -58,6 +61,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_timestamp = timestamp;
         m_isReadOnly = isReadOnly;
         m_subject = Subject.DEFAULT.getId();
+        m_isForReplay = isForReplay;
     }
 
     protected TransactionInfoBaseMessage(long initiatorHSId,
@@ -69,6 +73,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_txnId = rhs.m_txnId;
         m_timestamp = rhs.m_timestamp;
         m_isReadOnly = rhs.m_isReadOnly;
+        m_isForReplay = rhs.m_isForReplay;
         m_subject = rhs.m_subject;
         m_spHandle = rhs.m_spHandle;
         m_truncationHandle = rhs.m_truncationHandle;
@@ -122,6 +127,10 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         return false;
     }
 
+    public boolean isForReplay() {
+        return m_isForReplay;
+    }
+
     @Override
     public int getSerializedSize() {
         int msgsize = super.getSerializedSize();
@@ -131,7 +140,8 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
             + 8        // m_timestamp
             + 8        // m_spHandle
             + 8        // m_truncationHandle
-            + 1;       // m_isReadOnly
+            + 1        // m_isReadOnly
+            + 1;       // is for replay flag
         return msgsize;
     }
 
@@ -144,6 +154,7 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         buf.putLong(m_spHandle);
         buf.putLong(m_truncationHandle);
         buf.put(m_isReadOnly ? (byte) 1 : (byte) 0);
+        buf.put(m_isForReplay ? (byte) 1 : (byte) 0);
     }
 
     @Override
@@ -155,5 +166,6 @@ public abstract class TransactionInfoBaseMessage extends VoltMessage {
         m_spHandle = buf.getLong();
         m_truncationHandle = buf.getLong();
         m_isReadOnly = buf.get() == 1;
+        m_isForReplay = buf.get() == 1;
     }
 }

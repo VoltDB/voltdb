@@ -32,7 +32,7 @@ public class HeartbeatMessage extends TransactionInfoBaseMessage {
     }
 
     public HeartbeatMessage(long initiatorHSId, long txnId, long lastSafeTxnId) {
-        super(initiatorHSId, -1, txnId, TransactionIdManager.getTimestampFromTransactionId(txnId), true);
+        super(initiatorHSId, -1, txnId, TransactionIdManager.getTimestampFromTransactionId(txnId), true, false);
         m_lastSafeTxnId = lastSafeTxnId;
     }
 

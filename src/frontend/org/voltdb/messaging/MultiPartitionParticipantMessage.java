@@ -38,7 +38,8 @@ public class MultiPartitionParticipantMessage extends TransactionInfoBaseMessage
                 coordinatorHSId,
                 txnId,
                 TransactionIdManager.getTimestampFromTransactionId(txnId),
-                isReadOnly);
+                isReadOnly,
+                false);
     }
 
     @Override

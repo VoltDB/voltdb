@@ -42,7 +42,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     long m_clientInterfaceHandle;
     long m_connectionId;
     boolean m_isSinglePartition;
-    boolean m_isForReplay;
     StoredProcedureInvocation m_invocation;
 
     // not serialized.
@@ -66,14 +65,13 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
                         long connectionId,
                         boolean isForReplay)
     {
-        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly);
+        super(initiatorHSId, coordinatorHSId, txnId, timestamp, isReadOnly, isForReplay);
         setTruncationHandle(truncationHandle);
 
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_clientInterfaceHandle = clientInterfaceHandle;
         m_connectionId = connectionId;
-        m_isForReplay = isForReplay;
     }
 
     /** Copy constructor for repair. */
@@ -95,10 +93,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
     @Override
     public boolean isSinglePartition() {
         return m_isSinglePartition;
-    }
-
-    public boolean isForReplay() {
-        return m_isForReplay;
     }
 
     public StoredProcedureInvocation getStoredProcedureInvocation() {
@@ -148,7 +142,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         msgsize += 8; // m_clientInterfaceHandle
         msgsize += 8; // m_connectionId
         msgsize += 1; // is single partition flag
-        msgsize += 1; // is for replay flag
         msgsize += m_invocation.getSerializedSize();
         return msgsize;
     }
@@ -161,7 +154,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         buf.putLong(m_clientInterfaceHandle);
         buf.putLong(m_connectionId);
         buf.put(m_isSinglePartition ? (byte) 1 : (byte) 0);
-        buf.put(m_isForReplay ? (byte) 1 : (byte) 0);
         m_invocation.flattenToBuffer(buf);
 
         assert(buf.capacity() == buf.position());
@@ -174,7 +166,6 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
         m_clientInterfaceHandle = buf.getLong();
         m_connectionId = buf.getLong();
         m_isSinglePartition = buf.get() == 1;
-        m_isForReplay = buf.get() == 1;
         m_invocation = new StoredProcedureInvocation();
         m_invocation.initFromBuffer(buf);
     }
@@ -204,7 +195,7 @@ public class Iv2InitiateTaskMessage extends TransactionInfoBaseMessage {
             sb.append("SINGLE PARTITION, ");
         else
             sb.append("MULTI PARTITION, ");
-        if (m_isForReplay)
+        if (isForReplay())
             sb.append("FOR REPLAY, ");
         else
             sb.append("NOT REPLAY, ");

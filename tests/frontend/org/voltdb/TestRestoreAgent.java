@@ -281,6 +281,9 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
         public void removeConnectionStats(long connectionId) {
 
         }
+
+        @Override
+        public void sendSentinel(long txnId, int partitionId) {}
     }
 
     void buildCatalog(int hostCount, int sitesPerHost, int kfactor, String voltroot,

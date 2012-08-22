@@ -36,6 +36,7 @@ import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.FragmentTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 
 public class SpScheduler extends Scheduler
 {
@@ -122,9 +123,24 @@ public class SpScheduler extends Scheduler
         }
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
+        } if (message instanceof MultiPartitionParticipantMessage) {
+            handleMultipartSentinel((MultiPartitionParticipantMessage)message);
         }
         else {
             throw new RuntimeException("UNKNOWN MESSAGE TYPE, BOOM!");
+        }
+    }
+
+    /*
+     * Use the sentinel to block the pending tasks queue until the multipart arrives
+     * and forward it to replicas so that their queues are blocked as well.
+     */
+    private void handleMultipartSentinel(
+            MultiPartitionParticipantMessage message) {
+        m_pendingTasks.offerMPSentinel(message.getTxnId());
+        if (m_sendToHSIds.size() > 0) {
+            m_mailbox.send(com.google.common.primitives.Longs.toArray(m_sendToHSIds),
+                    message);
         }
     }
 
@@ -339,6 +355,8 @@ public class SpScheduler extends Scheduler
     //   aggregation fragments, or not, if it's a replicated table read.
     // For multi-batch MP transactions, we'll need to look up the transaction state
     // that gets created when the first batch arrives.
+    // During command log replay a new SP handle is going to be generated, but it really
+    // doesn't matter, it isn't going to be used for anything.
     void handleFragmentTaskMessage(FragmentTaskMessage message)
     {
         FragmentTaskMessage msg = message;

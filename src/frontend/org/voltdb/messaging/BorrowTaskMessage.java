@@ -53,7 +53,7 @@ public class BorrowTaskMessage extends TransactionInfoBaseMessage
               frag.getCoordinatorHSId(),
               frag.getTxnId(),
               frag.getTimestamp(),
-              frag.isReadOnly());
+              frag.isReadOnly(), false);
         m_subject = Subject.DEFAULT.getId();
         m_fragTask = frag;
     }

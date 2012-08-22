@@ -76,7 +76,8 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
                 coordinatorHSId,
                 txnId,
                 TransactionIdManager.getTimestampFromTransactionId(txnId),
-                isReadOnly);
+                isReadOnly,
+                false);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_lastSafeTxnID = lastSafeTxnID;
@@ -94,7 +95,8 @@ public class InitiateTaskMessage extends TransactionInfoBaseMessage {
                 coordinatorHSId,
                 txnId,
                 TransactionIdManager.getTimestampFromTransactionId(txnId),
-                isReadOnly);
+                isReadOnly,
+                false);
         m_isSinglePartition = isSinglePartition;
         m_invocation = invocation;
         m_lastSafeTxnID = lastSafeTxnID;
