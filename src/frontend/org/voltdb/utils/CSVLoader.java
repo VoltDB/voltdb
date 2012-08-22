@@ -81,6 +81,8 @@ public class CSVLoader {
         blankValues.put(VoltType.FLOAT, "0.0");
         blankValues.put(VoltType.TIMESTAMP, "0");
         blankValues.put(VoltType.STRING, "");
+        blankValues.put(VoltType.DECIMAL, "0");
+        blankValues.put(VoltType.VARBINARY, "");
     }
     private static List <VoltType> typeList = new ArrayList<VoltType>();
 
@@ -369,12 +371,10 @@ public class CSVLoader {
             if ((slot[i]).equals("NULL") || slot[i].equals("\\N")
                     || !config.strictquotes && slot[i].equals("\"\\N\""))
                 slot[i] = null;
-            if (slot[i].equals("")) {
+            else if (slot[i].equals("")) {
                 if (config.blank.equalsIgnoreCase("null") ) slot[i] = null;
                 else if (config.blank.equalsIgnoreCase("empty"))
                     slot[i] = blankValues.get(typeList.get(i));
-                else
-                    assert(true);
             }
         }
 
@@ -488,6 +488,8 @@ public class CSVLoader {
         inCount.set(0);
         outCount.set(0);
         errorInfo.clear();
+
+        typeList.clear();
 
         out_invaliderowfile.close();
         out_logfile.close();
