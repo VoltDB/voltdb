@@ -253,15 +253,25 @@ public class plannerTester {
     }
 
     public static void printUsage() {
-        System.out.println("-C='configFile1, configFile2, ...'  : Specify the path to a config file");
-        System.out.println("-cs : Compile queries and save the plans according to the config files");
-        System.out.println("-cd : -cs -d -e -s");
-        System.out.println("-sp='savePath1, savePath2, ...': specify save paths for newly generated plan files, should be in the same order of the config files");
-        System.out.println("-d  : Do the diff between plan files in baseline and currentplan");
-        System.out.println("-e  : Output explained plan along with diff");
-        System.out.println("-s  : Output sql statement along with diff");
-        System.out.println("-r=reportFileDir  : Specify report file path, default will be tmp/, report file name is plannerTester.report");
-        System.out.println("-i=ignorePattern : Specify a pattern to ignore, the pattern will not be recorded in the report file");
+        System.out.println("-C='configFile1, configFile2, ...'" +
+        		"\nSpecify the path to a config file.\n");
+        System.out.println("-sp='savePath1, savePath2, ...'" +
+        		"\nspecify save paths for newly generated plan files, should be in the same order of the config files.\n");
+        System.out.println("-r=reportFileDir " +
+        		"\nSpecify report file path, default will be tmp/, report file name is plannerTester.report.\n");
+        System.out.println("-i=ignorePattern" +
+        		"\nSpecify a pattern to ignore, the pattern will not be recorded in the report file.\n");
+        System.out.println("-cd" +
+        		"\nSame as putting -cs -d -e -s.\n");
+        System.out.println("-cs" +
+        		"\nCompile queries and save the plans according to the config files.\n");
+        System.out.println("-d" +
+        		"\nDo the diff between plan files in baseline and the current ones.\n");
+        System.out.println("-e" +
+        		"\nOutput explained plan along with diff.\n");
+        System.out.println("-s" +
+        		"\nOutput sql statement along with diff.\n");
+
     }
 
     public static void setUp( String pathConfigFile ) throws IOException {
