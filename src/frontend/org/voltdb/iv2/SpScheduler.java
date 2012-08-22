@@ -123,7 +123,7 @@ public class SpScheduler extends Scheduler
         }
         else if (message instanceof BorrowTaskMessage) {
             handleBorrowTaskMessage((BorrowTaskMessage)message);
-        } if (message instanceof MultiPartitionParticipantMessage) {
+        } else if (message instanceof MultiPartitionParticipantMessage) {
             handleMultipartSentinel((MultiPartitionParticipantMessage)message);
         }
         else {
