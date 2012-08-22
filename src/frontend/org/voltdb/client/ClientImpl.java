@@ -368,6 +368,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
         if (m_isShutdown) {
             return;
         }
+        if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
+            throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
+                    " without deadlocking the client library");
+        }
         m_distributer.drain();
     }
 
@@ -378,6 +382,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
      */
     @Override
     public void close() throws InterruptedException {
+        if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
+            throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
+                    " without deadlocking the client library");
+        }
         m_isShutdown = true;
         synchronized (m_backpressureLock) {
             m_backpressureLock.notifyAll();
@@ -389,6 +397,10 @@ public final class ClientImpl implements Client, ReplicaProcCaller {
     public void backpressureBarrier() throws InterruptedException {
         if (m_isShutdown) {
             return;
+        }
+        if (m_blessedThreadIds.contains(Thread.currentThread().getId())) {
+            throw new RuntimeException("Can't invoke backpressureBarrier from within the client callback thread " +
+                    " without deadlocking the client library");
         }
         if (m_backpressure) {
             synchronized (m_backpressureLock) {
