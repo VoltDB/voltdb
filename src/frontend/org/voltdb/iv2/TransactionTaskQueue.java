@@ -329,6 +329,7 @@ public class TransactionTaskQueue
                              */
                             if (firstTask) {
                                 firstTask = false;
+                            } else {
                                 iter.remove();
                             }
                             taskQueueOffer(task);
