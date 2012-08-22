@@ -191,9 +191,9 @@ public class CSVLoader {
                         + Integer.MAX_VALUE);
             if (port < 0)
                 exitWithMessageAndUsage("port number must be >= 0");
-            if (blank.equalsIgnoreCase("error") &&
-                    blank.equalsIgnoreCase("null") &&
-                    blank.equalsIgnoreCase("empty"))
+            if ((blank.equalsIgnoreCase("error") ||
+                    blank.equalsIgnoreCase("null") ||
+                    blank.equalsIgnoreCase("empty")) == false)
                 exitWithMessageAndUsage("blank configuration specified must be one of {error|null|empty}");
         }
 
