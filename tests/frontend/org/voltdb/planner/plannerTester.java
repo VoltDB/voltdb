@@ -64,7 +64,6 @@ public class plannerTester {
     private static ArrayList<String> m_savePlanPaths = new ArrayList<String>();
     private static String m_savePlanPath;
     private static boolean m_isSavePathFromCML = false;
-//    private static ArrayList<Pair<String,String>> m_partitionColumns = new ArrayList<Pair<String,String>>();
     private static Map<String,String> m_partitionColumns = new HashMap<String, String>();
     private static ArrayList<String> m_stmts = new ArrayList<String>();
     private static int m_treeSizeDiff;
@@ -257,23 +256,23 @@ public class plannerTester {
 
     public static void printUsage() {
         System.out.println("-C='configFile1, configFile2, ...'" +
-        		"\nSpecify the path to a config file.\n");
+                        "\nSpecify the path to a config file.\n");
         System.out.println("-sp='savePath1, savePath2, ...'" +
-        		"\nspecify save paths for newly generated plan files, should be in the same order of the config files.\n");
+                        "\nspecify save paths for newly generated plan files, should be in the same order of the config files.\n");
         System.out.println("-r=reportFileDir " +
-        		"\nSpecify report file path, default will be tmp/, report file name is plannerTester.report.\n");
+                        "\nSpecify report file path, default will be tmp/, report file name is plannerTester.report.\n");
         System.out.println("-i=ignorePattern" +
-        		"\nSpecify a pattern to ignore, the pattern will not be recorded in the report file.\n");
+                        "\nSpecify a pattern to ignore, the pattern will not be recorded in the report file.\n");
         System.out.println("-cd" +
-        		"\nSame as putting -cs -d -e -s.\n");
+                        "\nSame as putting -cs -d -e -s.\n");
         System.out.println("-cs" +
-        		"\nCompile queries and save the plans according to the config files.\n");
+                        "\nCompile queries and save the plans according to the config files.\n");
         System.out.println("-d" +
-        		"\nDo the diff between plan files in baseline and the current ones.\n");
+                        "\nDo the diff between plan files in baseline and the current ones.\n");
         System.out.println("-e" +
-        		"\nOutput explained plan along with diff.\n");
+                        "\nOutput explained plan along with diff.\n");
         System.out.println("-s" +
-        		"\nOutput sql statement along with diff.\n");
+                        "\nOutput sql statement along with diff.\n");
 
     }
 
