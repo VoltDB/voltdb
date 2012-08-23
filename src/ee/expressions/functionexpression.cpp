@@ -223,6 +223,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
     case 1:
         if (functionId == FUNC_ABS) {
             ret = new UnaryFunctionExpression<FUNC_ABS>((*arguments)[0]);
+        } else if (functionId == FUNC_CHAR_LENGTH) {
+            ret = new UnaryFunctionExpression<FUNC_CHAR_LENGTH>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_YEAR) {
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_YEAR>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_MONTH) {

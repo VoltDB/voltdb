@@ -17,6 +17,15 @@
 
 namespace voltdb {
 
+
+/** implement the 1-argument SQL CHAR_LENGTH function */
+template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
+    if (isNull()) {
+        return getIntegerValue(0);
+    }
+    return getIntegerValue(getObjectLength());
+}
+
 /** implement the 2-argument SQL SUBSTRING function */
 template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
