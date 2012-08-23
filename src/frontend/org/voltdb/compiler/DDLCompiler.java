@@ -66,50 +66,146 @@ public class DDLCompiler {
     static final int MAX_COLUMNS = 1024;
     static final int MAX_ROW_SIZE = 1024 * 1024 * 2;
 
+    /**
+     * Regex Description:
+     * <pre>
+     * (?i) -- ignore case
+     * \\A -- beginning of statement
+     * PARTITION -- token
+     * \\s+ one or more spaces
+     * (PROCEDURE|TABLE) -- either PROCEDURE or TABLE token
+     * \\s+ -- one or more spaces
+     * .+ -- one or more of any characters
+     * ; -- a semicolon
+     * \\z -- end of string
+     * </pre>
+     */
     static final Pattern prePartitionPattern = Pattern.compile(
             "(?i)\\APARTITION\\s+(PROCEDURE|TABLE)\\s+.+;\\z"
-            );
-    // NB supports only unquoted table and column names
-    static final Pattern partitionTablePattern = Pattern.compile(
-            "(?i)TABLE\\s+(\\w+)\\s+ON\\s+COLUMN\\s+(\\w+)\\s*;\\z"
             );
     /**
      * NB supports only unquoted table and column names
      *
      * Regex Description:
+     * <pre>
+     * (?i) -- ignore case
+     * \\A -- beginning of statement
+     * PARTITION -- token
+     * \\s+ -- one or more spaces
+     * TABLE -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$]+) -- [table name capture group 1]
+     *    [\\w$]+ -- 1 or more identifier character
+     *        (letters, numbers, dollar sign ($) underscore (_))
+     * \\s+ -- one or more spaces
+     * ON -- token
+     * \\s+ -- one or more spaces
+     * COLUMN -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$]+) -- [column name capture group 2]
+     *    [\\w$]+ -- 1 or more identifier character
+     *        (letters, numbers, dollar sign ($) or underscore (_))
+     * \\s* -- 0 or more spaces
+     * ; a -- semicolon
+     * \\z -- end of string
+     * </pre>
+     */
+    static final Pattern partitionTablePattern = Pattern.compile(
+            "(?i)\\APARTITION\\s+TABLE\\s+([\\w$]+)\\s+ON\\s+COLUMN\\s+([\\w$]+)\\s*;\\z"
+            );
+    /**
+     * NB supports only unquoted table and column names
      *
-     * (?i)ignore case
-     * Token PROCEDURE
-     * \\s+ one or more spaces
-     * (\\w+) one ore more word characters [procedure name capture group 1]
-     * \\s+ one or more spaces
-     * Token ON
-     * \\s+ one or more spaces
-     * ' single quote
-     * ((\\w+)\\.(\\w+)\\s*:\\s*(\\d+)) [partition info capture group 2]
-     *     (\\w+) one or more word characters [table name capture group 3]
-     *     \\. a period
-     *     (\\w+) one or more word characters [column name capture group 4]
-     *     \\s* 0 or more spaces
+     * Regex Description:
+     * <pre>
+     * (?i) -- ignore case
+     * \\A -- beginning of statement
+     * PARTITION -- token
+     * \\s+ -- one or more spaces
+     * PROCEDURE -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$]+) -- [procedure name capture group 1]
+     *    [\\w$]+ -- one or more identifier character
+     *        (letters, numbers, dollar sign ($) or underscore (_))
+     * \\s+ -- one or more spaces
+     * ON -- token
+     * \\s+ -- one or more spaces
+     * ' -- single quote
+     * \\s* -- 0 or more spaces
+     * (([\\w$]+)\\.([\\w$]+)\\s*:\\s*(\\d+)) -- [partition info capture group 2]
+     *     ([\\w$]+) -- [table name capture group 3]
+     *        [\\w$]+ -- one or more identifier character
+     *            (letters, numbers, dollar sign ($) or underscore (_))
+     *     \\. -- a period
+     *     ([\\w$]+) -- [column name capture group 4]
+     *        [\\w$]+ -- one or more identifier character
+     *            (letters, numbers, dollar sign ($) or underscore (_))
+     *     \\s* -- 0 or more spaces
      *     : column
-     *     \\s* 0 or more spaces
-     *     \\d+ one ore more number digits [parameter index capture group 5]
-     * \\s* 0 or more spaces
-     * ; a semicolon
-     * \\z end of string
+     *     \\s* -- 0 or more spaces
+     *     \\d+ -- one ore more number digits [parameter index capture group 5]
+     * \\s* -- 0 or more spaces
+     * ' -- single quote
+     * \\s* -- 0 or more spaces
+     * ; -- a semicolon
+     * \\z -- end of string
+     * </pre>
      */
     static final Pattern partitionProcedurePattern = Pattern.compile(
-            "(?i)PROCEDURE\\s+(\\w+)\\s+ON\\s+'((\\w+)\\.(\\w+)\\s*:\\s*(\\d+))'\\s*;\\z"
+            "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+" +
+            "'\\s*(([\\w$]+)\\.([\\w$]+)\\s*:\\s*(\\d+))\\s*'\\s*;\\z"
             );
+    /**
+     * NB supports only unquoted table and column names
+     *
+     * Regex Description:
+     * <pre>
+     * (?i) -- ignore case
+     * \\A -- beginning of statement
+     * CREATE -- token
+     * \\s+ -- one or more spaces
+     * PROCEDURE -- token
+     * \\s+ -- one or more spaces
+     * FROM -- token
+     * \\s+ -- one or more spaces
+     * CLASS -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$.]+) -- [class name capture group 1]
+     *    [\\w$]+ -- one or more identifier character
+     *        (letters, numbers, dollar sign ($), underscore (_) or period (.))
+     * \\s* -- 0 or more spaces
+     * ; -- a semicolon
+     * \\z -- end of string
+     * </pre>
+     */
     static final Pattern procedureClassPattern = Pattern.compile(
-            "(?i)\\ACREATE\\s+PROCEDURE\\s+FROM\\s+CLASS\\s+([\\w.$]+)\\s*;\\z"
+            "(?i)\\ACREATE\\s+PROCEDURE\\s+FROM\\s+CLASS\\s+([\\w$.]+)\\s*;\\z"
             );
+
     static final Pattern procedureSingleStatementPattern = Pattern.compile(
             "(?i)\\ACREATE\\s+PROCEDURE\\s+([\\w.$]+)\\s+AS\\s+((?:SELECT|INSERT|UPDATE|DELETE)\\s+.+);\\z"
             );
-    // NB supports only unquoted table names
+
+    /**
+     * NB supports only unquoted table and column names
+     *
+     * Regex Description:
+     * <pre>
+     * (?i) -- ignore case
+     * \\A -- beginning of statement
+     * REPLICATE -- token
+     * \\s+ -- one or more spaces
+     * TABLE -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$.]+) -- [table name capture group 1]
+     *    [\\w$]+ -- one or more identifier character (letters, numbers, dollar sign ($) or underscore (_))
+     * \\s* -- 0 or more spaces
+     * ; -- a semicolon
+     * \\z -- end of string
+     * </pre>
+     */
     static final Pattern replicatePattern = Pattern.compile(
-            "(?i)\\AREPLICATE\\s+TABLE\\s+(\\w+)\\s*;\\z"
+            "(?i)\\AREPLICATE\\s+TABLE\\s+([\\w$]+)\\s*;\\z"
             );
     /**
      * Regex Description:
@@ -117,25 +213,27 @@ public class DDLCompiler {
      *  if the statement starts with either create procedure, partition, or
      *  replicate the first match group is set to respectively procedure,
      *  partition, or replicate
-     *
-     * (?i)ignore case
-     * ((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE) voltdb ddl
+     * <pre>
+     * (?i) -- ignore case
+     * ((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE) -- voltdb ddl
      *    [capture group 1]
-     *      (?<=\\ACREATE\\s{1,1024})PROCEDURE create procedure ddl
-     *          (?<=\\ACREATE\\s{0,1024}) CREATE zero-width positive lookbehind
-     *              \\A beginning of statement
-     *              CREATE token
-     *              \\s{1,1024} one or up to 1024 spaces
-     *          PROCEDURE procedure token
-     *      | or
-     *      \\A beginning of statement
-     *      PARTITION token
-     *      | or
-     *      \\A beginning of statement
-     *      REPLICATE token
+     *      (?<=\\ACREATE\\s{1,1024})PROCEDURE -- create procedure ddl
+     *          (?<=\\ACREATE\\s{0,1024}) -- CREATE zero-width positive lookbehind
+     *              \\A -- beginning of statement
+     *              CREATE -- token
+     *              \\s{1,1024} -- one or up to 1024 spaces
+     *              PROCEDURE -- procedure token
+     *      | -- or
+     *      \\A -- beginning of statement
+     *      -- PARTITION token
+     *      | -- or
+     *      \\A -- beginning of statement
+     *      REPLICATE -- token
+     * \\s -- one space
+     * </pre>
      */
     static final Pattern voltdbStatementPrefixPattern = Pattern.compile(
-            "(?i)((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE)"
+            "(?i)((?<=\\ACREATE\\s{0,1024})PROCEDURE|\\APARTITION|\\AREPLICATE)\\s"
             );
 
     static final String TABLE = "TABLE";
@@ -234,6 +332,36 @@ public class DDLCompiler {
     }
 
     /**
+     * Checks whether or not the start of the given identifier is java (and
+     * thus DDL) compliant. An identifier may start with: _ [a-zA-Z] $
+     * @param identifier the identifier to check
+     * @param statement the statement where the identifier is
+     * @return the given identifier unmodified
+     * @throws VoltCompilerException when it is not compliant
+     */
+    private String checkIdentifierStart(
+            final String identifier, final String statement
+            ) throws VoltCompilerException {
+
+        assert identifier != null && ! identifier.trim().isEmpty();
+        assert statement != null && ! statement.trim().isEmpty();
+
+        int loc = 0;
+        do {
+            if( ! Character.isJavaIdentifierStart(identifier.charAt(loc))) {
+                String msg = "Bad indentifier in DDL: \"" +
+                        statement.substring(0,statement.length()-1) +
+                        "\" contains invalid identifier \"" + identifier + "\"";
+                throw m_compiler.new VoltCompilerException(msg);
+            }
+            loc = identifier.indexOf('.', loc) + 1;
+        }
+        while( loc > 0 && loc < identifier.length());
+
+        return identifier;
+    }
+
+    /**
      * Process a VoltDB-specific DDL statement, like PARTITION, REPLICATE, and
      * CREATE PROCEDURE
      * @param statement  DDL statement string
@@ -259,7 +387,7 @@ public class DDLCompiler {
         // matches if it is CREATE PROCEDURE FROM CLASS <class-name>;
         statementMatcher = procedureClassPattern.matcher(statement);
         if( statementMatcher.matches()) {
-            String clazz = statementMatcher.group(1);
+            String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(
                     new ArrayList<String>(), clazz);
@@ -295,14 +423,17 @@ public class DDLCompiler {
                 // matches if it is PARTITION TABLE <table> ON COLUMN <column>
                 statementMatcher = partitionTablePattern.matcher(statement);
 
-                if( ! statementMatcher.find()) {
+                if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Bad PARTITION DDL statement: \"%s\", " +
                             "expected syntax: PARTITION TABLE <table> ON COLUMN <column>",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
                 // group(1) -> table, group(2) -> column
-                m_partitionMap.put(statementMatcher.group(1), statementMatcher.group(2));
+                m_partitionMap.put(
+                        checkIdentifierStart(statementMatcher.group(1),statement),
+                        checkIdentifierStart(statementMatcher.group(2),statement)
+                        );
                 return true;
             }
             else if( PROCEDURE.equals(partitionee)) {
@@ -312,16 +443,25 @@ public class DDLCompiler {
                 //      ON '<table>.<column>: <parameter-index-no>'
                 statementMatcher = partitionProcedurePattern.matcher(statement);
 
-                if( ! statementMatcher.find()) {
+                if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Bad PARTITION DDL statement: \"%s\", " +
                             "expected syntax: PARTITION PROCEDURE <procedure> ON "+
                             "'<table>.<column>: <parameter-index-no>'",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
+
+                // check the table portion of the partition info
+                checkIdentifierStart(statementMatcher.group(3), statement);
+
+                // check the column portion of the partition info
+                checkIdentifierStart(statementMatcher.group(4), statement);
+
                 // procedureName -> group(1), partitionInfo -> group(2)
                 m_partitionMap.addProcedurePartitionInfoTo(
-                        statementMatcher.group(1), statementMatcher.group(2));
+                        checkIdentifierStart(statementMatcher.group(1), statement),
+                        statementMatcher.group(2)
+                        );
 
                 return true;
             }
@@ -332,7 +472,10 @@ public class DDLCompiler {
         statementMatcher = replicatePattern.matcher(statement);
         if( statementMatcher.matches()) {
             // group(1) -> table
-            m_partitionMap.put(statementMatcher.group(1), null);
+            m_partitionMap.put(
+                    checkIdentifierStart(statementMatcher.group(1), statement),
+                    null
+                    );
             return true;
         }
 
@@ -802,6 +945,7 @@ public class DDLCompiler {
         }
 
         Index index = table.getIndexes().add(name);
+        index.setCountable(false);
 
         // set the type of the index based on the index name and column types
         // Currently, only int types can use hash or array indexes
@@ -809,6 +953,7 @@ public class DDLCompiler {
         if (indexNameNoCase.contains("tree"))
         {
             index.setType(IndexType.BALANCED_TREE.getValue());
+            index.setCountable(true);
         }
         else if (indexNameNoCase.contains("hash"))
         {
@@ -819,14 +964,19 @@ public class DDLCompiler {
             else
             {
                 String msg = "Index " + name + " in table " + table.getTypeName() +
-                             " uses a non-hashable column" + nonint_col_name;
+                            " uses a non-hashable column" + nonint_col_name;
                 throw m_compiler.new VoltCompilerException(msg);
             }
-        }
-        else
-        {
+        } else {
             index.setType(IndexType.BALANCED_TREE.getValue());
+            index.setCountable(true);
         }
+
+        // Countable is always on right now. Fix it when VoltDB can pack memory for TreeNode.
+//        if (indexNameNoCase.contains("NoCounter")) {
+//            index.setType(IndexType.BALANCED_TREE.getValue());
+//            index.setCountable(false);
+//        }
 
         // need to set other index data here (column, etc)
         for (int i = 0; i < columns.length; i++) {
@@ -838,7 +988,7 @@ public class DDLCompiler {
         index.setUnique(unique);
 
         String msg = "Created index: " + name + " on table: " +
-                     table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
+                    table.getTypeName() + " of type: " + IndexType.get(index.getType()).name();
 
         m_compiler.addInfo(msg);
 

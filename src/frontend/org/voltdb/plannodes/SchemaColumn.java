@@ -18,8 +18,10 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
+import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.TupleValueExpression;
 
@@ -71,6 +73,7 @@ public class SchemaColumn
     /**
      * Clone a schema column
      */
+    @Override
     protected SchemaColumn clone()
     {
         return new SchemaColumn(m_tableName, m_columnName, m_columnAlias,
@@ -181,6 +184,7 @@ public class SchemaColumn
         return retval;
     }
 
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
@@ -244,6 +248,26 @@ public class SchemaColumn
         stringer.key(Members.SIZE.name()).value(getSize());
 
         stringer.endObject();
+    }
+
+    public static SchemaColumn fromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        String tableName = "";
+        String columnName = "";
+        String columnAlias = "";
+        AbstractExpression expression = null;
+        if( !jobj.isNull( Members.TABLE_NAME.name() ) ) {
+            tableName = jobj.getString( Members.TABLE_NAME.name() );
+        }
+        if( !jobj.isNull( Members.COLUMN_NAME.name() ) ){
+            columnName = jobj.getString( Members.COLUMN_NAME.name() );
+        }
+        if( !jobj.isNull( Members.COLUMN_ALIAS.name() ) ){
+            columnAlias = jobj.getString( Members.COLUMN_ALIAS.name() );
+        }
+        if( !jobj.isNull( Members.EXPRESSION.name() ) ) {
+            expression = AbstractExpression.fromJSONObject( jobj.getJSONObject( Members.EXPRESSION.name() ), db);
+        }
+        return new SchemaColumn( tableName, columnName, columnAlias, expression );
     }
 
     private String m_tableName;
