@@ -289,6 +289,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private boolean m_hasGlobalClientBackPressure = false;
     private final boolean m_isConfiguredForHSQL;
 
+    private boolean m_isExplain = false;
+
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
         private final int m_port;
@@ -1242,65 +1244,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new VoltTable[0], realReason, handle);
     }
 
-    //this is similar to dispatchAdHoc() : 1. try the cache for plans fisrt. 2. If not in cache, send explainPlannerWork
-    //to planner, handle the completed work in onCompletion().processFinishedCompilerWork()
-    ClientResponseImpl dispatchExplainAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
-        ParameterSet params = task.getParams();
-        String sql = (String) params.toArray()[0];
-
-        // get the partition param if it exists
-        // null means MP-txn
-        Object partitionParam = null;
-        if (params.toArray().length > 1) {
-            if (params.toArray()[1] == null) {
-                // nulls map to zero
-                partitionParam = new Long(0);
-                // skip actual null value because it means MP txn
-            }
-            else {
-                partitionParam = params.toArray()[1];
-            }
-        }
-
-        // try the cache
-        // For now it's all or nothing on a batch of statements, i.e. all statements must match or
-        // none.
-        // TODO: Handle a mix of cached and uncached statements.
-        List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
-        AdHocPlannedStmtBatch planBatch =
-                new AdHocPlannedStmtBatch(sql,
-                        partitionParam,
-                        task.clientHandle,
-                        handler.connectionId(),
-                        handler.m_hostname,
-                        handler.isAdmin(),
-                        ccxn);
-        for (String sqlStatement : sqlStatements) {
-            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sqlStatement, partitionParam != null);
-            // check the catalog version if there is a cached plan
-            if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
-                break;
-            }
-            planBatch.addStatement(plannedStatement);
-        }
-        // All statements retrieved from cache?
-        if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
-            processExplainPlannedStmtBatch( planBatch );
-            return null;
-        }
-
-        AdHocPlannerWork ahpw = new AdHocPlannerWork(
-                m_siteId,
-                false, task.clientHandle, handler.connectionId(),
-                handler.m_hostname, handler.isAdmin(), ccxn,
-                sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler);
-        ahpw.setIsExplainWork();
-
-        LocalObjectMessage work = new LocalObjectMessage( ahpw );
-        m_mailbox.send(m_plannerSiteId, work);
-        return null;
-    }
-
     private void processExplainPlannedStmtBatch(  AdHocPlannedStmtBatch planBatch ) {
             final Connection c = (Connection)planBatch.clientData;
             Database db = m_catalogContext.get().database;
@@ -1427,7 +1370,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
-
     ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
         ParameterSet params = task.getParams();
         String sql = (String) params.toArray()[0];
@@ -1473,12 +1415,15 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return null;
         }
 
-        LocalObjectMessage work = new LocalObjectMessage(
-                new AdHocPlannerWork(
-                    m_siteId,
-                    false, task.clientHandle, handler.connectionId(),
-                    handler.m_hostname, handler.isAdmin(), ccxn,
-                    sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler));
+        AdHocPlannerWork ahpw = new AdHocPlannerWork(
+                m_siteId,
+                false, task.clientHandle, handler.connectionId(),
+                handler.m_hostname, handler.isAdmin(), ccxn,
+                sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler);
+        if( m_isExplain ){
+            ahpw.setIsExplainWork();
+        }
+        LocalObjectMessage work = new LocalObjectMessage( ahpw );
 
         m_mailbox.send(m_plannerSiteId, work);
         return null;
@@ -1649,7 +1594,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 assert(sysProc != null);
             }
             else if( task.procName.equals("@Explain") ){
-                return dispatchExplainAdHoc(task, handler, ccxn);
+                m_isExplain = true;
+                return dispatchAdHoc(task, handler, ccxn);
             }
             else if(task.procName.equals("@ExplainProc")) {
                 return dispatchExplainProcedure(task, handler, ccxn);
