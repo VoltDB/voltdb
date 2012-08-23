@@ -400,19 +400,18 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
             HashMap<Pair<String, Integer>, Long> tableToSourceSite,
             ExecutionEngine engine,
             Mailbox mailbox,
+            Mailbox dataMailbox,
             final long HSId,
             final int partitionId,
             Runnable onCompletion,
             MessageHandler messageHandler) {
         super();
         m_mailbox = mailbox;
+        m_mb = dataMailbox;
         m_engine = engine;
         m_HSId = HSId;
         m_partitionId = partitionId;
         m_messageHandler = messageHandler;
-
-        // Create a new mailbox to transfer snapshot data
-        m_mb = VoltDB.instance().getHostMessenger().createMailbox();
 
         /*
          * Only support recovering from one partition for now so just grab
@@ -570,6 +569,7 @@ public class RecoverySiteProcessorDestination extends RecoverySiteProcessor {
                 tableToSourceSite,
                 engine,
                 mailbox,
+                VoltDB.instance().getHostMessenger().createMailbox(),
                 HSId,
                 partitionId,
                 onCompletion,

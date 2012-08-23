@@ -75,6 +75,7 @@ public class MockMailbox implements Mailbox {
 
         Mailbox dest = postoffice.get(HSId);
         if (dest != null) {
+            message.m_sourceHSId = m_hsId;
             dest.deliver(message);
         }
     }
@@ -84,6 +85,7 @@ public class MockMailbox implements Mailbox {
         for (int i=0; HSIds != null && i < HSIds.length; ++i) {
             Mailbox dest = postoffice.get(HSIds[i]);
             if (dest != null) {
+                message.m_sourceHSId = m_hsId;
                 dest.deliver(message);
             }
         }
@@ -222,14 +224,16 @@ public class MockMailbox implements Mailbox {
 
     private final ArrayDeque<Message> outgoingMessages = new ArrayDeque<Message>();
 
+    private long m_hsId = 0;
+
     @Override
     public void setHSId(long hsid)
     {
+        m_hsId = hsid;
     }
 
     @Override
     public long getHSId() {
-        // TODO Auto-generated method stub
-        return 0;
+        return m_hsId;
     }
 }

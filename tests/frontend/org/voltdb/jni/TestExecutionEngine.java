@@ -205,7 +205,9 @@ public class TestExecutionEngine extends TestCase {
 
     public void testRecoveryProcessors() throws Exception {
         final long sourceId = 0;
+        final long sourceDataId = 1;
         final long destinationId = 32;
+        final long destinationDataId = 33;
         final AtomicReference<Boolean> sourceCompleted = new AtomicReference<Boolean>(false);
         final AtomicReference<Boolean> destinationCompleted = new AtomicReference<Boolean>(false);
         final String serializedCatalog = m_catalog.serialize();
@@ -222,6 +224,10 @@ public class TestExecutionEngine extends TestCase {
 
         final MockMailbox sourceMailbox = new MockMailbox();
         MockMailbox.registerMailbox(sourceId, sourceMailbox);
+
+        final MockMailbox sourceDataMailbox = new MockMailbox();
+        sourceDataMailbox.setHSId(sourceDataId);
+        MockMailbox.registerMailbox(sourceDataId, sourceDataMailbox);
 
         final Runnable onSourceCompletion = new Runnable() {
             @Override
@@ -256,6 +262,10 @@ public class TestExecutionEngine extends TestCase {
         final MockMailbox destinationMailbox = new MockMailbox();
         MockMailbox.registerMailbox(destinationId, destinationMailbox);
 
+        final MockMailbox destinationDataMailbox = new MockMailbox();
+        destinationDataMailbox.setHSId(destinationDataId);
+        MockMailbox.registerMailbox(destinationDataId, destinationDataMailbox);
+
         Thread destinationThread = new Thread("Destination thread") {
             @Override
             public void run() {
@@ -269,6 +279,7 @@ public class TestExecutionEngine extends TestCase {
                             tablesAndSources,
                             destinationEngine,
                             destinationMailbox,
+                            destinationDataMailbox,
                             destinationId,
                             0,
                             onDestinationCompletion,
@@ -318,6 +329,7 @@ public class TestExecutionEngine extends TestCase {
                                                         tablesAndDestinations,
                                                         sourceEngine,
                                                         sourceMailbox,
+                                                        sourceDataMailbox,
                                                         sourceId,
                                                         onSourceCompletion,
                                                         mh);

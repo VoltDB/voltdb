@@ -411,13 +411,14 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
             HashMap<Pair<String, Integer>, HashSet<Long>> tableToSites,
             ExecutionEngine engine,
             Mailbox mailbox,
+            Mailbox dataMailbox,
             final long siteId,
             Runnable onCompletion,
             MessageHandler messageHandler) {
         super();
         m_site = site;
         m_mailbox = mailbox;
-        m_mb = VoltDB.instance().getHostMessenger().createMailbox();
+        m_mb = dataMailbox;
         m_destHSId = destHSId;
         m_engine = engine;
         m_siteId = siteId;
@@ -752,6 +753,7 @@ public class RecoverySiteProcessorSource extends RecoverySiteProcessor {
                                                  tableToDestinationSite,
                                                  engine,
                                                  mailbox,
+                                                 VoltDB.instance().getHostMessenger().createMailbox(),
                                                  siteId,
                                                  onCompletion,
                                                  messageHandler);
