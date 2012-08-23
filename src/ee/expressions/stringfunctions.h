@@ -19,7 +19,7 @@ namespace voltdb {
 
 
 /** implement the 1-argument SQL CHAR_LENGTH function */
-template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
+template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
     if (isNull()) {
         return getIntegerValue(0);
     }

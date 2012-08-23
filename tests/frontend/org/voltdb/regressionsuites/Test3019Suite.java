@@ -76,14 +76,17 @@ public class Test3019Suite extends RegressionSuite {
                 PRIMARY KEY (ID)
                 );
         */
-        for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "XIN"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
-            client.drain();
+        for(int id=8; id < 11; id++) {
+            //client.callProcedure(callback, "P1.insert", - id, "Xin"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
+            //client.callProcedure(callback, "P1.insert", - id, "贾"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
+            //client.drain();
         }
+        client.callProcedure(callback, "P1.insert", 1, "贾鑫", 10, 1.1, new Timestamp(100000000L));
+        client.callProcedure(callback, "P1.insert", 2, "Xin", 10, 1.1, new Timestamp(100000000L));
         ClientResponse cr = null;
         VoltTable r = null;
 
-        cr = client.callProcedure("CHAR_LENGTH");
+        cr = client.callProcedure("OCTET_LENGTH");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         System.err.println("result:\n" + r);
@@ -149,15 +152,14 @@ public class Test3019Suite extends RegressionSuite {
         project.addPartitionInfo("P1", "ID");
 
         //project.addStmtProcedure("POSITION", "select desc, POSITION ('xin' IN desc) from P1");
-        project.addStmtProcedure("CHAR_LENGTH", "select desc, CHARACTER_LENGTH (desc) from P1");
-        //project.addStmtProcedure("OCTET_LENGTH", "select desc, OCTET_LENGTH (desc) from P1");
+        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1");
+        //project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //config = new LocalCluster("fixedsql-threesite.jar", 3/*HACK*/-2, 1, 0, BackendTarget.NATIVE_EE_IPC); //JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
