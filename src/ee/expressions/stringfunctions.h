@@ -17,12 +17,22 @@
 
 namespace voltdb {
 
-
 /** implement the 1-argument SQL CHAR_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
     if (isNull()) {
         return getIntegerValue(0);
     }
+    return getIntegerValue(getObjectLength());
+}
+
+/** implement the 1-argument SQL CHAR_LENGTH function */
+template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
+    if (isNull()) {
+        return getIntegerValue(0);
+    }
+    const int32_t valueUTF8Length = getObjectLength();
+    char *valueChars = reinterpret_cast<char*>(getObjectValue());
+    const char *valueEnd = valueChars+valueUTF8Length;
     return getIntegerValue(getObjectLength());
 }
 
