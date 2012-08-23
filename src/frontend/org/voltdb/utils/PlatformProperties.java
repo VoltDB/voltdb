@@ -71,8 +71,7 @@ public class PlatformProperties implements Serializable {
         HardwareInfo hw = new HardwareInfo();
 
         hw.hardwareThreads = CoreUtils.availableProcessors();
-
-        String result = ShellTools.cmd("/usr/sbin/system_profiler -detailLevel mini SPHardwareDataType").trim();
+        String result = ShellTools.local_cmd("/usr/sbin/system_profiler -detailLevel mini SPHardwareDataType").trim();
         String[] lines = result.split("\n");
         for (String line : lines) {
             line = line.trim();

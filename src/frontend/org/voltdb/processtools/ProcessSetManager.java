@@ -17,17 +17,9 @@
 
 package org.voltdb.processtools;
 
-import java.io.IOException;
-import java.util.HashMap;
-import java.util.HashSet;
-import java.util.Map;
-import java.util.Set;
-import java.util.concurrent.LinkedBlockingQueue;
-
-import org.voltdb.processtools.ProcessData.OutputLine;
 
 public class ProcessSetManager {
-
+/*
     LinkedBlockingQueue<OutputLine> m_output = new LinkedBlockingQueue<OutputLine>();
     Map<String, ProcessData> m_processes = new HashMap<String, ProcessData>();
     SimpleProgressHandler m_handler = new SimpleProgressHandler(m_output);
@@ -126,8 +118,9 @@ public class ProcessSetManager {
     public int size() {
         return m_processes.size();
     }
-
+*/
     public static void main(String[] args) {
+        /*
         ProcessSetManager psm = new ProcessSetManager();
         psm.startProcess("ping4c", new String[] { "ping", "volt4c" });
         psm.startProcess("ping3c", new String[] { "ping", "volt3c" });
@@ -135,6 +128,7 @@ public class ProcessSetManager {
             OutputLine line = psm.nextBlocking();
             System.out.printf("(%s:%s): %s\n", line.processName, line.stream.name(), line.message);
         }
+    */
     }
 
 }
