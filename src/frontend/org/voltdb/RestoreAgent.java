@@ -22,7 +22,6 @@ import java.io.FileFilter;
 import java.io.IOException;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Collection;
 import java.util.HashMap;
@@ -598,13 +597,15 @@ SnapshotCompletionInterest
             JSONObject digest_detail = SnapshotUtil.CRCCheck(digest);
             catalog_crc = digest_detail.getLong("catalogCRC");
 
-            JSONObject pidToTxnId = digest_detail.getJSONObject("partitionTransactionIds");
-            @SuppressWarnings("unchecked")
-            Iterator<String> it = pidToTxnId.keys();
-            while (it.hasNext()) {
-                String pidkey = it.next();
-                Long txnidval = pidToTxnId.getLong(pidkey);
-                pidToTxnMap.put(Integer.valueOf(pidkey), txnidval);
+            if (digest_detail.has("partitionTransactionIds")) {
+                JSONObject pidToTxnId = digest_detail.getJSONObject("partitionTransactionIds");
+                @SuppressWarnings("unchecked")
+                Iterator<String> it = pidToTxnId.keys();
+                while (it.hasNext()) {
+                    String pidkey = it.next();
+                    Long txnidval = pidToTxnId.getLong(pidkey);
+                    pidToTxnMap.put(Integer.valueOf(pidkey), txnidval);
+                }
             }
         }
         catch (IOException ioe)

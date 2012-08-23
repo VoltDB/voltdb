@@ -21,12 +21,13 @@ import java.util.Collections;
 import java.util.LinkedHashMap;
 import java.util.LinkedList;
 import java.util.Map;
+import java.util.PriorityQueue;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HeartbeatResponseMessage;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.logging.VoltLogger;
 
 /**
  * <p>Extends a PriorityQueue such that is only stores transaction state
@@ -40,7 +41,7 @@ import org.voltcore.logging.VoltLogger;
  *
  * <p>This class manages all that state.</p>
  */
-public class RestrictedPriorityQueue extends RPQBase {
+public class RestrictedPriorityQueue extends PriorityQueue<OrderableTransaction> implements RPQInterface  {
     private static final long serialVersionUID = 1L;
     private final VoltLogger m_joinLog = new VoltLogger("JOIN");
 
@@ -193,6 +194,7 @@ public class RestrictedPriorityQueue extends RPQBase {
      * Update the information stored about the latest transaction
      * seen from each initiator. Compute the newest safe transaction id.
      */
+    @Override
     public long noteTransactionRecievedAndReturnLastSeen(long initiatorHSId, long txnId,
             boolean isHeartbeat, long lastSafeTxnIdFromInitiator)
     {
@@ -259,6 +261,7 @@ public class RestrictedPriorityQueue extends RPQBase {
      * and do not require heartbeats from that initiator to proceed.
      * @param initiatorId id of the failed initiator.
      */
+    @Override
     public void gotFaultForInitiator(long initiatorId) {
         // calculate the next minimum transaction w/o our dead friend
         noteTransactionRecievedAndReturnLastSeen(initiatorId, Long.MAX_VALUE, true, DtxnConstants.DUMMY_LAST_SEEN_TXN_ID);
@@ -277,6 +280,7 @@ public class RestrictedPriorityQueue extends RPQBase {
      * @param initiatorId Initiator present in the catalog.
      * @return The number of initiators that weren't known
      */
+    @Override
     public int ensureInitiatorIsKnown(long initiatorId) {
         int newInitiatorCount = 0;
         if (m_initiatorData.get(initiatorId) == null) {
@@ -298,6 +302,7 @@ public class RestrictedPriorityQueue extends RPQBase {
      * Used to figure out what to do after an initiator fails.
      * @param initiatorId The id of the initiator that has failed.
      */
+    @Override
     public Long getNewestSafeTransactionForInitiator(long initiatorId) {
         LastInitiatorData lid = m_initiatorData.get(initiatorId);
         if (lid == null) {
@@ -466,6 +471,7 @@ public class RestrictedPriorityQueue extends RPQBase {
         }
     }
 
+    @Override
     public String toString() {
         StringBuilder sb = new StringBuilder();
         sb.append("State: ").append(m_state);
