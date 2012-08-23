@@ -114,9 +114,26 @@ public class TransactionTaskQueue
             if (!m_multipartBacklog.isEmpty() && ts.txnId == m_multipartBacklog.firstKey()) {
                 /*
                  * This branch is for fragments that follow the first fragment during replay
-                 * In that case the task is already in the backlog and the txnids can be compared.
-                 * In this case straight execute it
+                 * or first fragments during replay that follow the sentinenl (hence the key exists)
+                 * It is executed immeidately either way, but it may need to be inserted into the backlog
+                 * if it is the first fragment
                  */
+                Deque<TransactionTask> backlog = m_multipartBacklog.firstEntry().getValue();
+                TransactionTask first = backlog.peekFirst();
+                if (first != null) {
+                    if (first.m_txn.txnId != task.getTxnId()) {
+                        if (!first.m_txn.isSinglePartition()) {
+                            VoltDB.crashLocalVoltDB(
+                                    "If the first backlog task is multi-part, " +
+                                    "but has a different transaction id it is a bug", true, null);
+                        }
+                        backlog.addFirst(task);
+                    }
+                    //else the txnids match, don't need to put the second fragment at head of queue
+                } else {
+                    //The first task is expected to be in the head of the queue
+                    backlog.offer(task);
+                }
                 taskQueueOffer(task);
             } else if (m_multipartBacklog.containsKey(ts.txnId)) {
                 /*
