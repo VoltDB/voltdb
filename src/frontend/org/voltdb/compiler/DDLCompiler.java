@@ -182,6 +182,33 @@ public class DDLCompiler {
             "(?i)\\ACREATE\\s+PROCEDURE\\s+FROM\\s+CLASS\\s+([\\w$.]+)\\s*;\\z"
             );
 
+    /**
+     * NB supports only unquoted table and column names
+     *
+     * Regex Description:
+     * <pre>
+     * (?i) -- ignore case
+     * \\A -- beginning of statement
+     * CREATE -- token
+     * \\s+ -- one or more spaces
+     * PROCEDURE -- token
+     * \\s+ -- one or more spaces
+     * AS -- token
+     * \\s+ -- one or more spaces
+     * ((?:SELECT|INSERT|UPDATE|DELETE)\\s+.+) -- [select/dml statement capture group 1]
+     *     (?:SELECT|INSERT|UPDATE|DELETE) -- select/dml start token [not captured]
+     *         SELECT -- token
+     *         | -- or
+     *         INSERT -- token
+     *         | -- or
+     *         UPDATE -- token
+     *         | -- or
+     *         DELETE -- token
+     *     \\s+ -- one or more spaces
+     *     .+ -- one of more of any characters
+     * ; -- a semicolon
+     * \\z -- end of string
+     */
     static final Pattern procedureSingleStatementPattern = Pattern.compile(
             "(?i)\\ACREATE\\s+PROCEDURE\\s+([\\w.$]+)\\s+AS\\s+((?:SELECT|INSERT|UPDATE|DELETE)\\s+.+);\\z"
             );
@@ -401,7 +428,7 @@ public class DDLCompiler {
         // matches if it is CREATE PROCEDURE <proc-name> AS <select-or-dml-statement>
         statementMatcher = procedureSingleStatementPattern.matcher(statement);
         if( statementMatcher.matches()) {
-            String clazz = statementMatcher.group(1);
+            String clazz = checkIdentifierStart(statementMatcher.group(1), statement);
             String sqlStatement = statementMatcher.group(2);
 
             ProcedureDescriptor descriptor = m_compiler.new ProcedureDescriptor(

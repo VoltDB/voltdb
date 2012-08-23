@@ -2029,6 +2029,16 @@ public class TestVoltCompiler extends TestCase {
         expectedError = "PartitionInfo specifies invalid parameter index for procedure: org.kanamuri.Foo";
         assertTrue(isFeedbackPresent(expectedError, fbs));
 
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
+                "PARTITION PROCEDURE 7Foo ON 'PKEY_INTEGER.PKEY: 0';"
+                );
+        expectedError = "Bad indentifier in DDL: \""+
+                "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?" +
+                "\" contains invalid identifier \"7Foo\"";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 
     private ArrayList<Feedback> checkInvalidProcedureDDL(String ddl) {
