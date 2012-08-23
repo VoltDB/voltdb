@@ -134,9 +134,11 @@ public class PlanNodeTree implements JSONString {
                 try {
                     apn = nodeType.getPlanNodeClass().newInstance();
                 } catch (InstantiationException e) {
+                    System.err.println( e.getMessage() );
                     e.printStackTrace();
                     return;
                 } catch (IllegalAccessException e) {
+                    System.err.println( e.getMessage() );
                     e.printStackTrace();
                     return;
                 }

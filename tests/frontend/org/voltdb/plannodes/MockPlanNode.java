@@ -22,6 +22,8 @@
  */
 package org.voltdb.plannodes;
 
+import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.voltdb.catalog.Database;
 import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
@@ -121,6 +123,12 @@ public class MockPlanNode extends AbstractPlanNode
             m_isOrderDeterministic = false;
             m_nondeterminismDetail = explanation;
         }
+    }
+
+    @Override
+    protected void loadFromJSONObject(JSONObject jobj, Database db)
+            throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
     }
 
 }

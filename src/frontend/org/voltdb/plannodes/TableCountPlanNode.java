@@ -26,6 +26,10 @@ import org.voltdb.types.PlanNodeType;
 
 public class TableCountPlanNode extends AbstractScanPlanNode {
 
+    public TableCountPlanNode() {
+        super();
+    }
+
     public TableCountPlanNode(SeqScanPlanNode ssp, AggregatePlanNode apn) {
         super();
         m_outputSchema = apn.getOutputSchema().clone();
@@ -60,4 +64,5 @@ public class TableCountPlanNode extends AbstractScanPlanNode {
     protected String explainPlanForNode(String indent) {
         return "TABLE COUNT of \"" + m_targetTableName + "\"";
     }
+
 }

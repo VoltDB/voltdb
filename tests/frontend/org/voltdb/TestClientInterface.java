@@ -69,7 +69,6 @@ import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.compiler.ExplainPlannerWork;
 import org.voltdb.compiler.VoltProjectBuilder;
 import org.voltdb.dtxn.MailboxPublisher;
 import org.voltdb.dtxn.TransactionInitiator;
@@ -254,7 +253,7 @@ public class TestClientInterface {
         assertNull(resp);
         ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
         verify(m_messenger).send(eq(32L), captor.capture());
-        assertTrue(captor.getValue().payload instanceof ExplainPlannerWork );
+        assertTrue(captor.getValue().payload instanceof AdHocPlannerWork );
         System.out.println( captor.getValue().payload.toString() );
         assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
     }
