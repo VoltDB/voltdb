@@ -41,296 +41,304 @@ import org.voltdb.utils.BuildDirectoryUtils;
  */
 public class TestPartitionDDL extends TestCase {
 
-    String testout_jar;
+	String testout_jar;
 
-    @Override
-    public void setUp() {
-        testout_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "testout.jar";
-    }
+	@Override
+	public void setUp() {
+		testout_jar = BuildDirectoryUtils.getBuildDirectoryPath() + File.pathSeparator + "testout.jar";
+	}
 
-    @Override
-    public void tearDown() {
-        new File(testout_jar).delete();
-    }
+	@Override
+	public void tearDown() {
+		new File(testout_jar).delete();
+	}
 
-    class Item {
-        final String[] m_strings;
+	class Item {
+		final String[] m_strings;
 
-        Item(final String... strings) {
-            m_strings = strings;
-        }
+		Item(final String... strings) {
+			m_strings = strings;
+		}
 
-        String toDDL() {
-            return null;
-        }
+		String toDDL() {
+			return null;
+		}
 
-        String toXML() {
-            return null;
-        }
-    }
+		String toXML() {
+			return null;
+		}
+	}
 
-    class DDL extends Item {
-        DDL(final String... ddlStrings) {
-            super(ddlStrings);
-        }
-        @Override
-        String toDDL() {
-            return StringUtils.join(m_strings, '\n');
-        }
-    }
+	class DDL extends Item {
+		DDL(final String... ddlStrings) {
+			super(ddlStrings);
+		}
+		@Override
+		String toDDL() {
+			return StringUtils.join(m_strings, '\n');
+		}
+	}
 
-    class ReplicateDDL extends DDL {
-        ReplicateDDL(final String tableName) {
-            super(String.format("REPLICATE TABLE %s;", tableName));
-        }
-    }
+	class ReplicateDDL extends DDL {
+		ReplicateDDL(final String tableName) {
+			super(String.format("REPLICATE TABLE %s;", tableName));
+		}
+	}
 
-    class PartitionDDL extends DDL {
-        PartitionDDL(final String tableName, final String columnName) {
-            super(String.format("PARTITION TABLE %s ON COLUMN %s;", tableName, columnName));
-        }
-    }
+	class PartitionDDL extends DDL {
+		PartitionDDL(final String tableName, final String columnName) {
+			super(String.format("PARTITION TABLE %s ON COLUMN %s;", tableName, columnName));
+		}
+	}
 
-    class PartitionXML extends Item {
-        PartitionXML(final String tableName, final String columnName) {
-            super(tableName, columnName);
-        }
-        @Override
-        String toXML() {
-            return String.format("<partition table='%s' column='%s' />", m_strings[0], m_strings[1]);
-        }
-    }
+	class PartitionXML extends Item {
+		PartitionXML(final String tableName, final String columnName) {
+			super(tableName, columnName);
+		}
+		@Override
+		String toXML() {
+			return String.format("<partition table='%s' column='%s' />", m_strings[0], m_strings[1]);
+		}
+	}
 
-    class Tester {
-        final Item schemaItem;
-        final static String partitionedProc = "org.voltdb.compiler.procedures.AddBook";
-        final static String replicatedProc = "org.voltdb.compiler.procedures.EmptyProcedure";
+	class Tester {
+		final Item schemaItem;
+		final static String partitionedProc = "org.voltdb.compiler.procedures.AddBook";
+		final static String replicatedProc = "org.voltdb.compiler.procedures.EmptyProcedure";
 
-        Tester() {
-            schemaItem = new DDL(
-                "create table books (",
-                    "cash integer default 0 NOT NULL,",
-                    "title varchar(10) default 'foo',",
-                    "PRIMARY KEY(cash)",
-                ");");
-        }
+		Tester() {
+			schemaItem = new DDL(
+				"create table books (",
+					"cash integer default 0 NOT NULL,",
+					"title varchar(10) default 'foo',",
+					"PRIMARY KEY(cash)",
+				");");
+		}
 
-        String writeDDL(final Item... items) {
-            StringBuilder sb = new StringBuilder();
-            sb.append(schemaItem.toDDL());
-            sb.append('\n');
-            for (Item item : items) {
-                String line = item.toXML();
-                if (line == null) {
-                    sb.append(item.toDDL());
-                    sb.append('\n');
-                }
-            }
-            final File ddlFile = VoltProjectBuilder.writeStringToTempFile(sb.toString());
-            return ddlFile.getPath();
-        }
+		String writeDDL(final Item... items) {
+			StringBuilder sb = new StringBuilder();
+			sb.append(schemaItem.toDDL());
+			sb.append('\n');
+			for (Item item : items) {
+				String line = item.toXML();
+				if (line == null) {
+					sb.append(item.toDDL());
+					sb.append('\n');
+				}
+			}
+			final File ddlFile = VoltProjectBuilder.writeStringToTempFile(sb.toString());
+			return ddlFile.getPath();
+		}
 
-        String writeXML(final boolean partitioned, final String ddlPath, final Item... items) {
-            String xmlText =
-                    "<?xml version=\"1.0\"?>\n" +
-                    "<project>\n" +
-                    "  <database>\n" +
-                    "  <schemas>\n" +
-                    "    <schema path='" + ddlPath + "' />\n" +
-                    "  </schemas>\n";
-                int nxml = 0;
-                for (Item item : items) {
-                    String line = item.toXML();
-                    if (line != null) {
-                        nxml++;
-                        if (nxml == 1) {
-                            xmlText += "  <partitions>\n";
-                        }
-                        xmlText += String.format("    %s\n", line);
-                    }
-                }
-                if (nxml > 0) {
-                    xmlText += "  </partitions>\n";
-                }
-            xmlText += "    <procedures>\n";
-            xmlText += String.format("      <procedure class='%s' />\n",
-                                     partitioned ? partitionedProc : replicatedProc);
-            xmlText += "    </procedures>\n" +
-                       "  </database>\n" +
-                       "</project>\n";
-            return VoltProjectBuilder.writeStringToTempFile(xmlText).getPath();
-        }
+		String writeXML(final boolean partitioned, final String ddlPath, final Item... items) {
+			String xmlText =
+					"<?xml version=\"1.0\"?>\n" +
+					"<project>\n" +
+					"  <database>\n" +
+					"  <schemas>\n" +
+					"    <schema path='" + ddlPath + "' />\n" +
+					"  </schemas>\n";
+				int nxml = 0;
+				for (Item item : items) {
+					String line = item.toXML();
+					if (line != null) {
+						nxml++;
+						if (nxml == 1) {
+							xmlText += "  <partitions>\n";
+						}
+						xmlText += String.format("    %s\n", line);
+					}
+				}
+				if (nxml > 0) {
+					xmlText += "  </partitions>\n";
+				}
+			xmlText += "    <procedures>\n";
+			xmlText += String.format("      <procedure class='%s' />\n",
+									partitioned ? partitionedProc : replicatedProc);
+			xmlText += "    </procedures>\n" +
+					"  </database>\n" +
+					"</project>\n";
+			return VoltProjectBuilder.writeStringToTempFile(xmlText).getPath();
+		}
 
-        String getMessages(final VoltCompiler compiler, final boolean success) {
-            ByteArrayOutputStream ss = new ByteArrayOutputStream();
-            PrintStream ps = new PrintStream(ss);
-            if (success) {
-                compiler.summarizeSuccess(null, ps);
-            }
-            else {
-                compiler.summarizeErrors(null, ps);
-            }
-            // For some reason linefeeds break the regex pattern matching.
-            return ss.toString().trim().replace('\n', ' ');
-        }
+		String getMessages(final VoltCompiler compiler, final boolean success) {
+			ByteArrayOutputStream ss = new ByteArrayOutputStream();
+			PrintStream ps = new PrintStream(ss);
+			if (success) {
+				compiler.summarizeSuccess(null, ps);
+			}
+			else {
+				compiler.summarizeErrors(null, ps);
+			}
+			// For some reason linefeeds break the regex pattern matching.
+			return ss.toString().trim().replace('\n', ' ');
+		}
 
-         // Must provide a failRegex if failure is expected.
-        void test(final boolean partitioned, final String failRegex, final Item... items) {
-            // Generate DDL and XML files.
-            String ddlPath = writeDDL(items);
-            String xmlPath = writeXML(partitioned, ddlPath, items);
+		// Must provide a failRegex if failure is expected.
+		void test(final boolean partitioned, final String failRegex, final Item... items) {
+			// Generate DDL and XML files.
+			String ddlPath = writeDDL(items);
+			String xmlPath = writeXML(partitioned, ddlPath, items);
 
-            // Compile the catalog.
-            final VoltCompiler compiler = new VoltCompiler();
-            boolean success = compiler.compile(xmlPath, testout_jar);
+			// Compile the catalog.
+			final VoltCompiler compiler = new VoltCompiler();
+			boolean success = compiler.compile(xmlPath, testout_jar);
 
-            // Check for expected compilation success or failure.
-            String s = getMessages(compiler, false);
-            if (failRegex != null) {
-                assertFalse("Expected compilation failure.", success);
-                assertTrue(String.format("Expected error regex \"%s\" not matched.\n%s", failRegex, s),
-                           s.matches(failRegex));
-            }
-            else {
-                assertTrue(String.format("Unexpected compilation failure.\n%s", s), success);
+			// Check for expected compilation success or failure.
+			String s = getMessages(compiler, false);
+			if (failRegex != null) {
+				assertFalse("Expected compilation failure.", success);
+				assertTrue(String.format("Expected error regex \"%s\" not matched.\n%s", failRegex, s),
+						s.matches(failRegex));
+			}
+			else {
+				assertTrue(String.format("Unexpected compilation failure.\n%s", s), success);
 
-                // Check that the catalog table is appropriately configured.
-                Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
-                assertNotNull(db);
-                assertEquals(1, db.getTables().size());
-                Table t = db.getTables().getIgnoreCase("books");
-                assertNotNull(t);
-                Column c = t.getPartitioncolumn();
-                if (partitioned) {
-                    assertNotNull(c);
-                }
-                else {
-                    assertNull(c);
-                }
-            }
-        }
+				// Check that the catalog table is appropriately configured.
+				Database db = compiler.m_catalog.getClusters().get("cluster").getDatabases().get("database");
+				assertNotNull(db);
+				assertEquals(1, db.getTables().size());
+				Table t = db.getTables().getIgnoreCase("books");
+				assertNotNull(t);
+				Column c = t.getPartitioncolumn();
+				if (partitioned) {
+					assertNotNull(c);
+				}
+				else {
+					assertNull(c);
+				}
+			}
+		}
 
-        /**
-         *  Call when expected result is a partitioned table.
-         * @param items
-         */
-        void partitioned(final Item... items) {
-            test(true, null, items);
-        }
+		/**
+		 *  Call when expected result is a partitioned table.
+		 * @param items
+		 */
+		void partitioned(final Item... items) {
+			test(true, null, items);
+		}
 
-        /**
-         * Call when expected result is a replicated table.
-         * @param items
-         */
-        void replicated(final Item... items) {
-            test(false, null, items);
-        }
+		/**
+		 * Call when expected result is a replicated table.
+		 * @param items
+		 */
+		void replicated(final Item... items) {
+			test(false, null, items);
+		}
 
-        /**
-         * Call when expected result is a failure.
-         * Checks error message against failRegex.
-         * @param failRegex
-         * @param items
-         */
-        void bad(final String failRegex, final Item... items) {
-            test(false, failRegex, items);
-        }
-    }
+		/**
+		 * Call when expected result is a failure.
+		 * Checks error message against failRegex.
+		 * @param failRegex
+		 * @param items
+		 */
+		void bad(final String failRegex, final Item... items) {
+			test(false, failRegex, items);
+		}
+	}
 
-    public void testGeneralDDLParsing() {
-        Tester tester = new Tester();
+	public void testGeneralDDLParsing() {
+		Tester tester = new Tester();
 
-        // Just the CREATE TABLE statement.
-        tester.replicated();
+		// Just the CREATE TABLE statement.
+		tester.replicated();
 
-        // Garbage statement added.
-        tester.bad(".*unexpected token.*", new DDL("asldkf sadlfk;"));
-    }
+		// Garbage statement added.
+		tester.bad(".*unexpected token.*", new DDL("asldkf sadlfk;"));
+	}
 
-    public void testBadReplicate() {
-        Tester tester = new Tester();
+	public void testBadReplicate() {
+		Tester tester = new Tester();
 
-        // REPLICATE statement with no semi-colon.
-        tester.bad(".*no semicolon found.*",
-                   new DDL("REPLICATE TABLE books"));
+		// REPLICATE statement with no semi-colon.
+		tester.bad(".*no semicolon found.*",
+				new DDL("REPLICATE TABLE books"));
 
-        // REPLICATE statement with missing argument.
-        tester.bad(".*Bad REPLICATE DDL statement.*",
-                   new DDL("REPLICATE TABLE;"));
+		// REPLICATE statement with missing argument.
+		tester.bad(".*Bad REPLICATE DDL statement.*",
+				new DDL("REPLICATE TABLE;"));
 
-        // REPLICATE statement with too many arguments.
-        tester.bad(".*Bad REPLICATE DDL statement.*",
-                   new DDL("REPLICATE TABLE books NOW;"));
+		// REPLICATE statement with too many arguments.
+		tester.bad(".*Bad REPLICATE DDL statement.*",
+				new DDL("REPLICATE TABLE books NOW;"));
 
-        // REPLICATE with bad table clause.
-        tester.bad(".*Bad REPLICATE DDL statement.*",
-                   new DDL("REPLICATE TABLEX books;"));
-    }
+		// REPLICATE with bad table clause.
+		tester.bad(".*Bad REPLICATE DDL statement.*",
+				new DDL("REPLICATE TABLEX books;"));
 
-    public void testGoodReplicate() {
-        Tester tester = new Tester();
+		//REPLICATE with bad table identifier
+		tester.bad(".*Bad indentifier in DDL.*",
+				new DDL("REPLICATE TABLE 0books;"));
+	}
 
-        // REPLICATE with annoying whitespace.
-        tester.replicated(new DDL("\t\t  REPLICATE\r\nTABLE\nbooks\t\t\n  ;"));
+	public void testGoodReplicate() {
+		Tester tester = new Tester();
 
-        // REPLICATE with clean statement.
-        tester.replicated(new ReplicateDDL("books"));
-    }
+		// REPLICATE with annoying whitespace.
+		tester.replicated(new DDL("\t\t  REPLICATE\r\nTABLE\nbooks\t\t\n  ;"));
 
-    public void testBadPartition() {
-        Tester tester = new Tester();
+		// REPLICATE with clean statement.
+		tester.replicated(new ReplicateDDL("books"));
+	}
 
-        // PARTITION statement with no semi-colon.
-        tester.bad(".*no semicolon found.*",
-                   new DDL("PARTITION TABLE books ON COLUMN cash"));
+	public void testBadPartition() {
+		Tester tester = new Tester();
 
-        // PARTITION statement with missing arguments.
-        tester.bad(".*Bad PARTITION DDL statement.*",
-                   new DDL("PARTITION TABLE;"));
+		// PARTITION statement with no semi-colon.
+		tester.bad(".*no semicolon found.*",
+				new DDL("PARTITION TABLE books ON COLUMN cash"));
 
-        // PARTITION statement with too many arguments.
-        tester.bad(".*Bad PARTITION DDL statement.*",
-                   new DDL("PARTITION TABLE books ON COLUMN cash COW;"));
+		// PARTITION statement with missing arguments.
+		tester.bad(".*Bad PARTITION DDL statement.*",
+				new DDL("PARTITION TABLE;"));
 
-        // PARTITION with bad table clause.
-        tester.bad(".*Bad PARTITION DDL statement.*",
-                   new DDL("PARTITION TABLEX books ON COLUMN cash;"));
-    }
+		// PARTITION statement with too many arguments.
+		tester.bad(".*Bad PARTITION DDL statement.*",
+				new DDL("PARTITION TABLE books ON COLUMN cash COW;"));
 
-    public void testGoodPartition() {
-        Tester tester = new Tester();
+		// PARTITION statement intermixed with procedure.
+		tester.bad(".*Bad PARTITION DDL statement.*",
+				new DDL("PARTITION TABLE books PROCEDURE bruha ON COLUMN cash;"));
 
-        // PARTITION with annoying whitespace.
-        tester.partitioned(new DDL("\t\t  PARTITION\r\nTABLE\nbooks\r\n\tON COLUMN cash\t\t\n  ;"));
+		// PARTITION with bad table clause.
+		tester.bad(".*Bad PARTITION DDL statement.*",
+				new DDL("PARTITION TABLEX books ON COLUMN cash;"));
+	}
 
-        // PARTITION from DDL.
-        tester.partitioned(new PartitionDDL("books", "cash"));
+	public void testGoodPartition() {
+		Tester tester = new Tester();
 
-        // PARTITION from XML.
-        tester.partitioned(new PartitionXML("books", "cash"));
-    }
+		// PARTITION with annoying whitespace.
+		tester.partitioned(new DDL("\t\t  PARTITION\r\nTABLE\nbooks\r\n\tON COLUMN cash\t\t\n  ;"));
 
-    public void testRedundant() {
-        Tester tester = new Tester();
+		// PARTITION from DDL.
+		tester.partitioned(new PartitionDDL("books", "cash"));
 
-        // PARTITION from both XML and DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                   new PartitionXML("books", "cash"),
-                   new PartitionDDL("books", "cash"));
+		// PARTITION from XML.
+		tester.partitioned(new PartitionXML("books", "cash"));
+	}
 
-        // PARTITION and REPLICATE from both XML and DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                   new PartitionXML("books", "cash"),
-                   new ReplicateDDL("books"));
+	public void testRedundant() {
+		Tester tester = new Tester();
 
-        // PARTITION and REPLICATE from DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                   new PartitionDDL("books", "cash"),
-                   new ReplicateDDL("books"));
+		// PARTITION from both XML and DDL.
+		tester.bad(".*Partitioning already specified for table.*",
+				new PartitionXML("books", "cash"),
+				new PartitionDDL("books", "cash"));
 
-        // PARTITION twice from DDL.
-        tester.bad(".*Partitioning already specified for table.*",
-                   new PartitionDDL("books", "cash"),
-                   new PartitionDDL("books", "cash"));
-    }
+		// PARTITION and REPLICATE from both XML and DDL.
+		tester.bad(".*Partitioning already specified for table.*",
+				new PartitionXML("books", "cash"),
+				new ReplicateDDL("books"));
+
+		// PARTITION and REPLICATE from DDL.
+		tester.bad(".*Partitioning already specified for table.*",
+				new PartitionDDL("books", "cash"),
+				new ReplicateDDL("books"));
+
+		// PARTITION twice from DDL.
+		tester.bad(".*Partitioning already specified for table.*",
+				new PartitionDDL("books", "cash"),
+				new PartitionDDL("books", "cash"));
+	}
 }
