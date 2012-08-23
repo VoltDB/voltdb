@@ -160,7 +160,7 @@ def print_section(name, mismatches, output_dir):
 
     return result
 
-def is_different(x):
+def is_different(x, cntonly):
     """Marks the attributes that are different. Since the whole table will be
     printed out as a single string.
     the first line is column count,
@@ -196,9 +196,10 @@ def is_different(x):
                 if x["jni"]["Result"][i].tuples[j] != \
                         x["hsqldb"]["Result"][i].tuples[j]:
                     x["highlight"][i].append(j + 4) # Offset to the correct row
-        for i in x["highlight"]:
-            if i:
-                return True
+        if cntonly != True:
+            for i in x["highlight"]:
+                if i:
+                    return True
 
     return False
 
@@ -212,7 +213,7 @@ contain the SQL statements which caused different responses on both backends.
 """ % (prog_name)
 
 def generate_html_reports(seed, statements_path, hsql_path, jni_path,
-                          output_dir, report_all, is_matching = False):
+                          output_dir, report_all, cntonly = False, is_matching = False):
     if output_dir != None and not os.path.exists(output_dir):
         os.makedirs(output_dir)
 
@@ -244,10 +245,10 @@ def generate_html_reports(seed, statements_path, hsql_path, jni_path,
         statement["hsqldb"] = hsql
         statement["jni"] = jni
         if is_matching:
-            if not is_different(statement):
+            if not is_different(statement, cntonly):
                 mismatches.append(statement)
         else:
-            if is_different(statement):
+            if is_different(statement, cntonly):
                 mismatches.append(statement)
         if report_all:
             all_results.append(statement)
