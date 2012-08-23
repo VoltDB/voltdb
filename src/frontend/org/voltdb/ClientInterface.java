@@ -85,8 +85,6 @@ import org.voltdb.compiler.AsyncCompilerResult;
 import org.voltdb.compiler.AsyncCompilerWork.AsyncCompilerWorkCompletionHandler;
 import org.voltdb.compiler.CatalogChangeResult;
 import org.voltdb.compiler.CatalogChangeWork;
-import org.voltdb.compiler.ExplainPlannedStmtBatch;
-import org.voltdb.compiler.ExplainPlannerWork;
 import org.voltdb.dtxn.SimpleDtxnInitiator;
 import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
@@ -1269,8 +1267,8 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         // none.
         // TODO: Handle a mix of cached and uncached statements.
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
-        ExplainPlannedStmtBatch planBatch =
-                new ExplainPlannedStmtBatch(sql,
+        AdHocPlannedStmtBatch planBatch =
+                new AdHocPlannedStmtBatch(sql,
                         partitionParam,
                         task.clientHandle,
                         handler.connectionId(),
@@ -1291,18 +1289,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             return null;
         }
 
-        LocalObjectMessage work = new LocalObjectMessage(
-                new ExplainPlannerWork(
-                        m_siteId,
-                        false, task.clientHandle, handler.connectionId(),
-                        handler.m_hostname, handler.isAdmin(), ccxn,
-                        sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler));
+        AdHocPlannerWork ahpw = new AdHocPlannerWork(
+                m_siteId,
+                false, task.clientHandle, handler.connectionId(),
+                handler.m_hostname, handler.isAdmin(), ccxn,
+                sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler);
+        ahpw.setIsExplainWork();
 
+        LocalObjectMessage work = new LocalObjectMessage( ahpw );
         m_mailbox.send(m_plannerSiteId, work);
         return null;
     }
 
-    private void processExplainPlannedStmtBatch(  ExplainPlannedStmtBatch planBatch ) {
+    private void processExplainPlannedStmtBatch(  AdHocPlannedStmtBatch planBatch ) {
             final Connection c = (Connection)planBatch.clientData;
             Database db = m_catalogContext.get().database;
             int size = planBatch.getPlannedStatementCount();
@@ -1918,30 +1917,34 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 if (result.errorMsg == null) {
                     if (result instanceof AdHocPlannedStmtBatch) {
                         final AdHocPlannedStmtBatch plannedStmtBatch = (AdHocPlannedStmtBatch) result;
+
                         // assume all stmts have the same catalog version
                         if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
-                            (plannedStmtBatch.getPlannedStatement(0).catalogVersion != m_catalogContext.get().catalogVersion)) {
+                                (plannedStmtBatch.getPlannedStatement(0).catalogVersion != m_catalogContext.get().catalogVersion)) {
 
                             /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an
                                obsolete catalog, re-plan. */
                             LocalObjectMessage work = new LocalObjectMessage(
                                     new AdHocPlannerWork(m_siteId,
-                                                         false,
-                                                         plannedStmtBatch.clientHandle,
-                                                         plannedStmtBatch.connectionId,
-                                                         plannedStmtBatch.hostname,
-                                                         plannedStmtBatch.adminConnection,
-                                                         plannedStmtBatch.clientData,
-                                                         plannedStmtBatch.sqlBatchText,
-                                                         plannedStmtBatch.getSQLStatements(),
-                                                         plannedStmtBatch.partitionParam,
-                                                         null,
-                                                         false,
-                                                         true,
-                                                         m_adhocCompletionHandler));
+                                            false,
+                                            plannedStmtBatch.clientHandle,
+                                            plannedStmtBatch.connectionId,
+                                            plannedStmtBatch.hostname,
+                                            plannedStmtBatch.adminConnection,
+                                            plannedStmtBatch.clientData,
+                                            plannedStmtBatch.sqlBatchText,
+                                            plannedStmtBatch.getSQLStatements(),
+                                            plannedStmtBatch.partitionParam,
+                                            null,
+                                            false,
+                                            true,
+                                            m_adhocCompletionHandler));
 
                             m_mailbox.send(m_plannerSiteId, work);
+                        }
+                        else if( plannedStmtBatch.isExplainWork() ) {
+                            processExplainPlannedStmtBatch( plannedStmtBatch );
                         }
                         else {
                             createAdHocTransaction(plannedStmtBatch);
@@ -1982,37 +1985,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                                 task, false, true, true, m_allPartitions,
                                 m_allPartitions.length, changeResult.clientData, 0,
                                 EstTime.currentTimeMillis(), false);
-                    }
-                    else if (result instanceof ExplainPlannedStmtBatch ) {
-                        final ExplainPlannedStmtBatch plannedStmtBatch = (ExplainPlannedStmtBatch) result;
-                        if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
-                                (plannedStmtBatch.getPlannedStatement(0).catalogVersion != m_catalogContext.get().catalogVersion)) {
-
-                            /* The adhoc planner learns of catalog updates after the EE and the
-                               rest of the system. If the adhoc sql was planned against an
-                               obsolete catalog, re-plan. */
-                            LocalObjectMessage work = new LocalObjectMessage(
-                                    new ExplainPlannerWork(m_siteId,
-                                            false,
-                                            plannedStmtBatch.clientHandle,
-                                            plannedStmtBatch.connectionId,
-                                            plannedStmtBatch.hostname,
-                                            plannedStmtBatch.adminConnection,
-                                            plannedStmtBatch.clientData,
-                                            plannedStmtBatch.sqlBatchText,
-                                            plannedStmtBatch.getSQLStatements(),
-                                            plannedStmtBatch.partitionParam,
-                                            null,
-                                            false,
-                                            true,
-                                            m_adhocCompletionHandler));
-
-                         // XXX: Need to know the async mailbox id.
-                            m_mailbox.send(Long.MIN_VALUE, work);
-                        }
-                        else {
-                            processExplainPlannedStmtBatch( plannedStmtBatch );
-                        }
                     }
                     else {
                         throw new RuntimeException(
