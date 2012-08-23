@@ -95,6 +95,8 @@ namespace
             return false;
         }
 
+        VOLT_TRACE("TupleValueExpression: %s", tve->debug().c_str());
+        VOLT_TRACE("TVE table name: %s\n", tname.c_str());
         if (tname == oname)
             tve->setTupleIndex(0);
         else if (tname == iname)
@@ -122,6 +124,8 @@ namespace
         // eval() tuple parameter. By convention, eval's first parameter
         // will always be the outer table and its second parameter the inner
         const AbstractExpression* predicate = expression;
+
+        VOLT_TRACE("expression: %s", predicate->debug().c_str());
         std::stack<const AbstractExpression*> stack;
         while (predicate != NULL) {
             const AbstractExpression *left = predicate->getLeft();
@@ -170,6 +174,8 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     assert(node);
     inline_node = dynamic_cast<IndexScanPlanNode*>(node->getInlinePlanNode(PLAN_NODE_TYPE_INDEXSCAN));
     assert(inline_node);
+    VOLT_TRACE("<NestLoopIndexPlanNode> %s, <IndexScanPlanNode> %s", node->debug().c_str(), inline_node->debug().c_str());
+
     join_type = node->getJoinType();
     m_lookupType = inline_node->getLookupType();
     m_sortDirection = inline_node->getSortDirection();
@@ -202,6 +208,8 @@ bool NestLoopIndexExecutor::p_init(AbstractPlanNode* abstractNode,
     //
     int num_of_searchkeys = (int)inline_node->getSearchKeyExpressions().size();
     //nshi commented this out in revision 4495 of the old repo in index scan executor
+    VOLT_TRACE ("<Nested Loop Index exec, INIT...> Number of searchKeys: %d \n", num_of_searchkeys);
+
     //the code is cut and paste in nest loop and the change is necessary here as well
 //    if (num_of_searchkeys == 0) {
 //        VOLT_ERROR("There are no search key expressions for the internal"
@@ -308,7 +316,6 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                    ctr, inline_node->getSearchKeyExpressions()[ctr]->debug(true).c_str());
     }
 
-
     // end expression
     AbstractExpression* end_expression = inline_node->getEndExpression();
     if (end_expression) {
@@ -335,13 +342,17 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
     assert (inner_tuple.sizeInValues() == inner_table->columnCount());
     TableTuple &join_tuple = output_table->tempTuple();
 
+    VOLT_TRACE("<num_of_outer_cols>: %d\n", num_of_outer_cols);
     while (outer_iterator.next(outer_tuple)) {
         VOLT_TRACE("outer_tuple:%s",
                    outer_tuple.debug(outer_table->name()).c_str());
 
         int activeNumOfSearchKeys = num_of_searchkeys;
+        VOLT_TRACE ("<Nested Loop Index exec, WHILE-LOOP...> Number of searchKeys: %d \n", num_of_searchkeys);
         IndexLookupType localLookupType = m_lookupType;
         SortDirectionType localSortDirection = m_sortDirection;
+        VOLT_TRACE("Lookup type: %d\n", m_lookupType);
+        VOLT_TRACE("SortDirectionType: %d\n", m_sortDirection);
 
         // did this loop body find at least one match for this tuple?
         bool match = false;
@@ -365,8 +376,9 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 // setting up the search keys.
                 // e.g. TINYINT > 200 or INT <= 6000000000
 
-                // rethow if not an overflow - currently, it's expected to always be an overflow
-                if (e.getSqlState() != SQLException::data_exception_numeric_value_out_of_range) {
+                // re-throw if not an overflow or underflow
+                // currently, it's expected to always be an overflow or underflow
+                if ((e.getInternalFlags() & (SQLException::TYPE_OVERFLOW | SQLException::TYPE_UNDERFLOW)) == 0) {
                     throw e;
                 }
 
@@ -477,7 +489,7 @@ bool NestLoopIndexExecutor::p_execute(const NValueArray &params)
                 }
             }
             else if (m_sortDirection == SORT_DIRECTION_TYPE_INVALID && num_of_searchkeys == 0) {
-                return false;
+                index->moveToEnd(true);
             }
 
             while ((localLookupType == INDEX_LOOKUP_TYPE_EQ &&
