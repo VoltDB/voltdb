@@ -18,24 +18,17 @@
 package org.voltdb.processtools;
 
 import java.io.BufferedInputStream;
-import java.io.File;
 import java.io.IOException;
 
 import org.voltcore.logging.VoltLogger;
 
+
 public abstract class ShellTools {
     private static VoltLogger log = new VoltLogger("HOST");
 
-    private static Process createProcess(String dir, String command[], String passwordScript) {
+    private static Process createProcess(String command[]) {
         ProcessBuilder pb = new ProcessBuilder(command);
-        if (dir != null) {
-            File wd = new File(dir);
-            pb.directory(wd);
-        }
         pb.redirectErrorStream(true);
-        if (passwordScript != null) {
-            pb.environment().put("SSH_ASKPASS", passwordScript);
-        }
         Process p = null;
         try {
             p = pb.start();
@@ -52,22 +45,13 @@ public abstract class ShellTools {
         return p;
     }
 
-    public static String cmd(String command) {
-        return cmd(null, command, null);
+    public static String local_cmd(String command) {
+        return local_cmd(command.split(" "));
     }
 
-    public static String cmd(String dir, String command) {
-        return cmd(dir, command, null);
-    }
-
-    public static String cmd(String dir, String command, String input) {
-        String[] command2 = command.split(" ");
-        return cmd(dir, command2, input);
-    }
-
-    public static String cmd(String dir, String[] command, String passwordScript) {
+    public static String local_cmd(String[] command) {
         StringBuilder retval = new StringBuilder();
-        Process p = createProcess(dir, command, passwordScript);
+        Process p = createProcess(command);
         if (p == null) {
             return null;
         }
@@ -89,64 +73,5 @@ public abstract class ShellTools {
         }
         p.destroy();
         return retval.toString();
-    }
-
-    public static ProcessData command(String dir, String command[], String passwordScript,
-                                      String processName, OutputHandler handler) {
-        Process p = createProcess(dir, command, passwordScript);
-        if (p == null) {
-            return null;
-        }
-        return new ProcessData(processName, handler, p);
-    }
-
-    public static boolean cmdToStdOut(String[] command, String passwordScript) {
-        ProcessBuilder pb = new ProcessBuilder(command);
-        pb.redirectErrorStream(true);
-        if (passwordScript != null) {
-            pb.environment().put("SSH_ASKPASS", passwordScript);
-        }
-        Process p = null;
-        try {
-            p = pb.start();
-        } catch (IOException e) {
-            e.printStackTrace();
-            return false;
-        }
-
-        BufferedInputStream in = new BufferedInputStream(p.getInputStream());
-        int c;
-        try {
-            while((c = in.read()) != -1) {
-                System.out.print((char)c);
-            }
-        }
-        catch (Exception e) {
-            p.destroy();
-        }
-        try {
-            p.waitFor();
-        } catch (InterruptedException e) {
-            e.printStackTrace();
-        }
-        p.destroy();
-        return p.exitValue() == 0;
-    }
-
-    public static boolean cmdToStdOut(String command[]) {
-        return cmdToStdOut( command, null);
-    }
-
-    public static boolean cmdToStdOut(String command, String input) {
-        String[] command2 = command.split(" ");
-        return cmdToStdOut(command2, input);
-    }
-
-    public static boolean cmdToStdOut(String command) {
-        return cmdToStdOut(command, null);
-    }
-
-    public static void main(String[] args) {
-        System.out.println(cmd("cat build.py"));
     }
 }
