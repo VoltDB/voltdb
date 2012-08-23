@@ -212,7 +212,7 @@ public class TableBase {
     public final Index getIndex(int i) {
         return indexList[i];
     }
-    
+
     public Index[] getIndexes() {
         return indexList;
     }
@@ -290,6 +290,10 @@ public class TableBase {
 
         for (int i = 0; i < indexList.length; i++) {
             Index index     = indexList[i];
+            if (index.getExpressions() != null) {
+                // Expression-based indexes are not suitable for row identification.
+                continue;
+            }
             int[] cols      = index.getColumns();
             int   colsCount = index.getVisibleColumns();
 
@@ -397,6 +401,13 @@ public class TableBase {
         return newindex;
     }
 
+    public final Index createAndAddExprIndexStructure(HsqlName name, int[] cols, Expression[] indexExprs, boolean unique, boolean constraint) {
+
+        Index newExprIndex = createExprIndexStructure(name, cols, indexExprs, unique, constraint);
+        addIndex(newExprIndex);
+        return newExprIndex;
+    } /* createAndAddExprIndexStructure */
+
     final Index createIndexStructure(HsqlName name, int[] columns,
                                      boolean[] descending,
                                      boolean[] nullsLast, boolean unique,
@@ -422,6 +433,27 @@ public class TableBase {
 
         return newIndex;
     }
+
+    final Index createExprIndexStructure(HsqlName name, int[] columns, Expression[] expressions, boolean unique, boolean constraint) {
+        // TODO: DEFinitely implement for indexExprs
+        if (primaryKeyCols == null) {
+            throw Error.runtimeError(ErrorCode.U_S0500, "createIndex");
+        }
+
+        int    s     = columns.length;
+        int[]  cols  = new int[s];
+        Type[] types = new Type[s];
+
+        for (int j = 0; j < s; j++) {
+            cols[j]  = columns[j];
+            types[j] = colTypes[cols[j]];
+        }
+
+        long id = database.persistentStoreCollection.getNextId();
+        Index newExprIndex = new IndexAVL(name, id, this, cols, types, expressions, unique, constraint);
+
+        return newExprIndex;
+    } /* createExprIndexStructure */
 
     final void addIndex(Index index) {
 
@@ -483,6 +515,18 @@ public class TableBase {
 
         return newIndex;
     }
+
+    /**
+     *  Create new memory-resident index. For MEMORY and TEXT tables.
+     * @param indexExprs
+     */
+    public final Index createExprIndex(PersistentStore store, HsqlName name, int[] cols,
+                                       Expression[] indexExprs, boolean unique, boolean constraint) {
+
+        Index newExprIndex = createAndAddExprIndexStructure(name, cols, indexExprs, unique, constraint);
+
+        return newExprIndex;
+    } /* createExprIndex */
 
     public void clearAllData(Session session) {
 

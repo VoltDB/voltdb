@@ -27,6 +27,7 @@ import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -622,7 +623,7 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
     public abstract void finalizeValueTypes();
 
     /** Do the recursive part of finalizeValueTypes as requested. */
-    public final void finalizeChildValueTypes() {
+    protected final void finalizeChildValueTypes() {
         if (m_left != null)
             m_left.finalizeValueTypes();
         if (m_right != null)
@@ -630,6 +631,46 @@ public abstract class AbstractExpression implements JSONString, Cloneable {
         if (m_args != null) {
             for (AbstractExpression argument : m_args) {
                 argument.finalizeValueTypes();
+            }
+        }
+    }
+
+    /** Associate underlying TupleValueExpressions with columns in the schema
+     * and propagate the type implications to parent expressions.
+     */
+    public void resolveForDB(Database db) {
+        resolveChildrenForDB(db);
+    }
+
+    /** Do the recursive part of resolveForDB as required for tree-structured expession types. */
+    protected final void resolveChildrenForDB(Database db) {
+        if (m_left != null)
+            m_left.resolveForDB(db);
+        if (m_right != null)
+            m_right.resolveForDB(db);
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.resolveForDB(db);
+            }
+        }
+    }
+
+    /** Associate underlying TupleValueExpressions with columns in the table
+     * and propagate the type implications to parent expressions.
+     */
+    public void resolveForTable(Table table) {
+        resolveChildrenForTable(table);
+    }
+
+    /** Do the recursive part of resolveForTable as required for tree-structured expression types. */
+    protected final void resolveChildrenForTable(Table table) {
+        if (m_left != null)
+            m_left.resolveForTable(table);
+        if (m_right != null)
+            m_right.resolveForTable(table);
+        if (m_args != null) {
+            for (AbstractExpression argument : m_args) {
+                argument.resolveForTable(table);
             }
         }
     }

@@ -114,7 +114,7 @@ public class ExpressionValue extends Expression {
      * @return XML, correctly indented, representing this object.
      */
     @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    public VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         VoltXMLElement exp = new VoltXMLElement("unset");
         // We want to keep track of which expressions are the same in the XML output

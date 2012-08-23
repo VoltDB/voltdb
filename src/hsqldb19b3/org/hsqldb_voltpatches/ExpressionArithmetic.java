@@ -456,7 +456,7 @@ public class ExpressionArithmetic extends Expression {
      * @throws HSQLParseException
      */
     @Override
-    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    public VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         VoltXMLElement exp = new VoltXMLElement("unset");
 
