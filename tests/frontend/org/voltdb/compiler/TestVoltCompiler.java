@@ -1874,10 +1874,10 @@ public class TestVoltCompiler extends TestCase {
                 "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, PRIMARY KEY (PKEY) );" +
                 "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
                 "CREATE PROCEDURE FROM CLASS org.voltdb.compiler.procedures.NotAnnotatedPartitionParamInteger;" +
-                "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON 'PKEY_INTEGER.7PKEY: 0';"
+                "PARTITION PROCEDURE NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON 'PKEY_INTEGER.PKEY: 0';"
                 );
         expectedError = "Bad PARTITION DDL statement: \"PARTITION PROCEDURE " +
-                "NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON 'PKEY_INTEGER.PKEY: hello'\", " +
+                "NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON 'PKEY_INTEGER.PKEY: 0'\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "'<table>.<column>: <parameter-index-no>'";
         assertTrue(isFeedbackPresent(expectedError, fbs));
