@@ -160,9 +160,11 @@ public class plannerTester {
                 String subStr = str.split("=")[1];
                 String [] savePaths = subStr.split(",");
                 for( String savePath : savePaths ) {
-                    if( !savePath.endsWith("/") )
+                    savePath = savePath.trim();
+                    if( !savePath.endsWith("/") ){
                         savePath += "/";
-                    m_savePlanPaths.add( savePath.trim() );
+                    }
+                    m_savePlanPaths.add( savePath );
                 }
             }
             else if( str.startsWith("-cd") ) {
@@ -179,6 +181,7 @@ public class plannerTester {
             }
             else if( str.startsWith("-r") ){
                 m_reportDir = str.split("=")[1];
+                m_reportDir = m_reportDir.trim();
                 if( !m_reportDir.endsWith("/") ) {
                     m_reportDir += "/";
                 }

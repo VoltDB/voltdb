@@ -63,7 +63,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     protected Boolean m_keyIterate = false;
 
     //
-    protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
+    final protected List<AbstractExpression> m_endkeyExpressions = new ArrayList<AbstractExpression>();
 
     // This list of expressions corresponds to the values that we will use
     // at runtime in the lookup on the index
@@ -244,7 +244,6 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
      */
     public void setEndKeyExpression(AbstractExpression endExpr) {
         if (endExpr != null) {
-            m_endkeyExpressions = new ArrayList<AbstractExpression>();
             ArrayList <AbstractExpression> subEndExpr = endExpr.findAllSubexpressionsOfClass(ComparisonExpression.class);
             for (AbstractExpression ae: subEndExpr) {
                 assert (ae.getLeft() instanceof TupleValueExpression);
@@ -295,7 +294,7 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
 
 
         stringer.key(Members.ENDKEY_EXPRESSIONS.name());
-        if (m_endkeyExpressions == null || m_endkeyExpressions.isEmpty()) {
+        if ( m_endkeyExpressions.isEmpty()) {
             stringer.value(null);
         } else {
             stringer.array();
@@ -317,15 +316,10 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        if( !jobj.isNull( Members.KEY_ITERATE.name() ) ) {
-            m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
-        }
-        if( !jobj.isNull( Members.LOOKUP_TYPE.name() )) {
-            m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
-        }
-        if( !jobj.isNull( Members.END_TYPE.name() )) {
-            m_endType = IndexLookupType.get( jobj.getString( Members.END_TYPE.name() ) );
-        }
+        m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
+
+        m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
+        m_endType = IndexLookupType.get( jobj.getString( Members.END_TYPE.name() ) );
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         JSONObject tempjobj = null;
@@ -338,14 +332,11 @@ public class IndexCountPlanNode extends AbstractScanPlanNode {
                 m_endkeyExpressions.add( AbstractExpression.fromJSONObject( tempjobj, db) );
             }
         }
-        //load searchkey_expressions
-        if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
-            JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
-                int size = jarray.length();
-                for( int i = 0 ; i < size; i++ ) {
-                    tempjobj = jarray.getJSONObject( i );
-                    m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
-                }
+        JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
+        int size = jarray.length();
+        for( int i = 0 ; i < size; i++ ) {
+            tempjobj = jarray.getJSONObject( i );
+            m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
         }
     }
 
