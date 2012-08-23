@@ -112,11 +112,22 @@ public class PartitionMap {
         }
 
         // need to re-instantiate as descriptor fields are final
-        descriptor = m_compiler.new ProcedureDescriptor(
-                descriptor.m_authGroups,
-                descriptor.m_className,
-                partitionInfo);
-
+        if( descriptor.m_singleStmt == null) {
+            // the longer form costructor asserts on singleStatement
+            descriptor = m_compiler.new ProcedureDescriptor(
+                    descriptor.m_authGroups,
+                    descriptor.m_className,
+                    partitionInfo);
+        }
+        else {
+            descriptor = m_compiler.new ProcedureDescriptor(
+                    descriptor.m_authGroups,
+                    descriptor.m_className,
+                    descriptor.m_singleStmt,
+                    descriptor.m_joinOrder,
+                    partitionInfo,
+                    false);
+        }
         m_procedureMap.put(procedureName, descriptor);
     }
 
