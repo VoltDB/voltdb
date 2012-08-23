@@ -289,8 +289,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private boolean m_hasGlobalClientBackPressure = false;
     private final boolean m_isConfiguredForHSQL;
 
-    private boolean m_isExplain = false;
-
     /** A port that accepts client connections */
     public class ClientAcceptor implements Runnable {
         private final int m_port;
@@ -1370,7 +1368,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         return null;
     }
 
-    ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn) {
+    ClientResponseImpl dispatchAdHoc(StoredProcedureInvocation task, ClientInputHandler handler, Connection ccxn, boolean isExplain) {
         ParameterSet params = task.getParams();
         String sql = (String) params.toArray()[0];
 
@@ -1420,7 +1418,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 false, task.clientHandle, handler.connectionId(),
                 handler.m_hostname, handler.isAdmin(), ccxn,
                 sql, sqlStatements, partitionParam, null, false, true, m_adhocCompletionHandler);
-        if( m_isExplain ){
+        if( isExplain ){
             ahpw.setIsExplainWork();
         }
         LocalObjectMessage work = new LocalObjectMessage( ahpw );
@@ -1594,8 +1592,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 assert(sysProc != null);
             }
             else if( task.procName.equals("@Explain") ){
-                m_isExplain = true;
-                return dispatchAdHoc(task, handler, ccxn);
+                return dispatchAdHoc(task, handler, ccxn, true );
             }
             else if(task.procName.equals("@ExplainProc")) {
                 return dispatchExplainProcedure(task, handler, ccxn);
@@ -1632,7 +1629,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         if (sysProc != null) {
             // these have helpers that do all the work...
             if (task.procName.equals("@AdHoc")) {
-                return dispatchAdHoc(task, handler, ccxn);
+                return dispatchAdHoc(task, handler, ccxn, false);
             } else if (task.procName.equals("@UpdateApplicationCatalog")) {
                 return dispatchUpdateApplicationCatalog(task, handler, ccxn);
             } else if (task.procName.equals("@LoadSinglepartitionTable")) {
