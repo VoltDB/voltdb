@@ -18,13 +18,19 @@
 package org.voltdb.plannodes;
 
 import java.util.ArrayList;
+import java.util.HashSet;
 import java.util.List;
 
-import org.voltdb.VoltType;
-import org.voltdb.catalog.*;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
-import org.voltdb.expressions.*;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.CatalogMap;
+import org.voltdb.catalog.Column;
+import org.voltdb.catalog.Database;
+import org.voltdb.expressions.AbstractExpression;
+import org.voltdb.expressions.ExpressionUtil;
+import org.voltdb.expressions.TupleValueExpression;
 import org.voltdb.types.PlanNodeType;
 import org.voltdb.utils.CatalogUtil;
 
@@ -255,6 +261,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+    @Override
     public void resolveColumnIndexes()
     {
         // The following applies to both seq and index scan.  Index scan has
@@ -296,6 +303,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         }
     }
 
+    //TODO some members not in here
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
@@ -303,5 +311,27 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
         stringer.key(Members.PREDICATE.name());
         stringer.value(m_predicate);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        super.loadFromJSONObject(jobj, db);
+
+        if(!jobj.isNull(Members.PREDICATE.name())) {
+            m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
+        }
+        this.m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
+
+    }
+
+    @Override
+    public void getScanNodeList_recurse(ArrayList<AbstractScanPlanNode> collected,
+            HashSet<AbstractPlanNode> visited) {
+        if (visited.contains(this)) {
+            assert(false): "do not expect loops in plangraph.";
+            return;
+        }
+        visited.add(this);
+        collected.add(this);
     }
 }

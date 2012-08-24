@@ -32,4 +32,5 @@ public class HashAggregatePlanNode extends AggregatePlanNode {
     public PlanNodeType getPlanNodeType() {
         return PlanNodeType.HASHAGGREGATE;
     }
+
 }

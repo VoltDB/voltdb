@@ -38,6 +38,7 @@ import org.voltdb.plannodes.ProjectionPlanNode;
 import org.voltdb.plannodes.ReceivePlanNode;
 import org.voltdb.plannodes.SendPlanNode;
 import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
 import org.voltdb.plannodes.UnionPlanNode;
 import org.voltdb.plannodes.UpdatePlanNode;
 
@@ -53,6 +54,7 @@ public enum PlanNodeType {
     SEQSCAN         (10, SeqScanPlanNode.class),
     INDEXSCAN       (11, IndexScanPlanNode.class),
     INDEXCOUNT       (12, IndexCountPlanNode.class),
+    TABLECOUNT       (13, TableCountPlanNode.class),
 
     //
     // Join Nodes

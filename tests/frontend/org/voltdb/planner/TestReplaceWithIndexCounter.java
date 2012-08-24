@@ -34,6 +34,8 @@ import org.voltdb.plannodes.AbstractPlanNode;
 import org.voltdb.plannodes.AggregatePlanNode;
 import org.voltdb.plannodes.IndexCountPlanNode;
 import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
 
 public class TestReplaceWithIndexCounter extends TestCase {
     private PlannerTestAideDeCamp aide;
@@ -82,16 +84,38 @@ public class TestReplaceWithIndexCounter extends TestCase {
     }
 
     // DOES NOT support the cases down below right now
-    public void testCountStar00() {
+
+    // This is treated as new TABLE COUNT plan for replicated table
+    public void testCountStar000() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-        checkIndexCounter(pn, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
+    }
+    // This is treated as new TABLE COUNT plan for partitioned table
+    public void testCountStar001() {
+        List<AbstractPlanNode> pn = compile("SELECT count(*) from P1", 0, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        // AGGREGATE_SUM
+        assertTrue(p instanceof AggregatePlanNode);
+        p = pn.get(1).getChild(0);
+        assertTrue(p instanceof TableCountPlanNode);
     }
 
+    public void testCountStar002() {
+        List<AbstractPlanNode> pn = compile("SELECT POINTS, count(*) from T1 Group by POINTS", 0, false);
+        AbstractPlanNode p = pn.get(0).getChild(0);
+        assertTrue(p instanceof AggregatePlanNode);
+        p = p.getChild(0);
+        assertTrue(p instanceof SeqScanPlanNode);
+    }
+
+    // This is generated as IndexScan other than SeqScan as "SELECT count(*) from T1"
+    // "Order by" here cheat planner at this point
+    // Maybe we should fix it later
     public void testCountStar01() {
         List<AbstractPlanNode> pn = compile("SELECT count(*) from T1 ORDER BY POINTS ASC", 0, false);
         checkIndexCounter(pn, false);
     }
-
 
     public void testCountStar02() {
         List<AbstractPlanNode> pn = compile("SELECT P1.ID, P2.P2_ID from P1, P2 where P1.ID >= P2.P2_ID order by P1.ID, P2.P2_ID limit 10", 0, false);
@@ -230,8 +254,6 @@ public class TestReplaceWithIndexCounter extends TestCase {
             System.out.println("PlanNode Explan string:\n" + nd.toExplainPlanString());
         }
         AbstractPlanNode p = pn.get(0).getChild(0);
-        //System.out.println("PlanNode DOT string:\n" + p.toDOTString());
-        //System.out.println("PlanNode Explan string:\n" + p.toExplainPlanString());
         if (isReplaceable)
             assertTrue(p instanceof IndexCountPlanNode);
         else
