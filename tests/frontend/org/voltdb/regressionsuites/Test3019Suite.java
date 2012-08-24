@@ -81,15 +81,20 @@ public class Test3019Suite extends RegressionSuite {
             //client.callProcedure(callback, "P1.insert", - id, "贾"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             //client.drain();
         }
-        client.callProcedure(callback, "P1.insert", 1, "贾鑫", 10, 1.1, new Timestamp(100000000L));
+        client.callProcedure(callback, "P1.insert", 1, "贾鑫ab", 10, 1.1, new Timestamp(100000000L));
         client.callProcedure(callback, "P1.insert", 2, "Xin", 10, 1.1, new Timestamp(100000000L));
         ClientResponse cr = null;
         VoltTable r = null;
 
+        cr = client.callProcedure("CHAR_LENGTH");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[CHAR_LENGTH] result:\n" + r);
+        
         cr = client.callProcedure("OCTET_LENGTH");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.err.println("result:\n" + r);
+        System.err.println("[OCTET_LENGTH] result:\n" + r);
 
 
 
@@ -153,7 +158,7 @@ public class Test3019Suite extends RegressionSuite {
 
         //project.addStmtProcedure("POSITION", "select desc, POSITION ('xin' IN desc) from P1");
         project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1");
-        //project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1");
+        project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");

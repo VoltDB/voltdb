@@ -30,10 +30,14 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     if (isNull()) {
         return getIntegerValue(0);
     }
-    const int32_t valueUTF8Length = getObjectLength();
     char *valueChars = reinterpret_cast<char*>(getObjectValue());
-    const char *valueEnd = valueChars+valueUTF8Length;
-    return getIntegerValue(getObjectLength());
+
+    int32_t i = 0, j = 0;
+    while (valueChars[i]) {
+        if ((valueChars[i] & 0xc0) != 0x80) j++;
+        i++;
+    }
+    return getIntegerValue(j);
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
