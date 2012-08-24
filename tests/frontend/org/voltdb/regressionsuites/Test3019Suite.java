@@ -81,25 +81,26 @@ public class Test3019Suite extends RegressionSuite {
             //client.callProcedure(callback, "P1.insert", - id, "贾"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             //client.drain();
         }
-        client.callProcedure(callback, "P1.insert", 1, "贾鑫ab", 10, 1.1, new Timestamp(100000000L));
+        client.callProcedure(callback, "P1.insert", 1, "贾鑫Vo", 10, 1.1, new Timestamp(100000000L));
         client.callProcedure(callback, "P1.insert", 2, "Xin@Volt", 10, 1.1, new Timestamp(100000000L));
         ClientResponse cr = null;
         VoltTable r = null;
 
-//        cr = client.callProcedure("CHAR_LENGTH");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[CHAR_LENGTH] result:\n" + r);
-//
-//        cr = client.callProcedure("OCTET_LENGTH");
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[OCTET_LENGTH] result:\n" + r);
-
-        cr = client.callProcedure("POSITION","in");
+        cr = client.callProcedure("CHAR_LENGTH");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
-        System.err.println("[POSITION] result:\n" + r);
+        System.err.println("[CHAR_LENGTH] result:\n" + r);
+        
+        cr = client.callProcedure("OCTET_LENGTH");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[OCTET_LENGTH] result:\n" + r);
+
+        
+        cr = client.callProcedure("POSITION","Vo");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[POSITION-after] result:\n" + r);
 
 
         // Test application to weakly typed NUMERIC constants
@@ -113,20 +114,6 @@ public class Test3019Suite extends RegressionSuite {
 //            String msg = hsqlFailed.getMessage();
 //            assertTrue(msg.matches(".*ExpectedProcedureException.*HSQLDB.*"));
 //        }
-
-//        boolean caught = false;
-//
-//        caught = false;
-//        try {
-//            cr = client.callProcedure("@AdHoc", "select count(*) from P1 where not ABS(DESC) > 9");
-//            assertTrue(cr.getStatus() != ClientResponse.SUCCESS);
-//        } catch (ProcCallException e) {
-//            String msg = e.getMessage();
-//            assertTrue(msg.indexOf("incompatible data type") != -1);
-//            caught = true;
-//        }
-//        assertTrue(caught);
-
     }
 
 
