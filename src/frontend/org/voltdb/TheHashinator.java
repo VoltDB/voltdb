@@ -108,7 +108,7 @@ public abstract class TheHashinator {
         else if (obj instanceof Long) {
             long value = ((Long) obj).longValue();
             index = hashinateLong(value);
-        } else if (obj instanceof String) {
+        } else if (obj instanceof String || obj instanceof byte[] ) {
             index = hashinateStringAndVarBinary(obj);
         } else if (obj instanceof Integer) {
             long value = ((Integer)obj).intValue();
