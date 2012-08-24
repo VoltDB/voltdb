@@ -74,8 +74,8 @@ bool TempTable::insertTuple(TableTuple &source) {
     return true;
 }
 
-bool TempTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWithNewValues,
-                                               TableTuple &targetTupleToUpdate,
+bool TempTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                               TableTuple &sourceTupleWithNewValues,
                                                std::vector<TableIndex*> &indexesToUpdate) {
     updateTupleNonVirtual(targetTupleToUpdate, sourceTupleWithNewValues);
     return true;

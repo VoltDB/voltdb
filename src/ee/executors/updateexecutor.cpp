@@ -152,8 +152,10 @@ bool UpdateExecutor::p_init(AbstractPlanNode* abstract_node,
             BOOST_FOREACH(updateColInfo, m_inputTargetMap) {
                 if (updateColInfo.second == colIndex) {
                     indexKeyUpdated = true;
+                    break;
                 }
             }
+            if (indexKeyUpdated) break;
         }
         if (indexKeyUpdated) {
             m_indexesToUpdate.push_back(index);
@@ -212,7 +214,7 @@ bool UpdateExecutor::p_execute(const NValueArray &params) {
             }
         }
 
-        if (!m_targetTable->updateTupleWithSpecificIndexes(tempTuple, m_targetTuple,
+        if (!m_targetTable->updateTupleWithSpecificIndexes(m_targetTuple, tempTuple,
                                                            m_indexesToUpdate)) {
             VOLT_INFO("Failed to update tuple from table '%s'",
                       m_targetTable->name().c_str());

@@ -161,9 +161,9 @@ void Table::initializeWithColumns(TupleSchema *schema, const std::string* column
 // OPERATIONS
 // ------------------------------------------------------------------
 
-bool Table::updateTuple(TableTuple &sourceTupleWithNewValues, TableTuple &targetTupleToUpdate) {
+bool Table::updateTuple(TableTuple &targetTupleToUpdate, TableTuple &sourceTupleWithNewValues) {
     std::vector<TableIndex*> indexes = allIndexes();
-    return updateTupleWithSpecificIndexes(sourceTupleWithNewValues, targetTupleToUpdate, indexes);
+    return updateTupleWithSpecificIndexes(targetTupleToUpdate, sourceTupleWithNewValues, indexes);
 }
 
 // ------------------------------------------------------------------

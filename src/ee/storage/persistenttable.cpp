@@ -321,8 +321,8 @@ void PersistentTable::insertTupleForUndo(char *tuple) {
  * updated strings and creates an UndoAction. Additional optimization
  * for callers that know which indexes to update.
  */
-bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWithNewValues,
-                                                     TableTuple &targetTupleToUpdate,
+bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                     TableTuple &sourceTupleWithNewValues,
                                                      std::vector<TableIndex*> &indexesToUpdate)
 {
     /**
@@ -332,8 +332,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWith
                                     sourceTupleWithNewValues,
                                     indexesToUpdate))
     {
-        throw ConstraintFailureException(this, sourceTupleWithNewValues,
-                                         targetTupleToUpdate,
+        throw ConstraintFailureException(this, targetTupleToUpdate,
+                                         sourceTupleWithNewValues,
                                          CONSTRAINT_TYPE_UNIQUE);
     }
 
@@ -447,8 +447,8 @@ bool PersistentTable::updateTupleWithSpecificIndexes(TableTuple &sourceTupleWith
  * the target. Then insert the new (or rather, old) value back into
  * the indexes.
  */
-void PersistentTable::updateTupleForUndo(TableTuple &sourceTupleWithNewValues,
-                                         TableTuple &targetTupleToUpdate,
+void PersistentTable::updateTupleForUndo(TableTuple &targetTupleToUpdate,
+                                         TableTuple &sourceTupleWithNewValues,
                                          bool revertIndexes)
 {
     //If the indexes were never updated there is no need to revert them.
@@ -475,7 +475,6 @@ void PersistentTable::updateTupleForUndo(TableTuple &sourceTupleWithNewValues,
     } else {
         targetTupleToUpdate.setDirtyFalse();
     }
-    targetTupleToUpdate.isDirty();
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {

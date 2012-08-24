@@ -161,8 +161,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * targetTuple is swapped when making calls on the indexes. This
      * is just an inconsistency in the argument ordering.
      */
-    bool updateTupleWithSpecificIndexes(TableTuple &sourceTupleWithNewValues,
-                                        TableTuple &targetTupleToUpdate,
+    bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                        TableTuple &sourceTupleWithNewValues,
                                         std::vector<TableIndex*> &indexesToUpdate);
 
     /*
@@ -170,8 +170,8 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * for unlined columns is performed because that will be handled
      * by the UndoAction.
      */
-    void updateTupleForUndo(TableTuple &sourceTupleWithNewValues,
-                            TableTuple &targetTupleToUpdate,
+    void updateTupleForUndo(TableTuple &targetTupleToUpdate,
+                            TableTuple &sourceTupleWithNewValues,
                             bool revertIndexes);
 
     /*

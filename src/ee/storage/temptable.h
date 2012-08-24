@@ -98,8 +98,8 @@ class TempTable : public Table {
     // ------------------------------------------------------------------
     void deleteAllTuples(bool freeAllocatedStrings);
     bool insertTuple(TableTuple &source);
-    bool updateTupleWithSpecificIndexes(TableTuple &sourceTupleWithNewValues,
-                                        TableTuple &targetTupleToUpdate,
+    bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                        TableTuple &sourceTupleWithNewValues,
                                         std::vector<TableIndex*> &indexesToUpdate);
 
     // deleting tuple from temp table is not supported. use deleteAllTuples instead

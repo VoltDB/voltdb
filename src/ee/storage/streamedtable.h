@@ -57,7 +57,8 @@ class StreamedTable : public Table {
 
     virtual void deleteAllTuples(bool freeAllocatedStrings);
     virtual bool insertTuple(TableTuple &source);
-    virtual bool updateTupleWithSpecificIndexes(TableTuple &sourceTupleWithNewValues, TableTuple &targetTupleToUpdate,
+    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                TableTuple &sourceTupleWithNewValues,
                                                 std::vector<TableIndex*> &indexesToUpdate);
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings);
     virtual void loadTuplesFrom(SerializeInput &serialize_in, Pool *stringPool = NULL);

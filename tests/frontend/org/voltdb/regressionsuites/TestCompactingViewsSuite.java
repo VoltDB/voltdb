@@ -168,24 +168,11 @@ public class TestCompactingViewsSuite extends RegressionSuite {
             fail(error.getMessage());
         }
 
-        // JNI
+        // JNI local with 1 site
         config = new LocalCluster("sqltypes-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);
         boolean t1 = config.compile(project);
         assertTrue(t1);
         builder.addServerConfig(config);
-
-        // CLUSTER
-        /*config = new LocalCluster("sqltypes-cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI);
-        boolean t2 = config.compile(project);
-        assertTrue(t2);
-        builder.addServerConfig(config);
-
-        // IV2 CLUSTER
-        config = new LocalCluster("sqltypes-iv2cluster.jar", 2, 3, 1, BackendTarget.NATIVE_EE_JNI,
-                false, true); // LocalCluster constructor to enable IV2.  We have to drag along the isRejoinTest arg
-        boolean t3 = config.compile(project);
-        assertTrue(t3);
-        builder.addServerConfig(config);*/
 
         return builder;
     }
