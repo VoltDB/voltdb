@@ -83,9 +83,8 @@ public:
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
 
-        if (m_eq(m_tmp1, m_tmp2)) return true; // no update is needed for this index
-
         bool deleted = deleteEntryPrivate(m_tmp1);
+        //TODO: addEntry COULD be used here instead of setting and using m_tmp2.
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;
@@ -146,6 +145,11 @@ public:
         TableTuple retval = m_match;
         m_match.move(NULL);
         return retval;
+    }
+
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
     }
 
     size_t getSize() const { return m_entries.size(); }

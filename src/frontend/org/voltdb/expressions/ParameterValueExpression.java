@@ -20,6 +20,7 @@ package org.voltdb.expressions;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
 import org.voltdb.types.ExpressionType;
 
@@ -90,4 +91,37 @@ public class ParameterValueExpression extends AbstractValueExpression {
             m_paramIndex = obj.getInt(Members.PARAM_IDX.name());
         }
     }
+
+    @Override
+    public void refineValueType(VoltType columnType) {
+        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isInteger()) {
+            m_valueType = columnType;
+            m_valueSize = columnType.getLengthInBytesForFixedTypes();
+            return;
+        }
+    }
+
+    @Override
+    public void refineOperandType(VoltType columnType) {
+        if (m_valueType != null && m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        if ((columnType == VoltType.FLOAT) || (columnType == VoltType.DECIMAL) || columnType.isInteger()) {
+            m_valueType = columnType;
+            m_valueSize = columnType.getLengthInBytesForFixedTypes();
+        }
+    }
+
+    @Override
+    public void finalizeValueTypes() {
+        if (m_valueType != VoltType.NUMERIC) {
+            return;
+        }
+        m_valueType = VoltType.FLOAT;
+        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+    }
+
 }

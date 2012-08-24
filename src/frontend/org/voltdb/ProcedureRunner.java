@@ -511,7 +511,7 @@ public class ProcedureRunner {
 
         // check expectations
         int i = 0; for (QueuedSQL qs : batch) {
-            Expectation.check(m_procedureName, qs.stmt.getText(),
+            Expectation.check(m_procedureName, qs.stmt.sqlText,
                     i, qs.expectation, results[i]);
             i++;
         }

@@ -49,6 +49,7 @@ import java.util.List;
 import java.util.Map;
 import java.util.concurrent.atomic.AtomicBoolean;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HeartbeatMessage;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
@@ -58,7 +59,6 @@ import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.TransactionIdManager;
 import org.voltdb.VoltDB;
 import org.voltdb.client.ProcedureInvocationType;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.messaging.CoalescedHeartbeatMessage;
 import org.voltdb.messaging.InitiateTaskMessage;
 import org.voltdb.messaging.MultiPartitionParticipantMessage;
@@ -415,7 +415,7 @@ public class SimpleDtxnInitiator extends TransactionInitiator {
 
         /*
          * Send the transaction to the coordinator as well as his replicas
-         * so it is redudantly logged. The replicas that aren't listed
+         * so it is redundantly logged. The replicas that aren't listed
          * as the coordinator in the work request will treat it as
          * a participant notice
          */

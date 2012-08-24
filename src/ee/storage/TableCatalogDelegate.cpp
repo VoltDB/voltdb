@@ -145,6 +145,8 @@ TableCatalogDelegate::init(ExecutorContext *executorContext,
                                       index_columns,
                                       column_types,
                                       catalog_index->unique(),
+                                      true,// Fix it as the next line when VoltDB can disable CountingIndex feature
+                                      //catalog_index->countable(),
                                       isIntsOnly,
                                       schema);
         index_map[catalog_index->name()] = index_scheme;

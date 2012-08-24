@@ -59,12 +59,12 @@ namespace voltdb {
  * Index implemented as a Binary Tree Multimap.
  * @see TableIndex
  */
-template<typename KeyType, class KeyComparator, class KeyEqualityChecker>
+template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=true>
 class CompactingTreeMultiMapIndex : public TableIndex
 {
     friend class TableIndexFactory;
 
-    typedef CompactingMap<KeyType, const void*, KeyComparator> MapType;
+    typedef CompactingMap<KeyType, const void*, KeyComparator, hasRank> MapType;
     typedef typename MapType::iterator MMIter;
 
 public:
@@ -89,17 +89,14 @@ public:
         // this can probably be optimized
         m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
         m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-        if (m_eq(m_tmp1, m_tmp2))
-        {
-            // no update is needed for this index
-            return true;
-        }
 
-        // It looks like we're deleting the new value and inserting the new value
-        // The lookup is on the index keys, but the address of the current tuple
-        //  (which has the new key value) is needed for this non-unique index
-        //  to determine which of the tuples with a given key need to be deleted.
+        // newTupleValue actually points to the existing tuple referenced by the index
+        // -- though its column values have already been updated not to match the key stored in the index.
+        // newTupleValue must be passed into deleteEntryPrivate to delete only the correct entry
+        // that matches the old key m_tmp1 (possibly one of many, each with a different tuple address value).
+        // deleteEntry can not be used for this because it constructs its key from the tuple's current column values.
         bool deleted = deleteEntryPrivate(newTupleValue, m_tmp1);
+        //TODO: addEntry COULD be used here instead of setting and using m_tmp2.
         bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
         --m_deletes;
         --m_inserts;
@@ -218,6 +215,59 @@ public:
         if (m_keyIter.second.isEnd())
             return false;
         return moveToKey(m_keyIter.second.key());
+    }
+
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
+    }
+
+    /**
+     * @See comments in parent class TableIndex
+     */
+    int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
+        if (!hasRank) return -1;
+
+        m_tmp1.setFromKey(searchKey);
+        m_seqIter = m_entries.lowerBound(m_tmp1);
+
+        if (m_seqIter.isEnd()) {
+            return m_entries.size() + 1;
+        } else {
+            if (isUpper) {
+                return m_entries.rankUpper(m_seqIter.key());
+            } else {
+                return m_entries.rankAsc(m_seqIter.key());
+            }
+        }
+    }
+
+    /**
+     * @See comments in parent class TableIndex
+     */
+    int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
+        if (!hasRank) return -1;
+
+        m_tmp1.setFromKey(searchKey);
+        m_seqIter = m_entries.lowerBound(m_tmp1);
+
+        if (m_seqIter.isEnd())
+            return m_entries.size();
+
+        int cmp = m_eq(m_tmp1, m_seqIter.key());
+        KeyType tmpKey = m_seqIter.key();
+        if (cmp == 0) {
+            m_seqIter.movePrev();
+            if (m_seqIter.isEnd() == false) {
+                if (isUpper) return m_entries.rankUpper(m_seqIter.key());
+                else return m_entries.rankAsc(m_seqIter.key());
+            } else
+                // we can not find a previous key return rank as 0.
+                return 0;
+        }
+        // return rank with the current key if equal
+        if (isUpper) return m_entries.rankUpper(tmpKey);
+        else return m_entries.rankAsc(tmpKey);
     }
 
     size_t getSize() const { return m_entries.size(); }
