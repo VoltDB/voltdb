@@ -121,6 +121,16 @@ class IndexScanPlanNode : public AbstractScanPlanNode {
         // Sorting Direction
         //
         SortDirectionType sort_direction;
+
+        // Generally enable/disable index rank processing
+        bool track_rank;
+        // Configure the rank range -- how it is bounded inclusively/exclusively/not at each end.
+        IndexLookupType rank_range_type;
+        // The high and low end rank values of a rank range -- both optional
+        AbstractExpression* rank_range_min;
+        AbstractExpression* rank_range_max;
+        // An optional "search key" representing the location of "rank = 1" if not ranking over the entire index.
+        std::vector<AbstractExpression*> rank_offset_key_expressions;
 };
 
 }
