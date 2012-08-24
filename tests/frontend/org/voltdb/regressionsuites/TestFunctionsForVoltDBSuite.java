@@ -27,7 +27,6 @@ import java.io.IOException;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
-import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.ProcCallException;
@@ -168,6 +167,8 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertFalse(true);
         }
         project.addPartitionInfo("P1", "ID");
+
+        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

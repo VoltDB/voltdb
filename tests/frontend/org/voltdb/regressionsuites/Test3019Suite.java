@@ -90,13 +90,13 @@ public class Test3019Suite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         System.err.println("[CHAR_LENGTH] result:\n" + r);
-        
+
         cr = client.callProcedure("OCTET_LENGTH");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         System.err.println("[OCTET_LENGTH] result:\n" + r);
 
-        
+
         cr = client.callProcedure("POSITION","Vo");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
