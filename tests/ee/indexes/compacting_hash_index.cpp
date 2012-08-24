@@ -104,7 +104,7 @@ TEST_F(CompactingHashIndexTest, ENG1193) {
     index->addEntry(tuple3);
 
     TableTuple *tuple4 = newTuple(schema, 0, 10);
-    EXPECT_TRUE(index->replaceEntryNoKeyChange(tuple1, tuple4));
+    EXPECT_TRUE(index->replaceEntryNoKeyChange(*tuple4, *tuple1));
 
     EXPECT_TRUE(index->exists(tuple2));
     EXPECT_TRUE(index->exists(tuple3));
