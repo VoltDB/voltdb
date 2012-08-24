@@ -30,11 +30,10 @@ import com.jcraft.jsch.JSchException;
 import com.jcraft.jsch.Session;
 
 public class ProcessData {
-    private final Process m_process;
     private final Session m_ssh_session;
     private final Channel m_channel;
     private final StreamWatcher m_out;
-//    private final StreamWatcher m_err;
+    private Thread m_sshThread;
 
     private static VoltLogger log = new VoltLogger("SSH");
 
@@ -102,25 +101,21 @@ public class ProcessData {
     }
 
     ProcessData(String processName, OutputHandler handler, Session ssh_session, final String command) throws JSchException, IOException {
-        m_process = null;
         m_ssh_session = ssh_session;
         m_channel=ssh_session.openChannel("exec");
         ((ChannelExec)m_channel).setCommand(command);
 
-        // Set up the i/o streams, in, out, err
-        //channel.setInputStream(System.in);
+        // Set up the i/o streams
         m_channel.setInputStream(null);
         ((ChannelExec)m_channel).setErrStream(System.err);
 
         BufferedReader out = new BufferedReader(new InputStreamReader(m_channel.getInputStream()));
-//      BufferedReader err = new BufferedReader(new InputStreamReader(m_channel.getInputStream()));
-      m_out = new StreamWatcher(out, processName, Stream.STDOUT, handler);
-//      m_err = new StreamWatcher(err, processName, Stream.STDERR, handler);
+        m_out = new StreamWatcher(out, processName, Stream.STDOUT, handler);
 
         /*
          * Execute the command non-blocking.
          */
-        final Thread sshThread = new Thread() {
+        m_sshThread = new Thread() {
             @Override
             public void run() {
                 try {
@@ -132,25 +127,21 @@ public class ProcessData {
                 }
             }
         };
-        sshThread.start();
+        m_sshThread.start();
     }
 
     public int kill() {
         m_out.m_expectDeath.set(true);
-//        m_err.m_expectDeath.set(true);
         int retval = -255;
         m_channel.disconnect();
         m_ssh_session.disconnect();
+        m_sshThread.interrupt();
         return retval;
     }
 
     public boolean isAlive() {
-        try {
             synchronized(m_channel) {
                 return m_ssh_session.isConnected();
             }
-        } catch (IllegalThreadStateException e) {
-            return true;
-        }
     }
 }
