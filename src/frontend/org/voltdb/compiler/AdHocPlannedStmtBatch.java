@@ -117,7 +117,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      */
     public void addStatement(AdHocPlannedStatement plannedStmt) {
         // The first non-select statement makes it not read-only.
-        if (!plannedStmt.readOnly) {
+        if (!plannedStmt.core.readOnly) {
             readOnly = false;
         }
         plannedStatements.add(plannedStmt);
@@ -129,7 +129,7 @@ public class AdHocPlannedStmtBatch extends AsyncCompilerResult implements Clonea
      */
     public boolean isSinglePartitionCompatible() {
         for (AdHocPlannedStatement plannedStmt : plannedStatements) {
-            if (plannedStmt.collectorFragment != null) {
+            if (plannedStmt.core.collectorFragment != null) {
                 return false;
             }
         }

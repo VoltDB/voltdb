@@ -161,9 +161,19 @@ public class PlannerTestAideDeCamp {
                              hsql, estimates, false);
 
         CompiledPlan plan = null;
-        plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null, false);
+        String parsedToken = planner.parse(catalogStmt.getSqltext(),
+                                           catalogStmt.getTypeName(),
+                                           catalogStmt.getParent().getTypeName(),
+                                           false);
+        if (parsedToken != null) {
+            plan = planner.plan(costModel,
+                                catalogStmt.getSqltext(),
+                                joinOrder,
+                                catalogStmt.getTypeName(),
+                                catalogStmt.getParent().getTypeName(),
+                                StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                                null);
+        }
 
         if (plan == null)
         {
