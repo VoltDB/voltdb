@@ -34,17 +34,17 @@ public class SSHTools {
     private final String m_password;
 
     public SSHTools(String username, String password) {
-/*
         if (username != null && username.isEmpty()) {
             m_username = null;
         } else {
             m_username = username;
         }
-        m_password = password;
-*/
-        m_username ="jpiekos";
-        m_password = "katama";
- //       m_host="Johns-MacBook-Pro.local";
+        if (password == null || password.isEmpty()) {
+            // Make it a password-less connection
+            m_password = null;
+        } else {
+            m_password = password;
+        }
    }
 
     // Temporary - delete when finished implementation
@@ -62,7 +62,73 @@ public class SSHTools {
         System.out.println("JWP **********************");
     }
 
-    public ProcessData command(String hostname, String command[], String processName, OutputHandler handler) {
+    // Execute a remote SSH command on the specified host.
+    public String cmd(String hostname, String command) {
+        return cmdSSH(m_username, m_password, hostname, command);
+    }
+
+    // Execute a remote SSH command on the specified host.
+    public String cmd(String hostname, String[] command) {
+        return cmdSSH(m_username, m_password, hostname, command);
+    }
+
+    public String cmdSSH(String user, String password, String host, String[] command) {
+        return cmdSSH(user, password, host, stringify(command));
+    }
+
+    public String cmdSSH(String user, String password, String host, String command) {
+        String result = "";
+        try{
+            System.out.println("JWP EXECUTING SSH: " + command);
+            JSch jsch=new JSch();
+            Session session=jsch.getSession(user, host, 22);
+
+            // To avoid the UnknownHostKey issue
+            java.util.Properties config = new java.util.Properties();
+            config.put("StrictHostKeyChecking", "no");
+            session.setConfig(config);
+
+            // If two machines have SSH passwordless logins setup, the following lines are not needed:
+            if (null != password)
+                session.setPassword(password);
+            session.connect();
+
+            Channel channel=session.openChannel("exec");
+            ((ChannelExec)channel).setCommand(command);
+
+            // Set up the i/o streams, in, out, err
+            //channel.setInputStream(System.in);
+            channel.setInputStream(null);
+            ((ChannelExec)channel).setErrStream(System.err);
+            InputStream in=channel.getInputStream();
+
+            channel.connect();
+            byte[] tmp=new byte[1024];
+            while(true){
+                while(in.available()>0){
+                    int i=in.read(tmp, 0, 1024);
+                    if(i<0)break;
+                    String string_fragment = new String(tmp, 0, i);
+                    result += string_fragment;
+                }
+                if(channel.isClosed()){
+                    // System.out.println("exit-status: "+channel.getExitStatus());
+                    break;
+                }
+                try{Thread.sleep(100);}catch(Exception ee) {ee.printStackTrace();}
+            }
+            channel.disconnect();
+            session.disconnect();
+        }
+        catch(Throwable e){
+            e.printStackTrace();
+            // Return empty string if we can't connect.
+        }
+
+        return result;
+    }
+
+    public ProcessData long_running_command(String hostname, String command[], String processName, OutputHandler handler) {
         printCommandString(command);
         try{
             JSch jsch=new JSch();
@@ -73,8 +139,9 @@ public class SSHTools {
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
 
-            // If two machines have SSH passwordless logins setup, the following line is not needed:
-            session.setPassword(m_password);
+            // If two machines have SSH passwordless logins setup, the following lines are not needed:
+            if (null != m_password)
+                session.setPassword(m_password);
             session.connect();
 
             return new ProcessData(processName, handler, session, stringify(command));
@@ -95,11 +162,11 @@ public class SSHTools {
     }
 
     // The Jsch method for SCP to.
+    // This code is direcly copied from the Jsch SCP sample program.
     public boolean ScpTo(String local_file, String user, String password, String host, String remote_file){
 
         FileInputStream fis=null;
         try{
-            host="Johns-MacBook-Pro.local";
             boolean ptimestamp = true;
             String command="scp " + (ptimestamp ? "-p" :"") +" -t "+remote_file;
 
@@ -192,6 +259,7 @@ public class SSHTools {
     }
 
     // The Jsch method for SCP from.
+    // This code is direcly copied from the Jsch SCP sample program.
     public boolean ScpFrom(String user, String password, String host, String remote_file, String local_file){
 
         FileOutputStream fos=null;
@@ -201,7 +269,6 @@ public class SSHTools {
                 prefix=local_file+File.separator;
             }
 
-            host="Johns-MacBook-Pro.local";
             String command="scp -f "+remote_file;
 
             System.out.println("JWP SCP From: " + command);
@@ -259,8 +326,6 @@ public class SSHTools {
                         break;
                     }
                 }
-
-                //System.out.println("filesize="+filesize+", file="+file);
 
                 // send '\0'
                 buf[0]=0; out.write(buf, 0, 1); out.flush();
@@ -338,77 +403,6 @@ public class SSHTools {
             }
         }
         return result;
-    }
-
-    public String cmdSSH(String user, String password, String host, String[] command) {
-        return cmdSSH(user, password, host, stringify(command));
-    }
-
-    public String cmdSSH(String user, String password, String host, String command) {
-        String result = "";
-        try{
-            System.out.println("JWP EXECUTING SSH: " + command);
-            host="Johns-MacBook-Pro.local";
-
-            JSch jsch=new JSch();
-            Session session=jsch.getSession(user, host, 22);
-
-            // To avoid the UnknownHostKey issue
-            java.util.Properties config = new java.util.Properties();
-            config.put("StrictHostKeyChecking", "no");
-            session.setConfig(config);
-
-            // If two machines have SSH passwordless logins setup, the following line is not needed:
-            session.setPassword(password);
-            session.connect();
-
-            Channel channel=session.openChannel("exec");
-            ((ChannelExec)channel).setCommand(command);
-
-            // Set up the i/o streams, in, out, err
-            //channel.setInputStream(System.in);
-            channel.setInputStream(null);
-            ((ChannelExec)channel).setErrStream(System.err);
-            InputStream in=channel.getInputStream();
-
-            channel.connect();
-            byte[] tmp=new byte[1024];
-            while(true){
-                while(in.available()>0){
-                    int i=in.read(tmp, 0, 1024);
-                    if(i<0)break;
-                    String string_fragment = new String(tmp, 0, i);
-                    result += string_fragment;
-                }
-                if(channel.isClosed()){
-                    // System.out.println("exit-status: "+channel.getExitStatus());
-                    break;
-                }
-                try{Thread.sleep(100);}catch(Exception ee) {ee.printStackTrace();}
-            }
-            channel.disconnect();
-            session.disconnect();
-        }
-        catch(Throwable e){
-            e.printStackTrace();
-            System.exit(1);
-        }
-
-        return result;
-    }
-
-    // Execute a remote SSH command on the specified host.
-    public String cmd(String hostname, String command) {
-        return cmdSSH(m_username, m_password, hostname, command);
-    }
-
-    // Execute a remote SSH command on the specified host.
-    public String cmd(String hostname, String[] command) {
-        return cmdSSH(m_username, m_password, hostname, command);
-    }
-
-    public ProcessData long_running_command(String hostname, String command[], String processName, OutputHandler handler) {
-        return command(hostname, command, processName, handler);
     }
 
     public static void main(String args[]) throws Exception {
