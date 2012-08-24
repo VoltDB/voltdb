@@ -24,6 +24,12 @@ prunelist = ('hsqldb19b3',
              'jaxb',
              'pmsg')
 
+def licenseStartsHere(content, approvedLicenses):
+    for license in approvedLicenses:
+        if content.startswith(license):
+            return 1
+    return 0
+
 def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
     if f.endswith('.py'):
         if not content.startswith("#"):
@@ -45,9 +51,8 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
             content = content.lstrip()
 
         # verify license
-        for license in approvedLicensesPython:
-            if content.startswith(license):
-                return 0
+        if licenseStartsHere(content, approvedLicensesPython):
+            return 0
         print "ERROR: \"%s\" does not start with an approved license." % f
     else:
         if not content.startswith("/*"):
@@ -56,9 +61,8 @@ def verifyLicense(f, content, approvedLicensesJavaC, approvedLicensesPython):
             else:
                 print "ERROR: \"%s\" does not begin with a comment." % f
             return 1
-        for license in approvedLicensesJavaC:
-            if content.startswith(license):
-                return 0
+        if licenseStartsHere(content, approvedLicensesJavaC):
+            return 0
         print "ERROR: \"%s\" does not start with an approved license." % f
     return 1
 
@@ -99,43 +103,134 @@ def readFile(filename):
     FH.close()
     return fileString
 
-def processFile(f, approvedLicensesJavaC, approvedLicensesPython):
+def writeRepairedContent(filename, newtext, original):
+    try:
+        FH=open(filename + ".lcbak", 'r')
+        FH.close()
+    except IOError:
+        FH=open(filename + ".lcbak", 'w')
+        FH.write(original)
+        FH.close()
+    FH=open(filename, 'w')
+    FH.write(newtext)
+    FH.close()
+    return newtext
+
+def rmBakFile(filename):
+    try:
+        os.remove(filename + ".lcbak")
+    except OSError:
+        pass
+
+def fixLicensePython(f, content, approvedLicensesPython):
+    revisedcontent = content
+    preserved = ""
+    # skip hashbang
+    if revisedcontent.startswith("#!"):
+        (preserve, revisedcontent) = revisedcontent.split("\n", 1)
+        preserved = preserved + preserve + "\n"
+
+    # skip python coding magic
+    if revisedcontent.startswith("# -*-"):
+        (preserve, revisedcontent) = revisedcontent.split("\n", 1)
+        preserved = preserved + preserve + "\n"
+
+    if not revisedcontent.startswith("#"):
+        if licenseStartsHere(revisedcontent.lstrip(), approvedLicensesPython):
+            print "Fix: removing whitespace before the approved license."
+            return writeRepairedContent(f, preserved + revisedcontent.lstrip(), content)
+
+    print "Fix: Inserting a default license before the original content."
+    return writeRepairedContent(f, preserved + approvedLicensesPython[-1] + revisedcontent, content)
+
+def fixLicenseJavaC(f, content, approvedLicensesJavaC):
+    if licenseStartsHere(content.lstrip(), approvedLicensesJavaC):
+        print "Fix: removing whitespace before the approved license."
+        revisedcontent = content.lstrip()
+    else:
+        print "Fix: Inserting a default license before the original content."
+        revisedcontent = approvedLicensesJavaC[-1] + content
+    return writeRepairedContent(f, revisedcontent,  content)
+
+def fixTabs(f, content):
+    cleanlines = []
+    for line in content.split("\n"):
+        while '\t' in line:
+            (pre, post) = line.split('\t')
+            # replace each tab with a complement of up to 4 spaces -- I suppose this could be made adjustable.
+            # go ahead and allow trailing whitespace -- clean it up later
+            line = pre + ("    "[(len(pre) % 4 ): 4]) + post
+        cleanlines.append(line)
+    print "Fix: Replacing tabs with 4th-column indentation."
+    return writeRepairedContent(f, "\n".join(cleanlines),  content)
+
+def fixTrailingWhitespace(f, content):
+    lines = content.split("\n")
+    cleanlines = []
+    for line in lines:
+        if re.search(r'[\t\f\v ]+$', line):
+            (line, ignored) = re.split(r'[\t\f\v ]+$', line)
+        cleanlines.append(line)
+    print "Fix: Removing trailing whitespace."
+    return writeRepairedContent(f, "\n".join(cleanlines),  content)
+
+
+def processFile(f, fix, approvedLicensesJavaC, approvedLicensesPython): 
     for suffix in ('.java', '.cpp', '.cc', '.h', '.hpp', '.py'):
         if f.endswith(suffix):
             break
     else:
         return 0
     content = readFile(f)
+    if fix:
+        rmBakFile(f)
+    result = 0
+
     retval = verifyLicense(f, content,  approvedLicensesJavaC, approvedLicensesPython)
     if retval != 0:
-        return retval
+        if fix:
+            if f.endswith('.py'):
+                content = fixLicensePython(f, content, approvedLicensesPython)
+            else:
+                content = fixLicenseJavaC(f, content, approvedLicensesJavaC)
+        result += retval
+
     retval = verifyTabs(f, content)
     if retval != 0:
-        return retval
+        if fix:
+            content = fixTabs(f, content)
+        result += retval
+
     retval = verifyTrailingWhitespace(f, content)
     if (retval != 0):
-        return retval
+        if fix:
+            content = fixTrailingWhitespace(f, content)
+        result += retval
+
     retval = verifySprintf(f, content)
-    if (retval != 0):
-        return retval
+    result += retval
+
     retval = verifyGetStringChars(f, content)
-    if (retval != 0):
-        return retval
+    result += retval
 
-    return 0
+    return result
 
-def processAllFiles(d, approvedLicensesJavaC, approvedLicensesPython):
+def processAllFiles(d, fix, approvedLicensesJavaC, approvedLicensesPython):
     files = os.listdir(d)
     errcount = 0
     for f in [f for f in files if not f.startswith('.') and f not in prunelist]:
         fullpath = os.path.join(d,f)
         if os.path.isdir(fullpath):
-            errcount += processAllFiles(fullpath, approvedLicensesJavaC, approvedLicensesPython)
+            errcount += processAllFiles(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
         else:
-            errcount += processFile(fullpath, approvedLicensesJavaC, approvedLicensesPython)
+            errcount += processFile(fullpath, fix, approvedLicensesJavaC, approvedLicensesPython)
     return errcount
 
 
+fix = False
+for arg in sys.argv[1:]:
+    if arg == "--fix":
+        fix = True
 
 testLicenses =   [basepath + 'tools/approved_licenses/mit_x11_hstore_and_voltdb.txt',
                   basepath + 'tools/approved_licenses/mit_x11_evanjones_and_voltdb.txt',
@@ -153,20 +248,22 @@ srcLicensesPy =  [basepath + 'tools/approved_licenses/gpl3_voltdb_python.txt']
 
 
 errcount = 0
-errcount += processAllFiles(basepath + "src",
+errcount += processAllFiles(basepath + "src", fix,
                             tuple([readFile(f) for f in srcLicenses]),
                             tuple([readFile(f) for f in srcLicensesPy]))
 
-errcount += processAllFiles(basepath + "tests",
+errcount += processAllFiles(basepath + "tests", fix,
                             tuple([readFile(f) for f in testLicenses]),
                             tuple([readFile(f) for f in testLicensesPy]))
 
-errcount += processAllFiles(basepath + "examples",
+errcount += processAllFiles(basepath + "examples", fix,
                             tuple([readFile(f) for f in testLicenses]),
                             tuple([readFile(f) for f in testLicensesPy]))
 
 if errcount == 0:
     print "SUCCESS. Found 0 license text errors, 0 files containing tabs or trailing whitespace."
+elif fix:
+    print "PROGRESS? Found and tried to fix %d license text or whitespace errors. Re-run licensescheck to validate. Consult .lcbak files to recover if something went wrong." % errcount
 else:
     print "FAILURE. Found %d license text or whitespace errors." % errcount
 
@@ -176,16 +273,18 @@ else:
 # property is not set.
 if not ascommithook:
     for arg in sys.argv[1:]:
-        if arg != "${voltpro}":
+        if arg == "--fix":
+            fix = True
+        elif arg != "${voltpro}":
             print "Checking additional repository: " + arg;
             proLicenses = ["../" + arg + '/tools/approved_licenses/license.txt']
             proLicensesPy = ["../" + arg + '/tools/approved_licenses/license_python.txt']
             errcount = 0
-            errcount += processAllFiles("../" + arg + "/src/",
+            errcount += processAllFiles("../" + arg + "/src/", fix,
                                         tuple([readFile(f) for f in proLicenses]),
                                         tuple([readFile(f) for f in proLicensesPy]))
 
-            errcount += processAllFiles("../" + arg + "/tests/",
+            errcount += processAllFiles("../" + arg + "/tests/", fix,
                                         tuple([readFile(f) for f in proLicenses]),
                                         tuple([readFile(f) for f in proLicensesPy]))
 
