@@ -64,24 +64,24 @@ class TheHashinator {
         case VALUE_TYPE_INTEGER:
         case VALUE_TYPE_BIGINT:
         {
-        	return hashinate(ValuePeeker::peekAsRawInt64(value),
-        			partitionCount);
+            return hashinate(ValuePeeker::peekAsRawInt64(value),
+                    partitionCount);
         }
         case VALUE_TYPE_VARCHAR:
         {
-        	return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
-        			ValuePeeker::peekObjectLength(value),
-        			partitionCount);
+            return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
+                    ValuePeeker::peekObjectLength(value),
+                    partitionCount);
         }
         case VALUE_TYPE_VARBINARY:
         {
-        	return hashinate(reinterpret_cast<unsigned char*>(ValuePeeker::peekObjectValue(value)),
-        			ValuePeeker::peekObjectLength(value),
-        			partitionCount);
+            return hashinate(reinterpret_cast<unsigned char*>(ValuePeeker::peekObjectValue(value)),
+                    ValuePeeker::peekObjectLength(value),
+                    partitionCount);
         }
         default:
             throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
-                                getTypeName(val_type).c_str());
+                    getTypeName(val_type).c_str());
         }
     }
 
