@@ -55,7 +55,7 @@ public class PlannerTool {
         m_database = database;
         m_cluster = cluster;
         m_catalogVersion = catalogVersion;
-        m_cache = new AdHocCompilerCache();
+        m_cache = AdHocCompilerCache.getCacheForCatalogVersion(catalogVersion);
 
         // LOAD HSQL
         m_hsql = HSQLInterface.loadHsqldb();

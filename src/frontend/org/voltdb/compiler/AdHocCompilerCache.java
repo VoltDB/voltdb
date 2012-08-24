@@ -21,6 +21,7 @@ import java.util.LinkedHashMap;
 import java.util.Map;
 import java.util.Timer;
 import java.util.TimerTask;
+import java.util.WeakHashMap;
 
 import org.voltdb.VoltDB;
 import org.voltdb.planner.CorePlan;
@@ -38,6 +39,28 @@ import org.voltdb.planner.CorePlan;
  * actually used.
  */
 public class AdHocCompilerCache {
+
+    //////////////////////////////////////////////////////////////////////////
+    // STATIC CODE TO MANAGE CACHE LIFETIMES / GLOBALNESS
+    //////////////////////////////////////////////////////////////////////////
+
+    private static WeakHashMap<Integer, AdHocCompilerCache> m_catalogVersionMatch = new WeakHashMap<Integer, AdHocCompilerCache>();
+    /**
+     * Get the global cache for a given version of the catalog. Note that there can be only
+     * one cache per catalogVersion at a time.
+     */
+    public synchronized static AdHocCompilerCache getCacheForCatalogVersion(int catalogVersion) {
+        AdHocCompilerCache cache = m_catalogVersionMatch.get(catalogVersion);
+        if (cache == null) {
+            cache = new AdHocCompilerCache();
+            m_catalogVersionMatch.put(catalogVersion, cache);
+        }
+        return cache;
+    }
+
+    //////////////////////////////////////////////////////////////////////////
+    // PER-INSTANCE AWESOMEC CACHING CODE
+    //////////////////////////////////////////////////////////////////////////
 
     // cache sizes determined at construction time
     final int MAX_LITERAL_ENTRIES;
@@ -64,7 +87,7 @@ public class AdHocCompilerCache {
     /**
      * Constructor with default cache sizes.
      */
-    public AdHocCompilerCache() {
+    private AdHocCompilerCache() {
         this(1000, 1000);
     }
 
@@ -74,7 +97,7 @@ public class AdHocCompilerCache {
      * @param maxLiteralEntries cache size for literals
      * @param maxCoreEntries cache size for parameterized plans
      */
-    public AdHocCompilerCache(int maxLiteralEntries, int maxCoreEntries) {
+    AdHocCompilerCache(int maxLiteralEntries, int maxCoreEntries) {
         MAX_LITERAL_ENTRIES = maxLiteralEntries;
         MAX_CORE_ENTRIES = maxCoreEntries;
 
