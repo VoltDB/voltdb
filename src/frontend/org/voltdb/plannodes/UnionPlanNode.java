@@ -17,12 +17,20 @@
 
 package org.voltdb.plannodes;
 
+import java.util.List;
+import java.util.ArrayList;
+
 import org.voltdb.types.PlanNodeType;
+import org.voltdb.catalog.Database;
+import org.voltdb.planner.ParsedUnionStmt;
 
 public class UnionPlanNode extends AbstractPlanNode {
-
-    public UnionPlanNode() {
+    // Union Type
+    private ParsedUnionStmt.UnionType m_unionType;
+    
+    public UnionPlanNode(ParsedUnionStmt.UnionType unionType) {
         super();
+        m_unionType = unionType;
     }
 
     @Override
@@ -36,9 +44,29 @@ public class UnionPlanNode extends AbstractPlanNode {
         // This node doesn't actually exist
         assert(false);
     }
+    
+    public ParsedUnionStmt.UnionType getUnionType() {
+        return m_unionType;
+    }
+    
+    @Override
+    public void generateOutputSchema(Database db)
+    {
 
+        // Should be at leats two selects in a join
+        assert(m_children.size() > 1);
+        for (AbstractPlanNode child : m_children)
+        {
+            child.generateOutputSchema(db);
+        }
+        // @TODO MIKE - what should be an output schema for union?
+        m_outputSchema = m_children.get(0).getOutputSchema();
+   }
+    
     @Override
     protected String explainPlanForNode(String indent) {
         return "UNION";
     }
+    
+    
 }

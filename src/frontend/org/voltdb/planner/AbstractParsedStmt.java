@@ -94,18 +94,18 @@ public abstract class AbstractParsedStmt {
     // if this is null, that means ALL the columns get used.
     public HashMap<String, ArrayList<SchemaColumn>> scanColumns = null;
 
-    /**
+    static final String INSERT_NODE_NAME = "insert";
+    static final String UPDATE_NODE_NAME = "update";
+    static final String DELETE_NODE_NAME = "delete";
+    static final String SELECT_NODE_NAME = "select";
+    static final String UNION_NODE_NAME  = "union";
+   /**
      *
      * @param sql
      * @param xmlSQL
      * @param db
      */
     public static AbstractParsedStmt parse(String sql, VoltXMLElement xmlSQL, Database db, String joinOrder) {
-        final String INSERT_NODE_NAME = "insert";
-        final String UPDATE_NODE_NAME = "update";
-        final String DELETE_NODE_NAME = "delete";
-        final String SELECT_NODE_NAME = "select";
-        final String UNION_NODE_NAME  = "union";
 
         AbstractParsedStmt retval = null;
 
@@ -135,30 +135,13 @@ public abstract class AbstractParsedStmt {
         }
 
         // parse tables and parameters
-        for (VoltXMLElement node : xmlSQL.children) {
-            if (node.name.equalsIgnoreCase("parameters")) {
-                retval.parseParameters(node, db);
-            }
-            if (node.name.equalsIgnoreCase("tablescans")) {
-                retval.parseTables(node, db);
-            }
-            if (node.name.equalsIgnoreCase("scan_columns"))
-            {
-                retval.parseScanColumns(node, db);
-            }
-        }
+        retval.parseTablesAndParams(xmlSQL, db);
 
         // parse specifics
         retval.parse(xmlSQL, db);
 
-        // split up the where expression into categories
-        retval.analyzeWhereExpression(db);
-        // these just shouldn't happen right?
-        assert(retval.multiTableSelectionList.size() == 0);
-        assert(retval.noTableSelectionList.size() == 0);
-
-        retval.sql = sql;
-        retval.joinOrder = joinOrder;
+        // post parse action
+        retval.postParse(sql, db, joinOrder);
 
         return retval;
     }
@@ -169,6 +152,43 @@ public abstract class AbstractParsedStmt {
      * @param db
      */
     abstract void parse(VoltXMLElement stmtElement, Database db);
+
+    /**Parse tables and parameters
+     * .
+     * @param root
+     * @param db
+     */
+    void parseTablesAndParams(VoltXMLElement root, Database db) {
+        for (VoltXMLElement node : root.children) {
+            if (node.name.equalsIgnoreCase("parameters")) {
+                this.parseParameters(node, db);
+            }
+            if (node.name.equalsIgnoreCase("tablescans")) {
+                String str = node.toString();
+                this.parseTables(node, db);
+            }
+            if (node.name.equalsIgnoreCase("scan_columns")) {
+                this.parseScanColumns(node, db);
+            }
+        }
+    }
+    
+    /**Miscellaneous post parse activity
+     * .
+     * @param sql
+     * @param db
+     * @param joinOrder
+     */
+    void postParse(String sql, Database db, String joinOrder) {
+        // split up the where expression into categories
+        this.analyzeWhereExpression(db);
+        // these just shouldn't happen right?
+        assert(this.multiTableSelectionList.size() == 0);
+        assert(this.noTableSelectionList.size() == 0);
+
+        this.sql = sql;
+        this.joinOrder = joinOrder;
+    }
 
     /**
      * Convert a HSQL VoltXML expression to an AbstractExpression tree.
