@@ -224,7 +224,7 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
             break;
         }
     }
-    assert(activeNumOfSearchKeys > 0);
+
     VOLT_TRACE("Search key after substitutions: '%s'", m_searchKey.debugNoHeader().c_str());
 
     if (m_numOfEndkeys != 0) {
@@ -277,7 +277,6 @@ bool IndexCountExecutor::p_execute(const NValueArray &params)
                 break;
             }
         }
-        //assert((activeNumOfEndKeys == 0) || (m_endKey.getSchema()->columnCount() > 0));
         VOLT_TRACE("End key after substitutions: '%s'", m_endKey.debugNoHeader().c_str());
     }
 

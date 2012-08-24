@@ -86,16 +86,16 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
     uint32_t m_nextTupleInSourceOffset = source->lastCompactionOffset();
     int sourceTuplesPendingDeleteOnUndoRelease = 0;
     while (hasFreeTuples() && !source->isEmpty()) {
-        TableTuple sourceTuple(table->schema());
+        TableTuple sourceTupleWithNewValues(table->schema());
         TableTuple destinationTuple(table->schema());
 
         bool foundSourceTuple = false;
         //Iterate further into the block looking for active tuples
         //Stop when running into the unused tuple boundry
         while (m_nextTupleInSourceOffset < source->unusedTupleBoundry()) {
-            sourceTuple.move(&source->address()[m_tupleLength * m_nextTupleInSourceOffset]);
+            sourceTupleWithNewValues.move(&source->address()[m_tupleLength * m_nextTupleInSourceOffset]);
             m_nextTupleInSourceOffset++;
-            if (sourceTuple.isActive()) {
+            if (sourceTupleWithNewValues.isActive()) {
                 foundSourceTuple = true;
                 break;
             }
@@ -115,14 +115,14 @@ std::pair<int, int> TupleBlock::merge(Table *table, TBPtr source) {
         //index. If all the active tuples are pending delete on undo release the block
         //is effectively empty and shouldn't be considered for merge ops.
         //It will be completely discarded once the undo log releases the block.
-        if (sourceTuple.isPendingDeleteOnUndoRelease()) {
+        if (sourceTupleWithNewValues.isPendingDeleteOnUndoRelease()) {
             sourceTuplesPendingDeleteOnUndoRelease++;
             continue;
         }
 
         destinationTuple.move(nextFreeTuple().first);
-        table->swapTuples( sourceTuple, destinationTuple);
-        source->freeTuple(sourceTuple.address());
+        table->swapTuples(sourceTupleWithNewValues, destinationTuple);
+        source->freeTuple(sourceTupleWithNewValues.address());
     }
     source->lastCompactionOffset(m_nextTupleInSourceOffset);
 

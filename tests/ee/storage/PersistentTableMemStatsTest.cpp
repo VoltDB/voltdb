@@ -227,7 +227,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateTest) {
     // de-duplicated with executorcontext data
     m_engine->getExecutorContext();
 
-    m_table->updateTuple(tempTuple, tuple, true);
+    m_table->updateTuple(tuple, tempTuple);
 
     m_engine->releaseUndoToken(INT64_MIN + 2);
 
@@ -276,7 +276,7 @@ TEST_F(PersistentTableMemStatsTest, UpdateAndUndoTest) {
     // de-duplicated with executorcontext data
     m_engine->getExecutorContext();
 
-    m_table->updateTuple(tempTuple, tuple, true);
+    m_table->updateTuple(tuple, tempTuple);
 
     ASSERT_EQ(orig_size + added_bytes - removed_bytes, m_table->nonInlinedMemorySize());
 
