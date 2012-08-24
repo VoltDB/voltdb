@@ -41,6 +41,33 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
+template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& strValue = arguments[0];
+    if (strValue.isNull()) {
+        return strValue;
+    }
+    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const NValue& startArg = arguments[1];
+    if (startArg.isNull()) {
+        return getNullStringValue();
+    }
+
+    const int32_t valueUTF8Length = strValue.getObjectLength();
+    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const char *valueEnd = valueChars+valueUTF8Length;
+
+    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
+
+    UTF8Iterator iter(valueChars, valueEnd);
+    const char* startChar = iter.skipCodePoints(start-1);
+    return getTempStringValue(startChar, (int32_t)(valueEnd - startChar));
+}
+
+/** implement the 2-argument SQL SUBSTRING function */
 template<> inline NValue NValue::call<FUNC_VOLT_SUBSTRING_CHAR_FROM>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& strValue = arguments[0];

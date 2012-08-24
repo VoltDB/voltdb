@@ -287,7 +287,6 @@ public class FunctionSQL extends Expression {
                     Tokens.X_KEYSET, 2, Tokens.CHARACTERS, Tokens.OCTETS,
                     Tokens.CLOSEBRACKET
                 };
-                voltDisabled = DISABLED_IN_FUNCTIONSQL_CONSTRUCTOR;
                 break;
 
             case FUNC_OCCURENCES_REGEX :

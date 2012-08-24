@@ -156,7 +156,7 @@ public class Test3019Suite extends RegressionSuite {
         }
         project.addPartitionInfo("P1", "ID");
 
-        //project.addStmtProcedure("POSITION", "select desc, POSITION ('xin' IN desc) from P1");
+        project.addStmtProcedure("POSITION", "select desc, POSITION ('xin' IN desc) from P1");
         project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1");
         project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1");
 
