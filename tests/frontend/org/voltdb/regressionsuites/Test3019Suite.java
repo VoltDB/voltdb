@@ -82,20 +82,24 @@ public class Test3019Suite extends RegressionSuite {
             //client.drain();
         }
         client.callProcedure(callback, "P1.insert", 1, "贾鑫ab", 10, 1.1, new Timestamp(100000000L));
-        client.callProcedure(callback, "P1.insert", 2, "Xin", 10, 1.1, new Timestamp(100000000L));
+        client.callProcedure(callback, "P1.insert", 2, "Xin@Volt", 10, 1.1, new Timestamp(100000000L));
         ClientResponse cr = null;
         VoltTable r = null;
 
-        cr = client.callProcedure("CHAR_LENGTH");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[CHAR_LENGTH] result:\n" + r);
-        
-        cr = client.callProcedure("OCTET_LENGTH");
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[OCTET_LENGTH] result:\n" + r);
+//        cr = client.callProcedure("CHAR_LENGTH");
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        r = cr.getResults()[0];
+//        System.err.println("[CHAR_LENGTH] result:\n" + r);
+//
+//        cr = client.callProcedure("OCTET_LENGTH");
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        r = cr.getResults()[0];
+//        System.err.println("[OCTET_LENGTH] result:\n" + r);
 
+        cr = client.callProcedure("POSITION","in");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[POSITION] result:\n" + r);
 
 
         // Test application to weakly typed NUMERIC constants
@@ -156,7 +160,7 @@ public class Test3019Suite extends RegressionSuite {
         }
         project.addPartitionInfo("P1", "ID");
 
-        project.addStmtProcedure("POSITION", "select desc, POSITION ('xin' IN desc) from P1");
+        project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1");
         project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1");
         project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1");
 
@@ -170,10 +174,10 @@ public class Test3019Suite extends RegressionSuite {
         builder.addServerConfig(config);
 
         // CONFIG #2: HSQL
-        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
-        success = config.compile(project);
-        assertTrue(success);
-        builder.addServerConfig(config);
+//        config = new LocalCluster("fixedsql-hsql.jar", 1, 1, 0, BackendTarget.HSQLDB_BACKEND);
+//        success = config.compile(project);
+//        assertTrue(success);
+//        builder.addServerConfig(config);
 
         // no clustering tests for functions
 

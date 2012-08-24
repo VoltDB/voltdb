@@ -32,6 +32,7 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     }
     char *valueChars = reinterpret_cast<char*>(getObjectValue());
 
+    // very efficient code to count characters in UTF string and ASCII string
     int32_t i = 0, j = 0;
     while (valueChars[i]) {
         if ((valueChars[i] & 0xc0) != 0x80) j++;
@@ -51,20 +52,20 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
         throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
     }
 
-    const NValue& startArg = arguments[1];
-    if (startArg.isNull()) {
+    const NValue& pool = arguments[1];
+    if (pool.isNull()) {
         return getNullStringValue();
     }
 
-    const int32_t valueUTF8Length = strValue.getObjectLength();
-    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
-    const char *valueEnd = valueChars+valueUTF8Length;
+    char *strChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    char *poolChars = reinterpret_cast<char*>(pool.getObjectValue());
+    char * pch = NULL;
+    pch = strstr(poolChars, strChars);
+    int32_t pst = 0;
+    if (pch != NULL)
+        pst = pch - poolChars + 1;
 
-    int64_t start = std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(1L));
-
-    UTF8Iterator iter(valueChars, valueEnd);
-    const char* startChar = iter.skipCodePoints(start-1);
-    return getTempStringValue(startChar, (int32_t)(valueEnd - startChar));
+    return getIntegerValue(pst);
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
