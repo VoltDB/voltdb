@@ -29,13 +29,14 @@
 
 __author__ = 'scooper'
 
+import sys
 import os
 import glob
 import re
 import shlex
 
-import vcli_util
 import vcli_meta
+import vcli_util
 
 # Java configuration
 if 'JAVA_HOME' in os.environ:
@@ -65,7 +66,7 @@ def initialize():
     """Set the VOLTDB_HOME, VOLTDB_LIB and VOLTDB_VOLTDB environment variables
     based on the location of this script."""
 
-    dir = vcli_meta.mydir
+    dir = vcli_meta.bin_dir
 
     required_var_set = set(['VOLTDB_HOME', 'VOLTDB_LIB', 'VOLTDB_VOLTDB'])
 
@@ -115,7 +116,7 @@ def initialize():
         missing.sort()
         vcli_util.abort('Failed to establish VoltDB environment.',
                             ('You may need to perform a build.',
-                             'Initial search directory: %s' % vcli_meta.mydir,
+                             'Initial search directory: %s' % vcli_meta.bin_dir,
                              'Missing locations:', missing))
 
     # LOG4J configuration

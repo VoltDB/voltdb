@@ -33,6 +33,9 @@ __author__ = 'scooper'
 
 import sys
 import os
+import glob
+import copy
+import inspect
 
 def display_messages(msgs, f = sys.stdout, tag = None, level = 0):
     """
@@ -94,7 +97,7 @@ def abort(*msgs):
     Display ERROR messages and then abort.
     """
     error(*msgs)
-    display_messages('Errors are fatal, aborting execution', f = sys.stderr, tag = 'FATAL')
+    display_messages('Giving up.', f = sys.stderr, tag = 'FATAL')
     sys.exit(1)
 
 def find_in_path(name):
@@ -106,3 +109,31 @@ def find_in_path(name):
         if os.path.exists(os.path.join(dir, name)):
             return os.path.join(dir, name)
     return None
+
+def find_and_load_subclasses(base_class, base_dirs, sub_dir, **kwargs):
+    """
+    Look for python modules in a named subdirectory of a set of base
+    directories. Load any modules found and find all classes derived from the
+    specified base class. Return the classes found.
+    """
+    subclasses = []
+    for base_dir in base_dirs:
+        scan_dir = os.path.realpath(os.path.join(base_dir, sub_dir))
+        if os.path.exists(scan_dir):
+            for modpath in glob.glob(os.path.join(scan_dir, '*.py')):
+                filename = os.path.basename(modpath)
+                name = os.path.splitext(filename)[0]
+                # Start with an initial symbol table based on what the caller provided.
+                syms = copy.copy(kwargs)
+                before = set(syms.keys())
+                # Execute the module. The symbol table gets populated with the module symbols.
+                execfile(modpath, syms)
+                # Check the symbol table additions for subclasses of base_class.
+                after = set(syms)
+                for name in after.difference(before):
+                    # Ignore modules starting with '_' to allow utility modules.
+                    if not name.startswith('_'):
+                        o = syms[name]
+                        if inspect.isclass(o) and issubclass(o, base_class):
+                            subclasses.append(o())
+    return subclasses

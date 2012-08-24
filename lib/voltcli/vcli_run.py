@@ -28,67 +28,54 @@
 __author__ = 'scooper'
 
 import os
-import subprocess
 
 import vcli_util
 import vcli_env
-import vcli_opt
-
-def run_cmd(cmd, *args):
-    """Run external program without capturing or suppressing output and check return code."""
-    fullcmd = cmd
-    for arg in args:
-        if len(arg.split()) > 1:
-            fullcmd += ' "%s"' % arg
-        else:
-            fullcmd += ' %s' % arg
-    if vcli_opt.dryrun:
-        print fullcmd
-    else:
-        retcode = os.system(fullcmd)
-        if retcode != 0:
-            vcli_util.abort('return code %d: %s' % (retcode, fullcmd))
-
-def pipe_cmd(*args):
-    """Run external program, capture its output, and yield each output line for iteration."""
-    try:
-        proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
-        for line in iter(proc.stdout.readline, ''):
-            yield line.rstrip()
-        proc.stdout.close()
-    except Exception, e:
-        vcli_util.warning('Exception running command: %s' % ' '.join(args), e)
+import vcli_project
 
 #### Verb runner class
 
 class VerbRunner(object):
 
-    def __init__(self, name, options, args, parser):
-        self.name      = name
-        self.options   = options
-        self.args      = args
-        self.parser    = parser
-        self.classpath = vcli_env.classpath
-
-    def abort(self, *msgs):
-        vcli_util.error('Fatal error in "%s" command.' % self.name, *msgs)
-        print ''
-        self.parser.print_help()
-        print ''
-        vcli_util.abort()
-
-    def classpath_prepend(self, *paths):
-        self.classpath = list(paths) + self.classpath
-
-    def classpath_append(self, *paths):
-        self.classpath = self.classpath + list(paths)
+    def __init__(self, name, options, args, parser, project_path):
+        self.name         = name
+        self.options      = options
+        self.args         = args
+        self.parser       = parser
+        self.project_path = project_path
+        self.classpath    = ':'.join(vcli_env.classpath)
+        if project_path:
+            if not os.path.exists(self.project_path):
+                vlcli_util.abort('Project file "%s" does not exist.' % self.project_path)
+            self.project = vcli_project.parse(self.project_path)
+            cpext = self.project.get_config('classpath')
+            if cpext:
+                self.classpath += ':'.join((self.classpath, cpext))
+        else:
+            self.project = None
 
     def java(self, java_class, *args):
         java_args = [vcli_env.java]
         java_args.extend(vcli_env.java_opts)
         java_args.append('-Dlog4j.configuration=file://%s' % os.environ['LOG4J_CONFIG_PATH'])
-        java_args.append('-classpath')
-        java_args.append(':'.join(self.classpath))
+        java_args.extend(('-classpath', self.classpath))
         java_args.append(java_class)
         java_args.extend(args)
-        return run_cmd(*java_args)
+        return vcli_util.run_cmd(*java_args)
+
+    def run_cmd(self, *args):
+        vcli_util.run_cmd(*args)
+
+    def java_compile(self, outdir, *srcfiles):
+        vcli_util.run_cmd('javac', '-target', '1.6', '-source', '1.6',
+                          '-classpath', self.classpath, '-d', outdir, *srcfiles)
+
+    def abort(self, *msgs):
+        vcli_util.error('Fatal error in "%s" command.' % self.name, *msgs)
+        self.help()
+        vcli_util.abort()
+
+    def help(self, *args):
+        print ''
+        self.parser.print_help()
+        print ''

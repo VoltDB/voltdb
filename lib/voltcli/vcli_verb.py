@@ -25,27 +25,19 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
+# Provides static meta-data.
+
+import vcli_meta
+
+# IMPORTANT: Do not import other voltcli modules here. _util is the only one
+# guaranteed not to create a circular dependency.
+import _util
+
 __author__ = 'scooper'
 
-import os
-
-import vcli_opt
-import vcli_env
-import vcli_meta
-import vcli_run
-
-project_path = os.path.join(os.getcwd(), 'project.xml')
-
-def go():
-    # Parse the command line.
-    verb, options, args, verb_parser = vcli_opt.parse_cli()
-
-    # Initialize the environment
-    vcli_env.initialize()
-
-    # Run the command.
-    if verb.project_needed:
-        runner = vcli_run.VerbRunner(verb.name, options, args, verb_parser, project_path)
-    else:
-        runner = vcli_run.VerbRunner(verb.name, options, args, verb_parser, None)
-    verb.execute(runner)
+class Verb(object):
+    def __init__(self, name, **kwargs):
+        self.name     = name
+        self.metadata = vcli_meta.CLISpec(**kwargs)
+    def execute(self, env):
+        _util.abort('Verb "%s" object does not implement the required execute() method.' % self.name)

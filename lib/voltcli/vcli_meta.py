@@ -32,14 +32,19 @@ __author__ = 'scooper'
 import sys
 import os
 
-# IMPORTANT: Do not import other voltcli modules here. simpleutils is the
-# only one guaranteed not to create a circular dependency.
+# IMPORTANT: Do not import other voltcli modules here. _util is the only one
+# guaranteed not to create a circular dependency.
 import _util
 
 version = "0.9"
 version_string = '%%prog version %s' % version
 
-mydir, myname = os.path.split(os.path.realpath(sys.argv[0]))
+bin_dir, bin_name = os.path.split(os.path.realpath(sys.argv[0]))
+lib_dir = os.path.dirname(__file__)
+
+# Add the voltcli directory to the Python module load path so that verb modules
+# can import anything from here.
+sys.path.insert(0, lib_dir)
 
 #### Metadata class
 
@@ -51,41 +56,6 @@ class CLISpec(object):
     def __getattr__(self, name):
         return self._kwargs.get(name, None)
 
-#### Verb: abstract base class
-
-#TODO: Verbs should be compiled dynamically by scanning the verbs.d directory.
-
-class Verb(object):
-    def __init__(self, name, **kwargs):
-        self.name     = name
-        self.metadata = CLISpec(**kwargs)
-    def execute(self, env):
-        _util.abort('Verb "%s" object does not implement the required execute() method.' % self.name)
-
-#### Verb: compile
-
-class VerbCompile(Verb):
-    def __init__(self):
-        Verb.__init__(self, 'compile',
-                      description = 'Run the VoltDB compiler to build the catalog',
-                      usage       = '%prog compile CLASSPATH PROJECT JAR')
-    def execute(self, runner):
-        if len(runner.args) != 3:
-            runner.abort('3 arguments are required, %d were provided.' % len(runner.args))
-        runner.classpath_prepend(runner.args[0])
-        runner.classpath_append(runner.args[0])
-        runner.java('org.voltdb.compiler.VoltCompiler', *runner.args[1:])
-
-#### Verb: start
-
-class VerbStart(Verb):
-    def __init__(self):
-        Verb.__init__(self, 'start',
-                      description = 'Start the VoltDB server',
-                      usage       = '%prog start [OPTIONS] JAR')
-    def execute(self, env):
-        pass
-
 #### Option class
 
 class CLIOption(object):
@@ -93,11 +63,40 @@ class CLIOption(object):
         self.args   = args
         self.kwargs = kwargs
 
+#### Verbs
+
+class BaseVerb(object):
+    def __init__(self, name, project_needed, **kwargs):
+        self.name           = name
+        self.project_needed = project_needed
+        self.metadata       = CLISpec(**kwargs)
+    def execute(self, env):
+        _util.abort('%s "%s" object does not implement the required execute() method.'
+                        % (self.__class__.__name__, self.name))
+
+class Verb(BaseVerb):
+    """
+    ProjectVerb should be used for verbs that run outside the context of a
+    project. They must not need information from project.xml files.
+    """
+    def __init__(self, name, **kwargs):
+        BaseVerb.__init__(self, name, False, **kwargs)
+
+class ProjectVerb(BaseVerb):
+    """
+    ProjectVerb should be used for verbs that run inside the context of a
+    project. They likely will need information from project.xml files.
+    """
+    def __init__(self, name, **kwargs):
+        BaseVerb.__init__(self, name, True, **kwargs)
+
 # Verbs support the possible actions.
-verbs = (
-    VerbCompile(),
-    VerbStart(),
-    )
+# Look for Verb subclasses in the verbs.d subdirectory (relative to this file
+# and to the working directory). Also add ProjectVerb to the symbol table
+# provided to verb modules.
+verbs = _util.find_and_load_subclasses(BaseVerb, (lib_dir, '.'), 'verbs.d',
+                                       Verb = Verb,
+                                       ProjectVerb = ProjectVerb)
 
 # Options define the CLI behavior modifiers.
 cli = CLISpec(
@@ -112,5 +111,5 @@ cli = CLISpec(
                   help = 'pause before significant actions'),
         CLIOption('-v', '--verbose', action = 'store_true', dest = 'verbose',
                   help = 'display verbose messages, including external command lines'),
-        )
+    )
 )

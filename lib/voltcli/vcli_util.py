@@ -28,6 +28,8 @@
 # Volt CLI utility functions.
 
 import sys
+import subprocess
+from xml.etree import ElementTree
 
 import vcli_opt
 
@@ -42,3 +44,42 @@ def debug(*msgs):
     """
     if vcli_opt.debug:
         display_messages(msgs, tag = 'DEBUG')
+
+def parse_xml(xml_path):
+    """
+    Parses XML and returns an ElementTree object to provide access to element data.
+    """
+    et = ElementTree.ElementTree()
+    try:
+        return et.parse(xml_path)
+    except (OSError, IOError), e:
+        abort('Failed to parse XML file.', (xml_path, e))
+
+def run_cmd(cmd, *args):
+    """
+    Run external program without capturing or suppressing output and check return code.
+    """
+    fullcmd = cmd
+    for arg in args:
+        if len(arg.split()) > 1:
+            fullcmd += ' "%s"' % arg
+        else:
+            fullcmd += ' %s' % arg
+    if vcli_opt.dryrun:
+        print fullcmd
+    else:
+        retcode = os.system(fullcmd)
+        if retcode != 0:
+            abort('return code %d: %s' % (retcode, fullcmd))
+
+def pipe_cmd(*args):
+    """
+    Run external program, capture its output, and yield each output line for iteration.
+    """
+    try:
+        proc = subprocess.Popen(args, stdout=subprocess.PIPE, stderr=subprocess.STDOUT)
+        for line in iter(proc.stdout.readline, ''):
+            yield line.rstrip()
+        proc.stdout.close()
+    except Exception, e:
+        warning('Exception running command: %s' % ' '.join(args), e)

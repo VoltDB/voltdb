@@ -25,27 +25,23 @@
 # ARISING FROM, OUT OF OR IN CONNECTION WITH THE SOFTWARE OR THE USE OR
 # OTHER DEALINGS IN THE SOFTWARE.
 
-__author__ = 'scooper'
+import vcli_util
 
-import os
-
-import vcli_opt
-import vcli_env
-import vcli_meta
-import vcli_run
-
-project_path = os.path.join(os.getcwd(), 'project.xml')
-
-def go():
-    # Parse the command line.
-    verb, options, args, verb_parser = vcli_opt.parse_cli()
-
-    # Initialize the environment
-    vcli_env.initialize()
-
-    # Run the command.
-    if verb.project_needed:
-        runner = vcli_run.VerbRunner(verb.name, options, args, verb_parser, project_path)
-    else:
-        runner = vcli_run.VerbRunner(verb.name, options, args, verb_parser, None)
-    verb.execute(runner)
+class VerbConfig(ProjectVerb):
+    def __init__(self):
+        ProjectVerb.__init__(self, 'config',
+                             description = 'Configure project settings.',
+                             usage       = '%prog config NAME=VALUE')
+    def execute(self, runner):
+        if not runner.args:
+            vcli_util.abort('At least one argument is required.')
+        bad = []
+        for arg in runner.args:
+            if arg.find('=') == -1:
+                bad.append(arg)
+        if bad:
+            vcli_util.abort('Bad arguments (must be NAME=VALUE format):', bad)
+        for arg in runner.args:
+            name, value = [s.strip() for s in arg.split('=', 1)]
+            runner.project.set_config(name, value)
+        runner.project.save()
