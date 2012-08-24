@@ -151,18 +151,16 @@ public:
     virtual bool deleteEntry(const TableTuple *tuple) = 0;
 
     /**
-     * removes the index entry linked to old value and re-link it to new value.
-     * The address of the newTupleValue is used as the value in the index (and multimaps) as
-     * well as the key for the new entry.
-     */
-    virtual bool replaceEntry(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
-
-    /**
      * Update in place an index entry with a new tuple address
      */
-    virtual bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
+    virtual bool replaceEntryNoKeyChange(const TableTuple &destinationTuple,
+                                         const TableTuple &originalTuple) = 0;
+
+    /**
+     * Does the key out-of-line strings or binary data?
+     * Used for an optimization when key values are the same.
+     */
+    virtual bool keyUsesNonInlinedMemory() = 0;
 
     /**
      * just returns whether the value is already stored. no
