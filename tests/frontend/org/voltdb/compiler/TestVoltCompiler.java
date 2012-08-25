@@ -1093,6 +1093,32 @@ public class TestVoltCompiler extends TestCase {
         assertFalse(success);
     }
 
+    public void testBadDdlStmtProcName() throws IOException {
+        final String simpleSchema =
+            "create table books (cash integer default 23 not null, title varchar(10) default 'foo', PRIMARY KEY(cash));" +
+            "create procedure @Foo as select * from books;";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<procedures/>" +
+            "<partitions><partition table='BOOKS' column='CASH' /></partitions>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        final boolean success = compiler.compile(projectPath, testout_jar);
+        assertFalse(success);
+    }
+
     public void testGoodStmtProcName() throws IOException {
         final String simpleSchema =
             "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
@@ -1107,6 +1133,34 @@ public class TestVoltCompiler extends TestCase {
             "<database name='database'>" +
             "<schemas><schema path='" + schemaPath + "' /></schemas>" +
             "<procedures><procedure class='Foo'><sql>select * from books;</sql></procedure></procedures>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+
+        final boolean success = compiler.compile(projectPath, testout_jar);
+        assertTrue(success);
+    }
+
+    public void testGoodDdlStmtProcName() throws IOException {
+        final String simpleSchema =
+            "create table books (cash integer default 23 not null, title varchar(3) default 'foo', PRIMARY KEY(cash));" +
+            "PARTITION TABLE books ON COLUMN cash;" +
+            "CREATE PROCEDURE Foo AS select * from books where cash = ?;" +
+            "PARTITION PROCEDURE Foo ON 'BOOKS.CASH: 0';";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<procedures/>" +
             "</database>" +
             "</project>";
 
@@ -1191,6 +1245,47 @@ public class TestVoltCompiler extends TestCase {
         assertTrue(c2.serialize().equals(c1.serialize()));
     }
 
+
+    public void testDdlProcVarbinary() throws IOException {
+        final String simpleSchema =
+            "create table books (cash integer default 23 NOT NULL, title varbinary(10) default NULL, PRIMARY KEY(cash));" +
+            "partition table books on column cash;" +
+            "create procedure get as select * from books;" +
+            "create procedure i1 as insert into books values(5, 'AA');" +
+            "create procedure i2 as insert into books values(5, ?);" +
+            "create procedure s1 as update books set title = 'bb';" +
+            "create procedure i3 as insert into books values( ?, ?);" +
+            "partition procedure i3 on 'books.cash: 0';" +
+            "create procedure d1 as delete from books where title = ? and cash = ?;" +
+            "partition procedure d1 on 'books.cash: 1';";
+
+        final File schemaFile = VoltProjectBuilder.writeStringToTempFile(simpleSchema);
+        final String schemaPath = schemaFile.getPath();
+
+        final String simpleProject =
+            "<?xml version=\"1.0\"?>\n" +
+            "<project>" +
+            "<database name='database'>" +
+            "<schemas><schema path='" + schemaPath + "' /></schemas>" +
+            "<procedures/>" +
+            //"<procedures><procedure class='org.voltdb.compiler.procedures.AddBook' /></procedures>" +
+            "</database>" +
+            "</project>";
+
+        final File projectFile = VoltProjectBuilder.writeStringToTempFile(simpleProject);
+        final String projectPath = projectFile.getPath();
+
+        final VoltCompiler compiler = new VoltCompiler();
+        // final ClusterConfig cluster_config = new ClusterConfig(1, 1, 0, "localhost");
+
+        final boolean success = compiler.compile(projectPath, testout_jar);
+        assertTrue(success);
+        final Catalog c1 = compiler.getCatalog();
+        final String catalogContents = VoltCompiler.readFileFromJarfile(testout_jar, "catalog.txt");
+        final Catalog c2 = new Catalog();
+        c2.execute(catalogContents);
+        assertTrue(c2.serialize().equals(c1.serialize()));
+    }
 
     //
     // There are DDL tests a number of places. TestDDLCompiler seems more about
@@ -1880,6 +1975,69 @@ public class TestVoltCompiler extends TestCase {
                 "NotAnnotatedPartitionParamInteger TABLE PKEY_INTEGER ON 'PKEY_INTEGER.PKEY: 0'\", " +
                 "expected syntax: PARTITION PROCEDURE <procedure> ON " +
                 "'<table>.<column>: <parameter-index-no>'";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+    }
+
+    public void testInvalidSingleStatementCreateProcedureDDL() throws Exception {
+        ArrayList<Feedback> fbs;
+        String expectedError;
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER;" +
+                "PARTITION PROCEDURE Foo ON 'PKEY_INTEGER.PKEY: 0';"
+                );
+        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+                "\"CREATE PROCEDURE Foo AS BANBALOO pkey FROM PKEY_INTEGER\"";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER;" +
+                "PARTITION PROCEDURE Foo ON 'PKEY_INTEGER.PKEY: 0';"
+                );
+        expectedError = "Bad CREATE PROCEDURE DDL statement: " +
+                "\"CREATE PROCEDURE Foo AS SELEC pkey FROM PKEY_INTEGER\"";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
+                "PARTITION PROCEDURE Foo ON 'PKEY_INTEGER.PKEY: 2';"
+                );
+        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE Foo AS DELETE FROM PKEY_INTEGER;" +
+                "PARTITION PROCEDURE Foo ON 'PKEY_INTEGER.PKEY: 0';"
+                );
+        expectedError = "PartitionInfo specifies invalid parameter index for procedure: Foo";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE org.kanamuri.Foo AS DELETE FROM PKEY_INTEGER;" +
+                "PARTITION PROCEDURE Foo ON 'PKEY_INTEGER.PKEY: 0';"
+                );
+        expectedError = "PartitionInfo specifies invalid parameter index for procedure: org.kanamuri.Foo";
+        assertTrue(isFeedbackPresent(expectedError, fbs));
+
+        fbs = checkInvalidProcedureDDL(
+                "CREATE TABLE PKEY_INTEGER ( PKEY INTEGER NOT NULL, DESCR VARCHAR(128), PRIMARY KEY (PKEY) );" +
+                "PARTITION TABLE PKEY_INTEGER ON COLUMN PKEY;" +
+                "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?;" +
+                "PARTITION PROCEDURE 7Foo ON 'PKEY_INTEGER.PKEY: 0';"
+                );
+        expectedError = "Bad indentifier in DDL: \""+
+                "CREATE PROCEDURE 7Foo AS DELETE FROM PKEY_INTEGER WHERE PKEY = ?" +
+                "\" contains invalid identifier \"7Foo\"";
         assertTrue(isFeedbackPresent(expectedError, fbs));
     }
 

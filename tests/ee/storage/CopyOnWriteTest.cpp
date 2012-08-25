@@ -229,7 +229,7 @@ public:
             if (tableutil::getRandomTuple(table, tuple)) {
                 tempTuple.copy(tuple);
                 tempTuple.setNValue(1, ValueFactory::getIntegerValue(::rand()));
-                table->updateTuple( tempTuple, tuple, true);
+                table->updateTuple(tuple, tempTuple);
                 m_tuplesUpdated++;
             }
             break;
