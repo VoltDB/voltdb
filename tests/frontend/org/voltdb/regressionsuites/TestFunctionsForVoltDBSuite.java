@@ -24,11 +24,14 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
+import org.voltdb.VoltTable;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.client.NoConnectionsException;
 import org.voltdb.client.ProcCallException;
 import org.voltdb.client.ProcedureCallback;
 import org.voltdb.compiler.VoltProjectBuilder;
@@ -138,6 +141,31 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(caught);
 
     }
+    
+    public void testOctetLength() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING OCTET_LENGTH");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 2, "Xin", 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("OCTET_LENGTH", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(8, result.getLong(1));
+        
+        cr = client.callProcedure("OCTET_LENGTH", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(3, result.getLong(1));
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -168,7 +196,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         }
         project.addPartitionInfo("P1", "ID");
 
-        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1");
+        project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
 
         // CONFIG #1: Local Site/Partition running on JNI backend
         config = new LocalCluster("fixedsql-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_JNI);

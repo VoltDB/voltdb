@@ -543,8 +543,8 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.asScalarLong());
     }
 
-    public void testPositionAndCharLength() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING Position and CharLength");
+    public void testPosition() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING Position");
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
@@ -553,12 +553,52 @@ public class TestFunctionsSuite extends RegressionSuite {
         cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1, new Timestamp(100000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
-//        cr = client.callProcedure("POSITION","Vo", 1);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        result = cr.getResults()[0];
-//        assertEquals(1, result.getRowCount());
-//        assertTrue(result.advanceRow());
-//        assertEquals(3, result.getLong(1));
+        cr = client.callProcedure("POSITION","Vo", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(3, result.getLong(1));
+        
+        cr = client.callProcedure("POSITION","DB", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(0, result.getLong(1));
+        
+        cr = client.callProcedure("POSITION","Vo", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(5, result.getLong(1));
+    }
+    
+    
+    public void testCharLength() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING Char length");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1, new Timestamp(100000000L));
+        cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1, new Timestamp(100000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("CHAR_LENGTH", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(4, result.getLong(1));
+        
+        cr = client.callProcedure("CHAR_LENGTH", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(8, result.getLong(1));
     }
 
     //
