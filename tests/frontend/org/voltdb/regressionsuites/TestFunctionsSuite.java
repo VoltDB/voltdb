@@ -544,7 +544,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.asScalarLong());
     }
 
-    
+
     //
     // JUnit / RegressionSuite boilerplate
     //
