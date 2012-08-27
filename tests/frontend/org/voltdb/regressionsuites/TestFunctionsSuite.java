@@ -30,6 +30,7 @@ import java.sql.Timestamp;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -543,6 +544,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.asScalarLong());
     }
 
+    
     //
     // JUnit / RegressionSuite boilerplate
     //
