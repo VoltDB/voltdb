@@ -68,7 +68,7 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     std::string poolStr(poolChars, lenPool);
     std::string targetStr(targetChars, lenTarget);
 
-    size_t position = poolStr.find(targetStr);
+    int32_t position = poolStr.find(targetStr);
     if (position == std::string::npos)
         position = 0;
     else {
