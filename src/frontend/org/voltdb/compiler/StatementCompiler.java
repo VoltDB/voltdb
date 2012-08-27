@@ -129,8 +129,13 @@ public abstract class StatementCompiler {
             assert(plan != null);
         } catch (PlanningErrorException e) {
             // These are normal expectable errors -- don't normally need a stack-trace.
-            throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
-        } catch (Exception e) {
+            String msg = "Failed to plan for statement (" + catalogStmt.getTypeName() + ") " + catalogStmt.getSqltext();
+            if (e.getMessage() != null) {
+                msg += " Error: \"" + e.getMessage() + "\"";
+            }
+            throw compiler.new VoltCompilerException(msg);
+        }
+        catch (Exception e) {
             e.printStackTrace();
             throw compiler.new VoltCompilerException("Failed to plan for stmt: " + catalogStmt.getTypeName());
         }
