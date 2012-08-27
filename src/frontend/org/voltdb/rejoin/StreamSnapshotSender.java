@@ -19,11 +19,11 @@ package org.voltdb.rejoin;
 
 import java.io.IOException;
 import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import java.util.concurrent.LinkedBlockingQueue;
 import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltdb.utils.CompressionService;
 
@@ -33,15 +33,17 @@ import org.voltdb.utils.CompressionService;
 public class StreamSnapshotSender implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
-    private final SocketChannel m_sock;
+    private final Mailbox m_mb;
+    private final long m_destHSId;
     private final LinkedBlockingQueue<BBContainer> m_queue =
             new LinkedBlockingQueue<BBContainer>();
     private final AtomicLong m_bytesSent = new AtomicLong();
 
     private volatile Throwable m_lastException = null;
 
-    public StreamSnapshotSender(SocketChannel sock) {
-        m_sock = sock;
+    public StreamSnapshotSender(Mailbox mb, long destHSId) {
+        m_mb = mb;
+        m_destHSId = destHSId;
     }
 
     /**
@@ -79,30 +81,26 @@ public class StreamSnapshotSender implements Runnable {
 
                 try {
                     if (message.b.isDirect()) {
-                        //Leave space for a new length prefix
-                        compressionBuffer.clear().position(4);
+                        compressionBuffer.clear();
                         final int compressedSize =
                                 CompressionService.compressBuffer(message.b, compressionBuffer);
-                        compressionBuffer.putInt(0, compressedSize);
-                        compressionBuffer.limit(4 + compressedSize);
+                        compressionBuffer.limit(compressedSize);
                         compressionBuffer.position(0);
-                        while (compressionBuffer.hasRemaining()) {
-                            m_bytesSent.addAndGet(m_sock.write(compressionBuffer));
-                        }
+
+                        byte[] data = new byte[compressedSize];
+                        compressionBuffer.get(data);
+                        RejoinDataMessage msg = new RejoinDataMessage(data);
+                        m_mb.send(m_destHSId, msg);
+                        m_bytesSent.addAndGet(compressedSize);
                     } else {
-                        ByteBuffer lengthPrefix = ByteBuffer.allocate(4);
                         byte compressedBytes[] =
                                 CompressionService.compressBytes(
                                         message.b.array(), message.b.position(),
                                         message.b.remaining());
-                        ByteBuffer contents = ByteBuffer.wrap(compressedBytes);
-                        lengthPrefix.putInt(compressedBytes.length).flip();
-                        while (lengthPrefix.hasRemaining()) {
-                            m_bytesSent.addAndGet(m_sock.write(lengthPrefix));
-                        }
-                        while (contents.hasRemaining()) {
-                            m_bytesSent.addAndGet(m_sock.write(contents));
-                        }
+
+                        RejoinDataMessage msg = new RejoinDataMessage(compressedBytes);
+                        m_mb.send(m_destHSId, msg);
+                        m_bytesSent.addAndGet(compressedBytes.length);
                     }
                 } catch (IOException e) {
                     rejoinLog.error("Error writing rejoin snapshot block", e);

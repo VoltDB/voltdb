@@ -24,7 +24,6 @@ import java.io.StringWriter;
 import java.io.Writer;
 import java.lang.reflect.Constructor;
 import java.lang.reflect.InvocationTargetException;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
 import java.util.Deque;
@@ -1271,11 +1270,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         m_recoveryStartTime = System.currentTimeMillis();
 
         // Construct a snapshot stream receiver
-        m_rejoinSnapshotProcessor = new StreamSnapshotSink(getSiteId());
+        m_rejoinSnapshotProcessor = new StreamSnapshotSink();
 
-        Pair<List<byte[]>, Integer> endPoints = m_rejoinSnapshotProcessor.initialize();
-        List<byte[]> addresses = endPoints.getFirst();
-        int port = endPoints.getSecond();
+        long hsId = m_rejoinSnapshotProcessor.initialize();
 
         // Construct task log and start logging task messages
         int partition = getCorrespondingPartitionId();
@@ -1298,16 +1295,15 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
 
         m_rejoinLog.info("Initiating rejoin for site " +
                 CoreUtils.hsIdToString(getSiteId()));
-        initiateRejoinSnapshot(addresses, port);
+        initiateRejoinSnapshot(hsId);
     }
 
     /**
      * Try to request a stream snapshot.
      *
-     * @param addresses The addresses other replica can connect to.
-     * @param port The port number other replica can connect to.
+     * @param hsId The HSId of the stream snapshot destination
      */
-    private RejoinMessage initiateRejoinSnapshot(List<byte[]> addresses, int port) {
+    private RejoinMessage initiateRejoinSnapshot(long hsId) {
         // Pick a replica of the same partition to send us data
         int partition = getCorrespondingPartitionId();
         long sourceSite = 0;
@@ -1330,13 +1326,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
         try {
             JSONStringer jsStringer = new JSONStringer();
             jsStringer.object();
-            jsStringer.key("addresses").array();
-            for (byte[] addr : addresses) {
-                InetAddress inetAddress = InetAddress.getByAddress(addr);
-                jsStringer.value(inetAddress.getHostAddress());
-            }
-            jsStringer.endArray();
-            jsStringer.key("port").value(port);
+            jsStringer.key("hsId").value(hsId);
             // make this snapshot only contain data from this site
             m_rejoinLog.info("Rejoin source for site " + CoreUtils.hsIdToString(getSiteId()) +
                                " is " + CoreUtils.hsIdToString(sourceSite));
@@ -1419,7 +1409,6 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             if (m_rejoinTaskLog != null) {
                 m_rejoinTaskLog.setEarliestTxnId(m_rejoinSnapshotTxnId);
             }
-            m_rejoinSnapshotProcessor.startCountDown();
             VoltDB.instance().getSnapshotCompletionMonitor()
                   .addInterest(m_snapshotCompletionHandler);
         } else {
