@@ -25,6 +25,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.Pair;
 import org.voltdb.utils.CompressionService;
 
 /**
@@ -34,10 +35,13 @@ public class StreamSnapshotDataReceiver extends StreamSnapshotBase
 implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
-    private final LinkedBlockingQueue<BBContainer> m_queue =
-            new LinkedBlockingQueue<BBContainer>();
+    /*
+     * element is a pair of <sourceHSId, blockData>. The hsId should remain the
+     * same for the length of the data transfer process for this partition.
+     */
+    private final LinkedBlockingQueue<Pair<Long, BBContainer>> m_queue =
+            new LinkedBlockingQueue<Pair<Long, BBContainer>>();
 
-    private volatile long m_sourceHSId = -1;
     private final Mailbox m_mb;
     private volatile boolean m_closed = false;
 
@@ -50,16 +54,12 @@ implements Runnable {
         m_closed = true;
     }
 
-    public long getSourceHSId() {
-        return m_sourceHSId;
-    }
-
     /**
      * Get the next message from queue.
      *
      * @return null if the queue is empty.
      */
-    public BBContainer poll() {
+    public Pair<Long, BBContainer> poll() {
         return m_queue.poll();
     }
 
@@ -69,7 +69,7 @@ implements Runnable {
      * @return
      * @throws InterruptedException
      */
-    public BBContainer take() throws InterruptedException {
+    public Pair<Long, BBContainer> take() throws InterruptedException {
         return m_queue.take();
     }
 
@@ -95,7 +95,6 @@ implements Runnable {
                     VoltMessage msg = m_mb.recvBlocking();
                     assert(msg instanceof RejoinDataMessage);
                     RejoinDataMessage dataMsg = (RejoinDataMessage) msg;
-                    m_sourceHSId = dataMsg.m_sourceHSId;
                     byte[] data = dataMsg.getData();
 
                     compressionBuffer.limit(data.length);
@@ -106,7 +105,7 @@ implements Runnable {
                                     compressionBuffer,
                                     messageBuffer);
                     messageBuffer.limit(uncompressedSize);
-                    m_queue.offer(container);
+                    m_queue.offer(Pair.of(dataMsg.m_sourceHSId, container));
                     success = true;
                 } finally {
                     if (!success) {

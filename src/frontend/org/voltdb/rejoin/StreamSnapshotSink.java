@@ -126,8 +126,8 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
 
         Pair<Integer, ByteBuffer> result = null;
         while (!m_EOF) {
-            BBContainer container = m_in.take();
-            result = processMessage(container);
+            Pair<Long, BBContainer> msg = m_in.take();
+            result = processMessage(msg);
             if (result != null) {
                 break;
             }
@@ -143,23 +143,25 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
             return null;
         }
 
-        BBContainer container = m_in.poll();
-        return processMessage(container);
+        Pair<Long, BBContainer> msg = m_in.poll();
+        return processMessage(msg);
     }
 
     /**
      * Process a message pulled off from the network thread, and discard the
      * container once it's processed.
      *
-     * @param container
+     * @param msg A pair of <sourceHSId, blockContainer>
      * @return The processed message, or null if there's no data block to return
      *         to the site.
      */
-    private Pair<Integer, ByteBuffer> processMessage(BBContainer container) {
-        if (container == null) {
+    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, BBContainer> msg) {
+        if (msg == null) {
             return null;
         }
 
+        long hsId = msg.getFirst();
+        BBContainer container = msg.getSecond();
         try {
             ByteBuffer block = container.b;
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
@@ -190,10 +192,8 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
             ByteBuffer nextChunk = getNextChunk(block);
             m_bytesReceived += nextChunk.remaining();
 
-            // the source HSId should be the same each time
-            m_ack.setSourceHSId(m_in.getSourceHSId());
             // Queue ack to this block
-            m_ack.ack(blockIndex);
+            m_ack.ack(hsId, blockIndex);
 
             return Pair.of(tableId, nextChunk);
         } finally {

@@ -21,6 +21,7 @@ import java.util.concurrent.LinkedBlockingQueue;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
+import org.voltcore.utils.Pair;
 
 /**
  * Sends acks of snapshot blocks to the snapshot sender.
@@ -28,38 +29,37 @@ import org.voltcore.messaging.Mailbox;
 public class StreamSnapshotAckSender implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
-    private volatile long m_sourceHSId = -1;
     private final Mailbox m_mb;
-    private final LinkedBlockingQueue<Integer> m_blockIndices =
-            new LinkedBlockingQueue<Integer>();
+    private final LinkedBlockingQueue<Pair<Long, Integer>> m_blockIndices =
+            new LinkedBlockingQueue<Pair<Long, Integer>>();
 
     public StreamSnapshotAckSender(Mailbox mb) {
         m_mb = mb;
     }
 
-    public void setSourceHSId(long sourceHSId) {
-        m_sourceHSId = sourceHSId;
-    }
-
     public void close() {
         // an index of -1 will terminate the thread
-        m_blockIndices.offer(-1);
+        m_blockIndices.offer(Pair.of(-1L, -1));
     }
 
     /**
      * Ack with a positive block index.
+     * @param hsId The mailbox to send the ack to
      * @param blockIndex
      */
-    public void ack(int blockIndex) {
-        m_blockIndices.offer(blockIndex);
+    public void ack(long hsId, int blockIndex) {
+        m_blockIndices.offer(Pair.of(hsId, blockIndex));
     }
 
     @Override
     public void run() {
         while (true) {
+            long hsId;
             int blockIndex;
             try {
-                blockIndex = m_blockIndices.take();
+                Pair<Long, Integer> blockToAck = m_blockIndices.take();
+                hsId = blockToAck.getFirst();
+                blockIndex = blockToAck.getSecond();
             } catch (InterruptedException e1) {
                 break;
             }
@@ -72,8 +72,7 @@ public class StreamSnapshotAckSender implements Runnable {
             }
 
             RejoinDataAckMessage msg = new RejoinDataAckMessage(blockIndex);
-            assert(m_sourceHSId != -1);
-            m_mb.send(m_sourceHSId, msg);
+            m_mb.send(hsId, msg);
         }
     }
 }
