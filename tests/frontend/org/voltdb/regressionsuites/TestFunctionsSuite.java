@@ -30,6 +30,7 @@ import java.sql.Timestamp;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
+import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -543,78 +544,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.asScalarLong());
     }
 
-    public void testPosition() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING Position");
-        Client client = getClient();
-        ClientResponse cr;
-        VoltTable result;
-
-        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1, new Timestamp(100000000L));
-        cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1, new Timestamp(100000000L));
-        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1, new Timestamp(100000000L));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("POSITION","Vo", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(3, result.getLong(1));
-
-        cr = client.callProcedure("POSITION","DB", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(0, result.getLong(1));
-
-        cr = client.callProcedure("POSITION","Vo", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(5, result.getLong(1));
-
-        // null case
-        cr = client.callProcedure("POSITION","Vo", 3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(0, result.getRowCount());
-    }
-
-
-    public void testCharLength() throws NoConnectionsException, IOException, ProcCallException {
-        System.out.println("STARTING Char length");
-        Client client = getClient();
-        ClientResponse cr;
-        VoltTable result;
-
-        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1, new Timestamp(100000000L));
-        cr = client.callProcedure("P1.insert", 2, "Xin@Volt", 10, 1.1, new Timestamp(100000000L));
-        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1, new Timestamp(100000000L));
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-
-        cr = client.callProcedure("CHAR_LENGTH", 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(4, result.getLong(1));
-
-        cr = client.callProcedure("CHAR_LENGTH", 2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(1, result.getRowCount());
-        assertTrue(result.advanceRow());
-        assertEquals(8, result.getLong(1));
-
-        // null case
-        cr = client.callProcedure("CHAR_LENGTH", 3);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        result = cr.getResults()[0];
-        assertEquals(0, result.getRowCount());
-    }
-
+    
     //
     // JUnit / RegressionSuite boilerplate
     //
@@ -675,10 +605,6 @@ public class TestFunctionsSuite extends RegressionSuite {
         // next one disabled until ENG-3486
         //project.addStmtProcedure("PARAM_SUBSTRING", "select SUBSTRING(? FROM 2) from P1");
         project.addStmtProcedure("PARAM_ABS", "select ABS(? + NUM) from P1");
-
-        // Test POSITION and CHAR_LENGTH
-        project.addStmtProcedure("POSITION", "select desc, POSITION (? IN desc) from P1 where id = ?");
-        project.addStmtProcedure("CHAR_LENGTH", "select desc, CHAR_LENGTH (desc) from P1 where id = ?");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
