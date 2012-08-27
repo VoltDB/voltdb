@@ -47,15 +47,15 @@ public class TestExplainCommandSuite extends RegressionSuite {
         Client client = getClient();
         VoltTable vt = null;
 
-        vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM T1 order by A_INT" ).getResults()[0];
+        String[] strs = {"SELECT COUNT(*) FROM T1 order by A_INT", "SELECT COUNT(*) FROM T1 order by A_INT"};
+
+        vt = client.callProcedure("@Explain", (Object[]) strs ).getResults()[0];
         while( vt.advanceRow() ) {
             System.out.println(vt);
-            String plan = (String) vt.get(0, VoltType.STRING );
+            //String plan = (String) vt.get(0, VoltType.STRING );
+            String plan = (String) vt.get("EXEcution_PlaN", VoltType.STRING);
             assertTrue( plan.contains( "RETURN RESULTS TO STORED PROCEDURE" ));
             assertTrue( plan.contains( "ORDER BY (SORT)"));
-            assertTrue( plan.contains( "AGGREGATION ops: sum" ));
-            assertTrue( plan.contains( "RECEIVE FROM ALL PARTITIONS" ));
-            assertTrue( plan.contains( "SEND PARTITION RESULTS TO COORDINATOR" ));
             assertTrue( plan.contains( "TABLE COUNT" ));
         }
 
@@ -65,14 +65,6 @@ public class TestExplainCommandSuite extends RegressionSuite {
             System.out.println(vt);
             String plan = (String) vt.get(0, VoltType.STRING );
             assertTrue( plan.contains("INDEX COUNT") );
-        }
-
-        //test table count node
-        vt = client.callProcedure("@Explain", "SELECT COUNT(*) FROM t3" ).getResults()[0];
-        while( vt.advanceRow() ) {
-            System.out.println(vt);
-            String plan = (String) vt.get(0, VoltType.STRING );
-            assertTrue( plan.contains("TABLE COUNT") );
         }
     }
 
