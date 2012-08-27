@@ -68,13 +68,13 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     std::string poolStr(poolChars, lenPool);
     std::string targetStr(targetChars, lenTarget);
 
-    int32_t position = poolStr.find(targetStr);
+    size_t position = poolStr.find(targetStr);
     if (position == std::string::npos)
         position = 0;
     else {
         position = getCharLength(poolStr.substr(0,position).c_str(),position) + 1;
     }
-    return getIntegerValue(position);
+    return getIntegerValue(static_cast<int32_t>(position));
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
