@@ -224,9 +224,13 @@ public class plannerTester {
                 System.out.println(e1.getMessage());
                 System.exit(-1);
             }
+            Iterator<String> it = m_savePlanPaths.iterator();
             for( String config : m_config ) {
                 try {
                     setUp( config );
+                    if( m_isSavePathFromCML && it.hasNext() ) {
+                        m_savePlanPath = it.next();
+                    }
                     startDiff();
                 } catch (Exception e) {
                     e.printStackTrace();
