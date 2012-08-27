@@ -17,55 +17,64 @@
 
 namespace voltdb {
 
-/** implement the 1-argument SQL CHAR_LENGTH function */
-template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
-    if (isNull()) {
-        return getIntegerValue(0);
+static int32_t inline getCharLength(const char *valueChars, const size_t length) {
+    // very efficient code to count characters in UTF string and ASCII string
+    int32_t i = 0, j = 0;
+    size_t len = length;
+    while (len-- > 0) {
+        if ((valueChars[i] & 0xc0) != 0x80) j++;
+        i++;
     }
+    return j;
+}
+
+/** implement the 1-argument SQL OCTET_LENGTH function */
+template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
+    if (isNull())
+        return getNullValue();
+
     return getIntegerValue(getObjectLength());
 }
 
 /** implement the 1-argument SQL CHAR_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
-    if (isNull()) {
-        return getIntegerValue(0);
-    }
-    char *valueChars = reinterpret_cast<char*>(getObjectValue());
+    if (isNull())
+        return getNullValue();
 
-    // very efficient code to count characters in UTF string and ASCII string
-    int32_t i = 0, j = 0;
-    while (valueChars[i]) {
-        if ((valueChars[i] & 0xc0) != 0x80) j++;
-        i++;
-    }
-    return getIntegerValue(j);
+    char *valueChars = reinterpret_cast<char*>(getObjectValue());
+    return getIntegerValue(getCharLength(valueChars, getObjectLength()));
 }
 
-/** implement the 2-argument SQL SUBSTRING function */
+/** implement the 2-argument SQL FUNC_POSITION_CHAR function */
 template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
-    const NValue& strValue = arguments[0];
-    if (strValue.isNull()) {
-        return strValue;
+    const NValue& target = arguments[0];
+    if (target.isNull()) {
+        return getNullValue();
     }
-    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
-        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
+    if (target.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (target.getValueType(), VALUE_TYPE_VARCHAR);
     }
+    int32_t lenTarget = target.getObjectLength();
 
     const NValue& pool = arguments[1];
     if (pool.isNull()) {
-        return getNullStringValue();
+        return getNullValue();
     }
-
-    char *strChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    int32_t lenPool = pool.getObjectLength();
+    char *targetChars = reinterpret_cast<char*>(target.getObjectValue());
     char *poolChars = reinterpret_cast<char*>(pool.getObjectValue());
-    char * pch = NULL;
-    pch = strstr(poolChars, strChars);
-    int32_t pst = 0;
-    if (pch != NULL)
-        pst = pch - poolChars + 1;
 
-    return getIntegerValue(pst);
+    std::string poolStr(poolChars, lenPool);
+    std::string targetStr(targetChars, lenTarget);
+
+    size_t position = poolStr.find(targetStr);
+    if (position == std::string::npos)
+        position = 0;
+    else {
+        position = getCharLength(poolStr.substr(0,position).c_str(),position) + 1;
+    }
+    return getIntegerValue(position);
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
