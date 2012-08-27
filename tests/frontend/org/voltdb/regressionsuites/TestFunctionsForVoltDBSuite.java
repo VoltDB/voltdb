@@ -176,9 +176,9 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
     }
-    
+
     // this test is put here instead of TestFunctionSuite, because HSQL uses
-    // a different null case standard with standard sql 
+    // a different null case standard with standard sql
     public void testPosition() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Position");
         Client client = getClient();
@@ -221,7 +221,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
     }
 
     // this test is put here instead of TestFunctionSuite, because HSQL uses
-    // a different null case standard with standard sql 
+    // a different null case standard with standard sql
     public void testCharLength() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING Char length");
         Client client = getClient();
