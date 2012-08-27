@@ -165,10 +165,21 @@ public class PlannerTestAideDeCamp {
                              hsql, estimates, false);
 
         CompiledPlan plan = null;
-        plan = planner.compilePlan(costModel, catalogStmt.getSqltext(), joinOrder, catalogStmt.getTypeName(),
-                                   catalogStmt.getParent().getTypeName(),
-                                   StatementCompiler.DEFAULT_MAX_JOIN_TABLES, null, false);
+        String parsedToken = planner.parse(catalogStmt.getSqltext(),
+                                           catalogStmt.getTypeName(),
+                                           catalogStmt.getParent().getTypeName(),
+                                           false);
+        if (parsedToken != null) {
+            plan = planner.plan(costModel,
+                                catalogStmt.getSqltext(),
+                                joinOrder,
+                                catalogStmt.getTypeName(),
+                                catalogStmt.getParent().getTypeName(),
+                                StatementCompiler.DEFAULT_MAX_JOIN_TABLES,
+                                null);
+        }
         //TODO: Some day, when compilePlan throws a proper PlanningErrorException for all error cases, this test can become an assert.
+
         if (plan == null)
         {
             String msg = "planner.compilePlan returned null plan";
