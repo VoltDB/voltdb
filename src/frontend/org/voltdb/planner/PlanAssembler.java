@@ -184,13 +184,7 @@ public class PlanAssembler {
         return false;
     }
 
-    /**
-     * Clear any old state and get ready to plan a new plan. The next call to
-     * getNextPlan() will return the first candidate plan for these parameters.
-     *
-     */
-    void setupForNewPlans(AbstractParsedStmt parsedStmt)
-    {
+    public void verifyTablePatition (AbstractParsedStmt parsedStmt) {
         int countOfPartitionedTables = 0;
         Map<String, String> partitionColumnByTable = new HashMap<String, String>();
         // Do we have a need for a distributed scan at all?
@@ -227,6 +221,16 @@ public class PlanAssembler {
                 throw new PlanningErrorException(msg);
             }
         }
+    }
+
+    /**
+     * Clear any old state and get ready to plan a new plan. The next call to
+     * getNextPlan() will return the first candidate plan for these parameters.
+     *
+     */
+    void setupForNewPlans(AbstractParsedStmt parsedStmt)
+    {
+        verifyTablePatition (parsedStmt);
 
         if (parsedStmt instanceof ParsedSelectStmt) {
             if (tableListIncludesExportOnly(parsedStmt.tableList)) {
@@ -347,9 +351,9 @@ public class PlanAssembler {
         retval.setPartitioningKey(m_partitioning.effectivePartitioningValue());
         return retval;
     }
-    
+
     /**
-     * This is a UNION specific method. Generate a unique and correct plan 
+     * This is a UNION specific method. Generate a unique and correct plan
      * for the current SQL UNION statement given the best plans for each individual SELECT.
      * This method gets called ones.
      *
@@ -357,12 +361,12 @@ public class PlanAssembler {
      */
     public CompiledPlan getNextUnionPlan(AbstractParsedStmt nextStmt, ParsedUnionStmt.UnionType unionType, List<CompiledPlan> selectPlans) {
         CompiledPlan retval = new CompiledPlan();
-        
+
         AbstractPlanNode root = new UnionPlanNode(unionType);
         for (CompiledPlan selectPlan : selectPlans) {
             root.addAndLinkChild(selectPlan.rootPlanGraph);
         }
-        
+
         SendPlanNode sendNode = new SendPlanNode();
 
         // connect the nodes to build the graph
@@ -371,8 +375,8 @@ public class PlanAssembler {
 
         retval.rootPlanGraph = sendNode;
         retval.readOnly = true;
-       
-        
+
+
         assert (nextStmt != null);
         addParameters(retval, nextStmt);
         retval.fullWhereClause = nextStmt.where;
@@ -419,7 +423,7 @@ public class PlanAssembler {
             }
         }
     }
-    
+
     private AbstractPlanNode getNextSelectPlan(boolean addSendReceive) {
         assert (subAssembler != null);
 

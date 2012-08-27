@@ -50,7 +50,7 @@ public class QueryPlanner {
     String m_recentErrorMsg;
     boolean m_quietPlanner;
     final boolean m_fullDebug;
-    
+
     class NextPlanParams {
         // index of the plan currently being "costed"
         int m_counter = 0;
@@ -152,11 +152,14 @@ public class QueryPlanner {
 
         // get ready to find the plan with minimal cost
         CompiledPlan bestPlan = null;
-        
+
         if (parsedStmt instanceof ParsedUnionStmt) {
+
+            m_assembler.verifyTablePatition(parsedStmt);
+
             ParsedUnionStmt parsedUnionStmt = (ParsedUnionStmt) parsedStmt;
             ArrayList<CompiledPlan> childrenPlans = new ArrayList<CompiledPlan>();
-            
+
             NextPlanParams planParams = new NextPlanParams();
             planParams.m_isFinal = false;
             for (AbstractParsedStmt parsedSelectStmt : parsedUnionStmt.m_children) {
@@ -166,16 +169,16 @@ public class QueryPlanner {
                 if (bestSelectPlan == null) {
                     m_recentErrorMsg = "Unable to plan for statement. Error unknown.";
                     return null;
-                }               
+                }
                 childrenPlans.add(bestSelectPlan);
-            }    
-                        
+            }
+
             // For now the best plan for union is the sum of best plans for the selects
             bestPlan = m_assembler.getNextUnionPlan(parsedStmt, parsedUnionStmt.m_unionType, childrenPlans);
-            
+
             bestPlan.sql = sql;
 
-            // 
+            //
             boolean orderIsDeterministic = true;
             boolean contentIsDeterministic = true;
             for (CompiledPlan childPlan: childrenPlans) {
@@ -192,7 +195,7 @@ public class QueryPlanner {
             // filename for debug output
             // @TODO need a single plan for the union
             String filename = String.valueOf(planParams.m_counter++);
-            
+
             if (!m_quietPlanner) {
                 if (m_fullDebug) {
                     outputPlanFullDebug(bestPlan, bestPlan.rootPlanGraph, stmtName, procName, filename);
@@ -202,19 +205,19 @@ public class QueryPlanner {
                 bestPlan.explainedPlan = bestPlan.rootPlanGraph.toExplainPlanString();
                 outputExplainedPlan(stmtName, procName, bestPlan, filename);
             }
- 
-            
+
+
             // @TODO For now stat is empty debug output and finalize when to call?
             PlanStatistics stats = new PlanStatistics();
             if (bestPlan != null && !m_quietPlanner) {
                 finalizeOutput(stmtName, procName, filename, stats);
-            }                       
-        } else {  
+            }
+        } else {
             boolean needSendReceive = true;
             NextPlanParams planParams = new NextPlanParams();
             bestPlan = getBestCostPlan(parsedStmt, costModel,
                     sql, joinOrder, stmtName,procName, paramHints, planParams);
-        }    
+        }
 
         // make sure we got a winner
         if (bestPlan == null) {
@@ -240,7 +243,7 @@ public class QueryPlanner {
             String procName,
             ScalarValueHints[] paramHints,
             NextPlanParams planParams) {
-    
+
     // set up the plan assembler for this statement
     m_assembler.setupForNewPlans(parsedStmt);
 
@@ -313,13 +316,13 @@ public class QueryPlanner {
             }
         }
     }
-    
+
     if (planParams.m_isFinal && bestPlan != null && !m_quietPlanner) {
         finalizeOutput(stmtName, procName, bestFilename, stats);
     }
 
     return bestPlan;
-}   
+}
 
     /**
      * @param stmtName

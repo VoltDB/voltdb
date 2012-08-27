@@ -172,7 +172,7 @@ public abstract class AbstractParsedStmt {
             }
         }
     }
-    
+
     /**Miscellaneous post parse activity
      * .
      * @param sql
