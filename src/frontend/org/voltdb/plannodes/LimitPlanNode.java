@@ -156,7 +156,7 @@ public class LimitPlanNode extends AbstractPlanNode {
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+        helpLoadFromJSONObject(jobj, db);
         m_offset = jobj.getInt( Members.OFFSET.name() );
         m_limit = jobj.getInt( Members.LIMIT.name() );
         m_limitParameterId = jobj.getLong( Members.LIMIT_PARAM_IDX.name() );
