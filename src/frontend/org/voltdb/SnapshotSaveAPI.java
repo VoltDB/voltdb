@@ -21,7 +21,6 @@ import java.io.File;
 import java.io.IOException;
 import java.io.PrintWriter;
 import java.io.StringWriter;
-import java.net.InetAddress;
 import java.nio.ByteBuffer;
 import java.security.MessageDigest;
 import java.security.NoSuchAlgorithmException;
@@ -465,13 +464,7 @@ public class SnapshotSaveAPI
 
                     if (format == SnapshotFormat.STREAM && data != null) {
                         JSONObject jsObj = new JSONObject(data);
-                        int port = jsObj.getInt("port");
-                        JSONArray jsAddresses = jsObj.getJSONArray("addresses");
-                        ArrayList<byte[]> addresses = new ArrayList<byte[]>();
-                        for (int i = 0; i < jsAddresses.length(); i++) {
-                            InetAddress addr = InetAddress.getByName(jsAddresses.getString(i));
-                            addresses.add(addr.getAddress());
-                        }
+                        long hsId = jsObj.getLong("hsId");
 
                         // if a target_hsid exists, set it for filtering a snapshot for a specific site
                         try {
@@ -485,7 +478,7 @@ public class SnapshotSaveAPI
                             List<Long> localHSids = tracker.getSitesForHost(context.getHostId());
                             // if the target site is local to this node...
                             if (localHSids.contains(targetHSid)) {
-                                sdt = new StreamSnapshotDataTarget(addresses, port, schemas);
+                                sdt = new StreamSnapshotDataTarget(hsId, schemas);
                             }
                             else {
                                 sdt = new DevNullSnapshotTarget();
