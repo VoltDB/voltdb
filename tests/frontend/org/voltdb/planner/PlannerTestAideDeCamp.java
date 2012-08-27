@@ -167,10 +167,8 @@ public class PlannerTestAideDeCamp {
                     costModel, null, joinOrder);
 
         CompiledPlan plan = null;
-        String parsedToken = planner.parse(false);
-        if (parsedToken != null) {
-            plan = planner.plan();
-        }
+        planner.parse();
+        plan = planner.plan();
         assert(plan != null);
 
         // Input Parameters

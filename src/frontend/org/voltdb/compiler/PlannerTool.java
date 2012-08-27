@@ -115,7 +115,8 @@ public class PlannerTool {
         CompiledPlan plan = null;
         String parsedToken = null;
         try {
-            parsedToken = planner.parse(true);
+            planner.parse();
+            parsedToken = planner.parameterize();
             if (parsedToken != null) {
 
                 // if cacheable, check the cache for a matching pre-parameterized plan

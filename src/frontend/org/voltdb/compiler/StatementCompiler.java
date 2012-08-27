@@ -124,7 +124,7 @@ public abstract class StatementCompiler {
 
         CompiledPlan plan = null;
         try {
-            planner.parse(false);
+            planner.parse();
             plan = planner.plan();
             assert(plan != null);
         } catch (PlanningErrorException e) {

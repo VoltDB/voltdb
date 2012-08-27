@@ -130,11 +130,8 @@ public class QueryPlanner {
      * {@link this#plan(AbstractCostModel, String, String, String, String, int, ScalarValueHints[]) },
      * but splitting these two affords an opportunity to check a cache for a plan matching
      * the auto-parameterized parsed statement.
-     *
-     * @param parameterize Whether to use auto-parameterization.
-     * @return An opaque token representing the parsed statement with optional parameterization.
      */
-    public String parse(boolean parameterize) {
+    public void parse() throws PlanningErrorException {
         // reset any error message
         m_recentErrorMsg = null;
 
@@ -153,29 +150,28 @@ public class QueryPlanner {
         if (!m_quietPlanner && m_fullDebug) {
             outputCompiledStatement(m_xmlSQL);
         }
+    }
 
-        // what's going to happen next:
-        //  Try to parameterize the constant value expressions (if asked to do so)
-        //  On success return the plan.
-        //  On failure, try the plan again without parameterization
-        //  note, this means copies might need to be made of anything mutated in
-        //   the planning process, specifically the VoltXML object and maybe the partitioning info
+    /**
+     * Auto-parameterize all of the literals in the parsed SQL statement.
+     *
+     * @return An opaque token representing the parsed statement with (possibly) parameterization.
+     */
+    public String parameterize() {
+        m_paramzInfo = ParameterizationInfo.parameterize(m_xmlSQL);
 
-        if (parameterize) {
-            m_paramzInfo = ParameterizationInfo.parameterize(m_xmlSQL);
-
-            // skip plans with pre-existing parameters and plans that don't parameterize
-            // assume a user knows how to cache/optimize these
-            if (m_paramzInfo != null) {
-                // if requested output the second version of the parsed plan
-                if (!m_quietPlanner && m_fullDebug) {
-                    outputParameterizedCompiledStatement(m_paramzInfo.parameterizedXmlSQL);
-                }
-
-                return m_paramzInfo.parameterizedXmlSQL.toMinString();
+        // skip plans with pre-existing parameters and plans that don't parameterize
+        // assume a user knows how to cache/optimize these
+        if (m_paramzInfo != null) {
+            // if requested output the second version of the parsed plan
+            if (!m_quietPlanner && m_fullDebug) {
+                outputParameterizedCompiledStatement(m_paramzInfo.parameterizedXmlSQL);
             }
+
+            return m_paramzInfo.parameterizedXmlSQL.toMinString();
         }
 
+        // fallback when parameterization is
         return m_xmlSQL.toMinString();
     }
 
@@ -185,9 +181,14 @@ public class QueryPlanner {
      * @return The best plan found for the SQL statement.
      * @throws PlanningErrorException on failure.
      */
-    public CompiledPlan plan(){
+    public CompiledPlan plan() throws PlanningErrorException {
         // reset any error message
         m_recentErrorMsg = null;
+
+        // what's going to happen next:
+        //  If a parameterized statement exists, try to make a plan with it
+        //  On success return the plan.
+        //  On failure, try the plan again without parameterization
 
         if (m_paramzInfo != null) {
             try {
@@ -197,8 +198,10 @@ public class QueryPlanner {
                 plan.partitioningKeyIndex =
                         buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
                                 plan.parameters, plan.extractedParamValues);
-                // set the partition key value
-                plan.setPartitioningKey(plan.extractedParamValues.toArray()[plan.partitioningKeyIndex]);
+                // set the partition key value for SP plans
+                if (plan.partitioningKeyIndex >= 0) {
+                    plan.setPartitioningKey(plan.extractedParamValues.toArray()[plan.partitioningKeyIndex]);
+                }
 
                 m_wasParameterizedPlan = true;
                 return plan;
