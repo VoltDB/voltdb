@@ -24,7 +24,6 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
@@ -141,7 +140,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertTrue(caught);
 
     }
-    
+
     public void testOctetLength() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING OCTET_LENGTH");
         Client client = getClient();
@@ -150,6 +149,7 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
 
         cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 10, 1.1);
         cr = client.callProcedure("P1.insert", 2, "Xin", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         cr = client.callProcedure("OCTET_LENGTH", 1);
@@ -158,13 +158,19 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals(8, result.getLong(1));
-        
+
         cr = client.callProcedure("OCTET_LENGTH", 2);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals(3, result.getLong(1));
+
+        // null case
+        cr = client.callProcedure("OCTET_LENGTH", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(0, result.getRowCount());
     }
 
     //

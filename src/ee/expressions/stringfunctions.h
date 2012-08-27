@@ -28,18 +28,18 @@ static int32_t inline getCharLength(const char *valueChars, const size_t length)
     return j;
 }
 
-/** implement the 1-argument SQL CHAR_LENGTH function */
+/** implement the 1-argument SQL OCTET_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_OCTET_LENGTH>() const {
-    if (isNull()) {
-        return getIntegerValue(0);
-    }
+    if (isNull())
+        return getNullValue();
+
     return getIntegerValue(getObjectLength());
 }
 
 /** implement the 1-argument SQL CHAR_LENGTH function */
 template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     if (isNull())
-        return getIntegerValue(0);
+        return getNullValue();
 
     char *valueChars = reinterpret_cast<char*>(getObjectValue());
     return getIntegerValue(getCharLength(valueChars, getObjectLength()));
@@ -50,7 +50,7 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     assert(arguments.size() == 2);
     const NValue& target = arguments[0];
     if (target.isNull()) {
-        return target;
+        return getNullValue();
     }
     if (target.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (target.getValueType(), VALUE_TYPE_VARCHAR);
@@ -59,7 +59,7 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
 
     const NValue& pool = arguments[1];
     if (pool.isNull()) {
-        return getNullStringValue();
+        return getNullValue();
     }
     int32_t lenPool = pool.getObjectLength();
     char *targetChars = reinterpret_cast<char*>(target.getObjectValue());
