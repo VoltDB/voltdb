@@ -1245,12 +1245,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             List<byte[]> aggByteArray = new ArrayList<byte[]>( size );
             for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
-                aggByteArray.add(plannedStatement.aggregatorFragment);
+                aggByteArray.add(plannedStatement.core.aggregatorFragment);
             }
 
             List<byte[]> collByteArray = new ArrayList<byte[]>( size );
             for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
-                collByteArray.add(plannedStatement.collectorFragment );
+                collByteArray.add(plannedStatement.core.collectorFragment);
             }
 
             VoltTable[] vt = new VoltTable[ size ];
