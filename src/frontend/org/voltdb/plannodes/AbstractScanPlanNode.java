@@ -301,6 +301,14 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             }
             m_outputSchema.sortByTveIndex();
         }
+
+        // The outputschema of an inline limit node is completely irrelevant except that serialization will complain if it contains expressions of unresolved columns.
+        LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
+        if (limit != null)
+        {
+            limit.m_outputSchema = m_outputSchema.clone();
+        }
+
     }
 
     //TODO some members not in here
