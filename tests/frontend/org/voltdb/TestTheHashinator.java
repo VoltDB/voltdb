@@ -231,24 +231,20 @@ public class TestTheHashinator extends TestCase {
 
     public void testSameVarBinaryHash() {
         ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, 1);
-
         for (int i = 0; i < 100000; i++) {
             int partitionCount = r.nextInt(1000) + 1;
-
-            String str = Long.toString(r.nextLong());
-            byte[] valueToHash = str.getBytes();
+            byte[] valueToHash = new byte[r.nextInt(1000)];
+            r.nextBytes(valueToHash);
             TheHashinator.initialize(partitionCount);
-
             int eehash = ee.hashinate(valueToHash, partitionCount);
             int javahash = TheHashinator.hashinateStringAndVarBinary(valueToHash);
             if (eehash != javahash) {
                 partitionCount++;
             }
-            assertEquals(eehash, javahash);
             assertTrue(eehash < partitionCount);
             assertTrue(eehash >= 0);
+            assertEquals(eehash, javahash);
         }
-
         try { ee.release(); } catch (Exception e) {}
     }
 }
