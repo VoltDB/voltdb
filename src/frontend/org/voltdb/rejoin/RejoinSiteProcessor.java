@@ -18,8 +18,6 @@
 package org.voltdb.rejoin;
 
 import java.nio.ByteBuffer;
-import java.util.List;
-
 import org.voltcore.utils.Pair;
 
 public interface RejoinSiteProcessor {
@@ -28,15 +26,9 @@ public interface RejoinSiteProcessor {
      * Initialize the snapshot sink, bind to a socket and wait for incoming
      * connection.
      *
-     * @return A list of local addresses and port that remote node can connect
-     *         to.
+     * @return HSId of the new mailbox used to transfer snapshot data
      */
-    public abstract Pair<List<byte[]>, Integer> initialize();
-
-    /**
-     * Starts count down of waiting for the source to establish a connection.
-     */
-    public abstract void startCountDown();
+    public abstract long initialize();
 
     /**
      * Whether or not all snapshot blocks are polled

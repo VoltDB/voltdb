@@ -124,6 +124,8 @@ template <std::size_t keySize>
 class IntsKey {
 public:
 
+    static inline bool keyDependsOnTupleAddress() { return false; }
+    static inline bool keyUsesNonInlinedMemory() { return false; }
 
     /*
      * Take a value that is part of the key (already converted to a uint64_t) and inserts it into the
@@ -402,6 +404,10 @@ struct IntsHasher : std::unary_function<IntsKey<keySize>, std::size_t>
 template <std::size_t keySize>
 class GenericKey {
 public:
+
+    static inline bool keyDependsOnTupleAddress() { return false; }
+    static inline bool keyUsesNonInlinedMemory() { return true; } // maybe
+
     inline void setFromKey(const TableTuple *tuple) {
         assert(tuple);
         ::memcpy(data, tuple->m_data + TUPLE_HEADER_SIZE, tuple->getSchema()->tupleLength());
@@ -533,6 +539,9 @@ class TupleKey {
         m_keyTuple = NULL;
         m_keyTupleSchema = NULL;
     }
+
+    static inline bool keyDependsOnTupleAddress() { return true; }
+    static inline bool keyUsesNonInlinedMemory() { return true; } // maybe
 
     // Set a key from a key-schema tuple.
     inline void setFromKey(const TableTuple *tuple) {

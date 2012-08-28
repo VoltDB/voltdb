@@ -17,9 +17,9 @@
 
 package org.voltdb.rejoin;
 
-import java.nio.ByteBuffer;
-import java.nio.channels.SocketChannel;
 import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
+import org.voltcore.messaging.VoltMessage;
 
 /**
  * Reads acks from a rejoining partition
@@ -27,15 +27,15 @@ import org.voltcore.logging.VoltLogger;
 public class StreamSnapshotAckReceiver implements Runnable {
     private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
 
-    private final SocketChannel m_sock;
+    private final Mailbox m_mb;
     private final StreamSnapshotAckTracker m_ackTracker;
 
     private volatile boolean m_closed = false;
     private volatile Throwable m_lastException = null;
 
-    public StreamSnapshotAckReceiver(SocketChannel sock,
+    public StreamSnapshotAckReceiver(Mailbox mb,
                                      StreamSnapshotAckTracker tracker) {
-        m_sock = sock;
+        m_mb = mb;
         m_ackTracker = tracker;
     }
 
@@ -51,25 +51,10 @@ public class StreamSnapshotAckReceiver implements Runnable {
     public void run() {
         try {
             while (!m_closed) {
-                ByteBuffer lengthBuffer = ByteBuffer.allocate(4);
-                while (lengthBuffer.hasRemaining()) {
-                    int read = m_sock.read(lengthBuffer);
-                    if (read == -1) {
-                        return;
-                    }
-                }
-                lengthBuffer.flip();
-
-                ByteBuffer messageBuffer = ByteBuffer.allocate(lengthBuffer.getInt());
-                while(messageBuffer.hasRemaining()) {
-                    int read = m_sock.read(messageBuffer);
-                    if (read == -1) {
-                        return;
-                    }
-                }
-                messageBuffer.flip();
-                messageBuffer.getLong();//drop source site id
-                final int blockIndex = messageBuffer.getInt();
+                VoltMessage msg = m_mb.recvBlocking();
+                assert(msg instanceof RejoinDataAckMessage);
+                RejoinDataAckMessage ackMsg = (RejoinDataAckMessage) msg;
+                final int blockIndex = ackMsg.getBlockIndex();
                 m_ackTracker.ackReceived(blockIndex);
             }
         } catch (Exception e) {

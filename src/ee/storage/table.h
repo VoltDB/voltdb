@@ -144,8 +144,14 @@ class Table {
     // OPERATIONS
     // ------------------------------------------------------------------
     virtual void deleteAllTuples(bool freeAllocatedStrings) = 0;
-    virtual bool insertTuple(TableTuple &source) = 0;
-    virtual bool updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes) = 0;
+    virtual bool insertTuple(TableTuple &tuple) = 0;
+    virtual bool updateTuple(TableTuple &targetTupleToUpdate,
+                             TableTuple &sourceTupleWithNewValues);
+    // optimized version of update that only updates specific indexes
+    // if the caller knows which indexes need to be updated
+    virtual bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                TableTuple &sourceTupleWithNewValues,
+                                                std::vector<TableIndex*> &indexesToUpdate) = 0;
     virtual bool deleteTuple(TableTuple &tuple, bool deleteAllocatedStrings) = 0;
 
     // ------------------------------------------------------------------
@@ -326,7 +332,7 @@ protected:
     virtual void processLoadedTuple(TableTuple &tuple) {
     };
 
-    virtual void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple) {
+    virtual void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple) {
         throwFatalException("Unsupported operation");
     }
 
