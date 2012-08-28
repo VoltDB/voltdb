@@ -53,6 +53,8 @@
 #include "executors/deleteexecutor.h"
 #include "executors/distinctexecutor.h"
 #include "executors/indexscanexecutor.h"
+#include "executors/indexcountexecutor.h"
+#include "executors/tablecountexecutor.h"
 #include "executors/insertexecutor.h"
 #include "executors/limitexecutor.h"
 #include "executors/materializeexecutor.h"

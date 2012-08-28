@@ -20,6 +20,7 @@ package org.voltdb;
 import java.io.File;
 import java.io.IOException;
 
+import org.voltcore.logging.VoltLogger;
 import org.voltdb.catalog.Catalog;
 import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Cluster;
@@ -27,7 +28,6 @@ import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Procedure;
 import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.compiler.PlannerTool;
-import org.voltcore.logging.VoltLogger;
 import org.voltdb.utils.InMemoryJarfile;
 import org.voltdb.utils.VoltFile;
 
@@ -95,7 +95,7 @@ public class CatalogContext {
         authSystem = new AuthSystem(database, cluster.getSecurityenabled());
         this.deploymentCRC = deploymentCRC;
         m_jdbc = new JdbcDatabaseMetaDataGenerator(catalog);
-        m_ptool = new PlannerTool(cluster, database);
+        m_ptool = new PlannerTool(cluster, database, version);
         catalogVersion = version;
     }
 

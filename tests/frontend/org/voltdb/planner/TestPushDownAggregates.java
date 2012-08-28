@@ -48,7 +48,7 @@ public class TestPushDownAggregates extends TestCase {
         try {
             pn = aide.compile(sql, paramCount, singlePartition);
         }
-        catch (NullPointerException ex) {
+        catch (PlanningErrorException ex) {
             throw ex;
         }
         catch (Exception ex) {
@@ -84,20 +84,6 @@ public class TestPushDownAggregates extends TestCase {
     protected void tearDown() throws Exception {
         super.tearDown();
         aide.tearDown();
-    }
-
-    public void testCountStarOnReplicatedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from D1", 0, true);
-        checkPushedDown(pn, false,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        null);
-    }
-
-    public void testCountStarOnPartitionedTable() {
-        List<AbstractPlanNode> pn = compile("SELECT count(*) from T1", 0, false);
-        checkPushedDown(pn, true,
-                        new ExpressionType[] {ExpressionType.AGGREGATE_COUNT_STAR},
-                        new ExpressionType[] {ExpressionType.AGGREGATE_SUM});
     }
 
     public void testCountOnPartitionedTable() {
@@ -186,7 +172,7 @@ public class TestPushDownAggregates extends TestCase {
     public void testGroupByNotInDisplayColumn() {
         try {
             compile("SELECT count(A1) FROM T1 GROUP BY A1", 0, false);
-        } catch (NullPointerException e) {
+        } catch (PlanningErrorException e) {
             // There shouldn't be any plan
             return;
         }

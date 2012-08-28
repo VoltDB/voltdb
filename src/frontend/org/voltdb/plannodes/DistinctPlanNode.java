@@ -20,7 +20,9 @@ package org.voltdb.plannodes;
 import java.util.List;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Database;
 import org.voltdb.expressions.AbstractExpression;
 import org.voltdb.expressions.ExpressionUtil;
 import org.voltdb.expressions.TupleValueExpression;
@@ -124,6 +126,13 @@ public class DistinctPlanNode extends AbstractPlanNode {
         stringer.endObject();
     }
 
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
+        if( !jobj.isNull( Members.DISTINCT_EXPRESSION.name() ) ) {
+            m_distinctExpression = AbstractExpression.fromJSONObject( jobj.getJSONObject(Members.DISTINCT_EXPRESSION.name()), db);
+        }
+    }
     @Override
     protected String explainPlanForNode(String indent) {
         return "DISTINCT";

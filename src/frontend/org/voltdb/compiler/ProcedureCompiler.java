@@ -119,6 +119,21 @@ public abstract class ProcedureCompiler {
         return retval;
     }
 
+    /**
+     * get the short name of the class (no package)
+     * @param className fully qualified (or not) class name
+     * @return short name of the class (no package)
+     */
+    static String deriveShortProcedureName( String className) {
+        if( className == null || className.trim().isEmpty()) {
+            return null;
+        }
+        String[] parts = className.split("\\.");
+        String shortName = parts[parts.length - 1];
+
+        return shortName;
+    }
+
 
     static void compileJavaProcedure(VoltCompiler compiler, HSQLInterface hsql,
             DatabaseEstimates estimates, Catalog catalog, Database db,
@@ -137,8 +152,7 @@ public abstract class ProcedureCompiler {
         }
 
         // get the short name of the class (no package)
-        String[] parts = className.split("\\.");
-        String shortName = parts[parts.length - 1];
+        String shortName = deriveShortProcedureName(className);
 
         // add an entry to the catalog
         final Procedure procedure = db.getProcedures().add(shortName);
@@ -159,14 +173,30 @@ public abstract class ProcedureCompiler {
         // get the annotation
         // first try to get one that has been passed from the compiler
         ProcInfoData info = compiler.getProcInfoOverride(shortName);
+        // check if partition info was set in ddl
+        ProcInfoData ddlInfo = null;
+        if (procedureDescriptor.m_partitionString != null && ! procedureDescriptor.m_partitionString.trim().isEmpty()) {
+            ddlInfo = new ProcInfoData();
+            ddlInfo.partitionInfo = procedureDescriptor.m_partitionString;
+            ddlInfo.singlePartition = true;
+        }
         // then check for the usual one in the class itself
         // and create a ProcInfo.Data instance for it
         if (info == null) {
             info = new ProcInfoData();
             ProcInfo annotationInfo = procClass.getAnnotation(ProcInfo.class);
+            // error out if partition info is present in both ddl and annotation
+            if (annotationInfo != null && ddlInfo != null) {
+                String msg = "Procedure: " + shortName + " has partition properties defined both in ";
+                msg += "class \"" + className + "\" and in the schema defintion file(s)";
+                throw compiler.new VoltCompilerException(msg);
+            }
             if (annotationInfo != null) {
                 info.partitionInfo = annotationInfo.partitionInfo();
                 info.singlePartition = annotationInfo.singlePartition();
+            }
+            else if (ddlInfo != null) {
+                info = ddlInfo;
             }
         }
         assert(info != null);
@@ -438,7 +468,7 @@ public abstract class ProcedureCompiler {
             Class<?>[] validPartitionClzzes = {
                     Long.class, Integer.class, Short.class, Byte.class,
                     long.class, int.class, short.class, byte.class,
-                    String.class
+                    String.class, byte[].class
             };
             boolean found = false;
             for (Class<?> candidate : validPartitionClzzes) {
