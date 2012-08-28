@@ -26,6 +26,10 @@ import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
 
 import org.voltdb.BackendTarget;
+
+import org.voltdb.catalog.Cluster;
+import org.voltdb.catalog.Connector;
+import org.voltdb.catalog.Database;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 
@@ -55,6 +59,7 @@ public abstract class BaseInitiator implements Initiator
     protected Site m_executionSite = null;
     protected Thread m_siteThread = null;
     protected final RepairLog m_repairLog = new RepairLog();
+    private final TickProducer m_tickProducer;
 
     public BaseInitiator(String zkMailboxNode, HostMessenger messenger, Integer partition,
             Scheduler scheduler, String whoamiPrefix)
@@ -72,6 +77,8 @@ public abstract class BaseInitiator implements Initiator
                 m_repairLog,
                 rejoinProducer);
 
+        m_tickProducer = new TickProducer(m_scheduler.m_tasks);
+
         // Now publish the initiator mailbox to friends and family
         m_messenger.createMailbox(null, m_initiatorMailbox);
         rejoinProducer.setMailbox(m_initiatorMailbox);
@@ -83,6 +90,14 @@ public abstract class BaseInitiator implements Initiator
         }
         m_whoami = whoamiPrefix +  " " +
             CoreUtils.hsIdToString(getInitiatorHSId()) + partitionString;
+    }
+
+    private boolean isExportEnabled(CatalogContext catalogContext)
+    {
+        final Cluster cluster = catalogContext.catalog.getClusters().get("cluster");
+        final Database db = cluster.getDatabases().get("database");
+        final Connector conn= db.getConnectors().get("0");
+        return (conn != null && conn.getEnabled() == true);
     }
 
     protected void configureCommon(BackendTarget backend, String serializedCatalog,
@@ -97,6 +112,7 @@ public abstract class BaseInitiator implements Initiator
                 snapshotPriority = catalogContext.cluster.getDeployment().get("deployment").
                     getSystemsettings().get("systemsettings").getSnapshotpriority();
             }
+
             m_executionSite = new Site(m_scheduler.getQueue(),
                                        m_initiatorMailbox.getHSId(),
                                        backend, catalogContext,
@@ -118,6 +134,10 @@ public abstract class BaseInitiator implements Initiator
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
             m_scheduler.setProcedureSet(procSet);
+
+            if (isExportEnabled(catalogContext)) {
+                m_tickProducer.start();
+            }
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
