@@ -56,7 +56,7 @@ public class TestFunctionsSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
-    public void testAbsWithLimit() throws Exception
+    public void testAbsWithLimit_ENG3572() throws Exception
     {
         System.out.println("STARTING testAbs");
         Client client = getClient();
@@ -71,10 +71,8 @@ public class TestFunctionsSuite extends RegressionSuite {
                 );
         */
         ClientResponse cr = null;
-        VoltTable r = null;
         cr = client.callProcedure("@AdHoc", "select abs(NUM) from P1 where ID = 0 limit 1");
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
     }
 
     public void testAbs() throws Exception
