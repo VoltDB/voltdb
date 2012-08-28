@@ -486,9 +486,11 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_DIFFERENCE :
             case FUNC_REPEAT :
             case FUNC_DATEDIFF :
-            case FUNC_RIGHT :
                 parseList = doubleParamList;
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                break;
+            case FUNC_RIGHT :
+                parseList = doubleParamList;
                 break;
 
             case FUNC_LOCATE :

@@ -266,6 +266,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new GeneralFunctionExpression<FUNC_POSITION_CHAR>(*arguments);
         } else if (functionId == FUNC_LEFT) {
             ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
+        } else if (functionId == FUNC_RIGHT) {
+            ret = new GeneralFunctionExpression<FUNC_RIGHT>(*arguments);
         }
     }
     // May return null, leaving it to the caller (with more context) to generate an exception.

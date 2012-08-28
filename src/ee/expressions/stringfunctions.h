@@ -94,7 +94,7 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
     return getIntegerValue(static_cast<int32_t>(position));
 }
 
-/** implement the 2-argument SQL SUBSTRING function */
+/** implement the 2-argument SQL LEFT function */
 template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
     const NValue& strValue = arguments[0];
@@ -118,9 +118,41 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
         return getNullStringValue();
     UTF8Iterator iter(valueChars, valueEnd);
     const char* startChar = iter.skipCodePoints(0);
-    printf("count: %d, objectlength: %d\n", count, valueUTF8Length);
+    //printf("count: %d, objectlength: %d\n", count, valueUTF8Length);
 
     return getTempStringValue(startChar,(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - startChar));
+}
+
+/** implement the 2-argument SQL RIGHT function */
+template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& strValue = arguments[0];
+    if (strValue.isNull()) {
+        return strValue;
+    }
+    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const NValue& startArg = arguments[1];
+    if (startArg.isNull()) {
+        return getNullStringValue();
+    }
+
+    const int32_t valueUTF8Length = strValue.getObjectLength();
+    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const char *valueEnd = valueChars+valueUTF8Length;
+    int32_t count = static_cast<int32_t> (std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(0L)));
+    if (count == 0)
+        return getNullStringValue();
+    UTF8Iterator iter(valueChars, valueEnd);
+    const char* startChar = iter.skipCodePoints(0);
+    int32_t charLen = getCharLength(valueChars,valueUTF8Length);
+    if (count >= charLen)
+        return getTempStringValue(startChar,(int32_t)(valueEnd - startChar));
+
+    startChar = iter.skipCodePoints((int32_t)(getIthCharPosition(valueChars,valueUTF8Length,charLen-count+1) - startChar));
+    return getTempStringValue(startChar,(int32_t)(valueEnd - startChar));
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
