@@ -1717,6 +1717,8 @@ public class ExpressionLogical extends Expression {
         case OpTypes.IN:                element = "in"; break;
         case OpTypes.IS_NULL:           element = "is_null"; break;
         case OpTypes.NOT:               element = "not"; break;
+        // LIKE occurs in ExpressionLike which inherits this method from ExpressionLogical.
+        case OpTypes.LIKE:              element = "like"; break;
         //TODO: Enable these as they are supported in VoltDB.
         // They appear to be a complete set as supported by the other methods in this module.
         case OpTypes.ALL_QUANTIFIED :
