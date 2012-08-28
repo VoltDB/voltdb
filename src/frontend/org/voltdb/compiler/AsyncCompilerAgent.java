@@ -150,7 +150,6 @@ public class AsyncCompilerAgent {
                 String sqlStatement = work.sqlStatements[0];
                 AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
                                                              work.inferSinglePartition, work.allowParameterization);
-                result.catalogVersion = context.catalogVersion;
                 // The planning tool may have optimized for the single partition case
                 // and generated a partition parameter.
                 plannedStmtBatch.partitionParam = result.partitionParam;
@@ -166,7 +165,6 @@ public class AsyncCompilerAgent {
                 try {
                     AdHocPlannedStatement result = ptool.planSql(sqlStatement, work.partitionParam,
                                                                  false, work.allowParameterization);
-                    result.catalogVersion = context.catalogVersion;
                     plannedStmtBatch.addStatement(result);
                 }
                 catch (Exception e) {
@@ -177,7 +175,9 @@ public class AsyncCompilerAgent {
         if (!errorMsgs.isEmpty()) {
             plannedStmtBatch.errorMsg = StringUtils.join(errorMsgs, "\n");
         }
-
+        if( work.isExplainWork() ) {
+            plannedStmtBatch.setIsExplainWork();
+        }
         return plannedStmtBatch;
     }
 
