@@ -197,7 +197,7 @@ public class OrderByPlanNode extends AbstractPlanNode {
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+        helpLoadFromJSONObject(jobj, db);
         JSONArray jarray = null;
         if( !jobj.isNull(Members.SORT_COLUMNS.name()) ){
             jarray = jobj.getJSONArray( Members.SORT_COLUMNS.name() );

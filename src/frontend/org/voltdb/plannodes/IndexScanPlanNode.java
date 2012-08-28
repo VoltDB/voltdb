@@ -371,15 +371,9 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
         super.loadFromJSONObject(jobj, db);
-        if( !jobj.isNull( Members.KEY_ITERATE.name() ) ) {
-            m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
-        }
-        if( !jobj.isNull( Members.LOOKUP_TYPE.name() )) {
-            m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
-        }
-        if( !jobj.isNull( Members.SORT_DIRECTION.name() )) {
-            m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
-        }
+        m_keyIterate = jobj.getBoolean( Members.KEY_ITERATE.name() );
+        m_lookupType = IndexLookupType.get( jobj.getString( Members.LOOKUP_TYPE.name() ) );
+        m_sortDirection = SortDirectionType.get( jobj.getString( Members.SORT_DIRECTION.name() ) );
         m_targetIndexName = jobj.getString(Members.TARGET_INDEX_NAME.name());
         m_catalogIndex = db.getTables().get(super.m_targetTableName).getIndexes().get(m_targetIndexName);
         JSONObject tempjobj = null;
@@ -391,11 +385,11 @@ public class IndexScanPlanNode extends AbstractScanPlanNode {
         //load searchkey_expressions
         if( !jobj.isNull( Members.SEARCHKEY_EXPRESSIONS.name() ) ) {
             JSONArray jarray = jobj.getJSONArray( Members.SEARCHKEY_EXPRESSIONS.name() );
-                int size = jarray.length();
-                for( int i = 0 ; i < size; i++ ) {
-                    tempjobj = jarray.getJSONObject( i );
-                    m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
-                }
+            int size = jarray.length();
+            for( int i = 0 ; i < size; i++ ) {
+                tempjobj = jarray.getJSONObject( i );
+                m_searchkeyExpressions.add( AbstractExpression.fromJSONObject(tempjobj, db));
+            }
         }
     }
 
