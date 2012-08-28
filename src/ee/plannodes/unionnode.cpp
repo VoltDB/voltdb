@@ -44,17 +44,56 @@
  */
 
 #include <sstream>
+#include <string>
+
 #include "unionnode.h"
 #include "common/common.h"
 #include "expressions/abstractexpression.h"
 
+using namespace std;
+
 namespace voltdb {
 
 std::string UnionPlanNode::debugInfo(const std::string &spacer) const {
-    //
-    // Nothing for now...
-    //
-    return (std::string(""));
+    ostringstream buffer;
+    buffer << spacer << "UnionType[" << m_unionType << "]\n";
+    return string(buffer.str());
+}
+
+void UnionPlanNode::loadFromJSONObject(json_spirit::Object& obj)
+{
+    json_spirit::Value unionTypeValue =
+        json_spirit::find_value(obj, "UNION_TYPE");
+    if (unionTypeValue == json_spirit::Value::null)
+    {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "UnionPlanNode::loadFromJSONObject:"
+                                      " Couldn't find UNION_TYPE value");
+    }
+
+    string unionTypeStr = unionTypeValue.get_str();
+    if (unionTypeStr == "UNION") {
+        m_unionType = UNION_TYPE_UNION;
+    } else if (unionTypeStr == "UNION_ALL") {
+        m_unionType = UNION_TYPE_UNION_ALL;
+    } else if (unionTypeStr == "INTERSECT") {
+        m_unionType = UNION_TYPE_INTERSECT;
+    } else if (unionTypeStr == "INTERSECT_ALL") {
+        m_unionType = UNION_TYPE_INTERSECT_ALL;
+    } else if (unionTypeStr == "EXCEPT") {
+        m_unionType = UNION_TYPE_EXCEPT;
+    } else if (unionTypeStr == "EXCEPT_ALL") {
+        m_unionType = UNION_TYPE_EXCEPT_ALL;
+    } else if (unionTypeStr == "UNION_TERM") {
+        m_unionType = UNION_TYPE_UNION_TERM;
+    } else if (unionTypeStr == "NOUNION") {
+        m_unionType = UNION_TYPE_NOUNION;
+    } else {
+        throw SerializableEEException(VOLT_EE_EXCEPTION_TYPE_EEEXCEPTION,
+                                      "UnionPlanNode::loadFromJSONObject:"
+                                      " Unsupported UNION_TYPE value " +
+                                      unionTypeValue.get_str());
+    }
 }
 
 }

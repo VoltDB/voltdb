@@ -55,16 +55,26 @@ namespace voltdb {
  */
 class UnionPlanNode : public AbstractPlanNode {
     public:
-        UnionPlanNode(CatalogId id) : AbstractPlanNode(id) {
+        UnionPlanNode(CatalogId id) : AbstractPlanNode(id), m_unionType(UNION_TYPE_NOUNION) {
             // Do nothing
         }
-        UnionPlanNode() : AbstractPlanNode() {
+        UnionPlanNode() : AbstractPlanNode(), m_unionType(UNION_TYPE_NOUNION) {
             // Do nothing
         }
-        virtual PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UNION); }
+
+        void setUnionType(UnionType unionType) { m_unionType = unionType; }
+
+        PlanNodeType getPlanNodeType() const { return (PLAN_NODE_TYPE_UNION); }
+
+        UnionType getUnionType() const { return m_unionType; }
 
         std::string debugInfo(const std::string &spacer) const;
-        virtual void loadFromJSONObject(json_spirit::Object &obj) {}
+
+    protected:
+        void loadFromJSONObject(json_spirit::Object &obj);
+
+    private:
+       UnionType m_unionType;
 };
 
 }
