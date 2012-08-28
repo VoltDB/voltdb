@@ -174,7 +174,7 @@ public class TestTheHashinator extends TestCase {
             TheHashinator.initialize(partitionCount);
 
             int eehash = ee.hashinate(valueToHash, partitionCount);
-            int javahash = TheHashinator.hashinateStringAndVarBinary(valueToHash);
+            int javahash = TheHashinator.hashinateString(valueToHash);
             if (eehash != javahash) {
                 partitionCount++;
             }
@@ -229,7 +229,7 @@ public class TestTheHashinator extends TestCase {
         try { ee.release(); } catch (Exception e) {}
     }
 
-    public void testSameVarBinaryHash() {
+    public void testSameBytesHash() {
         ExecutionEngine ee = new ExecutionEngineJNI(1, 1, 0, 0, "", 100, 1);
         for (int i = 0; i < 100000; i++) {
             int partitionCount = r.nextInt(1000) + 1;
@@ -237,7 +237,7 @@ public class TestTheHashinator extends TestCase {
             r.nextBytes(valueToHash);
             TheHashinator.initialize(partitionCount);
             int eehash = ee.hashinate(valueToHash, partitionCount);
-            int javahash = TheHashinator.hashinateStringAndVarBinary(valueToHash);
+            int javahash = TheHashinator.hashinateBytes(valueToHash);
             if (eehash != javahash) {
                 partitionCount++;
             }
