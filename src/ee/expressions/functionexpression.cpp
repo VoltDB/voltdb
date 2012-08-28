@@ -264,6 +264,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new GeneralFunctionExpression<FUNC_VOLT_SQL_ERROR>(*arguments);
         } else if (functionId == FUNC_POSITION_CHAR) {
             ret = new GeneralFunctionExpression<FUNC_POSITION_CHAR>(*arguments);
+        } else if (functionId == FUNC_LEFT) {
+            ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
         }
     }
     // May return null, leaving it to the caller (with more context) to generate an exception.

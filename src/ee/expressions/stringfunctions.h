@@ -17,7 +17,7 @@
 
 namespace voltdb {
 
-static int32_t inline getCharLength(const char *valueChars, const size_t length) {
+static inline int32_t getCharLength(const char *valueChars, const size_t length) {
     // very efficient code to count characters in UTF string and ASCII string
     int32_t i = 0, j = 0;
     size_t len = length;
@@ -26,6 +26,23 @@ static int32_t inline getCharLength(const char *valueChars, const size_t length)
         i++;
     }
     return j;
+}
+
+// Return the char * place of the ith char.
+// Return the end char* when ith is larger than it has, NULL if ith is less and equal to zero.
+static inline const char* getIthCharPosition(const char *valueChars, const size_t length, const int32_t ith) {
+    // very efficient code to count characters in UTF string and ASCII string
+    if (ith <= 0) return NULL;
+    int32_t i = 0, j = 0;
+    size_t len = length;
+    while (len-- > 0) {
+        if ((valueChars[i] & 0xc0) != 0x80) {
+            j++;
+            if (ith == j) break;
+        }
+        i++;
+    }
+    return &valueChars[i];
 }
 
 /** implement the 1-argument SQL OCTET_LENGTH function */
@@ -75,6 +92,35 @@ template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NVal
         position = getCharLength(poolStr.substr(0,position).c_str(),position) + 1;
     }
     return getIntegerValue(static_cast<int32_t>(position));
+}
+
+/** implement the 2-argument SQL SUBSTRING function */
+template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& strValue = arguments[0];
+    if (strValue.isNull()) {
+        return strValue;
+    }
+    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const NValue& startArg = arguments[1];
+    if (startArg.isNull()) {
+        return getNullStringValue();
+    }
+
+    const int32_t valueUTF8Length = strValue.getObjectLength();
+    char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
+    const char *valueEnd = valueChars+valueUTF8Length;
+    int32_t count = static_cast<int32_t> (std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(0L)));
+    if (count == 0)
+        return getNullStringValue();
+    UTF8Iterator iter(valueChars, valueEnd);
+    const char* startChar = iter.skipCodePoints(0);
+    printf("count: %d, objectlength: %d\n", count, valueUTF8Length);
+
+    return getTempStringValue(startChar,(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - startChar));
 }
 
 /** implement the 2-argument SQL SUBSTRING function */

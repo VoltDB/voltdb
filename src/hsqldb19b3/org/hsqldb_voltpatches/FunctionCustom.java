@@ -351,9 +351,11 @@ public class FunctionCustom extends FunctionSQL {
         switch (id) {
 
             case FUNC_CONCAT :
-            case FUNC_LEFT :
                 parseList = doubleParamList;
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                break;
+            case FUNC_LEFT :
+                parseList = doubleParamList;
                 break;
 
             case FUNC_DATABASE :
