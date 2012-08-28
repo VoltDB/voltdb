@@ -109,11 +109,14 @@ public class PlannerTool {
         TrivialCostModel costModel = new TrivialCostModel();
         PartitioningForStatement partitioning = new PartitioningForStatement(partitionParam, inferSP, inferSP);
         QueryPlanner planner = new QueryPlanner(
-                m_cluster, m_database, partitioning, m_hsql, new DatabaseEstimates(), true);
+                sql, "PlannerTool", "PlannerToolProc", m_cluster, m_database,
+                partitioning, m_hsql, new DatabaseEstimates(), true,
+                AD_HOC_JOINED_TABLE_LIMIT, costModel, null, null);
         CompiledPlan plan = null;
         String parsedToken = null;
         try {
-            parsedToken = planner.parse(sql, "PlannerTool", "PlannerToolProc", true);
+            planner.parse();
+            parsedToken = planner.parameterize();
             if (parsedToken != null) {
 
                 // if cacheable, check the cache for a matching pre-parameterized plan
@@ -122,13 +125,12 @@ public class PlannerTool {
                 if (cacheable) {
                     CorePlan core = m_cache.getWithParsedToken(parsedToken);
                     if (core != null) {
-                        planner.setRealParamTypes(core.parameterTypes);
-                        Object[] paramsFromPlanner = planner.getExtractedParameters();
                         ParameterSet params = new ParameterSet();
-                        params.setParameters(paramsFromPlanner);
+                        planner.buildParameterSetFromExtractedLiteralsAndReturnPartitionIndex(
+                                core.parameterTypes, params);
                         Object partitionKey = null;
                         if (core.partitioningParamIndex >= 0) {
-                            partitionKey = paramsFromPlanner[core.partitioningParamIndex];
+                            partitionKey = params.toArray()[core.partitioningParamIndex];
                         }
                         AdHocPlannedStatement ahps = new AdHocPlannedStatement(sql.getBytes(VoltDB.UTF8ENCODING),
                                                                                core,
@@ -140,20 +142,12 @@ public class PlannerTool {
                 }
 
                 // if not cacheable or no cach hit, do the expensive full planning
-                plan = planner.plan(costModel, sql, null, "PlannerTool", "PlannerToolProc", AD_HOC_JOINED_TABLE_LIMIT, null);
+                plan = planner.plan();
+                assert(plan != null);
             }
         } catch (Exception e) {
             e.printStackTrace();
             throw new RuntimeException("Error compiling query: " + e.getMessage(), e);
-        }
-        if (plan == null) {
-            String plannerMsg = planner.getErrorMessage();
-            if (plannerMsg != null) {
-                throw new RuntimeException("ERROR: " + plannerMsg + "\n");
-            }
-            else {
-                throw new RuntimeException("ERROR: UNKNOWN PLANNING ERROR\n");
-            }
         }
 
         if (!allowParameterization &&

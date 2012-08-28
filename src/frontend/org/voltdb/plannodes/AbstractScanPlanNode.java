@@ -315,7 +315,7 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+        helpLoadFromJSONObject(jobj, db);
 
         if(!jobj.isNull(Members.PREDICATE.name())) {
             m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
