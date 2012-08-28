@@ -31,6 +31,7 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
     final CatalogContext catalogContext;
     final boolean allowParameterization;
     final boolean inferSinglePartition;
+    private boolean isExplainWork = false;
 
     public AdHocPlannerWork(long replySiteId, boolean shouldShutdown, long clientHandle,
             long connectionId, String hostname, boolean adminConnection, Object clientData,
@@ -63,5 +64,13 @@ public class AdHocPlannerWork extends AsyncCompilerWork {
             }
         }
         return retval;
+    }
+
+    public void setIsExplainWork() {
+        isExplainWork = true;
+    }
+
+    public boolean isExplainWork() {
+        return isExplainWork;
     }
 }

@@ -248,6 +248,18 @@ public class TestClientInterface {
     }
 
     @Test
+    public void testExplain() throws IOException {
+        ByteBuffer msg = createMsg("@Explain", "select * from a");
+        ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);
+        assertNull(resp);
+        ArgumentCaptor<LocalObjectMessage> captor = ArgumentCaptor.forClass(LocalObjectMessage.class);
+        verify(m_messenger).send(eq(32L), captor.capture());
+        assertTrue(captor.getValue().payload instanceof AdHocPlannerWork );
+        System.out.println( captor.getValue().payload.toString() );
+        assertTrue(captor.getValue().payload.toString().contains("partition param: null"));
+    }
+
+    @Test
     public void testAdHoc() throws IOException {
         ByteBuffer msg = createMsg("@AdHoc", "select * from a");
         ClientResponseImpl resp = m_ci.handleRead(msg, m_handler, null);

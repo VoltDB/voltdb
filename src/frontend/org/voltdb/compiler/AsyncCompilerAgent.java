@@ -175,7 +175,9 @@ public class AsyncCompilerAgent {
         if (!errorMsgs.isEmpty()) {
             plannedStmtBatch.errorMsg = StringUtils.join(errorMsgs, "\n");
         }
-
+        if( work.isExplainWork() ) {
+            plannedStmtBatch.setIsExplainWork();
+        }
         return plannedStmtBatch;
     }
 
