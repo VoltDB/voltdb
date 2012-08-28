@@ -301,6 +301,22 @@ public abstract class AbstractScanPlanNode extends AbstractPlanNode {
             }
             m_outputSchema.sortByTveIndex();
         }
+
+        // The outputschema of an inline limit node is completely irrelevant to the EE except that
+        // serialization will complain if it contains expressions of unresolved columns.
+        // Logically, the limited scan output has the same schema as the pre-limit scan.
+        // It's at least as easy to just re-use the known-good output schema of the scan
+        // than it would be to carefully resolve the limit node's current output schema.
+        // And this simply works regardless of whether the limit was originally applied or inlined
+        // before or after the (possibly inline) projection.
+        // There's no need to be concerned about re-adjusting the irrelevant outputschema
+        // based on the different schema of the original raw scan and the projection.
+        LimitPlanNode limit = (LimitPlanNode)getInlinePlanNode(PlanNodeType.LIMIT);
+        if (limit != null)
+        {
+            limit.m_outputSchema = m_outputSchema.clone();
+        }
+
     }
 
     //TODO some members not in here
