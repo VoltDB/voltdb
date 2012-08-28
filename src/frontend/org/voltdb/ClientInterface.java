@@ -77,7 +77,6 @@ import org.voltdb.catalog.SnapshotSchedule;
 import org.voltdb.catalog.Statement;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
-import org.voltdb.compiler.AdHocCompilerCache;
 import org.voltdb.compiler.AdHocPlannedStatement;
 import org.voltdb.compiler.AdHocPlannedStmtBatch;
 import org.voltdb.compiler.AdHocPlannerWork;
@@ -139,9 +138,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     private final CopyOnWriteArrayList<Connection> m_connections = new CopyOnWriteArrayList<Connection>();
     private final SnapshotDaemon m_snapshotDaemon = new SnapshotDaemon();
     private final SnapshotDaemonAdapter m_snapshotDaemonAdapter = new SnapshotDaemonAdapter();
-
-    // cache of adhoc plans
-    AdHocCompilerCache m_adhocCache = new AdHocCompilerCache();
 
     // Atomically allows the catalog reference to change between access
     private final AtomicReference<CatalogContext> m_catalogContext = new AtomicReference<CatalogContext>(null);
@@ -1249,12 +1245,12 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
             List<byte[]> aggByteArray = new ArrayList<byte[]>( size );
             for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
-                aggByteArray.add(plannedStatement.aggregatorFragment);
+                aggByteArray.add(plannedStatement.core.aggregatorFragment);
             }
 
             List<byte[]> collByteArray = new ArrayList<byte[]>( size );
             for (AdHocPlannedStatement plannedStatement : planBatch.plannedStatements ) {
-                collByteArray.add(plannedStatement.collectorFragment );
+                collByteArray.add(plannedStatement.core.collectorFragment);
             }
 
             VoltTable[] vt = new VoltTable[ size ];
@@ -1386,32 +1382,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             }
         }
 
-        // try the cache
-        // For now it's all or nothing on a batch of statements, i.e. all statements must match or
-        // none.
-        // TODO: Handle a mix of cached and uncached statements.
         List<String> sqlStatements = MiscUtils.splitSQLStatements(sql);
-        AdHocPlannedStmtBatch planBatch =
-                new AdHocPlannedStmtBatch(sql,
-                                          partitionParam,
-                                          task.clientHandle,
-                                          handler.connectionId(),
-                                          handler.m_hostname,
-                                          handler.isAdmin(),
-                                          ccxn);
-        for (String sqlStatement : sqlStatements) {
-            AdHocPlannedStatement plannedStatement = m_adhocCache.get(sqlStatement, partitionParam != null);
-            // check the catalog version if there is a cached plan
-            if (plannedStatement == null || plannedStatement.catalogVersion != m_catalogContext.get().catalogVersion) {
-                break;
-            }
-            planBatch.addStatement(plannedStatement);
-        }
-        // All statements retrieved from cache?
-        if (planBatch.getPlannedStatementCount() == sqlStatements.size()) {
-            createAdHocTransaction(planBatch);
-            return null;
-        }
 
         AdHocPlannerWork ahpw = new AdHocPlannerWork(
                 m_siteId,
@@ -1822,7 +1793,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         boolean allowMismatchedResults = false;
         if (plannedStmtBatch.isReadOnly()) {
             for (AdHocPlannedStatement stmt : plannedStmtBatch.plannedStatements) {
-                if (stmt.isNonDeterministic) {
+                if (stmt.core.isNonDeterministic) {
                     allowMismatchedResults = true;
                     break;
                 }
@@ -1834,12 +1805,6 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 plannedStmtBatch.isReadOnly(), isSinglePartition, false,
                 partitions, partitions.length, plannedStmtBatch.clientData,
                 serializedSize, EstTime.currentTimeMillis(), allowMismatchedResults);
-
-        // cache the plans, but don't hold onto the connection object
-        plannedStmtBatch.clientData = null;
-        for (int index = 0; index < plannedStmtBatch.getPlannedStatementCount(); index++) {
-            m_adhocCache.put(plannedStmtBatch.getPlannedStatement(index));
-        }
     }
 
     /*
@@ -1863,7 +1828,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
                         // assume all stmts have the same catalog version
                         if ((plannedStmtBatch.getPlannedStatementCount() > 0) &&
-                                (plannedStmtBatch.getPlannedStatement(0).catalogVersion != m_catalogContext.get().catalogVersion)) {
+                            (plannedStmtBatch.getPlannedStatement(0).core.catalogVersion != m_catalogContext.get().catalogVersion)) {
 
                             /* The adhoc planner learns of catalog updates after the EE and the
                                rest of the system. If the adhoc sql was planned against an
