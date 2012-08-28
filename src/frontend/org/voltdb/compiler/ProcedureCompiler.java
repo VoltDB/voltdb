@@ -468,7 +468,7 @@ public abstract class ProcedureCompiler {
             Class<?>[] validPartitionClzzes = {
                     Long.class, Integer.class, Short.class, Byte.class,
                     long.class, int.class, short.class, byte.class,
-                    String.class
+                    String.class, byte[].class
             };
             boolean found = false;
             for (Class<?> candidate : validPartitionClzzes) {

@@ -65,23 +65,28 @@ public abstract class TheHashinator {
      * @return A value between 0 and partitionCount-1, hopefully pretty evenly
      * distributed.
      */
-    static int hashinateString(Object value) {
+    static int hashinateStringAndVarBinary(Object value) {
         int partitionCount = TheHashinator.catalogPartitionCount;
-
-        if (value instanceof String) {
+        byte[] bytes = null;
+        if (value instanceof String ) {
             String string = (String) value;
             try {
-                byte bytes[] = string.getBytes("UTF-8");
-                int hashCode = 0;
-                int offset = 0;
-                for (int ii = 0; ii < bytes.length; ii++) {
-                   hashCode = 31 * hashCode + bytes[offset++];
-                }
-                return java.lang.Math.abs(hashCode % partitionCount);
+                bytes = string.getBytes("UTF-8");
             } catch (UnsupportedEncodingException e) {
                 hostLogger.l7dlog( Level.FATAL, LogKeys.host_TheHashinator_ExceptionHashingString.name(), new Object[] { string }, e);
                 VoltDB.crashLocalVoltDB("No additional info.", false, e);
             }
+        }
+        else if( value instanceof byte[] ){
+            bytes = (byte[])value;
+        }
+        if( bytes!=null ) {
+            int hashCode = 0;
+            int offset = 0;
+            for (int ii = 0; ii < bytes.length; ii++) {
+                hashCode = 31 * hashCode + bytes[offset++];
+            }
+            return java.lang.Math.abs(hashCode % partitionCount);
         }
         hostLogger.l7dlog(Level.FATAL, LogKeys.host_TheHashinator_AttemptedToHashinateNonLongOrString.name(), new Object[] { value
                 .getClass().getName() }, null);
@@ -103,8 +108,8 @@ public abstract class TheHashinator {
         else if (obj instanceof Long) {
             long value = ((Long) obj).longValue();
             index = hashinateLong(value);
-        } else if (obj instanceof String) {
-            index = hashinateString(obj);
+        } else if (obj instanceof String || obj instanceof byte[] ) {
+            index = hashinateStringAndVarBinary(obj);
         } else if (obj instanceof Integer) {
             long value = ((Integer)obj).intValue();
             index = hashinateLong(value);
