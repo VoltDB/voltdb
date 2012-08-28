@@ -120,6 +120,11 @@ public class TestCompactingViewsSuite extends RegressionSuite {
     }
 
     public void testPartitionedCompactingViews() throws Exception {
+        // hard to test compaction in valgrind via java (at the moment)
+        if (isValgrind()) {
+            return;
+        }
+
         runCompactingViewsForTable("PP.insert", "PP.delete", "selectPP");
         runCompactingViewsForTable("PR.insert", "deletePR", "selectPR");
     }

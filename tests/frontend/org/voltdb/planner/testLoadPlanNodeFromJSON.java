@@ -40,18 +40,15 @@ public class testLoadPlanNodeFromJSON extends TestCase {
     private PlannerTestAideDeCamp aide;
 
     private AbstractPlanNode compile(String sql, int paramCount,
-                                     boolean singlePartition)
-    {
+            boolean singlePartition) {
         List<AbstractPlanNode> pn = null;
         try {
-            pn =  aide.compile(sql, paramCount, singlePartition);
-        }
-        catch (NullPointerException ex) {
+            pn = aide.compile(sql, paramCount, singlePartition);
+        } catch (NullPointerException ex) {
             // aide may throw NPE if no plangraph was created
             ex.printStackTrace();
             fail();
-        }
-        catch (Exception ex) {
+        } catch (Exception ex) {
             ex.printStackTrace();
             fail();
         }
@@ -63,12 +60,15 @@ public class testLoadPlanNodeFromJSON extends TestCase {
 
     @Override
     protected void setUp() throws Exception {
-        aide = new PlannerTestAideDeCamp(TestIndexSelection.class.getResource("testplans-indexselection-ddl.sql"),
-                                         "testindexselectionplans");
+        aide = new PlannerTestAideDeCamp(
+                TestIndexSelection.class
+                        .getResource("testplans-indexselection-ddl.sql"),
+                "testindexselectionplans");
 
         // Set all tables to non-replicated.
         Cluster cluster = aide.getCatalog().getClusters().get("cluster");
-        CatalogMap<Table> tmap = cluster.getDatabases().get("database").getTables();
+        CatalogMap<Table> tmap = cluster.getDatabases().get("database")
+                .getTables();
         for (Table t : tmap) {
             t.setIsreplicated(false);
         }
@@ -80,21 +80,32 @@ public class testLoadPlanNodeFromJSON extends TestCase {
         aide.tearDown();
     }
 
-    public void testLoadQueryPlans () throws JSONException {
-        testLoadQueryPlanTree( "select count(*) from l,t where lname=? and l.a=t.a order by l.b limit ?;", 3, true );
-        testLoadQueryPlanTree( "select * from l,t where lname=? and l.a=t.a order by l.b limit ?;", 3, true );
-        testLoadQueryPlanTree( "select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;", 3, true );
+    public void testLoadQueryPlans() throws JSONException {
+        testLoadQueryPlanTree(
+                "select count(*) from l,t where lname=? and l.a=t.a order by l.b limit ?;",
+                3, true);
+        testLoadQueryPlanTree(
+                "select * from l,t where lname=? and l.a=t.a order by l.b limit ?;",
+                3, true);
+        testLoadQueryPlanTree(
+                "select l.id, count(*) as tag from l group by l.id order by tag, l.id limit ?;",
+                3, true);
+        testLoadQueryPlanTree(
+                "select count(*) from l where lname=? and id < ?;",
+                3, true);
     }
 
-    public void testLoadQueryPlanTree( String sql, int paraCount, boolean singlePartition ) throws JSONException {
-        AbstractPlanNode pn = compile(sql, paraCount, singlePartition );
-        PlanNodeTree pnt = new PlanNodeTree( pn );
+    public void testLoadQueryPlanTree(String sql, int paraCount,
+            boolean singlePartition) throws JSONException {
+        AbstractPlanNode pn = compile(sql, paraCount, singlePartition);
+        PlanNodeTree pnt = new PlanNodeTree(pn);
         String str = pnt.toJSONString();
-        System.out.println( str );
-        JSONArray jarray = new JSONObject( str ).getJSONArray( PlanNodeTree.Members.PLAN_NODES.name() );
+        System.out.println(str);
+        JSONArray jarray = new JSONObject(str)
+                .getJSONArray(PlanNodeTree.Members.PLAN_NODES.name());
         PlanNodeTree pnt1 = new PlanNodeTree();
-        pnt1.loadFromJSONArray(jarray, aide.getDatabase() );
+        pnt1.loadFromJSONArray(jarray, aide.getDatabase());
         String str1 = pnt1.toJSONString();
-        assertTrue( str.equals(str1) );
+        assertTrue(str.equals(str1));
     }
 }
