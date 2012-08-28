@@ -1668,6 +1668,24 @@ TEST CASES
     <condition property="replicas" value="${sql_coverage_replicas}" else="0">
         <isset property="sql_coverage_replicas"/>
     </condition>
+    <condition property="hostname" value="-l ${sql_coverage_hostname}" else="">
+        <isset property="sql_coverage_hostname"/>
+    </condition>
+    <condition property="hostport" value="-p ${sql_coverage_hostport}" else="">
+        <isset property="sql_coverage_hostport"/>
+    </condition>
+    <condition property="hostcount" value="-n ${sql_coverage_hosts}" else="-n 1">
+        <isset property="sql_coverage_hosts"/>
+    </condition>
+    <condition property="kfactor" value="-k ${sql_coverage_replicas}" else="-k 0">
+        <isset property="sql_coverage_replicas"/>
+    </condition>
+    <condition property="sitescount" value="-t ${sql_coverage_sites}" else="-t 3">
+        <isset property="sql_coverage_sites"/>
+    </condition>
+    <condition property="flushddl" value="-f ${sql_coverage_flushddl}" else="-f flush-DDL.sql">
+        <isset property="sql_coverage_flushddl"/>
+    </condition>
     <property name='classpath' refid='project.classpath' />
     <property name='simpleserver.command' value='java
     -Djava.library.path=${build.dir}${build.dir.suffix}/nativelibs -classpath
@@ -1697,6 +1715,12 @@ TEST CASES
         <arg file="${meta_config}" />
         <arg file="${sqlcov.dir}" />
         <arg line='"${simpleserver.command}"' />
+        <arg line="${hostname}" />
+        <arg line="${hostport}" />
+        <arg line="${hostcount}" />
+        <arg line="${kfactor}" />
+        <arg line="${sitescount}" />
+        <arg line="${flushddl}" />
     </exec>
 </target>
 
