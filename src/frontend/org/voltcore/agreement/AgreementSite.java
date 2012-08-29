@@ -24,7 +24,6 @@ import java.io.IOException;
 import java.net.InetSocketAddress;
 import java.nio.ByteBuffer;
 import java.util.ArrayList;
-import java.util.Arrays;
 import java.util.Collections;
 import java.util.HashMap;
 import java.util.HashSet;
@@ -216,7 +215,7 @@ public class AgreementSite implements org.apache.zookeeper_voltpatches.server.Zo
                         new RecoveryMessage(
                                 m_hsId,
                                 safeTxnId,
-                                Arrays.asList(new byte[4]), -1);
+                                -1);
                     m_mailbox.send( sourceHSId, recoveryMessage);
                 }
             }

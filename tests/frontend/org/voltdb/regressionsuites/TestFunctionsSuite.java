@@ -24,6 +24,8 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
+import java.math.BigDecimal;
+import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
@@ -54,6 +56,25 @@ public class TestFunctionsSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+    public void testAbsWithLimit_ENG3572() throws Exception
+    {
+        System.out.println("STARTING testAbs");
+        Client client = getClient();
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        ClientResponse cr = null;
+        cr = client.callProcedure("@AdHoc", "select abs(NUM) from P1 where ID = 0 limit 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
     public void testAbs() throws Exception
     {
         System.out.println("STARTING testAbs");
@@ -73,11 +94,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 DESC VARCHAR(300),
                 NUM INTEGER,
                 RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
                 PRIMARY KEY (ID)
                 );
         */
         for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1);
+            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             client.drain();
         }
         ClientResponse cr = null;
@@ -287,11 +309,12 @@ public class TestFunctionsSuite extends RegressionSuite {
                 DESC VARCHAR(300),
                 NUM INTEGER,
                 RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
                 PRIMARY KEY (ID)
                 );
         */
         for(int id=7; id < 15; id++) {
-            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1);
+            client.callProcedure(callback, "P1.insert", - id, "X"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             client.drain();
         }
         ClientResponse cr = null;
@@ -432,13 +455,97 @@ public class TestFunctionsSuite extends RegressionSuite {
 
     }
 
+    public void testExtract() throws Exception
+    {
+        System.out.println("STARTING testExtract");
+        Client client = getClient();
+        ProcedureCallback callback = new ProcedureCallback() {
+            @Override
+            public void clientCallback(ClientResponse clientResponse)
+                    throws Exception {
+                if (clientResponse.getStatus() != ClientResponse.SUCCESS) {
+                    throw new RuntimeException("Failed with response: " + clientResponse.getStatusString());
+                }
+            }
+        };
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        client.callProcedure(callback, "P1.insert", 0, "X0", 10, 1.1, new Timestamp(1000000000000L));
+        client.drain();
+        ClientResponse cr = null;
+        VoltTable r = null;
+        long result;
+
+        cr = client.callProcedure("@AdHoc",
+                                  "select " +
+                                  "EXTRACT(YEAR FROM PAST), EXTRACT(MONTH FROM PAST), EXTRACT(DAY FROM PAST), " +
+                                  "EXTRACT(DAY_OF_WEEK FROM PAST), EXTRACT(DAY_OF_YEAR FROM PAST), " +
+                                  //"EXTRACT(WEEK_OF_YEAR FROM PAST), " +
+                                  "EXTRACT(QUARTER FROM PAST), EXTRACT(HOUR FROM PAST), EXTRACT(MINUTE FROM PAST), EXTRACT(SECOND FROM PAST) " +
+                                  "from P1;");
+
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        r.advanceRow();
+        int columnIndex = 0;
+
+        final int EXPECTED_YEAR = 2001;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_YEAR, result);
+
+        final int EXPECTED_MONTH = 9;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MONTH, result);
+
+        final int EXPECTED_DAY = 9;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DAY, result);
+
+        final int EXPECTED_DOW = 1;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOW, result);
+
+        final int EXPECTED_DOY = 252;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_DOY, result);
+
+//        final int EXPECTED_WOY = 36;
+//        result = r.getLong(columnIndex++);
+//        assertEquals(EXPECTED_WOY, result);
+
+        final int EXPECTED_QUARTER = 3;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_QUARTER, result);
+
+        final int EXPECTED_HOUR = 1;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_HOUR, result);
+
+        final int EXPECTED_MINUTE = 46;
+        result = r.getLong(columnIndex++);
+        assertEquals(EXPECTED_MINUTE, result);
+
+        final BigDecimal EXPECTED_SECONDS = new BigDecimal("40.000000000000");
+        BigDecimal decimalResult = r.getDecimalAsBigDecimal(columnIndex++);
+        assertEquals(EXPECTED_SECONDS, decimalResult);
+
+    }
+
     public void testParams() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING testSubstring");
         Client client = getClient();
         ClientResponse cr;
         VoltTable result;
 
-        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0);
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0, new Timestamp(1000000000000L));
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
 
         // next one disabled until ENG-3486
@@ -454,6 +561,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertEquals(1, result.asScalarLong());
     }
+
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -476,6 +584,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "DESC VARCHAR(300), " +
                 "NUM INTEGER, " +
                 "RATIO FLOAT, " +
+                "PAST TIMESTAMP DEFAULT NULL, " +
                 "PRIMARY KEY (ID) ); ";
         try {
             project.addLiteralSchema(literalSchema);
@@ -515,11 +624,12 @@ public class TestFunctionsSuite extends RegressionSuite {
         //project.addStmtProcedure("PARAM_SUBSTRING", "select SUBSTRING(? FROM 2) from P1");
         project.addStmtProcedure("PARAM_ABS", "select ABS(? + NUM) from P1");
 
-        project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null)");
+        project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
+        //config = new LocalCluster("fixedsql-threesite.jar", 3/*HACK*/-2, 1, 0, BackendTarget.NATIVE_EE_IPC); //JNI);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);

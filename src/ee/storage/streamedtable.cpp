@@ -105,7 +105,9 @@ bool StreamedTable::insertTuple(TableTuple &source)
     return true;
 }
 
-bool StreamedTable::updateTuple(TableTuple &source, TableTuple &target, bool updatesIndexes)
+bool StreamedTable::updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                                   TableTuple &sourceTupleWithNewValues,
+                                                   std::vector<TableIndex*> &indexesToUpdate)
 {
     throwFatalException("May not update a streamed table.");
 }

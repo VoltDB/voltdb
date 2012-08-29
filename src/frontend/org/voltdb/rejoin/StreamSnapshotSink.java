@@ -17,21 +17,8 @@
 
 package org.voltdb.rejoin;
 
-import java.io.IOException;
-import java.net.InetAddress;
-import java.net.InetSocketAddress;
-import java.net.NetworkInterface;
-import java.net.SocketException;
 import java.nio.ByteBuffer;
-import java.nio.channels.ClosedByInterruptException;
-import java.nio.channels.ServerSocketChannel;
-import java.nio.channels.SocketChannel;
-import java.util.ArrayList;
-import java.util.Enumeration;
-import java.util.List;
-import java.util.concurrent.Semaphore;
-
-import org.voltcore.logging.VoltLogger;
+import org.voltcore.messaging.Mailbox;
 import org.voltcore.utils.DBBPool.BBContainer;
 import org.voltcore.utils.Pair;
 import org.voltdb.VoltDB;
@@ -45,27 +32,7 @@ import org.voltdb.VoltDB;
  * This class is not thread-safe.
  */
 public class StreamSnapshotSink implements RejoinSiteProcessor {
-    private static final VoltLogger rejoinLog = new VoltLogger("JOIN");
-
-    private final long m_HSId;
-
-    /*
-     * Timeout if no connection in the specified amount of time. By default it's
-     * set to infinite. Once snapshot is successfully requested,
-     * startCountDown() will set it to 5 seconds.
-     */
-    private volatile long m_connectionTimeout = Long.MAX_VALUE;
-    private ServerSocketChannel m_serverSocket = null;
-    private SocketChannel m_sock = null;
-    private final Semaphore m_initializationLock = new Semaphore(0);
-    private boolean m_connectionAccepted = false;
-    private final Thread m_acceptThread = new Thread(new Runnable() {
-        @Override
-        public void run() {
-            acceptConnection();
-        }
-    });
-
+    private Mailbox m_mb = null;
     private StreamSnapshotDataReceiver m_in = null;
     private Thread m_inThread = null;
     private StreamSnapshotAckSender m_ack = null;
@@ -77,30 +44,20 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
     private ByteBuffer m_buffer = null;
     private long m_bytesReceived = 0;
 
-    public StreamSnapshotSink(long HSId) {
-        m_HSId = HSId;
-    }
-
     @Override
-    public Pair<List<byte[]>, Integer> initialize() {
-        List<byte[]> addresses = new ArrayList<byte[]>();
-        try {
-            Pair<ServerSocketChannel, Boolean> binded = bindSocket();
-            m_serverSocket = binded.getFirst();
-            Boolean allInterfaces = binded.getSecond();
+    public long initialize() {
+        // Mailbox used to transfer snapshot data
+        m_mb = VoltDB.instance().getHostMessenger().createMailbox();
 
-            if (allInterfaces) {
-                addresses = getLocalAddress();
-            } else {
-                addresses.add(m_serverSocket.socket().getInetAddress().getAddress());
-            }
-        } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Unable to get local addresses", true, e);
-        }
+        m_in = new StreamSnapshotDataReceiver(m_mb);
+        m_inThread = new Thread(m_in, "Snapshot data receiver");
+        m_inThread.setDaemon(true);
+        m_ack = new StreamSnapshotAckSender(m_mb);
+        m_ackThread = new Thread(m_ack, "Snapshot ack sender");
+        m_inThread.start();
+        m_ackThread.start();
 
-        m_acceptThread.start();
-
-        return Pair.of(addresses, m_serverSocket.socket().getLocalPort());
+        return m_mb.getHSId();
     }
 
     @Override
@@ -110,11 +67,6 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
 
     @Override
     public void close() {
-        m_acceptThread.interrupt();
-        try {
-            m_acceptThread.join();
-        } catch (InterruptedException e1) {}
-
         if (m_in != null) {
             m_in.close();
             // No need to join in thread, once socket is closed, it will exit
@@ -130,122 +82,9 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
         m_in = null;
         m_ack = null;
 
-        try {
-            m_sock.close();
-            m_serverSocket.close();
-        } catch (IOException e) {
-            rejoinLog.error("Failed to close sockets used for rejoin: " +
-                    e.getMessage());
+        if (m_mb != null) {
+            VoltDB.instance().getHostMessenger().removeMailbox(m_mb.getHSId());
         }
-    }
-
-    /**
-     * Wait for an incoming connection, then set up the thread to receive
-     * snapshot stream. If no connection in 5 seconds, crash.
-     */
-    private void acceptConnection() {
-        if (m_serverSocket == null) {
-            rejoinLog.error("Unable to accept rejoin connections, not bound to any port");
-            return;
-        }
-
-        try {
-            final long startTime = System.currentTimeMillis();
-            while (System.currentTimeMillis() - startTime < m_connectionTimeout) {
-                try {
-                    m_sock = m_serverSocket.accept();
-                    if (m_sock != null) {
-                        break;
-                    }
-                } catch (IOException e) {
-                    rejoinLog.error("Exception while attempting to accept recovery connection", e);
-                    m_serverSocket.close();
-                }
-                Thread.yield();
-            }
-            if (m_sock == null) {
-                VoltDB.crashLocalVoltDB("Timed out waiting for stream snapshot connection from source partition",
-                        false, null);
-            }
-            m_sock.configureBlocking(true);
-            m_sock.socket().setTcpNoDelay(true);
-        } catch (ClosedByInterruptException ignore) {
-            return;
-        } catch (IOException e) {
-            VoltDB.crashLocalVoltDB("Failed to accept rejoin connection",
-                                    true, e);
-        } finally {
-            try {
-                assert(m_sock != null);
-                rejoinLog.debug("Closing listening socket, m_sock is " + m_sock);
-                m_serverSocket.close();
-            } catch (IOException ignore) {}
-        }
-
-        rejoinLog.debug("Accepted a stream snapshot connection");
-        m_in = new StreamSnapshotDataReceiver(m_sock);
-        m_inThread = new Thread(m_in, "Snapshot data receiver");
-        m_inThread.setDaemon(true);
-        m_ack = new StreamSnapshotAckSender(m_sock, m_HSId);
-        m_ackThread = new Thread(m_ack, "Snapshot ack sender");
-        m_inThread.start();
-        m_ackThread.start();
-        m_initializationLock.release();
-    }
-
-    /**
-     * @throws IOException
-     */
-    private static Pair<ServerSocketChannel, Boolean> bindSocket() throws IOException {
-        ServerSocketChannel ssc = ServerSocketChannel.open();
-        ssc.configureBlocking(false);
-        InetSocketAddress sockAddr = null;
-        boolean allInterfaces = false;
-        String internalInterface = VoltDB.instance().getConfig().m_internalInterface;
-        if (internalInterface != null && !internalInterface.isEmpty()) {
-            rejoinLog.debug("An internal interface was specified (" + internalInterface + ")" +
-                    " binding to an ephemeral port to receive recovery connection");
-            sockAddr = new InetSocketAddress( internalInterface, 0);
-        } else {
-            rejoinLog.debug("No internal interface was specified. Binding to " +
-                    "all interfaces with an ephemeral port to receive " +
-                    "recovery connection");
-            allInterfaces = true;
-            sockAddr = new InetSocketAddress(0);
-        }
-        ssc.socket().bind(sockAddr);
-        return Pair.of(ssc, allInterfaces);
-    }
-
-    private static List<byte[]> getLocalAddress() throws SocketException {
-        List<byte[]> addresses = new ArrayList<byte[]>();
-        List<byte[]> loopbackInterfaces = new ArrayList<byte[]>();
-        List<InetAddress> loopbackAddresses = new ArrayList<InetAddress>();
-
-        /*
-         * If no internal interface was specified, bind on everything and then
-         * ship over every possible public address. Yikes!
-         */
-        Enumeration<NetworkInterface> interfaces = NetworkInterface.getNetworkInterfaces();
-        while (interfaces.hasMoreElements()) {
-            NetworkInterface intf = interfaces.nextElement();
-            if (!intf.isUp()) {
-                continue;
-            }
-            Enumeration<InetAddress> addressesEnum = intf.getInetAddresses();
-            while (addressesEnum.hasMoreElements()) {
-                InetAddress address = addressesEnum.nextElement();
-                if (intf.isLoopback()) {
-                    loopbackAddresses.add(address);
-                    loopbackInterfaces.add(address.getAddress());
-                } else {
-                    addresses.add(address.getAddress());
-                }
-            }
-        }
-        addresses.addAll(loopbackInterfaces);
-
-        return addresses;
     }
 
     private ByteBuffer getOutputBuffer(int length) {
@@ -279,17 +118,7 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
     }
 
     @Override
-    public void startCountDown() {
-        m_connectionTimeout = 5000; // 5 second timeout
-    }
-
-    @Override
     public Pair<Integer, ByteBuffer> take() throws InterruptedException {
-        if (!m_connectionAccepted) {
-            m_initializationLock.acquire();
-        }
-        m_connectionAccepted = true;
-
         if (m_in == null || m_ack == null) {
             // terminated already
             return null;
@@ -297,8 +126,8 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
 
         Pair<Integer, ByteBuffer> result = null;
         while (!m_EOF) {
-            BBContainer container = m_in.take();
-            result = processMessage(container);
+            Pair<Long, BBContainer> msg = m_in.take();
+            result = processMessage(msg);
             if (result != null) {
                 break;
             }
@@ -309,33 +138,30 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
 
     @Override
     public Pair<Integer, ByteBuffer> poll() {
-        if (!m_connectionAccepted && !m_initializationLock.tryAcquire()) {
-            return null;
-        }
-        m_connectionAccepted = true;
-
         if (m_in == null || m_ack == null) {
             // not initialized yet or terminated already
             return null;
         }
 
-        BBContainer container = m_in.poll();
-        return processMessage(container);
+        Pair<Long, BBContainer> msg = m_in.poll();
+        return processMessage(msg);
     }
 
     /**
      * Process a message pulled off from the network thread, and discard the
      * container once it's processed.
      *
-     * @param container
+     * @param msg A pair of <sourceHSId, blockContainer>
      * @return The processed message, or null if there's no data block to return
      *         to the site.
      */
-    private Pair<Integer, ByteBuffer> processMessage(BBContainer container) {
-        if (container == null) {
+    private Pair<Integer, ByteBuffer> processMessage(Pair<Long, BBContainer> msg) {
+        if (msg == null) {
             return null;
         }
 
+        long hsId = msg.getFirst();
+        BBContainer container = msg.getSecond();
         try {
             ByteBuffer block = container.b;
             byte typeByte = block.get(StreamSnapshotDataTarget.typeOffset);
@@ -367,7 +193,7 @@ public class StreamSnapshotSink implements RejoinSiteProcessor {
             m_bytesReceived += nextChunk.remaining();
 
             // Queue ack to this block
-            m_ack.ack(blockIndex);
+            m_ack.ack(hsId, blockIndex);
 
             return Pair.of(tableId, nextChunk);
         } finally {

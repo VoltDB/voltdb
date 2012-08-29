@@ -246,6 +246,18 @@ public class VoltCompiler {
             m_builtInStmt = false;
         }
 
+        ProcedureDescriptor (final ArrayList<String> authGroups, final String className, String partitionString) {
+            assert(className != null);
+            assert(partitionString != null);
+
+            m_authGroups = authGroups;
+            m_className = className;
+            m_singleStmt = null;
+            m_joinOrder = null;
+            m_partitionString = partitionString;
+            m_builtInStmt = false;
+        }
+
         ProcedureDescriptor (final ArrayList<String> authGroups, final String className,
                 final String singleStmt, final String joinOrder, final String partitionString,
                 boolean builtInStmt)
@@ -497,7 +509,7 @@ public class VoltCompiler {
         final ArrayList<String> schemas = new ArrayList<String>();
         final ArrayList<ProcedureDescriptor> procedures = new ArrayList<ProcedureDescriptor>();
         final ArrayList<Class<?>> classDependencies = new ArrayList<Class<?>>();
-        final TablePartitionMap partitionMap = new TablePartitionMap(this);
+        final PartitionMap partitionMap = new PartitionMap(this);
 
         final String databaseName = database.getName();
 
@@ -532,7 +544,7 @@ public class VoltCompiler {
         // procedures/procedure
         if (database.getProcedures() != null) {
             for (ProceduresType.Procedure proc : database.getProcedures().getProcedure()) {
-                procedures.add(getProcedure(proc));
+                partitionMap.add(getProcedure(proc));
             }
         }
 
@@ -625,6 +637,7 @@ public class VoltCompiler {
                     case INTEGER:
                     case BIGINT:
                     case STRING:
+                    case VARBINARY:
                         break;
                     default:
                         msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +
@@ -670,6 +683,9 @@ public class VoltCompiler {
         // tables, with some caveats. (See ENG-1601).
         List<ProcedureDescriptor> autoCrudProcedures = generateCrud(m_catalog);
         procedures.addAll(autoCrudProcedures);
+
+        // Add procedures read from DDL and project file
+        procedures.addAll( partitionMap.getProcedureDescriptors());
 
         // Actually parse and handle all the Procedures
         for (final ProcedureDescriptor procedureDescriptor : procedures) {

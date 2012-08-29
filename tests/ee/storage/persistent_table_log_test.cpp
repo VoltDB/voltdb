@@ -233,7 +233,7 @@ TEST_F(PersistentTableLogTest, InsertUpdateThenUndoOneTest) {
     NValue oldStringValue = tupleCopy.getNValue(6);
     tupleCopy.setNValue(6, ValueFactory::getStringValue("bar"));
 
-    m_table->updateTuple(tupleCopy, tuple, true);
+    m_table->updateTuple(tuple, tupleCopy);
 
     ASSERT_TRUE( m_table->lookupTuple(tupleBackup).isNullTuple());
     ASSERT_FALSE( m_table->lookupTuple(tupleCopy).isNullTuple());

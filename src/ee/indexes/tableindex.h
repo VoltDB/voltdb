@@ -68,11 +68,22 @@ struct TableIndexScheme {
         tupleSchema = keySchema = NULL;
     }
     TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
-                     std::vector<ValueType> columnTypes, bool unique, bool intsOnly,
-                     TupleSchema *tupleSchema) {
+                         std::vector<ValueType> columnTypes, bool unique,
+                         bool intsOnly, TupleSchema *tupleSchema) {
         this->name = name; this->type = type; this->columnIndices = columnIndices;
         this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
-        this->tupleSchema = tupleSchema; this->keySchema = NULL;
+        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = true;
+    }
+/* This constructor does not set countable field according what you value you pass in.
+ * FIX it when VoltDB CompactingMap can pack memory together for TreeNode without allocating
+ * memory for the 4 bytes countable field.
+ * */
+    TableIndexScheme(std::string name, TableIndexType type, std::vector<int32_t> columnIndices,
+                     std::vector<ValueType> columnTypes, bool unique,  bool countable,
+                     bool intsOnly, TupleSchema *tupleSchema) {
+        this->name = name; this->type = type; this->columnIndices = columnIndices;
+        this->columnTypes = columnTypes; this->unique = unique; this->intsOnly = intsOnly;
+        this->tupleSchema = tupleSchema; this->keySchema = NULL; this->countable = countable;
     }
 
     std::string name;
@@ -80,6 +91,7 @@ struct TableIndexScheme {
     std::vector<int32_t> columnIndices;
     std::vector<ValueType> columnTypes;
     bool unique;
+    bool countable;
     bool intsOnly;
     TupleSchema *tupleSchema;
     TupleSchema *keySchema;
@@ -139,18 +151,16 @@ public:
     virtual bool deleteEntry(const TableTuple *tuple) = 0;
 
     /**
-     * removes the index entry linked to old value and re-link it to new value.
-     * The address of the newTupleValue is used as the value in the index (and multimaps) as
-     * well as the key for the new entry.
-     */
-    virtual bool replaceEntry(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
-
-    /**
      * Update in place an index entry with a new tuple address
      */
-    virtual bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) = 0;
+    virtual bool replaceEntryNoKeyChange(const TableTuple &destinationTuple,
+                                         const TableTuple &originalTuple) = 0;
+
+    /**
+     * Does the key out-of-line strings or binary data?
+     * Used for an optimization when key values are the same.
+     */
+    virtual bool keyUsesNonInlinedMemory() = 0;
 
     /**
      * just returns whether the value is already stored. no
@@ -283,6 +293,47 @@ public:
     {
         return is_unique_index_;
     }
+    /**
+     * Same as isUniqueIndex...
+     */
+    inline bool isCountableIndex() const
+    {
+        return is_countable_index_;
+    }
+
+    virtual bool hasKey(const TableTuple *searchKey) = 0;
+
+    /**
+     * This function only supports countable tree index. It returns the counter value
+     * equal or greater than the serarchKey. It will return the rank with the searchKey
+     * in ascending order including itself.
+     *
+     * @parameter: isUpper means nothing to Unique index. For non-unique index, it will
+     * return the high or low rank according to this boolean flag as true or false,respectively.
+     *
+     * @Return great than rank value as "m_entries.size() + 1"  for given
+     * searchKey that is larger than all keys.
+     */
+    virtual int64_t getCounterGET(const TableTuple *searchKey, bool isUpper)
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterGET which has no implementation");
+    }
+    /**
+     * This function only supports countable tree index. It returns the counter value
+     * equal or less than the serarchKey. It will return the rank with the searchKey
+     * in ascending order including itself.
+     *
+     * @parameter: isUpper means nothing to Unique index. For non-unique index, it will
+     * return the high or low rank according to this boolean flag as true or false,respectively.
+     *
+     * @Return less than rank value as "m_entries.size()"  for given
+     * searchKey that is larger than all keys.
+     */
+    virtual int64_t getCounterLET(const TableTuple *searchKey, bool isUpper)
+    {
+        throwFatalException("Invoked non-countable TableIndex virtual method getCounterLET which has no implementation");
+    }
+
 
     virtual size_t getSize() const = 0;
 
@@ -343,6 +394,7 @@ protected:
     ValueType* column_types_;
     int colCount_;
     bool is_unique_index_;
+    bool is_countable_index_;
     int* column_indices_;
 
     // counters

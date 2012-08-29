@@ -60,12 +60,12 @@ namespace voltdb {
  * Index implemented as a Binary Unique Map.
  * @see TableIndex
  */
-template<typename KeyType, class KeyComparator, class KeyEqualityChecker>
+template<typename KeyType, class KeyComparator, class KeyEqualityChecker, bool hasRank=true>
 class CompactingTreeUniqueIndex : public TableIndex
 {
     friend class TableIndexFactory;
 
-    typedef CompactingMap<KeyType, const void*, KeyComparator> MapType;
+    typedef CompactingMap<KeyType, const void*, KeyComparator, hasRank> MapType;
 
 public:
 
@@ -83,39 +83,32 @@ public:
         return deleteEntryPrivate(m_tmp1);
     }
 
-    bool replaceEntry(const TableTuple* oldTupleValue,
-                      const TableTuple* newTupleValue)
-    {
-        // this can probably be optimized
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
-        m_tmp2.setFromTuple(newTupleValue, column_indices_, m_keySchema);
-
-        bool deleted = deleteEntryPrivate(m_tmp1);
-        //TODO: addEntry COULD be used here instead of setting and using m_tmp2.
-        bool inserted = addEntryPrivate(newTupleValue, m_tmp2);
-        --m_deletes;
-        --m_inserts;
-        ++m_updates;
-        return (deleted && inserted);
-    }
-
     /**
      * Update in place an index entry with a new tuple address
      */
-    bool replaceEntryNoKeyChange(const TableTuple *oldTupleValue,
-                              const TableTuple *newTupleValue) {
-        assert(oldTupleValue->address() != newTupleValue->address());
-        m_tmp1.setFromTuple(oldTupleValue, column_indices_, m_keySchema);
+    bool replaceEntryNoKeyChange(const TableTuple &destinationTuple, const TableTuple &originalTuple)
+    {
+        assert(originalTuple.address() != destinationTuple.address());
+
+        // full delete and insert for certain key types
+        if (KeyType::keyDependsOnTupleAddress()) {
+            if (!deleteEntry(&originalTuple)) return false;
+            return addEntry(&destinationTuple);
+        }
+
+        m_tmp1.setFromTuple(&originalTuple, column_indices_, m_keySchema);
         typename MapType::iterator mapiter = m_entries.find(m_tmp1);
         assert(!mapiter.isEnd());
         if (mapiter.isEnd()) {
             return false;
         }
-        mapiter.setValue(newTupleValue->address());
+        mapiter.setValue(destinationTuple.address());
 
         m_updates++;
         return true;
     }
+
+    bool keyUsesNonInlinedMemory() { return KeyType::keyUsesNonInlinedMemory(); }
 
     bool checkForIndexChange(const TableTuple* lhs, const TableTuple* rhs)
     {
@@ -232,6 +225,52 @@ public:
         }
 
         return !m_match.isNullTuple();
+    }
+
+    bool hasKey(const TableTuple *searchKey) {
+        m_tmp1.setFromKey(searchKey);
+        return (m_entries.find(m_tmp1).isEnd() == false);
+    }
+
+    /**
+     * See comments in parent class TableIndex
+     */
+    int64_t getCounterGET(const TableTuple* searchKey, bool isUpper) {
+        if (!hasRank) return -1;
+
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries.lowerBound(m_tmp1);
+        if (m_keyIter.isEnd()) {
+            return m_entries.size() + 1;
+        } else {
+            return m_entries.rankAsc(m_keyIter.key());
+        }
+    }
+
+    /**
+     * See comments in parent class TableIndex
+     */
+    int64_t getCounterLET(const TableTuple* searchKey, bool isUpper) {
+        if (!hasRank) return -1;
+
+        m_tmp1.setFromKey(searchKey);
+        m_keyIter = m_entries.lowerBound(m_tmp1);
+
+        if (m_keyIter.isEnd())
+            return m_entries.size();
+
+        int cmp = m_eq(m_tmp1, m_keyIter.key());
+        KeyType tmpKey = m_keyIter.key();
+        if (cmp == 0) {
+            m_keyIter.movePrev();
+            if (m_keyIter.isEnd() == false)
+                return m_entries.rankAsc(m_keyIter.key());
+            else
+                //we can not find a previous key
+                return 0;
+        }
+        // return rank with the current key if equal
+        return m_entries.rankAsc(tmpKey);
     }
 
     size_t getSize() const { return static_cast<size_t>(m_entries.size()); }

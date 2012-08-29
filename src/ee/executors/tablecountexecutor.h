@@ -15,13 +15,27 @@
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
 
-package org.voltdb.iv2;
 
+#ifndef HSTORETABLECOUNTEXECUTOR_H
+#define HSTORETABLECOUNTEXECUTOR_H
 
-/**
- * PartitionClerk provides an interface to map partition ids to
- * master partition initiator mailbox HSIds.
- */
-public interface PartitionClerk
+#include "common/common.h"
+#include "common/valuevector.h"
+#include "executors/abstractexecutor.h"
+
+namespace voltdb
 {
+    class TableCountExecutor : public AbstractExecutor {
+    public:
+        TableCountExecutor(VoltDBEngine *engine, AbstractPlanNode* abstract_node)
+            : AbstractExecutor(engine, abstract_node)
+        {}
+        ~TableCountExecutor();
+    protected:
+        bool p_init(AbstractPlanNode* abstract_node,
+                    TempTableLimits* limits);
+        bool p_execute(const NValueArray& params);
+    };
 }
+
+#endif

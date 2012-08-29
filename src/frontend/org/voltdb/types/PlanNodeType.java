@@ -21,7 +21,26 @@ import java.util.EnumSet;
 import java.util.HashMap;
 import java.util.Map;
 
-import org.voltdb.plannodes.*;
+import org.voltdb.plannodes.AbstractPlanNode;
+import org.voltdb.plannodes.AggregatePlanNode;
+import org.voltdb.plannodes.DeletePlanNode;
+import org.voltdb.plannodes.DistinctPlanNode;
+import org.voltdb.plannodes.HashAggregatePlanNode;
+import org.voltdb.plannodes.IndexCountPlanNode;
+import org.voltdb.plannodes.IndexScanPlanNode;
+import org.voltdb.plannodes.InsertPlanNode;
+import org.voltdb.plannodes.LimitPlanNode;
+import org.voltdb.plannodes.MaterializePlanNode;
+import org.voltdb.plannodes.NestLoopIndexPlanNode;
+import org.voltdb.plannodes.NestLoopPlanNode;
+import org.voltdb.plannodes.OrderByPlanNode;
+import org.voltdb.plannodes.ProjectionPlanNode;
+import org.voltdb.plannodes.ReceivePlanNode;
+import org.voltdb.plannodes.SendPlanNode;
+import org.voltdb.plannodes.SeqScanPlanNode;
+import org.voltdb.plannodes.TableCountPlanNode;
+import org.voltdb.plannodes.UnionPlanNode;
+import org.voltdb.plannodes.UpdatePlanNode;
 
 /**
  *
@@ -34,6 +53,8 @@ public enum PlanNodeType {
     //
     SEQSCAN         (10, SeqScanPlanNode.class),
     INDEXSCAN       (11, IndexScanPlanNode.class),
+    INDEXCOUNT       (12, IndexCountPlanNode.class),
+    TABLECOUNT       (13, TableCountPlanNode.class),
 
     //
     // Join Nodes

@@ -116,6 +116,10 @@ public class PartitioningForStatement {
         m_inferSP = inferSP;
     }
 
+    public boolean shouldInferSP() {
+        return m_inferSP;
+    }
+
     /**
      * accessor
      */

@@ -154,10 +154,10 @@ public class TestPartitionDDL extends TestCase {
                 }
             xmlText += "    <procedures>\n";
             xmlText += String.format("      <procedure class='%s' />\n",
-                                     partitioned ? partitionedProc : replicatedProc);
+                                    partitioned ? partitionedProc : replicatedProc);
             xmlText += "    </procedures>\n" +
-                       "  </database>\n" +
-                       "</project>\n";
+                    "  </database>\n" +
+                    "</project>\n";
             return VoltProjectBuilder.writeStringToTempFile(xmlText).getPath();
         }
 
@@ -174,7 +174,7 @@ public class TestPartitionDDL extends TestCase {
             return ss.toString().trim().replace('\n', ' ');
         }
 
-         // Must provide a failRegex if failure is expected.
+        // Must provide a failRegex if failure is expected.
         void test(final boolean partitioned, final String failRegex, final Item... items) {
             // Generate DDL and XML files.
             String ddlPath = writeDDL(items);
@@ -189,7 +189,7 @@ public class TestPartitionDDL extends TestCase {
             if (failRegex != null) {
                 assertFalse("Expected compilation failure.", success);
                 assertTrue(String.format("Expected error regex \"%s\" not matched.\n%s", failRegex, s),
-                           s.matches(failRegex));
+                        s.matches(failRegex));
             }
             else {
                 assertTrue(String.format("Unexpected compilation failure.\n%s", s), success);
@@ -252,19 +252,23 @@ public class TestPartitionDDL extends TestCase {
 
         // REPLICATE statement with no semi-colon.
         tester.bad(".*no semicolon found.*",
-                   new DDL("REPLICATE TABLE books"));
+                new DDL("REPLICATE TABLE books"));
 
         // REPLICATE statement with missing argument.
         tester.bad(".*Bad REPLICATE DDL statement.*",
-                   new DDL("REPLICATE TABLE;"));
+                new DDL("REPLICATE TABLE;"));
 
         // REPLICATE statement with too many arguments.
         tester.bad(".*Bad REPLICATE DDL statement.*",
-                   new DDL("REPLICATE TABLE books NOW;"));
+                new DDL("REPLICATE TABLE books NOW;"));
 
         // REPLICATE with bad table clause.
         tester.bad(".*Bad REPLICATE DDL statement.*",
-                   new DDL("REPLICATE TABLEX books;"));
+                new DDL("REPLICATE TABLEX books;"));
+
+        //REPLICATE with bad table identifier
+        tester.bad(".*Bad indentifier in DDL.*",
+                new DDL("REPLICATE TABLE 0books;"));
     }
 
     public void testGoodReplicate() {
@@ -282,19 +286,23 @@ public class TestPartitionDDL extends TestCase {
 
         // PARTITION statement with no semi-colon.
         tester.bad(".*no semicolon found.*",
-                   new DDL("PARTITION TABLE books ON COLUMN cash"));
+                new DDL("PARTITION TABLE books ON COLUMN cash"));
 
         // PARTITION statement with missing arguments.
         tester.bad(".*Bad PARTITION DDL statement.*",
-                   new DDL("PARTITION TABLE;"));
+                new DDL("PARTITION TABLE;"));
 
         // PARTITION statement with too many arguments.
         tester.bad(".*Bad PARTITION DDL statement.*",
-                   new DDL("PARTITION TABLE books ON COLUMN cash COW;"));
+                new DDL("PARTITION TABLE books ON COLUMN cash COW;"));
+
+        // PARTITION statement intermixed with procedure.
+        tester.bad(".*Bad PARTITION DDL statement.*",
+                new DDL("PARTITION TABLE books PROCEDURE bruha ON COLUMN cash;"));
 
         // PARTITION with bad table clause.
         tester.bad(".*Bad PARTITION DDL statement.*",
-                   new DDL("PARTITION TABLEX books ON COLUMN cash;"));
+                new DDL("PARTITION TABLEX books ON COLUMN cash;"));
     }
 
     public void testGoodPartition() {
@@ -315,22 +323,22 @@ public class TestPartitionDDL extends TestCase {
 
         // PARTITION from both XML and DDL.
         tester.bad(".*Partitioning already specified for table.*",
-                   new PartitionXML("books", "cash"),
-                   new PartitionDDL("books", "cash"));
+                new PartitionXML("books", "cash"),
+                new PartitionDDL("books", "cash"));
 
         // PARTITION and REPLICATE from both XML and DDL.
         tester.bad(".*Partitioning already specified for table.*",
-                   new PartitionXML("books", "cash"),
-                   new ReplicateDDL("books"));
+                new PartitionXML("books", "cash"),
+                new ReplicateDDL("books"));
 
         // PARTITION and REPLICATE from DDL.
         tester.bad(".*Partitioning already specified for table.*",
-                   new PartitionDDL("books", "cash"),
-                   new ReplicateDDL("books"));
+                new PartitionDDL("books", "cash"),
+                new ReplicateDDL("books"));
 
         // PARTITION twice from DDL.
         tester.bad(".*Partitioning already specified for table.*",
-                   new PartitionDDL("books", "cash"),
-                   new PartitionDDL("books", "cash"));
+                new PartitionDDL("books", "cash"),
+                new PartitionDDL("books", "cash"));
     }
 }

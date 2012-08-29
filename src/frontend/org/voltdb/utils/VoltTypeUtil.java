@@ -95,6 +95,14 @@ public abstract class VoltTypeUtil {
         return (ret);
     }
 
+    private static final VoltType CAST_ORDER[] = {
+        VoltType.STRING,
+        VoltType.DECIMAL,
+        VoltType.FLOAT,
+        VoltType.TIMESTAMP,
+        VoltType.BIGINT,
+    };
+
     public static VoltType determineImplicitCasting(VoltType left, VoltType right) {
         //
         // Make sure both are valid
@@ -140,12 +148,7 @@ public abstract class VoltTypeUtil {
         //        over the more general types
         //            Example: MONEY + FLOAT -> MONEY
         //            Example: TIMESTAMP + INTEGER -> TIMESTAMP
-        VoltType cast_order[] = { VoltType.STRING,
-                                  VoltType.DECIMAL,
-                                  VoltType.FLOAT,
-                                  VoltType.TIMESTAMP,
-                                  VoltType.BIGINT };
-        for (VoltType cast_type : cast_order) {
+        for (VoltType cast_type : CAST_ORDER) {
             //
             // If any one of the types is the current cast type, we'll use that
             //

@@ -148,12 +148,13 @@ public class NodeSchema
         Collections.sort(m_columns, new TveColCompare());
     }
 
+    @Override
     public NodeSchema clone()
     {
         NodeSchema copy = new NodeSchema();
         for (int i = 0; i < m_columns.size(); ++i)
         {
-            copy.addColumn((SchemaColumn)m_columns.get(i).clone());
+            copy.addColumn(m_columns.get(i).clone());
         }
         return copy;
     }
@@ -184,11 +185,12 @@ public class NodeSchema
         copy = schema.clone();
         for (int i = 0; i < m_columns.size(); ++i)
         {
-            copy.addColumn((SchemaColumn)m_columns.get(i).clone());
+            copy.addColumn(m_columns.get(i).clone());
         }
         return copy;
     }
 
+    @Override
     public String toString()
     {
         StringBuilder sb = new StringBuilder();
@@ -203,3 +205,4 @@ public class NodeSchema
 
     private ArrayList<SchemaColumn> m_columns;
 }
+

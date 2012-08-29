@@ -161,15 +161,17 @@ class PersistentTable : public Table, public UndoQuantumReleaseInterest {
      * targetTuple is swapped when making calls on the indexes. This
      * is just an inconsistency in the argument ordering.
      */
-    bool updateTuple(TableTuple &sourceTuple, TableTuple &targetTuple,
-                     bool updatesIndexes);
+    bool updateTupleWithSpecificIndexes(TableTuple &targetTupleToUpdate,
+                                        TableTuple &sourceTupleWithNewValues,
+                                        std::vector<TableIndex*> &indexesToUpdate);
 
     /*
      * Identical to regular updateTuple except no memory management
      * for unlined columns is performed because that will be handled
      * by the UndoAction.
      */
-    void updateTupleForUndo(TableTuple &sourceTuple, TableTuple &targetTuple,
+    void updateTupleForUndo(TableTuple &targetTupleToUpdate,
+                            TableTuple &sourceTupleWithNewValues,
                             bool revertIndexes);
 
     /*
@@ -290,11 +292,10 @@ protected:
     // ------------------------------------------------------------------
     void insertIntoAllIndexes(TableTuple *tuple);
     void deleteFromAllIndexes(TableTuple *tuple);
-    void updateFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
-    void updateWithSameKeyFromAllIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
-
     bool tryInsertOnAllIndexes(TableTuple *tuple);
-    bool checkUpdateOnUniqueIndexes(TableTuple &targetTuple, const TableTuple &sourceTuple);
+    bool checkUpdateOnUniqueIndexes(TableTuple &targetTupleToUpdate,
+                                    const TableTuple &sourceTupleWithNewValues,
+                                    std::vector<TableIndex*> &indexesToUpdate);
 
     bool checkNulls(TableTuple &tuple) const;
 
@@ -302,7 +303,7 @@ protected:
     void onSetColumns();
 
     void notifyBlockWasCompactedAway(TBPtr block);
-    void swapTuples(TableTuple sourceTuple, TableTuple destinationTuple);
+    void swapTuples(TableTuple &sourceTupleWithNewValues, TableTuple &destinationTuple);
 
     /**
      * Normally this will return the tuple storage to the free list.

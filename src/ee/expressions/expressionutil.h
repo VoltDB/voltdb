@@ -77,8 +77,8 @@ public:
     static boost::shared_array<int>
     convertIfAllParameterValues(const std::vector<voltdb::AbstractExpression*> &expressions);
 
-    // Implemented in functionexpression.cpp because function expression handling is growing into a system unto itself.
-    static AbstractExpression * functionFactory(ExpressionType et, const std::vector<AbstractExpression*>* arguments);
+    // Implemented in functionexpression.cpp because function expression handling is a system unto itself.
+    static AbstractExpression * functionFactory(int functionId, const std::vector<AbstractExpression*>* arguments);
 
 };
 

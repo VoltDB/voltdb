@@ -57,8 +57,8 @@ public class TestVoltType extends TestCase {
         assertEquals(VoltType.STRING, VoltType.typeFromString("STRING"));
         assertEquals(VoltType.VOLTTABLE, VoltType.typeFromString("VOLTTABLE"));
         assertEquals(VoltType.STRING, VoltType.typeFromString("VARCHAR"));
-        // Need to be able to turn CHAR SqlStmt paramters into varchars.
-        assertEquals(VoltType.STRING, VoltType.typeFromString("CHAR"));
+        // Need to be able to turn CHARACTER SqlStmt parameters into varchars.
+        assertEquals(VoltType.STRING, VoltType.typeFromString("CHARACTER"));
         assertEquals(VoltType.TIMESTAMP, VoltType.typeFromString("TIMESTAMP"));
         assertEquals(VoltType.DECIMAL, VoltType.typeFromString("DECIMAL"));
         assertEquals(VoltType.VARBINARY, VoltType.typeFromString("VARBINARY"));
@@ -135,6 +135,7 @@ public class TestVoltType extends TestCase {
         assertEquals(VoltType.typeFromString("DOUBLE"), VoltType.typeFromClass(Double.class));
         assertEquals(VoltType.typeFromString("TIMESTAMP"), VoltType.typeFromClass(TimestampType.class));
         assertEquals(VoltType.typeFromString("STRING"), VoltType.typeFromClass(String.class));
+        assertEquals(VoltType.typeFromString("CHARACTER"), VoltType.typeFromClass(String.class));
         assertEquals(VoltType.typeFromString("VOLTTABLE"), VoltType.typeFromClass(VoltTable.class));
         assertEquals(VoltType.typeFromString("DECIMAL"), VoltType.typeFromClass(BigDecimal.class));
         assertEquals(VoltType.typeFromString("VARBINARY"), VoltType.typeFromClass(byte[].class));

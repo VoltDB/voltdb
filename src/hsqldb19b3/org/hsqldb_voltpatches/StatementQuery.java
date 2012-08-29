@@ -191,18 +191,6 @@ public class StatementQuery extends StatementDMQL {
 
         QuerySpecification select = (QuerySpecification) queryExpression;
 
-        try {
-            getResult(session);
-        }
-        catch (HsqlException e)
-        {
-            throw new HSQLParseException(e.getMessage());
-        }
-        catch (Exception e)
-        {
-            // XXX coward.
-        }
-
         // select
         VoltXMLElement query = new VoltXMLElement("select");
         if (select.isDistinctSelect)
