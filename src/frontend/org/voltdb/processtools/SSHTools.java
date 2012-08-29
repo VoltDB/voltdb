@@ -56,9 +56,6 @@ public class SSHTools {
             }
         }
         else sb.append("null");
-        System.out.println("JWP **********************");
-        System.out.println("JWP Starting PROCESS with command " + sb.toString() );
-        System.out.println("JWP **********************");
     }
 
     // Execute a remote SSH command on the specified host.
@@ -75,11 +72,16 @@ public class SSHTools {
         return cmdSSH(user, key, host, stringify(command));
     }
 
+    /*
+     * The code from here to the end of the file is code that integrates with an external
+     * SSH library (JSCH, http://www.jcraft.com/jsch/).  If you wish to replaces this
+     * library, these are the methods that need to be re-worked.
+     */
     public String cmdSSH(String user, String key, String host, String command) {
         String result = "";
         try{
-            System.out.println("JWP EXECUTING SSH: " + command);
             JSch jsch=new JSch();
+
             // Set the private key
             if (null != key)
                 jsch.addIdentity(key);
@@ -168,8 +170,6 @@ public class SSHTools {
         try{
             boolean ptimestamp = true;
             String command="scp " + (ptimestamp ? "-p" :"") +" -t "+remote_file;
-
-            System.out.println("JWP SCP To: " + command);
 
             JSch jsch=new JSch();
             // Set the private key
@@ -271,8 +271,6 @@ public class SSHTools {
             }
 
             String command="scp -f "+remote_file;
-
-            System.out.println("JWP SCP From: " + command);
 
             JSch jsch=new JSch();
             // Set the private key
