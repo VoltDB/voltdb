@@ -530,18 +530,42 @@ SnapshotCompletionInterest
         final Long maxLastSeenTxn = m_replayAgent.getMaxLastSeenTxn();
         Set<SnapshotInfo> snapshotInfos = new HashSet<SnapshotInfo>();
         for (Entry<Long, Snapshot> e : snapshots.entrySet()) {
-            /*
-             * If the txn of the snapshot is before the latest txn
-             * among the last seen txns across all initiators when the
-             * log starts, there is a gap in between the snapshot was
-             * taken and the beginning of the log. So the snapshot is
-             * not viable for replay.
-             */
-            if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
-                continue;
+            if (!VoltDB.instance().isIV2Enabled()) {
+                /*
+                 * If the txn of the snapshot is before the latest txn
+                 * among the last seen txns across all initiators when the
+                 * log starts, there is a gap in between the snapshot was
+                 * taken and the beginning of the log. So the snapshot is
+                 * not viable for replay.
+                 */
+                if (maxLastSeenTxn != null && e.getKey() < maxLastSeenTxn) {
+                    continue;
+                }
             }
 
             SnapshotInfo info = checkSnapshotIsComplete(e.getKey(), e.getValue());
+            if (VoltDB.instance().isIV2Enabled()) {
+                final Map<Integer, Long> cmdlogmap = m_replayAgent.getMaxLastSeenTxnByPartition();
+                final Map<Integer, Long> snapmap = info.partitionToTxnId;
+                if (cmdlogmap == null || snapmap == null || cmdlogmap.size() != snapmap.size()) {
+                    info = null;
+                }
+                else {
+                    for (Integer cmdpart : cmdlogmap.keySet()) {
+                        Long snaptxnId = snapmap.get(cmdpart);
+                        if (snaptxnId == null) {
+                            info = null;
+                            break;
+                        }
+                        else if (snaptxnId < cmdlogmap.get(cmdpart)) {
+                            info = null;
+                            break;
+                        }
+                    }
+                }
+            }
+
+
             if (info != null) {
                 snapshotInfos.add(info);
             }

@@ -17,6 +17,8 @@
 
 package org.voltdb;
 
+import java.util.Map;
+
 import org.voltdb.dtxn.SiteTracker;
 import org.voltdb.dtxn.TransactionCreator;
 
@@ -55,6 +57,11 @@ public class DefaultCommandLogReinitiator implements CommandLogReinitiator
 
     @Override
     public Long getMaxLastSeenTxn() {
+        return null;
+    }
+
+    @Override
+    public Map<Integer, Long> getMaxLastSeenTxnByPartition() {
         return null;
     }
 
