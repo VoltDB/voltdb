@@ -1031,9 +1031,7 @@ public class DDLCompiler {
                              " uses a non-hashable column " + nonint_col_name;
                 throw m_compiler.new VoltCompilerException(msg);
             }
-        }
-        else
-        {
+        } else {
             index.setType(IndexType.BALANCED_TREE.getValue());
             index.setCountable(true);
         }

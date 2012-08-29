@@ -1617,6 +1617,7 @@ public class TestVoltCompiler extends TestCase {
         Database d = c.m_catalog.getClusters().get("cluster").getDatabases().get("database");
         assertTrue(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft_unique").getUnique());
         assertFalse(d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft").getUnique());
+        // Validate that general expression indexes get properly annotated with an expressionjson attribute
         String noExpressionFound = "";
         assertNotSame(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft_unique").getExpressionsjson());
         assertNotSame(noExpressionFound, d.getTables().getIgnoreCase("t").getIndexes().getIgnoreCase("idx_ft").getExpressionsjson());

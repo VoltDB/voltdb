@@ -589,7 +589,7 @@ public class TestFunctionsSuite extends RegressionSuite {
                 "CREATE INDEX P1_ABS_ID ON P1 ( ABS(ID) ); " + // Test generalized index on a function of an already indexed column.
                 "CREATE INDEX P1_ABS_NUM ON P1 ( ABS(NUM) ); " + // Test generalized index on a function of a non-indexed column.
                 "CREATE INDEX P1_ABS_ID_PLUS_NUM ON P1 ( ABS(ID) + NUM ); " + // Test generalized index on an expression of multiple columns.
-                /*near future*/ "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " + // Test generalized index on a string function.
+                "CREATE INDEX P1_SUBSTRING_DESC ON P1 ( SUBSTRING(DESC FROM 1 FOR 2) ); " + // Test generalized index on a string function.
                 "";
         try {
             project.addLiteralSchema(literalSchema);
@@ -634,7 +634,7 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
-        //* alternative for debug*/ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
+        // /* alternative for debug*/ config = new LocalCluster("IPC-onesite.jar", 1, 1, 0, BackendTarget.NATIVE_EE_IPC);
         success = config.compile(project);
         assertTrue(success);
         builder.addServerConfig(config);
