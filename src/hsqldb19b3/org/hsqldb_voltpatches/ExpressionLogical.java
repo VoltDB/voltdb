@@ -1730,6 +1730,8 @@ public class ExpressionLogical extends Expression {
         case OpTypes.NOT:               element = "not"; break;
         case OpTypes.LIKE:              element = "like"; break;
         // Handle some of the unsupported OpTypes with slightly more informative messages.
+        case OpTypes.EXISTS:
+            throw new HSQLParseException("VoltDB does not yet support EXISTS clause, consider using views instead");
         default:
             throw new HSQLParseException("Unsupported Logical Operation: #" +
                                          String.valueOf(opType));
