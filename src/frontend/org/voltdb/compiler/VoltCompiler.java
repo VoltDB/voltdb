@@ -637,6 +637,7 @@ public class VoltCompiler {
                     case INTEGER:
                     case BIGINT:
                     case STRING:
+                    case VARBINARY:
                         break;
                     default:
                         msg += "Partition column '" + tableName + "." + colName + "' is not a valid type. " +

@@ -56,6 +56,25 @@ public class TestFunctionsSuite extends RegressionSuite {
     /** Procedures used by this suite */
     static final Class<?>[] PROCEDURES = { Insert.class };
 
+    public void testAbsWithLimit_ENG3572() throws Exception
+    {
+        System.out.println("STARTING testAbs");
+        Client client = getClient();
+        /*
+        CREATE TABLE P1 (
+                ID INTEGER DEFAULT '0' NOT NULL,
+                DESC VARCHAR(300),
+                NUM INTEGER,
+                RATIO FLOAT,
+                PAST TIMESTAMP DEFAULT NULL,
+                PRIMARY KEY (ID)
+                );
+        */
+        ClientResponse cr = null;
+        cr = client.callProcedure("@AdHoc", "select abs(NUM) from P1 where ID = 0 limit 1");
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+    }
+
     public void testAbs() throws Exception
     {
         System.out.println("STARTING testAbs");
@@ -542,6 +561,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertEquals(1, result.asScalarLong());
     }
+
 
     //
     // JUnit / RegressionSuite boilerplate

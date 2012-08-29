@@ -1729,6 +1729,20 @@ TEST CASES
 </target>
 
 
+<target name="plannertester" description="Run plannertester">
+    <property name="plannertester.dir" value="tests/scripts/plannertester"/>
+    <fileset id="plannertester.configs" dir="${plannertester.dir}/config" includes="**"/>
+    <echo message="Running from ${plannertester.dir}"/>
+
+    <java classname="org.voltdb.planner.plannerTester"
+          classpathref="project.classpath"
+          dir="${plannertester.dir}"
+          failonerror="true"
+          fork="true">
+        <arg line="-C=config/voter,config/voltkv,config/voltcache -d -s -e -cs -r=reports -sp=plan-voter,plan-voltkv,plan-voltcache"/>
+    </java>
+</target>
+
 <!--
 ***************************************
 BENCHMARKS

@@ -132,30 +132,30 @@ public class DDLCompiler {
      * \\s+ -- one or more spaces
      * ON -- token
      * \\s+ -- one or more spaces
-     * ' -- single quote
-     * \\s* -- 0 or more spaces
-     * (([\\w$]+)\\.([\\w$]+)\\s*:\\s*(\\d+)) -- [partition info capture group 2]
-     *     ([\\w$]+) -- [table name capture group 3]
-     *        [\\w$]+ -- one or more identifier character
-     *            (letters, numbers, dollar sign ($) or underscore (_))
-     *     \\. -- a period
-     *     ([\\w$]+) -- [column name capture group 4]
-     *        [\\w$]+ -- one or more identifier character
-     *            (letters, numbers, dollar sign ($) or underscore (_))
-     *     \\s* -- 0 or more spaces
-     *     : column
-     *     \\s* -- 0 or more spaces
-     *     \\d+ -- one ore more number digits [parameter index capture group 5]
-     * \\s* -- 0 or more spaces
-     * ' -- single quote
+     * TABLE -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$]+) -- [table name capture group 2]
+     *    [\\w$]+ -- one or more identifier character
+     *        (letters, numbers, dollar sign ($) or underscore (_))
+     * \\s+ -- one or more spaces
+     * COLUMN -- token
+     * \\s+ -- one or more spaces
+     * ([\\w$]+) -- [column name capture group 3]
+     *    [\\w$]+ -- one or more identifier character
+     *        (letters, numbers, dollar sign ($) or underscore (_))
+     * (?:\\s+PARAMETER\\s+(\\d+))? 0 or 1 parameter clause [non-capturing]
+     *    \\s+ -- one or more spaces
+     *    PARAMETER -- token
+     *    \\s+ -- one or more spaces
+     *    \\d+ -- one ore more number digits [parameter index capture group 4]
      * \\s* -- 0 or more spaces
      * ; -- a semicolon
      * \\z -- end of string
      * </pre>
      */
     static final Pattern partitionProcedurePattern = Pattern.compile(
-            "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+" +
-            "'\\s*(([\\w$]+)\\.([\\w$]+)\\s*:\\s*(\\d+))\\s*'\\s*;\\z"
+            "(?i)\\APARTITION\\s+PROCEDURE\\s+([\\w$]+)\\s+ON\\s+TABLE\\s+" +
+            "([\\w$]+)\\s+COLUMN\\s+([\\w$]+)(?:\\s+PARAMETER\\s+(\\d+))?\\s*;\\z"
             );
     /**
      * NB supports only unquoted table and column names
@@ -469,27 +469,35 @@ public class DDLCompiler {
 
                 // matches if it is
                 //   PARTITION PROCEDURE <procedure>
-                //      ON '<table>.<column>: <parameter-index-no>'
+                //      ON  TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]
                 statementMatcher = partitionProcedurePattern.matcher(statement);
 
                 if( ! statementMatcher.matches()) {
                     throw m_compiler.new VoltCompilerException(String.format(
                             "Bad PARTITION DDL statement: \"%s\", " +
                             "expected syntax: PARTITION PROCEDURE <procedure> ON "+
-                            "'<table>.<column>: <parameter-index-no>'",
+                            "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]",
                             statement.substring(0,statement.length()-1))); // remove trailing semicolon
                 }
 
                 // check the table portion of the partition info
-                checkIdentifierStart(statementMatcher.group(3), statement);
+                String tableName = checkIdentifierStart(statementMatcher.group(2), statement);
 
                 // check the column portion of the partition info
-                checkIdentifierStart(statementMatcher.group(4), statement);
+                String columnName = checkIdentifierStart(statementMatcher.group(3), statement);
+
+                // if not specified default parameter index to 0
+                String parameterNo = statementMatcher.group(4);
+                if( parameterNo == null) {
+                    parameterNo = "0";
+                }
+
+                String partitionInfo = String.format("%s.%s: %s", tableName, columnName, parameterNo);
 
                 // procedureName -> group(1), partitionInfo -> group(2)
                 m_partitionMap.addProcedurePartitionInfoTo(
                         checkIdentifierStart(statementMatcher.group(1), statement),
-                        statementMatcher.group(2)
+                        partitionInfo
                         );
 
                 return true;
@@ -518,7 +526,7 @@ public class DDLCompiler {
                     "Bad PARTITION DDL statement: \"%s\", " +
                     "expected syntax: \"PARTITION TABLE <table> ON COLUMN <column>\" or " +
                     "\"PARTITION PROCEDURE <procedure> ON " +
-                    "'<table>.<column>: <parameter-index-no>'\"",
+                    "TABLE <table> COLUMN <column> [PARAMETER <parameter-index-no>]\"",
                     statement.substring(0,statement.length()-1))); // remove trailing semicolon
         }
 

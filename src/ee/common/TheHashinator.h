@@ -67,6 +67,7 @@ class TheHashinator {
             return hashinate(ValuePeeker::peekAsRawInt64(value),
                              partitionCount);
         }
+        case VALUE_TYPE_VARBINARY:
         case VALUE_TYPE_VARCHAR:
         {
             return hashinate(reinterpret_cast<char*>(ValuePeeker::peekObjectValue(value)),
@@ -75,7 +76,7 @@ class TheHashinator {
         }
         default:
             throwDynamicSQLException("Attempted to hashinate an unsupported type: %s",
-                                getTypeName(val_type).c_str());
+                                     getTypeName(val_type).c_str());
         }
     }
 
@@ -107,13 +108,14 @@ class TheHashinator {
         int32_t hashCode = 0;
         int32_t offset = 0;
         if (length < 0) {
-            throwDynamicSQLException("Attempted to hashinate a string with length(%d) < 0", length);
+            throwDynamicSQLException("Attempted to hashinate a value with length(%d) < 0", length);
         }
         for (int32_t ii = 0; ii < length; ii++) {
            hashCode = 31 * hashCode + string[offset++];
         }
         return abs(hashCode % partitionCount);
     }
+
 };
 
 } // namespace voltdb

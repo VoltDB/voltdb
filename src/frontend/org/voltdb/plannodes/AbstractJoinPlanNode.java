@@ -200,7 +200,7 @@ public abstract class AbstractJoinPlanNode extends AbstractPlanNode {
 
     @Override
     public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
-        super.loadFromJSONObject(jobj, db);
+        helpLoadFromJSONObject(jobj, db);
         this.m_joinType = JoinType.get( jobj.getString( Members.JOIN_TYPE.name() ) );
         if( !jobj.isNull( Members.PREDICATE.name() )) {
             m_predicate = AbstractExpression.fromJSONObject(jobj.getJSONObject(Members.PREDICATE.name()), db);
