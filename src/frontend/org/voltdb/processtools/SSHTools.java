@@ -31,19 +31,18 @@ import com.jcraft.jsch.Session;
 
 public class SSHTools {
     private final String m_username;
-    private final String m_password;
+    private final String m_keyFile;
 
-    public SSHTools(String username, String password) {
+    public SSHTools(String username, String key) {
         if (username != null && username.isEmpty()) {
             m_username = null;
         } else {
             m_username = username;
         }
-        if (password == null || password.isEmpty()) {
-            // Make it a password-less connection
-            m_password = null;
+        if (key == null || key.isEmpty()) {
+            m_keyFile = null;
         } else {
-            m_password = password;
+            m_keyFile = key;
         }
    }
 
@@ -64,23 +63,26 @@ public class SSHTools {
 
     // Execute a remote SSH command on the specified host.
     public String cmd(String hostname, String command) {
-        return cmdSSH(m_username, m_password, hostname, command);
+        return cmdSSH(m_username, m_keyFile, hostname, command);
     }
 
     // Execute a remote SSH command on the specified host.
     public String cmd(String hostname, String[] command) {
-        return cmdSSH(m_username, m_password, hostname, command);
+        return cmdSSH(m_username, m_keyFile, hostname, command);
     }
 
-    public String cmdSSH(String user, String password, String host, String[] command) {
-        return cmdSSH(user, password, host, stringify(command));
+    public String cmdSSH(String user, String key, String host, String[] command) {
+        return cmdSSH(user, key, host, stringify(command));
     }
 
-    public String cmdSSH(String user, String password, String host, String command) {
+    public String cmdSSH(String user, String key, String host, String command) {
         String result = "";
         try{
             System.out.println("JWP EXECUTING SSH: " + command);
             JSch jsch=new JSch();
+            // Set the private key
+            if (null != key)
+                jsch.addIdentity(key);
             Session session=jsch.getSession(user, host, 22);
 
             // To avoid the UnknownHostKey issue
@@ -88,9 +90,6 @@ public class SSHTools {
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
 
-            // If two machines have SSH passwordless logins setup, the following lines are not needed:
-            if (null != password)
-                session.setPassword(password);
             session.connect();
 
             Channel channel=session.openChannel("exec");
@@ -132,6 +131,9 @@ public class SSHTools {
         printCommandString(command);
         try{
             JSch jsch=new JSch();
+            // Set the private key
+            if (null != m_keyFile)
+                jsch.addIdentity(m_keyFile);
             Session session=jsch.getSession(m_username, hostname, 22);
 
             // To avoid the UnknownHostKey issue
@@ -139,9 +141,6 @@ public class SSHTools {
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
 
-            // If two machines have SSH passwordless logins setup, the following lines are not needed:
-            if (null != m_password)
-                session.setPassword(m_password);
             session.connect();
 
             return new ProcessData(processName, handler, session, stringify(command));
@@ -154,16 +153,16 @@ public class SSHTools {
     }
 
     public boolean copyFromLocal(String src, String hostNameTo, String pathTo) {
-        return ScpTo(src, m_username, m_password, hostNameTo, pathTo);
+        return ScpTo(src, m_username, m_keyFile, hostNameTo, pathTo);
     }
 
     public boolean copyFromRemote(String dst, String hostNameFrom, String pathFrom) {
-        return ScpFrom(m_username, m_password, hostNameFrom, pathFrom, dst);
+        return ScpFrom(m_username, m_keyFile, hostNameFrom, pathFrom, dst);
     }
 
     // The Jsch method for SCP to.
     // This code is direcly copied from the Jsch SCP sample program.
-    public boolean ScpTo(String local_file, String user, String password, String host, String remote_file){
+    public boolean ScpTo(String local_file, String user, String key, String host, String remote_file){
 
         FileInputStream fis=null;
         try{
@@ -173,14 +172,16 @@ public class SSHTools {
             System.out.println("JWP SCP To: " + command);
 
             JSch jsch=new JSch();
+            // Set the private key
+            if (null != key)
+                jsch.addIdentity(key);
             Session session=jsch.getSession(user, host, 22);
 
             // To avoid the UnknownHostKey issue
             java.util.Properties config = new java.util.Properties();
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
-            if (null != password)
-                session.setPassword(password);
+
             session.connect();
 
             // exec 'scp -t rfile' remotely
@@ -260,7 +261,7 @@ public class SSHTools {
 
     // The Jsch method for SCP from.
     // This code is direcly copied from the Jsch SCP sample program.
-    public boolean ScpFrom(String user, String password, String host, String remote_file, String local_file){
+    public boolean ScpFrom(String user, String key, String host, String remote_file, String local_file){
 
         FileOutputStream fos=null;
         try{
@@ -274,14 +275,16 @@ public class SSHTools {
             System.out.println("JWP SCP From: " + command);
 
             JSch jsch=new JSch();
+            // Set the private key
+            if (null != key)
+                jsch.addIdentity(key);
             Session session=jsch.getSession(user, host, 22);
 
             // To avoid the UnknownHostKey issue
             java.util.Properties config = new java.util.Properties();
             config.put("StrictHostKeyChecking", "no");
             session.setConfig(config);
-            if (null != password)
-                session.setPassword(password);
+
             session.connect();
 
             // exec 'scp -f rfile' remotely
