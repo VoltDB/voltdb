@@ -24,9 +24,9 @@
 #include "expressions/abstractexpression.h"
 
 // IMPORTANT: These FUNC_... values must be kept synchronized with those listed in the following hsql parser source files:
-// FunctionsSQL.java       -- standard SQL functions
-// FunctionsCustom.java    -- JDBC (Open Group SQL) functions
-// FunctionsForVoltDB.java -- VoltDB extensions
+// FunctionSQL.java       -- standard SQL functions
+// FunctionCustom.java    -- JDBC (Open Group SQL) functions
+// FunctionForVoltDB.java -- VoltDB extensions
 
 // Note that function names and function IDs need not correspond one-to-one.
 // A function name (especially one in the Custom/JDBC/OpenGroup category) may be just an alias for another function,
@@ -138,6 +138,8 @@ static const int FUNC_SUBSTR           = 139;
 static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 
+static const int FUNC_DECODE           = 150;
+
 // Specializations of EXTRACT.
 // They are based on various sets of constants and need to be adjusted by a constant offset
 // to prevent conflict with the other FUNC_ definitions
@@ -210,5 +212,6 @@ static const int FUNC_VOLT_SQL_ERROR                   = 20000;
 #include "datefunctions.h"
 #include "numericfunctions.h"
 #include "stringfunctions.h"
+#include "logicfunctions.h"
 
 #endif

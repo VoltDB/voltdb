@@ -34,6 +34,7 @@ package org.hsqldb_voltpatches;
 import java.text.SimpleDateFormat;
 import java.util.Date;
 
+import org.hsqldb_voltpatches.Tokens;
 import org.hsqldb_voltpatches.lib.IntKeyIntValueHashMap;
 import org.hsqldb_voltpatches.store.ValuePool;
 import org.hsqldb_voltpatches.types.CharacterType;
@@ -135,6 +136,9 @@ public class FunctionCustom extends FunctionSQL {
     private static final int FUNC_SECONDS_MIDNIGHT = 141;
 
     //
+    private final static int   FUNC_DECODE         = 150;
+
+    //
     static final IntKeyIntValueHashMap customRegularFuncMap =
         new IntKeyIntValueHashMap();
 
@@ -225,6 +229,9 @@ public class FunctionCustom extends FunctionSQL {
         customRegularFuncMap.put(Tokens.SOUNDEX, FUNC_SOUNDEX);
         customRegularFuncMap.put(Tokens.SPACE, FUNC_SPACE);
         customRegularFuncMap.put(Tokens.DATEDIFF, FUNC_DATEDIFF);
+        
+        //
+        customRegularFuncMap.put(Tokens.DECODE, FUNC_DECODE);
     }
 
     static final IntKeyIntValueHashMap customValueFuncMap =
@@ -501,6 +508,10 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_REPLACE :
                 parseList = tripleParamList;
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+                break;
+                
+            case FUNC_DECODE :
+                parseList = singleParamList;
                 break;
 
             default :

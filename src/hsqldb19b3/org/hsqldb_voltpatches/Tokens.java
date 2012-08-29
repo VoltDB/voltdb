@@ -445,6 +445,7 @@ public class Tokens {
     static final String T_DATETIME_INTERVAL_CODE = "DATETIME_INTERVAL_CODE";
     static final String T_DATETIME_INTERVAL_PRECISION =
         "DATETIME_INTERVAL_PRECISION";
+    static final String        T_DECODE               = "DECODE";
     static final String        T_DEFAULTS             = "DEFAULTS";
     static final String        T_DEFERRABLE           = "DEFERRABLE";
     static final String        T_DEFERRED             = "DEFERRED";
