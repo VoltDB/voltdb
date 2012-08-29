@@ -348,18 +348,18 @@ public class ParsedSelectStmt extends AbstractParsedStmt {
     }
 
     public int getLimitParameterIndex() {
-        return paramIndexById(limitParameterId);
+        return paramIndexById(m_paramsById, limitParameterId);
     }
 
     public int getOffsetParameterIndex() {
-        return paramIndexById(offsetParameterId);
+        return paramIndexById(m_paramsById, offsetParameterId);
     }
 
     private AbstractExpression getParameterOrConstantAsExpression(long id, long value) {
         if (id != -1) {
             ParameterValueExpression parameter = new ParameterValueExpression();
-            assert(paramsById.containsKey(id));
-            int index = paramsById.get(id);
+            assert(m_paramsById.containsKey(id));
+            int index = m_paramsById.get(id);
             parameter.setParameterIndex(index);
             parameter.setValueType(paramList[index]);
             parameter.setValueSize(paramList[index].getLengthInBytesForFixedTypes());

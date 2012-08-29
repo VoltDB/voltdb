@@ -22,6 +22,7 @@ import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.types.ExpressionType;
 
 public class FunctionExpression extends AbstractExpression {
@@ -57,11 +58,15 @@ public class FunctionExpression extends AbstractExpression {
         m_functionId = id;
     }
 
-    public void setParameterArgAndNegotiateInitialValueTypes(int parameterArg) {
+    public void setParameterArg(int parameterArg) {
         m_parameterArg = parameterArg;
+    }
 
-        // Avoid a non-castable types runtime exception by negotiating the type(s) of the parameterized function's result
-        // and its parameter argument. Either of these types could be null or a specific supported value type, or a generic
+    /** Negotiate the type(s) of the parameterized function's result and its parameter argument.
+     * This avoids a fatal "non-castable type" runtime exception.
+     */
+    public void negotiateInitialValueTypes() {
+        // Either of the function result type or parameter type could be null or a specific supported value type, or a generic
         // NUMERIC. Replace any "generic" type (null or NUMERIC) with the more specific type without over-specifying
         // -- the BEST type might only become clear later when the context/caller of this function is parsed, so don't
         // risk guessing wrong here just for the sake of specificity.
@@ -69,7 +74,7 @@ public class FunctionExpression extends AbstractExpression {
 
         // DO use the type chosen by HSQL for the parameterized function as a specific type hint
         // for numeric constant arguments that could either go decimal or float.
-        AbstractExpression param_arg = m_args.get(parameterArg);
+        AbstractExpression param_arg = m_args.get(m_parameterArg);
         VoltType param_type = param_arg.getValueType();
         VoltType value_type = getValueType();
         // The heuristic for which type to change is that any type (parameter type or return type) specified so far,
@@ -257,4 +262,29 @@ public class FunctionExpression extends AbstractExpression {
         m_valueSize = m_valueType.getMaxLengthInBytes();
     }
 
+
+    @Override
+    public void resolveForDB(Database db) {
+        resolveChildrenForDB(db);
+        if (m_parameterArg == NOT_PARAMETERIZED) {
+            // Non-parameterized functions should have a fixed SPECIFIC type.
+            // Further refinement should be useless/un-possible.
+            return;
+        }
+        // resolving a child column has type implications for parameterized functions
+        negotiateInitialValueTypes();
+    }
+
+
+    @Override
+    public void resolveForTable(Table table) {
+        resolveChildrenForTable(table);
+        if (m_parameterArg == NOT_PARAMETERIZED) {
+            // Non-parameterized functions should have a fixed SPECIFIC type.
+            // Further refinement should be useless/un-possible.
+            return;
+        }
+        // resolving a child column has type implications for parameterized functions
+        negotiateInitialValueTypes();
+    }
 }
