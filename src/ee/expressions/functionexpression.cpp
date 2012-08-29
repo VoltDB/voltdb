@@ -30,7 +30,8 @@ template<> inline NValue NValue::callUnary<FUNC_VOLT_SQL_ERROR>() const {
     if (type == VALUE_TYPE_VARCHAR) {
         const int32_t valueLength = getObjectLength();
         const char *valueChars = reinterpret_cast<char*>(getObjectValue());
-        snprintf(msg_format_buffer, std::min((int32_t)sizeof(msg_format_buffer), valueLength+1), "%s", valueChars);
+        std::string valueStr(valueChars, valueLength);
+        snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
         sqlstatecode = SQLException::nonspecific_error_code_for_error_forced_by_user;
         msgtext = msg_format_buffer;
     } else {
@@ -73,7 +74,8 @@ template<> inline NValue NValue::call<FUNC_VOLT_SQL_ERROR>(const std::vector<NVa
         }
         const int32_t valueLength = strValue.getObjectLength();
         char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
-        snprintf(msg_format_buffer, std::min((int32_t)sizeof(msg_format_buffer), valueLength+1), "%s", valueChars);
+        std::string valueStr(valueChars, valueLength);
+        snprintf(msg_format_buffer, sizeof(msg_format_buffer), "%s", valueStr.c_str());
     }
     throw SQLException(sqlstatecode, msg_format_buffer);
 }

@@ -1736,8 +1736,9 @@ TEST CASES
 
     <java classname="org.voltdb.planner.plannerTester"
           classpathref="project.classpath"
-          fork="true"
-          dir="${plannertester.dir}">
+          dir="${plannertester.dir}"
+          failonerror="true"
+          fork="true">
         <arg line="-C=config/voter,config/voltkv,config/voltcache -d -s -e -cs -r=reports -sp=plan-voter,plan-voltkv,plan-voltcache"/>
     </java>
 </target>
