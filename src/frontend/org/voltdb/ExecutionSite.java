@@ -806,14 +806,14 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             String serializedCatalog,
             RestrictedPriorityQueue transactionQueue,
             boolean recovering,
-            boolean replicationActive,
+            NodeDRGateway nodeDRGateway,
             final long txnId,
             int configuredNumberOfPartitions,
             CatalogSpecificPlanner csp) throws Exception
     {
         this(voltdb, mailbox, serializedCatalog, transactionQueue,
-             new ProcedureRunnerFactory(), recovering, replicationActive,
-             txnId, configuredNumberOfPartitions, csp);
+             new ProcedureRunnerFactory(), recovering,
+             nodeDRGateway, txnId, configuredNumberOfPartitions, csp);
     }
 
     ExecutionSite(VoltDBInterface voltdb, Mailbox mailbox,
@@ -821,7 +821,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                   RestrictedPriorityQueue transactionQueue,
                   ProcedureRunnerFactory runnerFactory,
                   boolean recovering,
-                  boolean replicationActive,
+                  NodeDRGateway nodeDRGateway,
                   final long txnId,
                   int configuredNumberOfPartitions,
                   CatalogSpecificPlanner csp) throws Exception
@@ -844,10 +844,8 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
                              FaultType.SITE_FAILURE);
 
         // initialize the DR gateway
-        File overflowDir = new File(VoltDB.instance().getCatalogContext().cluster.getVoltroot(), "dr_overflow");
-
         m_partitionDRGateway =
-            PartitionDRGateway.getInstance(partitionId, replicationActive, overflowDir);
+            PartitionDRGateway.getInstance(partitionId, nodeDRGateway);
 
         if (voltdb.getBackendTargetType() == BackendTarget.NONE) {
             ee = new MockExecutionEngine();
@@ -1473,7 +1471,7 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
             long ts = TransactionIdManager.getTimestampFromTransactionId(txnState.txnId);
             if ((invocation != null) && (m_rejoining == false) && (ts > m_startupTime)) {
                 if (!txnState.needsRollback()) {
-                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, invocation, txnState.getResults());
+                    m_partitionDRGateway.onSuccessfulProcedureCall(txnState.txnId, txnState.txnId, invocation, txnState.getResults());
                 }
             }
 

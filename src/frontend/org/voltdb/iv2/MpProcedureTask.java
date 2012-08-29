@@ -26,6 +26,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
@@ -43,12 +44,12 @@ public class MpProcedureTask extends ProcedureTask
     MpProcedureTask(Mailbox mailbox, ProcedureRunner runner,
                   long txnId, TransactionTaskQueue queue,
                   Iv2InitiateTaskMessage msg, List<Long> pInitiators,
-                  long buddyHSId)
+                  long buddyHSId, PartitionDRGateway drGateway)
     {
         super(mailbox, runner,
               new MpTransactionState(mailbox, txnId, msg, pInitiators,
                                      buddyHSId),
-              queue);
+              queue, drGateway);
         m_msg = msg;
         m_initiatorHSIds = com.google.common.primitives.Longs.toArray(pInitiators);
     }

@@ -33,6 +33,8 @@ import org.voltcore.zk.LeaderElector;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
+import org.voltdb.NodeDRGateway;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.Promotable;
 import org.voltdb.VoltDB;
 import org.voltdb.VoltZK;
@@ -79,7 +81,8 @@ public class SpInitiator extends BaseInitiator implements Promotable
                           CatalogContext catalogContext,
                           int kfactor, CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          NodeDRGateway nodeDRGateway)
         throws KeeperException, InterruptedException, ExecutionException
     {
         try {
@@ -89,12 +92,16 @@ public class SpInitiator extends BaseInitiator implements Promotable
         }
         super.configureCommon(backend, serializedCatalog, catalogContext,
                 csp, numberOfPartitions,
-                createForRejoin && isRejoinable());
+                createForRejoin && isRejoinable(),
+                nodeDRGateway);
         // add ourselves to the ephemeral node list which BabySitters will watch for this
         // partition
         LeaderElector.createParticipantNode(m_messenger.getZK(),
                 LeaderElector.electionDirForPartition(m_partitionId),
                 Long.toString(getInitiatorHSId()), null);
+
+        // configure DR
+        m_scheduler.setDRGateway(PartitionDRGateway.getInstance(m_partitionId, nodeDRGateway));
     }
 
     @Override

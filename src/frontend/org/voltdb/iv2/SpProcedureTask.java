@@ -28,6 +28,7 @@ import org.voltdb.ClientResponseImpl;
 import org.voltdb.iv2.Site;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.utils.LogKeys;
@@ -42,9 +43,10 @@ public class SpProcedureTask extends ProcedureTask
 {
     SpProcedureTask(Mailbox initiator, ProcedureRunner runner,
                   long txnId, TransactionTaskQueue queue,
-                  Iv2InitiateTaskMessage msg)
+                  Iv2InitiateTaskMessage msg,
+                  PartitionDRGateway drGateway)
     {
-       super(initiator, runner, new SpTransactionState(txnId, msg), queue);
+       super(initiator, runner, new SpTransactionState(txnId, msg), queue, drGateway);
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */
@@ -67,6 +69,12 @@ public class SpProcedureTask extends ProcedureTask
         m_initiator.deliver(response);
         execLog.l7dlog( Level.TRACE, LogKeys.org_voltdb_ExecutionSite_SendingCompletedWUToDtxn.name(), null);
         hostLog.debug("COMPLETE: " + this);
+
+        // Log invocation to DR
+        if (m_drGateway != null && !m_txn.needsRollback()) {
+            m_drGateway.onSuccessfulProcedureCall(txn.txnId, txn.m_task.getSpHandle(),
+                                                  txn.getInvocation(), response.getClientResponseData());
+        }
     }
 
     @Override

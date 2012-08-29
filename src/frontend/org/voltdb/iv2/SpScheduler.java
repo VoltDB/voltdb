@@ -35,7 +35,9 @@ import org.voltcore.messaging.VoltMessage;
 import org.voltdb.messaging.BorrowTaskMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.ProcedureRunner;
+import org.voltdb.StoredProcedureInvocation;
 import org.voltdb.VoltDB;
+import org.voltdb.client.ProcedureInvocationType;
 import org.voltdb.dtxn.TransactionState;
 import org.voltdb.messaging.CompleteTransactionMessage;
 import org.voltdb.messaging.FragmentResponseMessage;
@@ -163,7 +165,12 @@ public class SpScheduler extends Scheduler
                 // Also, if this is a vanilla single-part procedure, make the TXNID
                 // be the SpHandle (for now)
                 if (!runner.isEverySite()) {
-                    msg.setTxnId(newSpHandle);
+                    StoredProcedureInvocation invocation = msg.getStoredProcedureInvocation();
+                    if (invocation.getType() == ProcedureInvocationType.REPLICATED) {
+                        msg.setTxnId(invocation.getOriginalTxnId());
+                    } else {
+                        msg.setTxnId(newSpHandle);
+                    }
                 }
                 if (m_sendToHSIds.size() > 0) {
                     Iv2InitiateTaskMessage replmsg =
@@ -193,7 +200,7 @@ public class SpScheduler extends Scheduler
             Iv2Trace.logIv2InitiateTaskMessage(message, m_mailbox.getHSId(), msg.getTxnId(), newSpHandle);
             final SpProcedureTask task =
                 new SpProcedureTask(m_mailbox, runner,
-                        newSpHandle, m_pendingTasks, msg);
+                        newSpHandle, m_pendingTasks, msg, m_drGateway);
             m_pendingTasks.offer(task);
             return;
         }
@@ -234,7 +241,7 @@ public class SpScheduler extends Scheduler
                     message.getCoordinatorHSId(), message);
 
             final SpProcedureTask task = new SpProcedureTask(m_mailbox, runner,
-                    localWork.getSpHandle(), m_pendingTasks, localWork);
+                    localWork.getSpHandle(), m_pendingTasks, localWork, m_drGateway);
             m_pendingTasks.offer(task);
         }
 

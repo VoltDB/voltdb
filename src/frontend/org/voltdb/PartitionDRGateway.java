@@ -17,7 +17,6 @@
 
 package org.voltdb;
 
-import java.io.File;
 import java.io.IOException;
 
 import org.voltdb.licensetool.LicenseApi;
@@ -28,7 +27,6 @@ import org.voltdb.licensetool.LicenseApi;
  *
  */
 public class PartitionDRGateway {
-
     /**
      * Load the full subclass if it should, otherwise load the
      * noop stub.
@@ -37,8 +35,7 @@ public class PartitionDRGateway {
      * @return Instance of PartitionDRGateway
      */
     public static PartitionDRGateway getInstance(int partitionId,
-                                                 boolean replicationActive,
-                                                 File overflowDir)
+                                                 NodeDRGateway nodeGateway)
     {
         final VoltDBInterface vdb = VoltDB.instance();
         LicenseApi api = vdb.getLicenseApi();
@@ -47,7 +44,7 @@ public class PartitionDRGateway {
         // if this is a primary cluster in a DR-enabled scenario
         // try to load the real version of this class
         PartitionDRGateway pdrg = null;
-        if (licensedToDR) {
+        if (licensedToDR && nodeGateway != null) {
             pdrg = tryToLoadProVersion();
         }
         if (pdrg == null) {
@@ -56,7 +53,7 @@ public class PartitionDRGateway {
 
         // init the instance and return
         try {
-            pdrg.init(partitionId, replicationActive, overflowDir);
+            pdrg.init(partitionId, nodeGateway);
         } catch (IOException e) {
             VoltDB.crashLocalVoltDB(e.getMessage(), false, e);
         }
@@ -91,13 +88,11 @@ public class PartitionDRGateway {
 
     // empty methods for community edition
     protected void init(int partitionId,
-                        boolean replicationActive,
-                        File overflowDir) throws IOException {}
-    public void onSuccessfulProcedureCall(long txnId, StoredProcedureInvocation spi, ClientResponseImpl response) {}
+                        NodeDRGateway gateway) throws IOException {}
+    public void onSuccessfulProcedureCall(long txnId, long spHandle,
+                                          StoredProcedureInvocation spi,
+                                          ClientResponseImpl response) {}
     public void tick(long txnId) {}
-    public void start() {}
-    public void setActive(boolean active) {}
-    public boolean isActive() { return false; }
     protected void shutdownInternal() {}
 
 }

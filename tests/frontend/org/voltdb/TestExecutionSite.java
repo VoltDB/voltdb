@@ -419,7 +419,7 @@ public class TestExecutionSite extends TestCase {
                         m_rpqs.get(siteId),
                         new MockProcedureRunnerFactory(),
                         false,
-                        false,
+                        null,
                         0,
                         partitionCount,
                         null));

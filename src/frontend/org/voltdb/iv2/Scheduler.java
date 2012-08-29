@@ -23,6 +23,7 @@ import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
 import org.voltdb.LoadedProcedureSet;
+import org.voltdb.PartitionDRGateway;
 
 /**
  * Scheduler's rough current responsibility is to take appropriate local action
@@ -55,6 +56,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
+    protected PartitionDRGateway m_drGateway = new PartitionDRGateway();
 
     Scheduler(SiteTaskerQueue taskQueue)
     {
@@ -81,6 +83,11 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public SiteTaskerQueue getQueue()
     {
         return m_tasks;
+    }
+
+    public void setDRGateway(PartitionDRGateway gateway)
+    {
+        m_drGateway = gateway;
     }
 
     abstract public void shutdown();

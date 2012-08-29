@@ -54,7 +54,7 @@ public class Iv2TestTransactionTaskQueue extends TestCase
         when(mbox.getHSId()).thenReturn(1337l);
 
         SpProcedureTask task =
-            new SpProcedureTask(mbox, null, localTxnId, queue, init);
+            new SpProcedureTask(mbox, null, localTxnId, queue, init, null);
         return task;
     }
 

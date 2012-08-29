@@ -25,6 +25,7 @@ import org.voltcore.logging.Level;
 import org.voltcore.messaging.Mailbox;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.ExpectedProcedureException;
+import org.voltdb.PartitionDRGateway;
 import org.voltdb.ProcedureRunner;
 import org.voltdb.SiteProcedureConnection;
 import org.voltdb.StoredProcedureInvocation;
@@ -41,13 +42,15 @@ abstract public class ProcedureTask extends TransactionTask
 {
     final ProcedureRunner m_runner;
     final Mailbox m_initiator;
+    final PartitionDRGateway m_drGateway;
 
     ProcedureTask(Mailbox initiator, ProcedureRunner runner, TransactionState txn,
-                  TransactionTaskQueue queue)
+                  TransactionTaskQueue queue, PartitionDRGateway drGateway)
     {
         super(txn, queue);
         m_initiator = initiator;
         m_runner = runner;
+        m_drGateway = drGateway;
     }
 
     /** Run is invoked by a run-loop to execute this transaction. */

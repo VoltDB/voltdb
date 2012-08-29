@@ -28,7 +28,7 @@ import org.voltcore.utils.CoreUtils;
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
-
+import org.voltdb.NodeDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
 import org.voltdb.LoadedProcedureSet;
@@ -89,7 +89,8 @@ public abstract class BaseInitiator implements Initiator
                           CatalogContext catalogContext,
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
-                          boolean createForRejoin)
+                          boolean createForRejoin,
+                          NodeDRGateway nodeDRGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
             int snapshotPriority = 6;
@@ -121,7 +122,6 @@ public abstract class BaseInitiator implements Initiator
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
-
     }
 
     @Override
