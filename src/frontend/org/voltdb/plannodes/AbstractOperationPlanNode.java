@@ -18,6 +18,7 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.VoltType;
 import org.voltdb.catalog.Database;
@@ -141,5 +142,11 @@ public abstract class AbstractOperationPlanNode extends AbstractPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.TARGET_TABLE_NAME.name()).value(m_targetTableName);
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        helpLoadFromJSONObject(jobj, db);
+        m_targetTableName = jobj.getString( Members.TARGET_TABLE_NAME.name() );
     }
 }

@@ -18,7 +18,9 @@
 package org.voltdb.plannodes;
 
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.catalog.Database;
 import org.voltdb.types.PlanNodeType;
 
 public class DeletePlanNode extends AbstractOperationPlanNode {
@@ -50,6 +52,12 @@ public class DeletePlanNode extends AbstractOperationPlanNode {
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
         stringer.key(Members.TRUNCATE.name()).value(m_truncate);
+    }
+
+    @Override
+    public void loadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        super.loadFromJSONObject(jobj, db);
+        m_truncate = jobj.getBoolean( Members.TRUNCATE.name() );
     }
 
     @Override

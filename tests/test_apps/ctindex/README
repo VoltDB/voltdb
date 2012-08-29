@@ -1,0 +1,30 @@
+This directory contains the source files for the performance test of Counting index
+
+The app is designed to familiarize you with the source code and the commands needed to write and compile VoltDB applications, so we suggest you try issuing the commands yourself. However, a run.sh script is provided as well for those who just want to see the example in action.
+
+The commands to process these files (not using run.sh) are the following:
+
+  $ export CLASSPATH=.:../../../lib/*:../../../voltdb/*
+
+  $ javac Client.java
+  $ javac Insert.java
+  $ javac CountStarSmaller.java
+  $ javac CountStarRange.java
+
+        (compile application catalog)
+
+  $ java org.voltdb.compiler.VoltCompiler project.xml helloworld.jar
+
+        (create database)
+
+  $ java -Djava.library.path=../../../voltdb/ org.voltdb.VoltDB \
+         host localhost \
+         catalog helloworld.jar \
+         deployment deployment.xml \
+         license ../../../voltdb/license.xml
+
+        (in a separate window, set default to the helloworld sample directory
+         then set the class path and run the client application)
+
+  $ export CLASSPATH=.:../../../voltdb/*
+  $ java Client

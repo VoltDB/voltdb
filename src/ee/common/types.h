@@ -46,6 +46,7 @@
 #define HSTORETYPES_H
 
 #include <string>
+#include <stdint.h>
 namespace voltdb {
 
 // forward declare
@@ -157,7 +158,9 @@ enum PlanNodeType {
     //
     PLAN_NODE_TYPE_SEQSCAN          = 10,
     PLAN_NODE_TYPE_INDEXSCAN        = 11,
-
+    // special counting index
+    PLAN_NODE_TYPE_INDEXCOUNT        = 12,
+    PLAN_NODE_TYPE_TABLECOUNT        = 13,
     //
     // Join Nodes
     //
@@ -277,9 +280,7 @@ enum ExpressionType {
     // -----------------------------
     // Functions
     // -----------------------------
-    EXPRESSION_TYPE_FUNCTION_ABS                    = 100,
-    EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM         = 110,
-    EXPRESSION_TYPE_FUNCTION_SUBSTRING_FROM_FOR     = 111,
+    EXPRESSION_TYPE_FUNCTION                        = 100,
 
 };
 
@@ -377,6 +378,8 @@ ExpressionType stringToExpression(std::string str );
 
 std::string indexLookupToString(IndexLookupType type);
 IndexLookupType stringToIndexLookup(std::string str );
+
+int64_t getMaxTypeValue (ValueType type);
 
 bool hexDecodeToBinary(unsigned char *bufferdst, const char *hexString);
 

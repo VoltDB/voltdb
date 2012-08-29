@@ -27,7 +27,9 @@ import java.util.Map;
 import java.util.Map.Entry;
 import java.util.Set;
 
+import org.json_voltpatches.JSONArray;
 import org.json_voltpatches.JSONException;
+import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONString;
 import org.json_voltpatches.JSONStringer;
 import org.voltdb.catalog.Cluster;
@@ -482,7 +484,7 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
 
         // NOTE: ignores inline nodes.
 
-}
+    }
 
     /**
      * @param type plan node type to search for
@@ -659,4 +661,93 @@ public abstract class AbstractPlanNode implements JSONString, Comparable<Abstrac
     }
 
     protected abstract String explainPlanForNode(String indent);
+
+    public ArrayList<AbstractScanPlanNode> getScanNodeList () {
+        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractScanPlanNode> collected = new ArrayList<AbstractScanPlanNode>();
+        getScanNodeList_recurse( collected, visited);
+        return collected;
+    }
+
+    //postorder adding scan nodes
+    public void getScanNodeList_recurse(ArrayList<AbstractScanPlanNode> collected,
+            HashSet<AbstractPlanNode> visited) {
+        if (visited.contains(this)) {
+            assert(false): "do not expect loops in plangraph.";
+            return;
+        }
+        visited.add(this);
+        for (AbstractPlanNode n : m_children) {
+            n.getScanNodeList_recurse(collected, visited);
+        }
+
+        for (AbstractPlanNode node : m_inlineNodes.values()) {
+            node.getScanNodeList_recurse(collected, visited);
+        }
+    }
+
+    public ArrayList<AbstractPlanNode> getPlanNodeList () {
+        HashSet<AbstractPlanNode> visited = new HashSet<AbstractPlanNode>();
+        ArrayList<AbstractPlanNode> collected = new ArrayList<AbstractPlanNode>();
+        getPlanNodeList_recurse( collected, visited);
+        return collected;
+    }
+
+    //postorder add nodes
+    public void getPlanNodeList_recurse(ArrayList<AbstractPlanNode> collected,
+            HashSet<AbstractPlanNode> visited) {
+        if (visited.contains(this)) {
+            assert(false): "do not expect loops in plangraph.";
+            return;
+        }
+        visited.add(this);
+
+        for (AbstractPlanNode n : m_children) {
+            n.getPlanNodeList_recurse(collected, visited);
+        }
+        collected.add(this);
+    }
+
+    abstract protected void loadFromJSONObject(JSONObject obj, Database db) throws JSONException;
+
+    protected final void helpLoadFromJSONObject( JSONObject jobj, Database db ) throws JSONException {
+        assert( jobj != null );
+        m_id = jobj.getInt( Members.ID.name() );
+
+        JSONArray jarray = null;
+        //load inline nodes
+        if( !jobj.isNull( Members.INLINE_NODES.name() ) ){
+            jarray = jobj.getJSONArray( Members.INLINE_NODES.name() );
+            PlanNodeTree pnt = new PlanNodeTree();
+            pnt.loadFromJSONArray(jarray, db);
+            List<AbstractPlanNode> list = pnt.getNodeList();
+            for( AbstractPlanNode pn : list ) {
+                m_inlineNodes.put( pn.getPlanNodeType(), pn);
+            }
+        }
+        //children and parents list loading implemented in planNodeTree.loadFromJsonArray
+
+        //load output shchema
+        m_outputSchema = new NodeSchema();
+        if( !jobj.isNull( Members.OUTPUT_SCHEMA.name() ) ){
+            jarray = jobj.getJSONArray( Members.OUTPUT_SCHEMA.name() );
+        }
+        int size = jarray.length();
+        for( int i = 0; i < size; i++ ) {
+            m_outputSchema.addColumn( SchemaColumn.fromJSONObject(jarray.getJSONObject(i), db) );
+        }
+    }
+
+    public boolean reattachFragment( SendPlanNode child ) {
+        for( AbstractPlanNode pn : m_inlineNodes.values() ) {
+            if( pn.reattachFragment( child) )
+                return true;
+        }
+        for( AbstractPlanNode pn : m_children ) {
+            if( pn.reattachFragment( child) )
+                return true;
+        }
+        return false;
+    }
+
 }

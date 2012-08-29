@@ -44,7 +44,8 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
         }
     }
 
-    void parseCondition(VoltXMLElement conditionNode, Database db) {
+    //XXX: This looks a lot like it might be a slightly more verbose duplicate of AbstractParsedStmt.parseConditions
+    private void parseCondition(VoltXMLElement conditionNode, Database db) {
         AbstractExpression tempWhere = null;
         for (VoltXMLElement exprNode : conditionNode.children) {
             if (tempWhere == null) {
@@ -54,9 +55,12 @@ public class ParsedDeleteStmt extends AbstractParsedStmt {
                 tempWhere = ExpressionUtil.combine(tempWhere, parseExpressionTree(exprNode, db));
             }
         }
+        assert(where == null); // Should be non-reentrant -- never overwriting a previous value!
         where = tempWhere;
-        ExpressionUtil.assignLiteralConstantTypesRecursively(where);
-        ExpressionUtil.assignOutputValueTypesRecursively(where);
+        if (where == null) {
+            return;
+        }
+        ExpressionUtil.finalizeValueTypes(where);
     }
 
     @Override

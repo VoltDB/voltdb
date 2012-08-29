@@ -390,10 +390,10 @@ public class ProcedureRunner {
             AdHocPlannedStatement plannedStatement = paw.plannedStatements.get(0);
             queuedSQL.stmt = SQLStmtAdHocHelper.createWithPlan(
                     plannedStatement.sql,
-                    plannedStatement.aggregatorFragment,
-                    plannedStatement.collectorFragment,
-                    plannedStatement.isReplicatedTableDML,
-                    plannedStatement.parameterTypes);
+                    plannedStatement.core.aggregatorFragment,
+                    plannedStatement.core.collectorFragment,
+                    plannedStatement.core.isReplicatedTableDML,
+                    plannedStatement.core.parameterTypes);
             if (plannedStatement.extractedParamValues.size() == 0) {
                 // case handles if there were parameters OR
                 // if there were no constants to pull out

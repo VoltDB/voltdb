@@ -17,6 +17,9 @@
 
 package org.voltdb.expressions;
 
+import java.util.HashMap;
+import java.util.Map;
+
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.voltdb.VoltType;
@@ -53,4 +56,36 @@ public class ComparisonExpression extends AbstractExpression {
         return true;
     }
 
+    private static Map<ExpressionType,ExpressionType> reverses = new HashMap<ExpressionType, ExpressionType>();
+    static {
+        reverses.put(ExpressionType.COMPARE_EQUAL, ExpressionType.COMPARE_EQUAL);
+        reverses.put(ExpressionType.COMPARE_NOTEQUAL, ExpressionType.COMPARE_NOTEQUAL);
+        reverses.put(ExpressionType.COMPARE_LESSTHAN, ExpressionType.COMPARE_GREATERTHAN);
+        reverses.put(ExpressionType.COMPARE_GREATERTHAN, ExpressionType.COMPARE_LESSTHAN);
+        reverses.put(ExpressionType.COMPARE_LESSTHANOREQUALTO, ExpressionType.COMPARE_GREATERTHANOREQUALTO);
+        reverses.put(ExpressionType.COMPARE_GREATERTHANOREQUALTO, ExpressionType.COMPARE_LESSTHANOREQUALTO);
+    }
+
+    public ComparisonExpression reverseOperator() {
+        ExpressionType reverseType = reverses.get(this.m_type);
+        // Left and right exprs are reversed on purpose
+        return new ComparisonExpression(reverseType, m_right, m_left);
+    }
+
+    @Override
+    public void finalizeValueTypes()
+    {
+        finalizeChildValueTypes();
+        //
+        // IMPORTANT:
+        // We are not handling the case where one of types is NULL. That is because we
+        // are only dealing with what the *output* type should be, not what the actual
+        // value is at execution time. There will need to be special handling code
+        // over on the ExecutionEngine to handle special cases for conjunctions with NULLs
+        // Therefore, it is safe to assume that the output is always going to be an
+        // integer (for booleans)
+        //
+        m_valueType = VoltType.BIGINT;
+        m_valueSize = m_valueType.getLengthInBytesForFixedTypes();
+    }
 }
