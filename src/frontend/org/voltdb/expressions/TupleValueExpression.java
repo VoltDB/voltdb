@@ -173,10 +173,6 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        // Complain early about improperly resolved columns -- the EE de-serializer will if we don't.
-        if (m_columnIndex < 0) {
-            throw new RuntimeException("Unresolved column reference");
-        }
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
         stringer.key(Members.TABLE_NAME.name()).value(m_tableName);
         stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
