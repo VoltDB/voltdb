@@ -290,8 +290,9 @@ public class TableBase {
 
         for (int i = 0; i < indexList.length; i++) {
             Index index     = indexList[i];
+            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose.
+            // Expression-based indexes are not suitable for row identification.
             if (index.getExpressions() != null) {
-                // Expression-based indexes are not suitable for row identification.
                 continue;
             }
             int[] cols      = index.getColumns();
@@ -401,6 +402,7 @@ public class TableBase {
         return newindex;
     }
 
+    // A VoltDB extension to support indexed expressions
     public final Index createAndAddExprIndexStructure(HsqlName name, int[] cols, Expression[] indexExprs, boolean unique, boolean constraint) {
 
         Index newExprIndex = createExprIndexStructure(name, cols, indexExprs, unique, constraint);
@@ -434,6 +436,7 @@ public class TableBase {
         return newIndex;
     }
 
+    // A VoltDB extension to support indexed expressions
     final Index createExprIndexStructure(HsqlName name, int[] columns, Expression[] expressions, boolean unique, boolean constraint) {
         // TODO: DEFinitely implement for indexExprs
         if (primaryKeyCols == null) {
@@ -517,7 +520,8 @@ public class TableBase {
     }
 
     /**
-     *  Create new memory-resident index. For MEMORY and TEXT tables.
+     *  Create new memory-resident index with indexed expressions. For MEMORY and TEXT tables.
+     *  A VoltDB extension to support indexed expressions.
      * @param indexExprs
      */
     public final Index createExprIndex(PersistentStore store, HsqlName name, int[] cols,

@@ -151,7 +151,7 @@ public class ExpressionOrderBy extends Expression {
      * @throws HSQLParseException
      */
     @Override
-    public VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         VoltXMLElement exp = new VoltXMLElement("operation");
         // We want to keep track of which expressions are the same in the XML output

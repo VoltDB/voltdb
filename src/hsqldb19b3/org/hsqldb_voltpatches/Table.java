@@ -747,7 +747,7 @@ public class Table extends TableBase implements SchemaObject {
     void getConstraintPath(int[] columnMap, OrderedHashSet list) {
 
         for (int i = 0; i < constraintList.length; i++) {
-            // Don't consider non-column expression indexes for this purpose
+            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
             if (constraintList[i].hasExprs()) {
                 continue;
             }
@@ -795,7 +795,7 @@ public class Table extends TableBase implements SchemaObject {
     }
 
     /**
-     * Returns the UNIQUE constraint with the given expression signature.
+     * Returns the UNIQUE constraint with the given expression signature -- a VoltDB extension.
      */
     Constraint getUniqueConstraintForExprs(Expression[] indexExprs) {
         for (int i = 0, size = constraintList.length; i < size; i++) {
@@ -818,6 +818,7 @@ public class Table extends TableBase implements SchemaObject {
         for (int i = 0, size = constraintList.length; i < size; i++) {
             Constraint c    = constraintList[i];
 
+            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
             if (c.hasExprs()) {
                 continue;
             }
@@ -1056,8 +1057,9 @@ public class Table extends TableBase implements SchemaObject {
             }
 
             int[] colarr = ArrayUtil.toAdjustedColumnArray(idx.getColumns(),
-                    colIndex, adjust);
+                colIndex, adjust);
 
+            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
             Expression[] exprArr = idx.getExpressions();
             if (exprArr != null) {
                 idx = tn.createExprIndexStructure(idx.getName(), colarr, adjustExprs(exprArr, colIndex, adjust),
@@ -1118,12 +1120,12 @@ public class Table extends TableBase implements SchemaObject {
         return tn;
     }
 
+    /// Index expressions as exported to VoltDB are "column name based" not "column index based",
+    /// so they are not thrown off by column re-numbering.
+    /// VoltDB is responsible for re-resolving the names to the moved columns (changed column index numbers).
+    /// This stubbed pass-through method is here in case that someday changes in a way that would require
+    /// processing of the expression trees.
     private Expression[] adjustExprs(Expression[] exprArr, int colIndex, int adjust) {
-        // Index expressions as exported to VoltDB are "column name based" not "column index based",
-        // so they are not thrown off by column re-numbering.
-        // VoltDB is responsible for re-resolving the names to the moved columns (changed column index numbers).
-        // This stubbed pass-through method is here in case that someday changes in a way that would require
-        // processing of the expression trees.
         return exprArr;
     }
 
@@ -2534,6 +2536,7 @@ public class Table extends TableBase implements SchemaObject {
     void updateRowSet(Session session, HashMappedList rowSet, int[] cols,
                       boolean isTriggeredSet) {
 
+        // Prevent warning for "unused": boolean         hasLob = false;
         PersistentStore store  = session.sessionData.getRowStore(this);
 
         for (int i = 0; i < rowSet.size(); i++) {

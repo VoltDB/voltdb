@@ -125,7 +125,7 @@ public class IndexAVL implements Index {
     private final Type[]    colTypes;
     private final boolean[] colDesc;
     private final boolean[] nullsLast;
-    private Expression[] exprs;
+    private Expression[]    exprs; // A VoltDB extension to support indexed expressions
     private final int[]     pkCols;
     private final Type[]    pkTypes;
     private final boolean   isUnique;    // DDL uniqueness
@@ -273,7 +273,7 @@ public class IndexAVL implements Index {
     }
 
     /**
-     * Expr Index Constructor declaration
+     * VoltDB-specific Expression Index Constructor supports indexed expressions
      *
      * @param name HsqlName of the index
      * @param id persistnece id
@@ -1677,6 +1677,8 @@ public class IndexAVL implements Index {
         VoltXMLElement index = new VoltXMLElement("index");
 
         index.attributes.put("name", getName().name);
+
+        // Support indexed expressions
         if (exprs != null) {
             VoltXMLElement indexedExprs = new VoltXMLElement("exprs");
             index.children.add(indexedExprs);
@@ -1686,6 +1688,7 @@ public class IndexAVL implements Index {
                 indexedExprs.children.add(xml);
             }
         }
+
         index.attributes.put("columns", getColumnNameList());
         index.attributes.put("unique", isUnique() ? "true" : "false");
 

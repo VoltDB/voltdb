@@ -514,7 +514,7 @@ public class TableWorks {
     }
 
     /**
-     * An extended variant of addIndex that supports indexed generalized non-column expressions.
+     * A VoltDB extended variant of addIndex that supports indexed generalized non-column expressions.
      *
      * @param cols int[]
      * @param indexExprs Expression[]
@@ -618,7 +618,7 @@ public class TableWorks {
     }
 
     /**
-     * An extended variant of addUniqueConstraint that supports indexed generalized non-column expressions.
+     * A VoltDB extended variant of addUniqueConstraint that supports indexed generalized non-column expressions.
      * @param cols
      * @param indexExprs
      * @param name HsqlName
@@ -1215,5 +1215,4 @@ public class TableWorks {
         column.setNullable(true);
         table.setColumnTypeVars(colIndex);
     }
-
 }

@@ -947,6 +947,7 @@ public class StatementSchema extends Statement {
                 HsqlName name;
                 int[]    indexColumns;
                 boolean  unique;
+                // A VoltDB extension to support indexed expressions
                 List<Expression> indexExprs;
 
                 table        = (Table) arguments[0];
@@ -972,7 +973,9 @@ public class StatementSchema extends Statement {
                     TableWorks tableWorks = new TableWorks(session, table);
 
                     if (indexExprs != null) {
+                        // A VoltDB extension to support indexed expressions
                         tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique);
+
                         break;
                     }
 

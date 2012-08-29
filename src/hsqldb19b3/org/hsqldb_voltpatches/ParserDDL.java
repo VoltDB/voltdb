@@ -815,6 +815,7 @@ public class ParserDDL extends ParserRoutine {
                 switch (token.tokenType) {
 
                     case Tokens.PRIMARY : {
+                        // Prevent warning for "unused": boolean cascade = false;
 
                         read();
                         readThis(Tokens.KEY);
@@ -1157,6 +1158,7 @@ public class ParserDDL extends ParserRoutine {
 
     StatementSchema readTableAsSubqueryDefinition(Table table) {
 
+        // Prevent warning for "unused": HsqlName   readName    = null;
         boolean    withData    = true;
         HsqlName[] columnNames = null;
         Statement  statement   = null;
@@ -1271,6 +1273,7 @@ public class ParserDDL extends ParserRoutine {
                     c.setColumnsIndexes(table);
 
                     if (c.indexExprs != null) {
+                        // Special case handling for VoltDB indexed expressions
                         if (table.getUniqueConstraintForExprs(c.indexExprs) != null) {
                             throw Error.error(ErrorCode.X_42522);
                         }
@@ -1286,6 +1289,7 @@ public class ParserDDL extends ParserRoutine {
 
                     Index index = null;
                     if (c.indexExprs != null) {
+                        // Special case handling for VoltDB indexed expressions
                         index = table.createAndAddExprIndexStructure(indexName, c.core.mainCols, c.indexExprs, true, true);
                     } else {
                         index = table.createAndAddIndexStructure(indexName,
@@ -2410,6 +2414,7 @@ public class ParserDDL extends ParserRoutine {
         boolean        isIdentity     = false;
         boolean        isPKIdentity   = false;
         boolean        identityAlways = false;
+        // Prevent warning for "unused": Expression     generateExpr   = null;
         boolean        isNullable     = true;
         Expression     defaultExpr    = null;
         Type           typeObject;
@@ -2465,7 +2470,7 @@ public class ParserDDL extends ParserRoutine {
             } else if (token.tokenType == Tokens.OPENBRACKET) {
                 read();
 
-                /* generateExpr = Discarding result? */ XreadValueExpression();
+                /* Discarding rather than getting warned for "unused" generateExpr = */ XreadValueExpression();
 
                 readThis(Tokens.CLOSEBRACKET);
             }
@@ -2689,6 +2694,7 @@ public class ParserDDL extends ParserRoutine {
 
                 read();
 
+                // A VoltDB extension to "readColumnNames(false)" to support indexed expressions.
                 List<Expression> indexExprs = XreadExpressions(null);
                 OrderedHashSet set = getSimpleColumnNames(indexExprs);
 
@@ -2699,7 +2705,8 @@ public class ParserDDL extends ParserRoutine {
                 }
 
                 if ((indexExprs != null) && (set == null)) {
-                    // not all expressions are simple columns.
+                    // A VoltDB extension to support indexed expressions.
+                    // Not all expressions are simple columns.
                     set = getBaseColumnNames(indexExprs);
                     Constraint exprc = new Constraint(constName, set, indexExprs.toArray(new Expression[indexExprs.size()]));
                     constraintList.add(exprc);
@@ -2971,13 +2978,16 @@ public class ParserDDL extends ParserRoutine {
         indexHsqlName.schema = table.getSchemaName();
 
         List<Boolean> ascDesc = new ArrayList<Boolean>();
+        // A VoltDB extension to "readColumnList(table, true)" to support indexed expressions.
         List<Expression> indexExprs = XreadExpressions(ascDesc);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
         int[] indexColumns = null;
 
         if (set == null) {
-            // Not just indexing columns -- need extended support for generalized index expressions.
-            // The meaning of set and indexColumns shifts here to be the set of unique base columns for the indexed expressions.
+            // A VoltDB extension to support indexed expressions.
+            // Not just indexing columns.
+            // The meaning of set and indexColumns shifts here to be 
+            // the set of unique base columns for the indexed expressions.
             set = getBaseColumnNames(indexExprs);
         } else {
             // Just indexing columns -- by-pass extended support for generalized index expressions.
@@ -2995,6 +3005,8 @@ public class ParserDDL extends ParserRoutine {
                                    null, table.getName());
     }
 
+    /// A VoltDB extension to the parsing behavior of the "readColumnList/readColumnNames" functions,
+    /// adding support for indexed expressions.
     private List<Expression> XreadExpressions(List<Boolean> ascDesc) {
         readThis(Tokens.OPENBRACKET);
 
@@ -3004,6 +3016,9 @@ public class ParserDDL extends ParserRoutine {
             Expression expression = XreadValueExpression();
             indexExprs.add(expression);
 
+            // A VoltDB extension to the "readColumnList(table, true)" support for descending-value indexes,
+            // that similarly parses the asc/desc indicators but COLLECTS them so they can be ignored later,
+            // rather than ignoring them on the spot.
             if (ascDesc != null) {
                 Boolean is_asc = Boolean.TRUE;
                 if (token.tokenType == Tokens.ASC
@@ -3027,6 +3042,7 @@ public class ParserDDL extends ParserRoutine {
     }
 
     /// Collect the names of the columns being indexed, or null if indexing anything more general than columns.
+    /// This adapts XreadExpressions output to the format originally produced by readColumnNames
     private OrderedHashSet getSimpleColumnNames(List<Expression> indexExprs) {
         OrderedHashSet set = new OrderedHashSet();
 
@@ -3062,6 +3078,7 @@ public class ParserDDL extends ParserRoutine {
     }
 
     /// Collect the column indexes of the unique columns underlying a list of indexed expressions.
+    /// This adapts XreadExpressions/getSimpleColumnNames output to the format originally produced by readColumnList.
     private int[] getColumnList(OrderedHashSet set, Table table) {
         if (set == null) {
             return null;
@@ -3411,6 +3428,7 @@ public class ParserDDL extends ParserRoutine {
                     SchemaObject.CONSTRAINT);
         }
 
+        // A VoltDB extension to "readColumnList(table, false)" to support indexed expressions.
         List<Expression> indexExprs = XreadExpressions(null);
         OrderedHashSet set = getSimpleColumnNames(indexExprs);
         int[] cols = getColumnList(set, table);
@@ -3420,9 +3438,14 @@ public class ParserDDL extends ParserRoutine {
         TableWorks tableWorks = new TableWorks(session, table);
 
         if ((indexExprs != null) && (cols == null)) {
+            // A VoltDB extension to support indexed expressions.
+            // Not just indexing columns.
+            // The meaning of cols shifts here to be 
+            // the set of unique base columns for the indexed expressions.
             set = getBaseColumnNames(indexExprs);
             cols = getColumnList(set, table);
             tableWorks.addUniqueExprConstraint(cols, indexExprs.toArray(new Expression[indexExprs.size()]), name);
+
             return;
         }
 
@@ -3916,11 +3939,11 @@ public class ParserDDL extends ParserRoutine {
             ColumnSchema column) {
 
         HsqlName writeName  = null;
-        /*Type     typeObject = Discard result?*/ readTypeDefinition(false);
+        /* Discarding rather than getting warned for "unused": Type     typeObject = */ readTypeDefinition(false);
         String   sql        = getLastPart();
-        // Object[] args       = new Object[] {
-        //     table, column, typeObject
-        // };
+        // Prevent warning for "unused": Object[] args       = new Object[] {
+        // Prevent warning for "unused":     table, column, typeObject
+        // Prevent warning for "unused": };
 
         if (!table.isTemp()) {
             writeName = table.getName();

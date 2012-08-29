@@ -1949,7 +1949,7 @@ public class FunctionSQL extends Expression {
      * @throws HSQLParseException
      */
     @Override
-    public VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         // XXX Should this throw HSQLParseException instead?
         assert(getType() == OpTypes.SQL_FUNCTION);

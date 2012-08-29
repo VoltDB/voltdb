@@ -296,7 +296,7 @@ public class ExpressionAggregate extends Expression {
      * @throws HSQLParseException
      */
     @Override
-    public VoltXMLElement voltGetXML(Session session) throws HSQLParseException
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
         switch (opType) {

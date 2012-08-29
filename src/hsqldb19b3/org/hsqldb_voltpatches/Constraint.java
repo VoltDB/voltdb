@@ -134,7 +134,7 @@ public final class Constraint implements SchemaObject {
     OrderedHashSet mainColSet;
     OrderedHashSet refColSet;
     // Is this for temp constraints only? What's a temp constraint?
-    Expression[] indexExprs;
+    Expression[] indexExprs; // A VoltDB extension to support indexed expressions
 
     //
     final public static Constraint[] emptyArray = new Constraint[]{};
@@ -218,11 +218,9 @@ public final class Constraint implements SchemaObject {
         mainColSet = mainCols;
     }
 
+    // A VoltDB extension to support indexed expressions
     public Constraint(HsqlName name, OrderedHashSet baseCols, Expression[] exprs) {
-        core       = new ConstraintCore();
-        this.name  = name;
-        constType  = Constraint.UNIQUE;
-        mainColSet = baseCols;
+        this(name, baseCols, Constraint.UNIQUE);
         indexExprs = exprs;
     }
 
@@ -336,6 +334,7 @@ public final class Constraint implements SchemaObject {
 
                 sb.append(Tokens.T_UNIQUE);
 
+                // A VoltDB extension to support indexed expressions
                 if (indexExprs != null) {
                     return getExprList(sb);
                 }
@@ -1104,6 +1103,7 @@ public final class Constraint implements SchemaObject {
         return constraint;
     }
 
+    // A VoltDB extension to support indexed expressions
     public boolean isUniqueWithExprs(Expression[] indexExprs2) {
         if (constType != UNIQUE || ! indexExprs.equals(indexExprs2)) {
             return false;
@@ -1111,11 +1111,13 @@ public final class Constraint implements SchemaObject {
         return true;
     }
 
+    // A VoltDB extension to support indexed expressions
     // Is this for temp constraints only? What's a temp constraint?
     public boolean hasExprs() {
         return indexExprs != null;
     }
 
+    // A VoltDB extension to support indexed expressions
     public String getExprList(StringBuffer sb) {
         String sep = "";
         for(Expression ex : indexExprs) {

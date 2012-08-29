@@ -206,7 +206,7 @@ public class FunctionForVoltDB extends FunctionSQL {
     }
 
     @Override
-    public VoltXMLElement voltGetXML(Session session) throws HSQLParseException {
+    VoltXMLElement voltGetXML(Session session) throws HSQLParseException {
         VoltXMLElement exp = super.voltGetXML(session);
         exp.attributes.put("volt_alias", m_def.getName());
         return exp;

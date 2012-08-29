@@ -1351,6 +1351,7 @@ public class Expression {
                                          Expression.emptyExpressionSet);
     }
 
+    // A VoltDB extension to support indexed expressions
     public void collectAllColumnExpressions(HsqlList set) {
 
         Expression.collectAllExpressions(set, this,
@@ -1546,6 +1547,7 @@ public class Expression {
         return cached_id;
     }
 
+    // A VoltDB extension to support indexed expressions
     public VoltXMLElement voltGetExpressionXML(Session session, Table table) throws HSQLParseException {
         // TODO Auto-generated method stub
         resolveTableColumns(table);
@@ -1554,6 +1556,7 @@ public class Expression {
         return voltGetXML(session);
     }
 
+    // A VoltDB extension to support indexed expressions
     private void resolveTableColumns(Table table) {
         HsqlList set = new HsqlArrayList();
         collectAllColumnExpressions(set);
