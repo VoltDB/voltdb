@@ -1706,11 +1706,6 @@ public class ExpressionLogical extends Expression {
     {
         String element = null;
         switch (opType) {
-        case OpTypes.LIMIT:             element = "limit"; break;
-        case OpTypes.ADD:               element = "add"; break;
-        case OpTypes.SUBTRACT:          element = "subtract"; break;
-        case OpTypes.MULTIPLY:          element = "multiply"; break;
-        case OpTypes.DIVIDE:            element = "divide"; break;
         case OpTypes.EQUAL:             element = "equal"; break;
         case OpTypes.NOT_EQUAL:         element = "notequal"; break;
         case OpTypes.GREATER:           element = "greaterthan"; break;
@@ -1720,16 +1715,27 @@ public class ExpressionLogical extends Expression {
         case OpTypes.AND:               element = "and"; break;
         case OpTypes.OR:                element = "or"; break;
         case OpTypes.IN:                element = "in"; break;
-        case OpTypes.COUNT:             element = "count"; break;
-        case OpTypes.SUM:               element = "sum"; break;
-        case OpTypes.MIN:               element = "min"; break;
-        case OpTypes.MAX:               element = "max"; break;
-        case OpTypes.AVG:               element = "avg"; break;
-        case OpTypes.SQL_FUNCTION:      element = "function"; break;
         case OpTypes.IS_NULL:           element = "is_null"; break;
         case OpTypes.NOT:               element = "not"; break;
+        // LIKE occurs in ExpressionLike which inherits this method from ExpressionLogical.
         case OpTypes.LIKE:              element = "like"; break;
-        // Handle some of the unsupported OpTypes with slightly more informative messages.
+        //TODO: Enable these as they are supported in VoltDB.
+        // They appear to be a complete set as supported by the other methods in this module.
+        case OpTypes.ALL_QUANTIFIED :
+        case OpTypes.ANY_QUANTIFIED :
+        case OpTypes.EXISTS :
+        case OpTypes.MATCH_FULL :
+        case OpTypes.MATCH_PARTIAL :
+        case OpTypes.MATCH_SIMPLE :
+        case OpTypes.MATCH_UNIQUE_FULL :
+        case OpTypes.MATCH_UNIQUE_PARTIAL :
+        case OpTypes.MATCH_UNIQUE_SIMPLE :
+        case OpTypes.NEGATE :
+        case OpTypes.NOT_DISTINCT :
+        case OpTypes.OVERLAPS :
+        case OpTypes.SIMPLE_COLUMN :
+        case OpTypes.UNIQUE :
+        case OpTypes.VALUE :
         default:
             throw new HSQLParseException("Unsupported Logical Operation: #" +
                                          String.valueOf(opType));

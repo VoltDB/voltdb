@@ -300,29 +300,22 @@ public class ExpressionAggregate extends Expression {
     {
         String element = null;
         switch (opType) {
-        case OpTypes.LIMIT:             element = "limit"; break;
-        case OpTypes.ADD:               element = "add"; break;
-        case OpTypes.SUBTRACT:          element = "subtract"; break;
-        case OpTypes.MULTIPLY:          element = "multiply"; break;
-        case OpTypes.DIVIDE:            element = "divide"; break;
-        case OpTypes.EQUAL:             element = "equal"; break;
-        case OpTypes.NOT_EQUAL:         element = "notequal"; break;
-        case OpTypes.GREATER:           element = "greaterthan"; break;
-        case OpTypes.GREATER_EQUAL:     element = "greaterthanorequalto"; break;
-        case OpTypes.SMALLER:           element = "lessthan"; break;
-        case OpTypes.SMALLER_EQUAL:     element = "lessthanorequalto"; break;
-        case OpTypes.AND:               element = "and"; break;
-        case OpTypes.OR:                element = "or"; break;
-        case OpTypes.IN:                element = "in"; break;
+        // Last minute simple column substitutions can blast a new opType into Expressions of any class
+        // as an optimization for duplicated expressions, so just go with it.
+        case OpTypes.SIMPLE_COLUMN:     element = "simplecolumn"; break;
+
         case OpTypes.COUNT:             element = "count"; break;
         case OpTypes.SUM:               element = "sum"; break;
         case OpTypes.MIN:               element = "min"; break;
         case OpTypes.MAX:               element = "max"; break;
         case OpTypes.AVG:               element = "avg"; break;
-        case OpTypes.SQL_FUNCTION:      element = "function"; break;
-        case OpTypes.SIMPLE_COLUMN:     element = "simplecolumn"; break;
-        case OpTypes.IS_NULL:           element = "is_null"; break;
-        case OpTypes.NOT:               element = "not"; break;
+        //TODO: enable these when VoltDB supports them -- EVERY and SOME would probably be the next lowest-hanging fruit
+        case OpTypes.EVERY :
+        case OpTypes.SOME :
+        case OpTypes.STDDEV_POP :
+        case OpTypes.STDDEV_SAMP :
+        case OpTypes.VAR_POP :
+        case OpTypes.VAR_SAMP :
         default:
             throw new HSQLParseException("Unsupported Aggregate Operation: " +
                                          String.valueOf(opType));
@@ -338,6 +331,8 @@ public class ExpressionAggregate extends Expression {
         if (this.isDistinctAggregate) {
             exp.attributes.put("distinct", "true");
         }
+        // Aggregates operate on one value (per input row) or no value in the case of COUNT(*).
+        assert(nodes.length <= 1);
         for (Expression expr : nodes) {
             VoltXMLElement vxmle = expr.voltGetXML(session);
             exp.children.add(vxmle);

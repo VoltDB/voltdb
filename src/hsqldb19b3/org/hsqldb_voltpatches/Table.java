@@ -282,6 +282,7 @@ public class Table extends TableBase implements SchemaObject {
                                          this, true);
     }
 
+    @Override
     public int getType() {
         return SchemaObject.TABLE;
     }
@@ -289,6 +290,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      *  Returns the HsqlName object fo the table
      */
+    @Override
     public final HsqlName getName() {
         return tableName;
     }
@@ -296,6 +298,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the catalog name or null, depending on a database property.
      */
+    @Override
     public HsqlName getCatalogName() {
         return database.getCatalogName();
     }
@@ -303,14 +306,17 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Returns the schema name.
      */
+    @Override
     public HsqlName getSchemaName() {
         return tableName.schema;
     }
 
+    @Override
     public Grantee getOwner() {
         return tableName.schema.owner;
     }
 
+    @Override
     public OrderedHashSet getReferences() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -326,6 +332,7 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
+    @Override
     public OrderedHashSet getComponents() {
 
         OrderedHashSet set = new OrderedHashSet();
@@ -342,6 +349,7 @@ public class Table extends TableBase implements SchemaObject {
         return set;
     }
 
+    @Override
     public void compile(Session session) {}
 
     String[] getSQL(OrderedHashSet resolved, OrderedHashSet unresolved) {
@@ -417,6 +425,7 @@ public class Table extends TableBase implements SchemaObject {
         return array;
     }
 
+    @Override
     public String getSQL() {
 
         StringBuffer sb = new StringBuffer();
@@ -527,6 +536,7 @@ public class Table extends TableBase implements SchemaObject {
     /**
      * Used to create row id's
      */
+    @Override
     public int getId() {
         return tableName.hashCode();
     }
@@ -737,6 +747,10 @@ public class Table extends TableBase implements SchemaObject {
     void getConstraintPath(int[] columnMap, OrderedHashSet list) {
 
         for (int i = 0; i < constraintList.length; i++) {
+            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
+            if (constraintList[i].hasExprs()) {
+                continue;
+            }
             if (constraintList[i].hasTriggeredAction()) {
                 int[] mainColumns = constraintList[i].getMainColumns();
 
@@ -781,6 +795,20 @@ public class Table extends TableBase implements SchemaObject {
     }
 
     /**
+     * Returns the UNIQUE constraint with the given expression signature -- a VoltDB extension.
+     */
+    Constraint getUniqueConstraintForExprs(Expression[] indexExprs) {
+        for (int i = 0, size = constraintList.length; i < size; i++) {
+            Constraint exprc = constraintList[i];
+
+            if (exprc.isUniqueWithExprs(indexExprs)) {
+                return exprc;
+            }
+        }
+        return null;
+    }
+
+    /**
      * Returns the UNIQUE or PK constraint with the given column signature.
      * Modifies the composition of refTableCols if necessary.
      */
@@ -789,6 +817,12 @@ public class Table extends TableBase implements SchemaObject {
 
         for (int i = 0, size = constraintList.length; i < size; i++) {
             Constraint c    = constraintList[i];
+
+            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
+            if (c.hasExprs()) {
+                continue;
+            }
+
             int        type = c.getConstraintType();
 
             if (type != Constraint.UNIQUE && type != Constraint.PRIMARY_KEY) {
@@ -1025,6 +1059,15 @@ public class Table extends TableBase implements SchemaObject {
             int[] colarr = ArrayUtil.toAdjustedColumnArray(idx.getColumns(),
                 colIndex, adjust);
 
+            // A VoltDB extension -- Don't consider non-column expression indexes for this purpose
+            Expression[] exprArr = idx.getExpressions();
+            if (exprArr != null) {
+                idx = tn.createExprIndexStructure(idx.getName(), colarr, adjustExprs(exprArr, colIndex, adjust),
+                                                  idx.isUnique(), idx.isConstraint());
+                tn.addIndex(idx);
+                continue;
+            }
+
             idx = tn.createIndexStructure(idx.getName(), colarr,
                                           idx.getColumnDesc(), null,
                                           idx.isUnique(), idx.isConstraint(),
@@ -1075,6 +1118,15 @@ public class Table extends TableBase implements SchemaObject {
         tn.triggerLists = triggerLists;
 
         return tn;
+    }
+
+    /// Index expressions as exported to VoltDB are "column name based" not "column index based",
+    /// so they are not thrown off by column re-numbering.
+    /// VoltDB is responsible for re-resolving the names to the moved columns (changed column index numbers).
+    /// This stubbed pass-through method is here in case that someday changes in a way that would require
+    /// processing of the expression trees.
+    private Expression[] adjustExprs(Expression[] exprArr, int colIndex, int adjust) {
+        return exprArr;
     }
 
     /**
@@ -2484,7 +2536,7 @@ public class Table extends TableBase implements SchemaObject {
     void updateRowSet(Session session, HashMappedList rowSet, int[] cols,
                       boolean isTriggeredSet) {
 
-        boolean         hasLob = false;
+        // Prevent warning for "unused": boolean         hasLob = false;
         PersistentStore store  = session.sessionData.getRowStore(this);
 
         for (int i = 0; i < rowSet.size(); i++) {
@@ -2578,6 +2630,7 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    @Override
     public void clearAllData(Session session) {
 
         super.clearAllData(session);
@@ -2587,6 +2640,7 @@ public class Table extends TableBase implements SchemaObject {
         }
     }
 
+    @Override
     public void clearAllData(PersistentStore store) {
 
         super.clearAllData(store);

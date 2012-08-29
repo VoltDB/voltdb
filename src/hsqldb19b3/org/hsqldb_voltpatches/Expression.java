@@ -1351,6 +1351,14 @@ public class Expression {
                                          Expression.emptyExpressionSet);
     }
 
+    // A VoltDB extension to support indexed expressions
+    public void collectAllColumnExpressions(HsqlList set) {
+
+        Expression.collectAllExpressions(set, this,
+                                         Expression.columnExpressionSet,
+                                         Expression.emptyExpressionSet);
+    }
+
     /**
      * collect all extrassions of a set of expression types appearing anywhere
      * in a select statement and its subselects, etc.
@@ -1537,5 +1545,26 @@ public class Expression {
         long id = session.getNodeIdForExpression(hashCode);
         cached_id = Long.toString(id);
         return cached_id;
+    }
+
+    // A VoltDB extension to support indexed expressions
+    public VoltXMLElement voltGetExpressionXML(Session session, Table table) throws HSQLParseException {
+        // TODO Auto-generated method stub
+        resolveTableColumns(table);
+        Expression parent = null; // As far as I can tell, this argument just gets passed around but never used !?
+        resolveTypes(session, parent);
+        return voltGetXML(session);
+    }
+
+    // A VoltDB extension to support indexed expressions
+    private void resolveTableColumns(Table table) {
+        HsqlList set = new HsqlArrayList();
+        collectAllColumnExpressions(set);
+        for (int i = 0; i < set.size(); i++) {
+            ExpressionColumn array_element = (ExpressionColumn)set.get(i);
+            ColumnSchema column = table.getColumn(table.getColumnIndex(array_element.getAlias()));
+            array_element.setAttributesAsColumn(column, false);
+
+        }
     }
 }
