@@ -40,9 +40,9 @@ from Query import VoltQueryClient
 from SQLCoverageReport import generate_summary
 from SQLGenerator import SQLGenerator
 from xml.etree import ElementTree
-from xml.dom import minidom
-from xml.etree.ElementTree import Element, SubElement, Comment, tostring
+from xml.etree.ElementTree import Element, SubElement
 from subprocess import call # invoke unix/linux cmds
+from XMLUtils import prettify # To create a human readable xml file
 
 class Config:
     def __init__(self, filename):
@@ -57,13 +57,6 @@ class Config:
 
     def get_config(self, config_name):
         return self.__config[config_name]
-
-def prettify(elem):
-    """Return a pretty-printed XML string for the Element.
-    """
-    rough_string = ElementTree.tostring(elem, 'utf-8')
-    reparsed = minidom.parseString(rough_string)
-    return reparsed.toprettyxml(indent="  ")
 
 def run_once(name, command, statements_path, results_path, testConfigKit):
 
@@ -299,6 +292,7 @@ def create_deploymentFile(options):
         deploymentFile = None
     return deploymentFile
 
+# To store all necessary test config info in a dictionary variable
 def create_testConfigKits(options, basedir):
     testConfigKits = {}
 
@@ -456,6 +450,12 @@ if __name__ == "__main__":
     defaultHost = "localhost"
     defaultPort = 21212
     if(options.hostname != None and options.hostname != defaultHost):
+        # To set a dictionary with following 5 keys:
+        # testConfigKits["voltcompiler"]
+        # testConfigKits["flushCatalog"]
+        # testConfigKits["deploymentFile"]
+        # testConfigKits["hostname"]
+        # testConfigKits["hostport"]
         testConfigKits = create_testConfigKits(options, basedir)
 
     success = True
@@ -468,6 +468,7 @@ if __name__ == "__main__":
             testDDL = basedir + "/" + config['ddl']
             testProjectFile = create_projectFile(testDDL, 'test')
             testCatalog = create_catalogFile(testConfigKits['voltcompiler'], testProjectFile, 'test')
+            # To add one more key
             testConfigKits["testCatalog"] = testCatalog
         result = run_config(config, basedir, report_dir, seed, options.report_all, \
                             options.generate_only, args, testConfigKits)
