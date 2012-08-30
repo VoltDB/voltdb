@@ -1128,8 +1128,6 @@ public class Expression {
     void insertValuesIntoSubqueryTable(Session session,
                                        PersistentStore store) {
 
-        TableDerived table = subQuery.getTable();
-
         for (int i = 0; i < nodes.length; i++) {
             Object[] data = nodes[i].getRowValue(session);
 
@@ -1479,8 +1477,13 @@ public class Expression {
             assert(asterisk != null);
         }
         // catch unexpected types
-        // XXX Should this throw HSQLParseException instead?
         else {
+            switch( getType()) {
+            case OpTypes.ROW_SUBQUERY:
+            case OpTypes.SCALAR_SUBQUERY:
+            case OpTypes.TABLE_SUBQUERY:
+                throw new HSQLParseException("VoltDB does not yet support subqueries, consider using views instead");
+            }
             System.err.println("UNSUPPORTED EXPR TYPE: " + String.valueOf(getType()));
             VoltXMLElement unknown = new VoltXMLElement("unknown");
             exp.children.add(unknown);

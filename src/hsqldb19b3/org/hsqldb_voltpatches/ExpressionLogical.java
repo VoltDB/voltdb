@@ -1705,6 +1705,7 @@ public class ExpressionLogical extends Expression {
     VoltXMLElement voltGetXML(Session session) throws HSQLParseException
     {
         String element = null;
+        boolean unsupported = false;
         switch (opType) {
         case OpTypes.EQUAL:             element = "equal"; break;
         case OpTypes.NOT_EQUAL:         element = "notequal"; break;
@@ -1719,26 +1720,32 @@ public class ExpressionLogical extends Expression {
         case OpTypes.NOT:               element = "not"; break;
         // LIKE occurs in ExpressionLike which inherits this method from ExpressionLogical.
         case OpTypes.LIKE:              element = "like"; break;
+        case OpTypes.EXISTS:
+            throw new HSQLParseException("VoltDB does not yet support EXISTS clause, consider using views instead");
         //TODO: Enable these as they are supported in VoltDB.
         // They appear to be a complete set as supported by the other methods in this module.
-        case OpTypes.ALL_QUANTIFIED :
-        case OpTypes.ANY_QUANTIFIED :
-        case OpTypes.EXISTS :
-        case OpTypes.MATCH_FULL :
-        case OpTypes.MATCH_PARTIAL :
-        case OpTypes.MATCH_SIMPLE :
-        case OpTypes.MATCH_UNIQUE_FULL :
-        case OpTypes.MATCH_UNIQUE_PARTIAL :
-        case OpTypes.MATCH_UNIQUE_SIMPLE :
-        case OpTypes.NEGATE :
-        case OpTypes.NOT_DISTINCT :
-        case OpTypes.OVERLAPS :
-        case OpTypes.SIMPLE_COLUMN :
-        case OpTypes.UNIQUE :
-        case OpTypes.VALUE :
+        case OpTypes.ALL_QUANTIFIED : unsupported = true; element = "allquantified"; break;
+        case OpTypes.ANY_QUANTIFIED : unsupported = true; element = "anyquantified"; break;
+        case OpTypes.MATCH_FULL : unsupported = true; element = "matchfull"; break;
+        case OpTypes.MATCH_PARTIAL : unsupported = true; element = "matchpartial"; break;
+        case OpTypes.MATCH_SIMPLE : unsupported = true; element = "matchsimple"; break;
+        case OpTypes.MATCH_UNIQUE_FULL : unsupported = true; element = "matchuniquefull"; break;
+        case OpTypes.MATCH_UNIQUE_PARTIAL : unsupported = true; element = "matchuniquepartial"; break;
+        case OpTypes.MATCH_UNIQUE_SIMPLE : unsupported = true; element = "matchuniquesimple"; break;
+        case OpTypes.NEGATE : unsupported = true; element = "negate"; break;
+        case OpTypes.NOT_DISTINCT : unsupported = true; element = "notdistinct"; break;
+        case OpTypes.OVERLAPS : unsupported = true; element = "overlaps"; break;
+        case OpTypes.SIMPLE_COLUMN : unsupported = true; element = "simplecolumn"; break;
+        case OpTypes.UNIQUE : unsupported = true; element = "unique"; break;
+        case OpTypes.VALUE : unsupported = true; element = "value"; break;
+
+        // Handle some of the unsupported OpTypes with slightly more informative messages.
         default:
             throw new HSQLParseException("Unsupported Logical Operation: #" +
                                          String.valueOf(opType));
+        }
+        if( unsupported) {
+            throw new HSQLParseException(element + " logical operator is not supported");
         }
 
         VoltXMLElement exp = new VoltXMLElement("operation");
