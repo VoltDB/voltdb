@@ -1537,6 +1537,9 @@ public class Tokens {
     public static final int X_MALFORMED_COMMENT        = 737;
     public static final int X_MALFORMED_IDENTIFIER     = 738;
     public static final int X_MALFORMED_UNICODE_ESCAPE = 739;
+    
+    //
+    public static final int DECODE                     = 740;     
 
     //
     public static final int X_UNKNOWN_TOKEN = -1;
@@ -2116,6 +2119,7 @@ public class Tokens {
         commandSet.put(T_QUESTION, Tokens.QUESTION);
         commandSet.put(T_OPENBRACKET, OPENBRACKET);
         commandSet.put(T_CLOSEBRACKET, CLOSEBRACKET);
+        commandSet.put(T_DECODE, DECODE);
     }
 
     static int get(String token) {
