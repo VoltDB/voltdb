@@ -474,9 +474,10 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_CHAR :
             case FUNC_HEXTORAW :
             case FUNC_RAWTOHEX :
-            case FUNC_SPACE :
                 parseList = singleParamList;
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
+            case FUNC_SPACE :
+                parseList = singleParamList;
                 break;
 
             case FUNC_ROUND :

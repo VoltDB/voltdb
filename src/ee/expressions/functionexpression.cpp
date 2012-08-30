@@ -227,6 +227,8 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new UnaryFunctionExpression<FUNC_OCTET_LENGTH>((*arguments)[0]);
         } else if (functionId == FUNC_CHAR_LENGTH) {
             ret = new UnaryFunctionExpression<FUNC_CHAR_LENGTH>((*arguments)[0]);
+        } else if (functionId == FUNC_SPACE) {
+            ret = new UnaryFunctionExpression<FUNC_SPACE>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_YEAR) {
             ret = new UnaryFunctionExpression<FUNC_EXTRACT_YEAR>((*arguments)[0]);
         } else if (functionId == FUNC_EXTRACT_MONTH) {

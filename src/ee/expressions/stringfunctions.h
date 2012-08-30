@@ -62,6 +62,15 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     return getIntegerValue(getCharLength(valueChars, getObjectLength()));
 }
 
+/** implement the 1-argument SQL SPACE function */
+template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
+    if (isNull())
+        return getNullStringValue();
+
+    int32_t count = static_cast<int32_t>(castAsBigIntAndGetValue());
+    return getTempStringValue("",count);
+}
+
 /** implement the 2-argument SQL FUNC_POSITION_CHAR function */
 template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
