@@ -38,7 +38,7 @@ import org.voltdb_testprocs.regressionsuites.fixedsql.Insert;
  * Tests for SQL that was recently (early 2012) unsupported.
  */
 
-public class Test3019Suite extends RegressionSuite {
+public class Test3283Suite extends RegressionSuite {
 
     /**
      * Inner class procedure to see if we can invoke it.
@@ -80,86 +80,86 @@ public class Test3019Suite extends RegressionSuite {
             //client.callProcedure(callback, "P1.insert", - id, "贾"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             //client.drain();
         }
-        client.callProcedure(callback, "P1.insert", 1, "贾鑫", " NB",10);
+        client.callProcedure(callback, "P1.insert", 1, "贾鑫V", " NB",10);
         client.callProcedure(callback, "P1.insert", 2, "Xin", " @Volt", 10);
         ClientResponse cr = null;
         VoltTable r = null;
 
-      cr = client.callProcedure("RIGHT", 0, 1);
-      assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-      r = cr.getResults()[0];
-      System.err.println("[RIGHT- 0] result:\n" + r);
+        cr = client.callProcedure("RIGHT", 0, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[RIGHT- 0] result:\n" + r);
 
-      cr = client.callProcedure("RIGHT", 1, 1);
-      assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-      r = cr.getResults()[0];
-      System.err.println("[RIGHT- 1] result:\n" + r);
+        cr = client.callProcedure("RIGHT", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[RIGHT- 1] result:\n" + r);
 
-      cr = client.callProcedure("RIGHT", 2, 1);
-      assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-      r = cr.getResults()[0];
-      System.err.println("[RIGHT- 2] result:\n" + r);
+        cr = client.callProcedure("RIGHT", 2, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[RIGHT- 2] result:\n" + r);
 
-      cr = client.callProcedure("RIGHT", 3, 1);
-      assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-      r = cr.getResults()[0];
-      System.err.println("[RIGHT- 3] result:\n" + r);
+        cr = client.callProcedure("RIGHT", 3, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[RIGHT- 3] result:\n" + r);
 
-//        cr = client.callProcedure("LEFT", -10,1);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT- -1] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 0,1);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-0] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 1,1);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-1] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 2,1);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-2] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 3,1);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-3] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 4,1);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-4] result:\n" + r);
-//
-//
-//        cr = client.callProcedure("LEFT", 0,2);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-0] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 1,2);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-1] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 2,2);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-2] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 3,2);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-3] result:\n" + r);
-//
-//        cr = client.callProcedure("LEFT", 4,2);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[LEFT-4] result:\n" + r);
+        cr = client.callProcedure("LEFT", -10,1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT- -1] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 0,1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-0] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 1,1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-1] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 2,1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-2] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 3,1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-3] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 4,1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-4] result:\n" + r);
+
+
+        cr = client.callProcedure("LEFT", 0,2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-0] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 1,2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-1] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 2,2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-2] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 3,2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-3] result:\n" + r);
+
+        cr = client.callProcedure("LEFT", 4,2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[LEFT-4] result:\n" + r);
 
     }
 
@@ -167,7 +167,7 @@ public class Test3019Suite extends RegressionSuite {
     //
     // JUnit / RegressionSuite boilerplate
     //
-    public Test3019Suite(String name) {
+    public Test3283Suite(String name) {
         super(name);
     }
 
@@ -175,7 +175,7 @@ public class Test3019Suite extends RegressionSuite {
 
         VoltServerConfig config = null;
         MultiConfigSuiteBuilder builder =
-            new MultiConfigSuiteBuilder(Test3019Suite.class);
+            new MultiConfigSuiteBuilder(Test3283Suite.class);
         boolean success;
 
         VoltProjectBuilder project = new VoltProjectBuilder();

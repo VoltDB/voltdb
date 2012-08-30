@@ -28,7 +28,7 @@ static inline int32_t getCharLength(const char *valueChars, const size_t length)
     return j;
 }
 
-// Return the char * place of the ith char.
+// Return the beginning char * place of the ith char.
 // Return the end char* when ith is larger than it has, NULL if ith is less and equal to zero.
 static inline const char* getIthCharPosition(const char *valueChars, const size_t length, const int32_t ith) {
     // very efficient code to count characters in UTF string and ASCII string
@@ -112,15 +112,13 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
 
     const int32_t valueUTF8Length = strValue.getObjectLength();
     char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
-    const char *valueEnd = valueChars+valueUTF8Length;
     int32_t count = static_cast<int32_t> (std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(0L)));
     if (count == 0)
         return getNullStringValue();
-    UTF8Iterator iter(valueChars, valueEnd);
-    const char* startChar = iter.skipCodePoints(0);
-    //printf("count: %d, objectlength: %d\n", count, valueUTF8Length);
 
-    return getTempStringValue(startChar,(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - startChar));
+    printf("LEFT count: %d, objectlength: %d\n", count, valueUTF8Length);
+    printf("LEFT: from start %d bytes\n",(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - valueChars));
+    return getTempStringValue(valueChars,(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - valueChars));
 }
 
 /** implement the 2-argument SQL RIGHT function */
@@ -145,14 +143,15 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
     int32_t count = static_cast<int32_t> (std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(0L)));
     if (count == 0)
         return getNullStringValue();
-    UTF8Iterator iter(valueChars, valueEnd);
-    const char* startChar = iter.skipCodePoints(0);
     int32_t charLen = getCharLength(valueChars,valueUTF8Length);
     if (count >= charLen)
-        return getTempStringValue(startChar,(int32_t)(valueEnd - startChar));
+        return getTempStringValue(valueChars,(int32_t)(valueEnd - valueChars));
 
-    startChar = iter.skipCodePoints((int32_t)(getIthCharPosition(valueChars,valueUTF8Length,charLen-count+1) - startChar));
-    return getTempStringValue(startChar,(int32_t)(valueEnd - startChar));
+    printf("Count start: %d, charLen: %d\n", count, charLen);
+    const char* newStartChar = getIthCharPosition(valueChars,valueUTF8Length,charLen-count+1);
+
+    printf("Right: from start %d bytes\n", (int32_t)(valueEnd - newStartChar));
+    return getTempStringValue(newStartChar,(int32_t)(valueEnd - newStartChar));
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
