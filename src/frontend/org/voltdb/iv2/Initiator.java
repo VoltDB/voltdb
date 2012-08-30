@@ -18,7 +18,6 @@
 package org.voltdb.iv2;
 
 import java.util.List;
-import java.util.concurrent.CountDownLatch;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
@@ -59,4 +58,7 @@ public interface Initiator
     /** Create a Promotion implementation appropriate for the subclass */
     public RepairAlgo createPromoteAlgo(List<Long> survivors, InitiatorMailbox mailbox,
             String whoami);
+
+
+    public long getCurrentTxnId();
 }

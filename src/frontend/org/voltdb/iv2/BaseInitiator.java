@@ -103,7 +103,8 @@ public abstract class BaseInitiator implements Initiator
                                        m_partitionId,
                                        numberOfPartitions,
                                        createForRejoin,
-                                       snapshotPriority);
+                                       snapshotPriority,
+                                       m_initiatorMailbox);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -157,5 +158,10 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
+    }
+
+    @Override
+    public long getCurrentTxnId() {
+        return m_scheduler.getCurrentTxnId();
     }
 }

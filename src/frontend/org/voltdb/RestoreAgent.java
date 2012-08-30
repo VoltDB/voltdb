@@ -82,7 +82,7 @@ SnapshotCompletionInterest
          *            The txnId of the truncation snapshot at the end of the
          *            restore, or Long.MIN if there is none.
          */
-        public void onRestoreCompletion(long txnId);
+        public void onRestoreCompletion(long txnId, long perPartitionTxnIds[]);
     }
 
     private final static VoltLogger LOG = new VoltLogger("HOST");
@@ -142,6 +142,7 @@ SnapshotCompletionInterest
 
     // The txnId of the truncation snapshot generated at the end.
     private long m_truncationSnapshot = Long.MIN_VALUE;
+    private long m_truncationSnapshotPerPartition[] = new long[0];
 
     // Whether or not we have a snapshot to restore
     private boolean m_hasRestored = false;
@@ -719,7 +720,6 @@ SnapshotCompletionInterest
      * node, so we just need to read it here.
      */
     private void fetchSnapshotTxnId() {
-        long txnId = 0;
         try {
             byte[] data = m_zk.getData(VoltZK.restore_snapshot_id, false, null);
 
@@ -1037,7 +1037,7 @@ SnapshotCompletionInterest
         } else if (m_state == State.TRUNCATE) {
             m_snapshotMonitor.removeInterest(this);
             if (m_callback != null) {
-                m_callback.onRestoreCompletion(m_truncationSnapshot);
+                m_callback.onRestoreCompletion(m_truncationSnapshot, m_truncationSnapshotPerPartition);
             }
         }
     }
@@ -1147,6 +1147,7 @@ SnapshotCompletionInterest
                                      false, null);
         } else {
             m_truncationSnapshot = txnId;
+            m_truncationSnapshotPerPartition = partitionTxnIds;
             m_replayAgent.returnAllSegments();
             changeState();
         }

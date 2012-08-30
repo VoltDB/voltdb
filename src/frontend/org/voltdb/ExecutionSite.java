@@ -2918,4 +2918,9 @@ implements Runnable, SiteTransactionConnection, SiteProcedureConnection, SiteSna
     public ProcedureRunner getProcedureRunner(String procedureName) {
         throw new RuntimeException("getProcedureRunner is an IV2-only interface.");
     }
+
+    @Override
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
+        //A noop pre-IV2
+    }
 }

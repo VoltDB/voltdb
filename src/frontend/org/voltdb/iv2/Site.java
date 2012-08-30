@@ -86,6 +86,14 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
     // Manages pending tasks.
     final SiteTaskerQueue m_scheduler;
 
+    /*
+     * There is really no legit reason to touch the initiator mailbox from the site,
+     * but it turns out to be necessary at startup when restoring a snapshot. The snapshot
+     * has the transaction id for the partition that it must continue from and it has to be
+     * set at all replicas of the partition.
+     */
+    final InitiatorMailbox m_initiatorMailbox;
+
     // Almighty execution engine and its HSQL sidekick
     ExecutionEngine m_ee;
     HsqlBackend m_hsql;
@@ -264,7 +272,8 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
             int partitionId,
             int numPartitions,
             boolean createForRejoin,
-            int snapshotPriority)
+            int snapshotPriority,
+            InitiatorMailbox initiatorMailbox)
     {
         m_siteId = siteId;
         m_context = context;
@@ -279,6 +288,7 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         m_lastCommittedTxnId = TxnEgo.makeZero(partitionId).getTxnId();
         m_lastCommittedSpHandle = TxnEgo.makeZero(partitionId).getTxnId();
         m_currentTxnId = Long.MIN_VALUE;
+        m_initiatorMailbox = initiatorMailbox;
     }
 
     /** Update the loaded procedures. */
@@ -667,5 +677,16 @@ public class Site implements Runnable, SiteProcedureConnection, SiteSnapshotConn
         }
 
         return true;
+    }
+
+    @Override
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds) {
+        for (long txnId : perPartitionTxnIds) {
+            if (TxnEgo.getPartitionId(txnId) == m_partitionId) {
+                m_initiatorMailbox.setMaxLastSeenTxnId(txnId);
+                return;
+            }
+        }
+
     }
 }

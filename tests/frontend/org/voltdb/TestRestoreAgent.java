@@ -753,7 +753,7 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
     }
 
     @Override
-    public void onRestoreCompletion(long txnId) {
+    public void onRestoreCompletion(long txnId, long perPartitionTxnIds[]) {
         if (snapshotTxnId != null) {
             assertEquals(snapshotTxnId.longValue(), txnId);
         }

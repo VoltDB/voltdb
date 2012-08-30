@@ -19,7 +19,6 @@ package org.voltdb.iv2;
 
 import java.util.List;
 import java.util.concurrent.ExecutionException;
-import java.util.concurrent.atomic.AtomicLong;
 
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
@@ -56,9 +55,6 @@ public class InitiatorMailbox implements Mailbox
     private long m_hsId;
     private RepairAlgo m_algo;
 
-    // hacky temp txnid
-    AtomicLong m_txnId = new AtomicLong(0);
-
     synchronized public void setRepairAlgo(RepairAlgo algo)
     {
         m_algo = algo;
@@ -69,6 +65,11 @@ public class InitiatorMailbox implements Mailbox
         m_repairLog.setLeaderState(true);
         m_scheduler.setMaxSeenTxnId(maxSeenTxnId);
         m_scheduler.setLeaderState(true);
+    }
+
+
+    synchronized public void setMaxLastSeenTxnId(long txnId) {
+        m_scheduler.setMaxSeenTxnId(txnId);
     }
 
     public InitiatorMailbox(int partitionId,

@@ -131,7 +131,7 @@ public class SnapshotSaveAPI
                 List<Long>  partitionTransactionIds =
                         SnapshotSiteProcessor.m_partitionLastSeenTransactionIds;
                 SnapshotSiteProcessor.m_partitionLastSeenTransactionIds = new ArrayList<Long>();
-
+                partitionTransactionIds.add(multiPartTxnId);
                 createSetup(
                         file_path,
                         file_nonce,

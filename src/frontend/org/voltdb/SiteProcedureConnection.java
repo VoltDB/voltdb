@@ -154,4 +154,5 @@ public interface SiteProcedureConnection {
 
     // Snapshot services provided by the site
     public Future<?> doSnapshotWork(boolean ignoreQuietPeriod);
+    public void setPerPartitionTxnIds(long[] perPartitionTxnIds);
 }

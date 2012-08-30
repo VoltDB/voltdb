@@ -73,9 +73,6 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.CoreUtils;
 import org.voltcore.utils.Pair;
 import org.voltcore.zk.ZKUtil;
-import org.voltdb.iv2.Cartographer;
-import org.voltdb.iv2.LeaderAppointer;
-import org.voltdb.iv2.SpInitiator;
 import org.voltdb.VoltDB.START_ACTION;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.Catalog;
@@ -99,8 +96,11 @@ import org.voltdb.fault.FaultDistributor;
 import org.voltdb.fault.FaultDistributorInterface;
 import org.voltdb.fault.SiteFailureFault;
 import org.voltdb.fault.VoltFault.FaultType;
+import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Initiator;
+import org.voltdb.iv2.LeaderAppointer;
 import org.voltdb.iv2.MpInitiator;
+import org.voltdb.iv2.SpInitiator;
 import org.voltdb.iv2.TxnEgo;
 import org.voltdb.licensetool.LicenseApi;
 import org.voltdb.messaging.VoltDbMessageFactory;
@@ -187,6 +187,8 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     LeaderAppointer m_leaderAppointer = null;
     GlobalServiceElector m_globalServiceElector = null;
     MpInitiator m_MPI = null;
+    long m_iv2InitiatorStartingTxnIds[] = new long[0];
+
 
     // Should the execution sites be started in recovery mode
     // (used for joining a node to an existing cluster)
@@ -406,7 +408,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
              *
              * The starting state for partition assignments are statically derived from the host id generated
              * by host messenger and the k-factor/host count/sites per host. This starting state
-             * is published to ZK as the toplogy metadata node.
+             * is published to ZK as the topology metadata node.
              *
              * On rejoin the rejoining node has to inspect the topology meta node to find out what is missing
              * and then update the topology listing itself as a replacement for one of the missing host ids.
@@ -424,11 +426,19 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                     m_cartographer = new Cartographer(m_messenger.getZK(), iv2config.getPartitionCount());
                     if (isRejoin) {
                         List<Integer> partitionsToReplace = m_cartographer.getIv2PartitionsToReplace(topo);
+                        m_iv2InitiatorStartingTxnIds = new long[partitionsToReplace.size()];
+                        for (int ii = 0; ii < partitionsToReplace.size(); ii++) {
+                            m_iv2InitiatorStartingTxnIds[ii] = TxnEgo.makeZero(partitionsToReplace.get(ii)).getTxnId();
+                        }
                         m_iv2Initiators = createIv2Initiators(partitionsToReplace);
                     }
                     else {
                         List<Integer> partitions =
                             ClusterConfig.partitionsForHost(topo, m_messenger.getHostId());
+                        m_iv2InitiatorStartingTxnIds = new long[partitions.size()];
+                        for (int ii = 0; ii < partitions.size(); ii++) {
+                            m_iv2InitiatorStartingTxnIds[ii] = TxnEgo.makeZero(partitions.get(ii)).getTxnId();
+                        }
                         m_iv2Initiators = createIv2Initiators(partitions);
                     }
                     // each node has an MPInitiator (and exactly 1 node has the master MPI).
@@ -766,8 +776,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             }
 
             if (m_commandLog != null && isRejoin) {
+                //On rejoin the starting IDs are all 0 so technically it will load any snapshot
+                //but the newest snapshot will always be the truncation snapshot taken after rejoin
+                //completes at which point the node will mark itself as actually recovered.
                 m_commandLog.initForRejoin(
-                        m_catalogContext, Long.MIN_VALUE, true);
+                        m_catalogContext, Long.MIN_VALUE, m_iv2InitiatorStartingTxnIds, true);
             }
 
             /*
@@ -1520,7 +1533,7 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
             m_restoreAgent.restore();
         }
         else {
-            onRestoreCompletion(Long.MIN_VALUE);
+            onRestoreCompletion(Long.MIN_VALUE, m_iv2InitiatorStartingTxnIds);
         }
 
         // Start the rejoin coordinator
@@ -2011,14 +2024,14 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     }
 
     @Override
-    public void onRestoreCompletion(long txnId) {
+    public void onRestoreCompletion(long txnId, long perPartitionTxnIds[]) {
 
         /*
          * Command log is already initialized if this is a rejoin
          */
         if ((m_commandLog != null) && (m_commandLog.needsInitialization())) {
             // Initialize command logger
-            m_commandLog.init(m_catalogContext, txnId);
+            m_commandLog.init(m_catalogContext, txnId, perPartitionTxnIds);
         }
 
         /*

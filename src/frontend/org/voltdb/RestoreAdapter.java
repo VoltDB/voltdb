@@ -18,19 +18,14 @@
 package org.voltdb;
 
 import java.io.IOException;
-
 import java.nio.ByteBuffer;
-
 import java.util.concurrent.Future;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
-
 import org.voltcore.utils.DeferredSerialization;
-
 import org.voltdb.client.ClientResponse;
 
 /**
@@ -90,6 +85,7 @@ public class RestoreAdapter implements Connection, WriteStream {
         if (results == null || results.length != 1) {
             failure = true;
         }
+
         while (!failure && results[0].advanceRow()) {
             String resultStatus = results[0].getString("RESULT");
             if (!resultStatus.equalsIgnoreCase("success")) {
@@ -98,6 +94,9 @@ public class RestoreAdapter implements Connection, WriteStream {
         }
 
         if (failure) {
+            for (VoltTable result : results) {
+                LOG.fatal(result);
+            }
             VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
                                      res.getStatusString(), false, null);
         } else {
