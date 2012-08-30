@@ -1646,6 +1646,11 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
                 // After sites are terminated, shutdown the InvocationBufferServer.
                 // The IBS is shared by all sites; don't kill it while any site is active.
                 PartitionDRGateway.shutdown();
+                try {
+                    m_nodeDRGateway.shutdown();
+                } catch (InterruptedException e) {
+                    log.warn("Interrupted shutting down invocation buffer server", e);
+                }
 
                 // help the gc along
                 m_localSites = null;
@@ -2091,7 +2096,9 @@ public class RealVoltDB implements VoltDBInterface, RestoreAgent.Callback, Mailb
     {
         if (m_replicationActive != active) {
             m_replicationActive = active;
-            m_nodeDRGateway.setActive(active);
+            if (m_nodeDRGateway != null) {
+                m_nodeDRGateway.setActive(active);
+            }
         }
     }
 
