@@ -109,15 +109,19 @@ template<> inline NValue NValue::call<FUNC_LEFT>(const std::vector<NValue>& argu
     if (startArg.isNull()) {
         return getNullStringValue();
     }
+    int32_t count = static_cast<int32_t>(startArg.castAsBigIntAndGetValue());
+    if (count < 0) {
+        char msg[1024];
+        snprintf(msg, 1024, "data exception: substring error");
+        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+            msg);
+    }
+    if (count == 0)
+        return getStringValue("");
 
     const int32_t valueUTF8Length = strValue.getObjectLength();
     char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
-    int32_t count = static_cast<int32_t> (std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(0L)));
-    if (count == 0)
-        return getNullStringValue();
 
-    printf("LEFT count: %d, objectlength: %d\n", count, valueUTF8Length);
-    printf("LEFT: from start %d bytes\n",(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - valueChars));
     return getTempStringValue(valueChars,(int32_t)(getIthCharPosition(valueChars,valueUTF8Length,count+1) - valueChars));
 }
 
@@ -137,12 +141,19 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
         return getNullStringValue();
     }
 
+    int32_t count = static_cast<int32_t>(startArg.castAsBigIntAndGetValue());
+    if (count < 0) {
+        char msg[1024];
+        snprintf(msg, 1024, "data exception: substring error");
+        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+            msg);
+    }
+    if (count == 0)
+        return getStringValue("");
+
     const int32_t valueUTF8Length = strValue.getObjectLength();
     char *valueChars = reinterpret_cast<char*>(strValue.getObjectValue());
     const char *valueEnd = valueChars+valueUTF8Length;
-    int32_t count = static_cast<int32_t> (std::max(startArg.castAsBigIntAndGetValue(), static_cast<int64_t>(0L)));
-    if (count == 0)
-        return getNullStringValue();
     int32_t charLen = getCharLength(valueChars,valueUTF8Length);
     if (count >= charLen)
         return getTempStringValue(valueChars,(int32_t)(valueEnd - valueChars));

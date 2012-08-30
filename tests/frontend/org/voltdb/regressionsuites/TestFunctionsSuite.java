@@ -30,7 +30,6 @@ import java.sql.Timestamp;
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
 import org.voltdb.VoltTable;
-import org.voltdb.VoltType;
 import org.voltdb.client.Client;
 import org.voltdb.client.ClientResponse;
 import org.voltdb.client.NoConnectionsException;
@@ -544,6 +543,123 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.asScalarLong());
     }
 
+    public void testLeftAndRight() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING Left and Right");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "贾鑫Vo", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // test LEFT function
+        cr = client.callProcedure("LEFT", 0, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 2, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 3, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫V", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 4, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫Vo", result.getString(1));
+
+        cr = client.callProcedure("LEFT", 5, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫Vo", result.getString(1));
+
+        // invalid case
+        Exception ex = null;
+        try {
+            cr = client.callProcedure("LEFT", -1, 1);
+        } catch (Exception e) {
+            assertTrue(e instanceof ProcCallException);
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+        }
+
+        // test RIGHT function
+        cr = client.callProcedure("RIGHT", 0, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("o", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 2, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("Vo", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 3, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("鑫Vo", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 4, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫Vo", result.getString(1));
+
+        cr = client.callProcedure("RIGHT", 5, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("贾鑫Vo", result.getString(1));
+
+        ex = null;
+        try {
+            cr = client.callProcedure("RIGHT", -1, 1);
+        } catch (Exception e) {
+            assertTrue(e instanceof ProcCallException);
+            ex = e;
+        } finally {
+            assertNotNull(ex);
+        }
+
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -605,6 +721,9 @@ public class TestFunctionsSuite extends RegressionSuite {
         // next one disabled until ENG-3486
         //project.addStmtProcedure("PARAM_SUBSTRING", "select SUBSTRING(? FROM 2) from P1");
         project.addStmtProcedure("PARAM_ABS", "select ABS(? + NUM) from P1");
+
+        project.addStmtProcedure("LEFT", "select id, LEFT(DESC,?) from P1 where id = ?");
+        project.addStmtProcedure("RIGHT", "select id, RIGHT(DESC,?) from P1 where id = ?");
 
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
