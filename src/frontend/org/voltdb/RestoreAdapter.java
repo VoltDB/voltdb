@@ -100,7 +100,13 @@ public class RestoreAdapter implements Connection, WriteStream {
             VoltDB.crashGlobalVoltDB("Failed to restore from snapshot: " +
                                      res.getStatusString(), false, null);
         } else {
-            m_doneNotifier.run();
+            Thread networkHandoff = new Thread() {
+                @Override
+                public void run() {
+                    m_doneNotifier.run();
+                }
+            };
+            networkHandoff.start();
         }
     }
 
