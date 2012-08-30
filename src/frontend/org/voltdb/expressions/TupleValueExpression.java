@@ -20,7 +20,10 @@ package org.voltdb.expressions;
 import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.json_voltpatches.JSONStringer;
+import org.voltdb.VoltType;
+import org.voltdb.catalog.Column;
 import org.voltdb.catalog.Database;
+import org.voltdb.catalog.Table;
 import org.voltdb.types.ExpressionType;
 
 /**
@@ -173,10 +176,6 @@ public class TupleValueExpression extends AbstractValueExpression {
     @Override
     public void toJSONString(JSONStringer stringer) throws JSONException {
         super.toJSONString(stringer);
-        // Complain early about improperly resolved columns -- the EE de-serializer will if we don't.
-        if (m_columnIndex < 0) {
-            throw new RuntimeException("Unresolved column reference");
-        }
         stringer.key(Members.COLUMN_IDX.name()).value(m_columnIndex);
         stringer.key(Members.TABLE_NAME.name()).value(m_tableName);
         stringer.key(Members.COLUMN_NAME.name()).value(m_columnName);
@@ -190,4 +189,33 @@ public class TupleValueExpression extends AbstractValueExpression {
         m_columnName = obj.getString(Members.COLUMN_NAME.name());
         m_columnAlias = obj.getString(Members.COLUMN_ALIAS.name());
     }
+
+    @Override
+    public void resolveForDB(Database db) {
+        if (m_tableName == null && m_columnName == null) {
+            // This is a dummy TVE standing in for a simplecolumn
+            // -- the assumption has to be that it is not being used in a general expression,
+            // so the schema-dependent type implications don't matter
+            // and its "target" value is getting properly validated, so we can shortcut checking here.
+            return;
+        }
+        Table table = db.getTables().getIgnoreCase(m_tableName);
+        resolveForTable(table);
+    }
+
+
+    @Override
+    public void resolveForTable(Table table) {
+        assert(table != null);
+        // It MAY be that for the case in which this function is called (expression indexes), the column's
+        // table name is not specified (and not missed?).
+        // It is possible to "correct" that here by cribbing it from the supplied table (base table for the index)
+        // -- not bothering for now.
+        Column column = table.getColumns().getIgnoreCase(m_columnName);
+        assert(column != null);
+        m_columnIndex = column.getIndex();
+        setValueType(VoltType.get((byte)column.getType()));
+        setValueSize(column.getSize());
+    }
+
 }

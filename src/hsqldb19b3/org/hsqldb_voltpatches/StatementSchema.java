@@ -31,6 +31,8 @@
 
 package org.hsqldb_voltpatches;
 
+import java.util.List;
+
 import org.hsqldb_voltpatches.HsqlNameManager.HsqlName;
 import org.hsqldb_voltpatches.lib.HsqlArrayList;
 import org.hsqldb_voltpatches.lib.OrderedHashSet;
@@ -255,6 +257,7 @@ public class StatementSchema extends Statement {
         }
     }
 
+    @Override
     public Result execute(Session session) {
 
         Result result = getResult(session);
@@ -944,11 +947,14 @@ public class StatementSchema extends Statement {
                 HsqlName name;
                 int[]    indexColumns;
                 boolean  unique;
+                // A VoltDB extension to support indexed expressions
+                List<Expression> indexExprs;
 
                 table        = (Table) arguments[0];
                 indexColumns = (int[]) arguments[1];
                 name         = (HsqlName) arguments[2];
                 unique       = ((Boolean) arguments[3]).booleanValue();
+                indexExprs   = (List<Expression>)arguments[4];
 
                 try {
                     /*
@@ -965,6 +971,13 @@ public class StatementSchema extends Statement {
                     setOrCheckObjectName(session, table.getName(), name, true);
 
                     TableWorks tableWorks = new TableWorks(session, table);
+
+                    if (indexExprs != null) {
+                        // A VoltDB extension to support indexed expressions
+                        tableWorks.addExprIndex(indexColumns, indexExprs.toArray(new Expression[indexExprs.size()]), name, unique);
+
+                        break;
+                    }
 
                     tableWorks.addIndex(indexColumns, name, unique);
 
@@ -1172,10 +1185,12 @@ public class StatementSchema extends Statement {
         }
     }
 
+    @Override
     public boolean isAutoCommitStatement() {
         return true;
     }
 
+    @Override
     public String describe(Session session) {
         return sql;
     }
