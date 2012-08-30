@@ -63,7 +63,7 @@ abstract public class Scheduler implements InitiatorMessageHandler
         m_txnEgo = TxnEgo.makeZero(partitionId);
     }
 
-    final public void setMaxSeenTxnId(long maxSeenTxnId)
+    public void setMaxSeenTxnId(long maxSeenTxnId)
     {
         final TxnEgo ego = new TxnEgo(maxSeenTxnId);
         if (m_txnEgo.getPartitionId() != ego.getPartitionId()) {

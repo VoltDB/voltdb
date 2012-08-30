@@ -64,9 +64,7 @@ import org.voltdb.ProcInfo;
 import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.TheHashinator;
 import org.voltdb.VoltDB;
-import org.voltdb.VoltProcedure.VoltAbortException;
 import org.voltdb.VoltSystemProcedure;
-import org.voltdb.VoltSystemProcedure.SynthesizedPlanFragment;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
 import org.voltdb.VoltType;
@@ -1023,6 +1021,12 @@ public class SnapshotRestore extends VoltSystemProcedure
             oos.flush();
             byte exportSequenceNumberBytes[] = baos.toByteArray();
             oos.close();
+
+            /*
+             * Also set the perPartitionTxnIds locally at the multi-part coordinator.
+             * The coord will have to forward this value to all the idle coordinators.
+             */
+            ctx.getSiteProcedureConnection().setPerPartitionTxnIds(perPartitionTxnIds);
 
             results =
                     performDistributeExportSequenceNumbers(
