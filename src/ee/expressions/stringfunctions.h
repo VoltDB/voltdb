@@ -158,10 +158,7 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
     if (count >= charLen)
         return getTempStringValue(valueChars,(int32_t)(valueEnd - valueChars));
 
-    printf("Count start: %d, charLen: %d\n", count, charLen);
     const char* newStartChar = getIthCharPosition(valueChars,valueUTF8Length,charLen-count+1);
-
-    printf("Right: from start %d bytes\n", (int32_t)(valueEnd - newStartChar));
     return getTempStringValue(newStartChar,(int32_t)(valueEnd - newStartChar));
 }
 
