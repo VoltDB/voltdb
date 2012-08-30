@@ -131,6 +131,7 @@
                               "ddl": "int-DDL.sql",
                               "template": "regression-advanced-ints-cntonly.sql",
                               "normalizer": "not-a-normalizer.py"},
+# To test index count
     "index-count1": {"schema": "index-count1-schema.py",
                      "ddl": "index-count1-DDL.sql",
                      "template": "index-count1.sql",
