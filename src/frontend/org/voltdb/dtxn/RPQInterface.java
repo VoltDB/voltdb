@@ -14,14 +14,25 @@
  * You should have received a copy of the GNU General Public License
  * along with VoltDB.  If not, see <http://www.gnu.org/licenses/>.
  */
-package org.voltdb;
 
-import java.util.concurrent.CountDownLatch;
+package org.voltdb.dtxn;
 
-public interface SnapshotCompletionInterest {
-    public CountDownLatch snapshotCompleted(
-            String nonce,
-            long multipartTxnId,
-            long partitionTxnIds[],
-            boolean truncationSnapshot);
+public interface RPQInterface {
+    /**
+     * Only return transaction state objects that are ready to run.
+     */
+    public OrderableTransaction poll();
+
+    public boolean add(OrderableTransaction txnState);
+
+    public long noteTransactionRecievedAndReturnLastSeen(long initiatorHSId, long txnId,
+            boolean isHeartbeat, long lastSafeTxnIdFromInitiator);
+
+    public Long getNewestSafeTransactionForInitiator(long initiator);
+
+    public void gotFaultForInitiator(long initiatorId);
+
+    public int ensureInitiatorIsKnown(long initiatorId);
+
+    public boolean isEmpty();
 }

@@ -22,8 +22,8 @@ import java.util.List;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.Mailbox;
 import org.voltcore.messaging.VoltMessage;
-import org.voltdb.LoadedProcedureSet;
 import org.voltdb.PartitionDRGateway;
+import org.voltdb.VoltDB;
 
 /**
  * Scheduler's rough current responsibility is to take appropriate local action
@@ -52,16 +52,39 @@ abstract public class Scheduler implements InitiatorMessageHandler
     // offered work.
     // IZZY: We should refactor this to be inviolable in the future.
     final protected SiteTaskerQueue m_tasks;
-    protected LoadedProcedureSet m_loadedProcs;
     protected Mailbox m_mailbox;
     final protected TransactionTaskQueue m_pendingTasks;
     protected boolean m_isLeader = false;
     protected PartitionDRGateway m_drGateway = new PartitionDRGateway();
+    private TxnEgo m_txnEgo;
 
-    Scheduler(SiteTaskerQueue taskQueue)
+    Scheduler(int partitionId, SiteTaskerQueue taskQueue)
     {
         m_tasks = taskQueue;
         m_pendingTasks = new TransactionTaskQueue(m_tasks);
+        m_txnEgo = TxnEgo.makeZero(partitionId);
+    }
+
+    final public void setMaxSeenTxnId(long maxSeenTxnId)
+    {
+        final TxnEgo ego = new TxnEgo(maxSeenTxnId);
+        if (m_txnEgo.getPartitionId() != ego.getPartitionId()) {
+            VoltDB.crashLocalVoltDB(
+                    "Received a transaction id at partition " + m_txnEgo.getPartitionId() +
+                    " for partition " + ego.getPartitionId() + ". The partition ids should match.", true, null);
+        }
+        m_txnEgo = ego;
+    }
+
+    final protected TxnEgo advanceTxnEgo()
+    {
+        m_txnEgo = m_txnEgo.makeNext();
+        return m_txnEgo;
+    }
+
+    final protected long getCurrentTxnId()
+    {
+        return m_txnEgo.getTxnId();
     }
 
     @Override
@@ -73,11 +96,6 @@ abstract public class Scheduler implements InitiatorMessageHandler
     public void setLeaderState(boolean isLeader)
     {
         m_isLeader = isLeader;
-    }
-
-    void setProcedureSet(LoadedProcedureSet loadedProcs)
-    {
-        m_loadedProcs = loadedProcs;
     }
 
     public SiteTaskerQueue getQueue()
@@ -97,7 +115,5 @@ abstract public class Scheduler implements InitiatorMessageHandler
 
     @Override
     abstract public void deliver(VoltMessage message);
-
-    abstract public void setMaxSeenTxnId(long maxSeenTxnId);
 
 }

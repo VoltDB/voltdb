@@ -27,12 +27,12 @@ import org.json_voltpatches.JSONStringer;
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.utils.CoreUtils;
 import org.voltdb.DependencyPair;
-import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.ParameterSet;
 import org.voltdb.ProcInfo;
 import org.voltdb.SnapshotFormat;
 import org.voltdb.SnapshotSaveAPI;
 import org.voltdb.SnapshotSiteProcessor;
+import org.voltdb.SystemProcedureExecutionContext;
 import org.voltdb.VoltSystemProcedure;
 import org.voltdb.VoltTable;
 import org.voltdb.VoltTable.ColumnInfo;
@@ -141,6 +141,7 @@ public class SnapshotSave extends VoltSystemProcedure
             SnapshotSaveAPI saveAPI = new SnapshotSaveAPI();
             VoltTable result = saveAPI.startSnapshotting(file_path, file_nonce,
                                                          format, block, txnId,
+                                                         context.getLastCommittedSpHandle(),
                                                          data, context, hostname);
             return new DependencyPair(SnapshotSave.DEP_createSnapshotTargets, result);
         }

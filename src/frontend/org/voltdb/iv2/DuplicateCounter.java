@@ -22,12 +22,9 @@ import java.util.List;
 import java.util.Set;
 
 import org.voltcore.logging.VoltLogger;
-
 import org.voltcore.messaging.VoltMessage;
-
 import org.voltdb.messaging.FragmentResponseMessage;
 import org.voltdb.messaging.InitiateResponseMessage;
-
 import org.voltdb.utils.MiscUtils;
 
 /**
@@ -40,7 +37,8 @@ public class DuplicateCounter
     static final int DONE = 1;
     static final int WAITING = 2;
 
-    protected VoltLogger hostLog = new VoltLogger("HOST");
+    protected static final VoltLogger hostLog = new VoltLogger("HOST");
+
     final long m_destinationId;
     Long m_responseHash = null;
     protected VoltMessage m_lastResponse = null;

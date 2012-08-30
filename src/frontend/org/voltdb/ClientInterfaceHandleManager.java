@@ -41,9 +41,9 @@ public class ClientInterfaceHandleManager
 {
     private static final VoltLogger hostLog = new VoltLogger("HOST");
     private static final VoltLogger tmLog = new VoltLogger("TM");
-    static final int PART_ID_BITS = 10;
+    static final int PART_ID_BITS = 14;
     static final int MP_PART_ID = (1 << PART_ID_BITS) - 1;
-    static final int PART_ID_SHIFT = 54;
+    static final int PART_ID_SHIFT = 50;
     static final int SEQNUM_MAX = (1 << PART_ID_SHIFT) - 1;
 
     private long m_outstandingTxns;
@@ -112,6 +112,35 @@ public class ClientInterfaceHandleManager
         this.isAdmin = isAdmin;
         this.connection = connection;
         m_acg = acg;
+    }
+
+    /**
+     * Factory to make a threadsafe version of CIHM. This is used
+     * exclusively by some internal CI adapters that don't have
+     * the natural thread-safety protocol/design of VoltNetwork.
+     */
+    public static ClientInterfaceHandleManager makeThreadSafeCIHM(
+            boolean isAdmin, Connection connection, AdmissionControlGroup acg)
+    {
+        return new ClientInterfaceHandleManager(isAdmin, connection, acg) {
+            synchronized long getHandle(boolean isSinglePartition, int partitionId,
+                    long clientHandle, int messageSize, long creationTime) {
+                return super.getHandle(isSinglePartition, partitionId,
+                        clientHandle, messageSize, creationTime);
+            }
+            synchronized boolean removeHandle(long ciHandle) {
+                return super.removeHandle(ciHandle);
+            }
+            synchronized Iv2InFlight findHandle(long ciHandle) {
+                return super.findHandle(ciHandle);
+            }
+            synchronized long getOutstandingTxns() {
+                return super.getOutstandingTxns();
+            }
+            synchronized void freeOutstandingTxns() {
+                super.freeOutstandingTxns();
+            }
+        };
     }
 
     /**

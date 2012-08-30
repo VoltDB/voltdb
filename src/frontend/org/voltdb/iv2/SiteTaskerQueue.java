@@ -17,11 +17,9 @@
 
 package org.voltdb.iv2;
 
-import java.lang.Object;
-
 import java.util.Comparator;
-import java.util.concurrent.atomic.AtomicLong;
 import java.util.concurrent.PriorityBlockingQueue;
+import java.util.concurrent.atomic.AtomicLong;
 
 /** SiteTaskerScheduler orders SiteTaskers for execution. */
 public class SiteTaskerQueue
@@ -29,6 +27,7 @@ public class SiteTaskerQueue
     /** TaskComparator orders SiteTaskers by priority */
     static class TaskComparator implements Comparator<SiteTasker>
     {
+        @Override
         public int compare(SiteTasker o1, SiteTasker o2)
         {
             int priorityDiff = o1.priority() - o2.priority();
@@ -40,6 +39,7 @@ public class SiteTaskerQueue
             }
         }
 
+        @Override
         public boolean equals(Object rhs)
         {
             return (rhs instanceof TaskComparator);
@@ -65,5 +65,9 @@ public class SiteTaskerQueue
     public SiteTasker poll() throws InterruptedException
     {
         return m_tasks.take();
+    }
+
+    public boolean isEmpty() {
+        return m_tasks.isEmpty();
     }
 }

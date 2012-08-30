@@ -35,6 +35,7 @@ public abstract class TransactionTask extends SiteTasker
         m_queue = queue;
     }
 
+    @Override
     abstract public void run(SiteProcedureConnection siteConnection);
 
     @Override
@@ -48,10 +49,12 @@ public abstract class TransactionTask extends SiteTasker
         return m_txn;
     }
 
-    public long getLocalTxnId()
+    public long getSpHandle()
     {
-        return m_txn.txnId;
+        return m_txn.spHandle;
     }
 
-    abstract public long getMpTxnId();
+    public long getTxnId() {
+        return m_txn.txnId;
+    }
 }

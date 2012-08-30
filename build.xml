@@ -1191,10 +1191,10 @@ TEST CASES
                 <exclude name="**/TestJSONInterface.class" />
 <!--                <exclude name="**/TestRejoinEndToEnd.class" /> -->
                 <exclude name="**/TestIV2BlacklistSaveRestoreSysprocSuite.class" />
-                <exclude name="**/TestRejoinWithCatalogUpdates.class" />
+<!--                <exclude name="**/TestRejoinWithCatalogUpdates.class" /> -->
                 <exclude name="**/TestRejoinFuzz.class" />
                 <exclude name="**/TestRejoinFuzz2.class" />
-                <exclude name="**/TestReplicatedInvocation.class" />
+<!--                <exclude name="**/TestReplicatedInvocation.class" /> -->
 <!--                <exclude name="**/TestRestoreAgent.class" -->
 <!--                <exclude name="**/TestSimpleCJK.class" /> -->
 <!--                <exclude name="**/TestClientTimeouts.class" /> -->
@@ -1202,7 +1202,7 @@ TEST CASES
                 <exclude name="**/TestNonDetermisticSeppuku.class" />
 <!--                <exclude name="**/TestJDBCDriver.class" />-->
                 <exclude name="**/TestAdminMode.class" />
-                <exclude name="**/TestCatalogUpdateSuite.class" />
+<!--                <exclude name="**/TestCatalogUpdateSuite.class" /> -->
 <!--                <exclude name="**/TestCRUDSuite.class" /> -->
 <!--                <exclude name="**/TestFailureDetectSuite.class" /> -->
                 <!-- ExecutionSite not relevant to Iv2. -->

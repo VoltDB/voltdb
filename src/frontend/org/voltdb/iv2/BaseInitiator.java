@@ -20,17 +20,16 @@ package org.voltdb.iv2;
 import java.util.concurrent.ExecutionException;
 
 import org.apache.zookeeper_voltpatches.KeeperException;
-
 import org.voltcore.logging.VoltLogger;
 import org.voltcore.messaging.HostMessenger;
 import org.voltcore.utils.CoreUtils;
-
 import org.voltdb.BackendTarget;
 import org.voltdb.CatalogContext;
 import org.voltdb.CatalogSpecificPlanner;
 import org.voltdb.NodeDRGateway;
 import org.voltdb.ProcedureRunnerFactory;
 import org.voltdb.iv2.Site;
+import org.voltdb.CommandLog;
 import org.voltdb.LoadedProcedureSet;
 
 /**
@@ -90,6 +89,7 @@ public abstract class BaseInitiator implements Initiator
                           CatalogSpecificPlanner csp,
                           int numberOfPartitions,
                           boolean createForRejoin,
+                          CommandLog cl,
                           NodeDRGateway nodeDRGateway)
         throws KeeperException, ExecutionException, InterruptedException
     {
@@ -106,7 +106,8 @@ public abstract class BaseInitiator implements Initiator
                                        m_partitionId,
                                        numberOfPartitions,
                                        createForRejoin,
-                                       snapshotPriority);
+                                       snapshotPriority,
+                                       m_initiatorMailbox);
             ProcedureRunnerFactory prf = new ProcedureRunnerFactory();
             prf.configure(m_executionSite, m_executionSite.m_sysprocContext);
 
@@ -118,7 +119,7 @@ public abstract class BaseInitiator implements Initiator
                     numberOfPartitions);
             procSet.loadProcedures(catalogContext, backend, csp);
             m_executionSite.setLoadedProcedures(procSet);
-            m_scheduler.setProcedureSet(procSet);
+            m_scheduler.setCommandLog(cl);
 
             m_siteThread = new Thread(m_executionSite);
             m_siteThread.start();
@@ -160,5 +161,10 @@ public abstract class BaseInitiator implements Initiator
     public long getInitiatorHSId()
     {
         return m_initiatorMailbox.getHSId();
+    }
+
+    @Override
+    public long getCurrentTxnId() {
+        return m_scheduler.getCurrentTxnId();
     }
 }

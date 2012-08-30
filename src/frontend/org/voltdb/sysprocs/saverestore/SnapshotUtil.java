@@ -53,8 +53,8 @@ import org.voltcore.network.Connection;
 import org.voltcore.network.NIOReadStream;
 import org.voltcore.network.WriteStream;
 import org.voltcore.utils.CoreUtils;
-import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.DBBPool.BBContainer;
+import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.Pair;
 import org.voltdb.ClientResponseImpl;
 import org.voltdb.SnapshotDaemon;
@@ -66,6 +66,7 @@ import org.voltdb.catalog.CatalogMap;
 import org.voltdb.catalog.Database;
 import org.voltdb.catalog.Table;
 import org.voltdb.client.ClientResponse;
+import org.voltdb.iv2.TxnEgo;
 import org.voltdb.utils.CatalogUtil;
 import org.voltdb.utils.VoltFile;
 
@@ -88,7 +89,8 @@ public class SnapshotUtil {
         String nonce,
         List<Table> tables,
         int hostId,
-        Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers)
+        Map<String, List<Pair<Integer, Long>>> exportSequenceNumbers,
+        List<Long> partitionTransactionIds)
     throws IOException
     {
         final File f = new VoltFile(path, constructDigestFilenameForNonce(nonce, hostId));
@@ -127,6 +129,13 @@ public class SnapshotUtil {
                 stringer.endObject();
             }
             stringer.endArray();
+            if (VoltDB.instance().isIV2Enabled()) {
+                stringer.key("partitionTransactionIds").object();
+                for (Long txnid : partitionTransactionIds) {
+                    stringer.key(Long.toString(TxnEgo.getPartitionId(txnid))).value(txnid);
+                }
+                stringer.endObject();
+            }
             stringer.key("catalogCRC").value(catalogCRC);
             stringer.endObject();
         } catch (JSONException e) {

@@ -84,7 +84,7 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
-        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, true, false, spi, 2101, 3101);
+        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 10L, 100045, 99, true, false, spi, 2101, 3101, true);
         itask.setSpHandle(31337);
         Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage) checkVoltMessage(itask);
 
@@ -92,6 +92,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
         assertEquals(itask.getTruncationHandle(), itask2.getTruncationHandle());
         assertEquals(itask.getTxnId(), itask2.getTxnId());
+        assertEquals(itask.getTimestamp(), itask2.getTimestamp());
         assertEquals(itask.isReadOnly(), itask2.isReadOnly());
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
@@ -101,6 +102,7 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getConnectionId(), 3101);
         assertEquals(itask.getSpHandle(), itask2.getSpHandle());
         assertEquals(31337, itask.getSpHandle());
+        assertTrue(itask.isForReplay());
     }
 
     public void testInitiateResponse() throws IOException {
@@ -127,7 +129,7 @@ public class TestVoltMessageSerialization extends TestCase {
     }
 
     public void testFragmentTask() throws IOException {
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true, true);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
         ft.addFragment(5, 12, ByteBuffer.allocate(0));
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
 
@@ -136,7 +138,9 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
         assertEquals(ft.getTxnId(), ft2.getTxnId());
+        assertEquals(ft.getTimestamp(), ft2.getTimestamp());
         assertEquals(ft.isReadOnly(), ft2.isReadOnly());
+        assertEquals(ft.isForReplay(), ft2.isForReplay());
 
         assertEquals(ft.getFragmentCount(), ft2.getFragmentCount());
 
@@ -161,7 +165,7 @@ public class TestVoltMessageSerialization extends TestCase {
         param2_fs.writeObject(param_set2);
         ByteBuffer param2_buf = param2_fs.getBuffer();
 
-        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, true, true);
+        FragmentTaskMessage ft = new FragmentTaskMessage(9, 70654312, -75, 99, true, true, false);
         ft.addFragment(5, 12, param1_buf);
         ft.addFragment(10, 24, param2_buf);
         ft.setFragmentTaskType(FragmentTaskMessage.SYS_PROC_PER_PARTITION);
@@ -171,7 +175,9 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(ft.getInitiatorHSId(), ft2.getInitiatorHSId());
         assertEquals(ft.getCoordinatorHSId(), ft2.getCoordinatorHSId());
         assertEquals(ft.getTxnId(), ft2.getTxnId());
+        assertEquals(ft.getTimestamp(), ft2.getTimestamp());
         assertEquals(ft.isReadOnly(), ft2.isReadOnly());
+        assertEquals(ft.isForReplay(), ft2.isForReplay());
 
         assertEquals(ft.getFragmentCount(), ft2.getFragmentCount());
 
@@ -200,7 +206,7 @@ public class TestVoltMessageSerialization extends TestCase {
 
 
     public void testFragmentResponse() throws IOException {
-        FragmentTaskMessage ft = new FragmentTaskMessage(15, 12, 37, false, false);
+        FragmentTaskMessage ft = new FragmentTaskMessage(15, 12, 37, 99, false, false, false);
 
         VoltTable table = new VoltTable(
                 new VoltTable.ColumnInfo("bearhugg", VoltType.STRING)
@@ -300,13 +306,15 @@ public class TestVoltMessageSerialization extends TestCase {
         spi.setProcName("johnisgreat");
         spi.setParams(57, "gooniestoo", "dudemandude");
 
-        Iv2InitiateTaskMessage itask = new Iv2InitiateTaskMessage(23, 8, 100044, 100045, true, false, spi, 2101, 3101);
+        Iv2InitiateTaskMessage itask =
+                new Iv2InitiateTaskMessage(23, 8, 100044, 100045, 99, true, false, spi, 2101, 3101, false);
         itask.setSpHandle(31337);
 
-        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, itask);
+        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 1, 2, 3L, 3L, itask);
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
         assertEquals(r1.getHandle(), r2.getHandle());
+        assertEquals(r1.getTxnId(), r2.getTxnId());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
 
@@ -314,6 +322,7 @@ public class TestVoltMessageSerialization extends TestCase {
         Iv2InitiateTaskMessage itask2 = (Iv2InitiateTaskMessage)r2.getPayload();
         assertEquals(itask.getInitiatorHSId(), itask2.getInitiatorHSId());
         assertEquals(itask.getTxnId(), itask2.getTxnId());
+        assertEquals(itask.getTimestamp(), itask2.getTimestamp());
         assertEquals(itask.isReadOnly(), itask2.isReadOnly());
         assertEquals(itask.isSinglePartition(), itask2.isSinglePartition());
         assertEquals(itask.getStoredProcedureName(), itask2.getStoredProcedureName());
@@ -323,15 +332,17 @@ public class TestVoltMessageSerialization extends TestCase {
         assertEquals(itask.getConnectionId(), 3101);
         assertEquals(itask.getSpHandle(), itask2.getSpHandle());
         assertEquals(31337, itask.getSpHandle());
+        assertFalse(itask.isForReplay());
     }
 
     public void testFirstIv2RepairLogResponseMessage() throws Exception
     {
         // simulate the first message in the sequence, sequence must be 0
-        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 0, 10, Long.MAX_VALUE, null);
+        Iv2RepairLogResponseMessage r1 = new Iv2RepairLogResponseMessage(0, 0, 10, Long.MAX_VALUE, Long.MAX_VALUE, null);
         Iv2RepairLogResponseMessage r2 = (Iv2RepairLogResponseMessage)checkVoltMessage(r1);
         assertEquals(r1.getOfTotal(), r2.getOfTotal());
         assertEquals(r1.getHandle(), r2.getHandle());
+        assertEquals(r1.getTxnId(), r2.getTxnId());
         assertEquals(r1.getRequestId(), r2.getRequestId());
         assertEquals(r1.getSequence(), r2.getSequence());
     }

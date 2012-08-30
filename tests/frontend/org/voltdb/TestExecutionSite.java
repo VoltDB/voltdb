@@ -692,10 +692,12 @@ public class TestExecutionSite extends TestCase {
                         FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
+                                                m_txnState.timestamp,
                                                 m_txnState.isReadOnly(),
                                                 1,
                                                 localTask_outputDep,
                                                 paramBuf,
+                                                false,
                                                 false);
 
                     localTask.addInputDepId(0, localTask_startDep);
@@ -704,11 +706,13 @@ public class TestExecutionSite extends TestCase {
                         FragmentTaskMessage.createWithOneFragment(m_txnState.initiatorHSId,
                                                 m_txnState.coordinatorSiteId,
                                                 m_txnState.txnId,
+                                                m_txnState.timestamp,
                                                 m_txnState.isReadOnly(),
                                                 0,
                                                 localTask_startDep,
                                                 paramBuf,
-                                                finalTask);
+                                                finalTask,
+                                                false);
 
                     m_txnState.createLocalFragmentWork(localTask, nonTransactional() && finalTask);
                     m_txnState.createAllParticipatingFragmentWork(distributedTask);

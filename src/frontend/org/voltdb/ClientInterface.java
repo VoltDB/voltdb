@@ -65,9 +65,6 @@ import org.voltcore.utils.COWMap;
 import org.voltcore.utils.DeferredSerialization;
 import org.voltcore.utils.EstTime;
 import org.voltcore.utils.Pair;
-
-import org.voltdb.iv2.LeaderCache;
-import org.voltdb.iv2.LeaderCacheReader;
 import org.voltdb.SystemProcedureCatalog.Config;
 import org.voltdb.VoltZK.MailboxType;
 import org.voltdb.catalog.CatalogMap;
@@ -89,11 +86,14 @@ import org.voltdb.dtxn.TransactionInitiator;
 import org.voltdb.export.ExportManager;
 import org.voltdb.iv2.Cartographer;
 import org.voltdb.iv2.Iv2Trace;
+import org.voltdb.iv2.LeaderCache;
+import org.voltdb.iv2.LeaderCacheReader;
 import org.voltdb.messaging.FastDeserializer;
 import org.voltdb.messaging.FastSerializer;
 import org.voltdb.messaging.InitiateResponseMessage;
 import org.voltdb.messaging.Iv2InitiateTaskMessage;
 import org.voltdb.messaging.LocalMailbox;
+import org.voltdb.messaging.MultiPartitionParticipantMessage;
 import org.voltdb.sysprocs.LoadSinglepartitionTable;
 import org.voltdb.utils.Encoder;
 import org.voltdb.utils.LogKeys;
@@ -918,7 +918,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
     }
 
     // Wrap API to SimpleDtxnInitiator - mostly for the future
-    public  boolean createTransaction(
+    public boolean createTransaction(
             final long connectionId,
             final String connectionHostname,
             final boolean adminConnection,
@@ -933,13 +933,51 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
             final long now,
             final boolean allowMismatchedResults)
     {
+        return createTransaction(
+                connectionId,
+                connectionHostname,
+                adminConnection,
+                Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                0, //unused timestammp
+                invocation,
+                isReadOnly,
+                isSinglePartition,
+                isEveryPartition,
+                partitions,
+                numPartitions,
+                clientData,
+                messageSize,
+                now,
+                allowMismatchedResults,
+                false);  // is for replay.
+    }
+
+    // Wrap API to SimpleDtxnInitiator - mostly for the future
+    public  boolean createTransaction(
+            final long connectionId,
+            final String connectionHostname,
+            final boolean adminConnection,
+            final long txnId,
+            final long timestamp,
+            final StoredProcedureInvocation invocation,
+            final boolean isReadOnly,
+            final boolean isSinglePartition,
+            final boolean isEveryPartition,
+            final int partitions[],
+            final int numPartitions,
+            final Object clientData,
+            final int messageSize,
+            final long now,
+            final boolean allowMismatchedResults,
+            final boolean isForReplay)
+    {
         if (VoltDB.instance().isIV2Enabled()) {
             final ClientInterfaceHandleManager cihm = m_cihm.get(connectionId);
 
             long handle = cihm.getHandle(isSinglePartition, partitions[0], invocation.getClientHandle(),
                     messageSize, now);
             Long initiatorHSId;
-            if (isSinglePartition) {
+            if (isSinglePartition && !isEveryPartition) {
                 initiatorHSId = m_iv2Masters.get(partitions[0]);
                 if (initiatorHSId == null) {
                     hostLog.error("Failed to find master initiator for partition: "
@@ -955,12 +993,14 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                 new Iv2InitiateTaskMessage(m_siteId,
                         initiatorHSId,
                         Iv2InitiateTaskMessage.UNUSED_TRUNC_HANDLE,
-                        Iv2InitiateTaskMessage.UNUSED_MP_TXNID,
+                        txnId,
+                        timestamp,
                         isReadOnly,
                         isSinglePartition,
                         invocation,
                         handle,
-                        connectionId);
+                        connectionId,
+                        isForReplay);
 
             Iv2Trace.logCreateTransaction(workRequest);
             m_mailbox.send(initiatorHSId, workRequest);
@@ -1183,15 +1223,18 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
         m_snapshotDaemon.init(this, zk, new Runnable() {
             @Override
             public void run() {
-                /*
-                 * For the snapshot daemon create a noop ACG because it is privileged
-                 */
-                m_cihm.put(
-                        m_snapshotDaemonAdapter.connectionId(),
-                        new ClientInterfaceHandleManager(true, m_snapshotDaemonAdapter,
-                                AdmissionControlGroup.getDummy()));
+                bindAdapter(m_snapshotDaemonAdapter);
             }
         });
+    }
+
+    /**
+     * Tell the clientInterface about a connection adapter.
+     */
+    public void bindAdapter(final Connection adapter) {
+        m_cihm.put(adapter.connectionId(),
+                ClientInterfaceHandleManager.makeThreadSafeCIHM(true, adapter,
+                    AdmissionControlGroup.getDummy()));
     }
 
     // if this ClientInterface's site ID is the lowest non-execution site ID
@@ -1781,7 +1824,7 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
                         createTransaction(changeResult.connectionId, changeResult.hostname,
                                 changeResult.adminConnection,
                                 task, false, true, true, m_allPartitions,
-                                m_allPartitions.length, changeResult.clientData, 0,
+                                m_allPartitions.length, changeResult.clientData, task.getSerializedSize(),
                                 EstTime.currentTimeMillis(), false);
                     }
                     else {
@@ -2168,5 +2211,19 @@ public class ClientInterface implements SnapshotDaemon.DaemonInitiator {
 
     public SnapshotDaemon getSnapshotDaemon() {
         return m_snapshotDaemon;
+    }
+
+    public void sendSentinel(long txnId, int partitionId) {
+        assert(VoltDB.instance().isIV2Enabled());
+        final long initiatorHSId = m_iv2Masters.get(partitionId);
+
+        //The only field that is relevant is txnid
+        MultiPartitionParticipantMessage mppm =
+                new MultiPartitionParticipantMessage(
+                        initiatorHSId,
+                        m_cartographer.getHSIdForMultiPartitionInitiator(),
+                        txnId,
+                        false);
+        m_mailbox.send(initiatorHSId, mppm);
     }
 }
