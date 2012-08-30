@@ -52,6 +52,7 @@ import org.apache.zookeeper_voltpatches.WatchedEvent;
 import org.apache.zookeeper_voltpatches.Watcher;
 import org.apache.zookeeper_voltpatches.ZooDefs.Ids;
 import org.apache.zookeeper_voltpatches.ZooKeeper;
+import org.json_voltpatches.JSONException;
 import org.json_voltpatches.JSONObject;
 import org.junit.After;
 import org.junit.Before;
@@ -778,5 +779,17 @@ public class TestRestoreAgent extends ZKTestBase implements RestoreAgent.Callbac
             frags.put(txnid, si);
         }
         si.add(new SnapshotInfo(txnid, "dummy", "dummy", 1, crc, -1));
+    }
+
+    @Test
+    public void testSnapshotInfoRoundTrip() throws JSONException
+    {
+        RestoreAgent.SnapshotInfo dut = new RestoreAgent.SnapshotInfo(1234L, "dummy", "stupid", 11, 4321L, 13);
+        dut.partitionToTxnId.put(1, 7000L);
+        dut.partitionToTxnId.put(7, 1000L);
+        byte[] serial = dut.toJSONObject().toString().getBytes(VoltDB.UTF8ENCODING);
+        SnapshotInfo rt = new SnapshotInfo(new JSONObject(new String(serial, VoltDB.UTF8ENCODING)));
+        System.out.println("Got: " + rt.toJSONObject().toString());
+        assertEquals(dut.partitionToTxnId.get(1), rt.partitionToTxnId.get(1));
     }
 }
