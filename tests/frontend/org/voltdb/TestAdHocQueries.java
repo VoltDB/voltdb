@@ -463,7 +463,7 @@ public class TestAdHocQueries extends AdHocQueryTester {
 
     @Test
     public void testXopenSubSelectQueries() throws Exception {
-        XopenTestEnv env = new XopenTestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, m_useIv2);
+        TestEnv env = new TestEnv(m_catalogJar, m_pathToDeployment, 2, 1, 0, m_useIv2);
         String adHocQuery;
         try {
             env.setUp();
@@ -613,10 +613,70 @@ public class TestAdHocQueries extends AdHocQueryTester {
                                            "IVAL bigint default 0 not null, " +
                                            "TVAL timestamp default null," +
                                            "DVAL decimal default null," +
-                                           "PRIMARY KEY(IVAL));");
-                m_builder.addPartitionInfo("BLAH", "IVAL");
-                m_builder.addStmtProcedure("Insert", "INSERT into BLAH values (?, ?, ?);", null);
-                m_builder.addStmtProcedure("InsertWithDate", "INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);");
+                                           "PRIMARY KEY(IVAL));\n" +
+                                           "PARTITION TABLE BLAH ON COLUMN IVAL;\n" +
+                                           "\n" +
+                                           "CREATE TABLE AAA (A1 VARCHAR(2), A2 VARCHAR(2), A3 VARCHAR(2));\n" +
+                                           "CREATE TABLE BBB (B1 VARCHAR(2), B2 VARCHAR(2), B3 VARCHAR(2) NOT NULL UNIQUE);\n" +
+                                           "CREATE TABLE CCC (C1 VARCHAR(2), C2 VARCHAR(2), C3 VARCHAR(2));\n" +
+                                           "\n" +
+                                           "CREATE TABLE CHAR_TEST (COL1 VARCHAR(254));\n" +
+                                           "CREATE TABLE INT_TEST (COL1 INTEGER);\n" +
+                                           "CREATE TABLE SMALL_TEST (COL1 SMALLINT);\n" +
+                                           "CREATE TABLE REAL_TEST (REF VARCHAR(1),COL1 REAL);\n" +
+                                           "CREATE TABLE REAL3_TEST (COL1 REAL,COL2 REAL,COL3 REAL);\n" +
+                                           "CREATE TABLE DOUB_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
+                                           "CREATE TABLE DOUB3_TEST (COL1 FLOAT,COL2 FLOAT\n" +
+                                           "   PRECISION,COL3 FLOAT);\n" +
+                                           "\n" +
+                                           "-- Users may provide an explicit precision for FLOAT_TEST.COL1\n" +
+                                           "\n" +
+                                           "CREATE TABLE FLOAT_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
+                                           "\n" +
+                                           "CREATE TABLE INDEXLIMIT(COL1 VARCHAR(2), COL2 VARCHAR(2),\n" +
+                                           "   COL3 VARCHAR(2), COL4 VARCHAR(2), COL5 VARCHAR(2),\n" +
+                                           "   COL6 VARCHAR(2), COL7 VARCHAR(2));\n" +
+                                           "\n" +
+                                           "CREATE TABLE WIDETABLE (WIDE VARCHAR(118));\n" +
+                                           "CREATE TABLE WIDETAB (WIDE1 VARCHAR(38), WIDE2 VARCHAR(38), WIDE3 VARCHAR(38));\n" +
+                                           "\n" +
+                                           "CREATE TABLE TEST_TRUNC (TEST_STRING VARCHAR (6));\n" +
+                                           "\n" +
+                                           "CREATE TABLE WARNING(TESTCHAR VARCHAR(6), TESTINT INTEGER);\n" +
+                                           "\n" +
+                                           "CREATE TABLE TV (dec3 DECIMAL(3), dec1514 DECIMAL(15,14),\n" +
+                                           "                 dec150 DECIMAL(15,0), dec1515 DECIMAL(15,15));\n" +
+                                           "\n" +
+                                           "CREATE TABLE TU (smint SMALLINT, dec1514 DECIMAL(15,14),\n" +
+                                           "                 integr INTEGER, dec1515 DECIMAL(15,15));\n" +
+                                           "\n" +
+                                           "CREATE TABLE STAFF\n" +
+                                           "  (EMPNUM   VARCHAR(3) NOT NULL UNIQUE,\n" +
+                                           "   EMPNAME  VARCHAR(20),\n" +
+                                           "   GRADE    DECIMAL(4),\n" +
+                                           "   CITY     VARCHAR(15));\n" +
+                                           "\n" +
+                                           "CREATE TABLE PROJ\n" +
+                                           "  (PNUM     VARCHAR(3) NOT NULL UNIQUE,\n" +
+                                           "   PNAME    VARCHAR(20),\n" +
+                                           "   PTYPE    VARCHAR(6),\n" +
+                                           "   BUDGET   DECIMAL(9),\n" +
+                                           "   CITY     VARCHAR(15));\n" +
+                                           "\n" +
+                                           "CREATE TABLE WORKS\n" +
+                                           "  (EMPNUM   VARCHAR(3) NOT NULL,\n" +
+                                           "   PNUM     VARCHAR(3) NOT NULL,\n" +
+                                           "   HOURS    DECIMAL(5),\n" +
+                                           "   UNIQUE(EMPNUM,PNUM));\n" +
+                                           "\n" +
+                                           "CREATE TABLE INTS\n" +
+                                           "  (INT1      SMALLINT NOT NULL,\n" +
+                                           "   INT2      SMALLINT NOT NULL);\n" +
+                                           "CREATE PROCEDURE TestProcedure AS INSERT INTO AAA VALUES(?,?,?);\n" +
+                                           "CREATE PROCEDURE Insert AS INSERT into BLAH values (?, ?, ?);\n" +
+                                           "CREATE PROCEDURE InsertWithDate AS \n" +
+                                           "  INSERT INTO BLAH VALUES (974599638818488300, '2011-06-24 10:30:26.002', 5);\n" +
+                                           "");
 
                 // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
                 AdHocQueryTester.setUpSchema(m_builder, pathToCatalog, pathToDeployment);
@@ -687,148 +747,4 @@ public class TestAdHocQueries extends AdHocQueryTester {
         }
     }
 
-    private static class XopenTestEnv  {
-        static final String xopenDDL = " CREATE SCHEMA XOPEN1;\n" +
-                "\n" +
-                "  CREATE TABLE XOPEN1.ECCO (C1 VARCHAR(6));\n" +
-                "\n" +
-                "  CREATE TABLE AAA (A1 VARCHAR(2), A2 VARCHAR(2), A3 VARCHAR(2));\n" +
-                "  CREATE TABLE BBB (B1 VARCHAR(2), B2 VARCHAR(2), B3 VARCHAR(2) NOT NULL UNIQUE);\n" +
-                "  CREATE TABLE CCC (C1 VARCHAR(2), C2 VARCHAR(2), C3 VARCHAR(2));\n" +
-                "\n" +
-                "  CREATE TABLE CHAR_TEST (COL1 VARCHAR(254));\n" +
-                "  CREATE TABLE INT_TEST (COL1 INTEGER);\n" +
-                "  CREATE TABLE SMALL_TEST (COL1 SMALLINT);\n" +
-                "  CREATE TABLE REAL_TEST (REF VARCHAR(1),COL1 REAL);\n" +
-                "  CREATE TABLE REAL3_TEST (COL1 REAL,COL2 REAL,COL3 REAL);\n" +
-                "  CREATE TABLE DOUB_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
-                "  CREATE TABLE DOUB3_TEST (COL1 FLOAT,COL2 FLOAT\n" +
-                "     PRECISION,COL3 FLOAT);\n" +
-                "\n" +
-                "-- Users may provide an explicit precision for FLOAT_TEST.COL1\n" +
-                "\n" +
-                "  CREATE TABLE FLOAT_TEST (REF VARCHAR(1),COL1 FLOAT);\n" +
-                "\n" +
-                "  CREATE TABLE INDEXLIMIT(COL1 VARCHAR(2), COL2 VARCHAR(2),\n" +
-                "     COL3 VARCHAR(2), COL4 VARCHAR(2), COL5 VARCHAR(2),\n" +
-                "     COL6 VARCHAR(2), COL7 VARCHAR(2));\n" +
-                "\n" +
-                "  CREATE TABLE WIDETABLE (WIDE VARCHAR(118));\n" +
-                "  CREATE TABLE WIDETAB (WIDE1 VARCHAR(38), WIDE2 VARCHAR(38), WIDE3 VARCHAR(38));\n" +
-                "\n" +
-                "  CREATE TABLE TEST_TRUNC (TEST_STRING VARCHAR (6));\n" +
-                "\n" +
-                "  CREATE TABLE WARNING(TESTCHAR VARCHAR(6), TESTINT INTEGER);\n" +
-                "\n" +
-                "  CREATE TABLE TV (dec3 DECIMAL(3), dec1514 DECIMAL(15,14),\n" +
-                "                   dec150 DECIMAL(15,0), dec1515 DECIMAL(15,15));\n" +
-                "\n" +
-                "  CREATE TABLE TU (smint SMALLINT, dec1514 DECIMAL(15,14),\n" +
-                "                   integr INTEGER, dec1515 DECIMAL(15,15));\n" +
-                "\n" +
-                "  CREATE TABLE STAFF\n" +
-                "   (EMPNUM   VARCHAR(3) NOT NULL UNIQUE,\n" +
-                "    EMPNAME  VARCHAR(20),\n" +
-                "    GRADE    DECIMAL(4),\n" +
-                "    CITY     VARCHAR(15));\n" +
-                "\n" +
-                "\n" +
-                "  CREATE TABLE PROJ\n" +
-                "   (PNUM     VARCHAR(3) NOT NULL UNIQUE,\n" +
-                "    PNAME    VARCHAR(20),\n" +
-                "    PTYPE    VARCHAR(6),\n" +
-                "    BUDGET   DECIMAL(9),\n" +
-                "    CITY     VARCHAR(15));\n" +
-                "\n" +
-                "\n" +
-                "  CREATE TABLE WORKS\n" +
-                "   (EMPNUM   VARCHAR(3) NOT NULL,\n" +
-                "    PNUM     VARCHAR(3) NOT NULL,\n" +
-                "    HOURS    DECIMAL(5),\n" +
-                "    UNIQUE(EMPNUM,PNUM));\n" +
-                "\n" +
-                "  CREATE TABLE INTS\n" +
-                "  (INT1      SMALLINT NOT NULL,\n" +
-                "   INT2      SMALLINT NOT NULL);\n" +
-                "  CREATE PROCEDURE TestProcedure AS INSERT INTO AAA VALUES(?,?,?);\n" +
-                "";
-
-        final VoltProjectBuilder m_builder;
-        LocalCluster m_cluster;
-        Client m_client = null;
-
-        XopenTestEnv(String pathToCatalog, String pathToDeployment,
-                int siteCount, int hostCount, int kFactor, boolean enableIv2) {
-            m_builder = new VoltProjectBuilder();
-            try {
-                m_builder.addLiteralSchema(xopenDDL);
-
-                // add more partitioned and replicated tables, PARTED[1-3] and REPED[1-2]
-                AdHocQueryTester.setUpSchema(m_builder, pathToCatalog, pathToDeployment);
-            }
-            catch (Exception e) {
-                e.printStackTrace();
-                fail("Failed to set up schema");
-            }
-
-            m_cluster = new LocalCluster(pathToCatalog, siteCount, hostCount, kFactor,
-                                    BackendTarget.NATIVE_EE_JNI,
-                                    LocalCluster.FailureState.ALL_RUNNING,
-                                    m_debug, false, enableIv2);
-            boolean success = m_cluster.compile(m_builder);
-            assert(success);
-
-            try {
-                MiscUtils.copyFile(m_builder.getPathToDeployment(), pathToDeployment);
-            }
-            catch (Exception e) {
-                fail(String.format("Failed to copy \"%s\" to \"%s\"", m_builder.getPathToDeployment(), pathToDeployment));
-            }
-
-            m_cluster.setHasLocalServer(true);
-        }
-
-        void setUp() {
-            m_cluster.startUp();
-
-            try {
-                // do the test
-                m_client = ClientFactory.createClient();
-                m_client.createConnection("localhost", m_cluster.port(0));
-            }
-            catch (UnknownHostException e) {
-                e.printStackTrace();
-                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
-            }
-            catch (IOException e) {
-                e.printStackTrace();
-                fail(String.format("Failed to connect to localhost:%d", m_cluster.port(0)));
-            }
-        }
-
-        void tearDown() {
-            if (m_client != null) {
-                try {
-                    m_client.close();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    fail("Failed to close client");
-                }
-            }
-            m_client = null;
-
-            if (m_cluster != null) {
-                try {
-                    m_cluster.shutDown();
-                } catch (InterruptedException e) {
-                    e.printStackTrace();
-                    fail("Failed to shut down cluster");
-                }
-            }
-            m_cluster = null;
-
-            // no clue how helpful this is
-            System.gc();
-        }
-    }
 }
