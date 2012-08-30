@@ -459,11 +459,21 @@ public abstract class AbstractParsedStmt {
      * @param db
      */
     private void parseTables(VoltXMLElement tablesNode, Database db) {
+        Set<Table> visited = new HashSet<Table>(tableList);
+
         for (VoltXMLElement node : tablesNode.children) {
             if (node.name.equalsIgnoreCase("tablescan")) {
+
                 String tableName = node.attributes.get("table");
                 Table table = db.getTables().getIgnoreCase(tableName);
+
                 assert(table != null);
+
+                if( visited.contains( table)) {
+                    throw new PlanningErrorException("VoltDB does not yet support self joins, consider using views instead");
+                }
+
+                visited.add(table);
                 tableList.add(table);
             }
         }
