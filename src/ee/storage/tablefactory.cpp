@@ -112,14 +112,11 @@ Table* TableFactory::getPersistentTable(
         table = new PersistentTable(ctx, exportEnabled);
         PersistentTable *pTable = dynamic_cast<PersistentTable*>(table);
         TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
-        pTable->m_indexCount = (int)indexes.size();
-        pTable->m_indexes = new TableIndex*[indexes.size()];
         pTable->m_partitionColumn = partitionColumn;
 
         for (int i = 0; i < indexes.size(); ++i) {
-            pTable->m_indexes[i] = TableIndexFactory::getInstance(indexes[i]);
+            pTable->addIndex(TableIndexFactory::getInstance(indexes[i]));
         }
-        initConstraints(pTable);
     }
 
     // initialize stats for the table
@@ -153,15 +150,12 @@ Table* TableFactory::getPersistentTable(
         TableFactory::initCommon(databaseId, pTable, name, schema, columnNames, true);
         pTable->m_partitionColumn = partitionColumn;
 
-        // one for pkey + all the other indexes
-        pTable->m_indexCount = 1 + (int)indexes.size();
-        pTable->m_indexes = new TableIndex*[1 + indexes.size()];
-        pTable->m_indexes[0] = pTable->m_pkeyIndex;
+        pTable->addIndex(pTable->m_pkeyIndex);
+        pTable->setPrimaryKeyIndex(pTable->m_pkeyIndex);
 
         for (int i = 0; i < indexes.size(); ++i) {
-            pTable->m_indexes[i + 1] = TableIndexFactory::getInstance(indexes[i]);
+            pTable->addIndex(TableIndexFactory::getInstance(indexes[i]));
         }
-        initConstraints(pTable);
     }
 
     // initialize stats for the table
@@ -215,33 +209,6 @@ void TableFactory::initCommon(
     table->m_name = name;
     table->initializeWithColumns(schema, columnNames, ownsTupleSchema);
     assert (table->columnCount() == schema->columnCount());
-}
-
-void TableFactory::initConstraints(PersistentTable* table) {
-
-    // count the unique indexes
-    table->m_uniqueIndexCount = 0;
-    for (int i = 0; i < table->m_indexCount; ++i) {
-        TableIndex *index = table->m_indexes[i];
-        if (index->isUniqueIndex()) {
-            table->m_uniqueIndexCount++;
-        }
-    }
-
-    if (table->m_uniqueIndexes)
-        delete[] table->m_uniqueIndexes;
-    table->m_uniqueIndexes = new TableIndex*[table->m_uniqueIndexCount];
-    int curIndex = 0;
-    if (table->m_pkeyIndex != NULL) {
-        table->m_uniqueIndexes[curIndex++] = table->m_pkeyIndex;
-    }
-
-    for (int i = 0; i < table->m_indexCount; ++i) {
-        TableIndex *index = table->m_indexes[i];
-        if ((index->isUniqueIndex()) && (index != table->m_pkeyIndex)) {
-            table->m_uniqueIndexes[curIndex++] = index;
-        }
-    }
 }
 
 void TableFactory::configureStats(voltdb::CatalogId databaseId,

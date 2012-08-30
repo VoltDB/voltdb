@@ -46,7 +46,9 @@
 #include <sstream>
 #include <cassert>
 #include <cstdio>
-#include "boost/scoped_array.hpp"
+#include <boost/foreach.hpp>
+#include <boost/scoped_array.hpp>
+
 #include "table.h"
 #include "common/debuglog.h"
 #include "common/serializeio.h"
@@ -78,6 +80,7 @@ Table::Table(int tableAllocationTargetSize) :
     m_name(""),
     m_ownsTupleSchema(true),
     m_tableAllocationTargetSize(tableAllocationTargetSize),
+    m_pkeyIndex(NULL),
     m_refcount(0)
 {
 }
@@ -85,6 +88,12 @@ Table::Table(int tableAllocationTargetSize) :
 Table::~Table() {
     // not all tables are reference counted but this should be invariant
     assert(m_refcount == 0);
+
+    // clean up indexes
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        delete index;
+    }
+    m_pkeyIndex = NULL;
 
     // clear the schema
     if (m_ownsTupleSchema) {
@@ -482,6 +491,51 @@ void Table::loadTuplesFrom(SerializeInput &serialize_io,
     }
 
     loadTuplesFromNoHeader(serialize_io, stringPool);
+}
+
+bool isExistingTableIndex(std::vector<TableIndex*> &indexes, TableIndex* index) {
+    BOOST_FOREACH(TableIndex *i2, indexes) {
+        if (i2 == index) {
+            return true;
+        }
+    }
+    return false;
+}
+
+TableIndex *Table::index(std::string name) {
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        if (index->getName().compare(name) == 0) {
+            return index;
+        }
+    }
+    std::stringstream errorString;
+    errorString << "Could not find Index with name " << name << std::endl;
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        errorString << index->getName() << std::endl;
+    }
+    throwFatalException("%s", errorString.str().c_str());
+}
+
+void Table::addIndex(TableIndex *index) {
+    // for now, no calling on non-empty tables
+    assert(activeTupleCount() == 0);
+    assert(!isExistingTableIndex(m_indexes, index));
+
+    // future versions will fill the new index
+    // with tuple data on non-empty tables
+
+    if (index->isUniqueIndex()) {
+        m_uniqueIndexes.push_back(index);
+    }
+    m_indexes.push_back(index);
+}
+
+void Table::setPrimaryKeyIndex(TableIndex *index) {
+    // for now, no calling on non-empty tables
+    assert(activeTupleCount() == 0);
+    assert(isExistingTableIndex(m_indexes, index));
+    
+    m_pkeyIndex = index;
 }
 
 }

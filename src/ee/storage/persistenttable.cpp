@@ -85,8 +85,7 @@ PersistentTable::PersistentTable(ExecutorContext *ctx, bool exportEnabled) :
     Table(TABLE_BLOCKSIZE),
     m_iter(this, m_data.begin()),
     m_executorContext(ctx),
-    m_uniqueIndexes(NULL), m_uniqueIndexCount(0), m_allowNulls(NULL),
-    m_indexes(NULL), m_indexCount(0), m_pkeyIndex(NULL),
+    m_allowNulls(NULL),
     stats_(this),
     m_COWContext(NULL),
     m_failedCompactionCount(0)
@@ -114,16 +113,7 @@ PersistentTable::~PersistentTable() {
         tuple.setActiveFalse();
     }
 
-    for (int i = 0; i < m_indexCount; ++i) {
-        TableIndex *index = m_indexes[i];
-        if (index != m_pkeyIndex) {
-            delete index;
-        }
-    }
-    if (m_pkeyIndex) delete m_pkeyIndex;
-    if (m_uniqueIndexes) delete[] m_uniqueIndexes;
     if (m_allowNulls) delete[] m_allowNulls;
-    if (m_indexes) delete[] m_indexes;
 
     // note this class has ownership of the views, even if they
     // were allocated by VoltDBEngine
@@ -453,10 +443,10 @@ void PersistentTable::updateTupleForUndo(TableTuple &targetTupleToUpdate,
 {
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
-        for (int i = m_indexCount - 1; i >= 0; --i) {
-            if (!m_indexes[i]->deleteEntry(&targetTupleToUpdate)) {
+        BOOST_FOREACH(TableIndex *index, m_indexes) {
+            if (!index->deleteEntry(&targetTupleToUpdate)) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
-                                    m_name.c_str(), m_indexes[i]->getName().c_str());
+                                    m_name.c_str(), index->getName().c_str());
             }
         }
     }
@@ -478,10 +468,10 @@ void PersistentTable::updateTupleForUndo(TableTuple &targetTupleToUpdate,
 
     //If the indexes were never updated there is no need to revert them.
     if (revertIndexes) {
-        for (int i = m_indexCount - 1; i >= 0; --i) {
-            if (!m_indexes[i]->addEntry(&targetTupleToUpdate)) {
+        BOOST_FOREACH(TableIndex *index, m_indexes) {
+            if (!index->addEntry(&targetTupleToUpdate)) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
-                                    m_name.c_str(), m_indexes[i]->getName().c_str());
+                                    m_name.c_str(), index->getName().c_str());
             }
         }
     }
@@ -586,30 +576,30 @@ TableTuple PersistentTable::lookupTuple(TableTuple tuple) {
 }
 
 void PersistentTable::insertIntoAllIndexes(TableTuple *tuple) {
-    for (int i = m_indexCount - 1; i >= 0;--i) {
-        if (!m_indexes[i]->addEntry(tuple)) {
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        if (!index->addEntry(tuple)) {
             throwFatalException(
-                    "Failed to insert tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
+                    "Failed to insert tuple in Table: %s Index %s", m_name.c_str(), index->getName().c_str());
         }
     }
 }
 
 void PersistentTable::deleteFromAllIndexes(TableTuple *tuple) {
-    for (int i = m_indexCount - 1; i >= 0;--i) {
-        if (!m_indexes[i]->deleteEntry(tuple)) {
+    BOOST_FOREACH(TableIndex *index, m_indexes) {
+        if (!index->deleteEntry(tuple)) {
             throwFatalException(
-                    "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), m_indexes[i]->getName().c_str());
+                    "Failed to delete tuple in Table: %s Index %s", m_name.c_str(), index->getName().c_str());
         }
     }
 }
 
 bool PersistentTable::tryInsertOnAllIndexes(TableTuple *tuple) {
-    for (int i = m_indexCount - 1; i >= 0; --i) {
+    for (int i = static_cast<int>(m_indexes.size()) - 1; i >= 0; --i) {
         FAIL_IF(!m_indexes[i]->addEntry(tuple)) {
             VOLT_DEBUG("Failed to insert into index %s,%s",
                        m_indexes[i]->getTypeName().c_str(),
                        m_indexes[i]->getName().c_str());
-            for (int j = i + 1; j < m_indexCount; ++j) {
+            for (int j = i + 1; j < m_indexes.size(); ++j) {
                 m_indexes[j]->deleteEntry(tuple);
             }
             return false;
@@ -667,11 +657,11 @@ std::string PersistentTable::tableType() const {
 std::string PersistentTable::debug() {
     std::ostringstream buffer;
     buffer << Table::debug();
-    buffer << "\tINDEXES: " << m_indexCount << "\n";
+    buffer << "\tINDEXES: " << m_indexes.size() << "\n";
 
     // Indexes
     buffer << "===========================================================\n";
-    for (int index_ctr = 0; index_ctr < m_indexCount; ++index_ctr) {
+    for (int index_ctr = 0; index_ctr < m_indexes.size(); ++index_ctr) {
         if (m_indexes[index_ctr]) {
             buffer << "\t[" << index_ctr << "] " << m_indexes[index_ctr]->debug();
             //
@@ -685,34 +675,6 @@ std::string PersistentTable::debug() {
     }
 
     return buffer.str();
-}
-
-// ------------------------------------------------------------------
-// Accessors
-// ------------------------------------------------------------------
-// Index
-TableIndex *PersistentTable::index(std::string name) {
-    for (int i = 0; i < m_indexCount; ++i) {
-        TableIndex *index = m_indexes[i];
-        if (index->getName().compare(name) == 0) {
-            return index;
-        }
-    }
-    std::stringstream errorString;
-    errorString << "Could not find Index with name " << name << std::endl;
-    for (int i = 0; i < m_indexCount; ++i) {
-        TableIndex *index = m_indexes[i];
-        errorString << index->getName() << std::endl;
-    }
-    throwFatalException( "%s", errorString.str().c_str());
-}
-
-std::vector<TableIndex*> PersistentTable::allIndexes() const {
-    std::vector<TableIndex*> retval;
-    for (int i = 0; i < m_indexCount; i++)
-        retval.push_back(m_indexes[i]);
-
-    return retval;
 }
 
 void PersistentTable::onSetColumns() {
@@ -840,8 +802,8 @@ void PersistentTable::processRecoveryMessage(RecoveryProtoMsg* message, Pool *po
     case RECOVERY_MSG_TYPE_SCAN_TUPLES: {
         if (activeTupleCount() == 0) {
             uint32_t tupleCount = message->totalTupleCount();
-            for (int i = 0; i < m_indexCount; i++) {
-                m_indexes[i]->ensureCapacity(tupleCount);
+            BOOST_FOREACH(TableIndex *index, m_indexes) {
+                index->ensureCapacity(tupleCount);
             }
         }
         loadTuplesFromNoHeader(*message->stream(), pool);
@@ -913,10 +875,10 @@ void PersistentTable::swapTuples(TableTuple &originalTuple,
      * not move the tuple.
      */
     if (!originalTuple.isPendingDelete()) {
-        for (int i = m_indexCount - 1; i >= 0;--i) {
-            if (!m_indexes[i]->replaceEntryNoKeyChange(destinationTuple, originalTuple)) {
+        BOOST_FOREACH(TableIndex *index, m_indexes) {
+            if (!index->replaceEntryNoKeyChange(destinationTuple, originalTuple)) {
                 throwFatalException("Failed to update tuple in Table: %s Index %s",
-                                    m_name.c_str(), m_indexes[i]->getName().c_str());
+                                    m_name.c_str(), index->getName().c_str());
             }
         }
     }

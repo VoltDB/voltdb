@@ -156,8 +156,6 @@ public:
         TempTableLimits* limits);
 
 private:
-    static void initConstraints(PersistentTable* table);
-
     static void initCommon(
         voltdb::CatalogId databaseId,
         Table *table,

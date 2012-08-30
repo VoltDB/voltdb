@@ -764,7 +764,6 @@ bool VoltDBEngine::rebuildTableCollections() {
                                                       index->getIndexStats());
             }
 
-
             /*map<string, catalog::Index*>::const_iterator index_iterator;
             for (index_iterator = catTable->indexes().begin();
                  index_iterator != catTable->indexes().end(); index_iterator++) {
