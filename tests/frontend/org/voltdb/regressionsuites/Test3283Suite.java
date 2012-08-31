@@ -84,10 +84,10 @@ public class Test3283Suite extends RegressionSuite {
         ClientResponse cr = null;
         VoltTable r = null;
 
-        cr = client.callProcedure("RIGHT", 0, 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[RIGHT- 0] result:\n" + r);
+//        cr = client.callProcedure("CONCAT", 1);
+//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+//        r = cr.getResults()[0];
+//        System.err.println("[CONCAT- 0] result:\n" + r);
 
     }
 
@@ -121,7 +121,8 @@ public class Test3283Suite extends RegressionSuite {
         }
         project.addPartitionInfo("P1", "ID");
 
-//        project.addStmtProcedure("CONCAT", "select id, CONCAT(VCA,VCB) from P1 where id = ?");
+//        project.addStmtProcedure("REPEAT", "select REPEAT(VCA,?) from P1 where id = ?");
+        project.addStmtProcedure("CONCAT", "select id, CONCAT(VCA,VCB) from P1 where id = ?");
 //        project.addStmtProcedure("CONCAT", "select id, VCA||VCB from P1 where id = ?");
           project.addStmtProcedure("LEFT", "select id, LEFT(VCA,?) from P1 where id = ?");
           project.addStmtProcedure("RIGHT", "select id, RIGHT(VCA,?) from P1 where id = ?");

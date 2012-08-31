@@ -352,7 +352,6 @@ public class FunctionCustom extends FunctionSQL {
 
             case FUNC_CONCAT :
                 parseList = doubleParamList;
-                voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
             case FUNC_LEFT :
                 parseList = doubleParamList;
@@ -485,11 +484,11 @@ public class FunctionCustom extends FunctionSQL {
             case FUNC_BITOR :
             case FUNC_BITXOR :
             case FUNC_DIFFERENCE :
-            case FUNC_REPEAT :
             case FUNC_DATEDIFF :
                 parseList = doubleParamList;
                 voltDisabled = DISABLED_IN_FUNCTIONCUSTOM_CONSTRUCTOR;
                 break;
+            case FUNC_REPEAT :
             case FUNC_RIGHT :
                 parseList = doubleParamList;
                 break;

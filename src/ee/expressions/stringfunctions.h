@@ -79,6 +79,41 @@ template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
     return getTempStringValue(spacesStr.c_str(),count);
 }
 
+/** implement the 2-argument SQL REPEAT function */
+template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& strValue = arguments[0];
+    if (strValue.isNull()) {
+        return strValue;
+    }
+    if (strValue.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (strValue.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+
+    const NValue& countArg = arguments[1];
+    if (countArg.isNull()) {
+        return getNullStringValue();
+    }
+    int32_t count = static_cast<int32_t>(countArg.castAsBigIntAndGetValue());
+    if (count < 0) {
+        char msg[1024];
+        snprintf(msg, 1024, "data exception: substring error");
+        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+            msg);
+    }
+    if (count <= 1)
+        return getStringValue("");
+
+    const int32_t valueUTF8Length = strValue.getObjectLength();
+    char *repeatChars = reinterpret_cast<char*>(strValue.getObjectValue());
+
+    std::string repeatStr;
+    while (count-- > 0)
+        repeatStr.append(repeatChars,valueUTF8Length);
+
+    return getTempStringValue(repeatStr.c_str(),repeatStr.length());
+}
+
 /** implement the 2-argument SQL FUNC_POSITION_CHAR function */
 template<> inline NValue NValue::call<FUNC_POSITION_CHAR>(const std::vector<NValue>& arguments) {
     assert(arguments.size() == 2);
@@ -177,6 +212,32 @@ template<> inline NValue NValue::call<FUNC_RIGHT>(const std::vector<NValue>& arg
 
     const char* newStartChar = getIthCharPosition(valueChars,valueUTF8Length,charLen-count+1);
     return getTempStringValue(newStartChar,(int32_t)(valueEnd - newStartChar));
+}
+
+/** implement the 2-argument SQL CONCAT function */
+template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& arguments) {
+    assert(arguments.size() == 2);
+    const NValue& left = arguments[0];
+    if (left.isNull()) {
+        return getNullValue();
+    }
+    if (left.getValueType() != VALUE_TYPE_VARCHAR) {
+        throwCastSQLException (left.getValueType(), VALUE_TYPE_VARCHAR);
+    }
+    int32_t lenLeft = left.getObjectLength();
+
+    const NValue& right = arguments[1];
+    if (right.isNull()) {
+        return getNullValue();
+    }
+    int32_t lenRight = right.getObjectLength();
+    char *leftChars = reinterpret_cast<char*>(left.getObjectValue());
+    char *rightChars = reinterpret_cast<char*>(right.getObjectValue());
+
+    std::string leftStr(leftChars, lenLeft);
+    leftStr.append(rightChars, lenRight);
+
+    return getTempStringValue(leftStr.c_str(),lenLeft);
 }
 
 /** implement the 2-argument SQL SUBSTRING function */

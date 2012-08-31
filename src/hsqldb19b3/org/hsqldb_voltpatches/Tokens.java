@@ -1588,6 +1588,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_COLUMN, COLUMN);
         reservedKeys.put(Tokens.T_COMMIT, COMMIT);
         reservedKeys.put(Tokens.T_COMPARABLE, COMPARABLE);
+        reservedKeys.put(Tokens.T_CONCAT, CONCAT);
         reservedKeys.put(Tokens.T_CONDITION, CONDITION);
         reservedKeys.put(Tokens.T_CONNECT, CONNECT);
         reservedKeys.put(Tokens.T_CONSTRAINT, CONSTRAINT);

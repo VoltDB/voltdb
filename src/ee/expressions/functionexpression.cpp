@@ -270,6 +270,10 @@ ExpressionUtil::functionFactory(int functionId, const std::vector<AbstractExpres
             ret = new GeneralFunctionExpression<FUNC_LEFT>(*arguments);
         } else if (functionId == FUNC_RIGHT) {
             ret = new GeneralFunctionExpression<FUNC_RIGHT>(*arguments);
+        } else if (functionId == FUNC_REPEAT) {
+            ret = new GeneralFunctionExpression<FUNC_REPEAT>(*arguments);
+        } else if (functionId == FUNC_CONCAT) {
+            ret = new GeneralFunctionExpression<FUNC_CONCAT>(*arguments);
         }
     }
     // May return null, leaving it to the caller (with more context) to generate an exception.
