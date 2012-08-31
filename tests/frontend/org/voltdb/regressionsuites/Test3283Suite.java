@@ -54,7 +54,6 @@ public class Test3283Suite extends RegressionSuite {
 
     public void testAbs() throws Exception
     {
-        System.out.println("STARTING testAbs");
         Client client = getClient();
         ProcedureCallback callback = new ProcedureCallback() {
             @Override
@@ -89,77 +88,6 @@ public class Test3283Suite extends RegressionSuite {
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         r = cr.getResults()[0];
         System.err.println("[RIGHT- 0] result:\n" + r);
-
-        cr = client.callProcedure("RIGHT", 1, 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[RIGHT- 1] result:\n" + r);
-
-        cr = client.callProcedure("RIGHT", 2, 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[RIGHT- 2] result:\n" + r);
-
-        cr = client.callProcedure("RIGHT", 3, 1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[RIGHT- 3] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", -10,1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT- -1] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 0,1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-0] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 1,1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-1] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 2,1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-2] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 3,1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-3] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 4,1);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-4] result:\n" + r);
-
-
-        cr = client.callProcedure("LEFT", 0,2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-0] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 1,2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-1] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 2,2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-2] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 3,2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-3] result:\n" + r);
-
-        cr = client.callProcedure("LEFT", 4,2);
-        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-        r = cr.getResults()[0];
-        System.err.println("[LEFT-4] result:\n" + r);
 
     }
 
@@ -200,7 +128,7 @@ public class Test3283Suite extends RegressionSuite {
 //        project.addStmtProcedure("LTRIM", "select LTRIM(VCA) from P1 where id = ?");
 //        project.addStmtProcedure("RTRIM", "select RTRIM(VCA) from P1 where id = ?");
 //        project.addStmtProcedure("LTRIM", "select LTRIM(VCA) from P1 where id = ?");
-//        project.addStmtProcedure("SPACE", "select SPACE(2) || VCA from P1 where id = ?");
+          project.addStmtProcedure("SPACE", "select SPACE(2) + VCA from P1 where id = ?");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);

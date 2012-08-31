@@ -68,7 +68,15 @@ template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
         return getNullStringValue();
 
     int32_t count = static_cast<int32_t>(castAsBigIntAndGetValue());
-    return getTempStringValue("",count);
+    if (count < 0) {
+        char msg[1024];
+        snprintf(msg, 1024, "data exception: substring error");
+        throw SQLException(SQLException::data_exception_string_data_length_mismatch,
+            msg);
+    }
+
+    std::string spacesStr (count, ' ');
+    return getTempStringValue(spacesStr.c_str(),count);
 }
 
 /** implement the 2-argument SQL FUNC_POSITION_CHAR function */
