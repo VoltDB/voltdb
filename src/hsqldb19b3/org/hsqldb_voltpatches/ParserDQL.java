@@ -4190,6 +4190,9 @@ public class ParserDQL extends ParserBase {
                                 ex = caught;
                             }
                             if (ex != null) {
+                                if (ex.getMessage().equalsIgnoreCase("unexpected token: )")) {
+                                    break;
+                                }
                                 return ex;
                             }
                         }
