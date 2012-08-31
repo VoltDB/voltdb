@@ -46,8 +46,6 @@ public class SSHTools {
         } else {
             m_keyFile = key;
         }
-        System.out.println("JWP: " + m_username);
-        System.out.println("JWP: " + m_keyFile);
    }
 
     // Temporary - delete when finished implementation
