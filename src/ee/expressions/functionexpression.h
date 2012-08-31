@@ -138,8 +138,6 @@ static const int FUNC_SUBSTR           = 139;
 static const int FUNC_DATEDIFF         = 140;
 static const int FUNC_SECONDS_MIDNIGHT = 141;
 
-static const int FUNC_DECODE           = 150;
-
 // Specializations of EXTRACT.
 // They are based on various sets of constants and need to be adjusted by a constant offset
 // to prevent conflict with the other FUNC_ definitions
@@ -204,7 +202,7 @@ static const int FUNC_VOLT_SUBSTRING_CHAR_FROM              = 10000;
 
 // VoltDB-specific functions
 static const int FUNC_VOLT_SQL_ERROR                   = 20000;
-
+static const int FUNC_DECODE          				   = 20001;
 }
 
 // All of these "...functions.h" files need to be included AFTER the above definitions

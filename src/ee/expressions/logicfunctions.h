@@ -19,9 +19,28 @@ namespace voltdb {
 
 /** implement the 2n-argument DECODE function */
 template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& arguments) {
-	const NValue& strValue = arguments[0];
-    return strValue;
+	int size = (int)arguments.size();
+	assert(size>=3);
+    ValueType type = arguments[2].getValueType();
+	NValue retval(type);
+	bool hasDefault = ( size % 2 == 0 );
+	int loopnum = ( size - 1 )/2;
+	NValue baseval = arguments[0];
+	for( int i = 0; i < loopnum; i++ ) {
+		retval = arguments[2*i+1];
+		switch(type) {
+		case VALUE_TYPE_TINYINT:
+			if(baseval.getTinyInt() == retval.getTinyInt( )){
+				return retval;
+			}
+		default:
+			if( hasDefault ) {
+				return arguments[size-1];
+			}
+			return NValue::getNullStringValue();
+		}
+	}
+	return retval;
 }
-
 
 }
