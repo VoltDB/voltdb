@@ -79,15 +79,20 @@ public class Test3283Suite extends RegressionSuite {
             //client.callProcedure(callback, "P1.insert", - id, "贾"+String.valueOf(id), 10, 1.1, new Timestamp(100000000L));
             //client.drain();
         }
-        client.callProcedure(callback, "P1.insert", 1, "贾鑫V", " NB",10);
+        client.callProcedure(callback, "P1.insert", 1, "贾鑫V", "NB",10);
         client.callProcedure(callback, "P1.insert", 2, "Xin", " @Volt", 10);
         ClientResponse cr = null;
         VoltTable r = null;
 
-//        cr = client.callProcedure("CONCAT", 1);
-//        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
-//        r = cr.getResults()[0];
-//        System.err.println("[CONCAT- 0] result:\n" + r);
+        cr = client.callProcedure("CONCAT", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[CONCAT- 2] result:\n" + r);
+        
+        cr = client.callProcedure("CONCAT||", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        r = cr.getResults()[0];
+        System.err.println("[CONCAT- ||] result:\n" + r);
 
     }
 
@@ -121,9 +126,10 @@ public class Test3283Suite extends RegressionSuite {
         }
         project.addPartitionInfo("P1", "ID");
 
-//        project.addStmtProcedure("REPEAT", "select REPEAT(VCA,?) from P1 where id = ?");
+        project.addStmtProcedure("REPEAT", "select REPEAT(VCA,?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT", "select id, CONCAT(VCA,VCB) from P1 where id = ?");
-//        project.addStmtProcedure("CONCAT", "select id, VCA||VCB from P1 where id = ?");
+        project.addStmtProcedure("CONCAT||", "select id, VCA||VCB from P1 where id = ?");
+        project.addStmtProcedure("CONCATOPT", "select id, VCA||? from P1 where id = ?");
           project.addStmtProcedure("LEFT", "select id, LEFT(VCA,?) from P1 where id = ?");
           project.addStmtProcedure("RIGHT", "select id, RIGHT(VCA,?) from P1 where id = ?");
 //        project.addStmtProcedure("LTRIM", "select LTRIM(VCA) from P1 where id = ?");

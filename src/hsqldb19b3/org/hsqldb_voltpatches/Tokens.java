@@ -763,7 +763,7 @@ public class Tokens {
     static final String        T_BITXOR           = "BITXOR";
     static final String        T_ROUNDMAGIC       = "ROUNDMAGIC";
     static final String        T_ASCII            = "ASCII";
-    static final String        T_CONCAT_WORD      = "CONCAT_WORD";
+    static final String        T_CONCAT_WORD      = "CONCAT";
     static final String        T_DIFFERENCE       = "DIFFERENCE";
     static final String        T_HEXTORAW         = "HEXTORAW";
     static final String        T_LCASE            = "LCASE";

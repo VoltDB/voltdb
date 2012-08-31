@@ -117,7 +117,7 @@ public class FunctionCustom extends FunctionSQL {
     private static final int FUNC_ROUNDMAGIC       = 121;
     private static final int FUNC_ASCII            = 122;
     private static final int FUNC_CHAR             = 123;
-    private static final int FUNC_CONCAT           = 124;
+    public  static final int FUNC_CONCAT           = 124;
     private static final int FUNC_DIFFERENCE       = 125;
     private static final int FUNC_HEXTORAW         = 126;
     private static final int FUNC_LEFT             = 128;
@@ -1549,6 +1549,10 @@ public class FunctionCustom extends FunctionSQL {
 
                 if (!isChar && !nodes[0].dataType.isBinaryType()) {
                     throw Error.error(ErrorCode.X_42561);
+                }
+                
+                if (nodes[1].dataType == null) {
+                    nodes[1].dataType = Type.SQL_INTEGER;
                 }
 
                 dataType = isChar ? Type.SQL_VARCHAR

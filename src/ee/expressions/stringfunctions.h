@@ -62,6 +62,17 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     return getIntegerValue(getCharLength(valueChars, getObjectLength()));
 }
 
+/** implement the 1-argument SQL TRIM CHAR function
+template<> inline NValue NValue::callUnary<FUNC_TRIM_CHAR>() const {
+    if (isNull())
+        return getNullStringValue();
+
+    char *originalChars = reinterpret_cast<char*>(getObjectValue());
+    std::string originalStr (originalChars, getObjectLength());
+
+    return getTempStringValue(spacesStr.c_str(),count);
+}*/
+
 /** implement the 1-argument SQL SPACE function */
 template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
     if (isNull())
@@ -99,9 +110,9 @@ template<> inline NValue NValue::call<FUNC_REPEAT>(const std::vector<NValue>& ar
         char msg[1024];
         snprintf(msg, 1024, "data exception: substring error");
         throw SQLException(SQLException::data_exception_string_data_length_mismatch,
-            msg);
+                msg);
     }
-    if (count <= 1)
+    if (count == 0)
         return getStringValue("");
 
     const int32_t valueUTF8Length = strValue.getObjectLength();
@@ -219,7 +230,7 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
     assert(arguments.size() == 2);
     const NValue& left = arguments[0];
     if (left.isNull()) {
-        return getNullValue();
+        return getNullStringValue();
     }
     if (left.getValueType() != VALUE_TYPE_VARCHAR) {
         throwCastSQLException (left.getValueType(), VALUE_TYPE_VARCHAR);
@@ -228,7 +239,7 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
 
     const NValue& right = arguments[1];
     if (right.isNull()) {
-        return getNullValue();
+        return getNullStringValue();
     }
     int32_t lenRight = right.getObjectLength();
     char *leftChars = reinterpret_cast<char*>(left.getObjectValue());
@@ -237,7 +248,7 @@ template<> inline NValue NValue::call<FUNC_CONCAT>(const std::vector<NValue>& ar
     std::string leftStr(leftChars, lenLeft);
     leftStr.append(rightChars, lenRight);
 
-    return getTempStringValue(leftStr.c_str(),lenLeft);
+    return getTempStringValue(leftStr.c_str(),lenLeft+lenRight);
 }
 
 /** implement the 2-argument SQL SUBSTRING function */
