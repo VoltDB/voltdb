@@ -62,17 +62,6 @@ template<> inline NValue NValue::callUnary<FUNC_CHAR_LENGTH>() const {
     return getIntegerValue(getCharLength(valueChars, getObjectLength()));
 }
 
-/** implement the 1-argument SQL TRIM CHAR function
-template<> inline NValue NValue::callUnary<FUNC_TRIM_CHAR>() const {
-    if (isNull())
-        return getNullStringValue();
-
-    char *originalChars = reinterpret_cast<char*>(getObjectValue());
-    std::string originalStr (originalChars, getObjectLength());
-
-    return getTempStringValue(spacesStr.c_str(),count);
-}*/
-
 /** implement the 1-argument SQL SPACE function */
 template<> inline NValue NValue::callUnary<FUNC_SPACE>() const {
     if (isNull())

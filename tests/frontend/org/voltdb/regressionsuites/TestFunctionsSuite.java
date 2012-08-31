@@ -659,7 +659,7 @@ public class TestFunctionsSuite extends RegressionSuite {
             assertNotNull(ex);
         }
     }
-    
+
     public void testSpace() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Space");
         Client client = getClient();
@@ -675,14 +675,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("", result.getString(1));
-        
+
         cr = client.callProcedure("SPACE", 1, 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals(" ", result.getString(1));
-        
+
         cr = client.callProcedure("SPACE", 5, 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -706,14 +706,14 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("", result.getString(1));
-        
+
         cr = client.callProcedure("REPEAT", 1, 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("foo", result.getString(1));
-        
+
         cr = client.callProcedure("REPEAT", 3, 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
@@ -721,7 +721,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertTrue(result.advanceRow());
         assertEquals("foofoofoo", result.getString(1));
     }
-    
+
     public void testConcat() throws NoConnectionsException, IOException, ProcCallException {
         System.out.println("STARTING test Concat and its Operator");
         Client client = getClient();
@@ -737,27 +737,27 @@ public class TestFunctionsSuite extends RegressionSuite {
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("Xin", result.getString(1));
-        
+
         cr = client.callProcedure("CONCAT", "@VoltDB", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("Xin@VoltDB", result.getString(1));
-        
+
         cr = client.callProcedure("ConcatOpt", "", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
         assertEquals("Xin", result.getString(1));
-        
+
         cr = client.callProcedure("ConcatOpt", "@VoltDB", 1);
         assertEquals(ClientResponse.SUCCESS, cr.getStatus());
         result = cr.getResults()[0];
         assertEquals(1, result.getRowCount());
         assertTrue(result.advanceRow());
-        assertEquals("Xin@VoltDB", result.getString(1));    
+        assertEquals("Xin@VoltDB", result.getString(1));
     }
 
     //
@@ -827,7 +827,7 @@ public class TestFunctionsSuite extends RegressionSuite {
         project.addStmtProcedure("REPEAT", "select id, REPEAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("CONCAT", "select id, CONCAT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("ConcatOpt", "select id, DESC || ? from P1 where id = ?");
-        
+
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 
