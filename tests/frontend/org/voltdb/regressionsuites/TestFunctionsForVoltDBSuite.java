@@ -24,7 +24,6 @@
 package org.voltdb.regressionsuites;
 
 import java.io.IOException;
-import java.sql.Timestamp;
 
 import org.voltdb.BackendTarget;
 import org.voltdb.VoltProcedure;
@@ -256,6 +255,99 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
         assertEquals(VoltType.NULL_BIGINT,result.getLong(1));
     }
 
+    public void testDECODE() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING DECODE");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "IBM", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 2, "Microsoft", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, "Hewlett Packard", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 4, "Gateway", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 5, null, 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // match 1st condition
+        cr = client.callProcedure("DECODE", 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("zheng",result.getString(1));
+
+        // match 2nd condition
+        cr = client.callProcedure("DECODE", 2);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("li",result.getString(1));
+
+        // match 3rd condition
+        cr = client.callProcedure("DECODE", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("at",result.getString(1));
+
+        // match 4th condition
+        cr = client.callProcedure("DECODE", 4);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("VoltDB",result.getString(1));
+
+        // null case
+        cr = client.callProcedure("DECODE", 5);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("where",result.getString(1));
+    }
+
+    public void testDECODENoDefault() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING DECODE No Default");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // null case
+        cr = client.callProcedure("DECODEND", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(null,result.getString(1));
+    }
+
+    public void testDECODEVeryLong() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING DECODE Exceed Limit");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
+
+        cr = client.callProcedure("P1.insert", 1, "zheng", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 2, "li", 10, 1.1);
+        cr = client.callProcedure("P1.insert", 3, null, 10, 1.1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        // null case
+        cr = client.callProcedure("DECODEVERYLONG", 3);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("where",result.getString(1));
+    }
 
     //
     // JUnit / RegressionSuite boilerplate
@@ -285,6 +377,26 @@ public class TestFunctionsForVoltDBSuite extends RegressionSuite {
             assertFalse(true);
         }
         project.addPartitionInfo("P1", "ID");
+        // Test DECODE
+        project.addStmtProcedure("DECODE", "select desc,  DECODE (desc,'IBM','zheng'," +
+                        "'Microsoft','li'," +
+                        "'Hewlett Packard','at'," +
+                        "'Gateway','VoltDB'," +
+                        "'where') from P1 where id = ?");
+        project.addStmtProcedure("DECODEND", "select desc,  DECODE (desc,'zheng','a') from P1 where id = ?");
+        project.addStmtProcedure("DECODEVERYLONG", "select desc,  DECODE (desc,'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'a','a'," +
+                "'where') from P1 where id = ?");
         // Test OCTET_LENGTH
         project.addStmtProcedure("OCTET_LENGTH", "select desc,  OCTET_LENGTH (desc) from P1 where id = ?");
         // Test POSITION and CHAR_LENGTH
