@@ -21,6 +21,7 @@ namespace voltdb {
 template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& arguments) {
 	int size = (int)arguments.size();
 	assert(size>=3);
+	assert(arguments[0].getValueType() == arguments[1].getValueType() );
     ValueType type = arguments[2].getValueType();
 	NValue retval(type);
 	bool hasDefault = ( size % 2 == 0 );
@@ -28,17 +29,12 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
 	NValue baseval = arguments[0];
 	for( int i = 0; i < loopnum; i++ ) {
 		retval = arguments[2*i+1];
-		switch(type) {
-		case VALUE_TYPE_TINYINT:
-			if(baseval.getTinyInt() == retval.getTinyInt( )){
-				return retval;
-			}
-		default:
-			if( hasDefault ) {
-				return arguments[size-1];
-			}
-			return NValue::getNullStringValue();
+		if( retval.compare(baseval) == VALUE_COMPARE_EQUAL ) {
+			return retval;
 		}
+	}
+	if( hasDefault ) {
+		return arguments[size-1];
 	}
 	return retval;
 }
