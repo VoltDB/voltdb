@@ -34,16 +34,20 @@ public class SSHTools {
     private final String m_keyFile;
 
     public SSHTools(String username, String key) {
-        if (username != null && username.isEmpty()) {
-            m_username = null;
+        // If a username is not specified, default to the user who started the process.
+        if (username == null || username.isEmpty()) {
+            m_username = System.getProperty("user.name");
         } else {
             m_username = username;
         }
+        // If a private key is not specified, default to the rsa key in the default location.
         if (key == null || key.isEmpty()) {
-            m_keyFile = null;
+            m_keyFile = System.getProperty("user.home") + "/.ssh/id_rsa";
         } else {
             m_keyFile = key;
         }
+        System.out.println("JWP: " + m_username);
+        System.out.println("JWP: " + m_keyFile);
    }
 
     // Temporary - delete when finished implementation
