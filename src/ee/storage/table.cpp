@@ -517,13 +517,22 @@ TableIndex *Table::index(std::string name) {
 }
 
 void Table::addIndex(TableIndex *index) {
-    // for now, no calling on non-empty tables
-    assert(activeTupleCount() == 0);
     assert(!isExistingTableIndex(m_indexes, index));
 
-    // future versions will fill the new index
-    // with tuple data on non-empty tables
+    // can't yet add a unique index to a non-emtpy table
+    // the problem is that there's no way to roll back this change if it fails
+    if (index->isUniqueIndex() && activeTupleCount() > 0) {
+        throwFatalException("Adding unique indexes to non-empty tables is unsupported.");
+    }
 
+    // fill the index with tuples... potentially the slow bit
+    TableTuple tuple;
+    TableIterator iter = iterator();
+    while (iter.next(tuple)) {
+        index->addEntry(&tuple);
+    }
+
+    // add the index to the table
     if (index->isUniqueIndex()) {
         m_uniqueIndexes.push_back(index);
     }
