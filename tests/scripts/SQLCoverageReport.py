@@ -257,6 +257,7 @@ def generate_html_reports(seed, statements_path, hsql_path, jni_path,
     hsql_file.close()
     jni_file.close()
 
+    keyStats = createSummaryInHTML(count, failures, mismatches, seed)
     report = """
 <html>
 <head>
@@ -267,19 +268,15 @@ h2 {text-transform: uppercase}
 </head>
 
 <body>
-Random seed: %s
-<br/>
-Total statements: %d
-<br/>
-Failed (*not* necessarily mismatched) statements: %d
-""" % (seed, count, failures)
+"""
+
+    report += keyStats
 
     def key(x):
         return int(x["id"])
-    sorted(mismatches, cmp=cmp, key=key)
-
-    report += print_section("Mismatched Statements",
-                            mismatches, output_dir)
+    if(len(mismatches) > 0):
+        sorted(mismatches, cmp=cmp, key=key)
+        report += print_section("Mismatched Statements", mismatches, output_dir)
 
     if report_all:
         report += print_section("Total Statements", all_results, output_dir)
@@ -294,7 +291,42 @@ Failed (*not* necessarily mismatched) statements: %d
         summary.write(report.encode("utf-8"))
         summary.close()
 
-    return (failures, len(mismatches))
+    return (failures, len(mismatches), keyStats)
+
+def createSummaryInHTML(count, failures, mismatches, seed):
+    passed = count - (failures + len(mismatches))
+    passed_ps = fail_ps = mis_ps = cell4misPct = cell4misCnt = color = None
+    if(failures == 0):
+        fail_ps = "0.00%"
+    else:
+        fail_ps = str("{0:.2f}".format((failures/float(count)) * 100)) + "%"
+    if(len(mismatches) == 0):
+        mis_ps = "0.00%"
+        color = "#00FF00" # green/lime
+    else:
+        color = "#FF0000" # red
+        mis_ps = str("{0:.2f}".format((len(mismatches)/float(count)) * 100)) + "%"
+    cell4misPct = "<td align=right bgcolor=" + color + ">" + mis_ps + "</td>"
+    cell4misCnt = "<td align=right bgcolor=" + color + ">" + str(len(mismatches)) + "</td>"
+    misRow = cell4misCnt + cell4misPct
+
+    if(passed == count):
+        passed_ps = total = "100.00%"
+    else:
+        passed_ps = str("{0:.2f}".format((passed/float(count)) * 100)) + "%"
+        total = str("{0:.2f}".format((passed + failures + len(mismatches))/float(count) * 100 )) + "%"
+    stats = """
+<table border=1>
+<tr><td colspan=3 align=center><b>Test Summary</b></td></tr>
+<tr><td align=right>Random seed:</td><td colspan=2 align=left><b>%s</b></td></tr>
+<tr><td align=right>Passed statements:</td><td align=right>%d</td><td align=right>%s</td></tr>
+<tr><td align=right>Invalid statements:</td><td align=right>%d</td><td align=right>%s</td></tr>
+<tr><td align=right>Mismatched statements:</td>%s</tr>
+<tr bgcolor=#00FFFF><td align=right>Total statements:</td><td align=right>%d</td><td align=right>%s</td></tr>
+</table>
+""" % (seed, passed, passed_ps, failures, fail_ps, misRow, count, total)
+
+    return stats
 
 def generate_summary(output_dir, statistics):
     fd = open(os.path.join(output_dir, "index.html"), "w")
@@ -308,18 +340,16 @@ h2 {text-transform: uppercase}
 </head>
 
 <body>
-Summary:
-<br/>
+<h3>SQL Coverage Test Summary Grouped By Suites:</h3>
 <ul>
 """
 
-    def bullets(name, failures, mismatches):
-        return '<li><a href="%s/index.html">%s</a>: ' \
-            '%d failures, %d mismatches</li>' % \
-            (name, name, failures, mismatches)
+    def bullets(name, stats):
+        return "<li><a href=\"%s/index.html\">%s</a>:</li>%s<br>\n</body></html>" % \
+            (name, name, stats)
 
     for k, v in statistics.iteritems():
-        content += bullets(k, v[0], v[1])
+        content += bullets(k, v[2])
 
     fd.write(content)
     fd.close()
