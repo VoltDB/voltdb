@@ -56,5 +56,5 @@ public class DummyCommandLog implements CommandLog {
     public void initForRejoin(CatalogContext context, long txnId, long perPartitionTxnId[], boolean isRejoin) {}
 
     @Override
-    public void log(Iv2InitiateTaskMessage message) {}
+    public void log(Iv2InitiateTaskMessage message, long spHandle) {}
 }

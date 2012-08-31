@@ -70,7 +70,6 @@ public class TransactionTaskQueue
              */
             TransactionTask ts = m_multiPartPendingSentinelReceipt;
             m_multiPartPendingSentinelReceipt = null;
-            assert(m_multipartBacklog.isEmpty());
             Deque<TransactionTask> deque = new ArrayDeque<TransactionTask>();
             deque.addLast(ts);
             m_multipartBacklog.put(txnId, deque);
@@ -105,7 +104,7 @@ public class TransactionTaskQueue
         // offer to SiteTaskerQueue if:
         // the queue was empty
         // the queue wasn't empty but the txn IDs matched
-        if (ts.isForReplay() && !ts.isSinglePartition()) {
+        if (ts.isForReplay() && (task instanceof FragmentTask)) {
             /*
              * If this is a multi-partition transaction for replay then it can't
              * be inserted into the order for this partition until it's position is known
@@ -129,69 +128,35 @@ public class TransactionTaskQueue
                         }
                         backlog.addFirst(task);
                     }
-                    //else the txnids match, don't need to put the second fragment at head of queue
                 } else {
+                    // The txnids match, don't need to put the second fragment at head of queue
                     //The first task is expected to be in the head of the queue
                     backlog.offer(task);
                 }
                 taskQueueOffer(task);
-            } else if (m_multipartBacklog.containsKey(ts.txnId)) {
-                /*
-                 * This branch is for the first fragment where the position in the order is known due to the sentinel
-                 * already being received.
-                 * Since it is physically ordered the sentinel has already created the backlog
-                 * the two tasks are to insert the transaction task at the head of the backlog
-                 * and start execution
-                 */
-                m_multipartBacklog.get(ts.txnId).addFirst(task);
-                taskQueueOffer(task);
-            } else {
+            }
+            else {
                 /*
                  * This is the situation where the first fragment arrived before the sentinel.
-                 * It's position in the order is not known.
+                 * Its position in the order is not known.
                  * m_multiPartPendingSentinelReceipt should be null because the MP coordinator should only
                  * run one transaction at a time.
                  * It is not time to block single parts from executing because the order is not know,
                  * the only thing to do is stash it away for when the order is known from the sentinel
                  */
                 if (m_multiPartPendingSentinelReceipt != null) {
+                    hostLog.fatal("\tBacklog length: " + m_multipartBacklog.size());
+                    if (!m_multipartBacklog.isEmpty()) {
+                        hostLog.fatal("\tBacklog first item: " + m_multipartBacklog.firstEntry().getValue().peekFirst());
+                    }
+                    hostLog.fatal("\tHave this one SentinelReceipt: " + m_multiPartPendingSentinelReceipt);
+                    hostLog.fatal("\tAnd got this one, too: " + task);
                     VoltDB.crashLocalVoltDB(
                             "There should be only one multipart pending sentinel receipt at a time", true, null);
                 }
                 m_multiPartPendingSentinelReceipt = task;
                 retval = true;
             }
-
-            /*
-             * TODO I am pretty concerned that I can't identify dangling multi-parts right now
-             */
-//        } else if (!m_multipartBacklog.isEmpty()) {
-//            /*
-//             * In this situation the sentinel for a multi-part has been received and that multi-part
-//             * is blocking the execution of all transactions. The only way to drop in here
-//             * with a multi-part fragment task is if there is a sentinel for a dangling multi-part transaction.
-//             * It is dangling because this fragment task is not for replay which means that replay didn't
-//             * complete the multi-part transaction referred to by the sentinel, because if it had
-//             * the multipart backlog would be empty
-//             */
-//            if (!ts.isSinglePartition()) {
-//                VoltDB.crashLocalVoltDB(
-//                                "Received multi-part task before the previous one had " +
-//                                "been completed according to the sentinel", true, null);
-//            }
-//
-//            /*
-//             * Replay shouldn't leave dangling multi-parts for regular execution
-//             */
-//            if (!ts.isForReplay()) {
-//                VoltDB.crashLocalVoltDB(
-//                        "Received task that isn't for replay before replay finished " +
-//                        "executing a multipart according to the sentinel", true, null);
-//            }
-//
-//
-//            m_multipartBacklog.lastEntry().getValue().addLast(task);
-//            retval = true;
         } else if (!m_multipartBacklog.isEmpty()) {
             /*
              * This branch happens during regular execution when a multi-part is in progress.

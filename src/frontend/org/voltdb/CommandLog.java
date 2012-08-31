@@ -44,7 +44,7 @@ public interface CommandLog {
 
     public abstract void log(InitiateTaskMessage message);
 
-    public abstract void log(Iv2InitiateTaskMessage message);
+    public abstract void log(Iv2InitiateTaskMessage message, long spHandle);
 
     public abstract void shutdown() throws InterruptedException;
 
