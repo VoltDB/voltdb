@@ -1802,6 +1802,7 @@ public class Tokens {
         reservedKeys.put(Tokens.T_SIMILAR, SIMILAR);
         reservedKeys.put(Tokens.T_SMALLINT, SMALLINT);
         reservedKeys.put(Tokens.T_SOME, SOME);
+        reservedKeys.put(Tokens.T_SPACE, SPACE);
         reservedKeys.put(Tokens.T_SPECIFIC, SPECIFIC);
         reservedKeys.put(Tokens.T_SPECIFICTYPE, SPECIFICTYPE);
         reservedKeys.put(Tokens.T_SQL, SQL);

@@ -658,7 +658,37 @@ public class TestFunctionsSuite extends RegressionSuite {
         } finally {
             assertNotNull(ex);
         }
+    }
+    
+    public void testSpace() throws NoConnectionsException, IOException, ProcCallException {
+        System.out.println("STARTING test Space");
+        Client client = getClient();
+        ClientResponse cr;
+        VoltTable result;
 
+        cr = client.callProcedure("P1.insert", 1, "foo", 1, 1.0, new Timestamp(1000000000000L));
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+
+        cr = client.callProcedure("SPACE", 0, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("", result.getString(1));
+        
+        cr = client.callProcedure("SPACE", 1, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals(" ", result.getString(1));
+        
+        cr = client.callProcedure("SPACE", 5, 1);
+        assertEquals(ClientResponse.SUCCESS, cr.getStatus());
+        result = cr.getResults()[0];
+        assertEquals(1, result.getRowCount());
+        assertTrue(result.advanceRow());
+        assertEquals("     ", result.getString(1));
     }
 
     //
@@ -724,7 +754,8 @@ public class TestFunctionsSuite extends RegressionSuite {
 
         project.addStmtProcedure("LEFT", "select id, LEFT(DESC,?) from P1 where id = ?");
         project.addStmtProcedure("RIGHT", "select id, RIGHT(DESC,?) from P1 where id = ?");
-
+        project.addStmtProcedure("SPACE", "select id, SPACE(?) from P1 where id = ?");
+        
         project.addStmtProcedure("INSERT_NULL", "insert into P1 values (?, null, null, null, null)");
         // project.addStmtProcedure("UPS", "select count(*) from P1 where UPPER(DESC) > 'L'");
 

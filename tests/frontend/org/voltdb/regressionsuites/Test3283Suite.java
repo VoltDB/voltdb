@@ -128,7 +128,7 @@ public class Test3283Suite extends RegressionSuite {
 //        project.addStmtProcedure("LTRIM", "select LTRIM(VCA) from P1 where id = ?");
 //        project.addStmtProcedure("RTRIM", "select RTRIM(VCA) from P1 where id = ?");
 //        project.addStmtProcedure("LTRIM", "select LTRIM(VCA) from P1 where id = ?");
-          project.addStmtProcedure("SPACE", "select SPACE(2) + VCA from P1 where id = ?");
+          project.addStmtProcedure("SPACE", "select SPACE(2) from P1 where id = ?");
 
         // CONFIG #1: Local Site/Partitions running on JNI backend
         config = new LocalCluster("fixedsql-threesite.jar", 3, 1, 0, BackendTarget.NATIVE_EE_JNI);
