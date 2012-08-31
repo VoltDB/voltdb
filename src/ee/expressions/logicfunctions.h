@@ -21,11 +21,9 @@ namespace voltdb {
 template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& arguments) {
 	int size = (int)arguments.size();
 	assert(size>=3);
-	assert(arguments[0].getValueType() == arguments[1].getValueType() );
     ValueType rettype = arguments[2].getValueType();
     ValueType condtype = arguments[0].getValueType();
 	NValue condval(condtype);
-	bool hasDefault = ( size % 2 == 0 );
 	int loopnum = ( size - 1 )/2;
 	NValue baseval = arguments[0];
 	for( int i = 0; i < loopnum; i++ ) {
@@ -34,10 +32,11 @@ template<> inline NValue NValue::call<FUNC_DECODE>(const std::vector<NValue>& ar
 			return arguments[2*i+2];
 		}
 	}
+	bool hasDefault = ( size % 2 == 0 );
 	if( hasDefault ) {
 		return arguments[size-1];
 	}
-	return NValue(rettype);
+	return getNullValue();
 }
 
 }
